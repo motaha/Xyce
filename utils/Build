@@ -1,0 +1,69 @@
+#!/bin/sh
+
+# determine system.  Currently supported are solaris (SunOS) IRIX64, IRIX,
+# and Linux.
+
+echo "Xyce utils Build utility."
+
+if [ $# -eq 0 ]
+then
+  if uname  | grep "IRIX" > /dev/null
+  then
+        SYS=sgi10k
+        MAKE=gmake
+  fi
+  if uname | grep "SunOS" > /dev/null
+  then
+        SYS=solaris
+        MAKE=gmake
+  fi
+  if uname | grep "Linux" > /dev/null
+  then
+        SYS=linux
+        MAKE=gmake
+  fi
+  if uname | grep "FreeBSD" > /dev/null
+  then
+        SYS=freebsd
+        MAKE=gmake
+  fi
+  if uname | grep "Darwin" > /dev/null
+  then
+        SYS=OSX
+        MAKE=make
+  fi
+
+fi
+
+if [ $# -eq 1 ]
+then
+  SYS=$1
+fi
+
+if [ $# -ge 2 ]
+then
+  echo " "
+  echo "Usage:  "
+  echo "Build system <return>   - to specify system from command line"
+  echo "Build <return>          - to allow uname to determine system"
+  echo " "
+  exit
+fi
+
+# build script for xyce
+# display spbuild info:
+
+HOME=`pwd`
+
+echo " "
+echo "Circuit build procedure:"
+echo "SYS           is set to "$SYS
+
+# set defaults:
+MAKEARG=all
+
+echo " "
+
+$MAKE -f $HOME/Makefile SYSTEM=$SYS $MAKEARG
+
+

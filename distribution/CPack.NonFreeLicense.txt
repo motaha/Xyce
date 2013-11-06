@@ -1,0 +1,44 @@
+LICENSE
+=======
+
+This is an installer for a version of Xyce that contains the EKV3 MOSFET
+model.  
+
+THIS IS NOT AN OPEN SOURCE BINARY.
+
+The EKV3 model is not an open source model.  It was developed by the
+EKV Team of the Electronics Laboratory-TUC of the Technical University
+of Crete.  TUC has granted Sandia National Laboratories a
+non-exclusive, roalty-free licnse to use, copy, modify, implement and
+distribute the EKV3 Model Code in the form of compiled, executable
+code.  Sandia National Laboratories is not licensed to distribute this
+code in source form.  Documentation of the EKV3 model is available on
+the Xyce web site,
+http://charleston.sandia.gov/xyce/xyce_internal.html
+
+More information about the EKV model (including contact information
+for the EKV Model Team) is available at the EKV web site,
+http://ekv.epfl.ch/.
+
+All components of this version of Xyce OTHER THAN the EKV3 model are
+released under the GNU Public License:
+
+    Xyce(TM) Parallel Electrical Simulator
+    Copyright (C) 2002-2013  Sandia Corporation
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+To obtain source code for components of Xyce EXCLUDING the EKV model,
+see the Xyce web site, http://xyce.sandia.gov/

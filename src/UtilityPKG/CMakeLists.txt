@@ -1,0 +1,48 @@
+
+# -- process files for this library ------------------------------------------
+
+
+# process source file options
+if ( Xyce_USE_INTEL_FFT )
+  set ( FFT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_IntelFFT_Interface.C )
+endif ( Xyce_USE_INTEL_FFT )
+
+if ( Xyce_USE_FFTW )
+  set ( FFTW_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_FFTW_Interface.C )
+endif ( Xyce_USE_FFTW )
+
+
+# class source list
+set ( Utility_SOURCES
+      ${FFT_SOURCES}
+      ${FFTW_SOURCES}
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_BreakPoint.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_Demangle.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_Expression.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_ExpressionData.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_ExpressionInternals.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_FFTInterface.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_LogStream.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_Misc.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_NoCase.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_OptionBlock.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_Param.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_Registry.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_Timer.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_Version.C
+      CACHE INTERNAL "X_S" )
+
+
+# add header files to project
+set ( XYCE_INCLUDE_DIRECTORIES ${XYCE_INCLUDE_DIRECTORIES}
+      ${CMAKE_CURRENT_SOURCE_DIR}/include
+      CACHE INTERNAL "X_I" )
+
+
+
+
+# -- build requested libraries -----------------------------------------------
+set ( XYCE_PACKAGE_LIBRARIES ${XYCE_PACKAGE_LIBRARIES}
+      Utility
+      CACHE INTERNAL "X_L" )
+

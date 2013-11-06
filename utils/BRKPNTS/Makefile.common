@@ -1,0 +1,79 @@
+# (C) 1997 Plasma ERC, University of Wisconsin - Madison               02/23/98
+# J. Joshua Feng   fengj@percy.engr.wisc.edu
+
+######### DEBUG OPTION
+# if you want to debug, un-comment one of the following lines
+
+DEBUG  =  -w -DCON -g
+#DEBUG  =  -w
+#DEBUG  =
+#DEBUG  =  -g
+#DEBUG  =  -g -DDEBUG 
+
+######### SYSTEM & COMPILER WITH OPTIMIZATION LEVEL
+# choose one of the following and un-comment those variables (default: GNU)
+
+# ----------------------------------------------------------------------------
+# GNU (Linux)
+
+SYSTEM_LINUX  =  -DGNU
+cc_LINUX      =  gcc
+CC_LINUX      =  g++ -O2
+
+# ----------------------------------------------------------------------------
+# DEC Alpha
+
+SYSTEM_ALPHA  =  -DGNU
+cc_ALPHA      =  cxx
+CC_ALPHA      =  cxx 
+
+# ----------------------------------------------------------------------------
+# OSX (Apple)
+
+SYSTEM_OSX  =  -DGNU
+cc_OSX      =  gcc
+CC_OSX      =  g++ -O2
+
+# ----------------------------------------------------------------------------
+# HP-UX B.10.20
+
+SYSTEM_HPUX =  -DHPUX
+cc_HPUX     =  cc
+CC_HPUX     =  CC +a1 +O2
+
+# ----------------------------------------------------------------------------
+# Solaris 2.5/2.6
+SYSTEM_SOL =  -DHPUX -DGNU
+cc_SOL     =  cc
+CC_SOL     =  CC  -w
+
+# ----------------------------------------------------------------------------
+#
+SYSTEM	= $(SYSTEM_ALPHA)
+cc	= $(cc_ALPHA)
+CC	= $(CC_ALPHA)
+
+###############################################################################
+######  DO NOT MODIFY THE FOLLOWING, UNLESS YOU KNOW WHAT YOU ARE DOING  ######
+###############################################################################
+
+.SUFFIXES: .cpp .o .h .c
+
+HOMEDIR  =  ../
+
+COPY    =  cp
+MOVE    =  mv
+RFLAGS  =  -f
+RM      =  rm
+RMCOM   =  $(RM) $(RFLAGS)
+
+cFLAGS  =  -DANSIPROTO -DUNIX -DNODYNCAST -ansi $(DEBUG) 
+CFLAGS  =  -DANSIPROTO -DUNIX -DNODYNCAST -DNFUNC $(DEBUG) 
+
+cLINK   =  $(cc) 
+cRULES  =  $(cc) -c $< $(SYSTEM) $(cFLAGS)
+LINK    =  $(CC) 
+CRULES  =  $(CC) -c $< $(SYSTEM) $(CFLAGS)
+
+BUILD   =  $(CC) $(SYSTEM) $(CFLAGS)
+

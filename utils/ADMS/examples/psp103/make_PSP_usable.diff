@@ -1,0 +1,946 @@
+--- N_DEV_ADMSPSP103VA.C	2013-04-24 13:01:40.859640381 -0600
++++ /Net/Proj/Xyce/people/tvrusso/nightly_builds/Xyce/src/DeviceModelPKG/ADMS/src/N_DEV_ADMSPSP103VA.C	2013-04-24 12:51:56.654340342 -0600
+@@ -71,14 +70,15 @@
+   // Set up configuration constants:
+   // This assumes NO optional nodes on the instance line.  Might need that
+   // fixed?
+-  setNumNodes(numExtVars);
++  setNumNodes(4);
+   setNumOptionalNodes(0);
+   setNumFillNodes(0);
+   setModelRequired(1);
+ 
+   // we're going to have to come up with a way of generating the addModelType
+   // deal
+-  //  FIXME!    addModelType("WTF");
++  addModelType("NMOS");
++  addModelType("PMOS");
+ 
+ 
+   // Set up each parameter directly, using the up-cased variable name
+@@ -8882,911 +8882,8 @@
+ // Creation Date :
+ //-----------------------------------------------------------------------------
+ void Instance::collapseNodes()
+-{double rwellnoise;
+-  double rjundnoise;
+-  double rjunsnoise;
+-  double rbulknoise;
+-  double rdrainnoise;
+-  double rsourcenoise;
+-  double rgatenoise;
+-  double h2;
+-  double h1;
+-  double alpha1;
+-  double zsat;
+-  double s1;
+-  double qeff;
+-  double km;
+-  double u_pd;
+-  double xi_pd;
+-  double q_pd;
+-  double p_pd;
+-  double x_pm;
+-  double d0;
+-  double Pm;
+-  double D_bar;
+-  double xi0d;
+-  double qC;
+-  double pC;
+-  double delta_nd;
+-  double k_ds;
+-  double xn_d;
+-  double Vdse;
+-  double Phi_sat;
+-  double Phi0_Phi2;
+-  double Phi_0_2;
+-  double Phi_2;
+-  double asat;
+-  double Phi_0;
+-  double za;
+-  double ysat;
+-  double phi_inf;
+-  double wsat;
+-  double Mutmp;
+-  double Eeffm;
+-  double GR;
+-  double qbs;
+-  double xgs;
+-  double Rxcor;
+-  double Dd;
+-  double Dm;
+-  double Ed;
+-  double Em;
+-  double Ps;
+-  double Ds;
+-  double Es;
+-  double xi2s;
+-  double xi1s;
+-  double xi0s;
+-  double delta_1s;
+-  double Vdsat;
+-  double qeff1;
+-  double Voxm;
+-  double qis;
+-  double x_ds;
+-  double x_m;
+-  double x_d;
+-  double SP_S_x0;
+-  double SP_S_b;
+-  double SP_S_temp2;
+-  double SP_S_bx;
+-  double SP_S_w;
+-  double SP_S_xbar;
+-  double SP_S_A_fac;
+-  double SP_xg1;
+-  double SP_S_qC;
+-  double SP_S_pC;
+-  double SP_S_xi2;
+-  double SP_S_xi1;
+-  double SP_S_xi0;
+-  double SP_S_delta1;
+-  double SP_S_delta0;
+-  double SP_S_y0;
+-  double SP_S_tau;
+-  double SP_S_c;
+-  double SP_S_a;
+-  double SP_S_temp;
+-  double SP_S_eta;
+-  double SP_S_ysub;
+-  double SP_S_yg;
+-  double SP_S_temp1;
+-  double margin;
+-  double delta_ns;
+-  double xn_s;
+-  double Ux;
+-  double inv_xi;
+-  double xi;
+-  double inv_Gf2;
+-  double Gf2;
+-  double Gf;
+-  double Dnsub;
+-  double xg;
+-  double Vsbx;
+-  double xgm;
+-  double thesat1;
+-  double Udse;
+-  double Gmob_dL;
+-  double Gmob;
+-  double rhob;
+-  double xitsb;
+-  double sqm;
+-  double x_s;
+-  double SP_S_x1;
+-  double Gvsatinv;
+-  double Gvsat;
+-  double eta_p;
+-  double H;
+-  double qim1;
+-  double qim;
+-  double dps;
+-  double qbm;
+-  double dL;
+-  double GdL;
+-  double alpha;
+-  double G_0;
+-  double phib;
+-  double Vsbstar;
+-  double inv_xg1;
+-  double x_mrg_ov;
+-  double inv_xi_ov;
+-  double xi_ov;
+-  double GOV2;
+-  double GOV;
+-  double dL1;
+-  double s2;
+-  double r2;
+-  double r1;
+-  double qim1_1;
+-  double alpha1;
+-  double zsat;
+-  double s1;
+-  double qeff;
+-  double km;
+-  double u_pd;
+-  double xi_pd;
+-  double q_pd;
+-  double p_pd;
+-  double x_pm;
+-  double d0;
+-  double Pm;
+-  double D_bar;
+-  double xi0d;
+-  double qC;
+-  double pC;
+-  double delta_nd;
+-  double k_ds;
+-  double xn_d;
+-  double Vdse;
+-  double Phi_sat;
+-  double Phi0_Phi2;
+-  double Phi_0_2;
+-  double Phi_2;
+-  double asat;
+-  double Phi_0;
+-  double za;
+-  double ysat;
+-  double phi_inf;
+-  double wsat;
+-  double Mutmp;
+-  double Eeffm;
+-  double GR;
+-  double qbs;
+-  double xgs;
+-  double Rxcor;
+-  double Dd;
+-  double Dm;
+-  double Ed;
+-  double Em;
+-  double Ps;
+-  double Ds;
+-  double Es;
+-  double xi2s;
+-  double xi1s;
+-  double xi0s;
+-  double delta_1s;
+-  double Vdsat;
+-  double qeff1;
+-  double Voxm;
+-  double qis;
+-  double x_ds;
+-  double x_m;
+-  double x_d;
+-  double SP_S_x0;
+-  double SP_S_b;
+-  double SP_S_temp2;
+-  double SP_S_bx;
+-  double SP_S_w;
+-  double SP_S_xbar;
+-  double SP_S_A_fac;
+-  double SP_xg1;
+-  double SP_S_qC;
+-  double SP_S_pC;
+-  double SP_S_xi2;
+-  double SP_S_xi1;
+-  double SP_S_xi0;
+-  double SP_S_delta1;
+-  double SP_S_delta0;
+-  double SP_S_y0;
+-  double SP_S_tau;
+-  double SP_S_c;
+-  double SP_S_a;
+-  double SP_S_temp;
+-  double SP_S_eta;
+-  double SP_S_ysub;
+-  double SP_S_yg;
+-  double SP_S_temp1;
+-  double margin;
+-  double delta_ns;
+-  double xn_s;
+-  double Ux;
+-  double inv_xi;
+-  double xi;
+-  double inv_Gf2;
+-  double Gf2;
+-  double Gf;
+-  double Dnsub;
+-  double xg;
+-  double Vsbx;
+-  double xgm;
+-  double thesat1;
+-  double Udse;
+-  double Gmob_dL;
+-  double Gmob;
+-  double rhob;
+-  double xitsb;
+-  double sqm;
+-  double x_s;
+-  double SP_S_x1;
+-  double Gvsatinv;
+-  double Gvsat;
+-  double eta_p;
+-  double H;
+-  double qim1;
+-  double qim;
+-  double dps;
+-  double qbm;
+-  double dL;
+-  double GdL;
+-  double alpha;
+-  double FdL;
+-  double Vsbstar;
+-  double G_0;
+-  double phib;
+-  collapseNode_GP = false;
+-  collapseNode_SI = false;
+-  collapseNode_DI = false;
+-  collapseNode_BI = false;
+-  collapseNode_BP = false;
+-  collapseNode_BS = false;
+-  collapseNode_BD = false;
+-  // begin block named evaluateStatic
+-
+-  // begin block named SPcalc_dc
+-
+-  phib = phib_dc;
+-
+-  G_0 = G_0_dc;
+-
+-  Vsbstar = Vsbnud;
+-
+-  FdL = 1.0;
+-
+-  alpha = 0.0;
+-
+-  GdL = 1.0;
+-
+-  dL = 0.0;
+-
+-  qbm = 0.0;
+-
+-  dps = 0.0;
+-
+-  qim = 0.0;
+-
+-  qim1 = 0.0;
+-
+-  H = 1.0;
+-
+-  eta_p = 1.0;
+-
+-  Gvsat = 1.0;
+-
+-  Gvsatinv = 1.0;
+-
+-  SP_S_x1 = 0.0;
+-
+-  x_s = 0.0;
+-
+-  sqm = 0.0;
+-
+-  xitsb = 0.0;
+-
+-  rhob = 0.0;
+-
+-  Gmob = 1.0;
+-
+-  Gmob_dL = 1.0;
+-
+-  Udse = 0.0;
+-
+-  thesat1 = 0.0;
+-
+-  xgm = 0.0;
+-
+-  Vsbx = (Vsbstar+(0.5*(Vds-Vdsx)));
+-
+-  xg = (Vgb1*inv_phit1);
+-
+-  if ((DNSUB_i>0.0))
+-  {
+-
+-    Dnsub = ((DNSUB_i*0.5)*((+((Vgs+Vsb)-VNSUB_i))+sqrt((((-((Vgs+Vsb)-VNSUB_i))*(-((Vgs+Vsb)-VNSUB_i)))+NSLP_i))));
+-
+-    Gf = (G_0*sqrt((1.0+Dnsub)));
+-
+-  }
+-
+-  else
+-  {
+-
+-    Gf = G_0;
+-
+-  }
+-
+-  Gf2 = (Gf*Gf);
+-
+-  inv_Gf2 = (1.0/Gf2);
+-
+-  xi = (1.0+(Gf*7.0710678118654746e-01));
+-
+-  inv_xi = (1.0/xi);
+-
+-  Ux = (Vsbstar*inv_phit1);
+-
+-  xn_s = ((phib*inv_phit1)+Ux);
+-
+-  delta_ns = exp((-xn_s));
+-
+-  delta_ns = (1.0e-200/(1.0+((xn_s-4.6051701859880916e+02)*(1.0+(0.5*((xn_s-4.6051701859880916e+02)*(1.0+((xn_s-4.6051701859880916e+02)*3.3333333333333333e-01))))))));
+-
+-  margin = (1e-5*xi);
+-
+-
+-  SP_S_temp1 = (((inv_xi*inv_xi)*1.6666666666666667e-01)*7.0710678118654746e-01);
+-
+-  x_s = ((xg*inv_xi)*(1.0+(((xg*(1.0-delta_ns))*Gf)*SP_S_temp1)));
+-
+-
+-
+-  SP_S_yg = (-xg);
+-
+-  SP_S_ysub = (1.25*(SP_S_yg*inv_xi));
+-
+-  SP_S_eta = (0.5*((SP_S_ysub+10)-sqrt((((SP_S_ysub-6.0)*(SP_S_ysub-6.0))+64.0))));
+-
+-  SP_S_temp = (SP_S_yg-SP_S_eta);
+-
+-  SP_S_a = ((SP_S_temp*SP_S_temp)+(Gf2*(SP_S_eta+1.0)));
+-
+-  SP_S_c = ((2.0*SP_S_temp)-Gf2);
+-
+-  SP_S_tau = ((-SP_S_eta)+log((SP_S_a*inv_Gf2)));
+-
+-  SP_S_y0 = (SP_S_eta+(((SP_S_a*nu)*SP_S_tau)/(mutau+(((((nu/mutau)*SP_S_tau)*SP_S_tau)*SP_S_c)*(((SP_S_c*SP_S_c)*3.3333333333333333e-01)-SP_S_a)))));
+-
+-
+-  SP_S_delta0 = exp(SP_S_y0);
+-
+-
+-  SP_S_delta0 = (1.0e100*(1.0+((SP_S_y0-2.3025850929940458e+02)*(1.0+(0.5*((SP_S_y0-2.3025850929940458e+02)*(1.0+((SP_S_y0-2.3025850929940458e+02)*3.3333333333333333e-01))))))));
+-
+-  SP_S_delta1 = (1.0/SP_S_delta0);
+-
+-  SP_S_temp = (1.0/(2.0+(SP_S_y0*SP_S_y0)));
+-
+-  SP_S_xi0 = ((SP_S_y0*SP_S_y0)*SP_S_temp);
+-
+-  SP_S_xi1 = (4.0*((SP_S_y0*SP_S_temp)*SP_S_temp));
+-
+-  SP_S_xi2 = ((((8.0*SP_S_temp)-(12.0*SP_S_xi0))*SP_S_temp)*SP_S_temp);
+-
+-  SP_S_temp = (SP_S_yg-SP_S_y0);
+-
+-  SP_S_temp1 = (delta_ns*SP_S_delta1);
+-
+-  SP_S_pC = ((2.0*SP_S_temp)+(Gf2*(((SP_S_delta0-1.0)-SP_S_temp1)+(delta_ns*(1.0-SP_S_xi1)))));
+-
+-  SP_S_qC = ((SP_S_temp*SP_S_temp)-(Gf2*((((SP_S_delta0-SP_S_y0)-1.0)+SP_S_temp1)+(delta_ns*((SP_S_y0-1.0)-SP_S_xi0)))));
+-
+-  SP_S_temp = (2.0-(Gf2*((SP_S_delta0+SP_S_temp1)-(delta_ns*SP_S_xi2))));
+-
+-  SP_S_temp = ((SP_S_pC*SP_S_pC)-(2.0*(SP_S_qC*SP_S_temp)));
+-
+-  x_s = ((-SP_S_y0)-(2.0*(SP_S_qC/(SP_S_pC+sqrt(SP_S_temp)))));
+-
+-
+-  SP_xg1 = (1.0/(x1+(Gf*7.324648775608221e-001)));
+-
+-  SP_S_A_fac = ((((xi*x1)*SP_xg1)-1.0)*SP_xg1);
+-
+-  SP_S_xbar = ((xg*inv_xi)*(1.0+(SP_S_A_fac*xg)));
+-
+-
+-  SP_S_temp = exp((-SP_S_xbar));
+-
+-
+-  SP_S_temp = (1.0e-100/(1.0+(((-2.3025850929940458e+02)-(-SP_S_xbar))*(1.0+(0.5*(((-2.3025850929940458e+02)-(-SP_S_xbar))*(1.0+(((-2.3025850929940458e+02)-(-SP_S_xbar))*3.3333333333333333e-01))))))));
+-
+-  SP_S_w = (1.0-SP_S_temp);
+-
+-  SP_S_x1 = ((xg+(Gf2*0.5))-(Gf*sqrt(((xg+(Gf2*0.25))-SP_S_w))));
+-
+-  SP_S_bx = (xn_s+3.0);
+-
+-  SP_S_eta = ((0.5*((SP_S_x1+SP_S_bx)-sqrt((((SP_S_x1-SP_S_bx)*(SP_S_x1-SP_S_bx))+5.0))))-(0.5*(SP_S_bx-sqrt(((SP_S_bx*SP_S_bx)+5.0)))));
+-
+-  SP_S_temp = (xg-SP_S_eta);
+-
+-  SP_S_temp1 = exp((-SP_S_eta));
+-
+-  SP_S_temp2 = (1.0/(2.0+(SP_S_eta*SP_S_eta)));
+-
+-  SP_S_xi0 = ((SP_S_eta*SP_S_eta)*SP_S_temp2);
+-
+-  SP_S_xi1 = (4.0*((SP_S_eta*SP_S_temp2)*SP_S_temp2));
+-
+-  SP_S_xi2 = ((((8.0*SP_S_temp2)-(12.0*SP_S_xi0))*SP_S_temp2)*SP_S_temp2);
+-
+-  SP_S_a = max(1.0e-40,((SP_S_temp*SP_S_temp)-(Gf2*(((SP_S_temp1+SP_S_eta)-1.0)-(delta_ns*((SP_S_eta+1.0)+SP_S_xi0))))));
+-
+-  SP_S_b = (1.0-(0.5*(Gf2*(SP_S_temp1-(delta_ns*SP_S_xi2)))));
+-
+-  SP_S_c = ((2.0*SP_S_temp)+(Gf2*((1.0-SP_S_temp1)-(delta_ns*(1.0+SP_S_xi1)))));
+-
+-  SP_S_tau = ((xn_s-SP_S_eta)+log((SP_S_a/Gf2)));
+-
+-  SP_S_x0 = (SP_S_eta+(((SP_S_a*nu)*SP_S_tau)/(mutau+(((((nu/mutau)*SP_S_tau)*SP_S_tau)*SP_S_c)*(((SP_S_c*SP_S_c)*3.3333333333333333e-01)-(SP_S_a*SP_S_b))))));
+-
+-
+-  SP_S_delta0 = exp(SP_S_x0);
+-
+-  SP_S_delta1 = (1.0/SP_S_delta0);
+-
+-  SP_S_delta0 = (delta_ns*SP_S_delta0);
+-
+-
+-
+-  SP_S_delta0 = exp((SP_S_x0-xn_s));
+-
+-  SP_S_delta1 = (delta_ns/SP_S_delta0);
+-
+-
+-  SP_S_delta0 = (1.0e-100/(1.0+(((xn_s-SP_S_x0)-2.3025850929940458e+02)*(1.0+(0.5*(((xn_s-SP_S_x0)-2.3025850929940458e+02)*(1.0+(((xn_s-SP_S_x0)-2.3025850929940458e+02)*3.3333333333333333e-01))))))));
+-
+-  SP_S_delta1 = (1.0e-100/(1.0+((SP_S_x0-2.3025850929940458e+02)*(1.0+(0.5*((SP_S_x0-2.3025850929940458e+02)*(1.0+((SP_S_x0-2.3025850929940458e+02)*3.3333333333333333e-01))))))));
+-
+-  SP_S_temp = (1.0/(2.0+(SP_S_x0*SP_S_x0)));
+-
+-  SP_S_xi0 = ((SP_S_x0*SP_S_x0)*SP_S_temp);
+-
+-  SP_S_xi1 = (4.0*((SP_S_x0*SP_S_temp)*SP_S_temp));
+-
+-  SP_S_xi2 = ((((8.0*SP_S_temp)-(12.0*SP_S_xi0))*SP_S_temp)*SP_S_temp);
+-
+-  SP_S_temp = (xg-SP_S_x0);
+-
+-  SP_S_pC = ((2.0*SP_S_temp)+(Gf2*(((1.0-SP_S_delta1)+SP_S_delta0)-(delta_ns*(1.0+SP_S_xi1)))));
+-
+-  SP_S_qC = ((SP_S_temp*SP_S_temp)-(Gf2*((((SP_S_delta1+SP_S_x0)-1.0)+SP_S_delta0)-(delta_ns*((SP_S_x0+1.0)+SP_S_xi0)))));
+-
+-  SP_S_temp = (2.0-(Gf2*((SP_S_delta1+SP_S_delta0)-(delta_ns*SP_S_xi2))));
+-
+-  SP_S_temp = ((SP_S_pC*SP_S_pC)-(2.0*(SP_S_qC*SP_S_temp)));
+-
+-  x_s = (SP_S_x0+(2.0*(SP_S_qC/(SP_S_pC+sqrt(SP_S_temp)))));
+-
+-  x_d = x_s;
+-
+-  x_m = x_s;
+-
+-  x_ds = 0.0;
+-
+-
+-  qis = 0.0;
+-
+-  xgm = (xg-x_s);
+-
+-  Voxm = (xgm*phit1);
+-
+-  qeff1 = Voxm;
+-
+-  Vdsat = Vdsat_lim;
+-
+-
+-  delta_1s = 0.0;
+-
+-  xi0s = ((x_s*x_s)*temp);
+-
+-  xi1s = (4.0*((x_s*temp)*temp));
+-
+-  xi2s = ((((8.0*temp)-(12.0*xi0s))*temp)*temp);
+-
+-
+-  delta_1s = exp(x_s);
+-
+-  Es = (1.0/delta_1s);
+-
+-  delta_1s = (delta_ns*delta_1s);
+-
+-
+-  delta_1s = exp((x_s-xn_s));
+-
+-  Es = (delta_ns/delta_1s);
+-
+-
+-  delta_1s = (1.0e-100/(1.0+(((xn_s-x_s)-2.3025850929940458e+02)*(1.0+(0.5*(((xn_s-x_s)-2.3025850929940458e+02)*(1.0+(((xn_s-x_s)-2.3025850929940458e+02)*3.3333333333333333e-01))))))));
+-
+-  Es = (1.0e-100/(1.0+((x_s-2.3025850929940458e+02)*(1.0+(0.5*((x_s-2.3025850929940458e+02)*(1.0+((x_s-2.3025850929940458e+02)*3.3333333333333333e-01))))))));
+-
+-  Ds = (delta_1s-(delta_ns*((x_s+1.0)+xi0s)));
+-
+-
+-  Ps = (0.5*((x_s*x_s)*(1.0-(3.3333333333333333e-01*(x_s*(1.0-(0.25*x_s)))))));
+-
+-  Ds = (1.6666666666666667e-01*((((delta_ns*x_s)*x_s)*x_s)*(1.0+(1.75*x_s))));
+-
+-  sqm = (7.0710678118654746e-01*(x_s*temp));
+-
+-  alpha = (1.0+(((Gf*7.0710678118654746e-01)*((1.0-(0.5*x_s))+(1.6666666666666667e-01*(x_s*x_s))))/temp));
+-
+-
+-  Ps = ((x_s-1.0)+Es);
+-
+-  sqm = sqrt(Ps);
+-
+-  alpha = (1.0+(0.5*((Gf*(1.0-Es))/sqm)));
+-
+-  Em = Es;
+-
+-  Ed = Em;
+-
+-  Dm = Ds;
+-
+-  Dd = Dm;
+-
+-  Rxcor = ((1.0+((0.2*XCOR_i)*Vsbx))/(1.0+(XCOR_i*Vsbx)));
+-
+-
+-  xgs = (Gf*sqrt((Ps+Ds)));
+-
+-  qis = (((Gf2*Ds)*phit1)/(xgs+(Gf*sqm)));
+-
+-  qbs = ((sqm*Gf)*phit1);
+-
+-
+-  rhob = (1.0/(1.0-(RSB_i*Vsbx)));
+-
+-
+-  rhob = (1.0+(RSB_i*Vsbx));
+-
+-  GR = (THER_i*((rhob*temp)*qis));
+-
+-  Eeffm = (E_eff0*(qbs+(eta_mu*qis)));
+-
+-  Mutmp = (pow((Eeffm*MUE_i),THEMU_i)+(CS_i*(Ps/((Ps+Ds)+1.0e-14))));
+-
+-  Mutmp = (CS_i*(Ps/((Ps+Ds)+1.0e-14)));
+-
+-  Gmob = (((1.0+Mutmp)+GR)*Rxcor);
+-
+-
+-  xitsb = (1.0/(1.0-(THESATB_i*Vsbx)));
+-
+-
+-  xitsb = (1.0+(THESATB_i*Vsbx));
+-
+-  wsat = (100.0*(temp2/(100.0+temp2)));
+-
+-  thesat1 = (THESAT_i*(temp/Gmob));
+-
+-  phi_inf = ((qis/alpha)+phit1);
+-
+-  ysat = ((thesat1*phi_inf)*7.0710678118654746e-01);
+-
+-
+-  ysat = (ysat/sqrt((1.0+ysat)));
+-
+-
+-  za = (2.0/(1.0+sqrt((1.0+(4.0*ysat)))));
+-
+-  Phi_0 = ((phi_inf*za)*(1.0+(0.86*((temp1*(1.0-(temp1*za)))/(1.0+(4.0*((temp1*temp1)*za)))))));
+-
+-  asat = (xgs+(0.5*Gf2));
+-
+-  Phi_2 = (0.98*(((Gf2*Ds)*phit1)/(asat+sqrt(((asat*asat)-((Gf2*Ds)*0.98))))));
+-
+-  Phi_0_2 = (Phi_0+Phi_2);
+-
+-  Phi0_Phi2 = (2.0*(Phi_0*Phi_2));
+-
+-  Phi_sat = (Phi0_Phi2/(Phi_0_2+sqrt(((Phi_0_2*Phi_0_2)-(1.98*Phi0_Phi2)))));
+-
+-  Vdsat = (Phi_sat-(phit1*log((1.0+(((Phi_sat*(Phi_sat-((2.0*asat)*phit1)))*inv_Gf2)/((phit1*phit1)*Ds))))));
+-
+-
+-  Vdsat = Vdsat_lim;
+-
+-  Vdse = (Vds*pow((1.0+temp),(-inv_AX)));
+-
+-  Udse = (Vdse*inv_phit1);
+-
+-  xn_d = (xn_s+Udse);
+-
+-
+-  k_ds = exp((-Udse));
+-
+-
+-  k_ds = (1.0e-200/(1.0+((Udse-4.6051701859880916e+02)*(1.0+(0.5*((Udse-4.6051701859880916e+02)*(1.0+((Udse-4.6051701859880916e+02)*3.3333333333333333e-01))))))));
+-
+-  delta_nd = (delta_ns*k_ds);
+-
+-
+-  SP_S_temp1 = (((inv_xi*inv_xi)*1.6666666666666667e-01)*7.0710678118654746e-01);
+-
+-  x_d = ((xg*inv_xi)*(1.0+(((xg*(1.0-delta_nd))*Gf)*SP_S_temp1)));
+-
+-
+-  SP_S_bx = (xn_d+3);
+-
+-  SP_S_eta = ((0.5*((SP_S_x1+SP_S_bx)-sqrt((((SP_S_x1-SP_S_bx)*(SP_S_x1-SP_S_bx))+5.0))))-(0.5*(SP_S_bx-sqrt(((SP_S_bx*SP_S_bx)+5.0)))));
+-
+-  SP_S_temp = (xg-SP_S_eta);
+-
+-  SP_S_temp1 = exp((-SP_S_eta));
+-
+-  SP_S_temp2 = (1.0/(2.0+(SP_S_eta*SP_S_eta)));
+-
+-  SP_S_xi0 = ((SP_S_eta*SP_S_eta)*SP_S_temp2);
+-
+-  SP_S_xi1 = (4.0*((SP_S_eta*SP_S_temp2)*SP_S_temp2));
+-
+-  SP_S_xi2 = ((((8.0*SP_S_temp2)-(12.0*SP_S_xi0))*SP_S_temp2)*SP_S_temp2);
+-
+-  SP_S_a = max(1.0e-40,((SP_S_temp*SP_S_temp)-(Gf2*(((SP_S_temp1+SP_S_eta)-1.0)-(delta_nd*((SP_S_eta+1.0)+SP_S_xi0))))));
+-
+-  SP_S_b = (1.0-(0.5*(Gf2*(SP_S_temp1-(delta_nd*SP_S_xi2)))));
+-
+-  SP_S_c = ((2.0*SP_S_temp)+(Gf2*((1.0-SP_S_temp1)-(delta_nd*(1.0+SP_S_xi1)))));
+-
+-  SP_S_tau = ((xn_d-SP_S_eta)+log((SP_S_a/Gf2)));
+-
+-  SP_S_x0 = (SP_S_eta+(((SP_S_a*nu)*SP_S_tau)/(mutau+(((((nu/mutau)*SP_S_tau)*SP_S_tau)*SP_S_c)*(((SP_S_c*SP_S_c)*3.3333333333333333e-01)-(SP_S_a*SP_S_b))))));
+-
+-
+-  SP_S_delta0 = exp(SP_S_x0);
+-
+-  SP_S_delta1 = (1.0/SP_S_delta0);
+-
+-  SP_S_delta0 = (delta_nd*SP_S_delta0);
+-
+-
+-
+-  SP_S_delta0 = exp((SP_S_x0-xn_d));
+-
+-  SP_S_delta1 = (delta_nd/SP_S_delta0);
+-
+-
+-  SP_S_delta0 = (1.0e-100/(1.0+(((xn_d-SP_S_x0)-2.3025850929940458e+02)*(1.0+(0.5*(((xn_d-SP_S_x0)-2.3025850929940458e+02)*(1.0+(((xn_d-SP_S_x0)-2.3025850929940458e+02)*3.3333333333333333e-01))))))));
+-
+-  SP_S_delta1 = (1.0e-100/(1.0+((SP_S_x0-2.3025850929940458e+02)*(1.0+(0.5*((SP_S_x0-2.3025850929940458e+02)*(1.0+((SP_S_x0-2.3025850929940458e+02)*3.3333333333333333e-01))))))));
+-
+-  SP_S_temp = (1.0/(2.0+(SP_S_x0*SP_S_x0)));
+-
+-  SP_S_xi0 = ((SP_S_x0*SP_S_x0)*SP_S_temp);
+-
+-  SP_S_xi1 = (4.0*((SP_S_x0*SP_S_temp)*SP_S_temp));
+-
+-  SP_S_xi2 = ((((8.0*SP_S_temp)-(12.0*SP_S_xi0))*SP_S_temp)*SP_S_temp);
+-
+-  SP_S_temp = (xg-SP_S_x0);
+-
+-  SP_S_pC = ((2.0*SP_S_temp)+(Gf2*(((1.0-SP_S_delta1)+SP_S_delta0)-(delta_nd*(1.0+SP_S_xi1)))));
+-
+-  SP_S_qC = ((SP_S_temp*SP_S_temp)-(Gf2*((((SP_S_delta1+SP_S_x0)-1.0)+SP_S_delta0)-(delta_nd*((SP_S_x0+1.0)+SP_S_xi0)))));
+-
+-  SP_S_temp = (2.0-(Gf2*((SP_S_delta1+SP_S_delta0)-(delta_nd*SP_S_xi2))));
+-
+-  SP_S_temp = ((SP_S_pC*SP_S_pC)-(2.0*(SP_S_qC*SP_S_temp)));
+-
+-  x_d = (SP_S_x0+(2.0*(SP_S_qC/(SP_S_pC+sqrt(SP_S_temp)))));
+-
+-  x_ds = (x_d-x_s);
+-
+-
+-  pC = ((2.0*(xg-x_s))+(Gf2*(((1.0-Es)+(delta_1s*k_ds))-(delta_nd*(1.0+xi1s)))));
+-
+-  qC = ((Gf2*(1.0-k_ds))*Ds);
+-
+-  x_ds = (2.0*(qC/(pC+sqrt(temp))));
+-
+-  x_d = (x_s+x_ds);
+-
+-
+-  dps = (x_ds*phit1);
+-
+-  xi0d = ((x_d*x_d)/(2.0+(x_d*x_d)));
+-
+-
+-  Ed = exp((-x_d));
+-
+-
+-  Dd = (((((1.6666666666666667e-01*delta_nd)*x_d)*x_d)*x_d)*(1.0+(1.75*x_d)));
+-
+-
+-  Dd = (delta_nd*((((1.0/Ed)-x_d)-1.0)-xi0d));
+-
+-
+-
+-  Ed = (delta_nd/temp);
+-
+-  Dd = (temp-(delta_nd*((x_d+1.0)+xi0d)));
+-
+-
+-  Ed = (1.0e-100/(1.0+((x_d-2.3025850929940458e+02)*(1.0+(0.5*((x_d-2.3025850929940458e+02)*(1.0+((x_d-2.3025850929940458e+02)*3.3333333333333333e-01))))))));
+-
+-  Dd = (temp-(delta_nd*((x_d+1.0)+xi0d)));
+-
+-  x_m = (0.5*(x_s+x_d));
+-
+-  Em = 0.0;
+-
+-  D_bar = (0.5*(Ds+Dd));
+-
+-  Dm = (D_bar+(0.125*((x_ds*x_ds)*(Em-(2.0*inv_Gf2)))));
+-
+-
+-  Pm = (0.5*((x_m*x_m)*(1.0-(3.3333333333333333e-01*(x_m*(1.0-(0.25*x_m)))))));
+-
+-  xgm = (Gf*sqrt((Dm+Pm)));
+-
+-
+-  eta_p = (1.0/sqrt((1.0+(kp*xgm))));
+-
+-
+-  sqm = (7.0710678118654746e-01*(x_m*temp));
+-
+-  alpha = (eta_p+(7.0710678118654746e-01*((Gf*((1.0-(0.5*x_m))+(1.6666666666666667e-01*(x_m*x_m))))/temp)));
+-
+-
+-  Pm = ((x_m-1.0)+Em);
+-
+-  xgm = (Gf*sqrt((Dm+Pm)));
+-
+-
+-  d0 = ((1.0-Em)+(2.0*(xgm*inv_Gf2)));
+-
+-  eta_p = (1.0/sqrt((1.0+(kp*xgm))));
+-
+-  x_pm = (kp*(((temp*temp)*Gf2)*Dm));
+-
+-  p_pd = ((2.0*(xgm-x_pm))+(Gf2*((1.0-Em)+Dm)));
+-
+-  q_pd = (x_pm*(x_pm-(2.0*xgm)));
+-
+-  xi_pd = (1.0-(0.5*(Gf2*(Em+Dm))));
+-
+-  u_pd = ((q_pd*p_pd)/((p_pd*p_pd)-(xi_pd*q_pd)));
+-
+-  x_m = (x_m+u_pd);
+-
+-  km = exp(u_pd);
+-
+-  Em = (Em/km);
+-
+-  Dm = (Dm*km);
+-
+-  Pm = ((x_m-1.0)+Em);
+-
+-  xgm = (Gf*sqrt((Dm+Pm)));
+-
+-  x_ds = (((x_ds*km)*(d0+D_bar))/(help+(km*D_bar)));
+-
+-  dps = (x_ds*phit1);
+-
+-
+-  sqm = sqrt(Pm);
+-
+-  alpha = (eta_p+(0.5*((Gf*(1.0-Em))/sqm)));
+-
+-  qim = (phit1*((Gf2*Dm)/(xgm+(Gf*sqm))));
+-
+-  qim1 = (qim+(phit1*alpha));
+-
+-  qbm = ((sqm*Gf)*phit1);
+-
+-  GR = (THER_i*((rhob*temp)*qim));
+-
+-  qeff = (qbm+(eta_mu*qim));
+-
+-  qeff1 = (qbm+(eta_mu1*qim));
+-
+-  Eeffm = (E_eff0*qeff);
+-
+-  Mutmp = (pow((Eeffm*MUE_i),THEMU_i)+(CS_i*(Pm/((Pm+Dm)+1.0e-14))));
+-
+-  Mutmp = (CS_i*(Pm/((Pm+Dm)+1.0e-14)));
+-
+-  Gmob = (((1.0+Mutmp)+GR)*Rxcor);
+-
+-  s1 = log(((1.0+((Vds-dps)*inv_VP))/(1.0+((Vdse-dps)*inv_VP))));
+-
+-  dL = (ALP_i*s1);
+-
+-  GdL = (1.0/((1.0+dL)+(dL*dL)));
+-
+-  wsat = (100.0*(temp2/(100.0+temp2)));
+-
+-  Gmob_dL = (Gmob*GdL);
+-
+-  thesat1 = (THESAT_i*(temp/Gmob_dL));
+-
+-  zsat = (((thesat1*thesat1)*dps)*dps);
+-
+-
+-  zsat = (zsat/(1.0+(thesat1*dps)));
+-
+-
+-  Gvsat = (0.5*(Gmob_dL*(1.0+sqrt((1.0+(2.0*zsat))))));
+-
+-  Gvsatinv = (1.0/Gvsat);
+-
+-  Voxm = (xgm*phit1);
+-
+-  alpha1 = (alpha*(1.0+(0.5*((zsat*temp)*temp))));
+-
+-  H = ((temp*qim1)/alpha1);
+-
+-
+-  qim1_1 = (1.0/qim1);
+-
+-  r1 = (qim*qim1_1);
+-
+-  r2 = (phit1*(alpha*qim1_1));
+-
+-  s2 = log((1.0+(Vdsx*inv_VP)));
+-
+-  dL1 = ((dL+(ALP1_i*((qim1_1*r1)*s1)))+(ALP2_i*(((qbm*r2)*r2)*s2)));
+-
+-  FdL = (((1.0+dL1)+(dL1*dL1))*GdL);
+-
+-
+-  // end block  named SPcalc_dc
+-
+-  if (((((((model_.SWIGATE_i)!=0)&&((IGOV_i>0)||(IGOVD_i>0)))||(((model_.SWGIDL_i)!=0)&&((AGIDL_i>0)||(AGIDLD_i>0))))||(CGOV_i>0))||(CGOVD_i>0)))
+-  {
+-
+-    GOV = GOV_s;
+-
+-    GOV2 = GOV2_s;
+-
+-    xi_ov = xi_ov_s;
+-
+-    inv_xi_ov = inv_xi_ov_s;
+-
+-    x_mrg_ov = x_mrg_ov_s;
+-
+-    inv_xg1 = inv_xg1_s;
+-
+-    GOV = GOV_d;
+-
+-    GOV2 = GOV2_d;
+-
+-    xi_ov = xi_ov_d;
+-
+-    inv_xi_ov = inv_xi_ov_d;
+-
+-    x_mrg_ov = x_mrg_ov_d;
+-
+-    inv_xg1 = inv_xg1_d;
+-
+-  }
+-
+-  // end block  named evaluateStatic
+-
+-  // begin block named loadStatic
+-
+-  rgatenoise = (((model_.nt0)*MULT_i)*ggate);
+-
+-  rsourcenoise = (((model_.nt0)*MULT_i)*gsource);
+-
+-  rdrainnoise = (((model_.nt0)*MULT_i)*gdrain);
+-
+-  rbulknoise = (((model_.nt0)*MULT_i)*gbulk);
+-
+-  rjunsnoise = (((model_.nt0)*MULT_i)*gjuns);
+-
+-  rjundnoise = (((model_.nt0)*MULT_i)*gjund);
+-
+-  rwellnoise = (((model_.nt0)*MULT_i)*gwell);
++{
++  // Many, many lines of unnecessary and incorrect code manually deleted.
+ 
+   if (!((RG_i>0.0)))
+   {
+@@ -18489,6 +17586,11 @@
+ 
+   updateDependentParameters();
+ 
++  // Manually added code:
++  if (getType() == "pmos" || getType() == "PMOS")
++    TYPE = -1;
++
++
+   // calculate dependent (ie computed) params and check for errors:
+   processParams();
+ 

@@ -1,0 +1,28 @@
+`include "frontdef.inc"
+`define  SELFHEATING
+
+module bjtd504t_va (c, b, e, dt);
+
+  // External ports
+     inout c, b, e, dt;
+
+     electrical e, b, c;
+     electrical dt; 
+
+  // Internal nodes
+     electrical e1, b1, b2, c1, c2;
+
+`include "parameters.inc"
+`include "variables.inc"
+
+analog begin
+
+@(initial_model) begin 
+  `include "initialize.inc"
+end
+`include "tscaling.inc"
+`include "evaluate.inc"
+
+end  // analog
+endmodule
+

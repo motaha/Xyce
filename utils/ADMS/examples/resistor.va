@@ -1,0 +1,18 @@
+`include "disciplines.vams"
+`include "constants.vams"
+
+`define attr(txt) (*txt*)
+
+module resistor (p,n);
+  electrical p,n;
+  inout p,n;
+
+  parameter real R=1 from (0:inf) `attr(info="Resistance" type="instance");
+  real Ir;
+
+  analog
+  begin
+    Ir=V(p,n)/R;
+    I(p,n) <+ Ir;
+  end
+endmodule

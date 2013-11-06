@@ -1,0 +1,378 @@
+/* src/Xyce_config.h.in.  Generated from configure.ac by autoheader.  */
+
+/* define if the STL cannot support member templates */
+#undef BAD_STL
+
+/* Define to 1 if you have the <algorithm> header file. */
+#undef HAVE_ALGORITHM
+
+/* Define to 1 if you have the <algo.h> header file. */
+#undef HAVE_ALGO_H
+
+/* define if you have the bison parser generator */
+#undef HAVE_BISON
+
+/* Define to 1 if you have the <cctype> header file. */
+#undef HAVE_CCTYPE
+
+/* Define to 1 if you have the <climits> header file. */
+#undef HAVE_CLIMITS
+
+/* Define to 1 if you have the <cmath> header file. */
+#undef HAVE_CMATH
+
+/* Define to 1 if you have the <cstdio> header file. */
+#undef HAVE_CSTDIO
+
+/* Define to 1 if you have the <cstdlib> header file. */
+#undef HAVE_CSTDLIB
+
+/* Define to 1 if you have the <cstring> header file. */
+#undef HAVE_CSTRING
+
+/* Define to 1 if you have the `DftiCreateDescriptor' function. */
+#undef HAVE_DFTICREATEDESCRIPTOR
+
+/* Define to 1 if you have the <dlfcn.h> header file. */
+#undef HAVE_DLFCN_H
+
+/* define if you have the flex lexical scanner generator */
+#undef HAVE_FLEX
+
+/* define if the Standard Template Library has flexible insert */
+#undef HAVE_FLEXIBLE_INSERT
+
+/* Define to 1 if you have the <float.h> header file. */
+#undef HAVE_FLOAT_H
+
+/* Define to 1 if you have the <fstream> header file. */
+#undef HAVE_FSTREAM
+
+/* Define to 1 if you have the <functional> header file. */
+#undef HAVE_FUNCTIONAL
+
+/* Define to 1 if you have the `getopt' function. */
+#undef HAVE_GETOPT
+
+/* Define to 1 if you have the <inttypes.h> header file. */
+#undef HAVE_INTTYPES_H
+
+/* Define to 1 if you have the <iostream> header file. */
+#undef HAVE_IOSTREAM
+
+/* define if the Standard Template Library algorithms include iota */
+#undef HAVE_IOTA
+
+/* Define to 1 if you have the `3po' library (-l3po). */
+#undef HAVE_LIB3PO
+
+/* Define to 1 if you have the `amd' library (-lamd). */
+#undef HAVE_LIBAMD
+
+/* Define to 1 if you have the `amesos' library (-lamesos). */
+#undef HAVE_LIBAMESOS
+
+/* Define to 1 if you have the `amplsolver' library (-lamplsolver). */
+#undef HAVE_LIBAMPLSOLVER
+
+/* Define to 1 if you have the `appspack' library (-lappspack). */
+#undef HAVE_LIBAPPSPACK
+
+/* Define to 1 if you have the `aztecoo' library (-laztecoo). */
+#undef HAVE_LIBAZTECOO
+
+/* Define to 1 if you have the `belos' library (-lbelos). */
+#undef HAVE_LIBBELOS
+
+/* Define to 1 if you have the `belosepetra' library (-lbelosepetra). */
+#undef HAVE_LIBBELOSEPETRA
+
+/* Define to 1 if you have the `boost_filesystem ' library (-lboost_filesystem
+   ). */
+#undef HAVE_LIBBOOST_FILESYSTEM_
+
+/* Define to 1 if you have the `boost_system ' library (-lboost_system ). */
+#undef HAVE_LIBBOOST_SYSTEM_
+
+/* Define to 1 if you have the `cdd' library (-lcdd). */
+#undef HAVE_LIBCDD
+
+/* Define to 1 if you have the `cholmod' library (-lcholmod). */
+#undef HAVE_LIBCHOLMOD
+
+/* Define to 1 if you have the `colamd' library (-lcolamd). */
+#undef HAVE_LIBCOLAMD
+
+/* Define to 1 if you have the `colin' library (-lcolin). */
+#undef HAVE_LIBCOLIN
+
+/* Define to 1 if you have the `coliny' library (-lcoliny). */
+#undef HAVE_LIBCOLINY
+
+/* Define to 1 if you have the `conmin' library (-lconmin). */
+#undef HAVE_LIBCONMIN
+
+/* Define to 1 if you have the `conveyor' library (-lconveyor). */
+#undef HAVE_LIBCONVEYOR
+
+/* Define to 1 if you have the `cport' library (-lcport). */
+#undef HAVE_LIBCPORT
+
+/* Define to 1 if you have the `cubature' library (-lcubature). */
+#undef HAVE_LIBCUBATURE
+
+/* Define to 1 if you have the `dakota' library (-ldakota). */
+#undef HAVE_LIBDAKOTA
+
+/* Define to 1 if you have the `ddace' library (-lddace). */
+#undef HAVE_LIBDDACE
+
+/* Define to 1 if you have the `epetra' library (-lepetra). */
+#undef HAVE_LIBEPETRA
+
+/* Define to 1 if you have the `epetraext' library (-lepetraext). */
+#undef HAVE_LIBEPETRAEXT
+
+/* Define to 1 if you have the `evidence' library (-levidence). */
+#undef HAVE_LIBEVIDENCE
+
+/* Define to 1 if you have the `fl' library (-lfl). */
+#undef HAVE_LIBFL
+
+/* Define to 1 if you have the `fsudace' library (-lfsudace). */
+#undef HAVE_LIBFSUDACE
+
+/* Define to 1 if you have the `gsl' library (-lgsl). */
+#undef HAVE_LIBGSL
+
+/* Define to 1 if you have the `ifpack' library (-lifpack). */
+#undef HAVE_LIBIFPACK
+
+/* Define to 1 if you have the `isorropia' library (-lisorropia). */
+#undef HAVE_LIBISORROPIA
+
+/* Define to 1 if you have the `jega' library (-ljega). */
+#undef HAVE_LIBJEGA
+
+/* Define to 1 if you have the `lhs' library (-llhs). */
+#undef HAVE_LIBLHS
+
+/* Define to 1 if you have the `loca' library (-lloca). */
+#undef HAVE_LIBLOCA
+
+/* Define to 1 if you have the `metis' library (-lmetis). */
+#undef HAVE_LIBMETIS
+
+/* Define to 1 if you have the `ml' library (-lml). */
+#undef HAVE_LIBML
+
+/* Define to 1 if you have the `nappspack' library (-lnappspack). */
+#undef HAVE_LIBNAPPSPACK
+
+/* Define to 1 if you have the `ncsuopt' library (-lncsuopt). */
+#undef HAVE_LIBNCSUOPT
+
+/* Define to 1 if you have the `newmat' library (-lnewmat). */
+#undef HAVE_LIBNEWMAT
+
+/* Define to 1 if you have the `nlpql' library (-lnlpql). */
+#undef HAVE_LIBNLPQL
+
+/* Define to 1 if you have the `nox' library (-lnox). */
+#undef HAVE_LIBNOX
+
+/* Define to 1 if you have the `npsol' library (-lnpsol). */
+#undef HAVE_LIBNPSOL
+
+/* Define to 1 if you have the `opt' library (-lopt). */
+#undef HAVE_LIBOPT
+
+/* Define to 1 if you have the `parmetis' library (-lparmetis). */
+#undef HAVE_LIBPARMETIS
+
+/* Define to 1 if you have the `pebbl' library (-lpebbl). */
+#undef HAVE_LIBPEBBL
+
+/* Define to 1 if you have the `pecos' library (-lpecos). */
+#undef HAVE_LIBPECOS
+
+/* Define to 1 if you have the `psuade' library (-lpsuade). */
+#undef HAVE_LIBPSUADE
+
+/* Define to 1 if you have the `quadrature' library (-lquadrature). */
+#undef HAVE_LIBQUADRATURE
+
+/* Define to 1 if you have the `shared' library (-lshared). */
+#undef HAVE_LIBSHARED
+
+/* Define to 1 if you have the `shylu' library (-lshylu). */
+#undef HAVE_LIBSHYLU
+
+/* Define to 1 if you have the `suitesparseconfig' library
+   (-lsuitesparseconfig). */
+#undef HAVE_LIBSUITESPARSECONFIG
+
+/* Define to 1 if you have the `superlu' library (-lsuperlu). */
+#undef HAVE_LIBSUPERLU
+
+/* Define to 1 if you have the `superludist' library (-lsuperludist). */
+#undef HAVE_LIBSUPERLUDIST
+
+/* Define to 1 if you have the `surfpack' library (-lsurfpack). */
+#undef HAVE_LIBSURFPACK
+
+/* Define to 1 if you have the `teuchos' library (-lteuchos). */
+#undef HAVE_LIBTEUCHOS
+
+/* Define to 1 if you have the `teuchoscomm' library (-lteuchoscomm). */
+#undef HAVE_LIBTEUCHOSCOMM
+
+/* Define to 1 if you have the `teuchoscore' library (-lteuchoscore). */
+#undef HAVE_LIBTEUCHOSCORE
+
+/* Define to 1 if you have the `teuchosnumerics' library (-lteuchosnumerics).
+   */
+#undef HAVE_LIBTEUCHOSNUMERICS
+
+/* Define to 1 if you have the `teuchosparameterlist' library
+   (-lteuchosparameterlist). */
+#undef HAVE_LIBTEUCHOSPARAMETERLIST
+
+/* Define to 1 if you have the `teuchosremainder' library
+   (-lteuchosremainder). */
+#undef HAVE_LIBTEUCHOSREMAINDER
+
+/* Define to 1 if you have the `trilinoscouplings' library
+   (-ltrilinoscouplings). */
+#undef HAVE_LIBTRILINOSCOUPLINGS
+
+/* Define to 1 if you have the `triutils' library (-ltriutils). */
+#undef HAVE_LIBTRIUTILS
+
+/* Define to 1 if you have the `umfpack' library (-lumfpack). */
+#undef HAVE_LIBUMFPACK
+
+/* Define to 1 if you have the `utilib' library (-lutilib). */
+#undef HAVE_LIBUTILIB
+
+/* Define to 1 if you have the `zoltan' library (-lzoltan). */
+#undef HAVE_LIBZOLTAN
+
+/* Define to 1 if you have the <limits.h> header file. */
+#undef HAVE_LIMITS_H
+
+/* Define to 1 if you have the <math.h> header file. */
+#undef HAVE_MATH_H
+
+/* Define to 1 if you have the <memory.h> header file. */
+#undef HAVE_MEMORY_H
+
+/* define if the compiler implements namespaces */
+#undef HAVE_NAMESPACES
+
+/* define if the compiler supports isnan and isinf checks */
+#undef HAVE_NAN_INF_SUPPORT
+
+/* define if the compiler has numeric_limits<T> */
+#undef HAVE_NUMERIC_LIMITS
+
+/* Define to 1 if you have the <ostream> header file. */
+#undef HAVE_OSTREAM
+
+/* Define to 1 if you have the <ostream.h> header file. */
+#undef HAVE_OSTREAM_H
+
+/* Define to 1 if you have the <stdint.h> header file. */
+#undef HAVE_STDINT_H
+
+/* Define to 1 if you have the <stdlib.h> header file. */
+#undef HAVE_STDLIB_H
+
+/* define if the compiler supports Standard Template Library */
+#undef HAVE_STL
+
+/* Define to 1 if you have the `strcasecmp' function. */
+#undef HAVE_STRCASECMP
+
+/* Define to 1 if you have the <strings.h> header file. */
+#undef HAVE_STRINGS_H
+
+/* Define to 1 if you have the <string.h> header file. */
+#undef HAVE_STRING_H
+
+/* Define to 1 if you have the <sys/stat.h> header file. */
+#undef HAVE_SYS_STAT_H
+
+/* Define to 1 if you have the <sys/types.h> header file. */
+#undef HAVE_SYS_TYPES_H
+
+/* Define to 1 if you have the <tr1/functional> header file. */
+#undef HAVE_TR1_FUNCTIONAL
+
+/* Define to 1 if you have the <tr1/unordered_map> header file. */
+#undef HAVE_TR1_UNORDERED_MAP
+
+/* Define to 1 if you have the <unistd.h> header file. */
+#undef HAVE_UNISTD_H
+
+/* Define to 1 if you have the <unordered_map> header file. */
+#undef HAVE_UNORDERED_MAP
+
+/* Define to 1 if you have the <values.h> header file. */
+#undef HAVE_VALUES_H
+
+/* Define to the sub-directory in which libtool stores uninstalled libraries.
+   */
+#undef LT_OBJDIR
+
+/* define if math.h defines M_PI */
+#undef MATH_H_HAS_M_PI
+
+/* define if stl string header does not cause pair.h to be included */
+#undef NEED_PAIR_H
+
+/* Name of package */
+#undef PACKAGE
+
+/* Define to the address where bug reports for this package should be sent. */
+#undef PACKAGE_BUGREPORT
+
+/* Define to the full name of this package. */
+#undef PACKAGE_NAME
+
+/* Define to the full name and version of this package. */
+#undef PACKAGE_STRING
+
+/* Define to the one symbol short name of this package. */
+#undef PACKAGE_TARNAME
+
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
+
+/* Define to the version of this package. */
+#undef PACKAGE_VERSION
+
+/* Define to 1 if you have the ANSI C header files. */
+#undef STDC_HEADERS
+
+/* Version number of package */
+#undef VERSION
+
+/* Build the ATHENA device. */
+#undef Xyce_ATHENA
+
+/* Set to use either FFTW or Intel's FFT library. */
+#undef Xyce_USE_FFT
+
+/* Set to use FFTW library */
+#undef Xyce_USE_FFTW
+
+/* Set to use HDF5 library */
+#undef Xyce_USE_HDF5
+
+/* Set to use Intel's FFT library */
+#undef Xyce_USE_INTEL_FFT
+
+/* Define to 1 if `lex' declares `yytext' as a `char *' by default, not a
+   `char[]'. */
+#undef YYTEXT_POINTER

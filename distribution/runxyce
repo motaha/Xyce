@@ -1,0 +1,18 @@
+#!/bin/sh
+echo "-----------------------------------------------------------------------------"
+echo " Copyright Notice"
+echo
+echo " Copyright (c) 2002-2013, Sandia Corporation, Albuquerque, NM, USA. "
+echo " See the output of Xyce -license for details. "
+echo "-----------------------------------------------------------------------------"
+echo
+echo
+date
+echo
+
+LOCDIR="$( cd "$( dirname "$0" )"/.. && pwd )"
+
+export LD_LIBRARY_PATH="${LOCDIR}/lib:$LD_LIBRARY_PATH"
+export DYLD_LIBRARY_PATH="${LOCDIR}/lib:$DYLD_LIBRARY_PATH"
+
+exec "${LOCDIR}/bin/Xyce" $*

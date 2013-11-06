@@ -1,0 +1,2175 @@
+//-----------------------------------------------------------------------------
+// Copyright Notice
+//
+//   Copyright 2002 Sandia Corporation. Under the terms
+//   of Contract DE-AC04-94AL85000 with Sandia Corporation, the U.S.
+//   Government retains certain rights in this software.
+//
+//    Xyce(TM) Parallel Electrical Simulator
+//    Copyright (C) 2002-2013  Sandia Corporation
+//
+//    This program is free software: you can redistribute it and/or modify
+//    it under the terms of the GNU General Public License as published by
+//    the Free Software Foundation, either version 3 of the License, or
+//    (at your option) any later version.
+//
+//    This program is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    GNU General Public License for more details.
+//
+//    You should have received a copy of the GNU General Public License
+//    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//-----------------------------------------------------------------------------
+
+//-------------------------------------------------------------------------
+// Filename       : $RCSfile: N_NLS_DampedNewton.C,v $
+//
+// Purpose        : Body file for the implemenation of the Newton trust-region
+//                  related methods.
+//
+// Special Notes  :
+//
+// Creator        : Eric R. Keiter, SNL, Parallel Computational Sciences
+//
+// Creation Date  : 05/28/00
+//
+// Revision Information:
+// ---------------------
+//
+// Revision Number: $Revision: 1.207.2.3 $
+//
+// Revision Date  : $Date: 2013/10/03 17:23:48 $
+//
+// Current Owner  : $Author: tvrusso $
+//-------------------------------------------------------------------------
+
+#include <Xyce_config.h>
+
+
+// ----------   Standard Includes   ----------
+
+#include <N_UTL_Misc.h>
+
+#ifdef HAVE_CSTDIO
+#include <cstdio>
+#else
+#include <stdio.h>
+#endif
+
+#include <vector>
+
+// ----------   Other Includes   ----------
+
+// ----------   Xyce Includes   ----------
+
+#include <N_NLS_ConstraintBT.h>
+#include <N_NLS_DampedNewton.h>
+
+#include <N_NLS_TwoLevelNewton.h>
+#include <N_NLS_ParamMgr.h>
+
+#include <N_LOA_LoaderMgr.h>
+#include <N_LOA_Loader.h>
+
+#include <N_ANP_AnalysisInterface.h>
+#include <N_ANP_AnalysisManager.h>
+
+#include <N_LAS_System.h>
+#include <N_LAS_Vector.h>
+#include <N_LAS_Matrix.h>
+#include <N_LAS_Solver.h>
+#include <N_LAS_Problem.h>
+#include <N_LAS_Builder.h>
+#include <N_NLS_NonLinearSolver.h>
+#include <N_ERH_ErrorMgr.h>
+#include <N_UTL_Param.h>
+#include <N_UTL_OptionBlock.h>
+#include <N_UTL_Xyce.h>
+
+#include <N_IO_CmdParse.h>
+
+// ---------- Static Initializations ----------
+
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::N_NLS_DampedNewton
+// Purpose       : constructor
+// Special Notes :
+// Scope         : public
+// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
+// Creation Date : 5/01/00
+//-----------------------------------------------------------------------------
+N_NLS_DampedNewton::N_NLS_DampedNewton(N_IO_CmdParse & cp):
+  N_NLS_NonLinearSolver (cp),
+  nlParams(DC_OP,cp),
+  iNumCalls_(0),
+  loadJacobianFlag_(true),
+  nlConstraintPtr_(0),
+  searchDirectionPtr_(0),
+  tmpVectorPtr_(0),
+  delta_(pow(N_UTL_MachineDependentParams::MachineEpsilon(), 0.67)),
+  // set the measures:
+  normRHS_(0.0),
+  maxNormRHS_(0.0),
+  maxNormRHSindex_(-1),
+  normRHS_init_(0.0),
+  normSoln_(0.0),
+  normDX_(0.0),
+  wtNormDX_(0.0),
+  stepLength_(1.0),
+  constraintFactor_(1.0),
+  nlStep_(0),
+  newtonStep_(0),
+  modNewtonStep_(0),
+  descentStep_(0),
+  searchStep_(0),
+  firstTime(true),
+  initialDeltaXTol(0.0),
+  etaOld(0.1),
+  nlResNormOld(0.0),
+  tmpConvRate(0.0),
+  count (0)
+{
+  nlConstraintPtr_ = new N_NLS_ConstraintBT();
+  nlpMgrPtr_ = new N_NLS_ParamMgr (commandLine_);
+
+  resetCountersAndTimers_();
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::~N_NLS_DampedNewton
+// Purpose       : destructor
+// Special Notes :
+// Scope         : public
+// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
+// Creation Date : 5/01/00
+//-----------------------------------------------------------------------------
+N_NLS_DampedNewton::~N_NLS_DampedNewton()
+{
+  delete tmpVectorPtr_;
+  tmpVectorPtr_ = 0;
+
+  delete nlConstraintPtr_;
+  nlConstraintPtr_ = 0;
+
+  delete searchDirectionPtr_;
+  searchDirectionPtr_ = 0;
+
+  delete nlpMgrPtr_;
+  nlpMgrPtr_ = 0;
+
+#ifdef Xyce_DEBUG_VOLTLIM
+  delete jdxVLVectorPtr_;
+  jdxVLVectorPtr_ = 0;
+  delete fdxVLVectorPtr_;
+  fdxVLVectorPtr_ = 0;
+  delete qdxVLVectorPtr_;
+  qdxVLVectorPtr_ = 0;
+#endif
+
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::setOptions
+// Purpose       : Sets the nonlinear solver options.
+// Special Notes :
+// Scope         : public
+// Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
+// Creation Date : 9/29/00
+//-----------------------------------------------------------------------------
+bool N_NLS_DampedNewton::setOptions(const N_UTL_OptionBlock & OB)
+{
+  bool bsuccess = nlParams.setOptions(OB);
+
+  nlpMgrPtr_->addParameterSet(   DC_OP, nlParams);
+  nlpMgrPtr_->addParameterSet(DC_SWEEP, nlParams);
+
+  return bsuccess;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::setTranOptions
+// Purpose       : Sets the nonlinear solver options.
+// Special Notes :
+// Scope         : public
+// Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
+// Creation Date : 9/05/01
+//-----------------------------------------------------------------------------
+bool N_NLS_DampedNewton::setTranOptions(const N_UTL_OptionBlock & OB)
+{
+  N_NLS_NLParams nlTranParams(TRANSIENT, commandLine_);
+  bool bsuccess = nlTranParams.setOptions(OB);
+
+  nlpMgrPtr_->addParameterSet(TRANSIENT, nlTranParams);
+  return bsuccess;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::setHBOptions
+// Purpose       : Sets the nonlinear solver options.
+// Special Notes :
+// Scope         : public
+// Creator       : Ting Mei, SNL
+// Creation Date : 02/03/2009
+//-----------------------------------------------------------------------------
+bool N_NLS_DampedNewton::setHBOptions(const N_UTL_OptionBlock & OB)
+{
+  N_NLS_NLParams nlHBParams(HB, commandLine_);
+  bool bsuccess = nlHBParams.setOptions(OB);
+
+  nlpMgrPtr_->addParameterSet(HB, nlHBParams);
+  return bsuccess;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::initializeAll
+// Purpose       : Called after all register and set functions.
+//                 Once the various registrations have taken place,
+//                 this function sets the remaining pointers.
+// Special Notes :
+// Scope         : public
+// Creator       : Tamara G. Kolda, SNL, Compuational Sciences and
+// Creation Date : 1/31/02
+//-----------------------------------------------------------------------------
+bool N_NLS_DampedNewton::initializeAll()
+{
+  bool bsuccess = N_NLS_NonLinearSolver::initializeAll();
+
+  tmpVectorPtr_ = lasSysPtr_->builder().createVector();
+
+  // make sure the current nlParams is correct.
+  nlpMgrPtr_->getCurrentParams(nlParams);
+
+  // create and initialize constraint backtracking vectors:
+  nlConstraintPtr_->initializeAll (lasSysPtr_, nlParams);
+
+  searchDirectionPtr_ = lasSysPtr_->builder().createVector();
+
+#ifdef Xyce_DEBUG_VOLTLIM
+  // get the dx vector (due to voltage limiting)
+  dxVoltlimVectorPtr_ = lasSysPtr_->getDxVoltlimVector();
+
+  // this vector is for debug purposes:
+  jdxVLVectorPtr_ = lasSysPtr_->builder().createVector();
+  fdxVLVectorPtr_ = lasSysPtr_->builder().createVector();
+  qdxVLVectorPtr_ = lasSysPtr_->builder().createVector();
+
+  // get the test matrices
+  jacTestMatrixPtr_ = lasSysPtr_->getJacTestMatrix(); // old-DAE
+  dFdxTestMatrixPtr_ = lasSysPtr_->getdFdxTestMatrix(); // new-DAE
+  dQdxTestMatrixPtr_ = lasSysPtr_->getdQdxTestMatrix(); // new-DAE
+#endif
+
+  bsuccess = bsuccess && (jacobianMatrixPtr_ != 0);
+
+  return bsuccess;
+}
+
+#ifdef Xyce_VERBOSE_NONLINEAR
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::printHeader_
+// Purpose       : Print out header for step information.
+// Special Notes :
+// Scope         : private
+// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
+// Creation Date : 5/03/00
+//-----------------------------------------------------------------------------
+void N_NLS_DampedNewton::printHeader_()
+{
+  static const string crStr = "\n";
+  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, crStr);
+
+  static const string tmpStr4 =
+    "  Iter           Step         Wt DX        Inf-Norm      2-Norm (rel)\n"
+    "------------------------------------------------------------------";
+  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, tmpStr4);
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::printFooter_
+// Purpose       : 
+// Special Notes :
+// Scope         : private
+// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
+// Creation Date : 5/03/11
+//-----------------------------------------------------------------------------
+void N_NLS_DampedNewton::printFooter_()
+{
+  static const string tmpStr4 =
+    "------------------------------------------------------------------";
+  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, tmpStr4);
+}
+
+#endif
+
+#ifdef Xyce_VERBOSE_NONLINEAR
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::printStepInfo_
+// Purpose       : Print out Newton step information
+// Special Notes :
+// Scope         : public
+// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
+// Creation Date : 5/03/00
+//-----------------------------------------------------------------------------
+void N_NLS_DampedNewton::printStepInfo_(int step)
+{
+  char tmpChar[128];
+  sprintf(tmpChar,"Niter:%4d  %12.4e  %12.4e  %12.4e  %12.4e",
+          step,
+          stepLength_,
+          wtNormDX_,
+          maxNormRHS_,
+          normRHS_rel_);
+  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, tmpChar);
+}
+
+#endif
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::updateWeights_
+// Purpose       : Updates the error weight vector using the previous solution
+//                 values as "typical" and the absolute and relative
+//                 tolerances.
+// Special Notes :
+// Scope         : private
+// Creator       : Scott A. Hutchinson, SNL, Computational Sciences
+// Creation Date : 01/17/01
+//-----------------------------------------------------------------------------
+void N_NLS_DampedNewton::updateWeights_()
+{
+  // ***** Weighting Vector for Solution *****
+
+  // On the first call to the nonlinear solver,
+  // weigh based on the minimums.
+  double tmp = 0.0;
+  (*nextSolVectorPtrPtr_)->maxValue(&tmp);
+  double solnNorm = fabs(tmp);
+
+  if ((iNumCalls_ == 0) && (solnNorm <= N_UTL_MachineDependentParams::DoubleMin()))
+  {
+    solWtVectorPtr_->putScalar(nlParams.getRelTol() + nlParams.getAbsTol());
+  }
+  else
+  {
+    double newSoln, oldSoln;
+
+    int length = (*nextSolVectorPtrPtr_)->localLength();
+    for (int i = 0; i < length; ++i)
+    {
+      newSoln = (*(*nextSolVectorPtrPtr_))[i];
+      oldSoln = (*(*currSolVectorPtrPtr_))[i];
+
+      (*(solWtVectorPtr_))[i] =
+        nlParams.getRelTol() * Xycemax(fabs(oldSoln), fabs(newSoln)) +
+        nlParams.getAbsTol();
+    }
+  }
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::solve
+// Purpose       : solve implements a damped Newton method nonlinear equations
+//                 solver.
+// Special Notes : The implementation is based upon the original damped Newton
+//                 method implemented in Xyce(TM) by Eric Keiter.
+//
+// Selected variables and methods:
+//
+// nextSolVector      the approximate solution to the nonlinear equation
+//                    The rhsVector and jacobianMatrix load nextSolVector.
+//
+// equateTmpVectors_  tmpSolVector := nextSolVector
+// updateTmpSol_      tmpSolVector := nextVector + searchDirection*stepLength_
+//
+// switchTmpVectors   swap &tmpSolVector and &nextSolVector, makes it possible
+//                    for the nonlinear solver to preserve the entire
+//                    circuit state associated with nextSolVector.
+//
+// Scope         : public
+// Creator       : Scott A. Hutchinson, SNL, Computational Sciences
+// Creation Date : 01/09/01
+//-----------------------------------------------------------------------------
+int N_NLS_DampedNewton::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
+{
+#ifdef Xyce_VERBOSE_NONLINEAR
+  static string msg = "N_NLS_DampedNewton::solve: ";
+#endif
+
+#ifdef Xyce_DEBUG_NONLINEAR
+  setDebugFlags ();
+
+  if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 ) cout << retCodes_;
+#endif
+
+  resetCountersAndTimers_();
+
+  // Change the nlparams so that they are appropriate for the current
+  // time integration mode, if neccessary.
+  nlpMgrPtr_->getCurrentParams(nlParams);
+
+  // Get the current analysis mode
+  AnalysisMode mode1 = nlpMgrPtr_->getAnalysisMode();
+
+  if (mode1 == TRANSIENT)
+  {
+    // Set the tolerance
+    lasSolverPtr_->setTolerance(1.0e-09);
+  }
+
+#ifndef Xyce_SPICE_NORMS
+  if (firstTime)
+  {
+    // First time through we want to tighten up the convergence tolerance a la
+    // Petzold, et al. The DeltaXTol parameter is used by converge_().
+    initialDeltaXTol = nlParams.getDeltaXTol();
+    nlParams.setDeltaXTol(initialDeltaXTol * 0.01);
+    firstTime = false;
+  }
+#endif
+
+#ifdef Xyce_VERBOSE_NONLINEAR
+  // Output the nonlinear solver information header:
+  printHeader_();
+#endif
+
+#ifdef Xyce_VERBOSE_NONLINEAR
+
+  // Print warning about using the gradient-only strategy
+  if (nlParams.getNLStrategy() == GRADIENT)
+    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg +
+                           "WARNING: Use of the gradient strategy (1) is "
+                           "discouraged\n");
+#endif
+
+  // For the initial RHS load, the step number needs to be zero.  The Xyce
+  // device package needs to know this - either in the event that it might want
+  // to set initial conditions.
+  nlStep_ = newtonStep_ = modNewtonStep_ = descentStep_ = 0;
+
+  // Recall that prior to this solver being called, the new solution has been
+  // predicted and resides in nextSolVectorPtr.
+  rhs_();
+
+#ifdef Xyce_VERBOSE_NONLINEAR
+  // Set some values and dummy values so that we can call printStepInfo_().
+
+  // Relative RHS norm (normRHS_rel_).  On the first evaluation this is one
+  // since normRHS_init = normRHS.
+  normRHS_rel_ = 1.0;
+
+  // Weighted norm of the change (wtNormDX_) is set to zero initially.
+  wtNormDX_    = 0.0;
+
+  // Max RHS norm (maxNormRHS_).
+  rhsVectorPtr_->infNorm(&maxNormRHS_);
+  std::vector<int> index(1, -1);
+  rhsVectorPtr_->infNormIndex( &index[0] );
+  maxNormRHSindex_ = index[0];
+
+  // Print out the starting point information.
+  printStepInfo_(nlStep_);
+#endif
+
+  // Check to ensure that we haven't been passed a converged solution already
+  // (i.e., normRHS < absTol)
+
+  if (normRHS_ < N_UTL_MachineDependentParams::MachineEpsilon())
+  {
+    return true;
+  }
+
+  // Used to calculate resConvRate which is used by converged_(). This changes
+  // each nonlinear iteration to be the norm of the RHS from the previous
+  // iteration.
+  double normRHS_old = normRHS_;
+
+  // Used to calculate normRHS_rel_, which is output by printStepInfo_().
+  normRHS_init_ = normRHS_;
+
+  // Set the flag that controls the loading and solution of the Jacobian
+  // matrix.
+  if (nlParams.getLinearOpt())
+    loadJacobianFlag_ = !(loaderPtr_->getLinearSystemFlag());
+  else
+    loadJacobianFlag_ = true;
+
+  // If we're doing a modified-Newton iteration, initialize the solver flag.
+  if (nlParams.getDirection() == MOD_NEWTON_DIR)
+  {
+      // Reset these flags.
+//      lasSolverPtr_->setUpdatedJacobian(true);
+//      directSolverPtr_->setUpdatedJacobian(true);
+  }
+
+  // Update the error weighting vector for use with the weighted norms.
+  if (mode1 == TRANSIENT)
+    updateWeights_();
+
+  // Nonlinear loop. Loop continues until convergedStatus is nonzero. A
+  // positive value indicates that the method has converged. A negative value
+  // that the method has failed. This is updated using the subroutine
+  // converged_() at the end of each nonlinear solver iteration.
+  int convergedStatus = 0;
+  while (convergedStatus == 0)
+  {
+    // Increment step counters.  This needs to be updated *before* the rhs_
+    // call, which is inside of computeStepLength_.
+    nlStep_++;
+
+    // Calculate the Jacobian for the current iterate.
+    if (loadJacobianFlag_)
+      jacobian_();
+
+#ifdef Xyce_DEBUG_NONLINEAR
+      debugOutput1( *(lasSysPtr_->getJacobianMatrix()), *(lasSysPtr_->getRHSVector()));
+#endif
+
+    // Calculate a direction.
+    // Note: It is illegal to modify tmpVector between direction_ and
+    // computeStepLength_
+    direction_();
+
+    // Perform update constraining...
+    if (nlParams.getConstraintBT())
+      constraintFactor_ = constrain_();
+
+    setX0_();
+
+    // Calculate a step length (damping or backtracking for Newton, line search
+    // for others...) and take that step and recalulate the RHS.
+    computeStepLength_();
+
+#ifdef Xyce_DEBUG_NONLINEAR
+    debugOutput3 ((**nextSolVectorPtrPtr_), *searchDirectionPtr_ );
+#endif
+
+    // Test for convergence based on the weighted norms of the RHS and DX.
+    // Also update convergence rate and counters.
+
+    // Update the error weighting vector for use with the weighted norms.
+    if (mode1 != TRANSIENT)
+      updateWeights_();
+
+    // Scale the search direction so that we can calculate some norms on it and
+    // use them in the convergence tests and output.
+    searchDirectionPtr_->scale(stepLength_);
+
+    // Weighted norm of the change (wtNormDX_) is used in converged_() and
+    // output by printStepInfo_().
+
+#ifdef Xyce_SPICE_NORMS
+    // TGKOLDA: Why is tmpVectorPtr_ used here and where was it set??
+    searchDirectionPtr_->wMaxNorm(*solWtVectorPtr_,
+                                  *tmpVectorPtr_,
+                                  &wtNormDX_);
+#else
+    searchDirectionPtr_->wRMSNorm(*solWtVectorPtr_, &wtNormDX_);
+#endif
+
+    // Relative RHS norm (normRHS_rel_) is output by printStepInfo_().
+    normRHS_rel_ = normRHS_ / normRHS_init_;
+
+    // Max RHS norm (maxNormRHS_) is used in converged_() and output by
+    // printStepInfo_().
+    rhsVectorPtr_->infNorm(&maxNormRHS_);
+
+    // Residual convergence rate (resConvRate) used by converged_(),
+    // also printed out below.
+    resConvRate_ = normRHS_ / normRHS_old;
+
+    // Reset old norm for next nonlinear iteration.
+    normRHS_old = normRHS_;
+
+#ifdef Xyce_VERBOSE_NONLINEAR
+    printStepInfo_(nlStep_);
+#endif
+
+    // Increment diagnostic step counters.  These need to be updated after
+    // direction_, in which the current direction (NEWTON_DIR,
+    // MOD_NEWTON_DIR or GRADIENT_DIR) is set.
+    if (nlParams.getDirection() == NEWTON_DIR)
+      newtonStep_++;
+    else if (nlParams.getDirection() == MOD_NEWTON_DIR)
+      modNewtonStep_++;
+    else if (nlParams.getDirection() == GRADIENT_DIR)
+      descentStep_++;
+
+// #ifdef Xyce_VERBOSE_NONLINEAR
+//     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
+//                            "Residual Convergence Rate: ",
+//                             resConvRate_, "\n");
+// #endif
+
+    // Evaluate the need for a fresh Jacobian and/or preconditioner...
+    if (nlParams.getDirection() == MOD_NEWTON_DIR)
+      evalModNewton_();
+
+    // Check our iteration status. Returns positive if done, negative if error,
+    // zero otherwise.
+    convergedStatus = converged_();
+
+    // If the norm is an NaN, then exit.
+    if (maxNormRHS_ != 0.0 &&
+      !(maxNormRHS_ < 0.0) &&
+      !(maxNormRHS_ > 0.0))
+    {
+      convergedStatus = retCodes_.nanFail; // default = -6
+      //break;
+    }
+
+  } // while (convergedStatus == 0)
+
+#ifndef Xyce_SPICE_NORMS
+   // Reset the tolerance which is used in converged_().
+   nlParams.setDeltaXTol(initialDeltaXTol);
+#endif
+
+  // Reset the linear solver tolerance.
+  lasSolverPtr_->setDefaultOption( "AZ_tol" );
+
+  // Increment the number of calls to the nonlinear solver.
+  iNumCalls_++;
+
+#ifdef Xyce_VERBOSE_NONLINEAR
+  printFooter_();
+#endif
+
+  // A positive value of convergedStatus indicates a successful nonlinear
+  // solutions. Otherwise, there was an error.
+  return convergedStatus;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::takeFirstSolveStep
+//
+// Purpose       : This is the same as the function "solve", except that
+//                 it only does the various initializations at the top
+//                 of the "::solve" function, and only takes the first
+//                 NL step.
+//
+// Special Notes :
+// Scope         : public
+// Creator       : Eric R. Keiter, SNL, Computational Sciences
+// Creation Date : 01/09/01
+//-----------------------------------------------------------------------------
+int N_NLS_DampedNewton::takeFirstSolveStep (N_NLS_NonLinearSolver * nlsTmpPtr)
+{
+#ifdef Xyce_VERBOSE_NONLINEAR
+  static string msg = "N_NLS_DampedNewton::takeFirstSolveStep: ";
+#endif
+
+#ifdef Xyce_DEBUG_NONLINEAR
+  setDebugFlags ();
+#endif
+
+  // resolve the counters issue later.  It may be neccessary to save the
+  // counters for later.  Or not.
+  resetCountersAndTimers_();
+
+  // Change the nlparams so that they are appropriate for the current
+  // time integration mode, if neccessary.
+  nlpMgrPtr_->getCurrentParams(nlParams);
+
+  if (nlpMgrPtr_->getAnalysisMode() == TRANSIENT)
+    lasSolverPtr_->setTolerance(1.0e-09);
+
+
+#ifndef Xyce_SPICE_NORMS
+#if 0
+  static bool firstTime = true;
+  static double initialDeltaXTol;
+
+  if (firstTime)
+  {
+    // First time through we want to tighten up the convergence tolerance a la
+    // Petzold, et al. The DeltaXTol parameter is used by converge_().
+    initialDeltaXTol = nlParams.getDeltaXTol();
+    nlParams.setDeltaXTol(initialDeltaXTol * 0.01);
+    firstTime = false;
+  }
+#endif // figure this out later.  Mainly, understand what is really meant
+       // by "firstTime", and make sure it works correctly for this function.
+#endif
+
+#ifdef Xyce_VERBOSE_NONLINEAR
+
+  // Output the nonlinear solver information header:
+  printHeader_();
+
+#endif
+
+#ifdef Xyce_VERBOSE_NONLINEAR
+
+  // Print warning about using the gradient-only strategy
+  if (nlParams.getNLStrategy() == GRADIENT)
+    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg +
+                           "WARNING: Use of the gradient strategy (1) is "
+                           "discouraged\n");
+#endif
+
+  // For the initial RHS load, the step number needs to be zero.  The Xyce
+  // device package needs to know this - either in the event that it might want
+  // to set initial conditions.
+  nlStep_ = newtonStep_ = modNewtonStep_ = descentStep_ = 0;
+
+  // Recall that prior to this solver being called, the new solution has been
+  // predicted and resides in nextSolVectorPtr.
+  rhs_();
+
+#ifdef Xyce_VERBOSE_NONLINEAR
+  // Set some values and dummy values so that we can call printStepInfo_().
+
+  // Relative RHS norm (normRHS_rel_).  On the first evaluation this is one
+  // since normRHS_init = normRHS.
+  normRHS_rel_ = 1.0;
+
+  // Weighted norm of the change (wtNormDX_) is set to zero initially.
+  wtNormDX_    = 0.0;
+
+  // Max RHS norm (maxNormRHS_).
+  rhsVectorPtr_->infNorm(&maxNormRHS_);
+
+  // Print out the starting point information.
+  printStepInfo_(nlStep_);
+#endif
+
+  // Check to ensure that we haven't been passed a converged solution already
+  // (i.e., normRHS < absTol)
+  if (normRHS_ < N_UTL_MachineDependentParams::MachineEpsilon()) return  1;
+
+  // Used to calculate resConvRate which is used by converged_(). This changes
+  // each nonlinear iteration to be the norm of the RHS from the previous
+  // iteration.
+  double normRHS_old = normRHS_;
+
+  // Used to calculate normRHS_rel_, which is output by printStepInfo_().
+  normRHS_init_ = normRHS_;
+
+  // Set the flag that controls the loading and solution of the Jacobian
+  // matrix.
+  if (nlParams.getLinearOpt())
+    loadJacobianFlag_ = !(loaderPtr_->getLinearSystemFlag());
+  else
+    loadJacobianFlag_ = true;
+
+  // The variable convergedStatus: positive value indicates that
+  // the method has converged. A negative value
+  // that the method has failed. This is updated using the subroutine
+  // converged_() at the end of each nonlinear solver iteration.
+  int convergedStatus = 0;
+
+  // Increment step counters.  This needs to be updated *before* the rhs_
+  // call, which is inside of computeStepLength_.
+  nlStep_++;
+
+  // Calculate the Jacobian for the current iterate.
+  if (loadJacobianFlag_) jacobian_();
+
+#ifdef Xyce_DEBUG_NONLINEAR
+    debugOutput1( *(lasSysPtr_->getJacobianMatrix()), *(lasSysPtr_->getRHSVector()));
+#endif
+
+  // Calculate a direction.
+  // Note: It is illegal to modify tmpVector between direction_ and
+  // computeStepLength_
+  direction_();
+
+  // Perform update constraining...
+  if (nlParams.getConstraintBT())
+    constraintFactor_ = constrain_();
+
+  setX0_();
+
+  // Calculate a step length (damping or backtracking for Newton, line search
+  // for others...) and take that step and recalulate the RHS.
+  computeStepLength_();
+
+#ifdef Xyce_DEBUG_NONLINEAR
+  debugOutput3 ((**nextSolVectorPtrPtr_), *searchDirectionPtr_ );
+#endif
+
+  // Test for convergence based on the weighted norms of the RHS and DX.
+  // Also update convergence rate and counters.  1. Update the error
+  // weighting vector for use with the weighted norms.
+  updateWeights_();
+
+  // Scale the search direction so that we can calculate some norms on it and
+  // use them in the convergence tests and output.
+  searchDirectionPtr_->scale(stepLength_);
+
+  // Weighted norm of the change (wtNormDX_) is used in converged_() and
+  // output by printStepInfo_().
+
+#ifdef Xyce_SPICE_NORMS
+  // TGKOLDA: Why is tmpVectorPtr_ used here and where was it set??
+  searchDirectionPtr_->wMaxNorm(*solWtVectorPtr_,
+                                *tmpVectorPtr_,
+                                &wtNormDX_);
+#else
+  searchDirectionPtr_->wRMSNorm(*solWtVectorPtr_, &wtNormDX_);
+#endif
+
+  // Relative RHS norm (normRHS_rel_) is output by printStepInfo_().
+  normRHS_rel_ = normRHS_ / normRHS_init_;
+
+  // Max RHS norm (maxNormRHS_) is used in converged_() and output by
+  // printStepInfo_().
+  rhsVectorPtr_->infNorm(&maxNormRHS_);
+
+  // Residual convergence rate (resConvRate) used by converged_(),
+  // also printed out below.
+  resConvRate_ = normRHS_ / normRHS_old;
+
+  // Reset old norm for next nonlinear iteration.
+  normRHS_old = normRHS_;
+
+#ifdef Xyce_VERBOSE_NONLINEAR
+  printStepInfo_(nlStep_);
+#endif
+
+  // Increment diagnostic step counters.  These need to be updated after
+  // direction_, in which the current direction (NEWTON_DIR,
+  // MOD_NEWTON_DIR or GRADIENT_DIR) is set.
+  if (nlParams.getDirection() == NEWTON_DIR)
+    newtonStep_++;
+  else if (nlParams.getDirection() == MOD_NEWTON_DIR)
+    modNewtonStep_++;
+  else if (nlParams.getDirection() == GRADIENT_DIR)
+    descentStep_++;
+
+  // Evaluate the need for a fresh Jacobian and/or preconditioner...
+  if (nlParams.getDirection() == MOD_NEWTON_DIR)
+    evalModNewton_();
+
+  // Check our iteration status. Returns positive if done, negative if error,
+  // zero otherwise.
+  convergedStatus = converged_();
+
+#ifndef Xyce_SPICE_NORMS
+#if 0
+  // Reset the tolerance which is used in converged_().
+  nlParams.setDeltaXTol(initialDeltaXTol);
+#endif
+#endif
+
+  // Reset the linear solver tolerance.
+  lasSolverPtr_->setDefaultOption( "AZ_tol" );
+
+  // Increment the number of calls to the nonlinear solver.
+  iNumCalls_++;
+
+  // A positive value of convergedStatus indicates a successful nonlinear
+  // solutions. Otherwise, there was an error.
+  return convergedStatus;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::takeOneSolveStep
+//
+// Purpose       : Just like "::initializeSolve" is essentially the top
+//                 of the "::solve" function, this function is similar
+//                 to the bottom of the "::solve" function.  This
+//                 function also only takes a single NL step.
+//
+//                The main differences between this function and solve are:
+//                  1) There is no while loop. - this is only a single
+//                      step.
+//
+//                  2) Most tasks performed prior to the while loop are not
+//                     performed here, as they are initialization tasks.
+//                     These include:
+
+//                      - step counters, such as "nlStep_" and "newtonStep_"
+//                         are not reset to zero.
+//
+//                      - The function "resetCountersAndTimers" is not called.
+//                        This may be fixed up later.
+//
+//                      -  The resetting of the deltaXtol, which is performed
+//                         on the "first call" to ::solve, is not done.
+//                         I'll have to sort this out later as well.
+//
+//                      - the loadJacobianFlag is not updated - assumed to
+//                         have not changed.
+//
+// Special Notes :
+// Scope         : public
+// Creator       : Eric R. Keiter, SNL, Computational Sciences
+// Creation Date : 01/09/01
+//-----------------------------------------------------------------------------
+int N_NLS_DampedNewton::takeOneSolveStep()
+{
+#ifdef Xyce_VERBOSE_NONLINEAR
+  static string msg = "N_NLS_DampedNewton::takeOneSolveStep: ";
+#endif
+
+#ifdef Xyce_DEBUG_NONLINEAR
+  setDebugFlags ();
+#endif
+
+  // Change the nlparams so that they are appropriate for the current
+  // time integration mode, if neccessary.
+  nlpMgrPtr_->getCurrentParams(nlParams);
+
+  if (nlpMgrPtr_->getAnalysisMode() == TRANSIENT)
+    lasSolverPtr_->setTolerance(1.0e-09);
+
+  // Recall that prior to this solver step being called, a new solution has been
+  // predicted and resides in nextSolVectorPtr.
+  rhs_();
+
+  // Used to calculate resConvRate which is used by converged_(). This changes
+  // each nonlinear iteration to be the norm of the RHS from the previous
+  // iteration.
+  double normRHS_old = normRHS_;
+
+  // Nonlinear loop. Loop continues until convergedStatus is nonzero. A
+  // positive value indicates that the method has converged. A negative value
+  // that the method has failed. This is updated using the subroutine
+  // converged_() at the end of each nonlinear solver iteration.
+  int convergedStatus = 0;
+
+  // Increment step counters.  This needs to be updated *before* the rhs_
+  // call, which is inside of computeStepLength_.
+  nlStep_++;
+
+  // Calculate the Jacobian for the current iterate.
+  if (loadJacobianFlag_)
+    jacobian_();
+
+#ifdef Xyce_DEBUG_NONLINEAR
+    debugOutput1( *(lasSysPtr_->getJacobianMatrix()), *(lasSysPtr_->getRHSVector()));
+#endif
+
+  // Calculate a direction.
+  // Note: It is illegal to modify tmpVector between direction_ and
+  // computeStepLength_
+  direction_();
+
+  // Perform update constraining...
+  if (nlParams.getConstraintBT())
+    constraintFactor_ = constrain_();
+
+  setX0_();
+
+  // Calculate a step length (damping or backtracking for Newton, line search
+  // for others...) and take that step and recalulate the RHS.
+  computeStepLength_();
+
+#ifdef Xyce_DEBUG_NONLINEAR
+  debugOutput3 ((**nextSolVectorPtrPtr_), *searchDirectionPtr_ );
+#endif
+
+  // Test for convergence based on the weighted norms of the RHS and DX.
+  // Also update convergence rate and counters.  1. Update the error
+  // weighting vector for use with the weighted norms.
+  updateWeights_();
+
+  // Scale the search direction so that we can calculate some norms on it and
+  // use them in the convergence tests and output.
+  searchDirectionPtr_->scale(stepLength_);
+
+  // Weighted norm of the change (wtNormDX_) is used in converged_() and
+  // output by printStepInfo_().
+
+#ifdef Xyce_SPICE_NORMS
+  // TGKOLDA: Why is tmpVectorPtr_ used here and where was it set??
+  searchDirectionPtr_->wMaxNorm(*solWtVectorPtr_,
+                                *tmpVectorPtr_,
+                                &wtNormDX_);
+#else
+  searchDirectionPtr_->wRMSNorm(*solWtVectorPtr_, &wtNormDX_);
+#endif
+
+  // Relative RHS norm (normRHS_rel_) is output by printStepInfo_().
+  normRHS_rel_ = normRHS_ / normRHS_init_;
+
+  // Max RHS norm (maxNormRHS_) is used in converged_() and output by
+  // printStepInfo_().
+  rhsVectorPtr_->infNorm(&maxNormRHS_);
+
+  // Residual convergence rate (resConvRate) used by converged_(),
+  // also printed out below.
+  resConvRate_ = normRHS_ / normRHS_old;
+
+  // Reset old norm for next nonlinear iteration.
+  normRHS_old = normRHS_;
+
+#ifdef Xyce_VERBOSE_NONLINEAR
+  printStepInfo_(nlStep_);
+#endif
+
+  // Increment diagnostic step counters.  These need to be updated after
+  // direction_, in which the current direction (NEWTON_DIR,
+  // MOD_NEWTON_DIR or GRADIENT_DIR) is set.
+  if (nlParams.getDirection() == NEWTON_DIR)
+    newtonStep_++;
+  else if (nlParams.getDirection() == MOD_NEWTON_DIR)
+    modNewtonStep_++;
+  else if (nlParams.getDirection() == GRADIENT_DIR)
+    descentStep_++;
+
+  // Evaluate the need for a fresh Jacobian and/or preconditioner...
+  if (nlParams.getDirection() == MOD_NEWTON_DIR)
+    evalModNewton_();
+
+  // Check our iteration status. Returns positive if done, negative if error,
+  // zero otherwise.
+  convergedStatus = converged_();
+
+#ifdef Xyce_DEBUG_NONLINEAR
+  if (convergedStatus > 0)
+  {
+    // ERK Note: this one needs the nl solve step incremented by 1!
+    nlStep_++;
+    debugOutput1( *(lasSysPtr_->getJacobianMatrix()), *(lasSysPtr_->getRHSVector()));
+    nlStep_--; // restore original value.
+  }
+#endif
+
+  // Reset the linear solver tolerance.
+  lasSolverPtr_->setDefaultOption( "AZ_tol" );
+
+  // Increment the number of calls to the nonlinear solver.
+  iNumCalls_++;
+
+  // A positive value of convergedStatus indicates a successful nonlinear
+  // solutions. Otherwise, there was an error.
+  return convergedStatus;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::updateX_()
+//
+// Purpose       : Update the value of nextSolVectorPtr_ using
+//                 steplength and the searchDirectionPtr_.  On input, it is
+//                 assumed that tmpSolVectorPtr_ contains the intial guess for
+//                 the nonlinear iteration, i.e., setX0_ was called earlier.
+//
+// Special Notes : Also modifies errorEstVectorPtr_. Only this and
+//                 updateX_() should modify the solution directly.
+//
+//                 ERK: This is new version of this function, hopefully less
+//                 confusing.  The roles of "tmp" and "next" have been
+//                 reversed, which removes the need for some of the switch
+//                 functions.
+//
+// Scope         : private
+// Creator       : Tamara G. Kolda, SNL, Compuational Sciences and
+//                 Mathematics Research Department
+//
+//                 Eric Keiter, SNL, Parallel Computational Sciences (9233)
+//
+// Creation Date : 01/24/02
+//-----------------------------------------------------------------------------
+void N_NLS_DampedNewton::updateX_()
+{
+  (*nextSolVectorPtrPtr_)->daxpy(**tmpSolVectorPtrPtr_,
+                                  stepLength_,
+                                  *searchDirectionPtr_);
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::rhs_()
+// Purpose       : Updates the RHS based on nextSolVectorPtrPtr_ and
+//                 calculates normRHS_ based on nlParams.getNormLevel().
+// Special Notes : The rhsVectorPtr_ is really the NEGATIVE of F(x).
+// Scope         : private
+// Creator       : Tamara G. Kolda, SNL, Compuational Sciences and
+//                 Mathematics Research Department
+// Creation Date : 06/19/01
+//-----------------------------------------------------------------------------
+bool N_NLS_DampedNewton::rhs_()
+{
+  bool status = N_NLS_NonLinearSolver::rhs_();
+
+#ifdef Xyce_DEBUG_NONLINEAR
+  debugOutput3 ((**nextSolVectorPtrPtr_), *searchDirectionPtr_ );
+#endif
+
+  rhsVectorPtr_->lpNorm(nlParams.getNormLevel(), &normRHS_);
+
+  return status;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::newtonDirection_
+// Purpose       : Computes the Newton Direction inexactly using
+//                 jacobianMatrixPtr_ and the rhsVectorPtr_.
+//                 On output, NewtonVectorPtr_ contains the Newton
+//                 Direction.
+// Special Notes : This is *not* meant to override newton_ in
+//                 N_NLS_NonLinearSolver.
+// Scope         : private
+// Creator       : Tamara G. Kolda, SNL, Compuational Sciences and
+//                 Mathematics Research Department
+// Creation Date : 06/19/01
+//-----------------------------------------------------------------------------
+bool N_NLS_DampedNewton::newton_()
+{
+  // Set the solver tolerance based on the residual norm.
+  if (nlParams.getForcingFlag()) setForcing_(normRHS_);
+
+  return N_NLS_NonLinearSolver::newton_();
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::direction_
+// Purpose       : The function calculates the direction vector used in
+//                 the nonlinear solver (e.g., Newton direction).
+// Special Notes : If the search direction is a Newton direction, then a linear
+//                 system is solved inexactly.  To ensure that the approximate
+//                 solution is a descent direction, the projection of the
+//                 solution along the gradient is computed to working
+//                 precision.  On output, searchDirectionPtr_ points to the
+//                 search direction vector.  The vector allocated to store the
+//                 NewtonVector is always used to store the
+//                 SearchDirectionVector, regardless of the actual algorithm
+//                 used to determine the search direction.
+// Scope         : private
+// Creator       : Scott A. Hutchinson, SNL, Computational Sciences Department
+// Creation Date : 02/21/01
+//-----------------------------------------------------------------------------
+void N_NLS_DampedNewton::direction_()
+{
+#ifdef Xyce_DEBUG_NONLINEAR
+  char tmpStr[128];
+  static string msg = "N_NLS_DampedNewton::direction_: ";
+
+#if 0
+  if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
+  {
+    sprintf(tmpStr, "\nSearch Method: %d     Strategy: %d\n\n",
+    nlParams.getSearchMethod(), nlParams.getNLStrategy());
+    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + tmpStr);
+    // Print status messages
+    switch (nlParams.getNLStrategy()) 
+    {
+      case NEWTON:
+        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
+        "\nnonlinear strategy is Newton\n");
+        break;
+      case MOD_NEWTON:
+        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
+        "\nnonlinear strategy is Modified-Newton\n");
+        break;
+      case NEWTON_GRADIENT:
+        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
+        "\n\tnonlinear strategy is Inexact Newton\n"
+        "\t\tconvergence rate: ", resConvRate_);
+        break;
+      case MOD_NEWTON_GRADIENT:
+        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
+        "\n\tnonlinear strategy is Inexact "
+        "Modified-Newton\n\t\tconvergence rate: ",
+        resConvRate_);
+        break;
+      case GRADIENT:
+        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
+        "nonlinear strategy is Gradient\n");
+        break;
+
+      default:
+        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg +
+        "invalid nonlinear solver strategy: ",
+        static_cast<int> (nlParams.getNLStrategy()));
+        break;
+    } // end switch on nlParams.getNLStrategy() - status messages
+  }
+#endif
+#endif
+
+  // --- Set the Direction Type ---
+  switch (nlParams.getNLStrategy())
+  {
+    case NEWTON:
+      nlParams.setDirection(NEWTON_DIR);
+      break;
+
+    case MOD_NEWTON:
+      nlParams.setDirection(MOD_NEWTON_DIR);
+      break;
+
+    case NEWTON_GRADIENT:
+    {
+      const double minRedFac = 0.999;
+      if ((nlStep_ > 15) || (resConvRate_ > minRedFac))
+        nlParams.setDirection(NEWTON_DIR);
+      else
+        nlParams.setDirection(GRADIENT_DIR);
+
+      break;
+    }
+    case MOD_NEWTON_GRADIENT:
+    {
+      const double minRedFac = 0.999;
+      if ((nlStep_ > 15) || (resConvRate_ > minRedFac))
+      {
+        nlParams.setDirection(MOD_NEWTON_DIR);
+      }
+      else
+      {
+        nlParams.setDirection(GRADIENT_DIR);
+      }
+      break;
+    }
+    case GRADIENT:
+      nlParams.setDirection(GRADIENT_DIR);
+      break;
+
+    default:
+      nlParams.setDirection(NEWTON_DIR);
+      break;
+
+  } // end switch on nlParams.getNLStrategy()
+
+  // --- Calculate SearchDirection ---
+  switch (nlParams.getDirection())
+  {
+    case NEWTON_DIR:
+
+      // Compute the Newton direction
+      newton_();
+
+      // Copy the Newton direction into the search direction
+      *searchDirectionPtr_ = *NewtonVectorPtr_;
+
+      break;
+
+    case MOD_NEWTON_DIR:
+
+      // Compute the modified-Newton direction
+      newton_();
+
+      // Copy the modified-Newton direction into the search direction
+      *searchDirectionPtr_ = *NewtonVectorPtr_;
+
+      break;
+
+    case GRADIENT_DIR:
+
+      // Compute the gradient
+      gradient_();
+
+      // Copy Gradient into Search Direction, then Reverse and scale
+      // search direction. (Can this be done in one operation??)
+      *searchDirectionPtr_ = *gradVectorPtr_;
+      searchDirectionPtr_->scale(-1.0 / normRHS_);
+
+      break;
+
+    default:
+
+#ifdef Xyce_DEBUG_NONLINEAR
+      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg +
+                            "invalid search direction: ",
+                            static_cast<int> (nlParams.getDirection()));
+#endif
+
+      break;
+
+  } // end switch on nlParams.getDirection()
+
+} // end direction_
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::computeStepLength_
+// Purpose       : This function calculates the step length for a given search
+//                 direction. If the search direction is Newton, it may use one
+//                 of a variety of backtracking methods including on suggested
+//                 by
+// Special Notes : !!!!!NOTE:  In this method, we use the term FULLSTEP to mean
+//                 the maximum allowed Newton step (0..1).  fullStep = 1.
+//                 corresponds to a Newton step, but when computeStepLength_
+//                 is coupled with a constraint back tracking, 0<fullStep<=1.
+// Scope         : private
+// Creator       : Scott A. Hutchinson, SNL, Computational Sciences Department
+// Creation Date : 02/21/01
+//-----------------------------------------------------------------------------
+bool N_NLS_DampedNewton::computeStepLength_()
+
+{
+#if defined(Xyce_VERBOSE_NONLINEAR) || defined(Xyce_DEBUG_NONLINEAR)
+  static string msg = "N_NLS_DampedNewton::computeStepLength_: ";
+#endif
+
+  searchStep_ = 0;  // number of search steps
+
+  // Choose step length approach based on the current solution method.
+  switch (nlParams.getSearchMethod())
+  {
+    case DIVIDE:
+
+      return divide_();
+      break;
+
+    case BACKTRACK:
+
+      return backtrack_();
+      break;
+
+    case SIMPLE_BACKTRACK:
+
+      return simpleBacktrack_();
+      break;
+
+    case BANK_ROSE:
+
+      return bankRose_();
+      break;
+
+    case DESCENT:
+
+      return descent_();
+      break;
+
+    default:
+
+      return fullNewton_();
+      break;
+  }
+
+  // If the code gets to this point in the function there has been an
+  // error...
+  return false;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::divide_()
+// Purpose       : Eric's "Divide and Conquer" method. Subsequently halves
+//                 the steplength until there is improvement in the RHS or
+//                 the steplength becomes smaller than N_UTL_MachineDependentParams::MachineEpsilon().
+// Special Notes : Does not verify that the search direction is a descent
+//                 direction.
+// Scope         : private
+// Creator       : Tamara G. Kolda, SNL, Compuational Sciences and
+//                 Mathematics Research Department
+// Creation Date : 06/29/01
+//-----------------------------------------------------------------------------
+bool N_NLS_DampedNewton::divide_()
+{
+
+#if defined(Xyce_VERBOSE_NONLINEAR) || defined(Xyce_DEBUG_NONLINEAR)
+  static string msg = "N_NLS_DampedNewton::computeStepLength_: ";
+#endif
+#if defined(Xyce_DEBUG_NONLINEAR)
+  char tmpStr[128];
+#endif
+
+  // Want to get reduction in the norm, so we first copy the norm from
+  // the previous iterate
+  const double oldNormRHS = normRHS_;
+
+  // The upper bound on the backtracking (damping) is determined by
+  // the applied constraints.
+  const double fullStep = constraintFactor_;
+
+  // Starting value
+  stepLength_ = fullStep;
+
+  // Update the solution.
+  updateX_();
+
+  // Evaluate the new residual and take its norm:
+  rhs_();
+
+#ifdef Xyce_DEBUG_NONLINEAR
+  if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
+    {
+      sprintf(tmpStr, "\n\tSearch Step: %d Step Size: %e\n"
+	      "\toldNormRHS: %e normRHS: %e\n", searchStep_,
+	      stepLength_, oldNormRHS, normRHS_);
+      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + tmpStr);
+    }
+#endif
+
+  // Linesearch...
+  bool searchDone = (normRHS_ < oldNormRHS);
+  while (!searchDone)
+  {
+    // Cut the step length
+    stepLength_ *= 0.5;
+
+    // If the step length gets too small, try full step and finish.
+    if (stepLength_ < N_UTL_MachineDependentParams::MachineEpsilon())
+    {
+#ifdef Xyce_DEBUG_NONLINEAR
+  if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
+    {
+      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg +
+                             "\n\tStep size too small: ",
+                             stepLength_,
+                             "\n\tTaking a full step.\n");
+    }
+#endif
+
+      stepLength_ = fullStep;
+      searchDone = true;
+    }
+
+    updateX_();
+
+    // Evaluate the new RHS vector and take norm:
+    rhs_();
+
+    searchStep_++;
+
+    // Check to see if we're done:
+    searchDone = ((normRHS_ < oldNormRHS) || (searchDone) ||
+                  (searchStep_ >= nlParams.getMaxSearchStep()));
+
+#ifdef Xyce_DEBUG_NONLINEAR
+  if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
+    {
+      sprintf(tmpStr, "\n\tSearch Step: %d Step Size: %e\n"
+	      "\toldNormRHS: %e normRHS: %e\n", searchStep_,
+	      stepLength_, oldNormRHS, normRHS_);
+      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + tmpStr);
+    }
+#endif
+  }
+
+  return (normRHS_ < oldNormRHS);
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::backtrack_
+// Purpose       : Does a backtracking line search along the current search
+//                 direction in the hopes of satisfying the Wolfe conditions
+//                 for f(x) = 0.5 F(x)'F(x) = normrhs^2.
+// Special Notes :
+// Scope         : private
+// Creator       : Tamara G. Kolda, SNL, Compuational Sciences and
+//                 Mathematics Research Department
+// Creation Date : 07/02/01
+//-----------------------------------------------------------------------------
+bool N_NLS_DampedNewton::simpleBacktrack_()
+{
+  bool issuffdec;
+
+  // Local references
+  N_LAS_Vector& g(*gradVectorPtr_);            // Gradient
+  N_LAS_Vector& s(*searchDirectionPtr_);       // Search Direction
+
+  // Compute the gradient, i.e., fill in g
+  gradient_();
+
+  // Evaluate <s,g>
+  double sdotg = s.dotProduct(g);
+
+  double& normrhs(normRHS_);          // Norm of RHS
+  const double f = 0.5 * normrhs * normrhs;   // f(x) = 0.5 F(x)'F(X)
+
+  // If s is a descent direction, then do the line search
+  if (sdotg < 0)
+  {
+    issuffdec = simpleBt_(sdotg, f);
+  }
+
+  // If s is not a descent direction or we cannot find descent along s, switch
+  // to the gradient. We must recompute the maximum allowable step with the new
+  // search direction.
+  if (((sdotg >= 0) || (!issuffdec)) &&
+      (nlParams.getDirection() != GRADIENT_DIR))
+  {
+    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "Switching to Cauchy!");
+    s = g;
+    s.scale(-1.0 / normrhs);
+    sdotg = s.dotProduct(g);
+    double& maxstep(constraintFactor_);
+    maxstep = constrain_();
+    issuffdec = simpleBt_(sdotg, f);
+  }
+
+  if (!issuffdec)
+  {
+    double& step(stepLength_);
+    step = 0.0;
+    updateX_();
+    rhs_();
+
+    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "Linesearch failed!");
+  }
+
+  return issuffdec;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::simpleBt_
+// Purpose       : Does a backtracking line search along the current sear
+// Special Notes :
+// Scope         : private
+// Creator       : Tamara G. Kolda, SNL, Compuational Sciences and
+//                 Mathematics Research Department
+// Creation Date : 07/02/01
+//-----------------------------------------------------------------------------
+bool N_NLS_DampedNewton::simpleBt_(double gsinit, double finit)
+{
+  // Local references
+  double& normrhs(normRHS_);          // Norm of RHS
+  double& step(stepLength_);          // Step length
+  double& maxstep(constraintFactor_); // Maximum step length
+  unsigned int& nstep(searchStep_);   // Number of backtracking steps
+
+  // Local values
+  double f = 0.5 * normrhs * normrhs; // Function value
+  const double alpha = 1.0e-6;        // Suff dec cond parameter
+
+  cout.setf(ios::scientific);
+  cout.precision(10);
+
+  cout << "\nIteration: " << 0
+       << " Step: " << 0
+       << " F(X): " << finit
+       << " gsinit: " << gsinit
+       << " alpha * gsinit: " << alpha * gsinit
+       << endl;
+
+  // Initialize search
+  const int nstepmax = 20;            // Max number of backtracking steps
+  const double minstep = N_UTL_MachineDependentParams::MachineEpsilon(); // Min step length
+  nstep = 0;
+
+  // Loop until we obtain sufficient decrease or violate some condition.
+  bool issuffdec = false;
+  while (!issuffdec)
+  {
+    // Stop if we've taken too many steps
+    if (nstep >= nstepmax)
+      break;
+
+    // If this is the first iteration, set the step to maxstep.
+    // Otherwise, reduce the step by a factor of one-half.
+    if (nstep == 0)
+      step = maxstep;
+    else
+      step *= 0.5;
+
+    // Stop if the step has gotten too small
+    if (step < minstep)
+      break;
+
+    // Compute the new X based on the currect step
+    updateX_();
+
+    // Evaluate the RHS for the new X
+    rhs_();
+
+    // Compute the new function value
+    f = 0.5 * normrhs * normrhs;
+
+    // Check the sufficient decrease condition
+    issuffdec = (f <= (finit + (alpha * step * gsinit)));
+
+    // Increment the step counter
+    nstep ++;
+
+    cout << "Iteration: " << nstep
+         << " Step: " << step
+         << " F(X): " << f
+         << " Test: " << (finit + (alpha * step * gsinit))
+         << endl;
+  }
+
+  cout.unsetf(ios::scientific);
+
+  return issuffdec;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::backtrack_()
+// Purpose       : Backtracking method based on Dennis & Shnabel.
+// Special Notes :
+// Scope         : private
+// Creator       : Scott A. Hutchinson, SNL, Computational Sciences Department
+// Creation Date : 07/28/01
+//-----------------------------------------------------------------------------
+bool N_NLS_DampedNewton::backtrack_()
+{
+
+#if defined(Xyce_VERBOSE_NONLINEAR) || defined(Xyce_DEBUG_NONLINEAR)
+  static string msg = "N_NLS_DampedNewton::computeStepLength_: ";
+#endif
+#if defined(Xyce_DEBUG_NONLINEAR)
+  char tmpStr[128];
+#endif
+
+  // Want to get reduction in the norm, so we first copy the norm from
+  // the previous iterate
+  const double oldNormRHS = normRHS_;
+
+  // The upper bound on the backtracking (damping) is determined by
+  // the applied constraints.
+  const double fullStep = constraintFactor_;
+
+  // Starting value
+  stepLength_ = fullStep;
+
+  // Update the solution.
+  updateX_();
+
+  // Evaluate the new residual and take its norm:
+  rhs_();
+
+  // Linesearch...
+  double rho, delta, theta, lambda;
+  const double t = 1.0e-04, thetaMin = 0.1, thetaMax = 0.5;
+  const double minStep = pow(N_UTL_MachineDependentParams::MachineEpsilon(), 0.33);
+
+  // If we're using the inexact-Newton forcing, we use the forcing value
+  // (linear-solver convergence tolerance) to set the initial "lambda".
+  if (nlParams.getForcingFlag())
+    lambda = 1.0 - nlParams.getForcingTerm();
+  else
+    lambda = 1.0;
+
+  rho = normRHS_ / oldNormRHS;
+
+  while ((rho > 1.0 - t * lambda) &&
+         (searchStep_ < nlParams.getMaxSearchStep()))
+  {
+    delta = rho * rho - 1.0 + 2.0 * lambda;
+    if (delta <= 0.0)
+      theta = thetaMax;
+    else
+    {
+      theta = lambda / delta;
+
+      if (theta > thetaMax)
+        theta = thetaMax;
+      else if (theta < thetaMin)
+        theta = thetaMin;
+    }
+
+    lambda      *= theta;
+    stepLength_ *= theta;
+
+    // Jump out if the step-size gets too small...
+    if (stepLength_ < minStep)
+    {
+      stepLength_ = minStep;
+      searchStep_ = nlParams.getMaxSearchStep();
+    }
+
+    // Update solution & evaluate the new RHS vector and take norm:
+    updateX_();
+    rhs_();
+
+    rho = normRHS_ / oldNormRHS;
+    searchStep_++;
+
+#ifdef Xyce_DEBUG_NONLINEAR
+  if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
+    {
+      sprintf(tmpStr, "\n\tSearch Step: %d Step Size: %e\n"
+	      "\toldNormRHS: %e normRHS_: %e\n", searchStep_,
+	      stepLength_, oldNormRHS, normRHS_);
+      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + tmpStr);
+    }
+#endif
+  }
+
+  // If the linesearch fails, take a full step...
+//  if (rho > 1.0 - t * lambda)
+//    stepLength_ = fullStep;
+
+  return (rho <= 1.0 - t * lambda);
+
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::fullNewton_()
+// Purpose       :
+// Special Notes :
+// Scope         : private
+// Creator       : Tamara G. Kolda, SNL, Compuational Sciences and
+//                 Mathematics Research Department
+// Creation Date : 06/29/01
+//-----------------------------------------------------------------------------
+bool N_NLS_DampedNewton::fullNewton_()
+{
+  // ***** Full Newton method *****
+  stepLength_ = 1.0;
+
+  updateX_();
+
+  // Evaluate the new residual and take its norm:
+  rhs_();
+
+  return true;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::spiceNewton_()
+//
+// Purpose       : Mimics spice.  Assumes you've loaded things so
+//                 that the system you are solving is:
+//
+//                 J x_{i+1} = -f + J x_i
+//
+// Special Notes :  This is ONLY used for debugging!
+//
+//                  At the moment, this will not get the norm right.
+//
+// Scope         : private
+// Creator       : Eric R. Keite, SNL, Compuational Sciences
+// Creation Date : 12/16/04
+//-----------------------------------------------------------------------------
+bool N_NLS_DampedNewton::spiceNewton_()
+{
+  // ***** Spice Newton method *****
+  stepLength_ = 1.0;
+
+  // Create the real dx.  Normally, the search vector contains dx, but not
+  // in the spice-style iteration.  The search vector is actually the new x,
+  // so dx = search-nextSol.
+  (tmpVectorPtr_)->daxpy( *searchDirectionPtr_,
+			  -1.0,
+			  **nextSolVectorPtrPtr_ );
+
+  // copy "dx" into x.  "dx" is really the new solution.
+  //  - should really use the "=" operator for this.
+  (*nextSolVectorPtrPtr_)->putScalar(0.0);
+  (*nextSolVectorPtrPtr_)->addVec(1.0, *searchDirectionPtr_);
+
+  // now copy the tmp vector back into searchDirection, to set up the real dx.
+  (searchDirectionPtr_)->putScalar(0.0);
+  (searchDirectionPtr_)->addVec(1.0, *tmpVectorPtr_);
+
+  // Evaluate the new residual and take its norm:
+  rhs_();
+
+  return true;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::evalModNewton_
+// Purpose       : This method evaluates the modified Newton status to
+//                 determine if a fresh Jacobian and associated preconditioner
+//                 are required.  If we take a step that dramatically degrades
+//                 the NLS convergence, we ensure that we're going to use a
+//                 "fresh" Jacobian and preconditioner for some number of steps
+//                 to get us back to a region of good convergence.
+// Special Notes :
+// Scope         : private
+// Creator       : Scott A. Hutchinson, SNL, Computational Sciences Department
+// Creation Date : 08/17/01
+//-----------------------------------------------------------------------------
+void N_NLS_DampedNewton::evalModNewton_()
+
+{
+#ifdef Xyce_DEBUG_NONLINEAR
+  static string msg = "N_NLS_DampedNewton::evalModNewton_: ";
+#endif
+
+  const double minConvFactor = 0.01;
+
+  const double etaMax  = 1.0;
+  const double etaMin  = 1.0e-12;
+  const double etaInit = 1.0e-01;
+  double       eta;
+  double       nlResNorm = normRHS_;
+
+  if (modNewtonStep_ <= 2)
+  {
+    eta          = etaInit;
+    nlResNormOld = nlResNorm;
+  }
+  else
+  {
+//    double denom = Xycemax(N_UTL_MachineDependentParams::DoubleMin(), nlResNormOld);
+//    eta = fabs(nlResNorm - lasSolverPtr_->getLinearResidual()) / denom;
+    eta = resConvRate_;
+  }
+
+#ifdef Xyce_DEBUG_NONLINEAR
+   char tmpStr[128];
+  if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
+  {
+    N_UTL_Param linRes( "RESIDUAL", 0.0 );
+    lasSolverPtr_->getInfo( linRes );
+    sprintf(tmpStr, "\tnlResNorm: %e linRes: %e nlResNormOld: %e "
+	      "calculated eta: %e\n\n", nlResNorm,
+	      linRes.dVal(), nlResNormOld, eta);
+    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmpStr);
+  }
+#endif
+
+  etaOld       = eta;
+  nlResNormOld = nlResNorm;
+
+#ifdef Xyce_DEBUG_NONLINEAR
+  if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
+    {
+      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\t\teta:\t", eta, "\n");
+    }
+#endif
+
+
+//  lasSolverPtr_->setUpdatedJacobian(true);
+//  directSolverPtr_->setUpdatedJacobian(true);
+  loadJacobianFlag_ = true;
+
+  if (eta < minConvFactor)
+  {
+    loadJacobianFlag_ = false;
+//    lasSolverPtr_->setUpdatedJacobian(false);
+//    directSolverPtr_->setUpdatedJacobian(false);
+  }
+
+#ifdef Xyce_VERBOSE_NONLINEAR
+  if (loadJacobianFlag_)
+    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, " ***** Calculating "
+                           "new Jacobian and preconditioner\n");
+   else
+     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, " ***** Using old "
+                            "Jacobian and preconditioner\n");
+#endif
+
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::converged_
+// Purpose       : This method checks for convergence of the Newton solver.
+//                 Much of this is currently based on the methods in both
+//                 P.N. Brown, A.C. Hindmarsh and L.R. Petzold, "Consistent
+//                 initial condition calculations for differential-algebraic
+//                 systems", SIAM J. Sci. Comput., Vol. 19, No. 5,
+//                 pp. 1495-1512, Sep. 1998 and J.E. Dennis, Jr. and
+//                 R.B. Schnabel, "Numerical Methods for Unconstrained
+//                 Optimization and Nonlinear Equations", Prentice-Hall, 1983.
+//
+// Special Notes : Returns 0 if not converged, positive if converged, negative
+//                 if not converged but some other error.
+//
+//                 Eric Keiter, 9233, 03/27/03: I modified the code so that
+//                 it would use values in the N_NLS_ReturnCodes class as
+//                 the integer values for success/failure, rather than
+//                 hardwired numbers.  The defaults of this class are the
+//                 same numbers as the old hardwired ones.
+//
+//                 The reason for doing this is to allow the user, or
+//                 calling code to set which circumstances should be
+//                 considered adequate convergence.  If
+//                 running a two-level continuation loop, within the transient mode,
+//                 there needed to be a way to easily disable the
+//                 "nearConverged" senario.
+//
+// Scope         : private
+// Creator       : Scott A. Hutchinson, SNL, Computational Sciences Department
+// Creation Date : 01/13/01
+//-----------------------------------------------------------------------------
+int N_NLS_DampedNewton::converged_()
+
+{
+#ifdef Xyce_DEBUG_NONLINEAR
+  static string msg = "N_NLS_DampedNewton::converged_: ";
+#endif
+
+  const double rhsTol       = N_UTL_MachineDependentParams::MachineEpsilon();
+  const double convRateMax  = 0.5 * N_UTL_MachineDependentParams::DoubleMax();
+//  const double minResReduct = 1.0e-3;
+  const double minResReduct = 9.0e-1;
+  const double stagnationTol = 1.0e-3;
+//  const double stagnationTol = pow(N_UTL_MachineDependentParams::MachineEpsilon(), 1.0/3.0);
+
+  AnalysisMode mode1 = nlpMgrPtr_->getAnalysisMode();
+
+  // This parameter "takes-out" any damping induced in the size of the norm by
+  // a line-search or other globalization method.
+  double updateSize = wtNormDX_ / stepLength_;
+
+  // Devices need to satisfy their own convergence criteria
+  if (nlParams.getEnforceDeviceConvFlag ()) {
+    bool allDevicesConverged_ = loaderPtr_->allDevsConverged();
+    if (!allDevicesConverged_ && 
+             (nlStep_ < nlParams.getMaxNewtonStep() )) 
+    {
+      return 0;
+    }
+  }
+
+  // This test is for 2-level solves ONLY.
+  bool innerDevicesConverged_ = loaderPtr_->innerDevsConverged();
+  if (!innerDevicesConverged_ )
+  {
+    return 0;
+  }
+
+  // Make sure the residual isn't too small (i.e., there's nothing more to do)
+  if (maxNormRHS_ <= rhsTol && maxNormRHS_ <= nlParams.getRHSTol())
+    return retCodes_.normTooSmall; // 1;
+
+  // Check for "normal" convergence
+  if (maxNormRHS_ <= nlParams.getRHSTol() &&
+      updateSize <= nlParams.getDeltaXTol())
+    return retCodes_.normalConvergence; // 2;
+
+  // Transient "Near Converged"...
+  if (nlStep_ > nlParams.getMaxNewtonStep() &&
+      mode1 == TRANSIENT)
+  {
+    // Check for "near" convergence and let the time integrator handle the
+    // error analysis and decide on whether or not to accept its step
+    if ((normRHS_rel_ <= minResReduct) && (resConvRate_ <= 1.0))
+      return retCodes_.nearConvergence; // 3;
+  }
+
+  // Check to see if update is really small
+  if (updateSize <= nlParams.getSmallUpdateTol ())
+    return retCodes_.smallUpdate; // 4;
+
+  // Next check the number of steps
+  if (nlStep_ > nlParams.getMaxNewtonStep())
+    return retCodes_.tooManySteps; // -1;
+
+  // Make sure that we haven't had too big an update
+  else if (resConvRate_ > convRateMax)
+    return retCodes_.updateTooBig; // -2;
+
+  // Check for a stall in the convergence rate - if it is near one for five
+  // consecutive steps, we've stalled so jump out.
+  if (mode1 == TRANSIENT && fabs(resConvRate_ - 1.0) <= stagnationTol)
+  {
+    if (count == 0 || resConvRate_ < tmpConvRate) tmpConvRate = resConvRate_;
+
+    count++;
+#ifdef Xyce_DEBUG_NONLINEAR
+  if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
+    {
+      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
+			     "\tcount:\t", count);
+      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
+			     "\tresConvRate_:\t", resConvRate_, "\n");
+    }
+#endif
+  }
+  else
+    count = 0;
+
+  if (mode1 == TRANSIENT && count == 5)
+  {
+    count = 0;
+    if ((normRHS_rel_ < minResReduct) && (tmpConvRate <= 1.0))
+    {
+#ifdef Xyce_DEBUG_NONLINEAR
+      if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
+	{
+	  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
+				 "\ttmpConvRate: ", tmpConvRate);
+	  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
+				 "\tnormRHS_rel_:\t", normRHS_rel_);
+	  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\tReturning 3\n");
+	}
+#endif
+      return retCodes_.nearConvergence; // 3;
+    }
+    else
+    {
+#ifdef Xyce_DEBUG_NONLINEAR
+      if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
+      {
+        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
+            "\ttmpConvRate: ", tmpConvRate);
+        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
+            "\tnormRHS_rel_:\t", normRHS_rel_);
+        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
+            "\tReturning -3\n");
+      }
+#endif
+          return retCodes_.stalled;  // -3;
+    }
+  }
+
+  return 0;
+
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::constrain_
+// Purpose       : This method performs constraint backtracking by determining
+//                 a damping factor:
+//
+//                      theta = min{1, theta-, theta+, theta_u}
+//
+//                 where theta-, theta+ and theta_u are determined according
+//                 the constraint algorithm of J.N. Shadid (SNL internal
+//                 communication).
+// Special Notes : See the notes in N_NLS_ConstraintBT.C for how these are
+//                 calculated.
+// Scope         : private
+// Creator       : Scott A. Hutchinson, SNL, Computational Sciences Department
+// Creation Date : 02/08/01
+//-----------------------------------------------------------------------------
+double N_NLS_DampedNewton::constrain_()
+{
+  double minValue;
+
+  // First, update all the thetas...
+  nlConstraintPtr_->updateThetaBoundNeg(*nextSolVectorPtrPtr_,
+                                        searchDirectionPtr_);
+
+  nlConstraintPtr_->updateThetaBoundPos(*nextSolVectorPtrPtr_,
+                                        searchDirectionPtr_);
+
+  nlConstraintPtr_->updateThetaChange(*nextSolVectorPtrPtr_,
+                                       searchDirectionPtr_);
+
+  // Now, determine the minimum value
+  minValue = Xycemin(1.0, nlConstraintPtr_->getThetaBoundNeg());
+  minValue = Xycemin(minValue, nlConstraintPtr_->getThetaBoundPos());
+  minValue = Xycemin(minValue, nlConstraintPtr_->getThetaChange());
+
+#ifdef Xyce_DEBUG_NONLINEAR
+  static std::string msg = "N_NLS_DampedNewton::constrain_: ";
+  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + "minValue: ",
+                         minValue);
+#endif
+#ifdef Xyce_VERBOSE_NONLINEAR
+  if (minValue < 1.0)
+    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
+                           " ***** Constraining:\t", minValue, "\n");
+#endif
+
+  return minValue;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::setForcing_
+// Purpose       : This method calculates the forcing term (i.e., linear
+//                 residual tolerance) for iterative solvers based on the
+//                 method of Walker and Pernice (RefXXX)
+// Special Notes :
+// Scope         : private
+// Creator       : Scott A. Hutchinson, SNL, Computational Sciences Department
+// Creation Date : 05/03/01
+//-----------------------------------------------------------------------------
+void N_NLS_DampedNewton::setForcing_(const double nlResNorm)
+{
+  const double etaExp  = 0.5 * (1.0 + sqrt(5.0));
+  const double etaMax  = 0.1;
+  const double etaMin  = 1.0e-12;
+  const double etaInit = 1.0e-01;
+  double eta;
+  double etaSafe;
+
+  if (newtonStep_ == 0 && modNewtonStep_ == 0)
+  {
+    eta          = etaInit;
+    nlResNormOld = nlResNorm;
+  }
+
+  else if (nlResNormOld > N_UTL_MachineDependentParams::DoubleMin())
+  {
+    N_UTL_Param linRes( "RESIDUAL", 0.0 );
+    lasSolverPtr_->getInfo( linRes );
+    eta = fabs(nlResNorm - linRes.dVal()) / nlResNormOld;
+    eta *= eta;
+
+    // First safeguard...
+    etaSafe = pow(etaOld, etaExp);
+    if (etaSafe > 0.1)
+      eta = Xycemax(eta, etaSafe);
+
+    // Second safeguard...
+    eta = Xycemin(etaMax, eta);
+
+    // Not too small...
+    eta = Xycemax(etaMin, eta);
+
+#ifdef Xyce_DEBUG_NONLINEAR
+    char tmpStr[128];
+    sprintf(tmpStr, "\tnlResNorm: %e linRes: %e nlResNormOld: %e "
+            "calculated eta: %e\n\n", nlResNorm,
+            linRes.dVal(), nlResNormOld,
+            fabs(nlResNorm - linRes.dVal()) /
+            nlResNormOld);
+    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmpStr);
+#endif
+
+  }
+
+  else
+    eta = etaMax;
+
+  etaOld       = eta;
+  nlResNormOld = nlResNorm;
+
+#ifdef Xyce_VERBOSE_NONLINEAR
+  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\t\teta:\t", eta, "\n");
+#endif
+
+  // Set the tolerance
+  lasSolverPtr_->setTolerance(eta);
+
+  // Set the parameter
+  nlParams.setForcingTerm(eta);
+
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::bankRose_(nlInfo)
+// Purpose       : Method of R.E. Bank and D.J. Rose in their paper "Global
+//                 Approximate Newton Methods", 1981, Numerische Mathematik,
+//                 Springer-Verlag.  Modifications to their original method
+//                 have been made so that this implementation looks more like
+//                 that implemented in CAzM - W.M. Coughran, Jr., E. Grosse and
+//                 D.J. Rose, "CAzM: A Circuit Analyzer with Macromodeling",
+//                 IEEE Trans. on Electron Devices, Vol. ED-30, No. 9,
+//                 Sep. 1983.
+// Special Notes :
+// Scope         : private
+// Creator       : Tamara G. Kolda, SNL, Compuational Sciences and
+//                 Mathematics Research Department
+// Creation Date : 06/29/01
+//-----------------------------------------------------------------------------
+bool N_NLS_DampedNewton::bankRose_()
+{
+  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
+          "THIS IS BROKEN. DO NOT USE THIS METHOD");
+  return false;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_DampedNewton::descent_(nlInfo)
+// Purpose       :
+// Special Notes :
+// Scope         : private
+// Creator       : Tamara G. Kolda, SNL, Compuational Sciences and
+//                 Mathematics Research Department
+// Creation Date : 06/29/01
+//-----------------------------------------------------------------------------
+bool N_NLS_DampedNewton::descent_()
+{
+  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
+          "THIS IS BROKEN. DO NOT USE THIS METHOD");
+  return false;
+}
+
+//-----------------------------------------------------------------------------
+// Dummy function since homotopy doesn't work with old solver
+//-----------------------------------------------------------------------------
+bool N_NLS_DampedNewton::isFirstContinuationParam() const
+{
+  return true;
+}
+
+//-----------------------------------------------------------------------------
+// Dummy function since homotopy doesn't work with old solver
+//-----------------------------------------------------------------------------
+int N_NLS_DampedNewton::getContinuationStep() const
+{
+  return 0;
+}
+
+//-----------------------------------------------------------------------------
+// Dummy function since homotopy doesn't work with old solver
+//-----------------------------------------------------------------------------
+int N_NLS_DampedNewton::getParameterNumber() const
+{
+  return 0;
+}
+

@@ -1,0 +1,63 @@
+#!/bin/sh
+
+echo "-----------------------------------------------------------------------------"
+echo " Copyright Notice"
+echo
+echo " Copyright (c) 2002-2013, Sandia Corporation, Albuquerque, NM, USA.  "
+echo " See the output of Xyce -license for details. "
+echo "-----------------------------------------------------------------------------"
+echo
+echo
+date
+echo
+
+LOCDIR="$( cd "$( dirname "$0" )"/.. && pwd )"
+
+export LD_LIBRARY_PATH="${LOCDIR}/lib:$LD_LIBRARY_PATH"
+export DYLD_LIBRARY_PATH="${LOCDIR}/lib:$DYLD_LIBRARY_PATH"
+
+
+# Uncomment PATH and point to the Open MPI bin directory:
+#  PATH="/opt/openmpi/bin:$PATH"
+MPISCRIPT="mpirun"
+
+
+which $MPISCRIPT >/dev/null 2>&1
+
+[ $? -ne 0 ] && echo "Xyce failed to run because the MPI environment could not be determined.  Please edit ${LOCDIR}/bin/xmpirun, or update your path to include mpirun/mpiexec/etc.  Consult the Xyce Reference Guide for assistance." && exit 1
+
+### LOCVER=`mpirun -V 2>&1 >/dev/null | grep MPI | awk '{print $4}'`
+### MINVER=1.4
+### [ "$LOCVER" \< "$MINVER" ] && echo "Xyce requires Open MPI version $MINVER+ to run." && exit 2
+
+if [ $# -eq 0 ]; then
+  exec $MPISCRIPT $MPIRUNARGS "$LOCDIR/bin/Xyce" -h
+fi
+
+until [ $# -eq 1 ]
+do
+    case $1 in
+        -h | -v | -syntax | -norun | -gui | -jacobian_test | -test | -param | -info | -a )
+            # push the -np option to the mpi run script
+            XYCEARGS="$XYCEARGS $1"
+            shift
+        ;;
+
+        -delim | -o | -l | -nox | -linsolv | -maxord | -prf | -r )
+            # push the -np option to the mpi run script
+            XYCEARGS="$XYCEARGS $1 $2"
+            shift
+            shift
+        ;;
+
+        * )
+            MPIRUNARGS="$MPIRUNARGS $1"
+            shift
+        ;;
+    esac
+done
+
+XYCEARGS="$XYCEARGS $1"
+
+exec $MPISCRIPT $MPIRUNARGS "$LOCDIR/bin/Xyce" $XYCEARGS
+

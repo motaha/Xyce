@@ -1,0 +1,14 @@
+The code in this directory was obtained from the Mextram Users Group web site
+at http://mextram.sourceforge.net/index.html
+
+For use with the Xyce verilog-a/ADMS interface, the *.va files were modified
+so that the blocks that had formerly begun with:
+
+  begin : initializeModel
+
+now read: 
+  @(initial_model) begin
+
+In addition, evaluate.inc needed a newline at the end of the file in order
+for ADMS to process it properly.  Other than that, the files here are exactly
+as they were obtained from the MUG.

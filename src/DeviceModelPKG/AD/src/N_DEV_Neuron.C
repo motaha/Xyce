@@ -1,0 +1,1133 @@
+//-----------------------------------------------------------------------------
+// Copyright Notice
+//
+//   Copyright 2002 Sandia Corporation. Under the terms
+//   of Contract DE-AC04-94AL85000 with Sandia Corporation, the U.S.
+//   Government retains certain rights in this software.
+//
+//    Xyce(TM) Parallel Electrical Simulator
+//    Copyright (C) 2002-2011  Sandia Corporation
+//
+//    This program is free software: you can redistribute it and/or modify
+//    it under the terms of the GNU General Public License as published by
+//    the Free Software Foundation, either version 3 of the License, or
+//    (at your option) any later version.
+//
+//    This program is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    GNU General Public License for more details.
+//
+//    You should have received a copy of the GNU General Public License
+//    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//-----------------------------------------------------------------------------
+
+//-------------------------------------------------------------------------
+// Filename       : $RCSfile: N_DEV_Neuron.C,v $
+//
+// Purpose        :
+//
+// Special Notes  :
+//
+// Creator        : Richard Schiek, Electrical and Microsytem Modeling
+//
+// Creation Date  : 02/28/00
+//
+// Revision Information:
+// ---------------------
+//
+// Revision Number: $Revision: 1.34.2.1 $
+//
+// Revision Date  : $Date: 2013/10/03 17:23:33 $
+//
+// Current Owner  : $Author: tvrusso $
+//-------------------------------------------------------------------------
+
+#include <Xyce_config.h>
+
+
+// ---------- Standard Includes ----------
+
+#include <N_UTL_Misc.h>
+
+// ----------   Xyce Includes   ----------
+#include <N_DEV_Neuron.h>
+#include <N_DEV_ExternData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_DeviceOptions.h>
+#include <N_DEV_MatrixLoadData.h>
+
+#include <N_LAS_Vector.h>
+#include <N_LAS_Matrix.h>
+
+namespace Xyce {
+namespace Device {
+
+template<>
+ParametricData<Neuron::Instance>::ParametricData()
+{
+  setNumNodes(2);
+  setNumOptionalNodes(0);
+  setNumFillNodes(0);
+  setModelRequired(1);
+  setPrimaryParameter("");
+  addModelType("NEURON");
+}
+
+template<>
+ParametricData<Neuron::Model>::ParametricData()
+{
+  // Set up map for double precision variables:
+  addPar ("CMEM", 0.0, false, ParameterType::NO_DEP,
+          &Neuron::Model::cMem,
+          &Neuron::Model::cMemGiven,
+          U_FARAD, CAT_NONE, "Membrane capacitance");
+
+  addPar ("ELEAK", 0.0, false, ParameterType::NO_DEP,
+          &Neuron::Model::eLeak,
+          &Neuron::Model::eLeakGiven,
+          U_VOLT, CAT_NONE, "Leak current reversal potential");
+
+  addPar ("GMEM", 0.0, false, ParameterType::NO_DEP,
+          &Neuron::Model::gMem,
+          &Neuron::Model::gMemGiven,
+          U_OHMM1, CAT_NONE, "Membrane conductance");
+
+  addPar ("EK", 0.0, false, ParameterType::NO_DEP,
+          &Neuron::Model::eK,
+          &Neuron::Model::eKGiven,
+          U_VOLT, CAT_NONE, "Potassium reversal potential");
+
+  addPar ("GK", 0.0, false, ParameterType::NO_DEP,
+          &Neuron::Model::gK,
+          &Neuron::Model::gKGiven,
+          U_OHMM1, CAT_NONE, "Potassium base conductance");
+
+  addPar ("ENA", 0.0, false, ParameterType::NO_DEP,
+          &Neuron::Model::eNa,
+          &Neuron::Model::eNaGiven,
+          U_VOLT, CAT_NONE, "Sodium reversal potential");
+
+  addPar ("GNA", 0.0, false, ParameterType::NO_DEP,
+          &Neuron::Model::gNa,
+          &Neuron::Model::gNaGiven,
+          U_OHMM1, CAT_NONE, "Sodium base conductance");
+
+  addPar ("VREST", 0.0, false, ParameterType::NO_DEP,
+          &Neuron::Model::vRest,
+          &Neuron::Model::vRestGiven,
+          U_VOLT, CAT_NONE, "Resting potential");
+}
+
+namespace Neuron {
+
+vector<vector<int> >
+Instance::jacStamp;
+
+
+
+ParametricData<Instance> &Instance::getParametricData() {
+  static ParametricData<Instance> parMap;
+
+  return parMap;
+}
+
+ParametricData<Model> &Model::getParametricData() {
+  static ParametricData<Model> parMap;
+
+  return parMap;
+}
+
+// Class Instance
+//-----------------------------------------------------------------------------
+// Function      : Instance::processParams
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+bool Instance::processParams(string param)
+{
+  // If there are any time dependent parameters, set their values at for
+  // the current time.
+
+  // now set the temperature related stuff.
+  //updateTemperature(temp);
+
+  return true;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Instance::updateTemperature
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+bool Instance::updateTemperature ( const double & temp)
+{
+  bool bsuccess = true;
+  return bsuccess;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Instance::Instance
+// Purpose       : constructor
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+Instance::Instance(
+  InstanceBlock &                  IB,
+  Model & Miter,
+  MatrixLoadData &                 mlData1,
+  SolverState &                    ss1,
+  ExternData&                      ed1,
+  DeviceOptions &                  do1)
+  : DeviceInstance (IB, mlData1, ss1, ed1, do1),
+    model_(Miter),
+    kcl1Fvalue(0.0),
+    kcl1Qvalue(0.0),
+    kcl2Fvalue(0.0),
+    kcl2Qvalue(0.0),
+    nEquFvalue(0.0),
+    nEquQvalue(0.0),
+    mEquFvalue(0.0),
+    mEquQvalue(0.0),
+    hEquFvalue(0.0),
+    hEquQvalue(0.0),
+    dkcl1F_dV1(0.0),
+    dkcl1F_dV2(0.0),
+    dkcl1F_dn(0.0),
+    dkcl1F_dm(0.0),
+    dkcl1F_dh(0.0),
+    dkcl1Q_dV1(0.0),
+    dkcl1Q_dV2(0.0),
+    dkcl2F_dV1(0.0),
+    dkcl2F_dV2(0.0),
+    dkcl2F_dn(0.0),
+    dkcl2F_dm(0.0),
+    dkcl2F_dh(0.0),
+    dkcl2Q_dV1(0.0),
+    dkcl2Q_dV2(0.0),
+    dnF_dV1(0.0),
+    dnF_dV2(0.0),
+    dnF_dn(0.0),
+    dnQ_dn(0.0),
+    dmF_dV1(0.0),
+    dmF_dV2(0.0),
+    dmF_dm(0.0),
+    dmQ_dm(0.0),
+    dhF_dV1(0.0),
+    dhF_dV2(0.0),
+    dhF_dh(0.0),
+    dhQ_dh(0.0)
+{
+  numExtVars = 2;
+  numIntVars   = 3;
+  numStateVars = 2;
+
+  devConMap.resize(2);
+  devConMap[0] = 1;
+  devConMap[1] = 1;
+
+  setName(IB.getName());
+  setModelName(model_.getName());
+
+
+  // set up jacStamp
+  if( jacStamp.empty() )
+  {
+    // V1, V2, n, m, h
+    // all values depend on Vm = V1-V2
+    // V1 and V2 depend on n, m, and h
+    // n, m, and h each depend on themselves as well as V1 and V2
+    jacStamp.resize(5);
+    jacStamp[0].resize(5);	// V1
+    jacStamp[0][0] = 0;
+    jacStamp[0][1] = 1;
+    jacStamp[0][2] = 2;
+    jacStamp[0][3] = 3;
+    jacStamp[0][4] = 4;
+    jacStamp[1].resize(5);	// V2
+    jacStamp[1][0] = 0;
+    jacStamp[1][1] = 1;
+    jacStamp[1][2] = 2;
+    jacStamp[1][3] = 3;
+    jacStamp[1][4] = 4;
+    jacStamp[2].resize(3);	// n
+    jacStamp[2][0] = 0;
+    jacStamp[2][1] = 1;
+    jacStamp[2][2] = 2;
+    jacStamp[3].resize(3);	// m
+    jacStamp[3][0] = 0;
+    jacStamp[3][1] = 1;
+    jacStamp[3][2] = 3;
+    jacStamp[4].resize(3);	// h
+    jacStamp[4][0] = 0;
+    jacStamp[4][1] = 1;
+    jacStamp[4][2] = 4;
+  }
+
+  // Set params to constant default values:
+  setDefaultParams ();
+
+  // Set params according to instance line and constant defaults from metadata:
+  // there are no params for this device as yet, so calling setParams causes
+  // the code to exit.
+  // setParams (IB.params);
+
+  // Set any non-constant parameter defaults:
+
+  //if (!given("TEMP"))
+  //  temp = getDeviceOptions().temp.dVal();
+
+  // Calculate any parameters specified as expressions:
+  updateDependentParameters();
+
+  // calculate dependent (ie computed) params and check for errors:
+  processParams ();
+
+}
+
+// //-----------------------------------------------------------------------------
+// // Function      : Instance::Instance
+// // Purpose       : copy constructor
+// // Special Notes :
+// // Scope         : public
+// // Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// // Creation Date : 01/02/08
+// //-----------------------------------------------------------------------------
+// Instance::Instance(const Instance & right)
+//   : DeviceInstance(right),
+//     model_(right.model_),
+//     kcl1Fvalue(right.kcl1Fvalue),
+//     kcl1Qvalue(right.kcl1Qvalue),
+//     kcl2Fvalue(right.kcl2Fvalue),
+//     kcl2Qvalue(right.kcl2Qvalue),
+//     nEquFvalue(right.nEquFvalue),
+//     nEquQvalue(right.nEquQvalue),
+//     mEquFvalue(right.mEquFvalue),
+//     mEquQvalue(right.mEquQvalue),
+//     hEquFvalue(right.hEquFvalue),
+//     hEquQvalue(right.hEquQvalue),
+//     dkcl1F_dV1(right.dkcl1F_dV1),
+//     dkcl1F_dV2(right.dkcl1F_dV2),
+//     dkcl1F_dn(right.dkcl1F_dn),
+//     dkcl1F_dm(right.dkcl1F_dm),
+//     dkcl1F_dh(right.dkcl1F_dh),
+//     dkcl1Q_dV1(right.dkcl1Q_dV1),
+//     dkcl1Q_dV2(right.dkcl1Q_dV2),
+//     dkcl2F_dV1(right.dkcl2F_dV1),
+//     dkcl2F_dV2(right.dkcl2F_dV2),
+//     dkcl2F_dn(right.dkcl2F_dn),
+//     dkcl2F_dm(right.dkcl2F_dm),
+//     dkcl2F_dh(right.dkcl2F_dh),
+//     dkcl2Q_dV1(right.dkcl2Q_dV1),
+//     dkcl2Q_dV2(right.dkcl2Q_dV2),
+//     dnF_dV1(right.dnF_dV1),
+//     dnF_dV2(right.dnF_dV2),
+//     dnF_dn(right.dnF_dn),
+//     dnQ_dn(right.dnQ_dn),
+//     dmF_dV1(right.dmF_dV1),
+//     dmF_dV2(right.dmF_dV2),
+//     dmF_dm(right.dmF_dm),
+//     dmQ_dm(right.dmQ_dm),
+//     dhF_dV1(right.dhF_dV1),
+//     dhF_dV2(right.dhF_dV2),
+//     dhF_dh(right.dhF_dh),
+//     dhQ_dh(right.dhQ_dh)
+// {
+// }
+
+//-----------------------------------------------------------------------------
+// Function      : Instance::~Instance
+// Purpose       : destructor
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+Instance::~Instance()
+{
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Instance::registerLIDs
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+void Instance::registerLIDs(const vector<int> & intLIDVecRef,
+                            const vector<int> & extLIDVecRef)
+{
+  string msg;
+
+#ifdef Xyce_DEBUG_DEVICE
+  const string dashedline =
+    "-------------------------------------------------------------------------"
+    "----";
+  if (getDeviceOptions().debugLevel > 0)
+  {
+    cout << endl << dashedline << endl;
+    cout << "  Instance::registerLIDs" << endl;
+    cout << "  name = " << getName() << endl;
+  }
+#endif
+
+  // Check if the size of the ID lists corresponds to the
+  // proper number of internal and external variables.
+  int numInt = intLIDVecRef.size();
+  int numExt = extLIDVecRef.size();
+
+  if (numInt != numIntVars)
+  {
+    msg = "Instance::registerLIDs:";
+    msg += "numInt != numIntVars";
+    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
+  }
+
+  if (numExt != numExtVars)
+  {
+    msg = "Instance::registerLIDs:";
+    msg += "numExt != numExtVars";
+    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
+  }
+
+  // copy over the global ID lists.
+  intLIDVec = intLIDVecRef;
+  extLIDVec = extLIDVecRef;
+
+  li_Pos  = extLIDVec[0];
+  li_Neg  = extLIDVec[1];
+  li_nPro = intLIDVec[0];
+  li_mPro = intLIDVec[1];
+  li_hPro = intLIDVec[2];
+
+#ifdef Xyce_DEBUG_DEVICE
+  if (getDeviceOptions().debugLevel > 0 )
+  {
+    cout << "  li_Pos = " << li_Pos << endl
+         << "  li_Neg = " << li_Neg << endl
+         << "  li_nPro = " << li_nPro << endl
+         << "  li_mPro = " << li_mPro << endl
+         << "  li_hPro = " << li_hPro << endl;
+  }
+#endif
+
+#ifdef Xyce_DEBUG_DEVICE
+  if (getDeviceOptions().debugLevel > 0 )
+  {
+    cout << dashedline << endl;
+  }
+#endif
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Instance::getIntNameMap
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+map<int,string> & Instance::getIntNameMap ()
+{
+  // set up the internal name map, if it hasn't been already.
+  if (intNameMap.empty ())
+  {
+    string tmpstr;
+
+    tmpstr = getName() + "_N";
+    spiceInternalName (tmpstr);
+    intNameMap[ li_nPro ] = tmpstr;
+    tmpstr = getName() + "_M";
+    spiceInternalName (tmpstr);
+    intNameMap[ li_mPro ] = tmpstr;
+    tmpstr = getName() + "_H";
+    spiceInternalName (tmpstr);
+    intNameMap[ li_hPro ] = tmpstr;
+  }
+  return intNameMap;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Instance::registerStateLIDs
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+{
+  string msg;
+
+  // Check if the size of the ID lists corresponds to the
+  // proper number of internal and external variables.
+  int numSta = staLIDVecRef.size();
+
+  if (numSta != numStateVars)
+  {
+    msg = "Instance::registerStateLIDs:";
+    msg += "numSta != numStateVars";
+    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
+  }
+
+  // copy over the global ID lists.
+  staLIDVec = staLIDVecRef;
+
+  li_KCurrentState = staLIDVec[0];
+  li_NaCurrentState = staLIDVec[1];
+
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Instance::loadDeviceMask
+//
+// Purpose       : Loads the zero elements of the device mask
+//
+// Special Notes : elements of the error vector associated with zero
+//                 elements of the mask will not be included in weighted
+//                 norms by the time integrator.
+//
+// Scope         : public
+// Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
+// Creation Date : 01/19/07
+//-----------------------------------------------------------------------------
+bool Instance::loadDeviceMask ()
+{
+  bool returnVal=false;
+  N_LAS_Vector * maskVectorPtr = extData.deviceMaskVectorPtr;
+
+//   std::cout << "Masking n, m and h" << std::endl;
+//   (*maskVectorPtr)[li_nPro] = 0.0;
+//   (*maskVectorPtr)[li_mPro] = 0.0;
+//   (*maskVectorPtr)[li_hPro] = 0.0;
+//   returnVal = true;
+
+  return (returnVal);
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Instance::jacobianStamp
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+const vector< vector<int> > & Instance::jacobianStamp() const
+{
+  return jacStamp;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Instance::registerJacLIDs
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+{
+  DeviceInstance::registerJacLIDs( jacLIDVec );
+
+  APosEquPosNodeOffset = jacLIDVec[0][0];
+  APosEquNegNodeOffset = jacLIDVec[0][1];
+  APosEquNNodeOffset   = jacLIDVec[0][2];
+  APosEquMNodeOffset   = jacLIDVec[0][3];
+  APosEquHNodeOffset   = jacLIDVec[0][4];
+
+  ANegEquPosNodeOffset = jacLIDVec[1][0];
+  ANegEquNegNodeOffset = jacLIDVec[1][1];
+  ANegEquNNodeOffset   = jacLIDVec[1][2];
+  ANegEquMNodeOffset   = jacLIDVec[1][3];
+  ANegEquHNodeOffset   = jacLIDVec[1][4];
+
+  ANEquPosNodeOffset   = jacLIDVec[2][0];
+  ANEquNegNodeOffset   = jacLIDVec[2][1];
+  ANEquNNodeOffset     = jacLIDVec[2][2];
+
+  AMEquPosNodeOffset   = jacLIDVec[3][0];
+  AMEquNegNodeOffset   = jacLIDVec[3][1];
+  AMEquMNodeOffset     = jacLIDVec[3][2];
+
+  AHEquPosNodeOffset   = jacLIDVec[4][0];
+  AHEquNegNodeOffset   = jacLIDVec[4][1];
+  AHEquHNodeOffset     = jacLIDVec[4][2];
+}
+
+
+//-----------------------------------------------------------------------------
+// Function      : Instance::updateIntermediateVars
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+bool Instance::updateIntermediateVars()
+{
+  //std::cout << "Instance::updateIntermediateVars()" << std::endl;
+
+  bool bsuccess = true;
+
+  // here we take the current solutions for V1, V2, n, m and h
+  // and use those to calculate all the terms needed for the next
+  // load cycle (F, Q, dFdX, dQdX)
+  N_LAS_Vector * solVectorPtr = extData.nextSolVectorPtr;
+
+  // use suffix "now" to to clarify that this for the latest solution
+  double v1Now = (*solVectorPtr)[li_Pos];
+  double v2Now = (*solVectorPtr)[li_Neg];
+  double nNow  = (*solVectorPtr)[li_nPro];
+  double mNow  = (*solVectorPtr)[li_mPro];
+  double hNow  = (*solVectorPtr)[li_hPro];
+
+  // get function and derivative values
+  // independent variables
+  // use scoping to avoid lots of similar variable names
+
+  // kcl F
+  {
+    const int numDeriv = 5;
+    Sacado::Fad::SFad<double,5> v1Var( numDeriv, 0, v1Now );
+    Sacado::Fad::SFad<double,5> v2Var( numDeriv, 1, v2Now );
+    Sacado::Fad::SFad<double,5> nVar( numDeriv, 2, nNow );
+    Sacado::Fad::SFad<double,5> mVar( numDeriv, 3, mNow );
+    Sacado::Fad::SFad<double,5> hVar( numDeriv, 4, hNow );
+    // parameters
+    Sacado::Fad::SFad<double,5> gMemVar( model_.gMem );
+    Sacado::Fad::SFad<double,5> eLeakVar( model_.eLeak );
+    Sacado::Fad::SFad<double,5> gKVar( model_.gK );
+    Sacado::Fad::SFad<double,5> eKVar( model_.eK );
+    Sacado::Fad::SFad<double,5> gNaVar( model_.gNa );
+    Sacado::Fad::SFad<double,5> eNaVar( model_.eNa );
+
+    // compute the vaud and derivative terms for KCL 1 F
+    Sacado::Fad::SFad<double,5> resultFad;
+    resultFad = kcl1EquF( v1Var, v2Var, nVar, mVar, hVar, gMemVar, eLeakVar, gKVar, eKVar, gNaVar, eNaVar );
+    kcl1Fvalue = resultFad.val();
+    dkcl1F_dV1 = resultFad.dx(0);
+    dkcl1F_dV2 = resultFad.dx(1);
+    dkcl1F_dn  = resultFad.dx(2);
+    dkcl1F_dm  = resultFad.dx(3);
+    dkcl1F_dh  = resultFad.dx(4);
+
+    // compute the vaud and derivative terms for KCL 2 F
+    resultFad = kcl2EquF( v1Var, v2Var, nVar, mVar, hVar, gMemVar, eLeakVar, gKVar, eKVar, gNaVar, eNaVar );
+    kcl2Fvalue = resultFad.val();
+    dkcl2F_dV1 = resultFad.dx(0);
+    dkcl2F_dV2 = resultFad.dx(1);
+    dkcl2F_dn  = resultFad.dx(2);
+    dkcl2F_dm  = resultFad.dx(3);
+    dkcl2F_dh  = resultFad.dx(4);
+  }
+
+  // kcl Q
+  {
+    const int numDeriv = 2;
+    Sacado::Fad::SFad<double,2> v1Var( numDeriv, 0, v1Now );
+    Sacado::Fad::SFad<double,2> v2Var( numDeriv, 1, v2Now );
+
+    // parameters
+    Sacado::Fad::SFad<double,2> cMemVar( model_.cMem );
+
+    Sacado::Fad::SFad<double,2> resultFad;
+    resultFad = kcl1EquQ( v1Var, v2Var, cMemVar );
+    kcl1Qvalue = resultFad.val();
+    dkcl1Q_dV1 = resultFad.dx(0);
+    dkcl1Q_dV2 = resultFad.dx(1);
+
+    resultFad = kcl2EquQ( v1Var, v2Var, cMemVar );
+    kcl2Qvalue = resultFad.val();
+    dkcl2Q_dV1 = resultFad.dx(0);
+    dkcl2Q_dV2 = resultFad.dx(1);
+  }
+
+  // n - equation
+  {
+    const int numDeriv = 3;
+    Sacado::Fad::SFad<double,3> v1Var( numDeriv, 0, v1Now );
+    Sacado::Fad::SFad<double,3> v2Var( numDeriv, 1, v2Now );
+    Sacado::Fad::SFad<double,3> nVar( numDeriv, 2, nNow );
+    // parameter
+    Sacado::Fad::SFad<double,3> vRestVar( model_.vRest );
+
+    Sacado::Fad::SFad<double,3> resultFad = nEquF( v1Var, v2Var, nVar, vRestVar);
+    nEquFvalue = resultFad.val();
+    dnF_dV1 = resultFad.dx(0);
+    dnF_dV2 = resultFad.dx(1);
+    dnF_dn  = resultFad.dx(2);
+  }
+  {
+    const int numDeriv = 1;
+    Sacado::Fad::SFad<double,1> nVar( numDeriv, 0, nNow );
+
+    Sacado::Fad::SFad<double,1> resultFad = nEquQ( nVar );
+    nEquQvalue = resultFad.val();
+    dnQ_dn     = resultFad.dx(0);
+  }
+
+  // m - equation
+  {
+    const int numDeriv = 3;
+    Sacado::Fad::SFad<double,3> v1Var( numDeriv, 0, v1Now );
+    Sacado::Fad::SFad<double,3> v2Var( numDeriv, 1, v2Now );
+    Sacado::Fad::SFad<double,3> mVar( numDeriv, 2, mNow );
+    // parameter
+    Sacado::Fad::SFad<double,3> vRestVar( model_.vRest );
+
+    Sacado::Fad::SFad<double,3> resultFad = mEquF( v1Var, v2Var, mVar, vRestVar );
+    mEquFvalue = resultFad.val();
+    dmF_dV1 = resultFad.dx(0);
+    dmF_dV2 = resultFad.dx(1);
+    dmF_dm  = resultFad.dx(2);
+  }
+  {
+    const int numDeriv = 1;
+    Sacado::Fad::SFad<double,1> mVar( numDeriv, 0, mNow );
+
+    Sacado::Fad::SFad<double,1> resultFad = mEquQ( mVar );
+    mEquQvalue = resultFad.val();
+    dmQ_dm     = resultFad.dx(0);
+  }
+
+  // h - equation
+  {
+    const int numDeriv = 3;
+    Sacado::Fad::SFad<double,3> v1Var( numDeriv, 0, v1Now );
+    Sacado::Fad::SFad<double,3> v2Var( numDeriv, 1, v2Now );
+    Sacado::Fad::SFad<double,3> hVar( numDeriv, 2, hNow );
+    // parameter
+    Sacado::Fad::SFad<double,3> vRestVar( model_.vRest );
+
+    Sacado::Fad::SFad<double,3> resultFad = hEquF( v1Var, v2Var, hVar, vRestVar );
+    hEquFvalue = resultFad.val();
+    dhF_dV1 = resultFad.dx(0);
+    dhF_dV2 = resultFad.dx(1);
+    dhF_dh  = resultFad.dx(2);
+  }
+  {
+    const int numDeriv = 1;
+    Sacado::Fad::SFad<double,1> hVar( numDeriv, 0, hNow );
+
+    Sacado::Fad::SFad<double,1> resultFad = hEquQ( hVar );
+    hEquQvalue = resultFad.val();
+    dhQ_dh     = resultFad.dx(0);
+  }
+
+  // calculate potassium current
+  potassiumCurrent = model_.gK * pow(nNow, 4.0) * (v1Now - v2Now - model_.eK);
+
+  // calculate sodium current
+  sodiumCurrent = model_.gNa * pow(mNow, 3.0) * hNow * (v1Now - v2Now - model_.eNa);
+
+#ifdef Xyce_DEBUG_DEVICE
+  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+  {
+    double vRest = model_.vRest;
+    std::cout << "Instance::updateIntermediateVars()" << std::endl
+              << "vRest(input) = " << vRest << std::endl
+              << "v1 = " << v1Now << std::endl
+              << "v2 = " << v2Now << std::endl
+              << "nNow = " << nNow << std::endl
+              << "mNow = " << mNow << std::endl
+              << "hNow = " << hNow << std::endl
+              << "kcl1Fvalue = " << kcl1Fvalue << std::endl
+              << "dkcl1F_dV1 = " << dkcl1F_dV1 << std::endl
+              << "dkcl1F_dV2 = " << dkcl1F_dV2 << std::endl
+              << "dkcl1F_dn = " << dkcl1F_dn << std::endl
+              << "dkcl1F_dm = " << dkcl1F_dm << std::endl
+              << "dkcl1F_dh = " << dkcl1F_dh << std::endl
+              << "kcl2Fvalue = " << kcl2Fvalue << std::endl
+              << "dkcl2F_dV1 = " << dkcl2F_dV1 << std::endl
+              << "dkcl2F_dV2 = " << dkcl2F_dV2 << std::endl
+              << "dkcl2F_dn = " << dkcl2F_dn << std::endl
+              << "dkcl2F_dm = " << dkcl2F_dm << std::endl
+              << "dkcl2F_dh = " << dkcl2F_dh << std::endl
+              << "alphaN = " << alphaN<double>( v1Now, v2Now, vRest) << std::endl
+              << "betaN = " << betaN<double>( v1Now, v2Now, vRest) << std::endl
+              << "nEquFvalue = " << nEquFvalue << std::endl
+              << "dnF_dV1 = " << dnF_dV1 << std::endl
+              << "dnF_dV2 = " << dnF_dV2 << std::endl
+              << "dnF_dn = " << dnF_dn << std::endl
+              << "nEquQvalue = " << nEquQvalue << std::endl
+              << "dnQ_dn = " << dnQ_dn << std::endl
+              << "alphaM = " << alphaM<double>( v1Now, v2Now, vRest) << std::endl
+              << "betaM = " << betaM<double>( v1Now, v2Now, vRest) << std::endl
+              << "mEquFvalue = " << mEquFvalue << std::endl
+              << "dmF_dV1 = " << dmF_dV1 << std::endl
+              << "dmF_dV2 = " << dmF_dV2 << std::endl
+              << "dmF_dm = " << dmF_dm << std::endl
+              << "mEquQvalue = " << mEquQvalue << std::endl
+              << "dmQ_dm = " << dmQ_dm << std::endl
+              << "alphaH = " << alphaH<double>( v1Now, v2Now, vRest) << std::endl
+              << "betaH = " << betaH<double>( v1Now, v2Now, vRest) << std::endl
+              << "hEquFvalue = " << hEquFvalue << std::endl
+              << "dhF_dV1 = " << dhF_dV1 << std::endl
+              << "dhF_dV2 = " << dhF_dV2 << std::endl
+              << "dhF_dh = " << dhF_dh << std::endl
+              << "hEquQvalue = " << hEquQvalue << std::endl
+              << "dhQ_dh = " << dhQ_dh << std::endl
+              << std::endl;
+  }
+#endif
+
+  return bsuccess;
+}
+//-----------------------------------------------------------------------------
+// Function      : Instance::updatePrimaryState
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+bool Instance::updatePrimaryState()
+{
+  bool bsuccess = true;
+
+  updateIntermediateVars();
+
+  N_LAS_Vector * solVectorPtr = extData.nextSolVectorPtr;
+  N_LAS_Vector * staVectorPtr = extData.nextStaVectorPtr;
+
+  (*staVectorPtr)[li_KCurrentState]  = potassiumCurrent;
+  (*staVectorPtr)[li_NaCurrentState] = sodiumCurrent;
+
+  return bsuccess;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Instance::updateSecondaryState
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+bool Instance::updateSecondaryState ()
+{
+  bool bsuccess = true;
+  N_LAS_Vector * staVectorPtr = extData.nextStaVectorPtr;
+
+  return bsuccess;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Instance::loadDAEQVector
+//
+// Purpose       : Loads the Q-vector contributions for a single
+//                 Neuron instance.
+//
+// Special Notes : The "Q" vector is part of a standard DAE formalism in
+//                 which the system of equations is represented as:
+//
+//                 f(x) = dQ(x)/dt + F(x) - B(t) = 0
+//
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+bool Instance::loadDAEQVector ()
+{
+  bool bsuccess = true;
+
+  N_LAS_Vector * daeQVecPtr = extData.daeQVectorPtr;
+
+  (*daeQVecPtr)[li_Pos]  += kcl1Qvalue;
+  (*daeQVecPtr)[li_Neg]  += kcl2Qvalue;
+  (*daeQVecPtr)[li_nPro] += nEquQvalue;
+  (*daeQVecPtr)[li_mPro] += mEquQvalue;
+  (*daeQVecPtr)[li_hPro] += hEquQvalue;
+
+  return bsuccess;
+}
+
+
+
+//-----------------------------------------------------------------------------
+// Function      : Instance::loadDAEFVector
+//
+// Purpose       : Loads the F-vector contributions for a single
+//                 Neuron instance.
+//
+// Special Notes :
+//
+//
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+bool Instance::loadDAEFVector ()
+{
+  bool bsuccess=true;
+
+  N_LAS_Vector * daeFVecPtr = extData.daeFVectorPtr;
+
+  (*daeFVecPtr)[li_Pos]  += kcl1Fvalue;
+  (*daeFVecPtr)[li_Neg]  += kcl2Fvalue;
+  (*daeFVecPtr)[li_nPro] += nEquFvalue;
+  (*daeFVecPtr)[li_mPro] += mEquFvalue;
+  (*daeFVecPtr)[li_hPro] += hEquFvalue;
+
+  return bsuccess;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Instance::loadDAEdQdx
+//
+// Purpose       : Loads the Q-vector contributions for a single
+//                 Neuron instance.
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+bool Instance::loadDAEdQdx ()
+{
+  bool bsuccess = true;
+
+  N_LAS_Matrix * dQdxMatPtr = extData.dQdxMatrixPtr;
+
+  (*dQdxMatPtr)[li_Pos][APosEquPosNodeOffset] += dkcl1Q_dV1;
+  (*dQdxMatPtr)[li_Pos][APosEquNegNodeOffset] += dkcl1Q_dV2;
+
+  (*dQdxMatPtr)[li_Neg][ANegEquPosNodeOffset] += dkcl2Q_dV1;
+  (*dQdxMatPtr)[li_Neg][ANegEquNegNodeOffset] += dkcl2Q_dV2;
+
+  (*dQdxMatPtr)[li_nPro][ANEquNNodeOffset] += dnQ_dn;
+
+  (*dQdxMatPtr)[li_mPro][AMEquMNodeOffset] += dmQ_dm;
+
+  (*dQdxMatPtr)[li_hPro][AHEquHNodeOffset] += dhQ_dh;
+
+  return bsuccess;
+}
+
+
+
+//-----------------------------------------------------------------------------
+// Function      : Instance::loadDAEdFdx ()
+//
+// Purpose       : Loads the F-vector contributions for a single
+//                 Neuron instance.
+//
+// Special Notes : This is an algebraic constaint.
+//
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+bool Instance::loadDAEdFdx ()
+{
+  bool bsuccess = true;
+
+  N_LAS_Matrix * dFdxMatPtr = extData.dFdxMatrixPtr;
+
+  (*dFdxMatPtr)[li_Pos][APosEquPosNodeOffset] += dkcl1F_dV1;
+  (*dFdxMatPtr)[li_Pos][APosEquNegNodeOffset] += dkcl1F_dV2;
+  (*dFdxMatPtr)[li_Pos][APosEquNNodeOffset]   += dkcl1F_dn;
+  (*dFdxMatPtr)[li_Pos][APosEquMNodeOffset]   += dkcl1F_dm;
+  (*dFdxMatPtr)[li_Pos][APosEquHNodeOffset]   += dkcl1F_dh;
+
+  (*dFdxMatPtr)[li_Neg][ANegEquPosNodeOffset] += dkcl2F_dV1;
+  (*dFdxMatPtr)[li_Neg][ANegEquNegNodeOffset] += dkcl2F_dV2;
+  (*dFdxMatPtr)[li_Neg][ANegEquNNodeOffset]   += dkcl2F_dn;
+  (*dFdxMatPtr)[li_Neg][ANegEquMNodeOffset]   += dkcl2F_dm;
+  (*dFdxMatPtr)[li_Neg][ANegEquHNodeOffset]   += dkcl2F_dh;
+
+  (*dFdxMatPtr)[li_nPro][ANEquPosNodeOffset] += dnF_dV1;
+  (*dFdxMatPtr)[li_nPro][ANEquNegNodeOffset] += dnF_dV2;
+  (*dFdxMatPtr)[li_nPro][ANEquNNodeOffset]   += dnF_dn;
+
+  (*dFdxMatPtr)[li_mPro][AMEquPosNodeOffset] += dmF_dV1;
+  (*dFdxMatPtr)[li_mPro][AMEquNegNodeOffset] += dmF_dV2;
+  (*dFdxMatPtr)[li_mPro][AMEquMNodeOffset]   += dmF_dm;
+
+  (*dFdxMatPtr)[li_hPro][AHEquPosNodeOffset] += dhF_dV1;
+  (*dFdxMatPtr)[li_hPro][AHEquNegNodeOffset] += dhF_dV2;
+  (*dFdxMatPtr)[li_hPro][AHEquHNodeOffset]   += dhF_dh;
+
+  return bsuccess;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Instance::setIC
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+bool Instance::setIC ()
+{
+  bool bsuccess = true;
+
+  return bsuccess;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Instance::varTypes
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+void Instance::varTypes( vector<char> & varTypeVec )
+{
+  //varTypeVec.resize(1);
+  //varTypeVec[0] = 'I';
+}
+
+
+//-----------------------------------------------------------------------------
+// Function      : Model::processParams
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+bool Model::processParams (string param)
+{
+  return true;
+}
+
+//----------------------------------------------------------------------------
+// Function      : Model::processInstanceParams
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//----------------------------------------------------------------------------
+bool Model::processInstanceParams(string param)
+{
+
+  vector<Instance*>::iterator iter;
+  vector<Instance*>::iterator first = instanceContainer.begin();
+  vector<Instance*>::iterator last  = instanceContainer.end();
+
+  for (iter=first; iter!=last; ++iter)
+  {
+    (*iter)->processParams();
+  }
+
+  return true;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Model::Model
+// Purpose       : block constructor
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+Model::Model (const ModelBlock & MB,
+              SolverState & ss1,
+              DeviceOptions & do1)
+  : DeviceModel(MB,ss1,do1)
+{
+
+  // Set params to constant default values:
+  setDefaultParams ();
+
+  // Set params according to .model line and constant defaults from metadata:
+  setModParams (MB.params);
+
+  // Set any non-constant parameter defaults:
+  //if (!given("TNOM"))
+  //  tnom = getDeviceOptions().tnom;
+
+  // Calculate any parameters specified as expressions:
+  updateDependentParameters();
+
+  // calculate dependent (ie computed) params and check for errors:
+
+  processParams ();
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Model::~Model
+// Purpose       : destructor
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+Model::~Model ()
+{
+  vector<Instance*>::iterator iter;
+  vector<Instance*>::iterator first = instanceContainer.begin();
+  vector<Instance*>::iterator last  = instanceContainer.end();
+
+  for (iter=first; iter!=last; ++iter)
+  {
+    delete (*iter);
+  }
+}
+
+// additional Declarations
+
+//-----------------------------------------------------------------------------
+// Function      : Model::printOutInstances
+// Purpose       : debugging tool.
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsytem Modeling
+// Creation Date : 01/02/08
+//-----------------------------------------------------------------------------
+std::ostream &Model::printOutInstances(std::ostream &os) const
+{
+  vector<Instance*>::const_iterator iter;
+  vector<Instance*>::const_iterator first = instanceContainer.begin();
+  vector<Instance*>::const_iterator last  = instanceContainer.end();
+
+  int i, isize;
+  isize = instanceContainer.size();
+
+  os << endl;
+  os << "Number of Neuron instances: " << isize << endl;
+  os << "    name=\t\tmodelName\tParameters" << endl;
+  for (i=0, iter=first; iter!=last; ++iter, ++i)
+  {
+    os << "  " << i << ": " << (*iter)->getName() << "\t";
+    os << (*iter)->getModelName();
+    os << endl;
+  }
+
+  os << endl;
+}
+
+
+//-----------------------------------------------------------------------------
+// Function      : Master::updateState
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, SNL
+// Creation Date : 06/01/12
+//-----------------------------------------------------------------------------
+bool Master::updateState (double * solVec, double * staVec, double * stoVec)
+{
+  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  {
+    (*it)->updatePrimaryState();
+  }
+
+  return true;
+}
+
+} // namespace Neuron
+} // namespace Device
+} // namespace Xyce

@@ -1,0 +1,66 @@
+`include "discipline.h"
+
+// One cannot use this diode model and the one in diode.va at the same 
+// time, because the module names are the same.
+
+module diode(anode,cathode);
+ inout anode,cathode;
+ electrical anode,cathode;
+ electrical cathode_internal;
+
+ parameter real area = 1 from (0:inf) (* type="instance" *);
+ parameter real is=1e-14 from (0:inf);
+ parameter real n=1 from (0:inf);
+ parameter real cjo=0 from [0:inf);
+ parameter real m=0.5 from [0:inf);
+ parameter real phi=0.7 exclude 0;
+ parameter real fc=0.5 from (0:1];
+ parameter real tt=1p from [0:inf);
+ parameter real bv=1.0e+100 from [0:inf);
+// can't have rs=0, because of divide by zero in this toy model
+ parameter real rs=1 from (0:inf);
+
+ real Vd, Id, Qd, Ir;
+ real f1, f2, f3, fcp;
+ real ibv;
+
+ analog
+   begin
+     @(initial_instance)
+     begin
+       f1 = (phi/(1 - m))*(1 - pow((1 - fc), m));
+       f2 = pow((1 - fc), (1 + m));
+       f3 = 1 - fc*(1 + m);
+       fcp = fc*phi;
+       ibv = is*bv/$vt;
+     end
+
+     Vd = V(anode,cathode_internal);
+     Ir = V(cathode_internal,cathode)/rs;
+
+// intrinsic diode.
+     if (Vd < -5*n*$vt)
+     begin
+       if (Vd == -bv)
+         Id =  -area*ibv;
+       else
+         if (Vd > -bv)
+           Id =  -area*is;
+         else
+           Id =  -area*is*(exp(-(bv + Vd)/$vt) - 1 + bv/$vt);
+     end
+     else
+       Id =  area*is*(exp((Vd)/(n*$vt)) - 1);
+
+// capacitance (junction and diffusion).
+     if (Vd <= fcp)
+       Qd = tt*Id + area*cjo*phi*(1 - pow((1 - Vd/phi), (1 - m)))/(1 - m);
+     else
+       Qd = tt*Id + area*cjo*(f1 + (1/f2)*(f3*(Vd - fcp) +
+                           (0.5*m/phi)*(Vd*Vd - fcp*fcp)));
+     I(anode,cathode_internal) <+ Id;
+     I(anode,cathode_internal) <+ ddt(Qd);
+     I(cathode_internal,cathode) <+ Ir;
+   end
+endmodule
+

@@ -1,0 +1,337 @@
+
+4/06/02
+
+README file for using comparison utilities.  
+
+
+Introduction:
+
+The utilities in this directory are useful for the following senario:  A 
+user submits a bug that says "this circuit works in chilespice, but not 
+in Xyce", or "this circuit works in the sgi10k build of Xyce, but not 
+the linux build".  
+
+In creating and designing Xyce, every attempt (within reason) has been 
+made to create a code that can reproduce the behavior of Chilespice, 
+and/or Berkeley Spice3f5.  There are some obvious disadvantages to doing 
+things this way, but there is one big advantage -  if a circuit breaks in 
+Xyce, it will often be a circuit that does work in SPICE.  And, as long as 
+one has one code that works, tracking down a certain type of error can be 
+very easy.
+
+There are three programs in this directory:  
+
+	1) matcmp.C, which compares Jacobian matrices.
+
+	2) veccmp.C, which compares vectors (can be rhs, or solution, or 
+                     whatever)
+
+	3) mapMerge.C, which determines the index mapping between the 
+                     solution vectors of  Xyce and Chilespice.
+
+
+It is generally neccessary to run mapMerge at least once before you can 
+use either of the other two files.
+
+Compiling everything:
+
+To compile the  programs in this directory, run the script "Build".  Build 
+*should* detect what platform you are running on, and make the correct 
+adjustment.  Note that this is not a sophisticated build utility - I patterned 
+it after the old "pre-autoconf" build script of Xyce.  Note that as of this 
+writing, I have only built these utils on linux and sgi.
+
+The names of the platform will be part of the final executable names .  For 
+example, on linux, the 3 executables will be:  mapcmp_linux, veccmp_linux, 
+mapMerge_linux.
+
+
+
+Obtaining matrix and vector files from chilespice:
+
+To obtain matrix and vectors from chilespice, one needs to run chilespice 
+interactively, and use "matdump".  For example:
+
+
+  $ chilespice mc3086_test.35f.cir 
+  Note: can't find init file.
+  Program: ChileSPICE, version: 1.5, patchlevel: 3
+  Date built: Wed Mar 27 15:46:55 MST 2002
+
+  Circuit: Test harness for MC3086N_R subcircuit
+
+  ***note: inductor coupling coefficient set to unity for non-linear model
+  ChileSPICE 1 -> matdump
+  Matrix dump flag ON
+  You will also to set the exit time for this to work.
+  ChileSPICE 2 ->   exittime
+  Exit flag ON
+  Please enter exit time: -1
+  Program will stop at time >= -1.0000e+00
+
+  ChileSPICE 3 -> run
+  Warning: vin: no DC value, transient time 0 value used
+  Summary of device types in this circuit:
+  Type:  7 ::       8 instances :: Capacitor (Fixed capacitor)
+  Type: 11 ::       1 instances :: Diode (Junction Diode model)
+  Type: 13 ::       8 instances :: Inductor (Inductors)
+  Type: 14 ::       6 instances :: Mutual (Mutual inductors)
+  Type: 23 ::      29 instances :: Resistor (Simple linear resistor)
+  Type: 28 ::       1 instances :: Vsource (Independent voltage source)
+  $
+
+
+Note that in the example one has to set the exittime.  This is because (in part)
+that chilespice will only output the matrices and vectors for the Newton loop
+of the final time step (or dc operating point) prior to the code exitting.
+
+The naming convention for matrix files from chilespice:
+  matrix3.1
+  matrix3.2
+  matrix3.stat
+
+The first number in the name (in this case "3"), refers to the Newton iteration
+index.  The second string refers to:  1=original matrix, 2=reordered matrix 
+stat=statistics about the matrix
+
+For the purposes of comparison to Xyce, the only matrix we ever look at is the
+one that ends in the number 1.   So of the three files listed above, the only
+one we would use for comparison would be matrix3.1
+
+The naming convention for vector files from chilespice:  
+  rhs3
+  x_vec3
+  fvector3
+  jxp3
+
+The name, obviously , refers to the type of file.  The number at the end
+of the name refers to the Newton iteration index.  Generally, on the rhs
+and x_vec vectors are ever compared to Xyce.  The rhs vector will only
+match that of Xyce on the very first newton iteration of the operating
+point.  After that, they will be different because Xyce and chilespice
+use different Newton solver formulations.
+
+
+
+
+Obtaining matrix and vector files from Xyce:
+
+Make sure Xyce was compiled using --enable-debug_nonlinear.
+
+In the netlist (input) file, make sure there is a line which says
+either:
+
+.options nonlin debuglevel=1
+
+OR
+
+.options nonlin debuglevel=2
+
+The debug level must be at least 1.  Using 2 will result in a lot more files.
+
+
+The naming convention for matrix/vector files from Xyce:
+
+   For debuglevel=1          For debuglevel=2 (or more)
+   matrix.003.txt            matrix.010.001.txt
+   rhs.003.txt               rhs.010.003.txt
+   solution.003.txt          solution.010.003.txt
+
+
+The last number prior to the suffix, ".txt" refers to the Newton loop index.
+For the case of the higher debuglevel, the other number refers to the time
+step.  Obviously, for debuglevel=2, there will be a large number of files,
+so be careful!
+
+To make using debuglevel=2 more practical, you can specify which time steps you
+want to output:
+
+.options nonlin debuglevel=2 debugmintimestep=100 debugmaxtimestep=110
+
+
+With this options line, Xyce will only output matrix files for timesteps 
+100 through 110.
+
+
+Running mapMerge:
+
+Before running matcmp and/or veccmp, mapMerge must be run first.
+
+It produces a mapping between the chilespice data structures 
+and those of Xyce.  It is necessary for there to be "names" files from both 
+chilespice and Xyce for this program to work.  The names file produced by 
+chilespice is called namesChile.txt.  The names file produced by Xyce is 
+namesMap.txt.  The  names file are two-column text files.  The two columns 
+are:  solution vector index, and solution variable name.
+
+For Xyce to produce this (namesMap.txt) file, it is neccessary for it to 
+have been compiled with -enable-test_soln_var_map.
+
+For chilespice to produce this (namesChile.txt) file, it is neccessary for 
+it to have the code fragment contained in CS_names.c to be added to the 
+chilespice file niiter.c.  Once  that code fragment has been added and 
+compiled in, chilespice must be run in an interactive mode.  At the command 
+line, before typing "run", type "matdump".  This command instructs
+chilespice to dump out marices, rhs vectors, etc., and included in that 
+will be the namesChile.txt file.
+
+To run mapMerge, type in something like:
+
+mapMerge_linux namesChile.txt namesMap.txt <return>
+
+This will produce the file mergedMap.txt.   This file will tend to look like:
+
+        .       .       .
+        .       .       .
+        .       .       .
+        112     86      t:xk2:xdline:delay_i1
+        113     88      t:xk2:xdline:delay_i2
+        114     85      t:xk2:xdline:delay_int1
+        115     87      t:xk2:xdline:delay_int2
+        116     101     t:xk1:xdline:delay_i1
+        117     103     t:xk1:xdline:delay_i2
+        118     100     t:xk1:xdline:delay_int1
+        119     102     t:xk1:xdline:delay_int2
+        120     92      e:xk2:xcomp2:2_branch
+        121     96      e:xk2:xcomp1:2_branch
+        122     89      e:xk2:xdline:in_branch
+        123     99      e:xk2:dif_branch
+        124     107     e:xk1:xcomp2:2_branch
+        125     111     e:xk1:xcomp1:2_branch
+        .       .       .
+        .       .       .
+        .       .       .
+
+where the first column is the chilespice index, the second the Xyce index, 
+and the last column is the name of the variable, using the chilespice naming 
+convention.
+
+The program will, if neccessary, give error warnings to the screen if it is 
+unable to resolve any of the names.  The internal naming conventions of 
+Xyce and chilespice are NOT identical, so such errors are possible, even 
+if the user has done everything right.   A typical error message will read 
+like this:
+
+$ mapMerge_linux namesChile.txt namesMap.txt 
+Reading in the chilespice name file: namesChile.txt
+Reading in the Xyce name file: namesMap.txt
+Could not find string l:k2_branch in the Xyce map
+Could not find string l:k1_branch in the Xyce map
+
+The mapMerge program is capable of adjusting the names to account for most 
+of the known naming convention differences, but not all.  As of this writing, 
+the only unresolvable names come from coupled inductors, that happen to be 
+declared/used inside of subcircuits.  This is the case for the above example.  
+Names that are unresolved will be assigned the index -999999, so a fragment 
+of the file will appear as follows:
+
+        .       .       .
+        .       .       .
+        .       .       .
+        104     21      d2a_internal
+        105     22      d1a_internal
+        106     -999999 l:k2_branch
+        107     -999999 l:k1_branch
+        108     134     lp_branch
+        .       .       .
+        .       .       .
+        .       .       .
+
+If the circuit is not too large, the user can determine by hand which 
+names should match, and fix this bogus index(-999999) to the correct one.  
+In this case, one can determine by inspecting the original netlist, the 
+namesChile.txt file and the namesMap.txt file, and doing a process of 
+elimination, that the first unresolved variable has a chilespice name of 
+l:k2_branch, and l:xk2:_branch is the Xyce name.  The "x" which appears in the 
+Xyce name is a  character that indicates a subcircuit, which in this case 
+is named  xk2.  The Xyce index for this name turns out to be 18, so that 
+line of mergedMap.txt should be changed to 
+
+        106     18      l:k2_branch
+
+
+Running matcmp:
+
+The usage for this utility is:
+
+
+matcmp_linux chilespice_matrix_file  Xyce_matrix_file <return>
+
+e.g.:
+matcmp_linux matrix1.1  matrix.000.001.txt <return>
+
+The matrix elemenmts which are the "most different" (both absolute and 
+relative difference) will be printed to std output.  The file matresult.txt 
+will be output, which will have the following (very wide) format:  
+
+
+  i    j         Xyce matrix             i    j      chilespice matrix              difference          relative difference                        index names
+
+  .
+  .
+  .
+
+  56   56   1.000000000000000062e-09    43   43   1.000000000000000062e-09   0.000000000000000000e+00   0.000000000000000000e+00        (          xk1:4,            xk1:4)
+  56  114   1.000000000000000000e+00    43  127   1.000000000000000000e+00   0.000000000000000000e+00   0.000000000000000000e+00        (          xk1:4, e:xk1:dif_branch)
+  57   57   1.000000000000000000e+01    41   41   1.000000000000000000e+01   0.000000000000000000e+00   0.000000000000000000e+00        (         pwr_in,           pwr_in)
+  57   75  -1.000000000000000000e+01    41   37  -1.000000000000000000e+01   0.000000000000000000e+00   0.000000000000000000e+00        (         pwr_in,              110)
+  57  115   1.000000000000000000e+00    41  138   1.000000000000000000e+00   0.000000000000000000e+00   0.000000000000000000e+00        (         pwr_in,                 )
+  58   36   0.000000000000000000e+00    40   65   0.000000000000000000e+00   0.000000000000000000e+00   0.000000000000000000e+00        (             49,            xk2:7)
+  58   58   1.000200000000000082e-08    40   40   1.000200000000000082e-08   0.000000000000000000e+00   0.000000000000000000e+00        (             49,               49)
+  58   80  -1.999999999999999960e-12    40   35  -1.999999999999999960e-12   0.000000000000000000e+00   0.000000000000000000e+00        (             49,               40)
+  59   12  -1.999999999999999960e-12    39   58  -1.999999999999999960e-12   0.000000000000000000e+00   0.000000000000000000e+00        (             48,               45)
+  59   31   0.000000000000000000e+00    39   70   0.000000000000000000e+00   0.000000000000000000e+00   0.000000000000000000e+00        (             48,           xk2:14)
+  59   59   1.000200000000000082e-08    39   39   1.000200000000000082e-08   0.000000000000000000e+00   0.000000000000000000e+00        (             48,               48)
+  60   60   6.054661857235199562e+00    12   12   6.054661857235164923e+00   3.463895836830488406e-14   5.721039289239914080e-15        (             25,               25)
+  60  116   0.000000000000000000e+00    12   81   0.000000000000000000e+00   0.000000000000000000e+00   0.000000000000000000e+00        (             25,    q4c_collector)
+  60  117  -6.015991527640599523e-01    12   82  -6.015991527640641712e-01   4.218847493575594854e-15  -7.012721800208679506e-15        (             25,         q4c_base)
+  .
+  .
+  .
+
+
+
+
+Running veccmp:
+
+The usage for this utility is:
+
+veccmp_linux chilespice_vector_file  Xyce_vector_file <return>
+
+e.g.:
+veccmp_linux rhs1  rhs.000.001.txt <return>
+
+
+The vector elemenmts which are the "most different" (both absolute and 
+relative difference) will be printed to std output.  The file vecresult.txt 
+will be output, which will have the following (very wide) format:
+
+  i         Xyce vector           i  chilespice vector           difference                  relative diff.              variable name
+  .
+  .
+  .
+  36  0.000000000000000000e+00   14  0.000000000000000000e+00  0.000000000000000000e+00  0.000000000000000000e+00       x_mc3086:12
+  37  0.000000000000000000e+00   15  0.000000000000000000e+00  0.000000000000000000e+00  0.000000000000000000e+00       x_mc3086:20
+  38  0.000000000000000000e+00    0  0.000000000000000000e+00  0.000000000000000000e+00  0.000000000000000000e+00       1
+  39 -4.905561390798017785e-01    2 -4.905561390798017785e-01  0.000000000000000000e+00  0.000000000000000000e+00       3
+  40  0.000000000000000000e+00   23  0.000000000000000000e+00  0.000000000000000000e+00  0.000000000000000000e+00       out
+  41  0.000000000000000000e+00    1  0.000000000000000000e+00  0.000000000000000000e+00  0.000000000000000000e+00       2
+  42  0.000000000000000000e+00   43  0.000000000000000000e+00  0.000000000000000000e+00  0.000000000000000000e+00       vin_branch
+  43  4.905561390798017785e-01   24  4.905561390798017785e-01  0.000000000000000000e+00  0.000000000000000000e+00       d_cr5_internal
+  .
+  .
+  .
+
+
+Comparing 2 Xyce ports (as opposed to chilespice and Xyce):
+
+The matcmp and veccmp utility programs will have to be recompiled.  Before 
+recompilation, uncomment the line in basecmp.h:
+
+#define BOTH_FILES_ARE_XYCE 1
+
+Unfortunately, the code doesn't automatically detect the file formats.    
+This preprocessor macro will turn on the right settings to handle two Xyce 
+files, rather than a chilespice file and a Xyce file.
+
+

@@ -1,0 +1,33 @@
+#------------------------------------------------------------------------------
+# Copyright Notice
+#
+# Copyright (c) 2002, Sandia Corporation, Albuquerque, NM, USA.  Under the
+# terms of Contract DE-AC04-94AL85000, there is a non-exclusive license for
+# use of this work by or on behalf of the U.S. Government.  Export of this
+# program may require a license from the United States Government.
+#------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
+# Filename       : $RCSfile: CVS-MFile-Header,v $
+#
+# Purpose        : Describe the purpose of the contents of the file. If the
+#                  contains the header file of a class, provide a clear
+#                  description of the nature of the class.
+#
+# Special Notes  : Specify any "hidden" or subtle details of the class here.
+#                  Portability details, error handling information, etc.
+#
+# Creator        : {Name of the Creator of the File}
+#
+# Creation Date  : {mm/dd/yy}
+#
+# Revision Information:
+# ---------------------
+#
+# Revision Number: $Revision: 1.2 $
+#
+# Revision Date  : $Date: 2002/09/30 22:37:05 $
+#
+# Current Owner  : $Author: sahutch $
+#------------------------------------------------------------------------------
+

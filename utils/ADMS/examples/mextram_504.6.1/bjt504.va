@@ -1,0 +1,27 @@
+`include "frontdef.inc"
+`define SUBSTRATE
+
+module bjt504_va (c, b, e, s);
+
+  // External ports
+     inout c, b, e, s;
+
+     electrical e, b, c, s;
+
+  // Internal nodes
+     electrical e1, b1, b2, c1, c2;
+
+`include "parameters.inc"
+`include "variables.inc"
+
+analog begin
+
+@(initial_model) begin
+  `include "initialize.inc"
+  `include "tscaling.inc"
+end
+`include "evaluate.inc"
+
+end  // analog
+endmodule
+

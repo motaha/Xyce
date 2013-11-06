@@ -1,0 +1,422 @@
+%{
+//
+// OFFICIAL USE ONLY
+// May be exempt from public release under the Freedom of Information Act 
+// (5 U.S.C. 552), exemption number and category: 3 Statutory Exemption
+// Department of Energy review required before public release.
+// Name/Org: Scott Hutchinson, 1437    Date: 5/9/07
+//
+// EXPORT CONTROLLED INFORMATION: 
+// Treat this material per Department of State (DOS) International Traffic in 
+// Arms Regulations, 22CFR120-130.  Information contained in this document is 
+// also subject to controls defined by the Department of Defense Directive 
+// 5230.25. 
+//
+
+#include <Xyce_config.h>
+
+#include <iostream>
+#include <sstream>
+#include <fstream>
+using namespace std;
+#include <cstdlib>
+#include <string>
+#include <map>
+#include <vector>
+#include "location.hh"
+#include "position.hh"
+#include <N_ERH_ErrorMgr.h>
+#include <N_DEV_Specie.h>
+#include <N_DEV_ReactionNetwork.h>
+class N_DEV_ReactionLexer;
+%}
+
+%skeleton "lalr1.cc"
+%parse-param {N_DEV_ReactionLexer *theLexer}
+%parse-param {map<string,int> &theSpeciesIDs}
+%parse-param {N_DEV_ReactionNetwork &theReactionNetwork}
+%lex-param {N_DEV_ReactionLexer *theLexer}
+%lex-param {map<string,int> &theSpeciesIDs}
+
+%define "parser_class_name" "N_DEV_ReactionParser"
+%locations
+%defines
+
+%name-prefix="N_DEV"
+
+%union
+{
+  int ival;
+  double dval;
+  std::string *sval;
+  N_DEV::Specie *specievalp;
+  pair<string,double> *spe_p;  
+  vector<pair<string,double> > *spev_p;  
+};
+
+%{
+#undef yyFlexLexer
+  /* CAREFUL watch continuations! */
+#define YY_DECL \
+int N_DEV_ReactionLexer::getToken(N_DEV::N_DEV_ReactionParser::semantic_type *lvalp,  \
+                                       N_DEV::location *llocp, \
+                                       map<string,int> &theSpeciesIDs)
+
+  // YECH!  Work around very stupid way that multiple parsers/lexers are 
+  // handled.
+  // Bison's "%name-prefix" is implemented as a #define yylex "prefix"lex
+  // which BREAKS flex's C++ lexer: it contains a method "yylex" in the
+  // yyFlexLexer class.  Unless we do this kludge, that method gets renamed
+  // with the define as well, and the result is a broken set of classes
+#undef yylex
+#include <FlexLexer.h>
+#include <N_DEV_ReactionLexer.h>
+  // undo that kludge.  Note that because of this stupidity, if the 
+  // "%name-prefix" is changed, this line needs to be changed, too.
+#define yylex N_DEVlex
+
+
+int N_DEVlex(N_DEV::N_DEV_ReactionParser::semantic_type *lvalp, N_DEV::location *locp,
+          N_DEV_ReactionLexer *theLexer, map<string,int> &theSpeciesIDs);
+
+%}
+%token <ival> RXN_INT
+%token ARROW "->"
+%token <dval> RXN_FLOAT "float"
+%token <sval> SPECIE "specie"
+%token <sval> IDENTIFIER "identifier"
+%token <sval> XYCE_EXPRESSION "xyce_expression"
+%token SPECIES_BEGIN "species" 
+%token REACTIONS_BEGIN "reactions"
+%token SOURCES_BEGIN "sources"
+%token ICS_BEGIN "initial_conditions"
+%token KEY_END "end"
+%token KEY_SIMPLE "simple"
+%token KEY_CAPTURE "capture"
+%token KEY_EMISSION "emission"
+%token KEY_ECAPTURE "electron_capture"
+%token KEY_EEMISSION "electron_emission"
+%token KEY_HCAPTURE "hole_capture"
+%token KEY_HEMISSION "hole_emission"
+%token KEY_COMPLEX "complex"
+%token KEY_DECOMPLEX "decomplex"
+%token KEY_CONST "const"
+
+%type <specievalp> simple_specie_spec
+%type <spe_p> specie_expr
+%type <spev_p> species_expr
+/* Reactions return a string for later use*/
+%type <sval> reaction
+%destructor {delete $$;} "specie"
+%destructor {delete $$;} "identifier"
+
+%%
+
+network_spec:  species_spec sources_spec initial_conditions_spec
+             | species_spec reaction_net_spec sources_spec initial_conditions_spec
+                    { 
+                      if (yynerrs_ != 0)
+                      {
+                        YYABORT;
+                      }
+                      else
+                      {
+                        YYACCEPT;
+                      }
+                    }
+               ;
+
+species_spec: SPECIES_BEGIN species_list KEY_END
+               ;
+
+species_list: /* EMPTY */
+              | species_list specie_spec
+              | species_list error
+                    {
+                      cerr << "Invalid specie specification " << endl;
+                    }
+              ;
+
+specie_spec: variable_specie_spec
+             | constant_specie_spec
+             ;
+
+variable_specie_spec: simple_specie_spec
+             {
+               theReactionNetwork.addSpecie(*($1));
+               delete $1;
+             }
+             ;
+
+constant_specie_spec: simple_specie_spec "const"
+             {
+               theReactionNetwork.addConstant(*($1));
+               delete $1;
+             }
+             ;
+
+simple_specie_spec: SPECIE RXN_FLOAT RXN_FLOAT RXN_INT 
+                                /* diffusion prefactor, E, and charge state */
+             {
+               theSpeciesIDs[*($1)]=theSpeciesIDs.size();
+               $$ = new N_DEV::Specie(*($1),$2,$3,$4);
+               delete $1;
+             }
+             ;
+
+reaction_net_spec: REACTIONS_BEGIN reaction_network KEY_END
+               ;
+
+reaction_network: reaction_spec 
+                  | reaction_network reaction_spec
+                  ;
+
+reaction_spec: reaction "simple" '(' RXN_FLOAT ')'
+               {
+                 theReactionNetwork.setSimpleCalc(*$1,$4);
+                 delete $1;
+               }
+             | reaction "capture" '(' RXN_FLOAT ',' RXN_FLOAT ')'
+               { 
+                 theReactionNetwork.setCaptureCalc(*$1,$4,$6);
+                 delete $1;
+               }
+             | reaction "electron_capture" '(' RXN_FLOAT  ')'
+               { 
+                 theReactionNetwork.setElectronCaptureCalc(*$1,$4);
+                 delete $1;
+               }
+             | reaction "hole_capture" '(' RXN_FLOAT  ')'
+               { 
+                 theReactionNetwork.setHoleCaptureCalc(*$1,$4);
+                 delete $1;
+               }
+             | reaction "emission" '(' RXN_FLOAT ',' RXN_FLOAT ',' RXN_FLOAT ',' RXN_FLOAT ')'
+               { 
+                 theReactionNetwork.setEmissionCalc(*$1,$4,$6,$8,$10);
+                 delete $1;
+               }
+             | reaction "electron_emission" '('  RXN_FLOAT ',' RXN_FLOAT ')'
+               { 
+                 theReactionNetwork.setElectronEmissionCalc(*$1,$4,$6);
+                 delete $1;
+               }
+             | reaction "hole_emission" '('  RXN_FLOAT ',' RXN_FLOAT ')'
+               { 
+                 theReactionNetwork.setHoleEmissionCalc(*$1,$4,$6);
+                 delete $1;
+               }
+             | reaction "complex" 
+               {
+                 theReactionNetwork.setComplexCalc(*$1);
+                 delete $1;
+               }
+             | reaction "decomplex" '(' RXN_FLOAT ',' RXN_FLOAT ',' RXN_FLOAT ',' RXN_FLOAT ',' RXN_FLOAT ')'
+               {
+                 theReactionNetwork.setDecomplexCalc(*$1,$4,$6,$8,$10,$12);
+                 delete $1;
+               }
+           | reaction IDENTIFIER '(' num_list ')' 
+             { 
+               cerr << "Invalid rate type " << $2 << endl;
+               delete $1;
+               delete $2;
+               YYERROR;
+             }
+           | reaction error  
+             {
+               cerr << "Invalid rate spec " << endl;
+               delete $1;
+             }
+        
+          ;
+
+reaction: species_expr "->" species_expr ';'
+        { 
+          ostringstream ost;
+          bool electron_react=false;
+          bool electron_prod=false;
+          bool hole_react=false;
+          bool hole_prod=false;
+          int nl=$1->size();
+          int nr=$3->size();
+
+          {
+            int i;
+            for (i=0;i<nl;i++)
+            {
+              if (i>0)
+              {
+                ost << "+";
+              }
+              if (((*$1)[i].second!=1.0))
+              {
+                ost << (int)(*$1)[i].second;
+              }
+              ost << (*$1)[i].first;
+              if ((*$1)[i].first == "E") 
+                electron_react=true;
+              else if ((*$1)[i].first == "H") 
+                hole_react=true;
+            }
+            ost << "->";
+            for (i=0;i<nr;i++)
+            {
+              if (i>0)
+              {
+                ost << "+";
+              }
+              if (((*$3)[i].second!=1.0))
+              {
+                ost << (int)(*$3)[i].second;
+              }
+              ost << (*$3)[i].first;
+              if ((*$3)[i].first == "E") 
+                electron_prod=true;
+              else if ((*$3)[i].first == "H") 
+                hole_prod=true;
+            }
+          }
+
+          if (nl == 2 && nr==1 && electron_react)
+            ost << "_ELECTRON_CAPTURE";
+          else if (nl == 2 && nr==1 && hole_react)
+            ost << "_HOLE_CAPTURE";
+          else  if (nl == 1 && nr==2 && electron_prod)
+            ost << "_ELECTRON_EMISSION";
+          else if (nl == 1 && nr==2 && hole_prod)
+            ost << "_HOLE_EMISSION";
+
+
+
+          $$ = new std::string(ost.str());
+
+          // now go through it again and make the reaction object:
+          theReactionNetwork.addReaction(*$$);
+          {
+            int i;
+            for (i=0;i<nl;i++)
+            {
+              theReactionNetwork.addReactant(*$$,(*$1)[i].first,
+                                       (*$1)[i].second);
+            }
+            for (i=0;i<nr;i++)
+            {
+              theReactionNetwork.addProduct(*$$,(*$3)[i].first,
+                                       (*$3)[i].second);
+            }
+          }
+          delete $1;
+          delete $3;
+        }
+          ;
+
+num_list: num
+          | num_list ',' num
+          ;
+
+num: RXN_FLOAT|RXN_INT
+          ;
+
+species_expr: /* EMPTY */ 
+                {
+                  $$ = new vector< pair<string,double> >;
+                }
+              | specie_expr 
+                { 
+                  $$ = new vector< pair<string,double> >;
+                  $$->push_back(*($1));
+                  delete $1;
+                }
+
+              | species_expr '+' specie_expr
+               { 
+                 $1->push_back(*($3));
+                 $$=$1;
+                 delete $3;
+               }
+              | species_expr IDENTIFIER
+               {
+                 error(yyloc,string("Unrecognized species \"") + *$2 + "\"");
+                 YYERROR;
+               }
+              | species_expr error
+             { 
+               cerr << " Invalid species expression " << endl;
+               $$=$1;
+             }
+              ;
+
+specie_expr: SPECIE
+              {
+                $$ = new pair<string,double>(*($1),1.0);
+                delete $1;
+              }
+             | RXN_INT SPECIE
+              { 
+                $$ = new pair<string,double>(*($2),(double)$1);
+                delete $2;
+              }
+
+             ;
+
+sources_spec: /*empty */
+              | SOURCES_BEGIN source_list KEY_END
+              ;
+
+source_list: /* empty */
+              | source_list source_expr
+              ;
+
+source_expr:SPECIE XYCE_EXPRESSION
+                       {
+                         theReactionNetwork.addSourceTerm(*$1,*$2);
+                         delete $1;
+                         delete $2;
+                           }
+            | IDENTIFIER XYCE_EXPRESSION
+                       { 
+                         cerr << "Unknown specie in source specification.\n" 
+                              << endl;
+                         delete $1;
+                         delete $2;
+                         YYERROR;
+                       }
+            | SPECIE error
+                       { 
+                         cerr << "Invalid expression -- missing braces?\n" 
+                              << endl;
+                         delete $1;
+                         YYERROR;
+                       }
+
+               ;
+
+initial_conditions_spec: /*empty */
+              | ICS_BEGIN ics_list KEY_END
+              ;
+
+ics_list: /* empty */
+              | ics_list ics_expr
+              ;
+
+ics_expr: SPECIE RXN_FLOAT
+          {
+              theReactionNetwork.addInitialCondition(*$1,$2);
+              delete $1;
+          }
+          ;
+%%
+
+
+int N_DEVlex(N_DEV::N_DEV_ReactionParser::semantic_type *lvalp, N_DEV::location *locp, 
+                   N_DEV_ReactionLexer *theLexer, 
+                   map<string,int> &theSpeciesIDs)
+{
+        return(theLexer->getToken(lvalp,locp,theSpeciesIDs));
+}
+
+void N_DEV::N_DEV_ReactionParser::error(const N_DEV::N_DEV_ReactionParser::location_type& l, const string& m)
+{
+  cerr <<" at line " << l  << ": " << m << endl;
+}

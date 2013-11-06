@@ -1,0 +1,54 @@
+//======================================================================================
+//======================================================================================
+// Filename: psp103.va
+//======================================================================================
+//======================================================================================
+//
+//  (c) Copyright 2009, All Rights Reserved, NXP Semiconductors
+//
+//
+//  Version: 103.1, May 2009
+//
+//======================================================================================
+//======================================================================================
+//
+// Further information can be found in the file readme.txt
+//
+
+`include "discipline.h"
+
+`include "Common103_macrodefs.include"
+
+`include "JUNCAP200_macrodefs.include"
+
+`include "PSP103_macrodefs.include"
+
+// Note: some verilog-A compilers have problems handling the ddx-operator,
+// which occurs in definition of OP-output variables. If the line below is
+// commented out, all OP-output variables using the ddx-operator are skipped.
+//`define OPderiv
+
+// TVR:MODIFICATION For Xyce, we do NOT want to generate the NOI
+// nodes, because Xyce does not do noise models.
+//`define useNOInodes
+
+/////////////////////////////////////////////////////////////////////////////
+//
+//  PSP global model code
+//
+/////////////////////////////////////////////////////////////////////////////
+
+
+module PSP103VA(D, G, S, B)
+
+`P(
+  info = "PSP MOSFET Model"
+  version = `VERS
+  revision = `VREV
+  simkit:name = "psp103"
+  simkit:desc = "psp_103"
+);
+
+`include "PSP103_module.include"
+
+endmodule

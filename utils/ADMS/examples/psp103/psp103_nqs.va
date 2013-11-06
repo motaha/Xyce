@@ -1,0 +1,53 @@
+//======================================================================================
+//======================================================================================
+// Filename: psp103_nqs.va
+//======================================================================================
+//======================================================================================
+//
+//  (c) Copyright 2009, All Rights Reserved, NXP Semiconductors
+//
+//
+//  Version: 103.1, May 2009
+//
+//======================================================================================
+//======================================================================================
+//
+// Further information can be found in the file readme.txt
+//
+
+`define NQSmodel true
+
+`include "discipline.h"
+
+`include "Common103_macrodefs.include"
+
+`include "JUNCAP200_macrodefs.include"
+
+`include "PSP103_macrodefs.include"
+
+`include "PSP103_nqs_macrodefs.include"
+
+// Note: some verilog-A compilers have problems handling the ddx-operator,
+// which occurs in definition of OP-output variables. If the line below is
+// commented out, all OP-output variables using the ddx-operator are skipped.
+`define OPderiv
+
+/////////////////////////////////////////////////////////////////////////////
+//
+//  PSP-NQS global model code
+//
+/////////////////////////////////////////////////////////////////////////////
+
+module PSPNQS103VA(D, G, S, B)
+
+`P(
+  info = "PSP NQS MOSFET Model"
+  version = `VERS
+  revision = `VREV
+  simkit:name = "pspnqs103"
+  simkit:desc = "pspnqs_103"
+);
+
+`include "PSP103_module.include"
+
+endmodule

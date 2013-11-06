@@ -1,0 +1,18 @@
+`include "disciplines.vams"
+`include "constants.vams"
+
+`define attr(txt) (*txt*)
+
+module capacitor (p,n);
+  electrical p,n;
+  inout p,n;
+
+  parameter real C=1p from (0:inf) `attr(info="Capacitance" type="instance");
+  real Q;
+
+  analog
+  begin
+    Q=C*V(p,n);
+    I(p,n) <+ ddt(Q);
+  end
+endmodule

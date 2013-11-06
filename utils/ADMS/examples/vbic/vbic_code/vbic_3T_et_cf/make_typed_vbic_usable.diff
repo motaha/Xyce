@@ -1,0 +1,352 @@
+--- N_DEV_ADMSvbic.C	2013-04-24 10:55:15.583903245 -0600
++++ /Net/Proj/Xyce/people/tvrusso/nightly_builds/Xyce/src/DeviceModelPKG/ADMS/src/N_DEV_ADMSvbic.C	2013-04-24 10:54:05.635655469 -0600
+@@ -71,15 +71,16 @@
+   // Set up configuration constants:
+   // This assumes NO optional nodes on the instance line.  Might need that
+   // fixed?
+-  setNumNodes(numExtVars);
+-  setNumOptionalNodes(0);
++  setNumNodes(4);
++  setNumOptionalNodes(5);
+   setNumFillNodes(0);
+   setModelRequired(1);
+ 
+   // we're going to have to come up with a way of generating the addModelType
+   // deal
+-  //  FIXME!    addModelType("WTF");
+-
++  addModelType("VBIC");
++  addModelType("NPN");
++  addModelType("PNP");
+ 
+   // Set up each parameter directly, using the up-cased variable name
+   // as the tag.
+@@ -403,7 +404,8 @@
+   q_dt_Equ_b_Node_Ptr(0),
+   q_dt_Equ_ci_Node_Ptr(0),
+   q_dt_Equ_c_Node_Ptr(0),
+-  admsTemperature(getDeviceOptions().temp.dVal())
++  admsTemperature(getDeviceOptions().temp.dVal()),
++  externalNodeMode(false)
+ 
+ {
+   numIntVars = 6 + 0;
+@@ -413,6 +415,23 @@
+   // Right now, we only have state for limited probes...
+   numStateVars = 7;
+ 
++  // Manually inserted code:
++  devConMap.resize(4);
++  devConMap[0] = 1;
++  devConMap[1] = 1;
++  devConMap[2] = 1;
++  devConMap[3] = 2;
++
++  if ( IB.numExtVars > 4)
++  {
++    numExtVars = IB.numExtVars;
++    externalNodeMode = true;
++    numIntVars -= numExtVars-4;
++    devConMap.resize(numExtVars);
++    for (int i1=4; i1<numExtVars; ++i1)
++      devConMap[i1]=1;
++  }
++  // End manually inserted code
+ 
+   // Set up jacobian stamp:
+ 
+@@ -529,6 +548,21 @@
+   // calculate dependent (i.e. computed params) and check for errors.
+   processParams();
+   collapseNodes();
++
++  // Manually added code
++  // there are always ci and bi, but the others could be mapped away.
++  int numExist = ((collapseNode_cx)?0:1) + ((collapseNode_bx)?0:1) + ((collapseNode_ei)?0:1) + 2;
++  ;
++
++  if (externalNodeMode && (numExtVars != 4+numExist))
++  {
++    string msg = ": ";
++    msg += " name= " + getName();
++    msg += " wrong number of external nodes are set!";
++    msg += " If you specify any internal nodes as external, you must set all that exist. ";
++    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
++  }
++  // End manually added code
+ }
+ 
+ //-----------------------------------------------------------------------------
+@@ -712,24 +746,46 @@
+   li_e = extLIDVecRef[i++];
+   li_dt = extLIDVecRef[i++];
+ 
+-
+-  i=0;
++  // Manually modified code
++  int j=0;
+   if (!collapseNode_cx)
+-    li_cx = intLIDVecRef[i++];
++  {
++    if (externalNodeMode)
++      li_cx = extLIDVecRef[i++];
++    else
++      li_cx = intLIDVecRef[j++];
++  }
+   else
+     li_cx = li_c;
+-  li_ci = intLIDVecRef[i++];
++  if (externalNodeMode)
++    li_ci = extLIDVecRef[i++];
++  else
++    li_ci = intLIDVecRef[j++];
++
+   if (!collapseNode_bx)
+-    li_bx = intLIDVecRef[i++];
++  {
++    if (externalNodeMode)
++      li_bx = extLIDVecRef[i++];
++    else
++      li_bx = intLIDVecRef[j++];
++  }
+   else
+     li_bx = li_b;
+-  li_bi = intLIDVecRef[i++];
++  if (externalNodeMode)
++    li_bi = extLIDVecRef[i++];
++  else
++    li_bi = intLIDVecRef[j++];
+   if (!collapseNode_ei)
+-    li_ei = intLIDVecRef[i++];
++  {
++    if (externalNodeMode)
++      li_ei = extLIDVecRef[i++];
++    else
++      li_ei = intLIDVecRef[j++];
++  }
+   else
+     li_ei = li_e;
+-  li_bp = intLIDVecRef[i++];
+-
++  li_bp = intLIDVecRef[j++];
++  // End manually modified code
+ 
+ #ifdef Xyce_DEBUG_DEVICE
+   if (getDeviceOptions().debugLevel > 0)
+@@ -771,7 +827,8 @@
+   if (intNameMap.empty())
+   {
+     string tmpstr;
+-    if (!collapseNode_cx)
++    // Manually Modified Code
++    if (!collapseNode_cx && !externalNodeMode)
+     {
+ 
+       tmpstr = getName() + "_cx";
+@@ -779,10 +836,14 @@
+       intNameMap[li_cx] = tmpstr;
+     }
+ 
+-    tmpstr = getName() + "_ci";
+-    spiceInternalName(tmpstr);
+-    intNameMap[li_ci] = tmpstr;
+-    if (!collapseNode_bx)
++    if (!externalNodeMode)
++    {
++      tmpstr = getName() + "_ci";
++      spiceInternalName(tmpstr);
++      intNameMap[li_ci] = tmpstr;
++    }
++
++    if (!collapseNode_bx && !externalNodeMode)
+     {
+ 
+       tmpstr = getName() + "_bx";
+@@ -790,10 +851,14 @@
+       intNameMap[li_bx] = tmpstr;
+     }
+ 
+-    tmpstr = getName() + "_bi";
+-    spiceInternalName(tmpstr);
+-    intNameMap[li_bi] = tmpstr;
+-    if (!collapseNode_ei)
++    if (!externalNodeMode)
++    {
++      tmpstr = getName() + "_bi";
++      spiceInternalName(tmpstr);
++      intNameMap[li_bi] = tmpstr;
++    }
++
++    if (!collapseNode_ei && !externalNodeMode)
+     {
+ 
+       tmpstr = getName() + "_ei";
+@@ -804,7 +869,7 @@
+     tmpstr = getName() + "_bp";
+     spiceInternalName(tmpstr);
+     intNameMap[li_bp] = tmpstr;
+-
++    // End manually modified code
+   }
+   return intNameMap;
+ }
+@@ -1471,9 +1536,51 @@
+ 
+   origFlag = true;
+ 
++  // code manually moved from below, because we need it earlier than predicted by adms
++  tVCrit = (adms_vt(admsTemperature)*log((adms_vt(admsTemperature)/(1.41421356237309504880*(model_.IS)))));
++
+   if (getSolverState().newtonIter == 0)
+   {
+ 
++    if (getSolverState().initJctFlag && getDeviceOptions().voltageLimiterFlag)
++    {
++      // manually inserted code:
++      if (getSolverState().inputOPFlag)
++      {
++        N_LAS_Vector * flagSolVectorPtr = (extData.flagSolVectorPtr);
++        if ((*flagSolVectorPtr)[li_e] == 0 ||
++            (*flagSolVectorPtr)[li_ei] == 0 ||
++            (*flagSolVectorPtr)[li_b] == 0 ||
++            (*flagSolVectorPtr)[li_bi] == 0 ||
++            (*flagSolVectorPtr)[li_bx] == 0 ||
++            (*flagSolVectorPtr)[li_bp] == 0 ||
++            (*flagSolVectorPtr)[li_c] == 0 ||
++            (*flagSolVectorPtr)[li_ci] == 0 ||
++            (*flagSolVectorPtr)[li_cx] == 0 ||
++            (*flagSolVectorPtr)[li_dt] == 0 )
++        {
++          Vbci_limited = Vbcx_limited = Vbep_limited = 0;
++          Vbe_limited = Vbei_limited = Vbex_limited = tVCrit;
++          Vrth_limited = 0;
++          origFlag = false;
++        }
++      }
++      else
++      {
++        Vbci_limited = Vbcx_limited = Vbep_limited = 0;
++        Vbe_limited = Vbei_limited = Vbex_limited = tVCrit;
++        Vrth_limited = 0;
++        origFlag = false;
++#ifdef Xyce_DEBUG_DEVICE
++        if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
++        {
++          cout << " Setting device initial condition to Base-Emitter drop=tVCrit (" << tVCrit << ")"<<endl;
++        }
++#endif
++      }
++    }
++    // end manually inserted code
++
+     if (!(getSolverState().dcopFlag)||(getSolverState().locaEnabledFlag && getSolverState().dcopFlag))
+     {
+       Vbe_old = ((*extData.currStaVectorPtr))[li_state_admsProbeID_V_b_e];
+@@ -1507,14 +1614,15 @@
+   }
+ 
+   // -- code converted from analog/code block
+-  tVCrit = (adms_vt(admsTemperature)*log((adms_vt(admsTemperature)/(1.41421356237309504880*(model_.IS)))));
++  // manually moved to above, we need it earlier than this:
++  //tVCrit = (adms_vt(admsTemperature)*log((adms_vt(admsTemperature)/(1.41421356237309504880*(model_.IS)))));
+ 
+ 
+   //Vbei = ($limit(V(bi,ei),"typedpnjlim",$vt(),tVCrit,dtype));
+   if (getDeviceOptions().voltageLimiterFlag)
+   {
+     int icheck=0;
+-    Vbei_limited = devSupport.pnjlim(Vbei_limited,Vbei_old,adms_vt_nom,tVCrit,&icheck);
++    Vbei_limited = devSupport.pnjlim_new(Vbei_limited,Vbei_old,adms_vt_nom,tVCrit,&icheck);
+     if (icheck == 1)
+       origFlag = false;
+     if (!origFlag)
+@@ -1531,7 +1639,7 @@
+   if (getDeviceOptions().voltageLimiterFlag)
+   {
+     int icheck=0;
+-    Vbci_limited = devSupport.pnjlim(Vbci_limited,Vbci_old,adms_vt_nom,tVCrit,&icheck);
++    Vbci_limited = devSupport.pnjlim_new(Vbci_limited,Vbci_old,adms_vt_nom,tVCrit,&icheck);
+     if (icheck == 1)
+       origFlag = false;
+     if (!origFlag)
+@@ -1548,7 +1656,7 @@
+   if (getDeviceOptions().voltageLimiterFlag)
+   {
+     int icheck=0;
+-    Vbex_limited = devSupport.pnjlim(Vbex_limited,Vbex_old,adms_vt_nom,tVCrit,&icheck);
++    Vbex_limited = devSupport.pnjlim_new(Vbex_limited,Vbex_old,adms_vt_nom,tVCrit,&icheck);
+     if (icheck == 1)
+       origFlag = false;
+     if (!origFlag)
+@@ -1565,7 +1673,7 @@
+   if (getDeviceOptions().voltageLimiterFlag)
+   {
+     int icheck=0;
+-    Vbcx_limited = devSupport.pnjlim(Vbcx_limited,Vbcx_old,adms_vt_nom,tVCrit,&icheck);
++    Vbcx_limited = devSupport.pnjlim_new(Vbcx_limited,Vbcx_old,adms_vt_nom,tVCrit,&icheck);
+     if (icheck == 1)
+       origFlag = false;
+     if (!origFlag)
+@@ -1582,7 +1690,7 @@
+   if (getDeviceOptions().voltageLimiterFlag)
+   {
+     int icheck=0;
+-    Vbep_limited = devSupport.pnjlim(Vbep_limited,Vbep_old,adms_vt_nom,tVCrit,&icheck);
++    Vbep_limited = devSupport.pnjlim_new(Vbep_limited,Vbep_old,adms_vt_nom,tVCrit,&icheck);
+     if (icheck == 1)
+       origFlag = false;
+     if (!origFlag)
+@@ -2736,7 +2844,15 @@
+          <<Jdxp_dynamic[admsNodeID_bp] << endl;
+ 
+     if (!origFlag)
++    {
+       cout << "This step was limited by this device." << endl;
++      cout << " Vbei_limited = " << Vbei_limited << " _orig = " << Vbei_orig << " diff = " << Vbei_limited - Vbei_orig << endl;
++      cout << " Vbci_limited = " << Vbci_limited << " _orig = " << Vbci_orig << " diff = " << Vbci_limited - Vbci_orig << endl;
++      cout << " Vbex_limited = " << Vbex_limited << " _orig = " << Vbex_orig << " diff = " << Vbex_limited - Vbex_orig << endl;
++      cout << " Vbcx_limited = " << Vbcx_limited << " _orig = " << Vbcx_orig << " diff = " << Vbcx_limited - Vbcx_orig << endl;
++      cout << " Vbep_limited = " << Vbep_limited << " _orig = " << Vbep_orig << " diff = " << Vbep_limited - Vbep_orig << endl;
++      cout << " Vrth_limited = " << Vrth_limited << " _orig = " << Vrth_orig << " diff = " << Vrth_limited - Vrth_orig << endl;
++    }
+   }
+ #endif // Xyce_DEBUG_DEVICE
+   return true;
+@@ -4302,13 +4418,23 @@
+   if (!given("XYCEADMSMODTEMP"))
+     admsModTemp=getDeviceOptions().temp.dVal();
+ 
++  // Fix the TNOM parameter that has "helpfully" been converted to Kelvin
++  // by the DeviceEntity class
++
++  if (given("TNOM"))
++    TNOM -= CONSTCtoK;
++
+   // Calculate any parameters specified as expressions:
+ 
+   updateDependentParameters();
+ 
+   // calculate dependent (ie computed) params and check for errors:
+-  processParams();
+ 
++  //Manually inserted these two lines:
++  if (getType() == "pnp" || getType() == "PNP")
++    dtype = -1;
++
++  processParams();
+ }
+ 
+ //-----------------------------------------------------------------------------
+--- N_DEV_ADMSvbic.h	2013-04-24 10:51:32.890374600 -0600
++++ /Net/Proj/Xyce/people/tvrusso/nightly_builds/Xyce/src/DeviceModelPKG/ADMS/include/N_DEV_ADMSvbic.h	2013-04-24 10:54:07.627589912 -0600
+@@ -370,6 +371,10 @@
+   // "TEMP" parameter to use
+   double admsInstTemp;
+ 
++  // This is used to flag whether the cx, bx, and ei nodes are exposed
++  // on the instance line as external nodes.
++  bool externalNodeMode;
++
+   // thermal voltage at kelvin temperature temp)
+   inline double adms_vt(double temp) {return(CONSTKoverQ*temp);};
+ 

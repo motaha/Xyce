@@ -1,0 +1,56 @@
+
+
+This file contains a "diff" between the current ( as of 4/16/02) release of
+chilespice and what needs to be there for all the diagnostics such as
+matdump, newtinfo, etc. to work.
+
+This particular diff is applied to niconv.c.
+
+
+
+*** /Net/Proj/Xyce/ChileSPICE/src/lib/ni/niconv.c	Wed Feb 13 08:40:26 2002
+--- niconv.c	Mon Apr 15 14:43:37 2002
+***************
+*** 60,66 ****
+        ckt->CKTnormSums = (double *) REALLOC_SM(ckt->CKTnormSums, ((ckt->CKTsize_d+1)/SUM_CHUNK)*sizeof(double));
+        ckt->CKTnodeTypes = (int *) REALLOC_SM(ckt->CKTnodeTypes, (ckt->CKTsize_d+1)*sizeof(int));
+  #else
+!       ckt->CKTnormSums = (double *) trealloc(ckt->CKTnormSums, ((ckt->CKTsize_d+1)/SUM_CHUNK)*sizeof(double));
+        ckt->CKTnodeTypes = (int *) trealloc(ckt->CKTnodeTypes, (ckt->CKTsize_d+1)*sizeof(int));
+  #endif
+        new_nodes = 1;
+--- 60,66 ----
+        ckt->CKTnormSums = (double *) REALLOC_SM(ckt->CKTnormSums, ((ckt->CKTsize_d+1)/SUM_CHUNK)*sizeof(double));
+        ckt->CKTnodeTypes = (int *) REALLOC_SM(ckt->CKTnodeTypes, (ckt->CKTsize_d+1)*sizeof(int));
+  #else
+!       ckt->CKTnormSums = (double *) trealloc(ckt->CKTnormSums, ((ckt->CKTsize_d)/SUM_CHUNK+1)*sizeof(double));
+        ckt->CKTnodeTypes = (int *) trealloc(ckt->CKTnodeTypes, (ckt->CKTsize_d+1)*sizeof(int));
+  #endif
+        new_nodes = 1;
+***************
+*** 75,81 ****
+      i_hi = (pe_in_smp+1)*((size-1)/SUM_CHUNK)/num_pes_in_smp-1;
+  #else
+      i_lo = 0;
+!     i_hi = (size-1)/SUM_CHUNK-1;
+  #endif
+      maxnorm = 0.0;
+      for (i=i_lo;i<=i_hi;i++) 
+--- 75,81 ----
+      i_hi = (pe_in_smp+1)*((size-1)/SUM_CHUNK)/num_pes_in_smp-1;
+  #else
+      i_lo = 0;
+!     i_hi = (size)/SUM_CHUNK;
+  #endif
+      maxnorm = 0.0;
+      for (i=i_lo;i<=i_hi;i++) 
+***************
+*** 107,113 ****
+      }
+      maxnorm = sqrt(maxnorm);
+      twonorm = sqrt(twonorm);
+- 
+      return;
+  }
+  
+--- 107,112 ----

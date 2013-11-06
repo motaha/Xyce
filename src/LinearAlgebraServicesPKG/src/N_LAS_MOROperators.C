@@ -1,0 +1,138 @@
+//-----------------------------------------------------------------------------
+// Copyright Notice
+//
+//   Copyright 2002 Sandia Corporation. Under the terms
+//   of Contract DE-AC04-94AL85000 with Sandia Corporation, the U.S.
+//   Government retains certain rights in this software.
+//
+//    Xyce(TM) Parallel Electrical Simulator
+//    Copyright (C) 2002-2013  Sandia Corporation
+//
+//    This program is free software: you can redistribute it and/or modify
+//    it under the terms of the GNU General Public License as published by
+//    the Free Software Foundation, either version 3 of the License, or
+//    (at your option) any later version.
+//
+//    This program is distributed in the hope that it will be useful,
+//    but WITHOUT ANY WARRANTY; without even the implied warranty of
+//    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//    GNU General Public License for more details.
+//
+//    You should have received a copy of the GNU General Public License
+//    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//-----------------------------------------------------------------------------
+
+//-------------------------------------------------------------------------
+// Filename       : $RCSfile: N_LAS_MOROperators.C,v $
+//
+// Purpose       : Implementation of the Epetra_Operator interface to define
+//                 inv(A)*B, where inv(A) is computed by Amesos.
+// Special Notes :
+//
+// Creator       : Heidi Thornquist, SNL
+//
+// Creation Date : 06/04/12
+//
+// Revision Information:
+// ---------------------
+//
+// Revision Number: $Revision: 1.1.4.2 $
+//
+// Revision Date  : $Date: 2013/10/03 17:23:45 $
+//
+// Current Owner  : $Author: tvrusso $
+//-------------------------------------------------------------------------
+
+#include <Xyce_config.h>
+
+
+// ---------- Standard Includes ----------
+
+#include <algorithm>
+
+// ----------   Xyce Includes   ----------
+
+#include <N_UTL_Misc.h>
+#include <N_LAS_MOROperators.h>
+
+#if defined(Xyce_DEBUG_LINEAR) || defined(Xyce_DEBUG_DEVICE)
+#include <N_ERH_ErrorMgr.h>
+#endif
+
+// ----------  Other Includes   ----------
+
+#include "Epetra_MultiVector.h"
+
+//-----------------------------------------------------------------------------
+// Function      : N_LAS_AmesosGenOp::N_LAS_AmesosGenOp
+// Purpose       : Constructor 
+// Special Notes :
+// Scope         : Public
+// Creator       : Heidi Thornquist, SNL 
+// Creation Date : 06/04/12
+//-----------------------------------------------------------------------------
+N_LAS_AmesosGenOp::N_LAS_AmesosGenOp( const Teuchos::RCP<Amesos_BaseSolver>& solver,
+                                      const Teuchos::RCP<Epetra_Operator>& B,
+                                      bool useTranspose )
+  : useTranspose_(useTranspose),
+    solver_(solver),
+    B_(B)
+{
+  problem_ = Teuchos::rcp( const_cast<Epetra_LinearProblem*>( solver->GetProblem() ), false);
+
+  if ( solver_->UseTranspose() )
+    solver_->SetUseTranspose(!useTranspose);
+  else
+    solver_->SetUseTranspose(useTranspose);
+
+  if ( B_->UseTranspose() )
+    B_->SetUseTranspose(!useTranspose);
+  else
+    B_->SetUseTranspose(useTranspose);
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_LAS_AmesosGenOp::Apply()
+// Purpose       : Applies the operator inv(A)*B*X = Y
+// Special Notes :
+// Scope         : Public
+// Creator       : Heidi Thornquist, SNL 
+// Creation Date : 06/04/12
+//-----------------------------------------------------------------------------
+int N_LAS_AmesosGenOp::Apply(const Epetra_MultiVector& X, Epetra_MultiVector& Y ) const
+{ 
+  if (!useTranspose_) {
+
+    // Storage for B*X 
+    Epetra_MultiVector BX(X.Map(),X.NumVectors());
+
+    // Apply B*X
+    B_->Apply(X, BX);
+    Y.PutScalar(0.0);
+
+    // Set the LHS and RHS
+    problem_->SetRHS(&BX);
+    problem_->SetLHS(&Y);
+
+    // Solve the linear system A*Y = BX
+    solver_->Solve();
+  }
+  else {
+    // Storage for A^{-T}*X
+    Epetra_MultiVector ATX(X.Map(),X.NumVectors());
+    Epetra_MultiVector tmpX = const_cast<Epetra_MultiVector&>(X);
+
+    // Set the LHS and RHS
+    problem_->SetRHS(&tmpX);
+    problem_->SetLHS(&ATX);
+
+    // Solve the linear system A^T*Y = X 
+    solver_->Solve();
+
+    // Apply B*ATX
+    B_->Apply(ATX, Y);
+  }
+  
+  return 0;
+}
+
