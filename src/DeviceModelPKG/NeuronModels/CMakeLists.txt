@@ -2,7 +2,7 @@
 # -- process files for this library ------------------------------------------
 
 # class source list
-set ( AD_SOURCES  
+set ( NeuronModels_SOURCES  
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_Neuron.C 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_Neuron2.C 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_Neuron3.C 
@@ -35,5 +35,5 @@ set ( XYCE_INCLUDE_DIRECTORIES ${XYCE_INCLUDE_DIRECTORIES}
 
 # -- build requested libraries -----------------------------------------------
 set ( XYCE_PACKAGE_LIBRARIES ${XYCE_PACKAGE_LIBRARIES} 
-      AD 
+      NeuronModels 
       CACHE INTERNAL "X_L" )

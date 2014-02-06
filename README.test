@@ -1,0 +1,24 @@
+6/01 Regina Schells
+Revised 12/03, Tom Russo
+Revised again 7/07, Tom Russo
+
+To checkout and run the Xyce Test Suite:
+
+1. Add the location of the executable you want to test to your path. 
+   
+2. Checkout the test suite (cvs -d :ext:joseki:/Net/Proj/Xyce/CVS checkout Xyce_Regression)
+2a) If on the SRN and desiring the full test suite to include radiation models,
+    check out the export controlled test cases, too:
+    cd Xyce_Regression
+    cvs -d :ext:charleston:/Net/Proj/Xyce/CVS checkout Xyce_SandiaRegression
+
+3. To "automagically" run the test suite, cd to the TestScripts
+directory and type run_xyce_regression.  As the script runs it will tell
+you whether each test passed or failed, and if it passed how long the
+run took in user and system time.  After the script completes, a
+test_results."date" file will be placed in the Xyce_Test directory
+(one level above the TestScripts directory).  This file lets you know
+which tests failed.
+
+Instead of putting the executable in your path, you can also provide a path
+to it in the command line to run_xyce_regression.

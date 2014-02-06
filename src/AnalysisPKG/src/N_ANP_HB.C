@@ -31,9 +31,9 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.25.2.9 $
-// Revision Date  : $Date: 2013/10/03 17:23:31 $
-// Current Owner  : $Author: tvrusso $
+// Revision Number: $Revision: 1.25.2.11 $
+// Revision Date  : $Date: 2013/12/19 01:07:15 $
+// Current Owner  : $Author: tmei $
 //-----------------------------------------------------------------------------
 #include <Xyce_config.h>
 
@@ -92,6 +92,7 @@ N_ANP_HB::N_ANP_HB( N_ANP_AnalysisManager * anaManagerPtr ) :
   startUpPeriodsFinished_(false),
   saveIcData_(false),
   tiaParams_( anaManagerPtr->tiaParams ),
+  taHB_(1),
   fastTimeDisc_(0),
   fastTimeDiscOrder_(1),
   hbTotalNumberSuccessfulStepsTaken_(0),
@@ -298,6 +299,8 @@ bool N_ANP_HB::init()
   //
   period_ =   1.0/tiaParams_.freq;
 
+  if (taHB_ == 1) 
+  {
   bool retTol1 = runTol_(); returnValue = returnValue && retTol1;
 
   // Start up periods need to be run before the initial condition is computed, otherwise
@@ -322,6 +325,22 @@ bool N_ANP_HB::init()
   }
 
   interpolateIC_();
+  }
+  else
+  {
+
+    double TimeStep = period_/static_cast<double>(size_);
+//    timeSteps_.push_back( TimeStep );
+    fastTimes_.resize(size_+1);
+
+    goodTimePoints_.resize(size_+1);
+    for( int i = 0; i <= size_; ++i )
+    {
+      fastTimes_[i] = tiaParams_.initialTime + static_cast<double>(i) * TimeStep;
+    }
+    goodTimePoints_ = fastTimes_;
+
+  }
 
   freqPoints_.resize(size_);
   //   double fastStep = period_/static_cast<double>(size_);
@@ -372,6 +391,8 @@ bool N_ANP_HB::init()
   //anaManagerRCPtr_->anaIntPtr->getnlHBOptions(saved_nlHBOB_);
   nlsMgrRCPtr_->getHBOptions(saved_nlHBOB_);
 
+  if (taHB_ == 1)
+  {
   // Pick up IC data from the initial transient.
   for (int i=0 ; i<size_ ; ++i)
   {
@@ -390,6 +411,7 @@ bool N_ANP_HB::init()
   }
 
   hbLoaderPtr_->permutedFFT(*HBICVectorPtr_, &*HBICVectorFreqPtr_);
+  }
 
 #ifdef Xyce_DEBUG_HB
   if ( debugLevel > 1 )
@@ -787,6 +809,10 @@ bool N_ANP_HB::setHBOptions(const N_UTL_OptionBlock & OB)
     {
       debugLevel = iterPL->iVal ();
     }
+    else if ( tag == "TAHB" )
+    {
+      taHB_ = iterPL->iVal ();
+    }
     else
     {
       msg = "N_ANP_HB::setHBOptions";
@@ -1008,7 +1034,9 @@ bool N_ANP_HB::runTol_()
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL_0, msg );
   }
 
-  int numPoints = anaManagerRCPtr_->wimPtr->getNumberOfSteps();
+//  int numPoints = anaManagerRCPtr_->wimPtr->getNumberOfSteps();
+
+  int numPoints = anaManagerRCPtr_->getStepNumber();
 
   while((numPoints < (1.2*size_)) && (tiaParams.relErrorTol>= 1e-6))
   {
@@ -1035,7 +1063,9 @@ bool N_ANP_HB::runTol_()
         N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL_0, msg );
       }
       returnValue = retV && returnValue;
-      numPoints = anaManagerRCPtr_->wimPtr->getNumberOfSteps();
+//      numPoints = anaManagerRCPtr_->wimPtr->getNumberOfSteps();
+      numPoints = anaManagerRCPtr_->getStepNumber();
+
   }
 
   // Add in simulation times

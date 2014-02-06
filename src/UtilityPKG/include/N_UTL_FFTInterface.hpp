@@ -26,11 +26,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.5 $
+// Revision Number: $Revision: 1.5.2.1 $
 //
-// Revision Date  : $Date: 2013/06/10 23:52:25 $
+// Revision Date  : $Date: 2014/01/29 18:42:10 $
 //
-// Current Owner  : $Author: hkthorn $
+// Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 #ifndef N_UTL_FFTINTERFACE_HPP
 #define N_UTL_FFTINTERFACE_HPP 1
@@ -73,7 +73,7 @@ class N_UTL_FFTInterface
     N_UTL_FFTInterface( int length, int numSignals=1, int reqStride=0, bool overwrite=false )
 #ifdef Xyce_USE_INTEL_FFT
       : intelfftInterface( length, numSignals, reqStride, overwrite )
-#elif Xyce_USE_FFTW
+#elif defined(Xyce_USE_FFTW)
       : fftwInterface( length, numSignals, reqStride, overwrite )
 #endif
     {
@@ -92,7 +92,7 @@ class N_UTL_FFTInterface
 #ifdef Xyce_USE_INTEL_FFT
       intelfftInterface.registerVectors( Teuchos::rcp( &fftInData, false ), Teuchos::rcp( fftOutData, false ),
                                          Teuchos::rcp( &iftInData, false ), Teuchos::rcp( iftOutData, false ) );
-#elif Xyce_USE_FFTW
+#elif defined(Xyce_USE_FFTW)
       fftwInterface.registerVectors( Teuchos::rcp( &fftInData, false ), Teuchos::rcp( fftOutData, false ),
                                      Teuchos::rcp( &iftInData, false ), Teuchos::rcp( iftOutData, false ) );
 #endif
@@ -102,7 +102,7 @@ class N_UTL_FFTInterface
     {
 #ifdef Xyce_USE_INTEL_FFT
       intelfftInterface.calculateFFT( Teuchos::rcp( &inData, false ), Teuchos::rcp( outResult, false ) );
-#elif Xyce_USE_FFTW
+#elif defined(Xyce_USE_FFTW)
       fftwInterface.calculateFFT( Teuchos::rcp( &inData, false ), Teuchos::rcp( outResult, false ) );
 #endif
     }
@@ -111,7 +111,7 @@ class N_UTL_FFTInterface
     {
 #ifdef Xyce_USE_INTEL_FFT
       intelfftInterface.calculateIFT( Teuchos::rcp( &inData, false ), Teuchos::rcp( outResult, false ) );
-#elif Xyce_USE_FFTW
+#elif defined(Xyce_USE_FFTW)
       fftwInterface.calculateIFT( Teuchos::rcp( &inData, false ), Teuchos::rcp( outResult, false ) );
 #endif
     }
@@ -120,7 +120,7 @@ class N_UTL_FFTInterface
     {
 #ifdef Xyce_USE_INTEL_FFT
       intelfftInterface.calculateFFT();
-#elif Xyce_USE_FFTW
+#elif defined(Xyce_USE_FFTW)
       fftwInterface.calculateFFT();
 #endif
     }
@@ -129,7 +129,7 @@ class N_UTL_FFTInterface
     {
 #ifdef Xyce_USE_INTEL_FFT
       intelfftInterface.calculateIFT();
-#elif Xyce_USE_FFTW
+#elif defined(Xyce_USE_FFTW)
       fftwInterface.calculateIFT();
 #endif
     }
@@ -138,7 +138,7 @@ class N_UTL_FFTInterface
 
 #ifdef Xyce_USE_INTEL_FFT
     N_UTL_IntelFFT_Interface<VectorType> intelfftInterface;
-#elif Xyce_USE_FFTW
+#elif defined(Xyce_USE_FFTW)
     N_UTL_FFTW_Interface<VectorType> fftwInterface;
 #endif    
 };

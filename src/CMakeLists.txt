@@ -264,7 +264,7 @@ endif ( Xyce_RAD_MODELS )
 # DEBUG: forcing regression path to documentation (remove later)
 install ( FILES ${Xyce_BINARY_DIR}/../doc/Reference_Guide.pdf
                 ${Xyce_BINARY_DIR}/../doc/Users_Guide.pdf 
-                ${Xyce_BINARY_DIR}/../doc/Release_Notes_6.0.pdf
+                ${Xyce_BINARY_DIR}/../doc/Release_Notes_${Xyce_VERSION_STRING_SHORT}.pdf
           DESTINATION doc 
           OPTIONAL )
 if ( Xyce_RAD_MODELS )

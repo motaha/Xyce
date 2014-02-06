@@ -31,9 +31,9 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.7.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
-// Current Owner  : $Author: tvrusso $
+// Revision Number: $Revision: 1.7.2.3 $
+// Revision Date  : $Date: 2013/12/03 23:30:12 $
+// Current Owner  : $Author: rlschie $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
@@ -57,14 +57,20 @@
 //-----------------------------------------------------------------------------
 N_IO_MeasureRiseFallDelay::N_IO_MeasureRiseFallDelay( const N_UTL_OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr):
   N_IO_MeasureBase(measureBlock, outputMgr),
-  trigHistoryNeeded_( false ),
-  targHistoryNeeded_( false ),
+  trigVariableLengthHistoryNeeded_( false ),
+  targVariableLengthHistoryNeeded_( false ),
   trigMax_(0.0),
   targMax_(0.0),
   trigResultIndex_(0),
   targResultIndex_(0),
   timeForTrig_(0.0),
-  timeForTarg_(0.0)
+  timeForTarg_(0.0),
+  trigMaxChanged_(false),
+  targMaxChanged_(false),
+  timeForTrigFound_(false),
+  timeForTargFound_(false),
+  trigOutputValueTargetChanged_(false),
+  targOutputValueTargetChanged_(false)
 {
   // indicate that this measure type is supported and should be processed in simulation
   typeSupported_ = true;
@@ -83,11 +89,26 @@ N_IO_MeasureRiseFallDelay::N_IO_MeasureRiseFallDelay( const N_UTL_OptionBlock & 
   // be needed to find the extrema and than use it find the fraction of that extrema
   if( trigFracMaxGiven_ )
   {
-    trigHistoryNeeded_ = true;
+    trigVariableLengthHistoryNeeded_ = true;
   }
+  else
+  {
+    // we will have a fixed length history to bracket the 
+    // trigger.
+    trigIndepVarHistory_.resize(2);
+    trigVarHistory_.resize(2);     
+  }
+  
   if( targFracMaxGiven_ )
   {
-    targHistoryNeeded_ = true;
+    targVariableLengthHistoryNeeded_ = true;
+  }
+  else
+  {
+    // we will have a fixed length history to bracket the 
+    // target.
+    targIndepVarHistory_.resize(2);
+    targetVarHistory_.resize(2);   
   }
 }
 
@@ -108,11 +129,7 @@ void N_IO_MeasureRiseFallDelay::updateTran( const double circuitTime, RCP< N_LAS
     // measure and see if it triggers any specified rise, fall, cross windowing.
     double tempResult = 0.0;
 
-    // update our outVarValues_ vector
-    for( int i=0; i< numOutVars_; i++ )
-    {
-      outVarValues_[i] = getOutputValue(depSolVarIterVector_[i], solnVecRCP);
-    }
+    updateOutputVars( outVarValues_, circuitTime, solnVecRCP );
 
     // outVarValues has our TRIG and TARG values so, first store them in
     // our history array if needed.
@@ -120,7 +137,7 @@ void N_IO_MeasureRiseFallDelay::updateTran( const double circuitTime, RCP< N_LAS
     // one memory savings.  We won't store the value if it hasn't changed
     bool recordData = false;
 
-    if( trigHistoryNeeded_ )
+    if( trigVariableLengthHistoryNeeded_ )
     {
       int trigSize = trigVarHistory_.size();
       if( numOutVars_ > 0 )
@@ -137,8 +154,16 @@ void N_IO_MeasureRiseFallDelay::updateTran( const double circuitTime, RCP< N_LAS
         }
       }
     }
+    else
+    {
+      // just store the current value and rotate the history 
+      trigIndepVarHistory_[0] = trigIndepVarHistory_[1];
+      trigVarHistory_[0] = trigVarHistory_[1];
+      trigIndepVarHistory_[1] = circuitTime;
+      trigVarHistory_[1] = outVarValues_[0];
+    }
 
-    if( targHistoryNeeded_ )
+    if( targVariableLengthHistoryNeeded_ )
     {
       int targSize = targetVarHistory_.size();
       if( numOutVars_ > 0 )
@@ -155,8 +180,17 @@ void N_IO_MeasureRiseFallDelay::updateTran( const double circuitTime, RCP< N_LAS
         }
       }
     }
-
-
+    else
+    {
+      // just store the current value and rotate the history 
+      targIndepVarHistory_[0] = targIndepVarHistory_[1];
+      targetVarHistory_[0] = targetVarHistory_[1];
+      targIndepVarHistory_[1] = circuitTime;
+      targetVarHistory_[1] = outVarValues_[1];
+    }
+    
+    // this block records data for the use case where we need a variable length
+    // history of the signals (trigger and target signals)
     if ( recordData )
     {
       // earlier checks indicated that we needed to record history
@@ -170,7 +204,7 @@ void N_IO_MeasureRiseFallDelay::updateTran( const double circuitTime, RCP< N_LAS
         if( outVarValues_[0] > trigMax_ )
         {
           trigMax_ =  outVarValues_[0];
-          //std::cout << "trigMax = " << trigMax_;
+          trigMaxChanged_ = true;
         }
       }
       if( numOutVars_ >1 )
@@ -181,52 +215,89 @@ void N_IO_MeasureRiseFallDelay::updateTran( const double circuitTime, RCP< N_LAS
         if( outVarValues_[1] > targMax_ )
         {
           targMax_ =  outVarValues_[1];
-          //std::cout << "  targMax = " << targMax_ << std::endl;
+          targMaxChanged_ = true;
         }
       }
-
     }
-
-    if( trigHistoryNeeded_ )
+    
+    // in cases where trigFracMax_ is NOT given, then
+    // trigOutputValueTarget_ will be fixed and is set 
+    // during base class construction
+    if( trigFracMaxGiven_ && trigMaxChanged_ )
     {
-      // find time for TRIG
+      trigOutputValueTarget_ =  trigFracMax_ * trigMax_;
+      trigOutputValueTargetChanged_ = true;
+      trigMaxChanged_ = false;
+    }
+    
+    // find time for TRIG
+    if( !timeForTrigFound_ || trigOutputValueTargetChanged_)
+    {
+      // haven't found the trigger or the trigger value has changed 
       int trigSize = trigVarHistory_.size();
       for( int i=trigResultIndex_;i<(trigSize-1);i++ )
       {
         // goal is to find trigFracMax_ * trigMax_
-        double difference = trigVarHistory_[i] - trigFracMax_ * trigMax_;
-        double nextDifference = trigVarHistory_[i+1] - trigFracMax_ * trigMax_;
+        double difference = trigVarHistory_[i] - trigOutputValueTarget_;
+        double nextDifference = trigVarHistory_[i+1] - trigOutputValueTarget_;
 
         bool diffNeg = ( difference < 0 );
         bool nextDiffNeg = ( nextDifference < 0 );
-
         if( (fabs(difference) < minval_) || ( diffNeg != nextDiffNeg ) )
         {
-          timeForTrig_ = trigIndepVarHistory_[i];
+          // interpolate to get a better estimate of the targ time. 
+          if( fabs(trigVarHistory_[i+1] - trigVarHistory_[i]) < minval_ )
+          {
+            // avoid potentially dividing by zero 
+            timeForTrig_ = trigIndepVarHistory_[i];
+          }
+          else
+          {
+            timeForTrig_ = (trigIndepVarHistory_[i+1] - trigIndepVarHistory_[i]) * ((trigOutputValueTarget_- trigVarHistory_[i]) / (trigVarHistory_[i+1] - trigVarHistory_[i]) ) + trigIndepVarHistory_[i];
+            timeForTrigFound_=true;
+          }
+          trigOutputValueTargetChanged_=false;
           trigResultIndex_=i;
-          //std::cout << "Setting timeForTrig_ = " << timeForTrig_ << " and trigResultIndex_ = " << trigResultIndex_ << std::endl;
           break;
         }
       }
     }
-
-    if( targHistoryNeeded_ )
+  
+    // in cases where targFracMax_ is NOT given, then
+    // targOutputValueTarget_ will be fixed and is set 
+    // during base class construction
+    if( targFracMaxGiven_ && targMaxChanged_ )
     {
-      // find time for TARG
+      targOutputValueTarget_ = targFracMax_ * targMax_;
+      targOutputValueTargetChanged_ = true;
+      targMaxChanged_ = false;
+    }
+  
+    // find time for TARG
+    if( !timeForTargFound_ || targOutputValueTargetChanged_)
+    {
       int targSize = targetVarHistory_.size();
       for( int i=targResultIndex_;i<(targSize-1); i++ )
       {
-        double difference = targetVarHistory_[i] - targFracMax_ * targMax_;
-        double nextDifference = targetVarHistory_[i+1] - targFracMax_ * targMax_;
+        double difference = targetVarHistory_[i] - targOutputValueTarget_;
+        double nextDifference = targetVarHistory_[i+1] - targOutputValueTarget_;
         bool diffNeg = ( difference < 0 );
         bool nextDiffNeg = ( nextDifference < 0 );
-
-        // goal is to find targFracMax_ * trigMax_
         if( (fabs(difference) < minval_) || ( diffNeg != nextDiffNeg ) )
         {
-          timeForTarg_ = targIndepVarHistory_[i];
+          // interpolate to get a better estimate of the targ time. 
+          if( fabs( targetVarHistory_[i+1] - targetVarHistory_[i]) < minval_ )
+          {
+            // avoid potentially dividing by zero 
+            timeForTarg_ = targIndepVarHistory_[i];
+          }
+          else
+          {
+            timeForTarg_ = (targIndepVarHistory_[i+1] - targIndepVarHistory_[i]) * ((targOutputValueTarget_- targetVarHistory_[i]) /(targetVarHistory_[i+1] - targetVarHistory_[i])) + targIndepVarHistory_[i];
+            timeForTargFound_=true;
+          }
+          targOutputValueTargetChanged_=false;
           targResultIndex_=i;
-          //std::cout << "Setting timeForTarg_ = " << timeForTarg_ << " and targResultIndex_ = " << targResultIndex_ << std::endl;
           break;
         }
       }
@@ -238,7 +309,7 @@ void N_IO_MeasureRiseFallDelay::updateTran( const double circuitTime, RCP< N_LAS
     const int pruningHistoryThreshold=1000;
     if( trigResultIndex_> pruningHistoryThreshold )
     {
-      vector<double>::iterator pruneIttr = trigVarHistory_.begin();
+      std::vector<double>::iterator pruneIttr = trigVarHistory_.begin();
       pruneIttr += trigResultIndex_;
       trigVarHistory_.erase( trigVarHistory_.begin(), pruneIttr );
       pruneIttr = trigIndepVarHistory_.begin();
@@ -249,7 +320,7 @@ void N_IO_MeasureRiseFallDelay::updateTran( const double circuitTime, RCP< N_LAS
 
     if( targResultIndex_ > pruningHistoryThreshold )
     {
-      vector<double>::iterator pruneIttr = targetVarHistory_.begin();
+      std::vector<double>::iterator pruneIttr = targetVarHistory_.begin();
       pruneIttr += targResultIndex_;
       targetVarHistory_.erase( targetVarHistory_.begin(), pruneIttr );
       pruneIttr = targIndepVarHistory_.begin();
@@ -257,8 +328,6 @@ void N_IO_MeasureRiseFallDelay::updateTran( const double circuitTime, RCP< N_LAS
       targIndepVarHistory_.erase( targIndepVarHistory_.begin(), pruneIttr );
       targResultIndex_ = 0;
     }
-
-
   }
 }
 
@@ -271,7 +340,7 @@ void N_IO_MeasureRiseFallDelay::updateTran( const double circuitTime, RCP< N_LAS
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-void N_IO_MeasureRiseFallDelay::updateDC( const vector<N_ANP_SweepParam> & dcParmsVec, RCP< N_LAS_Vector > solnVecRCP)
+void N_IO_MeasureRiseFallDelay::updateDC( const std::vector<N_ANP_SweepParam> & dcParmsVec, RCP< N_LAS_Vector > solnVecRCP)
 {
 
 }

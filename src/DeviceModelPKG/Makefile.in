@@ -79,8 +79,6 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-@BUILD_REACTION_PARSER_TRUE@am__append_1 = N_DEV_ReactionParser.hxx
-@BUILD_REACTION_PARSER_TRUE@am__append_2 = $(BUILT_SOURCES) $(PARSER_SRCS)
 subdir = src/DeviceModelPKG
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/config/depcomp
@@ -110,168 +108,9 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libDeviceModel_la_LIBADD =
-am__libDeviceModel_la_SOURCES_DIST =  \
-	$(srcdir)/src/N_DEV_DeviceInterface.C \
-	$(srcdir)/src/N_DEV_ACC.C $(srcdir)/src/N_DEV_BJT.C \
-	$(srcdir)/src/N_DEV_CSW.C $(srcdir)/src/N_DEV_Capacitor.C \
-	$(srcdir)/src/N_DEV_DAC.C $(srcdir)/src/N_DEV_ADC.C \
-	$(srcdir)/src/N_DEV_Device.C \
-	$(srcdir)/src/N_DEV_DeviceInstance.C \
-	$(srcdir)/src/N_DEV_DeviceBlock.C \
-	$(srcdir)/src/N_DEV_DeviceState.C \
-	$(srcdir)/src/N_DEV_DeviceModel.C \
-	$(srcdir)/src/N_DEV_DeviceMgr.C \
-	$(srcdir)/src/N_DEV_DeviceSensitivities.C \
-	$(srcdir)/src/N_DEV_DeviceBld.C \
-	$(srcdir)/src/N_DEV_MatrixLoadData.C \
-	$(srcdir)/src/N_DEV_NumericalJacobian.C \
-	$(srcdir)/src/N_DEV_DeviceEntity.C \
-	$(srcdir)/src/N_DEV_CompositeParam.C \
-	$(srcdir)/src/N_DEV_Bsrc.C $(srcdir)/src/N_DEV_Diode.C \
-	$(srcdir)/src/N_DEV_ISRC.C $(srcdir)/src/N_DEV_Inductor.C \
-	$(srcdir)/src/N_DEV_JFET.C $(srcdir)/src/N_DEV_LTRA.C \
-	$(srcdir)/src/N_DEV_LTRA_Faddeeva.C \
-	$(srcdir)/src/N_DEV_MESFET.C $(srcdir)/src/N_DEV_MOSFET1.C \
-	$(srcdir)/src/N_DEV_MOSFET2.C $(srcdir)/src/N_DEV_MOSFET3.C \
-	$(srcdir)/src/N_DEV_MOSFET6.C $(srcdir)/src/N_DEV_MOSFET_B1.C \
-	$(srcdir)/src/N_DEV_MOSFET_B2.C \
-	$(srcdir)/src/N_DEV_MOSFET_B3.C \
-	$(srcdir)/src/N_DEV_MOSFET_B4.C \
-	$(srcdir)/src/N_DEV_MOSFET_B3SOI.C \
-	$(srcdir)/src/N_DEV_MutIndLin.C \
-	$(srcdir)/src/N_DEV_MutIndNonLin.C \
-	$(srcdir)/src/N_DEV_MutIndNonLin2.C \
-	$(srcdir)/src/N_DEV_NewDevice.C $(srcdir)/src/N_DEV_Xygra.C \
-	$(srcdir)/src/N_DEV_OpAmp.C $(srcdir)/src/N_DEV_Digital.C \
-	$(srcdir)/src/N_DEV_VDMOS.C $(srcdir)/src/N_DEV_Resistor.C \
-	$(srcdir)/src/N_DEV_Resistor3.C \
-	$(srcdir)/src/N_DEV_ThermalResistor.C $(srcdir)/src/N_DEV_SW.C \
-	$(srcdir)/src/N_DEV_Source.C $(srcdir)/src/N_DEV_SourceData.C \
-	$(srcdir)/src/N_DEV_TRA.C $(srcdir)/src/N_DEV_VCCS.C \
-	$(srcdir)/src/N_DEV_Vcvs.C $(srcdir)/src/N_DEV_Vsrc.C \
-	$(srcdir)/src/N_DEV_ROM.C $(srcdir)/src/N_DEV_RxnSet.C \
-	$(srcdir)/src/N_DEV_Region.C $(srcdir)/src/N_DEV_RegionData.C \
-	$(srcdir)/src/N_DEV_SpecieSource.C \
-	$(srcdir)/src/N_DEV_PlaceHolder.C \
-	$(srcdir)/src/N_DEV_DeviceSupport.C \
-	$(srcdir)/src/N_DEV_Param.C \
-	$(srcdir)/src/N_DEV_DeviceOptions.C \
-	$(srcdir)/src/N_DEV_SolverState.C \
-	$(srcdir)/src/N_DEV_Reaction.C \
-	$(srcdir)/src/N_DEV_ReactionNetwork.C \
-	$(srcdir)/src/N_DEV_RateConstantCalculators.C \
-	$(srcdir)/src/N_DEV_DeviceLevelKey.C \
-	$(srcdir)/src/N_DEV_Pars.C $(srcdir)/src/N_DEV_OutputPars.C \
-	$(srcdir)/src/N_DEV_Units.C $(srcdir)/src/N_DEV_Factory.C \
-	$(srcdir)/src/N_DEV_RegisterDevices.C \
-	$(srcdir)/src/N_DEV_Configuration.C \
-	$(srcdir)/include/N_DEV_fwd.h \
-	$(srcdir)/include/N_DEV_DeviceLevelKey.h \
-	$(srcdir)/include/N_DEV_Pars.h \
-	$(srcdir)/include/N_DEV_OutputPars.h \
-	$(srcdir)/include/N_DEV_Units.h \
-	$(srcdir)/include/N_DEV_Factory.h \
-	$(srcdir)/include/N_DEV_Configuration.h \
-	$(srcdir)/include/N_DEV_Property.h \
-	$(srcdir)/include/N_DEV_DeviceInterface.h \
-	$(srcdir)/include/N_DEV_SolverState.h \
-	$(srcdir)/include/N_DEV_ExternData.h \
-	$(srcdir)/include/N_DEV_ExternalSimulationData.h \
-	$(srcdir)/include/N_DEV_MatrixLoadData.h \
-	$(srcdir)/include/N_DEV_NumericalJacobian.h \
-	$(srcdir)/include/N_DEV_ACC.h $(srcdir)/include/N_DEV_BJT.h \
-	$(srcdir)/include/N_DEV_Bsrc.h $(srcdir)/include/N_DEV_CSW.h \
-	$(srcdir)/include/N_DEV_Capacitor.h \
-	$(srcdir)/include/N_DEV_Const.h $(srcdir)/include/N_DEV_DAC.h \
-	$(srcdir)/include/N_DEV_ADC.h $(srcdir)/include/N_DEV_Device.h \
-	$(srcdir)/include/N_DEV_DeviceBld.h \
-	$(srcdir)/include/N_DEV_DeviceBlock.h \
-	$(srcdir)/include/N_DEV_DeviceInstance.h \
-	$(srcdir)/include/N_DEV_DeviceMgr.h \
-	$(srcdir)/include/N_DEV_DeviceSensitivities.h \
-	$(srcdir)/include/N_DEV_DeviceModel.h \
-	$(srcdir)/include/N_DEV_DeviceOptions.h \
-	$(srcdir)/include/N_DEV_DeviceState.h \
-	$(srcdir)/include/N_DEV_DeviceSupport.h \
-	$(srcdir)/include/N_DEV_DeviceTemplate.h \
-	$(srcdir)/include/N_DEV_DeviceEntity.h \
-	$(srcdir)/include/N_DEV_CompositeParam.h \
-	$(srcdir)/include/N_DEV_Diode.h $(srcdir)/include/N_DEV_ISRC.h \
-	$(srcdir)/include/N_DEV_Inductor.h \
-	$(srcdir)/include/N_DEV_Interpolators.h \
-	$(srcdir)/include/N_DEV_JFET.h $(srcdir)/include/N_DEV_LTRA.h \
-	$(srcdir)/include/N_DEV_LTRA_Faddeeva.h \
-	$(srcdir)/include/N_DEV_MESFET.h \
-	$(srcdir)/include/N_DEV_MOSFET1.h \
-	$(srcdir)/include/N_DEV_MOSFET2.h \
-	$(srcdir)/include/N_DEV_MOSFET3.h \
-	$(srcdir)/include/N_DEV_MOSFET6.h \
-	$(srcdir)/include/N_DEV_MOSFET_B1.h \
-	$(srcdir)/include/N_DEV_MOSFET_B2.h \
-	$(srcdir)/include/N_DEV_MOSFET_B3.h \
-	$(srcdir)/include/N_DEV_MOSFET_B4.h \
-	$(srcdir)/include/N_DEV_MOSFET_B3SOI.h \
-	$(srcdir)/include/N_DEV_MutIndLin.h \
-	$(srcdir)/include/N_DEV_MutIndNonLin.h \
-	$(srcdir)/include/N_DEV_MutIndNonLin2.h \
-	$(srcdir)/include/N_DEV_NewDevice.h \
-	$(srcdir)/include/N_DEV_Xygra.h \
-	$(srcdir)/include/N_DEV_OpAmp.h \
-	$(srcdir)/include/N_DEV_Digital.h \
-	$(srcdir)/include/N_DEV_VDMOS.h \
-	$(srcdir)/include/N_DEV_Param.h \
-	$(srcdir)/include/N_DEV_PlaceHolder.h \
-	$(srcdir)/include/N_DEV_Resistor.h \
-	$(srcdir)/include/N_DEV_Resistor3.h \
-	$(srcdir)/include/N_DEV_ThermalResistor.h \
-	$(srcdir)/include/N_DEV_SW.h $(srcdir)/include/N_DEV_Source.h \
-	$(srcdir)/include/N_DEV_SourceData.h \
-	$(srcdir)/include/N_DEV_TRA.h $(srcdir)/include/N_DEV_VCCS.h \
-	$(srcdir)/include/N_DEV_Vcvs.h $(srcdir)/include/N_DEV_Vsrc.h \
-	$(srcdir)/include/N_DEV_ROM.h $(srcdir)/include/N_DEV_RxnSet.h \
-	$(srcdir)/include/N_DEV_Region.h \
-	$(srcdir)/include/N_DEV_RegionData.h \
-	$(srcdir)/include/N_DEV_SpecieSource.h \
-	$(srcdir)/include/N_DEV_TransportHelper.h \
-	$(srcdir)/include/N_DEV_ModelTypes.h \
-	$(srcdir)/include/N_DEV_Specie.h \
-	$(srcdir)/include/N_DEV_Reaction.h \
-	$(srcdir)/include/N_DEV_ReactionNetwork.h \
-	$(srcdir)/include/N_DEV_RateConstantCalculators.h \
-	N_DEV_ReactionParser.cxx N_DEV_ReactionParser.hxx \
-	N_DEV_ReactionLexer.cxx location.hh position.hh stack.hh \
-	$(srcdir)/include/N_DEV_ReactionLexer.h
-@BUILD_REACTION_PARSER_TRUE@am__objects_1 = N_DEV_ReactionParser.lo \
-@BUILD_REACTION_PARSER_TRUE@	N_DEV_ReactionLexer.lo
-am__objects_2 =
-@BUILD_REACTION_PARSER_TRUE@am__objects_3 = $(am__objects_1) \
-@BUILD_REACTION_PARSER_TRUE@	$(am__objects_2)
-am_libDeviceModel_la_OBJECTS = N_DEV_DeviceInterface.lo N_DEV_ACC.lo \
-	N_DEV_BJT.lo N_DEV_CSW.lo N_DEV_Capacitor.lo N_DEV_DAC.lo \
-	N_DEV_ADC.lo N_DEV_Device.lo N_DEV_DeviceInstance.lo \
-	N_DEV_DeviceBlock.lo N_DEV_DeviceState.lo N_DEV_DeviceModel.lo \
-	N_DEV_DeviceMgr.lo N_DEV_DeviceSensitivities.lo \
-	N_DEV_DeviceBld.lo N_DEV_MatrixLoadData.lo \
-	N_DEV_NumericalJacobian.lo N_DEV_DeviceEntity.lo \
-	N_DEV_CompositeParam.lo N_DEV_Bsrc.lo N_DEV_Diode.lo \
-	N_DEV_ISRC.lo N_DEV_Inductor.lo N_DEV_JFET.lo N_DEV_LTRA.lo \
-	N_DEV_LTRA_Faddeeva.lo N_DEV_MESFET.lo N_DEV_MOSFET1.lo \
-	N_DEV_MOSFET2.lo N_DEV_MOSFET3.lo N_DEV_MOSFET6.lo \
-	N_DEV_MOSFET_B1.lo N_DEV_MOSFET_B2.lo N_DEV_MOSFET_B3.lo \
-	N_DEV_MOSFET_B4.lo N_DEV_MOSFET_B3SOI.lo N_DEV_MutIndLin.lo \
-	N_DEV_MutIndNonLin.lo N_DEV_MutIndNonLin2.lo \
-	N_DEV_NewDevice.lo N_DEV_Xygra.lo N_DEV_OpAmp.lo \
-	N_DEV_Digital.lo N_DEV_VDMOS.lo N_DEV_Resistor.lo \
-	N_DEV_Resistor3.lo N_DEV_ThermalResistor.lo N_DEV_SW.lo \
-	N_DEV_Source.lo N_DEV_SourceData.lo N_DEV_TRA.lo N_DEV_VCCS.lo \
-	N_DEV_Vcvs.lo N_DEV_Vsrc.lo N_DEV_ROM.lo N_DEV_RxnSet.lo \
-	N_DEV_Region.lo N_DEV_RegionData.lo N_DEV_SpecieSource.lo \
-	N_DEV_PlaceHolder.lo N_DEV_DeviceSupport.lo N_DEV_Param.lo \
-	N_DEV_DeviceOptions.lo N_DEV_SolverState.lo N_DEV_Reaction.lo \
-	N_DEV_ReactionNetwork.lo N_DEV_RateConstantCalculators.lo \
-	N_DEV_DeviceLevelKey.lo N_DEV_Pars.lo N_DEV_OutputPars.lo \
-	N_DEV_Units.lo N_DEV_Factory.lo N_DEV_RegisterDevices.lo \
-	N_DEV_Configuration.lo $(am__objects_3)
+am_libDeviceModel_la_OBJECTS = N_DEV_CSW.lo N_DEV_Device.lo \
+	N_DEV_DeviceBld.lo N_DEV_DeviceLevelKey.lo N_DEV_Factory.lo \
+	N_DEV_MOSFET_B1.lo N_DEV_MOSFET_B2.lo
 libDeviceModel_la_OBJECTS = $(am_libDeviceModel_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -330,7 +169,7 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(libDeviceModel_la_SOURCES)
-DIST_SOURCES = $(am__libDeviceModel_la_SOURCES_DIST)
+DIST_SOURCES = $(libDeviceModel_la_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
 	ctags-recursive dvi-recursive html-recursive info-recursive \
 	install-data-recursive install-dvi-recursive \
@@ -371,7 +210,8 @@ am__define_uniq_tagged_files = \
   done | $(am__uniquify_input)`
 ETAGS = etags
 CTAGS = ctags
-DIST_SUBDIRS = PDESC AD ADMS EXTSC @MAYBE_RAD@ @MAYBE_NONFREE@
+DIST_SUBDIRS = Core OpenModels TCADModels NeuronModels ADMS EXTSC \
+	@MAYBE_RAD@ @MAYBE_NONFREE@ $(am__empty)
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 am__relativize = \
   dir0=`pwd`; \
@@ -554,8 +394,8 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CPPFLAGS = @Xyce_INCS@
-@EXTDEV_FALSE@EXTDIRS = PDESC AD ADMS
-@EXTDEV_TRUE@EXTDIRS = PDESC EXTSC AD ADMS
+@EXTDEV_FALSE@EXTDIRS = TCADModels NeuronModels ADMS
+@EXTDEV_TRUE@EXTDIRS = TCADModels EXTSC NeuronModels ADMS
 
 #if RADMODELS
 #  SUBDIRS = $(EXTDIRS) SandiaModels
@@ -566,161 +406,30 @@ AM_CPPFLAGS = @Xyce_INCS@
 #if NONFREEMODELS
 #  SUBDIRS += Xyce_NonFree
 #endif
-SUBDIRS = $(EXTDIRS) $(MAYBE_RAD) $(MAYBE_NONFREE)
+SUBDIRS = Core OpenModels $(EXTDIRS) $(MAYBE_RAD) $(MAYBE_NONFREE)
 noinst_LTLIBRARIES = libDeviceModel.la
-@BUILD_REACTION_PARSER_FALSE@BUILT_SOURCES = 
+libDeviceModel_la_SOURCES = \
+  $(srcdir)/src/N_DEV_CSW.C \
+  $(srcdir)/src/N_DEV_Device.C \
+  $(srcdir)/src/N_DEV_DeviceBld.C \
+  $(srcdir)/src/N_DEV_DeviceLevelKey.C \
+  $(srcdir)/src/N_DEV_Factory.C \
+  $(srcdir)/src/N_DEV_MOSFET_B1.C \
+  $(srcdir)/src/N_DEV_MOSFET_B2.C \
+  $(srcdir)/include/N_DEV_CSW.h \
+  $(srcdir)/include/N_DEV_DeviceBld.h \
+  $(srcdir)/include/N_DEV_DeviceLevelKey.h \
+  $(srcdir)/include/N_DEV_Factory.h \
+  $(srcdir)/include/N_DEV_MOSFET_B1.h \
+  $(srcdir)/include/N_DEV_MOSFET_B2.h \
+  $(srcdir)/include/N_DEV_ModelTypes.h \
+  $(srcdir)/include/N_DEV_PlaceHolder.h \
+  $(srcdir)/include/N_DEV_Property.h
 
-# these are files built by bison and flex
-@BUILD_REACTION_PARSER_TRUE@BUILT_SOURCES = N_DEV_ReactionParser.cxx \
-@BUILD_REACTION_PARSER_TRUE@            N_DEV_ReactionParser.hxx \
-@BUILD_REACTION_PARSER_TRUE@            N_DEV_ReactionLexer.cxx \
-@BUILD_REACTION_PARSER_TRUE@            location.hh \
-@BUILD_REACTION_PARSER_TRUE@            position.hh \
-@BUILD_REACTION_PARSER_TRUE@	    stack.hh
-
-CLEANFILES = $(BUILT_SOURCES)
-PARSER_HEADER_DEPS = $(am__append_1)
-
-#these are extra parser-related files that we want to include conditionally
-PARSER_SRCS = $(srcdir)/include/N_DEV_ReactionLexer.h
-libDeviceModel_la_SOURCES = $(srcdir)/src/N_DEV_DeviceInterface.C \
-	$(srcdir)/src/N_DEV_ACC.C $(srcdir)/src/N_DEV_BJT.C \
-	$(srcdir)/src/N_DEV_CSW.C $(srcdir)/src/N_DEV_Capacitor.C \
-	$(srcdir)/src/N_DEV_DAC.C $(srcdir)/src/N_DEV_ADC.C \
-	$(srcdir)/src/N_DEV_Device.C \
-	$(srcdir)/src/N_DEV_DeviceInstance.C \
-	$(srcdir)/src/N_DEV_DeviceBlock.C \
-	$(srcdir)/src/N_DEV_DeviceState.C \
-	$(srcdir)/src/N_DEV_DeviceModel.C \
-	$(srcdir)/src/N_DEV_DeviceMgr.C \
-	$(srcdir)/src/N_DEV_DeviceSensitivities.C \
-	$(srcdir)/src/N_DEV_DeviceBld.C \
-	$(srcdir)/src/N_DEV_MatrixLoadData.C \
-	$(srcdir)/src/N_DEV_NumericalJacobian.C \
-	$(srcdir)/src/N_DEV_DeviceEntity.C \
-	$(srcdir)/src/N_DEV_CompositeParam.C \
-	$(srcdir)/src/N_DEV_Bsrc.C $(srcdir)/src/N_DEV_Diode.C \
-	$(srcdir)/src/N_DEV_ISRC.C $(srcdir)/src/N_DEV_Inductor.C \
-	$(srcdir)/src/N_DEV_JFET.C $(srcdir)/src/N_DEV_LTRA.C \
-	$(srcdir)/src/N_DEV_LTRA_Faddeeva.C \
-	$(srcdir)/src/N_DEV_MESFET.C $(srcdir)/src/N_DEV_MOSFET1.C \
-	$(srcdir)/src/N_DEV_MOSFET2.C $(srcdir)/src/N_DEV_MOSFET3.C \
-	$(srcdir)/src/N_DEV_MOSFET6.C $(srcdir)/src/N_DEV_MOSFET_B1.C \
-	$(srcdir)/src/N_DEV_MOSFET_B2.C \
-	$(srcdir)/src/N_DEV_MOSFET_B3.C \
-	$(srcdir)/src/N_DEV_MOSFET_B4.C \
-	$(srcdir)/src/N_DEV_MOSFET_B3SOI.C \
-	$(srcdir)/src/N_DEV_MutIndLin.C \
-	$(srcdir)/src/N_DEV_MutIndNonLin.C \
-	$(srcdir)/src/N_DEV_MutIndNonLin2.C \
-	$(srcdir)/src/N_DEV_NewDevice.C $(srcdir)/src/N_DEV_Xygra.C \
-	$(srcdir)/src/N_DEV_OpAmp.C $(srcdir)/src/N_DEV_Digital.C \
-	$(srcdir)/src/N_DEV_VDMOS.C $(srcdir)/src/N_DEV_Resistor.C \
-	$(srcdir)/src/N_DEV_Resistor3.C \
-	$(srcdir)/src/N_DEV_ThermalResistor.C $(srcdir)/src/N_DEV_SW.C \
-	$(srcdir)/src/N_DEV_Source.C $(srcdir)/src/N_DEV_SourceData.C \
-	$(srcdir)/src/N_DEV_TRA.C $(srcdir)/src/N_DEV_VCCS.C \
-	$(srcdir)/src/N_DEV_Vcvs.C $(srcdir)/src/N_DEV_Vsrc.C \
-	$(srcdir)/src/N_DEV_ROM.C $(srcdir)/src/N_DEV_RxnSet.C \
-	$(srcdir)/src/N_DEV_Region.C $(srcdir)/src/N_DEV_RegionData.C \
-	$(srcdir)/src/N_DEV_SpecieSource.C \
-	$(srcdir)/src/N_DEV_PlaceHolder.C \
-	$(srcdir)/src/N_DEV_DeviceSupport.C \
-	$(srcdir)/src/N_DEV_Param.C \
-	$(srcdir)/src/N_DEV_DeviceOptions.C \
-	$(srcdir)/src/N_DEV_SolverState.C \
-	$(srcdir)/src/N_DEV_Reaction.C \
-	$(srcdir)/src/N_DEV_ReactionNetwork.C \
-	$(srcdir)/src/N_DEV_RateConstantCalculators.C \
-	$(srcdir)/src/N_DEV_DeviceLevelKey.C \
-	$(srcdir)/src/N_DEV_Pars.C $(srcdir)/src/N_DEV_OutputPars.C \
-	$(srcdir)/src/N_DEV_Units.C $(srcdir)/src/N_DEV_Factory.C \
-	$(srcdir)/src/N_DEV_RegisterDevices.C \
-	$(srcdir)/src/N_DEV_Configuration.C \
-	$(srcdir)/include/N_DEV_fwd.h \
-	$(srcdir)/include/N_DEV_DeviceLevelKey.h \
-	$(srcdir)/include/N_DEV_Pars.h \
-	$(srcdir)/include/N_DEV_OutputPars.h \
-	$(srcdir)/include/N_DEV_Units.h \
-	$(srcdir)/include/N_DEV_Factory.h \
-	$(srcdir)/include/N_DEV_Configuration.h \
-	$(srcdir)/include/N_DEV_Property.h \
-	$(srcdir)/include/N_DEV_DeviceInterface.h \
-	$(srcdir)/include/N_DEV_SolverState.h \
-	$(srcdir)/include/N_DEV_ExternData.h \
-	$(srcdir)/include/N_DEV_ExternalSimulationData.h \
-	$(srcdir)/include/N_DEV_MatrixLoadData.h \
-	$(srcdir)/include/N_DEV_NumericalJacobian.h \
-	$(srcdir)/include/N_DEV_ACC.h $(srcdir)/include/N_DEV_BJT.h \
-	$(srcdir)/include/N_DEV_Bsrc.h $(srcdir)/include/N_DEV_CSW.h \
-	$(srcdir)/include/N_DEV_Capacitor.h \
-	$(srcdir)/include/N_DEV_Const.h $(srcdir)/include/N_DEV_DAC.h \
-	$(srcdir)/include/N_DEV_ADC.h $(srcdir)/include/N_DEV_Device.h \
-	$(srcdir)/include/N_DEV_DeviceBld.h \
-	$(srcdir)/include/N_DEV_DeviceBlock.h \
-	$(srcdir)/include/N_DEV_DeviceInstance.h \
-	$(srcdir)/include/N_DEV_DeviceMgr.h \
-	$(srcdir)/include/N_DEV_DeviceSensitivities.h \
-	$(srcdir)/include/N_DEV_DeviceModel.h \
-	$(srcdir)/include/N_DEV_DeviceOptions.h \
-	$(srcdir)/include/N_DEV_DeviceState.h \
-	$(srcdir)/include/N_DEV_DeviceSupport.h \
-	$(srcdir)/include/N_DEV_DeviceTemplate.h \
-	$(srcdir)/include/N_DEV_DeviceEntity.h \
-	$(srcdir)/include/N_DEV_CompositeParam.h \
-	$(srcdir)/include/N_DEV_Diode.h $(srcdir)/include/N_DEV_ISRC.h \
-	$(srcdir)/include/N_DEV_Inductor.h \
-	$(srcdir)/include/N_DEV_Interpolators.h \
-	$(srcdir)/include/N_DEV_JFET.h $(srcdir)/include/N_DEV_LTRA.h \
-	$(srcdir)/include/N_DEV_LTRA_Faddeeva.h \
-	$(srcdir)/include/N_DEV_MESFET.h \
-	$(srcdir)/include/N_DEV_MOSFET1.h \
-	$(srcdir)/include/N_DEV_MOSFET2.h \
-	$(srcdir)/include/N_DEV_MOSFET3.h \
-	$(srcdir)/include/N_DEV_MOSFET6.h \
-	$(srcdir)/include/N_DEV_MOSFET_B1.h \
-	$(srcdir)/include/N_DEV_MOSFET_B2.h \
-	$(srcdir)/include/N_DEV_MOSFET_B3.h \
-	$(srcdir)/include/N_DEV_MOSFET_B4.h \
-	$(srcdir)/include/N_DEV_MOSFET_B3SOI.h \
-	$(srcdir)/include/N_DEV_MutIndLin.h \
-	$(srcdir)/include/N_DEV_MutIndNonLin.h \
-	$(srcdir)/include/N_DEV_MutIndNonLin2.h \
-	$(srcdir)/include/N_DEV_NewDevice.h \
-	$(srcdir)/include/N_DEV_Xygra.h \
-	$(srcdir)/include/N_DEV_OpAmp.h \
-	$(srcdir)/include/N_DEV_Digital.h \
-	$(srcdir)/include/N_DEV_VDMOS.h \
-	$(srcdir)/include/N_DEV_Param.h \
-	$(srcdir)/include/N_DEV_PlaceHolder.h \
-	$(srcdir)/include/N_DEV_Resistor.h \
-	$(srcdir)/include/N_DEV_Resistor3.h \
-	$(srcdir)/include/N_DEV_ThermalResistor.h \
-	$(srcdir)/include/N_DEV_SW.h $(srcdir)/include/N_DEV_Source.h \
-	$(srcdir)/include/N_DEV_SourceData.h \
-	$(srcdir)/include/N_DEV_TRA.h $(srcdir)/include/N_DEV_VCCS.h \
-	$(srcdir)/include/N_DEV_Vcvs.h $(srcdir)/include/N_DEV_Vsrc.h \
-	$(srcdir)/include/N_DEV_ROM.h $(srcdir)/include/N_DEV_RxnSet.h \
-	$(srcdir)/include/N_DEV_Region.h \
-	$(srcdir)/include/N_DEV_RegionData.h \
-	$(srcdir)/include/N_DEV_SpecieSource.h \
-	$(srcdir)/include/N_DEV_TransportHelper.h \
-	$(srcdir)/include/N_DEV_ModelTypes.h \
-	$(srcdir)/include/N_DEV_Specie.h \
-	$(srcdir)/include/N_DEV_Reaction.h \
-	$(srcdir)/include/N_DEV_ReactionNetwork.h \
-	$(srcdir)/include/N_DEV_RateConstantCalculators.h \
-	$(am__append_2)
-
-# these can't be in "SOURCES" above or automake screams about YACC.
-EXTRA_DIST = $(srcdir)/src/N_DEV_ReactionLexer.l \
-  $(srcdir)/src/N_DEV_ReactionParser.yxx
-
-all: $(BUILT_SOURCES)
-	$(MAKE) $(AM_MAKEFLAGS) all-recursive
+all: all-recursive
 
 .SUFFIXES:
-.SUFFIXES: .C .cxx .lo .o .obj
+.SUFFIXES: .C .lo .o .obj
 $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
@@ -772,82 +481,13 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_ACC.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_ADC.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_BJT.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Bsrc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_CSW.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Capacitor.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_CompositeParam.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Configuration.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DAC.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Device.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceBld.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceBlock.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceEntity.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceInstance.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceInterface.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceLevelKey.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceMgr.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceModel.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceOptions.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceSensitivities.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceState.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceSupport.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Digital.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Diode.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Factory.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_ISRC.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Inductor.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_JFET.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_LTRA.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_LTRA_Faddeeva.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_MESFET.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_MOSFET1.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_MOSFET2.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_MOSFET3.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_MOSFET6.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_MOSFET_B1.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_MOSFET_B2.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_MOSFET_B3.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_MOSFET_B3SOI.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_MOSFET_B4.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_MatrixLoadData.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_MutIndLin.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_MutIndNonLin.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_MutIndNonLin2.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_NewDevice.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_NumericalJacobian.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_OpAmp.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_OutputPars.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Param.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Pars.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_PlaceHolder.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_ROM.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_RateConstantCalculators.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Reaction.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_ReactionLexer.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_ReactionNetwork.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_ReactionParser.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Region.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_RegionData.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_RegisterDevices.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Resistor.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Resistor3.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_RxnSet.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_SW.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_SolverState.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Source.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_SourceData.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_SpecieSource.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_TRA.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_ThermalResistor.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Units.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_VCCS.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_VDMOS.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Vcvs.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Vsrc.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Xygra.Plo@am__quote@
 
 .C.o:
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -870,54 +510,12 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LTCXXCOMPILE) -c -o $@ $<
 
-N_DEV_DeviceInterface.lo: $(srcdir)/src/N_DEV_DeviceInterface.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_DeviceInterface.lo -MD -MP -MF $(DEPDIR)/N_DEV_DeviceInterface.Tpo -c -o N_DEV_DeviceInterface.lo `test -f '$(srcdir)/src/N_DEV_DeviceInterface.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceInterface.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_DeviceInterface.Tpo $(DEPDIR)/N_DEV_DeviceInterface.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_DeviceInterface.C' object='N_DEV_DeviceInterface.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_DeviceInterface.lo `test -f '$(srcdir)/src/N_DEV_DeviceInterface.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceInterface.C
-
-N_DEV_ACC.lo: $(srcdir)/src/N_DEV_ACC.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_ACC.lo -MD -MP -MF $(DEPDIR)/N_DEV_ACC.Tpo -c -o N_DEV_ACC.lo `test -f '$(srcdir)/src/N_DEV_ACC.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ACC.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_ACC.Tpo $(DEPDIR)/N_DEV_ACC.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_ACC.C' object='N_DEV_ACC.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_ACC.lo `test -f '$(srcdir)/src/N_DEV_ACC.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ACC.C
-
-N_DEV_BJT.lo: $(srcdir)/src/N_DEV_BJT.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_BJT.lo -MD -MP -MF $(DEPDIR)/N_DEV_BJT.Tpo -c -o N_DEV_BJT.lo `test -f '$(srcdir)/src/N_DEV_BJT.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_BJT.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_BJT.Tpo $(DEPDIR)/N_DEV_BJT.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_BJT.C' object='N_DEV_BJT.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_BJT.lo `test -f '$(srcdir)/src/N_DEV_BJT.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_BJT.C
-
 N_DEV_CSW.lo: $(srcdir)/src/N_DEV_CSW.C
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_CSW.lo -MD -MP -MF $(DEPDIR)/N_DEV_CSW.Tpo -c -o N_DEV_CSW.lo `test -f '$(srcdir)/src/N_DEV_CSW.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_CSW.C
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_CSW.Tpo $(DEPDIR)/N_DEV_CSW.Plo
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_CSW.C' object='N_DEV_CSW.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_CSW.lo `test -f '$(srcdir)/src/N_DEV_CSW.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_CSW.C
-
-N_DEV_Capacitor.lo: $(srcdir)/src/N_DEV_Capacitor.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Capacitor.lo -MD -MP -MF $(DEPDIR)/N_DEV_Capacitor.Tpo -c -o N_DEV_Capacitor.lo `test -f '$(srcdir)/src/N_DEV_Capacitor.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Capacitor.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Capacitor.Tpo $(DEPDIR)/N_DEV_Capacitor.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Capacitor.C' object='N_DEV_Capacitor.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Capacitor.lo `test -f '$(srcdir)/src/N_DEV_Capacitor.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Capacitor.C
-
-N_DEV_DAC.lo: $(srcdir)/src/N_DEV_DAC.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_DAC.lo -MD -MP -MF $(DEPDIR)/N_DEV_DAC.Tpo -c -o N_DEV_DAC.lo `test -f '$(srcdir)/src/N_DEV_DAC.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DAC.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_DAC.Tpo $(DEPDIR)/N_DEV_DAC.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_DAC.C' object='N_DEV_DAC.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_DAC.lo `test -f '$(srcdir)/src/N_DEV_DAC.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DAC.C
-
-N_DEV_ADC.lo: $(srcdir)/src/N_DEV_ADC.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_ADC.lo -MD -MP -MF $(DEPDIR)/N_DEV_ADC.Tpo -c -o N_DEV_ADC.lo `test -f '$(srcdir)/src/N_DEV_ADC.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ADC.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_ADC.Tpo $(DEPDIR)/N_DEV_ADC.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_ADC.C' object='N_DEV_ADC.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_ADC.lo `test -f '$(srcdir)/src/N_DEV_ADC.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ADC.C
 
 N_DEV_Device.lo: $(srcdir)/src/N_DEV_Device.C
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Device.lo -MD -MP -MF $(DEPDIR)/N_DEV_Device.Tpo -c -o N_DEV_Device.lo `test -f '$(srcdir)/src/N_DEV_Device.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Device.C
@@ -926,48 +524,6 @@ N_DEV_Device.lo: $(srcdir)/src/N_DEV_Device.C
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Device.lo `test -f '$(srcdir)/src/N_DEV_Device.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Device.C
 
-N_DEV_DeviceInstance.lo: $(srcdir)/src/N_DEV_DeviceInstance.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_DeviceInstance.lo -MD -MP -MF $(DEPDIR)/N_DEV_DeviceInstance.Tpo -c -o N_DEV_DeviceInstance.lo `test -f '$(srcdir)/src/N_DEV_DeviceInstance.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceInstance.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_DeviceInstance.Tpo $(DEPDIR)/N_DEV_DeviceInstance.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_DeviceInstance.C' object='N_DEV_DeviceInstance.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_DeviceInstance.lo `test -f '$(srcdir)/src/N_DEV_DeviceInstance.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceInstance.C
-
-N_DEV_DeviceBlock.lo: $(srcdir)/src/N_DEV_DeviceBlock.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_DeviceBlock.lo -MD -MP -MF $(DEPDIR)/N_DEV_DeviceBlock.Tpo -c -o N_DEV_DeviceBlock.lo `test -f '$(srcdir)/src/N_DEV_DeviceBlock.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceBlock.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_DeviceBlock.Tpo $(DEPDIR)/N_DEV_DeviceBlock.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_DeviceBlock.C' object='N_DEV_DeviceBlock.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_DeviceBlock.lo `test -f '$(srcdir)/src/N_DEV_DeviceBlock.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceBlock.C
-
-N_DEV_DeviceState.lo: $(srcdir)/src/N_DEV_DeviceState.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_DeviceState.lo -MD -MP -MF $(DEPDIR)/N_DEV_DeviceState.Tpo -c -o N_DEV_DeviceState.lo `test -f '$(srcdir)/src/N_DEV_DeviceState.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceState.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_DeviceState.Tpo $(DEPDIR)/N_DEV_DeviceState.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_DeviceState.C' object='N_DEV_DeviceState.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_DeviceState.lo `test -f '$(srcdir)/src/N_DEV_DeviceState.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceState.C
-
-N_DEV_DeviceModel.lo: $(srcdir)/src/N_DEV_DeviceModel.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_DeviceModel.lo -MD -MP -MF $(DEPDIR)/N_DEV_DeviceModel.Tpo -c -o N_DEV_DeviceModel.lo `test -f '$(srcdir)/src/N_DEV_DeviceModel.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceModel.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_DeviceModel.Tpo $(DEPDIR)/N_DEV_DeviceModel.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_DeviceModel.C' object='N_DEV_DeviceModel.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_DeviceModel.lo `test -f '$(srcdir)/src/N_DEV_DeviceModel.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceModel.C
-
-N_DEV_DeviceMgr.lo: $(srcdir)/src/N_DEV_DeviceMgr.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_DeviceMgr.lo -MD -MP -MF $(DEPDIR)/N_DEV_DeviceMgr.Tpo -c -o N_DEV_DeviceMgr.lo `test -f '$(srcdir)/src/N_DEV_DeviceMgr.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceMgr.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_DeviceMgr.Tpo $(DEPDIR)/N_DEV_DeviceMgr.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_DeviceMgr.C' object='N_DEV_DeviceMgr.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_DeviceMgr.lo `test -f '$(srcdir)/src/N_DEV_DeviceMgr.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceMgr.C
-
-N_DEV_DeviceSensitivities.lo: $(srcdir)/src/N_DEV_DeviceSensitivities.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_DeviceSensitivities.lo -MD -MP -MF $(DEPDIR)/N_DEV_DeviceSensitivities.Tpo -c -o N_DEV_DeviceSensitivities.lo `test -f '$(srcdir)/src/N_DEV_DeviceSensitivities.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceSensitivities.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_DeviceSensitivities.Tpo $(DEPDIR)/N_DEV_DeviceSensitivities.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_DeviceSensitivities.C' object='N_DEV_DeviceSensitivities.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_DeviceSensitivities.lo `test -f '$(srcdir)/src/N_DEV_DeviceSensitivities.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceSensitivities.C
-
 N_DEV_DeviceBld.lo: $(srcdir)/src/N_DEV_DeviceBld.C
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_DeviceBld.lo -MD -MP -MF $(DEPDIR)/N_DEV_DeviceBld.Tpo -c -o N_DEV_DeviceBld.lo `test -f '$(srcdir)/src/N_DEV_DeviceBld.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceBld.C
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_DeviceBld.Tpo $(DEPDIR)/N_DEV_DeviceBld.Plo
@@ -975,117 +531,19 @@ N_DEV_DeviceBld.lo: $(srcdir)/src/N_DEV_DeviceBld.C
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_DeviceBld.lo `test -f '$(srcdir)/src/N_DEV_DeviceBld.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceBld.C
 
-N_DEV_MatrixLoadData.lo: $(srcdir)/src/N_DEV_MatrixLoadData.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_MatrixLoadData.lo -MD -MP -MF $(DEPDIR)/N_DEV_MatrixLoadData.Tpo -c -o N_DEV_MatrixLoadData.lo `test -f '$(srcdir)/src/N_DEV_MatrixLoadData.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MatrixLoadData.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_MatrixLoadData.Tpo $(DEPDIR)/N_DEV_MatrixLoadData.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_MatrixLoadData.C' object='N_DEV_MatrixLoadData.lo' libtool=yes @AMDEPBACKSLASH@
+N_DEV_DeviceLevelKey.lo: $(srcdir)/src/N_DEV_DeviceLevelKey.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_DeviceLevelKey.lo -MD -MP -MF $(DEPDIR)/N_DEV_DeviceLevelKey.Tpo -c -o N_DEV_DeviceLevelKey.lo `test -f '$(srcdir)/src/N_DEV_DeviceLevelKey.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceLevelKey.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_DeviceLevelKey.Tpo $(DEPDIR)/N_DEV_DeviceLevelKey.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_DeviceLevelKey.C' object='N_DEV_DeviceLevelKey.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_MatrixLoadData.lo `test -f '$(srcdir)/src/N_DEV_MatrixLoadData.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MatrixLoadData.C
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_DeviceLevelKey.lo `test -f '$(srcdir)/src/N_DEV_DeviceLevelKey.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceLevelKey.C
 
-N_DEV_NumericalJacobian.lo: $(srcdir)/src/N_DEV_NumericalJacobian.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_NumericalJacobian.lo -MD -MP -MF $(DEPDIR)/N_DEV_NumericalJacobian.Tpo -c -o N_DEV_NumericalJacobian.lo `test -f '$(srcdir)/src/N_DEV_NumericalJacobian.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_NumericalJacobian.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_NumericalJacobian.Tpo $(DEPDIR)/N_DEV_NumericalJacobian.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_NumericalJacobian.C' object='N_DEV_NumericalJacobian.lo' libtool=yes @AMDEPBACKSLASH@
+N_DEV_Factory.lo: $(srcdir)/src/N_DEV_Factory.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Factory.lo -MD -MP -MF $(DEPDIR)/N_DEV_Factory.Tpo -c -o N_DEV_Factory.lo `test -f '$(srcdir)/src/N_DEV_Factory.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Factory.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Factory.Tpo $(DEPDIR)/N_DEV_Factory.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Factory.C' object='N_DEV_Factory.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_NumericalJacobian.lo `test -f '$(srcdir)/src/N_DEV_NumericalJacobian.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_NumericalJacobian.C
-
-N_DEV_DeviceEntity.lo: $(srcdir)/src/N_DEV_DeviceEntity.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_DeviceEntity.lo -MD -MP -MF $(DEPDIR)/N_DEV_DeviceEntity.Tpo -c -o N_DEV_DeviceEntity.lo `test -f '$(srcdir)/src/N_DEV_DeviceEntity.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceEntity.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_DeviceEntity.Tpo $(DEPDIR)/N_DEV_DeviceEntity.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_DeviceEntity.C' object='N_DEV_DeviceEntity.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_DeviceEntity.lo `test -f '$(srcdir)/src/N_DEV_DeviceEntity.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceEntity.C
-
-N_DEV_CompositeParam.lo: $(srcdir)/src/N_DEV_CompositeParam.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_CompositeParam.lo -MD -MP -MF $(DEPDIR)/N_DEV_CompositeParam.Tpo -c -o N_DEV_CompositeParam.lo `test -f '$(srcdir)/src/N_DEV_CompositeParam.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_CompositeParam.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_CompositeParam.Tpo $(DEPDIR)/N_DEV_CompositeParam.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_CompositeParam.C' object='N_DEV_CompositeParam.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_CompositeParam.lo `test -f '$(srcdir)/src/N_DEV_CompositeParam.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_CompositeParam.C
-
-N_DEV_Bsrc.lo: $(srcdir)/src/N_DEV_Bsrc.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Bsrc.lo -MD -MP -MF $(DEPDIR)/N_DEV_Bsrc.Tpo -c -o N_DEV_Bsrc.lo `test -f '$(srcdir)/src/N_DEV_Bsrc.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Bsrc.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Bsrc.Tpo $(DEPDIR)/N_DEV_Bsrc.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Bsrc.C' object='N_DEV_Bsrc.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Bsrc.lo `test -f '$(srcdir)/src/N_DEV_Bsrc.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Bsrc.C
-
-N_DEV_Diode.lo: $(srcdir)/src/N_DEV_Diode.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Diode.lo -MD -MP -MF $(DEPDIR)/N_DEV_Diode.Tpo -c -o N_DEV_Diode.lo `test -f '$(srcdir)/src/N_DEV_Diode.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Diode.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Diode.Tpo $(DEPDIR)/N_DEV_Diode.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Diode.C' object='N_DEV_Diode.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Diode.lo `test -f '$(srcdir)/src/N_DEV_Diode.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Diode.C
-
-N_DEV_ISRC.lo: $(srcdir)/src/N_DEV_ISRC.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_ISRC.lo -MD -MP -MF $(DEPDIR)/N_DEV_ISRC.Tpo -c -o N_DEV_ISRC.lo `test -f '$(srcdir)/src/N_DEV_ISRC.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ISRC.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_ISRC.Tpo $(DEPDIR)/N_DEV_ISRC.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_ISRC.C' object='N_DEV_ISRC.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_ISRC.lo `test -f '$(srcdir)/src/N_DEV_ISRC.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ISRC.C
-
-N_DEV_Inductor.lo: $(srcdir)/src/N_DEV_Inductor.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Inductor.lo -MD -MP -MF $(DEPDIR)/N_DEV_Inductor.Tpo -c -o N_DEV_Inductor.lo `test -f '$(srcdir)/src/N_DEV_Inductor.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Inductor.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Inductor.Tpo $(DEPDIR)/N_DEV_Inductor.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Inductor.C' object='N_DEV_Inductor.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Inductor.lo `test -f '$(srcdir)/src/N_DEV_Inductor.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Inductor.C
-
-N_DEV_JFET.lo: $(srcdir)/src/N_DEV_JFET.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_JFET.lo -MD -MP -MF $(DEPDIR)/N_DEV_JFET.Tpo -c -o N_DEV_JFET.lo `test -f '$(srcdir)/src/N_DEV_JFET.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_JFET.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_JFET.Tpo $(DEPDIR)/N_DEV_JFET.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_JFET.C' object='N_DEV_JFET.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_JFET.lo `test -f '$(srcdir)/src/N_DEV_JFET.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_JFET.C
-
-N_DEV_LTRA.lo: $(srcdir)/src/N_DEV_LTRA.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_LTRA.lo -MD -MP -MF $(DEPDIR)/N_DEV_LTRA.Tpo -c -o N_DEV_LTRA.lo `test -f '$(srcdir)/src/N_DEV_LTRA.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_LTRA.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_LTRA.Tpo $(DEPDIR)/N_DEV_LTRA.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_LTRA.C' object='N_DEV_LTRA.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_LTRA.lo `test -f '$(srcdir)/src/N_DEV_LTRA.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_LTRA.C
-
-N_DEV_LTRA_Faddeeva.lo: $(srcdir)/src/N_DEV_LTRA_Faddeeva.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_LTRA_Faddeeva.lo -MD -MP -MF $(DEPDIR)/N_DEV_LTRA_Faddeeva.Tpo -c -o N_DEV_LTRA_Faddeeva.lo `test -f '$(srcdir)/src/N_DEV_LTRA_Faddeeva.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_LTRA_Faddeeva.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_LTRA_Faddeeva.Tpo $(DEPDIR)/N_DEV_LTRA_Faddeeva.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_LTRA_Faddeeva.C' object='N_DEV_LTRA_Faddeeva.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_LTRA_Faddeeva.lo `test -f '$(srcdir)/src/N_DEV_LTRA_Faddeeva.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_LTRA_Faddeeva.C
-
-N_DEV_MESFET.lo: $(srcdir)/src/N_DEV_MESFET.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_MESFET.lo -MD -MP -MF $(DEPDIR)/N_DEV_MESFET.Tpo -c -o N_DEV_MESFET.lo `test -f '$(srcdir)/src/N_DEV_MESFET.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MESFET.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_MESFET.Tpo $(DEPDIR)/N_DEV_MESFET.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_MESFET.C' object='N_DEV_MESFET.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_MESFET.lo `test -f '$(srcdir)/src/N_DEV_MESFET.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MESFET.C
-
-N_DEV_MOSFET1.lo: $(srcdir)/src/N_DEV_MOSFET1.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_MOSFET1.lo -MD -MP -MF $(DEPDIR)/N_DEV_MOSFET1.Tpo -c -o N_DEV_MOSFET1.lo `test -f '$(srcdir)/src/N_DEV_MOSFET1.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MOSFET1.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_MOSFET1.Tpo $(DEPDIR)/N_DEV_MOSFET1.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_MOSFET1.C' object='N_DEV_MOSFET1.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_MOSFET1.lo `test -f '$(srcdir)/src/N_DEV_MOSFET1.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MOSFET1.C
-
-N_DEV_MOSFET2.lo: $(srcdir)/src/N_DEV_MOSFET2.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_MOSFET2.lo -MD -MP -MF $(DEPDIR)/N_DEV_MOSFET2.Tpo -c -o N_DEV_MOSFET2.lo `test -f '$(srcdir)/src/N_DEV_MOSFET2.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MOSFET2.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_MOSFET2.Tpo $(DEPDIR)/N_DEV_MOSFET2.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_MOSFET2.C' object='N_DEV_MOSFET2.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_MOSFET2.lo `test -f '$(srcdir)/src/N_DEV_MOSFET2.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MOSFET2.C
-
-N_DEV_MOSFET3.lo: $(srcdir)/src/N_DEV_MOSFET3.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_MOSFET3.lo -MD -MP -MF $(DEPDIR)/N_DEV_MOSFET3.Tpo -c -o N_DEV_MOSFET3.lo `test -f '$(srcdir)/src/N_DEV_MOSFET3.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MOSFET3.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_MOSFET3.Tpo $(DEPDIR)/N_DEV_MOSFET3.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_MOSFET3.C' object='N_DEV_MOSFET3.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_MOSFET3.lo `test -f '$(srcdir)/src/N_DEV_MOSFET3.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MOSFET3.C
-
-N_DEV_MOSFET6.lo: $(srcdir)/src/N_DEV_MOSFET6.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_MOSFET6.lo -MD -MP -MF $(DEPDIR)/N_DEV_MOSFET6.Tpo -c -o N_DEV_MOSFET6.lo `test -f '$(srcdir)/src/N_DEV_MOSFET6.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MOSFET6.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_MOSFET6.Tpo $(DEPDIR)/N_DEV_MOSFET6.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_MOSFET6.C' object='N_DEV_MOSFET6.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_MOSFET6.lo `test -f '$(srcdir)/src/N_DEV_MOSFET6.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MOSFET6.C
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Factory.lo `test -f '$(srcdir)/src/N_DEV_Factory.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Factory.C
 
 N_DEV_MOSFET_B1.lo: $(srcdir)/src/N_DEV_MOSFET_B1.C
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_MOSFET_B1.lo -MD -MP -MF $(DEPDIR)/N_DEV_MOSFET_B1.Tpo -c -o N_DEV_MOSFET_B1.lo `test -f '$(srcdir)/src/N_DEV_MOSFET_B1.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MOSFET_B1.C
@@ -1100,314 +558,6 @@ N_DEV_MOSFET_B2.lo: $(srcdir)/src/N_DEV_MOSFET_B2.C
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_MOSFET_B2.C' object='N_DEV_MOSFET_B2.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_MOSFET_B2.lo `test -f '$(srcdir)/src/N_DEV_MOSFET_B2.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MOSFET_B2.C
-
-N_DEV_MOSFET_B3.lo: $(srcdir)/src/N_DEV_MOSFET_B3.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_MOSFET_B3.lo -MD -MP -MF $(DEPDIR)/N_DEV_MOSFET_B3.Tpo -c -o N_DEV_MOSFET_B3.lo `test -f '$(srcdir)/src/N_DEV_MOSFET_B3.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MOSFET_B3.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_MOSFET_B3.Tpo $(DEPDIR)/N_DEV_MOSFET_B3.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_MOSFET_B3.C' object='N_DEV_MOSFET_B3.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_MOSFET_B3.lo `test -f '$(srcdir)/src/N_DEV_MOSFET_B3.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MOSFET_B3.C
-
-N_DEV_MOSFET_B4.lo: $(srcdir)/src/N_DEV_MOSFET_B4.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_MOSFET_B4.lo -MD -MP -MF $(DEPDIR)/N_DEV_MOSFET_B4.Tpo -c -o N_DEV_MOSFET_B4.lo `test -f '$(srcdir)/src/N_DEV_MOSFET_B4.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MOSFET_B4.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_MOSFET_B4.Tpo $(DEPDIR)/N_DEV_MOSFET_B4.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_MOSFET_B4.C' object='N_DEV_MOSFET_B4.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_MOSFET_B4.lo `test -f '$(srcdir)/src/N_DEV_MOSFET_B4.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MOSFET_B4.C
-
-N_DEV_MOSFET_B3SOI.lo: $(srcdir)/src/N_DEV_MOSFET_B3SOI.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_MOSFET_B3SOI.lo -MD -MP -MF $(DEPDIR)/N_DEV_MOSFET_B3SOI.Tpo -c -o N_DEV_MOSFET_B3SOI.lo `test -f '$(srcdir)/src/N_DEV_MOSFET_B3SOI.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MOSFET_B3SOI.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_MOSFET_B3SOI.Tpo $(DEPDIR)/N_DEV_MOSFET_B3SOI.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_MOSFET_B3SOI.C' object='N_DEV_MOSFET_B3SOI.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_MOSFET_B3SOI.lo `test -f '$(srcdir)/src/N_DEV_MOSFET_B3SOI.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MOSFET_B3SOI.C
-
-N_DEV_MutIndLin.lo: $(srcdir)/src/N_DEV_MutIndLin.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_MutIndLin.lo -MD -MP -MF $(DEPDIR)/N_DEV_MutIndLin.Tpo -c -o N_DEV_MutIndLin.lo `test -f '$(srcdir)/src/N_DEV_MutIndLin.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MutIndLin.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_MutIndLin.Tpo $(DEPDIR)/N_DEV_MutIndLin.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_MutIndLin.C' object='N_DEV_MutIndLin.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_MutIndLin.lo `test -f '$(srcdir)/src/N_DEV_MutIndLin.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MutIndLin.C
-
-N_DEV_MutIndNonLin.lo: $(srcdir)/src/N_DEV_MutIndNonLin.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_MutIndNonLin.lo -MD -MP -MF $(DEPDIR)/N_DEV_MutIndNonLin.Tpo -c -o N_DEV_MutIndNonLin.lo `test -f '$(srcdir)/src/N_DEV_MutIndNonLin.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MutIndNonLin.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_MutIndNonLin.Tpo $(DEPDIR)/N_DEV_MutIndNonLin.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_MutIndNonLin.C' object='N_DEV_MutIndNonLin.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_MutIndNonLin.lo `test -f '$(srcdir)/src/N_DEV_MutIndNonLin.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MutIndNonLin.C
-
-N_DEV_MutIndNonLin2.lo: $(srcdir)/src/N_DEV_MutIndNonLin2.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_MutIndNonLin2.lo -MD -MP -MF $(DEPDIR)/N_DEV_MutIndNonLin2.Tpo -c -o N_DEV_MutIndNonLin2.lo `test -f '$(srcdir)/src/N_DEV_MutIndNonLin2.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MutIndNonLin2.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_MutIndNonLin2.Tpo $(DEPDIR)/N_DEV_MutIndNonLin2.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_MutIndNonLin2.C' object='N_DEV_MutIndNonLin2.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_MutIndNonLin2.lo `test -f '$(srcdir)/src/N_DEV_MutIndNonLin2.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MutIndNonLin2.C
-
-N_DEV_NewDevice.lo: $(srcdir)/src/N_DEV_NewDevice.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_NewDevice.lo -MD -MP -MF $(DEPDIR)/N_DEV_NewDevice.Tpo -c -o N_DEV_NewDevice.lo `test -f '$(srcdir)/src/N_DEV_NewDevice.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_NewDevice.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_NewDevice.Tpo $(DEPDIR)/N_DEV_NewDevice.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_NewDevice.C' object='N_DEV_NewDevice.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_NewDevice.lo `test -f '$(srcdir)/src/N_DEV_NewDevice.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_NewDevice.C
-
-N_DEV_Xygra.lo: $(srcdir)/src/N_DEV_Xygra.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Xygra.lo -MD -MP -MF $(DEPDIR)/N_DEV_Xygra.Tpo -c -o N_DEV_Xygra.lo `test -f '$(srcdir)/src/N_DEV_Xygra.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Xygra.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Xygra.Tpo $(DEPDIR)/N_DEV_Xygra.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Xygra.C' object='N_DEV_Xygra.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Xygra.lo `test -f '$(srcdir)/src/N_DEV_Xygra.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Xygra.C
-
-N_DEV_OpAmp.lo: $(srcdir)/src/N_DEV_OpAmp.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_OpAmp.lo -MD -MP -MF $(DEPDIR)/N_DEV_OpAmp.Tpo -c -o N_DEV_OpAmp.lo `test -f '$(srcdir)/src/N_DEV_OpAmp.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_OpAmp.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_OpAmp.Tpo $(DEPDIR)/N_DEV_OpAmp.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_OpAmp.C' object='N_DEV_OpAmp.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_OpAmp.lo `test -f '$(srcdir)/src/N_DEV_OpAmp.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_OpAmp.C
-
-N_DEV_Digital.lo: $(srcdir)/src/N_DEV_Digital.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Digital.lo -MD -MP -MF $(DEPDIR)/N_DEV_Digital.Tpo -c -o N_DEV_Digital.lo `test -f '$(srcdir)/src/N_DEV_Digital.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Digital.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Digital.Tpo $(DEPDIR)/N_DEV_Digital.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Digital.C' object='N_DEV_Digital.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Digital.lo `test -f '$(srcdir)/src/N_DEV_Digital.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Digital.C
-
-N_DEV_VDMOS.lo: $(srcdir)/src/N_DEV_VDMOS.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_VDMOS.lo -MD -MP -MF $(DEPDIR)/N_DEV_VDMOS.Tpo -c -o N_DEV_VDMOS.lo `test -f '$(srcdir)/src/N_DEV_VDMOS.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_VDMOS.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_VDMOS.Tpo $(DEPDIR)/N_DEV_VDMOS.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_VDMOS.C' object='N_DEV_VDMOS.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_VDMOS.lo `test -f '$(srcdir)/src/N_DEV_VDMOS.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_VDMOS.C
-
-N_DEV_Resistor.lo: $(srcdir)/src/N_DEV_Resistor.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Resistor.lo -MD -MP -MF $(DEPDIR)/N_DEV_Resistor.Tpo -c -o N_DEV_Resistor.lo `test -f '$(srcdir)/src/N_DEV_Resistor.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Resistor.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Resistor.Tpo $(DEPDIR)/N_DEV_Resistor.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Resistor.C' object='N_DEV_Resistor.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Resistor.lo `test -f '$(srcdir)/src/N_DEV_Resistor.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Resistor.C
-
-N_DEV_Resistor3.lo: $(srcdir)/src/N_DEV_Resistor3.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Resistor3.lo -MD -MP -MF $(DEPDIR)/N_DEV_Resistor3.Tpo -c -o N_DEV_Resistor3.lo `test -f '$(srcdir)/src/N_DEV_Resistor3.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Resistor3.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Resistor3.Tpo $(DEPDIR)/N_DEV_Resistor3.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Resistor3.C' object='N_DEV_Resistor3.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Resistor3.lo `test -f '$(srcdir)/src/N_DEV_Resistor3.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Resistor3.C
-
-N_DEV_ThermalResistor.lo: $(srcdir)/src/N_DEV_ThermalResistor.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_ThermalResistor.lo -MD -MP -MF $(DEPDIR)/N_DEV_ThermalResistor.Tpo -c -o N_DEV_ThermalResistor.lo `test -f '$(srcdir)/src/N_DEV_ThermalResistor.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ThermalResistor.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_ThermalResistor.Tpo $(DEPDIR)/N_DEV_ThermalResistor.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_ThermalResistor.C' object='N_DEV_ThermalResistor.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_ThermalResistor.lo `test -f '$(srcdir)/src/N_DEV_ThermalResistor.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ThermalResistor.C
-
-N_DEV_SW.lo: $(srcdir)/src/N_DEV_SW.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_SW.lo -MD -MP -MF $(DEPDIR)/N_DEV_SW.Tpo -c -o N_DEV_SW.lo `test -f '$(srcdir)/src/N_DEV_SW.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_SW.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_SW.Tpo $(DEPDIR)/N_DEV_SW.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_SW.C' object='N_DEV_SW.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_SW.lo `test -f '$(srcdir)/src/N_DEV_SW.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_SW.C
-
-N_DEV_Source.lo: $(srcdir)/src/N_DEV_Source.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Source.lo -MD -MP -MF $(DEPDIR)/N_DEV_Source.Tpo -c -o N_DEV_Source.lo `test -f '$(srcdir)/src/N_DEV_Source.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Source.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Source.Tpo $(DEPDIR)/N_DEV_Source.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Source.C' object='N_DEV_Source.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Source.lo `test -f '$(srcdir)/src/N_DEV_Source.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Source.C
-
-N_DEV_SourceData.lo: $(srcdir)/src/N_DEV_SourceData.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_SourceData.lo -MD -MP -MF $(DEPDIR)/N_DEV_SourceData.Tpo -c -o N_DEV_SourceData.lo `test -f '$(srcdir)/src/N_DEV_SourceData.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_SourceData.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_SourceData.Tpo $(DEPDIR)/N_DEV_SourceData.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_SourceData.C' object='N_DEV_SourceData.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_SourceData.lo `test -f '$(srcdir)/src/N_DEV_SourceData.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_SourceData.C
-
-N_DEV_TRA.lo: $(srcdir)/src/N_DEV_TRA.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_TRA.lo -MD -MP -MF $(DEPDIR)/N_DEV_TRA.Tpo -c -o N_DEV_TRA.lo `test -f '$(srcdir)/src/N_DEV_TRA.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_TRA.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_TRA.Tpo $(DEPDIR)/N_DEV_TRA.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_TRA.C' object='N_DEV_TRA.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_TRA.lo `test -f '$(srcdir)/src/N_DEV_TRA.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_TRA.C
-
-N_DEV_VCCS.lo: $(srcdir)/src/N_DEV_VCCS.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_VCCS.lo -MD -MP -MF $(DEPDIR)/N_DEV_VCCS.Tpo -c -o N_DEV_VCCS.lo `test -f '$(srcdir)/src/N_DEV_VCCS.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_VCCS.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_VCCS.Tpo $(DEPDIR)/N_DEV_VCCS.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_VCCS.C' object='N_DEV_VCCS.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_VCCS.lo `test -f '$(srcdir)/src/N_DEV_VCCS.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_VCCS.C
-
-N_DEV_Vcvs.lo: $(srcdir)/src/N_DEV_Vcvs.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Vcvs.lo -MD -MP -MF $(DEPDIR)/N_DEV_Vcvs.Tpo -c -o N_DEV_Vcvs.lo `test -f '$(srcdir)/src/N_DEV_Vcvs.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Vcvs.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Vcvs.Tpo $(DEPDIR)/N_DEV_Vcvs.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Vcvs.C' object='N_DEV_Vcvs.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Vcvs.lo `test -f '$(srcdir)/src/N_DEV_Vcvs.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Vcvs.C
-
-N_DEV_Vsrc.lo: $(srcdir)/src/N_DEV_Vsrc.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Vsrc.lo -MD -MP -MF $(DEPDIR)/N_DEV_Vsrc.Tpo -c -o N_DEV_Vsrc.lo `test -f '$(srcdir)/src/N_DEV_Vsrc.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Vsrc.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Vsrc.Tpo $(DEPDIR)/N_DEV_Vsrc.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Vsrc.C' object='N_DEV_Vsrc.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Vsrc.lo `test -f '$(srcdir)/src/N_DEV_Vsrc.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Vsrc.C
-
-N_DEV_ROM.lo: $(srcdir)/src/N_DEV_ROM.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_ROM.lo -MD -MP -MF $(DEPDIR)/N_DEV_ROM.Tpo -c -o N_DEV_ROM.lo `test -f '$(srcdir)/src/N_DEV_ROM.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ROM.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_ROM.Tpo $(DEPDIR)/N_DEV_ROM.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_ROM.C' object='N_DEV_ROM.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_ROM.lo `test -f '$(srcdir)/src/N_DEV_ROM.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ROM.C
-
-N_DEV_RxnSet.lo: $(srcdir)/src/N_DEV_RxnSet.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_RxnSet.lo -MD -MP -MF $(DEPDIR)/N_DEV_RxnSet.Tpo -c -o N_DEV_RxnSet.lo `test -f '$(srcdir)/src/N_DEV_RxnSet.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_RxnSet.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_RxnSet.Tpo $(DEPDIR)/N_DEV_RxnSet.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_RxnSet.C' object='N_DEV_RxnSet.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_RxnSet.lo `test -f '$(srcdir)/src/N_DEV_RxnSet.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_RxnSet.C
-
-N_DEV_Region.lo: $(srcdir)/src/N_DEV_Region.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Region.lo -MD -MP -MF $(DEPDIR)/N_DEV_Region.Tpo -c -o N_DEV_Region.lo `test -f '$(srcdir)/src/N_DEV_Region.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Region.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Region.Tpo $(DEPDIR)/N_DEV_Region.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Region.C' object='N_DEV_Region.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Region.lo `test -f '$(srcdir)/src/N_DEV_Region.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Region.C
-
-N_DEV_RegionData.lo: $(srcdir)/src/N_DEV_RegionData.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_RegionData.lo -MD -MP -MF $(DEPDIR)/N_DEV_RegionData.Tpo -c -o N_DEV_RegionData.lo `test -f '$(srcdir)/src/N_DEV_RegionData.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_RegionData.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_RegionData.Tpo $(DEPDIR)/N_DEV_RegionData.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_RegionData.C' object='N_DEV_RegionData.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_RegionData.lo `test -f '$(srcdir)/src/N_DEV_RegionData.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_RegionData.C
-
-N_DEV_SpecieSource.lo: $(srcdir)/src/N_DEV_SpecieSource.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_SpecieSource.lo -MD -MP -MF $(DEPDIR)/N_DEV_SpecieSource.Tpo -c -o N_DEV_SpecieSource.lo `test -f '$(srcdir)/src/N_DEV_SpecieSource.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_SpecieSource.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_SpecieSource.Tpo $(DEPDIR)/N_DEV_SpecieSource.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_SpecieSource.C' object='N_DEV_SpecieSource.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_SpecieSource.lo `test -f '$(srcdir)/src/N_DEV_SpecieSource.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_SpecieSource.C
-
-N_DEV_PlaceHolder.lo: $(srcdir)/src/N_DEV_PlaceHolder.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_PlaceHolder.lo -MD -MP -MF $(DEPDIR)/N_DEV_PlaceHolder.Tpo -c -o N_DEV_PlaceHolder.lo `test -f '$(srcdir)/src/N_DEV_PlaceHolder.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_PlaceHolder.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_PlaceHolder.Tpo $(DEPDIR)/N_DEV_PlaceHolder.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_PlaceHolder.C' object='N_DEV_PlaceHolder.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_PlaceHolder.lo `test -f '$(srcdir)/src/N_DEV_PlaceHolder.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_PlaceHolder.C
-
-N_DEV_DeviceSupport.lo: $(srcdir)/src/N_DEV_DeviceSupport.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_DeviceSupport.lo -MD -MP -MF $(DEPDIR)/N_DEV_DeviceSupport.Tpo -c -o N_DEV_DeviceSupport.lo `test -f '$(srcdir)/src/N_DEV_DeviceSupport.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceSupport.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_DeviceSupport.Tpo $(DEPDIR)/N_DEV_DeviceSupport.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_DeviceSupport.C' object='N_DEV_DeviceSupport.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_DeviceSupport.lo `test -f '$(srcdir)/src/N_DEV_DeviceSupport.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceSupport.C
-
-N_DEV_Param.lo: $(srcdir)/src/N_DEV_Param.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Param.lo -MD -MP -MF $(DEPDIR)/N_DEV_Param.Tpo -c -o N_DEV_Param.lo `test -f '$(srcdir)/src/N_DEV_Param.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Param.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Param.Tpo $(DEPDIR)/N_DEV_Param.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Param.C' object='N_DEV_Param.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Param.lo `test -f '$(srcdir)/src/N_DEV_Param.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Param.C
-
-N_DEV_DeviceOptions.lo: $(srcdir)/src/N_DEV_DeviceOptions.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_DeviceOptions.lo -MD -MP -MF $(DEPDIR)/N_DEV_DeviceOptions.Tpo -c -o N_DEV_DeviceOptions.lo `test -f '$(srcdir)/src/N_DEV_DeviceOptions.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceOptions.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_DeviceOptions.Tpo $(DEPDIR)/N_DEV_DeviceOptions.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_DeviceOptions.C' object='N_DEV_DeviceOptions.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_DeviceOptions.lo `test -f '$(srcdir)/src/N_DEV_DeviceOptions.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceOptions.C
-
-N_DEV_SolverState.lo: $(srcdir)/src/N_DEV_SolverState.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_SolverState.lo -MD -MP -MF $(DEPDIR)/N_DEV_SolverState.Tpo -c -o N_DEV_SolverState.lo `test -f '$(srcdir)/src/N_DEV_SolverState.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_SolverState.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_SolverState.Tpo $(DEPDIR)/N_DEV_SolverState.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_SolverState.C' object='N_DEV_SolverState.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_SolverState.lo `test -f '$(srcdir)/src/N_DEV_SolverState.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_SolverState.C
-
-N_DEV_Reaction.lo: $(srcdir)/src/N_DEV_Reaction.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Reaction.lo -MD -MP -MF $(DEPDIR)/N_DEV_Reaction.Tpo -c -o N_DEV_Reaction.lo `test -f '$(srcdir)/src/N_DEV_Reaction.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Reaction.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Reaction.Tpo $(DEPDIR)/N_DEV_Reaction.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Reaction.C' object='N_DEV_Reaction.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Reaction.lo `test -f '$(srcdir)/src/N_DEV_Reaction.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Reaction.C
-
-N_DEV_ReactionNetwork.lo: $(srcdir)/src/N_DEV_ReactionNetwork.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_ReactionNetwork.lo -MD -MP -MF $(DEPDIR)/N_DEV_ReactionNetwork.Tpo -c -o N_DEV_ReactionNetwork.lo `test -f '$(srcdir)/src/N_DEV_ReactionNetwork.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ReactionNetwork.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_ReactionNetwork.Tpo $(DEPDIR)/N_DEV_ReactionNetwork.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_ReactionNetwork.C' object='N_DEV_ReactionNetwork.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_ReactionNetwork.lo `test -f '$(srcdir)/src/N_DEV_ReactionNetwork.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ReactionNetwork.C
-
-N_DEV_RateConstantCalculators.lo: $(srcdir)/src/N_DEV_RateConstantCalculators.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_RateConstantCalculators.lo -MD -MP -MF $(DEPDIR)/N_DEV_RateConstantCalculators.Tpo -c -o N_DEV_RateConstantCalculators.lo `test -f '$(srcdir)/src/N_DEV_RateConstantCalculators.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_RateConstantCalculators.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_RateConstantCalculators.Tpo $(DEPDIR)/N_DEV_RateConstantCalculators.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_RateConstantCalculators.C' object='N_DEV_RateConstantCalculators.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_RateConstantCalculators.lo `test -f '$(srcdir)/src/N_DEV_RateConstantCalculators.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_RateConstantCalculators.C
-
-N_DEV_DeviceLevelKey.lo: $(srcdir)/src/N_DEV_DeviceLevelKey.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_DeviceLevelKey.lo -MD -MP -MF $(DEPDIR)/N_DEV_DeviceLevelKey.Tpo -c -o N_DEV_DeviceLevelKey.lo `test -f '$(srcdir)/src/N_DEV_DeviceLevelKey.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceLevelKey.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_DeviceLevelKey.Tpo $(DEPDIR)/N_DEV_DeviceLevelKey.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_DeviceLevelKey.C' object='N_DEV_DeviceLevelKey.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_DeviceLevelKey.lo `test -f '$(srcdir)/src/N_DEV_DeviceLevelKey.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceLevelKey.C
-
-N_DEV_Pars.lo: $(srcdir)/src/N_DEV_Pars.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Pars.lo -MD -MP -MF $(DEPDIR)/N_DEV_Pars.Tpo -c -o N_DEV_Pars.lo `test -f '$(srcdir)/src/N_DEV_Pars.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Pars.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Pars.Tpo $(DEPDIR)/N_DEV_Pars.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Pars.C' object='N_DEV_Pars.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Pars.lo `test -f '$(srcdir)/src/N_DEV_Pars.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Pars.C
-
-N_DEV_OutputPars.lo: $(srcdir)/src/N_DEV_OutputPars.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_OutputPars.lo -MD -MP -MF $(DEPDIR)/N_DEV_OutputPars.Tpo -c -o N_DEV_OutputPars.lo `test -f '$(srcdir)/src/N_DEV_OutputPars.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_OutputPars.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_OutputPars.Tpo $(DEPDIR)/N_DEV_OutputPars.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_OutputPars.C' object='N_DEV_OutputPars.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_OutputPars.lo `test -f '$(srcdir)/src/N_DEV_OutputPars.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_OutputPars.C
-
-N_DEV_Units.lo: $(srcdir)/src/N_DEV_Units.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Units.lo -MD -MP -MF $(DEPDIR)/N_DEV_Units.Tpo -c -o N_DEV_Units.lo `test -f '$(srcdir)/src/N_DEV_Units.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Units.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Units.Tpo $(DEPDIR)/N_DEV_Units.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Units.C' object='N_DEV_Units.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Units.lo `test -f '$(srcdir)/src/N_DEV_Units.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Units.C
-
-N_DEV_Factory.lo: $(srcdir)/src/N_DEV_Factory.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Factory.lo -MD -MP -MF $(DEPDIR)/N_DEV_Factory.Tpo -c -o N_DEV_Factory.lo `test -f '$(srcdir)/src/N_DEV_Factory.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Factory.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Factory.Tpo $(DEPDIR)/N_DEV_Factory.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Factory.C' object='N_DEV_Factory.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Factory.lo `test -f '$(srcdir)/src/N_DEV_Factory.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Factory.C
-
-N_DEV_RegisterDevices.lo: $(srcdir)/src/N_DEV_RegisterDevices.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_RegisterDevices.lo -MD -MP -MF $(DEPDIR)/N_DEV_RegisterDevices.Tpo -c -o N_DEV_RegisterDevices.lo `test -f '$(srcdir)/src/N_DEV_RegisterDevices.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_RegisterDevices.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_RegisterDevices.Tpo $(DEPDIR)/N_DEV_RegisterDevices.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_RegisterDevices.C' object='N_DEV_RegisterDevices.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_RegisterDevices.lo `test -f '$(srcdir)/src/N_DEV_RegisterDevices.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_RegisterDevices.C
-
-N_DEV_Configuration.lo: $(srcdir)/src/N_DEV_Configuration.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Configuration.lo -MD -MP -MF $(DEPDIR)/N_DEV_Configuration.Tpo -c -o N_DEV_Configuration.lo `test -f '$(srcdir)/src/N_DEV_Configuration.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Configuration.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Configuration.Tpo $(DEPDIR)/N_DEV_Configuration.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Configuration.C' object='N_DEV_Configuration.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Configuration.lo `test -f '$(srcdir)/src/N_DEV_Configuration.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Configuration.C
-
-.cxx.o:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ $<
-
-.cxx.obj:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
-
-.cxx.lo:
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LTCXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LTCXXCOMPILE) -c -o $@ $<
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -1570,13 +720,11 @@ distdir: $(DISTFILES)
 	  fi; \
 	done
 check-am: all-am
-check: $(BUILT_SOURCES)
-	$(MAKE) $(AM_MAKEFLAGS) check-recursive
+check: check-recursive
 all-am: Makefile $(LTLIBRARIES)
 installdirs: installdirs-recursive
 installdirs-am:
-install: $(BUILT_SOURCES)
-	$(MAKE) $(AM_MAKEFLAGS) install-recursive
+install: install-recursive
 install-exec: install-exec-recursive
 install-data: install-data-recursive
 uninstall: uninstall-recursive
@@ -1598,7 +746,6 @@ install-strip:
 mostlyclean-generic:
 
 clean-generic:
-	-test -z "$(CLEANFILES)" || rm -f $(CLEANFILES)
 
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
@@ -1607,7 +754,6 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
-	-test -z "$(BUILT_SOURCES)" || rm -f $(BUILT_SOURCES)
 clean: clean-recursive
 
 clean-am: clean-generic clean-libtool clean-noinstLTLIBRARIES \
@@ -1679,8 +825,7 @@ ps-am:
 
 uninstall-am:
 
-.MAKE: $(am__recursive_targets) all check install install-am \
-	install-strip
+.MAKE: $(am__recursive_targets) install-am install-strip
 
 .PHONY: $(am__recursive_targets) CTAGS GTAGS TAGS all all-am check \
 	check-am clean clean-generic clean-libtool \
@@ -1697,20 +842,6 @@ uninstall-am:
 	mostlyclean-libtool pdf pdf-am ps ps-am tags tags-am uninstall \
 	uninstall-am
 
-
-#We have to do it this way, because automake appears to assume it can use
-# yacc and bison interchangably, and we can't.
-
-N_DEV_ReactionParser.cxx: $(srcdir)/src/N_DEV_ReactionParser.yxx
-	$(BISON) -o$@ $(srcdir)/src/N_DEV_ReactionParser.yxx
-
-N_DEV_ReactionLexer.cxx: $(srcdir)/src/N_DEV_ReactionLexer.l
-	$(LEX) -+ -o$@ $(srcdir)/src/N_DEV_ReactionLexer.l
-
-N_DEV_ReactionParser.hxx: N_DEV_ReactionParser.cxx
-location.hh: N_DEV_ReactionParser.cxx
-position.hh: N_DEV_ReactionParser.cxx
-stack.hh: N_DEV_ReactionParser.cxx
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

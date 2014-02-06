@@ -36,11 +36,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.16.2.21 $
+// Revision Number: $Revision: 1.16.2.24 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:43 $
+// Revision Date  : $Date: 2014/01/10 00:08:15 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: erkeite $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
@@ -250,8 +250,10 @@ TimePrn::doFinishOutputStep()
   // Deal with the *prn file:
   if (outStreamPtr_)
   {
-    if (outputManager_.getFormat() != Format::PROBE && outputManager_.getPrintEndOfSimulationLine())
+    if (outputManager_.getPrintEndOfSimulationLine())
+    {
       (*outStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
+    }
 
     outputManager_.closeFile(outStreamPtr_);
     outStreamPtr_ = 0;
@@ -265,7 +267,6 @@ FrequencyPrn::FrequencyPrn(OutputMgr &output_manager, const PrintParameters &pri
     outFilename_(),
     suffix_(),
     outStreamPtr_(0),
-    headerPrintCalls_(0),
     stepCount_(0)
 {
   if (printParameters_.extension_.empty())
@@ -338,7 +339,7 @@ void FrequencyPrn::doFinishOutput()
       if (!outputManager_.getSTEPEnabledFlag() && outputManager_.getPrintEndOfSimulationLine())
       {
         (*outStreamPtr_) << "End of Xyce(TM) Simulation" << std::endl;
-        headerPrintCalls_ = 0;
+        firstTimePrint_ = true;
       }
 
       if (!outputManager_.getSTEPEnabledFlag())
@@ -349,7 +350,7 @@ void FrequencyPrn::doFinishOutput()
     }
   } // procID
 
-  firstTimePrint_ = true;
+  index_ = 0;
 }
 
 void
@@ -358,8 +359,10 @@ FrequencyPrn::doFinishOutputStep()
   // Deal with the *prn file:
   if (outStreamPtr_)
   {
-    if (outputManager_.getFormat() != Format::PROBE && outputManager_.getPrintEndOfSimulationLine())
+    if (outputManager_.getPrintEndOfSimulationLine())
+    {
       (*outStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
+    }
 
     outputManager_.closeFile(outStreamPtr_);
     outStreamPtr_ = 0;
@@ -580,8 +583,10 @@ FrequencyCSV::doFinishOutputStep()
   // Deal with the *prn file:
   if (outStreamPtr_)
   {
-    if (outputManager_.getFormat() != Format::PROBE && outputManager_.getPrintEndOfSimulationLine())
+    if (outputManager_.getPrintEndOfSimulationLine())
+    {
       (*outStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
+    }
   }
 
   outputManager_.closeFile(outStreamPtr_);
@@ -748,12 +753,11 @@ void TimeTecPlot::doFinishOutput()
   {
     if (outStreamPtr_)
     {
-      headerPrintCalls_ = 0;
-
       if (!outputManager_.getSTEPEnabledFlag())
       {
         outputManager_.closeFile(outStreamPtr_);
         outStreamPtr_ = 0;
+        headerPrintCalls_ = 0;
       }
     }
   } // procID
@@ -782,7 +786,7 @@ FrequencyTecPlot::FrequencyTecPlot(OutputMgr &output_manager, const PrintParamet
     index_(0)
 {
   if (printParameters_.extension_.empty())
-    printParameters_.extension_ = ".dat";
+    printParameters_.extension_ = ".FD.dat";
 
   fixupColumns(outputManager_, printParameters_);
 }
@@ -872,9 +876,7 @@ FrequencyTecPlot::doOutputFrequency(double frequency, const N_LAS_Vector *real_s
       }
     }
 
-    (*outStreamPtr_) << frequency;
     firstColPrinted = true;
-
   }
 
   // periodic time-domain steady-state output
@@ -900,12 +902,38 @@ FrequencyTecPlot::doOutputFrequency(double frequency, const N_LAS_Vector *real_s
 
 void FrequencyTecPlot::doFinishOutput()
 {
+  if (outputManager_.getProcID() == 0)
+  {
+    if (outStreamPtr_)
+    {
+      if (!outputManager_.getSTEPEnabledFlag() && outputManager_.getPrintEndOfSimulationLine())
+      {
+        (*outStreamPtr_) << "End of Xyce(TM) Simulation" << std::endl;
+      }
+
+      if (!outputManager_.getSTEPEnabledFlag())
+      {
+        outputManager_.closeFile(outStreamPtr_);
+        outStreamPtr_ = 0;
+      }
+    }
+  } // procID
   firstTime_ = true;
 }
 
 void
 FrequencyTecPlot::doFinishOutputStep()
 {
+  if (outStreamPtr_)
+  {
+    if ( outputManager_.getPrintEndOfSimulationLine() )
+    {
+      (*outStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
+    }
+
+    outputManager_.closeFile(outStreamPtr_);
+    outStreamPtr_ = 0;
+  }
 }
 
 TimeProbe::TimeProbe(OutputMgr &output_manager, const PrintParameters &print_parameters)
@@ -1575,13 +1603,17 @@ HBPrn::doFinishOutputStep()
   // Deal with the *prn file:
   if (timeStreamPtr_)
   {
-    if (outputManager_.getFormat() != Format::PROBE && outputManager_.getPrintEndOfSimulationLine())
+    if (outputManager_.getPrintEndOfSimulationLine())
+    {
       (*timeStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
+    }
   }
   if (freqStreamPtr_)
   {
-    if (outputManager_.getFormat() != Format::PROBE && outputManager_.getPrintEndOfSimulationLine())
+    if (outputManager_.getPrintEndOfSimulationLine())
+    {
       (*freqStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
+    }
   }
 
   outputManager_.closeFile(timeStreamPtr_);
@@ -1749,13 +1781,17 @@ HBCSV::doFinishOutputStep()
   // Deal with the *prn file:
   if (timeStreamPtr_)
   {
-    if (outputManager_.getFormat() != Format::PROBE && outputManager_.getPrintEndOfSimulationLine())
+    if (outputManager_.getPrintEndOfSimulationLine())
+    {
       (*timeStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
+    }
   }
   if (freqStreamPtr_)
   {
-    if (outputManager_.getFormat() != Format::PROBE && outputManager_.getPrintEndOfSimulationLine())
+    if (outputManager_.getPrintEndOfSimulationLine())
+    {
       (*freqStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
+    }
   }
 
   outputManager_.closeFile(timeStreamPtr_);
@@ -1914,6 +1950,10 @@ void HBTecPlot::doFinishOutput()
 
     firstTimeHB_ = true;
   }
+  else
+  {
+    firstTimeHB_ = true;
+  }
 }
 
 void
@@ -1922,13 +1962,17 @@ HBTecPlot::doFinishOutputStep()
   // Deal with the *dat file:
   if (timeStreamPtr_)
   {
-    if (outputManager_.getFormat() != Format::PROBE && outputManager_.getPrintEndOfSimulationLine())
+    if (outputManager_.getPrintEndOfSimulationLine())
+    {
       (*timeStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
+    }
   }
   if (freqStreamPtr_)
   {
-    if (outputManager_.getFormat() != Format::PROBE && outputManager_.getPrintEndOfSimulationLine())
+    if (outputManager_.getPrintEndOfSimulationLine())
+    {
       (*freqStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
+    }
   }
 
   outputManager_.closeFile(timeStreamPtr_);
@@ -1948,24 +1992,31 @@ HBTecPlot::doFinishOutputStep()
 //-----------------------------------------------------------------------------
 void HBTecPlot::tecplotTimeHBHeader( ostream & stream)
 {
+  int tecplotHeaderPrecision_ = 2;
+  stream.setf(ios::scientific);
+  stream.precision( tecplotHeaderPrecision_);
+
   if (stepCount_ == 0)
   {
-    stream << " TITLE                            = \" Xyce Time Domain HB data, " << outputManager_.getNetListFilename() << "\", " << std::endl;
-    stream << "\tVARIABLES                       = \"TIME \" " << std::endl;
+    stream << " TITLE      = \" Xyce Time Domain HB data, " << outputManager_.getNetListFilename() << "\", " << std::endl;
 
     // output the user-specified solution vars:
+    stream << "\tVARIABLES = ";
     for (ParameterList::const_iterator iterParam = timePrintParameters_.variableList_.begin() ; iterParam != timePrintParameters_.variableList_.end(); ++iterParam)
     {
       stream << "\" " << (*iterParam).tag() << "\" " << std::endl;
     }
+
+    stream << "DATASETAUXDATA ";
+    stream << getTecplotTimeDateStamp();
+    stream << std::endl;
+    if (!outputManager_.getTempSweepFlag())
+    {
+      stream << "DATASETAUXDATA TEMP = \"" << outputManager_.getCircuitTemp() << " \"" << std::endl;
+    }
   }
 
-  // output some AUXDATA
-  stream << "DATASETAUXDATA ";
-  stream << getTecplotTimeDateStamp();
-  stream << std::endl;
-  stream << "ZONE F=POINT\n";
-
+  stream << "ZONE F=POINT ";
   if (outputManager_.getStepParamVec().empty())
   {
     stream << " T=\"Xyce data\" ";
@@ -1979,16 +2030,26 @@ void HBTecPlot::tecplotTimeHBHeader( ostream & stream)
     stream << " T= \" ";
     for (iterParam=firstParam;iterParam!=lastParam;++iterParam)
     {
-      int tecplotHeaderPrecision_ = 2;
-      stream.setf(ios::scientific);
-      stream.precision( tecplotHeaderPrecision_);
       stream << " " << iterParam->name << " = ";
       stream << iterParam->currentVal;
     }
     stream << "\" ";
   }
-
   stream << std::endl;
+
+  // put in the various sweep parameters as auxdata:
+  if (!outputManager_.getStepParamVec().empty()) {
+    for (std::vector<N_ANP_SweepParam>::const_iterator iterParam = outputManager_.getStepParamVec().begin(); iterParam != outputManager_.getStepParamVec().end(); ++iterParam)
+    {
+      // convert any ":" or "%" in the name to a "_", so as not to confuse tecplot.
+      std::string tmpName(iterParam->name);
+      replace(tmpName.begin(), tmpName.end(), '%', '_');
+      replace(tmpName.begin(), tmpName.end(), ':', '_');
+      stream << "AUXDATA " << tmpName << " = " << "\" " << iterParam->currentVal << "\" ";
+    }
+    stream << std::endl;
+  }
+
   stream << flush;
 }
 
@@ -2632,27 +2693,10 @@ void HomotopyTecPlot::doOutputHeader(const std::vector<std::string> & parameter_
   ParameterList::const_iterator iterParam = printParameters_.variableList_.begin();
   ParameterList::const_iterator last = printParameters_.variableList_.end();
 
-
-  while ( iterParam != last && iterParam->tag() != "I" &&
-          iterParam->tag() != "V" &&
-          iterParam->tag() != "VSTART" &&
-          !(iterParam->hasExpressionTag()))
-  {
-    ++iterParam;
-  }
-
   if (stepCount_ == 0)
   {
     (*outStreamPtr_) << " TITLE = \" Xyce homotopy data, " << outputManager_.getNetListFilename() << "\", " << std::endl;
     (*outStreamPtr_) << "\tVARIABLES = ";
-    if (!outputManager_.getNoIndex())
-    {
-      (*outStreamPtr_) << "\"Index \" " << std::endl;
-    }
-    if (printParameters_.printType_ == PrintType::TRAN)
-    {
-      (*outStreamPtr_) << "\"TIME \" " << std::endl;
-    }
 
     // output the continuation parameters:
     std::vector<std::string>::const_iterator iter_name;
@@ -2667,9 +2711,12 @@ void HomotopyTecPlot::doOutputHeader(const std::vector<std::string> & parameter_
     // output the user-specified solution vars:
     while (iterParam != printParameters_.variableList_.end())
     {
-      (*outStreamPtr_) << "\" ";
-      (*outStreamPtr_) << (*iterParam).tag();
-      (*outStreamPtr_) << "\" " << std::endl;
+      if ( !((*iterParam).getSimContext() == TIME_VAR) )
+      {
+        (*outStreamPtr_) << "\" ";
+        (*outStreamPtr_) << (*iterParam).tag();
+        (*outStreamPtr_) << "\" " << std::endl;
+      }
       ++iterParam;
     }
   }
@@ -2707,8 +2754,6 @@ void HomotopyTecPlot::doOutputHeader(const std::vector<std::string> & parameter_
   (*outStreamPtr_) << std::endl;
   (*outStreamPtr_) << flush;
 
-
-  (*outStreamPtr_) << flush;
 
   outStreamPtr_->setf(ios::scientific);
   outStreamPtr_->precision(printParameters_.streamPrecision_);
@@ -2748,23 +2793,11 @@ void HomotopyTecPlot::doOutputHomotopy(const std::vector<std::string> & paramete
       outStreamPtr_->width(8);
     else
       outStreamPtr_->width(0);
-    (*outStreamPtr_) << index_++;
 
     if (printParameters_.delimiter_ == "")
       outStreamPtr_->width(printParameters_.streamWidth_);
 
-    if (printParameters_.printType_ == PrintType::TRAN)
-    {
-      // Output a TAB.
-      if (printParameters_.delimiter_ != "")
-        (*outStreamPtr_) << printParameters_.delimiter_;
-      (*outStreamPtr_) << tmpTime;
-    }
-
-    //-------------------------------------
-    //HOMOTOPY PARAM VALUE OUTPUT GOES HERE
-    //-------------------------------------
-
+    // Output homotopy params
     for (int iparam=0;iparam < parameter_values.size(); ++iparam)
     {
 
@@ -2781,6 +2814,7 @@ void HomotopyTecPlot::doOutputHomotopy(const std::vector<std::string> & paramete
     }
   } // procID
 
+  // output user-requested variables
   ParameterList::const_iterator iterParam = printParameters_.variableList_.begin();
   ParameterList::const_iterator last = printParameters_.variableList_.end();
 
@@ -2803,21 +2837,23 @@ void HomotopyTecPlot::doOutputHomotopy(const std::vector<std::string> & paramete
   {
     double result;
     result = 0.0;
-    result = outputManager_.getPrintValue(iterParam, solution_vector);
-
-    if (outputManager_.getProcID() == 0)
+    if ( !((*iterParam).getSimContext() == TIME_VAR) )
     {
-      if (printParameters_.delimiter_ == "")
-        outStreamPtr_->width(printParameters_.streamWidth_);
-      else
-      {
-        outStreamPtr_->width(0);
-        if (printParameters_.delimiter_ != "")
-          (*outStreamPtr_) << printParameters_.delimiter_;
-      }
-      (*outStreamPtr_) << result;
-    }
+      result = outputManager_.getPrintValue(iterParam, solution_vector);
 
+      if (outputManager_.getProcID() == 0)
+      {
+        if (printParameters_.delimiter_ == "")
+          outStreamPtr_->width(printParameters_.streamWidth_);
+        else
+        {
+          outStreamPtr_->width(0);
+          if (printParameters_.delimiter_ != "")
+            (*outStreamPtr_) << printParameters_.delimiter_;
+        }
+        (*outStreamPtr_) << result;
+      }
+    }
     outputManager_.getCommPtr()->barrier();
   }
 
@@ -6314,28 +6350,41 @@ namespace { // <unnamed>
 //-----------------------------------------------------------------------------
 void tecplotFreqHeader(OutputMgr &output_manager, const PrintParameters &print_parameters, std::ostream &os, int counter)
 {
+
+  int tecplotHeaderPrecision_ = 2;
+  os.setf(ios::scientific);
+  os.precision( tecplotHeaderPrecision_);
+
   if (counter == 0)
   {
     os << " TITLE = \" Xyce Frequency Domain data, " << output_manager.getNetListFilename() << "\", " << std::endl;
-    os << "\tVARIABLES = \"FREQ \" " << std::endl;
+    os << "\tVARIABLES = ";
 
     // output the user-specified solution vars:
     for (ParameterList::const_iterator iterParam = print_parameters.variableList_.begin() ; iterParam != print_parameters.variableList_.end(); ++iterParam)
     {
       os << "\" ";
-      os << "Re(" << (*iterParam).tag() << ")";
+      if ( (*iterParam).tag() == "FREQUENCY" )
+      {
+        os << "FREQ";
+      }
+      else
+      {
+        os << (*iterParam).tag() ;
+      }
       os << "\" " << std::endl;
-      os << "\" ";
-      os << "Im(" << (*iterParam).tag() << ")";
-      os << "\" " << std::endl;
+    }
+    os << "DATASETAUXDATA ";
+    os << getTecplotTimeDateStamp();
+    os << std::endl;
+    if (!output_manager.getTempSweepFlag())
+    {
+      os << "DATASETAUXDATA TEMP = \"" << output_manager.getCircuitTemp() << " \"" << std::endl;
     }
   }
 
   // output some AUXDATA
-  os << "DATASETAUXDATA ";
-  os << getTecplotTimeDateStamp();
-  os << std::endl;
-  os << "ZONE F=POINT\n";
+  os << "ZONE F=POINT ";
 
   if (output_manager.getStepParamVec().empty())
   {
@@ -6350,16 +6399,27 @@ void tecplotFreqHeader(OutputMgr &output_manager, const PrintParameters &print_p
     os << " T= \" ";
     for (iterParam=firstParam;iterParam!=lastParam;++iterParam)
     {
-      int tecplotHeaderPrecision_ = 2;
-      os.setf(ios::scientific);
-      os.precision( tecplotHeaderPrecision_);
       os << " " << iterParam->name << " = ";
       os << iterParam->currentVal;
     }
     os << "\" ";
   }
-
   os << std::endl;
+
+  // put in the various sweep parameters as auxdata:
+  if (!output_manager.getStepParamVec().empty()) {
+    for (std::vector<N_ANP_SweepParam>::const_iterator iterParam = output_manager.getStepParamVec().begin(); iterParam != output_manager.getStepParamVec().end(); ++iterParam)
+    {
+      // convert any ":" or "%" in the name to a "_", so as not to confuse tecplot.
+      std::string tmpName(iterParam->name);
+      replace(tmpName.begin(), tmpName.end(), '%', '_');
+      replace(tmpName.begin(), tmpName.end(), ':', '_');
+      os << "AUXDATA " << tmpName << " = " << "\" " << iterParam->currentVal << "\" ";
+    }
+    os << std::endl;
+  }
+
+  os << flush;
 }
 
 std::ostream &printHeader(std::ostream &os, const PrintParameters &print_parameters)

@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.6.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
-// Current Owner  : $Author: tvrusso $
+// Revision Number: $Revision: 1.6.2.3 $
+// Revision Date  : $Date: 2013/12/03 23:30:11 $
+// Current Owner  : $Author: rlschie $
 //-----------------------------------------------------------------------------
 
 #ifndef Xyce_N_IO_MeasureRiseFallDelay_h
@@ -68,23 +68,29 @@ public:
   double getMeasureResult();
 
 private:
-  bool trigHistoryNeeded_;
-  bool targHistoryNeeded_;
+  bool trigVariableLengthHistoryNeeded_;
+  bool targVariableLengthHistoryNeeded_;
   double trigMax_;
   double targMax_;
   int trigResultIndex_;
   int targResultIndex_;
   double timeForTrig_;
   double timeForTarg_;
+  bool trigMaxChanged_;
+  bool targMaxChanged_;
+  bool timeForTrigFound_;
+  bool timeForTargFound_;
+  bool trigOutputValueTargetChanged_;
+  bool targOutputValueTargetChanged_;
   int numOutVars_;
-  vector<double> outVarValues_;
+  std::vector<double> outVarValues_;
   // these are vectors to store history information.
   // we need two independent var vectors because we will
   // trim the vectors dynamically to keep down on memory use
-  vector<double> trigIndepVarHistory_; // usually time
-  vector<double> trigVarHistory_;      // the trigger history
-  vector<double> targIndepVarHistory_; // usually time
-  vector<double> targetVarHistory_;    // the target history
+  std::vector<double> trigIndepVarHistory_; // usually time
+  std::vector<double> trigVarHistory_;      // the trigger history
+  std::vector<double> targIndepVarHistory_; // usually time
+  std::vector<double> targetVarHistory_;    // the target history
 
 };
 

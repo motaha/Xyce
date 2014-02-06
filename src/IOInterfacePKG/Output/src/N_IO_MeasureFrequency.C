@@ -31,9 +31,9 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.3.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
-// Current Owner  : $Author: tvrusso $
+// Revision Number: $Revision: 1.3.2.3 $
+// Revision Date  : $Date: 2013/12/03 23:30:12 $
+// Current Owner  : $Author: rlschie $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
@@ -96,7 +96,7 @@ N_IO_MeasureFrequency::N_IO_MeasureFrequency( const N_UTL_OptionBlock & measureB
 //-----------------------------------------------------------------------------
 void N_IO_MeasureFrequency::updateTran( const double circuitTime, RCP< N_LAS_Vector > solnVecRCP)
 {
-  if( !calculationDone_ && withinTransientWindow( circuitTime ) )
+  if( !calculationDone_ && (withinTransientWindow( circuitTime ) || withinFromToWindow( circuitTime )) )
   {
     // we're in the transient window, now we need to calculate the value of this
     // measure and see if it triggers any specified rise, fall, cross windowing.

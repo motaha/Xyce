@@ -12,8 +12,8 @@
         Revision Information:                                         
         ====================-                                         
                                                                       
-        Revision Number: $Revision: 1.64 $                            
-        Revision Date:   $Date: 2013/04/25 16:08:46 $                 
+        Revision Number: $Revision: 1.64.2.1 $                            
+        Revision Date:   $Date: 2013/10/07 21:16:16 $                 
         Current Owner:   $Author: tvrusso $                           
                                                                       
    =================================================================- 
@@ -1467,7 +1467,7 @@
     </admst:when>
       
     <admst:otherwise>
-      <admst:fatal format="%(datatypename): adms element not implemented\n"/>
+      <admst:fatal format="%(datatypename): adms element not implemented\n"/> 
     </admst:otherwise>
   </admst:choose>
 

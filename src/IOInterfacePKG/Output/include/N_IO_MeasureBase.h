@@ -36,11 +36,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.13.2.2 $
+// Revision Number: $Revision: 1.13.2.3 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:40 $
+// Revision Date  : $Date: 2013/12/03 23:30:11 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: rlschie $
 //-----------------------------------------------------------------------------
 
 #ifndef Xyce_N_IO_MeasureBase_h
@@ -93,6 +93,8 @@ public:
   bool withinFromToWindow( double time );
   bool withinMinMaxThreash( double value);
 
+  void updateOutputVars(std::vector<double> & outputVarVec, const double circuitTime, RCP< N_LAS_Vector > solnVecRCP);
+  
   // used to call the output manager's getPrintValue()
   double getOutputValue(list<N_UTL_Param>::iterator & paramListIt, RCP< N_LAS_Vector > solnVecRCP);
 
@@ -142,6 +144,7 @@ public:
   // many controls on how the measure calculation is done are set via keyword=val
   // we'll parse those out and hold them in the base class:
   double td_;
+  bool tdGiven_;
   double goal_;
   double weight_;
   double minval_;
@@ -182,6 +185,10 @@ public:
   // circuit so they are of the type N_UTL_Param
   N_UTL_Param trig_;
   N_UTL_Param targ_;
+  double trigOutputValueTarget_;
+  bool trigOutputValueTargetGiven_;
+  double targOutputValueTarget_;
+  bool targOutputValueTargetGiven_;
   double trigFracMax_;  // fraction of the maxima for the trigger value
   bool trigFracMaxGiven_;
   double targFracMax_;  // fraction of the maxima for the target value

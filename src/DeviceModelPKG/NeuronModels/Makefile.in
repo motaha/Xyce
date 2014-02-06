@@ -79,7 +79,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-subdir = src/DeviceModelPKG/AD
+subdir = src/DeviceModelPKG/NeuronModels
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/config/depcomp
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -107,8 +107,8 @@ CONFIG_HEADER = $(top_builddir)/src/Xyce_config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
-libAD_la_LIBADD =
-am_libAD_la_OBJECTS = N_DEV_Neuron.lo N_DEV_Neuron2.lo \
+libNeuronModels_la_LIBADD =
+am_libNeuronModels_la_OBJECTS = N_DEV_Neuron.lo N_DEV_Neuron2.lo \
 	N_DEV_Neuron3.lo N_DEV_Neuron4.lo N_DEV_Neuron5.lo \
 	N_DEV_Neuron6.lo N_DEV_Neuron7.lo N_DEV_Neuron8.lo \
 	N_DEV_Neuron9.lo N_DEV_NeuronPop1.lo N_DEV_Synapse.lo \
@@ -116,7 +116,7 @@ am_libAD_la_OBJECTS = N_DEV_Neuron.lo N_DEV_Neuron2.lo \
 	N_DEV_Synapse4.lo N_DEV_MembranePassive.lo \
 	N_DEV_MembraneUserDefined.lo N_DEV_MembraneHH.lo \
 	N_DEV_MembraneCS.lo
-libAD_la_OBJECTS = $(am_libAD_la_OBJECTS)
+libNeuronModels_la_OBJECTS = $(am_libNeuronModels_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -173,8 +173,8 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libAD_la_SOURCES)
-DIST_SOURCES = $(libAD_la_SOURCES)
+SOURCES = $(libNeuronModels_la_SOURCES)
+DIST_SOURCES = $(libNeuronModels_la_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -356,8 +356,8 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CPPFLAGS = @Xyce_INCS@
-noinst_LTLIBRARIES = libAD.la
-libAD_la_SOURCES = \
+noinst_LTLIBRARIES = libNeuronModels.la
+libNeuronModels_la_SOURCES = \
   $(srcdir)/src/N_DEV_Neuron.C \
   $(srcdir)/src/N_DEV_Neuron2.C \
   $(srcdir)/src/N_DEV_Neuron3.C \
@@ -425,9 +425,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__confi
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign src/DeviceModelPKG/AD/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign src/DeviceModelPKG/NeuronModels/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --foreign src/DeviceModelPKG/AD/Makefile
+	  $(AUTOMAKE) --foreign src/DeviceModelPKG/NeuronModels/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -458,8 +458,8 @@ clean-noinstLTLIBRARIES:
 	  rm -f $${locs}; \
 	}
 
-libAD.la: $(libAD_la_OBJECTS) $(libAD_la_DEPENDENCIES) $(EXTRA_libAD_la_DEPENDENCIES) 
-	$(AM_V_CXXLD)$(CXXLINK)  $(libAD_la_OBJECTS) $(libAD_la_LIBADD) $(LIBS)
+libNeuronModels.la: $(libNeuronModels_la_OBJECTS) $(libNeuronModels_la_DEPENDENCIES) $(EXTRA_libNeuronModels_la_DEPENDENCIES) 
+	$(AM_V_CXXLD)$(CXXLINK)  $(libNeuronModels_la_OBJECTS) $(libNeuronModels_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)

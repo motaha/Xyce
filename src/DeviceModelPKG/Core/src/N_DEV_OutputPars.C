@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.4.2.9 $
+// Revision Number: $Revision: 1.4.2.10 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2013/12/08 23:38:51 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -304,6 +304,8 @@ std::ostream &documentParameter(std::ostream &os, const std::string &name, const
     descriptor.getEntry().print(os);
 
   os << " \\\\ \\hline" << endl;
+
+  return os;
 }
 
 } // namespace <unnamed>

@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.66.2.3 $
+// Revision Number: $Revision: 1.66.2.4 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:43 $
+// Revision Date  : $Date: 2014/01/29 18:42:10 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -68,7 +68,7 @@
 
 // ----------   Xyce Includes   ----------
 
-#include <IO_NetlistImportTool.h>
+#include <N_IO_NetlistImportTool.h>
 
 #include <N_IO_DistributionTool.h>
 

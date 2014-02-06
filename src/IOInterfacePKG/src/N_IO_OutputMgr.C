@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.374.2.21 $
+// Revision Number: $Revision: 1.374.2.23 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:43 $
+// Revision Date  : $Date: 2013/12/12 20:59:21 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -863,6 +863,10 @@ bool OutputMgr::registerOutputOptions(const N_UTL_OptionBlock & OB)
       // look for optional time pairs.
       outputIntervalPairs_.clear();
       bool doneWithTimePairs = false;
+
+      // need to point at next parameter
+      ++iterPL;
+
       while ((iterPL != OB.getParams().end()) && !doneWithTimePairs)
       {
         if (iterPL->tag() == "TIME")
@@ -871,6 +875,7 @@ bool OutputMgr::registerOutputOptions(const N_UTL_OptionBlock & OB)
           ++iterPL;
           double iv = iterPL->dVal();
           ++iterPL;
+
           outputIntervalPairs_.push_back(pair<double, double>(t, iv));
         }
         else
@@ -880,20 +885,25 @@ bool OutputMgr::registerOutputOptions(const N_UTL_OptionBlock & OB)
         }
       }
     }
-
     // look for other option tags
-    if (iterPL->tag()=="HDF5FILENAME")
+    else if (iterPL->tag()=="HDF5FILENAME")
+
     {
       hdf5FileNameGiven_=true;
       hdf5FileName_=iterPL->sVal();
+      ++iterPL;
     }
-
-    // look for flag to turn off "End of Xyce(TM) Simulation" line
-    if (iterPL->tag()=="PRINTENDOFSIMLINE")
+    else if (iterPL->tag()=="PRINTENDOFSIMLINE")
     {
+      // look for flag to turn off "End of Xyce(TM) Simulation" line
       printEndOfSimulationLine_=iterPL->bVal();
+      ++iterPL;
     }
-    ++iterPL;
+    else
+    {
+      //silently ignore unrecognized parameters
+      ++iterPL;
+    }
   }
 
   return true;
@@ -3305,6 +3315,18 @@ void OutputMgr::output(
   // Check for temperature:
   circuitTemp_ = devPtr_->getParam("TEMP");
 
+  // call on the measure manager to update any active measures
+  RCP< N_LAS_Vector > solnVecRCP(solnVecPtr, false);
+  if (PRINTType_ == PrintType::TRAN)
+  {
+    measureManager_.updateTranMeasures(circuitTime_, solnVecRCP);
+    fourierManager_.updateFourierData(circuitTime_, solnVecRCP);
+  }
+  else
+  {
+    measureManager_.updateDcMeasures(dcParamVec_, solnVecRCP);
+  }
+
   // Needs to pass skipPrintLineOutput
   if (!skipPrintLineOutput)
   {
@@ -3320,17 +3342,6 @@ void OutputMgr::output(
   }
 #endif // Xyce_USE_HDF5
 
-  // call on the measure manager to update any active measures
-  RCP< N_LAS_Vector > solnVecRCP(solnVecPtr, false);
-  if (PRINTType_ == PrintType::TRAN)
-  {
-    measureManager_.updateTranMeasures(circuitTime_, solnVecRCP);
-    fourierManager_.updateFourierData(circuitTime_, solnVecRCP);
-  }
-  else
-  {
-    measureManager_.updateDcMeasures(dcParamVec_, solnVecRCP);
-  }
 
   // if any variables are needed for a response function
   // save them now.

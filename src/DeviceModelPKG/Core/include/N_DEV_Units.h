@@ -36,11 +36,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.1.4.5 $
+// Revision Number: $Revision: 1.1.4.6 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2013/12/13 23:15:14 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: jcverle $
 //-------------------------------------------------------------------------
 
 #ifndef Xyce_N_DEV_Units_h
@@ -149,6 +149,7 @@ enum ParameterUnit
   U_MHVMH,               // m**(1/2)/V**(1/2)
   U_MOM1,                // m/ohm
   U_MSM1,                // m/s
+  U_MM1SM1,              // 1/m**3/s
   U_MVMH,                // m/V**(1/2)
   U_M2VMH,               // m**2/V**(1/2)
   U_M3VMH,               // m**2/V**(1/2)
@@ -174,6 +175,8 @@ enum ParameterUnit
   U_OHMMICRONM2,         // Ohm*micron*m**2
   U_OHMM,		 // Ohm*m
   U_OHMMM1,              // Ohm/m
+  U_OHMMM2,              // Ohm/m**2
+  U_OHMMMALPHA,          // Ohm*m**(2-3*alpha)
   U_OHMM1,               // 1/Ohm
   U_OHMM1MM1,            // 1/(Ohm*m)
   U_OHMM1MM2,		 // 1/(Ohm*m**2)

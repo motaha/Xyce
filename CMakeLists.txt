@@ -395,9 +395,9 @@ if ( Xyce_SUPERLUDIST )
 endif ( Xyce_SUPERLUDIST )
 
 if ( Xyce_UMFPACK )
-#  XYCE_FIND_OPTIONAL_LIBRARY (suitesparseconfig)
-#  XYCE_FIND_OPTIONAL_LIBRARY ( colamd )
-#  XYCE_FIND_OPTIONAL_LIBRARY ( cholmod )
+  XYCE_FIND_OPTIONAL_LIBRARY (suitesparseconfig)
+  XYCE_FIND_OPTIONAL_LIBRARY ( colamd )
+  XYCE_FIND_OPTIONAL_LIBRARY ( cholmod )
   XYCE_FIND_LIBRARY ( umfpack )
 endif ( Xyce_UMFPACK )
 

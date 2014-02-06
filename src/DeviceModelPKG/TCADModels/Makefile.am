@@ -1,9 +1,9 @@
 
 AM_CPPFLAGS = @Xyce_INCS@
 
-noinst_LTLIBRARIES = libPDE.la
+noinst_LTLIBRARIES = libTCADModels.la
 
-libPDE_la_SOURCES = \
+libTCADModels_la_SOURCES = \
   $(srcdir)/src/N_DEV_PDEMeshContainer.C \
   $(srcdir)/src/N_DEV_PDE_2DMesh.C \
   $(srcdir)/src/N_DEV_PDE_Electrode.C \

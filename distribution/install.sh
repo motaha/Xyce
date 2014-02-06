@@ -241,7 +241,7 @@ echo "LOCDIR=\"\$( cd \"\$( dirname \"\$0\" )\"/.. && pwd )\"" >> $XYCESTART
 # set lib env vars
 case $0 in 
 
-  *Linux* )
+  *Linux*|*RHEL6* )
     echo "export LD_LIBRARY_PATH=\"\$LOCDIR/lib:\$LD_LIBRARY_PATH\"" >> "$XYCESTART"
   ;;
 

@@ -485,8 +485,10 @@ XYCESOURCES = \
 XYCELINK_BASE = \
   $(top_builddir)/src/CircuitPKG/libCircuit.la \
   $(top_builddir)/src/DeviceModelPKG/libDeviceModel.la \
-  $(top_builddir)/src/DeviceModelPKG/PDESC/libPDE.la \
-  $(top_builddir)/src/DeviceModelPKG/AD/libAD.la \
+  $(top_builddir)/src/DeviceModelPKG/Core/libDeviceCore.la \
+  $(top_builddir)/src/DeviceModelPKG/OpenModels/libOpenModels.la \
+  $(top_builddir)/src/DeviceModelPKG/TCADModels/libTCADModels.la \
+  $(top_builddir)/src/DeviceModelPKG/NeuronModels/libNeuronModels.la \
   $(top_builddir)/src/DeviceModelPKG/ADMS/libADMS.la \
   $(top_builddir)/src/ErrorHandlingPKG/libErrorHandling.la \
   $(top_builddir)/src/IOInterfacePKG/libIOInterface.la \
@@ -546,8 +548,8 @@ include_HEADERS = \
   $(srcdir)/UtilityPKG/include/N_UTL_Misc.h \
   $(srcdir)/UtilityPKG/include/N_UTL_fwd.h \
   $(srcdir)/ParallelDistPKG/include/N_PDS_Manager.h \
-  $(srcdir)/DeviceModelPKG/include/N_DEV_ExternalSimulationData.h \
-  $(srcdir)/DeviceModelPKG/include/N_DEV_fwd.h \
+  $(srcdir)/DeviceModelPKG/Core/include/N_DEV_ExternalSimulationData.h \
+  $(srcdir)/DeviceModelPKG/Core/include/N_DEV_fwd.h \
   $(srcdir)/TimeIntegrationPKG/include/N_TIA_TwoLevelError.h \
   $(top_builddir)/src/Xyce_config.h
 

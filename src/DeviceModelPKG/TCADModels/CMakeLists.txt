@@ -2,7 +2,7 @@
 # -- process files for this library ------------------------------------------
 
 # class source list
-set ( PDE_SOURCES  
+set ( TCADModels_SOURCES  
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_2DPDE_DAE.C 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_2DPDE_Output.C 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_2DPDEInstance.C 
@@ -32,5 +32,5 @@ set ( XYCE_INCLUDE_DIRECTORIES ${XYCE_INCLUDE_DIRECTORIES}
 
 # -- build requested libraries -----------------------------------------------
 set ( XYCE_PACKAGE_LIBRARIES ${XYCE_PACKAGE_LIBRARIES} 
-      PDE 
+      TCADModels 
       CACHE INTERNAL "X_L" )

@@ -116,6 +116,7 @@ public:
   void getDdtVals (vector<double> &);
   void setDdtDerivs (vector<double> &);
   int num_vars ();
+  bool isTimeDependent() const;
 #ifdef Xyce_DEBUG_EXPRESSION
   void dumpParseTree();
 #endif

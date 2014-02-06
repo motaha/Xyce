@@ -79,7 +79,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-subdir = src/DeviceModelPKG/PDESC
+subdir = src/DeviceModelPKG/TCADModels
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/config/depcomp
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -107,15 +107,16 @@ CONFIG_HEADER = $(top_builddir)/src/Xyce_config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
-libPDE_la_LIBADD =
-am_libPDE_la_OBJECTS = N_DEV_PDEMeshContainer.lo N_DEV_PDE_2DMesh.lo \
-	N_DEV_PDE_Electrode.lo N_DEV_DiodePDE_DAE.lo \
-	N_DEV_DiodePDEModel.lo N_DEV_DiodePDEInstance.lo \
-	N_DEV_2DPDE_Output.lo N_DEV_2DPDE_DAE.lo N_DEV_2DPDEModel.lo \
-	N_DEV_2DPDEInstance.lo N_DEV_2DPDEParam.lo N_DEV_2DPDESetup.lo \
+libTCADModels_la_LIBADD =
+am_libTCADModels_la_OBJECTS = N_DEV_PDEMeshContainer.lo \
+	N_DEV_PDE_2DMesh.lo N_DEV_PDE_Electrode.lo \
+	N_DEV_DiodePDE_DAE.lo N_DEV_DiodePDEModel.lo \
+	N_DEV_DiodePDEInstance.lo N_DEV_2DPDE_Output.lo \
+	N_DEV_2DPDE_DAE.lo N_DEV_2DPDEModel.lo N_DEV_2DPDEInstance.lo \
+	N_DEV_2DPDEParam.lo N_DEV_2DPDESetup.lo \
 	N_DEV_DevicePDEInstance.lo N_DEV_DopeInfo.lo \
 	N_DEV_MaterialSupport.lo N_DEV_BernouliSupport.lo
-libPDE_la_OBJECTS = $(am_libPDE_la_OBJECTS)
+libTCADModels_la_OBJECTS = $(am_libTCADModels_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -172,8 +173,8 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libPDE_la_SOURCES)
-DIST_SOURCES = $(libPDE_la_SOURCES)
+SOURCES = $(libTCADModels_la_SOURCES)
+DIST_SOURCES = $(libTCADModels_la_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -355,8 +356,8 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CPPFLAGS = @Xyce_INCS@
-noinst_LTLIBRARIES = libPDE.la
-libPDE_la_SOURCES = \
+noinst_LTLIBRARIES = libTCADModels.la
+libTCADModels_la_SOURCES = \
   $(srcdir)/src/N_DEV_PDEMeshContainer.C \
   $(srcdir)/src/N_DEV_PDE_2DMesh.C \
   $(srcdir)/src/N_DEV_PDE_Electrode.C \
@@ -402,9 +403,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__confi
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign src/DeviceModelPKG/PDESC/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign src/DeviceModelPKG/TCADModels/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --foreign src/DeviceModelPKG/PDESC/Makefile
+	  $(AUTOMAKE) --foreign src/DeviceModelPKG/TCADModels/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -435,8 +436,8 @@ clean-noinstLTLIBRARIES:
 	  rm -f $${locs}; \
 	}
 
-libPDE.la: $(libPDE_la_OBJECTS) $(libPDE_la_DEPENDENCIES) $(EXTRA_libPDE_la_DEPENDENCIES) 
-	$(AM_V_CXXLD)$(CXXLINK)  $(libPDE_la_OBJECTS) $(libPDE_la_LIBADD) $(LIBS)
+libTCADModels.la: $(libTCADModels_la_OBJECTS) $(libTCADModels_la_DEPENDENCIES) $(EXTRA_libTCADModels_la_DEPENDENCIES) 
+	$(AM_V_CXXLD)$(CXXLINK)  $(libTCADModels_la_OBJECTS) $(libTCADModels_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)

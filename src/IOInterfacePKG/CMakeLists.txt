@@ -3,7 +3,7 @@
 
 # class source list
 set ( IOInterface_SOURCES
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/IO_NetlistImportTool.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_IO_NetlistImportTool.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_IO_CircuitBlock.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_IO_CircuitContext.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_IO_CircuitMetadata.C

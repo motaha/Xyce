@@ -16,5 +16,6 @@ endif ( CMAKE_HOST_APPLE AND Xyce_Dakota AND NOT Xyce_Dakota50 )
 add_subdirectory ( FFTInterface )
 add_subdirectory ( LinearAlgebraTest )
 add_subdirectory ( XyceAsLibrary )
+add_subdirectory ( XyceUnitTest )
 add_subdirectory ( XygraTestHarnesses )
 

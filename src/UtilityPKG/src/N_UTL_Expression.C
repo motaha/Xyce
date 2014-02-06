@@ -36,11 +36,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.111.4.3 $
+// Revision Number: $Revision: 1.111.4.4 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2013/12/03 23:30:12 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: rlschie $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
@@ -721,6 +721,34 @@ int N_UTL_Expression::num_vars ()
     retVal = expPtr_->num_vars();
   }
   return retVal;
+}
+
+
+//-----------------------------------------------------------------------------
+// Function      : Expression::isTimeDependent
+// Purpose       : Return true if expression is either explicitly or implicitly
+//                 time dependent
+// Special Notes : The ExpressionInternals::isTimeDependent method only returns
+//                 true if the expression is implicitly time dependent.
+//
+//                 It is impossible at this time for indirect time dependence
+//                 through global_params to be detected through this method.
+//
+// Scope         :
+// Creator       : Richard Schiek, SNL
+// Creation Date : 10/07/2013
+//-----------------------------------------------------------------------------
+bool N_UTL_Expression::isTimeDependent() const
+{
+  bool implicitTimeDep = expPtr_->isTimeDepedent();
+  bool explicitTimeDep = false;
+  std::vector<std::string> specials;
+  expPtr_->get_names(XEXP_SPECIAL, specials);
+  if (!specials.empty())
+  {
+    explicitTimeDep=(std::find(specials.begin(), specials.end(), "TIME") != specials.end());
+  }
+  return (implicitTimeDep || explicitTimeDep);
 }
 
 #ifdef Xyce_DEBUG_EXPRESSION

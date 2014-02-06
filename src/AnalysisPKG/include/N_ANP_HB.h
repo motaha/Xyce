@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.10.2.3 $
-// Revision Date  : $Date: 2013/10/03 17:23:30 $
-// Current Owner  : $Author: tvrusso $
+// Revision Number: $Revision: 1.10.2.4 $
+// Revision Date  : $Date: 2013/12/19 01:07:14 $
+// Current Owner  : $Author: tmei $
 //-----------------------------------------------------------------------------
 
 #ifndef Xyce_N_ANP_HB_h
@@ -167,6 +167,9 @@ private:
 
   // Stored copy of transient TIAParams
   N_TIA_TIAParams tiaParams_;
+
+  // Transient assisted HB.
+  int taHB_;
 
   // HB loader, builder, and system
   Teuchos::RCP<N_LOA_HBLoader> hbLoaderPtr_;

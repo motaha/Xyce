@@ -31,9 +31,9 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.15.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
-// Current Owner  : $Author: tvrusso $
+// Revision Number: $Revision: 1.15.2.3 $
+// Revision Date  : $Date: 2013/12/03 23:30:12 $
+// Current Owner  : $Author: rlschie $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
@@ -58,6 +58,7 @@ N_IO_MeasureBase::N_IO_MeasureBase( const N_UTL_OptionBlock & measureBlock,  N_I
  type_(""),
  typeSupported_(false),
  td_(0.0),
+ tdGiven_(false),
  goal_(0.0),
  weight_(0.0),
  minval_(1.0e-12),
@@ -91,6 +92,10 @@ N_IO_MeasureBase::N_IO_MeasureBase( const N_UTL_OptionBlock & measureBlock,  N_I
  fractionToExtremaGiven_(false),
  numFreq_(10),
  gridSize_(200),
+ trigOutputValueTarget_(0.0),
+ trigOutputValueTargetGiven_(false),
+ targOutputValueTarget_(0.0),
+ targOutputValueTargetGiven_(false),
  trigFracMax_(0.0),
  trigFracMaxGiven_(false),
  targFracMax_(0.0),
@@ -152,6 +157,7 @@ N_IO_MeasureBase::N_IO_MeasureBase( const N_UTL_OptionBlock & measureBlock,  N_I
     else if( tag == "TD" )
     {
       td_ = currentParamIt->dVal();
+      tdGiven_ = true;
     }
     else if( tag == "GOAL" )
     {
@@ -300,6 +306,18 @@ N_IO_MeasureBase::N_IO_MeasureBase( const N_UTL_OptionBlock & measureBlock,  N_I
         outputValueTarget_ = currentParamIt->dVal();
       }
       outputValueTargetGiven_ = true;
+      if( inTrigBlock )
+      {
+        trigOutputValueTarget_ = outputValueTarget_;
+        trigOutputValueTargetGiven_ = true;
+        outputValueTargetGiven_ = false;
+      }
+      else if( inTargBlock )
+      {
+        targOutputValueTarget_ = outputValueTarget_;
+        targOutputValueTargetGiven_ = true;
+        outputValueTargetGiven_ = false;
+      }
     }
     else if( tag == "ON" )
     {
@@ -439,6 +457,46 @@ bool N_IO_MeasureBase::withinMinMaxThreash( double value)
 
   return returnValue;
 }
+
+
+
+//-----------------------------------------------------------------------------
+// Function      : MeasureBase::updateOutputVars
+// Purpose       : Call's the OutputMgr's getPrintValue() function to update 
+//                 the objects in std::list<N_UTL_Param> outputVars_;
+// Special Notes : 
+// Scope         : public
+// Creator       : Richard Schiek, Electrical and Microsystem Modeling
+// Creation Date : 11/01/2013
+//-----------------------------------------------------------------------------
+void N_IO_MeasureBase::updateOutputVars(std::vector<double> & outputVarVec, const double circuitTime, RCP< N_LAS_Vector > solnVecRCP)
+{
+
+  std::list<N_UTL_Param>::iterator currentParamIt = outputVars_.begin();
+  int vecIndex = 0;
+  while( currentParamIt != outputVars_.end() )
+  {
+    if( currentParamIt->getSimContext() == UNDEFINED )
+    {
+      // call set param context
+      outputManager_.setParamContextType_( currentParamIt );
+    }
+    
+    if( currentParamIt->getSimContext() == NODE_OR_DEVICE_NAME )
+    {
+      // delete any unneeded Param objects from the outputVars_ list.
+      currentParamIt = outputVars_.erase(currentParamIt); 
+    }
+    else
+    {
+      outputVarVec[ vecIndex ]  = outputManager_.getPrintValue( currentParamIt, solnVecRCP.getRawPtr() );
+      vecIndex++;
+      currentParamIt++;
+    }
+    
+  }
+}
+
 
 //-----------------------------------------------------------------------------
 // Function      : N_IO_MeasureBase::getOutputValue

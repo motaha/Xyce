@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.101.2.2 $
+// Revision Number: $Revision: 1.101.2.3 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2013/12/08 17:50:58 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -242,15 +242,22 @@ N_LAS_MultiVector & N_LAS_MultiVector::operator=( const N_LAS_MultiVector & righ
 {
   if( (oMultiVector_->Map().NumGlobalElements() == right.oMultiVector_->Map().NumGlobalElements())
      && (oMultiVector_->Map().NumMyElements() == right.oMultiVector_->Map().NumMyElements()) )
+  {
     *oMultiVector_ = *right.oMultiVector_;
+  }
+
   if( (aMultiVector_->Map().NumGlobalElements() == right.aMultiVector_->Map().NumGlobalElements())
      && (aMultiVector_->Map().NumMyElements() == right.aMultiVector_->Map().NumMyElements()) )
+  {
     *aMultiVector_ = *right.aMultiVector_;
+  }
   else
+  {
 #ifdef Xyce_VERBOSE_LINEAR
     N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,
 	"MultiVector being assigned with different Mapping\n" );
 #endif
+  }
 
   return *this;
 }

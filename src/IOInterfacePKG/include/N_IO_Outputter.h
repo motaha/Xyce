@@ -37,11 +37,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.9.2.9 $
+// Revision Number: $Revision: 1.9.2.10 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Date  : $Date: 2014/01/10 00:08:15 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: erkeite $
 //-----------------------------------------------------------------------------
 
 #ifndef Xyce_N_IO_Outputter_h
@@ -505,7 +505,6 @@ class FrequencyPrn : public FrequencyInterface
     std::string         outFilename_;
     std::string         suffix_;
     std::ostream *      outStreamPtr_;
-    int                 headerPrintCalls_;
     int                 stepCount_;
 };
 

@@ -247,6 +247,24 @@ case $PLAT in
     cp -v $INTEL_PATH/cce/current/lib/intel64/libirc.so*    $BUILDIR/lib/ 
     cp -v $INTEL_PATH/cce/current/lib/intel64/libintlc.so*  $BUILDIR/lib/ 
   ;;
+
+  Intel64_RHEL6*icc14* )
+    cp -v $MKLROOT/lib/intel64/libmkl_intel_lp64.so*   $BUILDIR/lib/ 
+    cp -v $MKLROOT/lib/intel64/libmkl_intel_thread.so* $BUILDIR/lib/ 
+    cp -v $MKLROOT/lib/intel64/libmkl_core.so*         $BUILDIR/lib/ 
+    cp -v $MKLROOT/lib/intel64/libmkl_def.so*         $BUILDIR/lib/ 
+    cp -v $MKLROOT/lib/intel64/libmkl_mc.so*         $BUILDIR/lib/ 
+
+    cp -v $INTEL_PATH/lib/intel64/libiomp5.so*  $BUILDIR/lib/ 
+    cp -v $INTEL_PATH/lib/intel64/libifport.so*    $BUILDIR/lib/ 
+    cp -v $INTEL_PATH/lib/intel64/libifcoremt.so*  $BUILDIR/lib/ 
+    cp -v $INTEL_PATH/lib/intel64/libimf.so*    $BUILDIR/lib/ 
+    cp -v $INTEL_PATH/lib/intel64/libirc.so*    $BUILDIR/lib/ 
+    cp -v $INTEL_PATH/lib/intel64/libintlc.so*  $BUILDIR/lib/ 
+    cp -v $INTEL_PATH/lib/intel64/libsvml.so*  $BUILDIR/lib/ 
+    cp -v $INTEL_PATH/lib/intel64/libirng.so*  $BUILDIR/lib/ 
+    cp -v $INTEL_PATH/lib/intel64/libcilkrts.so*  $BUILDIR/lib/ 
+  ;;
   
   Intel64_OSX*icc12* )
     cp -v $MKLROOT/lib/libmkl_intel_lp64.dylib     $BUILDIR/lib/ 

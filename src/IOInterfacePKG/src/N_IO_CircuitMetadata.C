@@ -35,11 +35,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.164.2.3 $
+// Revision Number: $Revision: 1.164.2.4 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:43 $
+// Revision Date  : $Date: 2013/12/19 01:07:15 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: tmei $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
@@ -800,6 +800,7 @@ void CircuitMetadata::optionsMetadata()
   optionsParameters.push_back(N_UTL_Param("STARTUPPERIODS", 0));
   optionsParameters.push_back(N_UTL_Param("SAVEICDATA", false));
   optionsParameters.push_back(N_UTL_Param("DEBUGLEVEL", 0));
+  optionsParameters.push_back(N_UTL_Param("TAHB", 1)); 
   optionsMetadata_[string("HBINT")] = optionsParameters;
 
   optionsParameters.clear();

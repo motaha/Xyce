@@ -38,11 +38,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.134.2.4 $
+// Revision Number: $Revision: 1.134.2.5 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:43 $
+// Revision Date  : $Date: 2013/12/03 23:30:12 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: rlschie $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
@@ -2067,7 +2067,6 @@ bool N_IO_OptionBlock::extractMEASUREData()
              numOrTextKeywords.end(), inserter<set<string> >(keywords, keywords.begin()) );
 
   int numFields = parsedLine.size();
-
   if( numFields < 4 )
   {
     string msg("Too few items on .MEASURE line.  Need at lest .MEASURE <mode> <name> <type>");
@@ -2241,9 +2240,9 @@ bool N_IO_OptionBlock::extractMEASUREData()
         {
           nextWord = parsedLine[endPosition].string_;
           nextWord.toUpper();
-          if( keywords.find( nextWord ) != keywords.end() )
+          if( (keywords.find( nextWord ) != keywords.end()) || (typeSet.find( nextWord ) != typeSet.end()) )
           {
-            // found a keyword, so we're at the end of space to
+            // found a keyword or type was found so we're at the end of space to
             // use in finding out_var, out_var, out_var=val or out_var1=out_var2
             endNotFound=false;
           }

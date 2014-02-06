@@ -400,6 +400,7 @@ public:
   void setDdtDerivs (vector<double> &);
   inline ExpressionNode *get_tree() {return tree_;};
   inline int num_vars () {return num_N_+num_I_+num_lead_+num_string_+num_special_+num_var_+num_func_;};
+  bool isTimeDepedent() const {return timeDependent_;};
 #ifdef Xyce_DEBUG_EXPRESSION
   void dumpParseTree();
 #endif

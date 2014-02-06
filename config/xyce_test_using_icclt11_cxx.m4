@@ -8,7 +8,7 @@ ac_cv_cxx_xyce_using_icclt11_cxx,
  AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([[]],[[
 #ifdef __ICC
-#if _ICC < 1100
+#if __ICC < 1100
 #define A 1
 #else
 error intel but later than version 11

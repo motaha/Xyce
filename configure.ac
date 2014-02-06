@@ -6,7 +6,7 @@ dnl ********************************************************************
 dnl Autoconf boilerplate
 dnl Initialize the macros, define the package name, version number and 
 dnl bug reporting address
-AC_INIT(Xyce,R::6.0,erkeite@sandia.gov)
+AC_INIT(Xyce,R::6.0.1,erkeite@sandia.gov)
 
 dnl This is a FILTHY HACK designed to get rid of the troublesome space that
 dnl AC_INIT stuffs into PACKAGE_STRING, and which buggers MPILAM's "hcp" 
@@ -45,7 +45,7 @@ dnl to the configure script generated from it, but in a way that CVS won't
 dnl corrupt in the configure script --- that way you can always tell which
 dnl revision of configure.ac was used to generate a given configure
 
-AC_REVISION($Revision: 1.355.2.11 $)
+AC_REVISION($Revision: 1.355.2.16 $)
 
 dnl Determine a canonicalized system type (e.g. i386-unknown-freebsd4.4)
 AC_CANONICAL_TARGET
@@ -903,7 +903,7 @@ dnl This makes @Xyce_INCS@ be replaced with the full string of -I's needed
 dnl for all packages to compile without problem.
 dnl It is used by setting "INCLUDES = @Xyce_INCS@" in the Makefile.am for
 dnl a package.
-default_INCS="$default_INCS -I\$(top_srcdir)/src/AnalysisPKG/include -I\$(top_srcdir)/src/CircuitPKG/include -I\$(top_srcdir)/src/IOInterfacePKG/include -I\$(top_srcdir)/src/IOInterfacePKG/Output/include -I\$(top_srcdir)/src/DeviceModelPKG/include -I\$(top_srcdir)/src/DeviceModelPKG/PDESC/include -I\$(top_srcdir)/src/DeviceModelPKG/EXTSC/include -I\$(top_srcdir)/src/DeviceModelPKG/AD/include -I\$(top_srcdir)/src/DeviceModelPKG/ADMS/include -I\$(top_srcdir)/src/ErrorHandlingPKG/include -I\$(top_srcdir)/src/LinearAlgebraServicesPKG/include -I\$(top_srcdir)/src/LoaderServicesPKG/include -I\$(top_srcdir)/src/NonlinearSolverPKG/include -I\$(top_srcdir)/src/ParallelDistPKG/include -I\$(top_srcdir)/src/TimeIntegrationPKG/include -I\$(top_srcdir)/src/TopoManagerPKG/include -I\$(top_srcdir)/src/UtilityPKG/include -I\$(top_srcdir)/src/MultiTimePDEPKG/include -I\$(top_srcdir)/src/DakotaLinkPKG/include -I\$(top_builddir)/src"
+default_INCS="$default_INCS -I\$(top_srcdir)/src/AnalysisPKG/include -I\$(top_srcdir)/src/CircuitPKG/include -I\$(top_srcdir)/src/IOInterfacePKG/include -I\$(top_srcdir)/src/IOInterfacePKG/Output/include -I\$(top_srcdir)/src/DeviceModelPKG/include -I\$(top_srcdir)/src/DeviceModelPKG/Core/include -I\$(top_srcdir)/src/DeviceModelPKG/OpenModels/include -I\$(top_srcdir)/src/DeviceModelPKG/TCADModels/include -I\$(top_srcdir)/src/DeviceModelPKG/EXTSC/include -I\$(top_srcdir)/src/DeviceModelPKG/NeuronModels/include -I\$(top_srcdir)/src/DeviceModelPKG/ADMS/include -I\$(top_srcdir)/src/ErrorHandlingPKG/include -I\$(top_srcdir)/src/LinearAlgebraServicesPKG/include -I\$(top_srcdir)/src/LoaderServicesPKG/include -I\$(top_srcdir)/src/NonlinearSolverPKG/include -I\$(top_srcdir)/src/ParallelDistPKG/include -I\$(top_srcdir)/src/TimeIntegrationPKG/include -I\$(top_srcdir)/src/TopoManagerPKG/include -I\$(top_srcdir)/src/UtilityPKG/include -I\$(top_srcdir)/src/MultiTimePDEPKG/include -I\$(top_srcdir)/src/DakotaLinkPKG/include -I\$(top_builddir)/src"
 if test "x$RAD_MODELS" = "xyes"; then
   default_INCS="$default_INCS -I\$(top_srcdir)/src/DeviceModelPKG/SandiaModels/include"
 fi
@@ -1087,8 +1087,10 @@ AC_CONFIG_FILES([Makefile
  src/IOInterfacePKG/Output/Makefile
  src/DakotaLinkPKG/Makefile 
  src/DeviceModelPKG/Makefile 
- src/DeviceModelPKG/PDESC/Makefile 
- src/DeviceModelPKG/AD/Makefile 
+ src/DeviceModelPKG/OpenModels/Makefile 
+ src/DeviceModelPKG/Core/Makefile 
+ src/DeviceModelPKG/TCADModels/Makefile 
+ src/DeviceModelPKG/NeuronModels/Makefile 
  src/DeviceModelPKG/ADMS/Makefile 
  src/DeviceModelPKG/EXTSC/Makefile 
  src/ErrorHandlingPKG/Makefile 
@@ -1104,6 +1106,7 @@ AC_CONFIG_FILES([Makefile
  src/test/XyceAsLibrary/Makefile
  src/test/FFTInterface/Makefile
  src/test/LinearAlgebraTest/Makefile
+ src/test/XyceUnitTest/Makefile
  src/test/XygraTestHarnesses/Makefile
  src/IOInterfacePKG/include/N_IO_XMLPath.h
  distribution/CPackConfig.cmake])

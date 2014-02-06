@@ -344,6 +344,7 @@ SUBDIRS = \
   FFTInterface \
   LinearAlgebraTest \
   XyceAsLibrary \
+  XyceUnitTest \
   XygraTestHarnesses
 
 all: all-recursive

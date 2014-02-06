@@ -1,9 +1,9 @@
 
 AM_CPPFLAGS = @Xyce_INCS@
 
-noinst_LTLIBRARIES = libAD.la
+noinst_LTLIBRARIES = libNeuronModels.la
 
-libAD_la_SOURCES = \
+libNeuronModels_la_SOURCES = \
   $(srcdir)/src/N_DEV_Neuron.C \
   $(srcdir)/src/N_DEV_Neuron2.C \
   $(srcdir)/src/N_DEV_Neuron3.C \

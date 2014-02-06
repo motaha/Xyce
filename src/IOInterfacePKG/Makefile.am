@@ -7,7 +7,7 @@ noinst_LTLIBRARIES = libIOInterface.la
 
 libIOInterface_la_SOURCES = \
   $(srcdir)/src/N_IO_CmdParse.C \
-  $(srcdir)/src/IO_NetlistImportTool.C \
+  $(srcdir)/src/N_IO_NetlistImportTool.C \
   $(srcdir)/src/N_IO_DistributionTool.C \
   $(srcdir)/src/N_IO_OutputMgr.C \
   $(srcdir)/src/N_IO_Outputter.C \
@@ -26,7 +26,7 @@ libIOInterface_la_SOURCES = \
   $(srcdir)/src/N_IO_PkgOptionsMgr.C \
   $(srcdir)/src/N_IO_FourierMgr.C \
   $(srcdir)/include/N_IO_fwd.h \
-  $(srcdir)/include/IO_NetlistImportTool.h \
+  $(srcdir)/include/N_IO_NetlistImportTool.h \
   $(srcdir)/include/N_IO_DistributionTool.h \
   $(srcdir)/include/N_IO_SpiceSeparatedFieldTool.h \
   $(srcdir)/include/N_IO_CircuitMetadata.h \

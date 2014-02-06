@@ -36,11 +36,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.1.4.7 $
+// Revision Number: $Revision: 1.1.4.8 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:39 $
+// Revision Date  : $Date: 2013/12/13 23:15:15 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: jcverle $
 //-------------------------------------------------------------------------
 
 
@@ -82,7 +82,7 @@ UnitInfo unitTable[] =
   U_DEGCM1,          U_INVALID,        "1/(degree C)",           "$^\\circ$C$^{-1}$",
   U_DEGCM2,          U_INVALID,        "1/(degree C)**2",        "$^\\circ$C$^{-2}$",
   U_EV,              U_INVALID,        "eV",                     "eV",
-  U_EVDEGKM1,        U_INVALID,        "eV/(degree K)",          "eV/K",
+  U_EVDEGKM1,        U_INVALID,        "eV/K",                   "eV/K",
   U_FARAD,           U_FARADM,         "F",                      "F",
   U_FARADM,          U_INVALID,        "F*m",                    "Fm",
   U_FARADMM1,        U_FARAD,          "F/m",                    "F/m",
@@ -127,6 +127,7 @@ UnitInfo unitTable[] =
   U_MHVMH,           U_INVALID,        "(m/s)**(1/2)",           "m$^{1/2}$/V$^{1/2}$",
   U_MOM1,            U_M2OM1,          "m/ohm",                  "m/$\\Omega$",
   U_MSM1,            U_M2SM1,          "m/s",                    "m/s",
+  U_MM1SM1,          U_INVALID,        "1/m**3/s",               "m$^{-3}$s$^{-1}$",
   U_MVMH,            U_M2VMH,          "m/V**(1/2)",             "m/V$^{1/2}$",
   U_M2VMH,           U_M3VMH,          "m**2/V**(1/2)",          "m$^{2}$/V$^{1/2}$",
   U_M3VMH,           U_INVALID,        "m**3/V**(1/2)",          "m$^{3}$/V$^{1/2}$",
@@ -152,12 +153,14 @@ UnitInfo unitTable[] =
   U_OHMMICRONM2,     U_INVALID,        "ohm*micron*m**2",        "$\\Omega-\\mu$m-m$^{2}$",
   U_OHMM,            U_INVALID,        "ohm*m",                  "$\\Omega$-m",
   U_OHMMM1,          U_OHM,            "ohm/m",                  "$\\Omega$/m",
+  U_OHMMM2,          U_INVALID,        "ohm/m**2",               "$\\Omega$ m$^{-2}$",
+  U_OHMMMALPHA,      U_INVALID,        "Ohm*m**(2-3*alpha)",     "$\\Omega$ m$^{2-3\\alpha}$",
   U_OHMM1,           U_MOM1,           "1/ohm",                  "$\\Omega^{-1}$",
-  U_OHMM1MM1,           U_MOM1,           "1/(ohm*m)",                  "$\\Omega^{-1}m^{-1}$",
-  U_OHMM1MM2,        U_INVALID,        "1/(ohm*m**2)",           "$1/(Omegam^{2})$",
-  U_OHMPV,           U_INVALID,        "ohm/volt",               "ohm/volt",
+  U_OHMM1MM1,        U_MOM1,           "1/(ohm*m)",              "$\\Omega^{-1}m^{-1}$",
+  U_OHMM1MM2,        U_INVALID,        "1/(ohm*m**2)",           "$\\Omega$ m$^{-2}$",
+  U_OHMPV,           U_INVALID,        "ohm/volt",               "$\\Omega$/V",
   U_OMM1,            U_OHM,            "ohm/m",                  "ohm/m",
-  U_OSQM1,           U_INVALID,        "ohm/square",             "ohm/square",
+  U_OSQM1,           U_INVALID,        "ohm/square",             "$\\Omega$/square",
   U_RAD,             U_INVALID,        "rad",                    "rad",
   U_RADPS,           U_INVALID,        "rad/s",                  "rad/s",
   U_SECOND,          U_INVALID,        "s",                      "s",
@@ -203,11 +206,13 @@ StdDescription descriptionTable[] =
   "TC2",       U_DEGCM2,  CAT_TEMP,    "Quadratic temperature coefficient",
 
   // Radiation parameters
-  "GRORDER",   U_NONE,    CAT_RAD,     "Order of magnitude of radiation generation rate",
+  // JCV Note: 10/28/2013 This really belongs with the pulse parameters as far
+  // as a user is concerned, so I changed the category from CAT_RAD to CAT_RADP.
+  "GRORDER",   U_NONE,    CAT_RADP,     "Order of magnitude of radiation generation rate",
 
   // Pulsedata parameters
   "FUNCTIONTYPE", U_NONE, CAT_RADP,    "Internal function type for pulse (1-6) or user defined (7)",
-  "PULSEDATA", U_NONE,    CAT_RADP,    "Expression (in braces {}) or filename (in quotes \"\") of (Time, Value)"
+  "PULSEDATA", U_NONE,    CAT_RADP,    "Expression (in braces {}) or filename (in quotes \\texttt{\" \"}) of (Time,~Value)"
                                        " pairs to use instead of internal radiation source (functiontype = 7)",
   "PULSEV1",   U_NONE,    CAT_RADP,    "Initial value of radiation pulse (functiontype = 1)",
   "PULSEV2",   U_NONE,    CAT_RADP,    "Maximum value of radiation pulse (functiontype = 1)",

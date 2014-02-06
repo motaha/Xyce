@@ -36,11 +36,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.13.2.5 $
+// Revision Number: $Revision: 1.13.2.6 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2013/12/03 23:30:12 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: rlschie $
 //-------------------------------------------------------------------------
 #include <Xyce_config.h>
 #include <N_UTL_Misc.h>
@@ -172,6 +172,14 @@ double N_UTL_ExpressionData::evaluate (const N_LAS_Vector * solnVecPtr, const N_
       varVals[index] = outputMgrPtr_->getPrintValue( iterCur, solnVecPtr, stateVecPtr, stoVecPtr );
       index++;
       iterCur++;
+    }
+    
+    // STD and DDT are implicitly time dependent.  Check the underlying expression 
+    // for time dependence, and if it is get the current time with getPrgetImmutableValue<int>()
+    // and set it in the underlying expression 
+    if( expPtr->isTimeDependent() )
+    {
+      expPtr->set_sim_time(outputMgrPtr_->getCircuitTime());
     }
 
     // now get expression value and partial derivatives.

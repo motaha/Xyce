@@ -109,7 +109,7 @@ CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libIOInterface_la_LIBADD =
 am_libIOInterface_la_OBJECTS = N_IO_CmdParse.lo \
-	IO_NetlistImportTool.lo N_IO_DistributionTool.lo \
+	N_IO_NetlistImportTool.lo N_IO_DistributionTool.lo \
 	N_IO_OutputMgr.lo N_IO_Outputter.lo N_IO_Objective.lo \
 	N_IO_RestartMgr.lo N_IO_SpiceSeparatedFieldTool.lo \
 	N_IO_CircuitMetadata.lo N_IO_CircuitBlock.lo \
@@ -403,7 +403,7 @@ SUBDIRS = Output
 noinst_LTLIBRARIES = libIOInterface.la
 libIOInterface_la_SOURCES = \
   $(srcdir)/src/N_IO_CmdParse.C \
-  $(srcdir)/src/IO_NetlistImportTool.C \
+  $(srcdir)/src/N_IO_NetlistImportTool.C \
   $(srcdir)/src/N_IO_DistributionTool.C \
   $(srcdir)/src/N_IO_OutputMgr.C \
   $(srcdir)/src/N_IO_Outputter.C \
@@ -422,7 +422,7 @@ libIOInterface_la_SOURCES = \
   $(srcdir)/src/N_IO_PkgOptionsMgr.C \
   $(srcdir)/src/N_IO_FourierMgr.C \
   $(srcdir)/include/N_IO_fwd.h \
-  $(srcdir)/include/IO_NetlistImportTool.h \
+  $(srcdir)/include/N_IO_NetlistImportTool.h \
   $(srcdir)/include/N_IO_DistributionTool.h \
   $(srcdir)/include/N_IO_SpiceSeparatedFieldTool.h \
   $(srcdir)/include/N_IO_CircuitMetadata.h \
@@ -497,7 +497,6 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/IO_NetlistImportTool.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_CircuitBlock.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_CircuitContext.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_CircuitMetadata.Plo@am__quote@
@@ -506,6 +505,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_DistributionTool.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_FourierMgr.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_FunctionBlock.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_NetlistImportTool.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_Objective.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_OptionBlock.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_OutputMgr.Plo@am__quote@
@@ -545,12 +545,12 @@ N_IO_CmdParse.lo: $(srcdir)/src/N_IO_CmdParse.C
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_IO_CmdParse.lo `test -f '$(srcdir)/src/N_IO_CmdParse.C' || echo '$(srcdir)/'`$(srcdir)/src/N_IO_CmdParse.C
 
-IO_NetlistImportTool.lo: $(srcdir)/src/IO_NetlistImportTool.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT IO_NetlistImportTool.lo -MD -MP -MF $(DEPDIR)/IO_NetlistImportTool.Tpo -c -o IO_NetlistImportTool.lo `test -f '$(srcdir)/src/IO_NetlistImportTool.C' || echo '$(srcdir)/'`$(srcdir)/src/IO_NetlistImportTool.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/IO_NetlistImportTool.Tpo $(DEPDIR)/IO_NetlistImportTool.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/IO_NetlistImportTool.C' object='IO_NetlistImportTool.lo' libtool=yes @AMDEPBACKSLASH@
+N_IO_NetlistImportTool.lo: $(srcdir)/src/N_IO_NetlistImportTool.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_IO_NetlistImportTool.lo -MD -MP -MF $(DEPDIR)/N_IO_NetlistImportTool.Tpo -c -o N_IO_NetlistImportTool.lo `test -f '$(srcdir)/src/N_IO_NetlistImportTool.C' || echo '$(srcdir)/'`$(srcdir)/src/N_IO_NetlistImportTool.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_IO_NetlistImportTool.Tpo $(DEPDIR)/N_IO_NetlistImportTool.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_IO_NetlistImportTool.C' object='N_IO_NetlistImportTool.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o IO_NetlistImportTool.lo `test -f '$(srcdir)/src/IO_NetlistImportTool.C' || echo '$(srcdir)/'`$(srcdir)/src/IO_NetlistImportTool.C
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_IO_NetlistImportTool.lo `test -f '$(srcdir)/src/N_IO_NetlistImportTool.C' || echo '$(srcdir)/'`$(srcdir)/src/N_IO_NetlistImportTool.C
 
 N_IO_DistributionTool.lo: $(srcdir)/src/N_IO_DistributionTool.C
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_IO_DistributionTool.lo -MD -MP -MF $(DEPDIR)/N_IO_DistributionTool.Tpo -c -o N_IO_DistributionTool.lo `test -f '$(srcdir)/src/N_IO_DistributionTool.C' || echo '$(srcdir)/'`$(srcdir)/src/N_IO_DistributionTool.C
