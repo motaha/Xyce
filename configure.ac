@@ -6,7 +6,7 @@ dnl ********************************************************************
 dnl Autoconf boilerplate
 dnl Initialize the macros, define the package name, version number and 
 dnl bug reporting address
-AC_INIT(Xyce,R::6.0.1,erkeite@sandia.gov)
+AC_INIT(Xyce,R::6.1,xyce@sandia.gov)
 
 dnl This is a FILTHY HACK designed to get rid of the troublesome space that
 dnl AC_INIT stuffs into PACKAGE_STRING, and which buggers MPILAM's "hcp" 
@@ -25,6 +25,8 @@ AC_CONFIG_MACRO_DIR(config)
 
 # Configure should create Xyce_config.h from Xyce_config.h.in
 AC_CONFIG_HEADERS(src/Xyce_config.h)
+
+AM_SILENT_RULES(no)
 
 # AM_MAINTAINER_MODE turns off maintainer-only makefile targets by
 # default, and changes configure to understand a
@@ -45,13 +47,13 @@ dnl to the configure script generated from it, but in a way that CVS won't
 dnl corrupt in the configure script --- that way you can always tell which
 dnl revision of configure.ac was used to generate a given configure
 
-AC_REVISION($Revision: 1.355.2.16 $)
+AC_REVISION($Revision: 1.377.2.9 $)
 
 dnl Determine a canonicalized system type (e.g. i386-unknown-freebsd4.4)
 AC_CANONICAL_TARGET
 
 dnl Initialize Automake
-AM_INIT_AUTOMAKE([1.10.1 foreign])
+AM_INIT_AUTOMAKE([1.11 foreign])
 
 dnl ********************************************************************
 dnl the autoconfing proper 
@@ -82,76 +84,6 @@ if test "x$ARCH_ROOT" = x; then
  fi
 fi
 
-dnl But let the user override the default
-AC_ARG_WITH(archroot,
-[AS_HELP_STRING([--with-archroot=path], [The root of architecture-dependent local libraries and includes (DEPRECATED)])],
-[ARCH_ROOT=$withval
- AC_MSG_NOTICE([Using $ARCH_ROOT to find platform libraries and includes by user request.  --with-archroot is a deprecated configure option.  Please use "ARCH_ROOT=" instead.])
-]
-)
-
-dnl and let the user completely override the ARCH_ROOT/Xyce_ARCH
-dnl hierarchy
-AC_ARG_WITH(archdir,
-[AS_HELP_STRING([--with-archdir=path], [Where to find include and libs for all external libraries instead of ARCH_ROOT/Xyce_ARCH/ (DEPRECATED)])],
-[ARCHDIR=$withval
- AC_MSG_NOTICE([Using $ARCHDIR/include and $ARCHDIR/lib for locating external libraries and includes by user request.  --with-archdir is a deprecated configure option.  Please use "ARCHDIR=" instead.])
-])
-
-dnl But we can't use ARCH_ROOT to set libraries yet, because we don't
-dnl know if we're doing a serial or parallel build yet.
-dnl so let's process more options
-dnl ********************************************
-dnl These are deprecated, unnecessary options from Tammy Kolda that allowed overriding defaults, but there
-dnl are already built-in methods to do this through autoconf.  Deprecated!
-AC_ARG_WITH(cc,
-[AS_HELP_STRING([--with-cc], [Gives the name of the C compiler to use. (DEPRECATED)])],
-[CC=$withval
-AC_MSG_ERROR([--with-cc is a deprecated configure option.  Please use "CC=" instead.])
-]
-)
-
-AC_ARG_WITH(cxx,
-[AS_HELP_STRING([--with-cxx], [Gives the name of the C++ compiler to use. (DEPRECATED)])],
-[CXX=$withval
-AC_MSG_ERROR([--with-cxx is a deprecated configure option.  Please use "CXX=" instead.])
-]
-)
-
-AC_ARG_WITH(f77,
-[AS_HELP_STRING([--with-f77], [Gives the name of the fortran compiler to use. (DEPRECATED)])],
-[F77=$withval
-AC_MSG_ERROR([--with-f77 is a deprecated configure option.  Please use "F77=" instead.])
-]
-)
-
-AC_ARG_WITH(include,
-[AS_HELP_STRING([--with-include], [Specifies include directories ("-Idir1 -Idir2 ...") (DEPRECATED)])],
-[
-XTRAINC=$withval
-AC_MSG_ERROR([Using extra include directories: $withval.   --with-include is a deprecated configure option.  Please use "CPPFLAGS=" instead.])
-]
-)
-
-AC_ARG_WITH(libs,
-[AS_HELP_STRING([--with-libs], [Specifies libraries ("-Ldir -llib ...") (DEPRECATED)])],
-[
-XTRALIBS=$withval
-AC_MSG_ERROR([Using extra libraries: $withval.  --with-libs is a deprecated configure option.  Please use "LIBS=" instead.])
-]
-)
-
-AC_ARG_WITH(flags,
-[AS_HELP_STRING([--with-flags], [Specifies flags ("-Dflag1 -Dflag2 ...") (DEPRECATED)])],
-[
-XTRAFLAGS=$withval
-AC_MSG_ERROR([Using extra flags: $withval.  --with-flags is a deprecated configure option.  Please use "CPPFLAGS" instead.])
-]
-)
-
-dnl ********************************************
-
-
 dnl ********************************************
 dnl Check to see if the executable is disabled.
 dnl RPP: 03/15/2006 - For Xyce/Charon coupling,
@@ -171,9 +103,50 @@ else
   AC_MSG_RESULT(no)
 fi
 
+AC_ARG_ENABLE(xyce-shareable,
+[AS_HELP_STRING([--enable-xyce-shareable],[enables building of the shareable xyce executable. (Default is to build the non-shareable)])],
+[ENABLE_XYCE_SHAREABLE=$enableval],
+[ENABLE_XYCE_SHAREABLE=no]
+)
+
+AC_MSG_CHECKING(whether to build xyce shareable)
+if test "X$ENABLE_XYCE_SHAREABLE" != "Xno"; then
+  AC_MSG_RESULT(yes)
+else
+  AC_MSG_RESULT(no)
+fi
+
+AM_CONDITIONAL(BUILD_XYCE_SHAREABLE, test "X$ENABLE_XYCE_SHAREABLE" != "Xno")
+
+# --enable-user-plugin means that "make all" will build the plugin if
+# we have --enable-xyce-shareable, and make install will install it.
+# Without it, the user has to do "make plugin" and "make install-plugin"
+
+MAYBE_PLUGIN=""
+AC_ARG_ENABLE(user-plugin,
+[AS_HELP_STRING([--enable-user-plugin],[enables building of the demo verilog plug-in as part of "make all" when doing shared executable build. You must have ADMS installed for this to work. (Default is only to build the plugin with "make plugin")])],
+[MAYBE_PLUGIN="user_plugin"],
+[MAYBE_PLUGIN=""]
+)
+AC_SUBST([MAYBE_PLUGIN])
+
+
+
 AM_CONDITIONAL(BUILD_XYCE_BINARY, test "X$ENABLE_XYCE_BINARY" != "Xno")
 dnl ********************************************
 
+dnl ********************************************
+dnl Here we determine whether we're doing a threaded build
+AC_ARG_ENABLE(thread-safe-logging, AC_HELP_STRING([--enable-thread-safe-logging], 
+                                      [enable thread safe logging for one Xyce per thread runs (default is no)]), 
+                                      ac_enable_threads=$enableval, 
+                                      ac_enable_threads=no) 
+if test "$ac_enable_threads" = yes; then 
+  AC_DEFINE(USE_THREADS, 1, [use threads]) 
+fi
+
+AM_CONDITIONAL(THREADS, test $ac_enable_threads = yes) 
+dnl ********************************************
 
 dnl ********************************************
 dnl Here we determine whether we're doing a parallel build or not
@@ -189,14 +162,6 @@ fi
 
 #Lastly, we allow the user to completely override our choice of Xyce_ARCH
 # if need be.
-
-AC_ARG_WITH(xyce_arch,
-[AS_HELP_STRING([--with-xyce_arch], [specifies which subdirectory of ARCH_ROOT to use for default locations of many packages (DEPRECATED)])],
-[
-  Xyce_ARCH=$withval
-  AC_MSG_NOTICE([Using Xyce_ARCH: $withval.  --with-xyce_arch is a deprecated configure option.  Please use "Xyce_ARCH=" instead.])
-]
-)
 
 dnl And now we know precisely what build we're doing, so maybe we can use
 dnl ARCH_ROOT
@@ -220,12 +185,12 @@ XYCE_DEBUG_OPTION(verbose_nox,no,[verbosity in NOX nonlinear solver library])
 XYCE_DEBUG_OPTION(verbose_linear,no,[verbosity in linear solver])
 XYCE_DEBUG_OPTION(spice_norms,yes,[using SPICE type norms])
 XYCE_DEBUG_OPTION(adaptive_solve,no,[adaptive iterative linear solvers])
-XYCE_DEBUG_OPTION(bsim3_const,no,[using constants from BSIM3],Xyce_USE_BSIM3_CONST)
+XYCE_DEBUG_OPTION(bsim3_const,no,[using constants from BSIM3 instead of more precise constants consistent with other devices],Xyce_USE_BSIM3_CONST)
 XYCE_DEBUG_OPTION(nox_use_vector_copy,yes,[using vector copies in NOX])
-XYCE_DEBUG_OPTION(sensitivity,no,[sensitivity capability],Xyce_SENSITIVITY_ENABLE, SENSITIVITY_ENABLE)
+XYCE_DEBUG_OPTION(sensitivity,no,[device sensitivity capability],Xyce_SENSITIVITY_ENABLE, SENSITIVITY_ENABLE)
 
 dnl optionally compile in support for external device support
-XYCE_DEBUG_OPTION(extdev,yes,[extdev extensions],Xyce_EXTDEV,USE_EXTDEV)
+XYCE_DEBUG_OPTION(extdev,yes,["external device" extensions],Xyce_EXTDEV,USE_EXTDEV)
 AM_CONDITIONAL(EXTDEV,test $USE_EXTDEV = yes)
 
 dnl optionally compile in support for rad models if the directory is there and
@@ -266,19 +231,12 @@ dnl For the LHS package in Dakota we need to link in a Dakota object file as wel
 dnl the dakota libraries.  
 AM_CONDITIONAL(DAKOTA_OBJ_NEEDED, test $USE_DAKOTA = yes )
 
-dnl optionally compile in support for Dakota linkage
-XYCE_DEBUG_OPTION(dakota50,no,[Dakota 5.0 direct linkage support],Xyce_Dakota50, USE_DAKOTA50)
-AM_CONDITIONAL(DAKOTA_LINK, test $USE_DAKOTA50 = yes -o $USE_DAKOTA = yes )
-dnl For the LHS package in Dakota we need to link in a Dakota object file as well as
-dnl the dakota libraries. (duplicating this test until I rip out the old dakota support) 
-AM_CONDITIONAL(DAKOTA_OBJ_NEEDED, test $USE_DAKOTA50 = yes )
-
 dnl optionally compile in support for Charon linkage
 XYCE_DEBUG_OPTION(charon,no,[Charon device support],Xyce_CHARON, USE_CHARON)
 AM_CONDITIONAL(BUILD_CHARON_SUPPORT, test $USE_CHARON = yes)
 
 dnl optionally compile in support for Trilinos Development
-XYCE_DEBUG_OPTION(trilinos_dev,no,[Trilinos development support],Xyce_TRILINOS_DEV, USE_TRILINOS_DEV)
+XYCE_DEBUG_OPTION(trilinos_dev,no,[support for development (pre-release) versions of Trilinos],Xyce_TRILINOS_DEV, USE_TRILINOS_DEV)
 AM_CONDITIONAL(TRILINOS_DEV, test $USE_TRILINOS_DEV = yes)
 
 dnl optionally compile in support for Trilinos Development with Rythmos
@@ -286,8 +244,8 @@ XYCE_DEBUG_OPTION(trilinos_dev_rythmos,no,[Trilinos development support with Ryt
 AM_CONDITIONAL(TRILINOS_DEV_RYTHMOS, test $USE_TRILINOS_DEV_RYTHMOS = yes)
 
 dnl compile in support for partitioning
-XYCE_DEBUG_OPTION(isorropia,yes,[isorropia],Xyce_USE_ISORROPIA,USE_ISORROPIA)
-XYCE_DEBUG_OPTION(zoltan,yes,[zoltan],Xyce_USE_ZOLTAN,USE_ZOLTAN)
+XYCE_DEBUG_OPTION(isorropia,yes,[isorropia partitioning option],Xyce_USE_ISORROPIA,USE_ISORROPIA)
+XYCE_DEBUG_OPTION(zoltan,yes,[zoltan partitioning option],Xyce_USE_ZOLTAN,USE_ZOLTAN)
 
 # This does nothing anymore --- there are no conditionals in the code that
 # need it, nor are there any conditionals in the Makefile.am's
@@ -427,6 +385,7 @@ fi
 
 AC_PROG_MAKE_SET
 AC_PROG_LIBTOOL
+AC_PROG_GREP
 
 dnl *********************************************************************
 dnl KLUDGES:
@@ -478,20 +437,8 @@ if test -d $ARCHDIR/include/trilinos; then
 fi
 
 dnl Include Dakota headers and library paths if asked for Dakota build
-if test "x$USE_DAKOTA50" = "xyes"; then
-  CPPFLAGS="-DXyce_Dakota $CPPFLAGS"
-  if test -d $ARCHDIR/dakota5_0; then
-    DAKOTA_ARCH_DIR="$ARCHDIR/dakota5_0"
-  fi
-  if test -d $ARCHDIR/dakota5_0/include; then
-    default_INCS="$default_INCS -I$ARCHDIR/dakota5_0/include"
-    CPPFLAGS="-I$ARCHDIR/dakota5_0/include $CPPFLAGS"
-  fi
-  if test -d $ARCHDIR/dakota5_0/lib; then
-    LDFLAGS="$LDFLAGS -L$ARCHDIR/dakota5_0/lib"
-  fi
-elif test "x$USE_DAKOTA" = "xyes"; then
-  if test -d $ARCHDIR/dakota5_0; then
+if test "x$USE_DAKOTA" = "xyes"; then
+  if test -d $ARCHDIR/dakota; then
     DAKOTA_ARCH_DIR="$ARCHDIR/dakota"
   fi
   if test -d $ARCHDIR/dakota/include; then
@@ -571,20 +518,22 @@ XYCE_LIBRARY_OPTION(teuchos,[],[],[],[XYCE_TEUCHOS_NOT_FOUND=1])
 # Now look for the new style if we haven't found the old.  Any one of these
 # not being found is a fatal configure error.
 if test $XYCE_TEUCHOS_NOT_FOUND = 1; then
-  XYCE_LIBRARY_OPTION(teuchoscore)
-  XYCE_LIBRARY_OPTION(teuchosremainder)
-  XYCE_LIBRARY_OPTION(teuchosnumerics)
-  XYCE_LIBRARY_OPTION(teuchoscomm)
-  XYCE_LIBRARY_OPTION(teuchosparameterlist)
+  XYCE_TRILINOS_LIBRARY_OPTION(Teuchos, USE_TEUCHOS_MAKEFILE, yes) 
+  if test "x$USE_TEUCHOS_MAKEFILE" = "xno"; then
+    XYCE_LIBRARY_OPTION(teuchoscore)
+    XYCE_LIBRARY_OPTION(teuchosremainder)
+    XYCE_LIBRARY_OPTION(teuchosnumerics)
+    XYCE_LIBRARY_OPTION(teuchoscomm)
+    XYCE_LIBRARY_OPTION(teuchosparameterlist)
+  fi
 fi
-  
-XYCE_LIBRARY_OPTION(triutils)
-XYCE_LIBRARY_OPTION(epetra)
-XYCE_LIBRARY_OPTION(epetraext)
+XYCE_TRILINOS_LIBRARY_OPTION(Triutils, USE_TRIUTILS_MAKEFILE)
+XYCE_TRILINOS_LIBRARY_OPTION(Epetra, USE_EPETRA_MAKEFILE)
+XYCE_TRILINOS_LIBRARY_OPTION(EpetraExt, USE_EPETRAEXT_MAKEFILE)
 
 dnl and if this is a parallel build we (may) need all the Isorropia stuff
 if test "x$USE_MPI" = "xyes" -a "x$USE_ISORROPIA" = "xyes"; then
-  XYCE_LIBRARY_OPTION(isorropia)
+  XYCE_TRILINOS_LIBRARY_OPTION(Isorropia, USE_ISORROPIA_MAKEFILE)
 fi
 
 dnl If the user enabled superludist, let's try to add it here:
@@ -608,90 +557,99 @@ if test "x$SUPERLU" = "xyes"; then
   AC_CHECK_LIB(superlu,dgssvx,[],[AC_MSG_ERROR([FATAL: SuperLU library does not contain dgssvx and this is required by Trilinos.])])
 fi
 
-XYCE_LIBRARY_OPTION(amesos)
-XYCE_LIBRARY_OPTION(trilinoscouplings)
+XYCE_TRILINOS_LIBRARY_OPTION(Amesos, USE_AMESOS_MAKEFILE)
+XYCE_TRILINOS_LIBRARY_OPTION(TrilinosCouplings, USE_TRILINOSCOUPLINGS_MAKEFILE)
 
 dnl If the user enabled ML, let's add it here:
 if test "x$USE_ML" = "xyes"; then 
-  XYCE_LIBRARY_OPTION(ml)
+  XYCE_TRILINOS_LIBRARY_OPTION(ML, USE_ML_MAKEFILE)
 fi
-XYCE_LIBRARY_OPTION(ifpack)
-XYCE_LIBRARY_OPTION(aztecoo)
+XYCE_TRILINOS_LIBRARY_OPTION(Ifpack, USE_IFPACK_MAKEFILE)
+XYCE_TRILINOS_LIBRARY_OPTION(AztecOO, USE_AZTECOO_MAKEFILE)
 
 dnl If the user enabled Belos, let's add it here:
 if test "x$USE_BELOS" = "xyes"; then
-    XYCE_LIBRARY_OPTION(belos)
-    XYCE_LIBRARY_OPTION(belosepetra)
+    XYCE_TRILINOS_LIBRARY_OPTION(Belos, USE_BELOS_MAKEFILE)
+    if test "x$USE_BELOS_MAKEFILE" = "xno"; then
+      XYCE_LIBRARY_OPTION(belosepetra)
+    fi
 fi
 
 dnl If the user enabled ShyLU, let's add it here:
 if test "x$USE_SHYLU" = "xyes"; then
-    XYCE_LIBRARY_OPTION(shylu)
+    XYCE_TRILINOS_LIBRARY_OPTION(ShyLU, USE_SHYLU_MAKEFILE)
 fi
 
-XYCE_LIBRARY_OPTION(nox)
-XYCE_LIBRARY_OPTION(loca)
+dnl NOX brings in the LOCA libraries as well using the Makefile.export system
+XYCE_TRILINOS_LIBRARY_OPTION(NOX, USE_NOX_MAKEFILE)
+if test "x$USE_NOX_MAKEFILE" = "xno"; then
+  XYCE_LIBRARY_OPTION(loca)
+fi
 CPPFLAGS="-DXyce_NOX_LOCA_SUPPORT $CPPFLAGS"
 
 dnl check for the dakota library if the user wants to link to it
-if test "x$USE_DAKOTA50" = "xyes"; then
-  XYCE_LIBRARY_OPTION(amplsolver)
-  XYCE_LIBRARY_OPTION(cdd)
-  XYCE_LIBRARY_OPTION(shared)
-  XYCE_LIBRARY_OPTION(conveyor) 
-  XYCE_LIBRARY_OPTION(appspack)
-  XYCE_LIBRARY_OPTION(nappspack)
-  XYCE_LIBRARY_OPTION(3po)
-  XYCE_LIBRARY_OPTION(utilib)
-  XYCE_LIBRARY_OPTION(pebbl)
-  XYCE_LIBRARY_OPTION(colin)
-  XYCE_LIBRARY_OPTION(coliny)
-  XYCE_LIBRARY_OPTION(quadrature)  
-  XYCE_LIBRARY_OPTION(ncsuopt)
-  XYCE_LIBRARY_OPTION(newmat)
-  XYCE_LIBRARY_OPTION(psuade)
-  XYCE_LIBRARY_OPTION(opt) 
-  XYCE_LIBRARY_OPTION(npsol)
-  XYCE_LIBRARY_OPTION(nlpql)
-  XYCE_LIBRARY_OPTION(cport)
-  XYCE_LIBRARY_OPTION(jega)
-  XYCE_LIBRARY_OPTION(fsudace)
-  XYCE_LIBRARY_OPTION(ddace)
-  XYCE_LIBRARY_OPTION(conmin)
-  XYCE_LIBRARY_OPTION(surfpack)
-  XYCE_LIBRARY_OPTION(lhs)
-  XYCE_LIBRARY_OPTION(pecos)
-  XYCE_LIBRARY_OPTION(dakota)
-elif test "x$USE_DAKOTA" = "xyes"; then
-  XYCE_LIBRARY_OPTION(fl)
-  XYCE_LIBRARY_OPTION(amplsolver)
-  XYCE_LIBRARY_OPTION(3po)
-  XYCE_LIBRARY_OPTION(appspack)
-  XYCE_LIBRARY_OPTION(utilib)
-  XYCE_LIBRARY_OPTION(pebbl)
-  XYCE_LIBRARY_OPTION(colin)
-  XYCE_LIBRARY_OPTION(coliny)
-  XYCE_LIBRARY_OPTION(cubature)
-  XYCE_LIBRARY_OPTION(gsl)
-  XYCE_LIBRARY_OPTION(lhs)
-  XYCE_LIBRARY_OPTION(ncsuopt)
-  XYCE_LIBRARY_OPTION(newmat)
-  XYCE_LIBRARY_OPTION(opt)
-  XYCE_LIBRARY_OPTION(npsol)
-  XYCE_LIBRARY_OPTION(cport)
-  XYCE_LIBRARY_OPTION(jega)
-  XYCE_LIBRARY_OPTION(fsudace)
-  XYCE_LIBRARY_OPTION(ddace)
-  XYCE_LIBRARY_OPTION(conmin)
-  XYCE_LIBRARY_OPTION(surfpack)
-  XYCE_LIBRARY_OPTION(evidence)
-  XYCE_LIBRARY_OPTION(dakota)
+if test "x$USE_DAKOTA" = "xyes"; then
 
-  dnl libmpi.a is only needed if we're using the prebuilt binary of Dakota
-  dnl not if we've built it from source
-  dnl XYCE_LIBRARY_OPTION(mpi)
-  dnl XYCE_LIBRARY_OPTION(lam)
-  dnl
+  dnl Here are the libraries needed by dakota:
+  dnl TPL LIBS: nidr;teuchosremainder;teuchosnumerics;teuchoscomm;teuchosparameterlist;teuchoscore;pecos;pecos_src;lhs;mods;mod;dfftpack;sparsegrid;surfpack;surfpack;surfpack_fortran;utilib;colin;interfaces;scolib;3po;pebbl;tinyxml;conmin;dace;analyzer;random;sampling;bose;fsudace;hopspack;jega;jega_fe;moga;soga;eutils;utilities;ncsuopt;nlpql;cport;nomad;npsol;optpp;psuade;amplsolver
+  dnl EXTRA TPL LIBS: libboost_regex.so;libboost_filesystem.so;libboost_system.so;libboost_signals.so;libboost_serialization.so;liblapack.a;libblas.a
+  dnl These libraries need to be in a certain order for some platforms to link correctly, so
+  dnl is is not acceptable to ls the arch-dir/dakota/lib diretory and just add in all those libraries. 
+  dnl dakotaLibs=$(cd $DAKOTA_ARCH_DIR/lib; ls *.a)
+  dnl dakotaLibs=$([amplsolver psuade optpp npsol nomad cport nlpql ncsuopt utilities eutils soga moga jega_fe jega hopspack fsudace bose sampling random analyzer dace conmin tinyxml pebbl 3po scolib interfaces colin utilib surfpack_fortran surfpack sparsegrid dfftpack mod mods lhs pecos_src pecos nidr])  
+  dnl From the dakota_library_mode test: dakota_src nidr pecos_src lhs mods mod dfftpack sparsegrid utilib colin interfaces scolib 3po pebbl tinyxml dace analyzer random sampling bose hopspack jega jega_fe moga soga eutils utilities ncsuopt cport nomad optpp dakota_src_fortran amplsolver
+  dnl Dakota libraries
+  echo "checking for Dakota libraries."
+  dnl Boost libraries required by Dakota
+  XYCE_LIBRARY_OPTION(boost_serialization)
+  XYCE_LIBRARY_OPTION(boost_signals)
+  XYCE_LIBRARY_OPTION(boost_system)
+  XYCE_LIBRARY_OPTION(boost_filesystem)
+  XYCE_LIBRARY_OPTION(boost_regex)
+  dnl Dakota libraries
+  XYCE_LIBRARY_OPTION(amplsolver)
+  CPPFLAGS="-DHAVE_AMPL $CPPFLAGS"
+  XYCE_LIBRARY_OPTION(dakota_src_fortran)
+  XYCE_LIBRARY_OPTION(psuade)
+  XYCE_LIBRARY_OPTION(optpp)
+  XYCE_LIBRARY_OPTION(npsol)
+  XYCE_LIBRARY_OPTION(nomad)
+  XYCE_LIBRARY_OPTION(cport)
+  XYCE_LIBRARY_OPTION(nlpql)
+  XYCE_LIBRARY_OPTION(ncsuopt)
+  XYCE_LIBRARY_OPTION(utilities)
+  XYCE_LIBRARY_OPTION(eutils)
+  XYCE_LIBRARY_OPTION(jega)
+  XYCE_LIBRARY_OPTION(soga)
+  XYCE_LIBRARY_OPTION(moga)
+  XYCE_LIBRARY_OPTION(jega_fe)
+  XYCE_LIBRARY_OPTION(jega)
+  XYCE_LIBRARY_OPTION(hopspack)
+  XYCE_LIBRARY_OPTION(fsudace)
+  XYCE_LIBRARY_OPTION(bose)
+  XYCE_LIBRARY_OPTION(sampling)
+  XYCE_LIBRARY_OPTION(random)
+  XYCE_LIBRARY_OPTION(analyzer)
+  XYCE_LIBRARY_OPTION(dace)
+  XYCE_LIBRARY_OPTION(conmin)
+  XYCE_LIBRARY_OPTION(utilib)
+  XYCE_LIBRARY_OPTION(tinyxml)
+  XYCE_LIBRARY_OPTION(pebbl)
+  XYCE_LIBRARY_OPTION(3po)
+  XYCE_LIBRARY_OPTION(scolib)
+  XYCE_LIBRARY_OPTION(interfaces)
+  XYCE_LIBRARY_OPTION(colin)
+  XYCE_LIBRARY_OPTION(surfpack_fortran)
+  XYCE_LIBRARY_OPTION(surfpack)
+  XYCE_LIBRARY_OPTION(sparsegrid)
+  XYCE_LIBRARY_OPTION(dfftpack)
+  XYCE_LIBRARY_OPTION(mod)
+  XYCE_LIBRARY_OPTION(mods)
+  XYCE_LIBRARY_OPTION(lhs)
+  XYCE_LIBRARY_OPTION(pecos_src)
+  XYCE_LIBRARY_OPTION(pecos)
+  XYCE_LIBRARY_OPTION(nidr)
+  XYCE_LIBRARY_OPTION(dakota_src)
 
 fi
 
@@ -740,7 +698,12 @@ dnl This is a showstopper, and must be done first!
 AC_CXX_HAVE_STL
 
 AC_LANG_PUSH(C++)
-AC_CHECK_HEADERS(unistd.h values.h limits.h float.h math.h cmath climits ostream iostream ostream.h fstream cstdio algorithm algo.h cctype cstdlib cstring strings.h string.h unordered_map functional tr1/unordered_map tr1/functional)
+AC_CHECK_HEADERS(unistd.h values.h limits.h float.h math.h cmath climits ostream iostream ostream.h fstream cstdio algorithm cctype cstdlib cstring strings.h string.h unordered_map functional tr1/unordered_map tr1/functional)
+
+dnl *********************************************************************
+dnl dlopen interface
+AC_CHECK_HEADERS([stdlib.h dlfcn.h])
+AC_SEARCH_LIBS([dlopen], [dl])
 
 dnl *********************************************************************
 dnl See if compiler supplies a nan/inf checker.  This must be done after the 
@@ -781,7 +744,7 @@ if test "x$USE_DAKOTA" = "xyes"; then
     CPPFLAGS="$CPPFLAGS -DDARWIN "
     LDFLAGS="$LDFLAGS  -Wl,-m " 
   fi
-  AC_CHECK_HEADER(DakotaStrategy.H,,[AC_MSG_ERROR([Sorry, Dakota headers not found])])
+  AC_CHECK_HEADER(DakotaStrategy.hpp,,[AC_MSG_ERROR([Sorry, Dakota headers not found])])
 fi
 
 #
@@ -797,7 +760,6 @@ dnl Checks for typedefs, structures, and compiler characteristics.
 
 dnl this one is prereq for other stuff:
 dnl AC_CXX_NAMESPACES 
-AC_CXX_HAVE_NUMERIC_LIMITS
 AC_HEADER_MATH_H_HAS_M_PI
 AC_CXX_NEED_PAIR_H
 
@@ -863,13 +825,28 @@ AM_CONDITIONAL(BUILD_FFTW_SUPPORT, test "X$ac_cv_header_fftw3_h" = "Xyes")
 if test "X$USE_HDF5" = "Xyes"; then
   AC_SEARCH_LIBS( [inflate], [z] )
   AC_SEARCH_LIBS( [SZ_Decompress], [sz])
-  AC_CHECK_HEADER( [hdf5.h],
-                   [AC_SEARCH_LIBS( [H5Fclose], [hdf5],
-                                    [AC_DEFINE([Xyce_USE_HDF5],[1], [Set to use HDF5 library])],
-                                    [AC_MSG_WARN([Could not find HDF5 Library.  Disabling HDF5 support])
-                                     ac_cv_header_hdf5_h=no
-                                    ])]
-                 )
+  if test "$USE_MPI" = yes; then
+    # look for an HDF5 function that is only defined if HDF is also
+    # built with MPI support.  Currently Xyce in parallel needs 
+    # parallel HDF5 to do IO in parallel.
+    AC_CHECK_HEADER( [hdf5.h],
+                     [AC_SEARCH_LIBS( [H5Pset_fapl_mpio], [hdf5],
+                                      [AC_DEFINE([Xyce_USE_HDF5],[1], [Set to use HDF5 library])],
+                                      [AC_MSG_WARN([Could not find HDF5 Library with MPI support.  Disabling parallel HDF5 support])
+                                       ac_cv_header_hdf5_h=no
+                                      ])]
+                   )
+  else
+    # configuring Xyce to build in serial, so only look for serial functions 
+    # to check HDF5 availabilit 
+    AC_CHECK_HEADER( [hdf5.h],
+                     [AC_SEARCH_LIBS( [H5Fclose], [hdf5],
+                                      [AC_DEFINE([Xyce_USE_HDF5],[1], [Set to use HDF5 library])],
+                                      [AC_MSG_WARN([Could not find HDF5 Library.  Disabling HDF5 support])
+                                       ac_cv_header_hdf5_h=no
+                                      ])]
+                   )
+  fi      
 else
  ac_cv_header_hdf5_h=no
 fi  
@@ -887,11 +864,6 @@ if test "x$GXX" = "xyes"; then
 fi
 
 XYCE_CHECK_IOTA
-XYCE_CHECK_FLEXIBLE_INSERT
-
-if test "$Xyce_TARGET" = "solaris"; then
-  XYCE_CHECK_STL_MEMBER_TEMPLATES
-fi
 
 dnl LASTLY:  add -nofor_main to FFLAGS for DEC.  Can't do it earlier than this
 if test "$USING_DEC_CXX" != "no"; then
@@ -903,7 +875,7 @@ dnl This makes @Xyce_INCS@ be replaced with the full string of -I's needed
 dnl for all packages to compile without problem.
 dnl It is used by setting "INCLUDES = @Xyce_INCS@" in the Makefile.am for
 dnl a package.
-default_INCS="$default_INCS -I\$(top_srcdir)/src/AnalysisPKG/include -I\$(top_srcdir)/src/CircuitPKG/include -I\$(top_srcdir)/src/IOInterfacePKG/include -I\$(top_srcdir)/src/IOInterfacePKG/Output/include -I\$(top_srcdir)/src/DeviceModelPKG/include -I\$(top_srcdir)/src/DeviceModelPKG/Core/include -I\$(top_srcdir)/src/DeviceModelPKG/OpenModels/include -I\$(top_srcdir)/src/DeviceModelPKG/TCADModels/include -I\$(top_srcdir)/src/DeviceModelPKG/EXTSC/include -I\$(top_srcdir)/src/DeviceModelPKG/NeuronModels/include -I\$(top_srcdir)/src/DeviceModelPKG/ADMS/include -I\$(top_srcdir)/src/ErrorHandlingPKG/include -I\$(top_srcdir)/src/LinearAlgebraServicesPKG/include -I\$(top_srcdir)/src/LoaderServicesPKG/include -I\$(top_srcdir)/src/NonlinearSolverPKG/include -I\$(top_srcdir)/src/ParallelDistPKG/include -I\$(top_srcdir)/src/TimeIntegrationPKG/include -I\$(top_srcdir)/src/TopoManagerPKG/include -I\$(top_srcdir)/src/UtilityPKG/include -I\$(top_srcdir)/src/MultiTimePDEPKG/include -I\$(top_srcdir)/src/DakotaLinkPKG/include -I\$(top_builddir)/src"
+default_INCS="$default_INCS -I\$(top_srcdir)/src/AnalysisPKG/include -I\$(top_srcdir)/src/CircuitPKG/include -I\$(top_srcdir)/src/IOInterfacePKG/include -I\$(top_srcdir)/src/IOInterfacePKG/Output/include -I\$(top_srcdir)/src/DeviceModelPKG/Core/include -I\$(top_srcdir)/src/DeviceModelPKG/OpenModels/include -I\$(top_srcdir)/src/DeviceModelPKG/TCADModels/include -I\$(top_srcdir)/src/DeviceModelPKG/EXTSC/include -I\$(top_srcdir)/src/DeviceModelPKG/NeuronModels/include -I\$(top_srcdir)/src/DeviceModelPKG/ADMS/include -I\$(top_srcdir)/src/ErrorHandlingPKG/include -I\$(top_srcdir)/src/LinearAlgebraServicesPKG/include -I\$(top_srcdir)/src/LoaderServicesPKG/include -I\$(top_srcdir)/src/NonlinearSolverPKG/include -I\$(top_srcdir)/src/ParallelDistPKG/include -I\$(top_srcdir)/src/TimeIntegrationPKG/include -I\$(top_srcdir)/src/TopoManagerPKG/include -I\$(top_srcdir)/src/UtilityPKG/include -I\$(top_srcdir)/src/MultiTimePDEPKG/include -I\$(top_srcdir)/src/DakotaLinkPKG/include -I\$(top_builddir)/src"
 if test "x$RAD_MODELS" = "xyes"; then
   default_INCS="$default_INCS -I\$(top_srcdir)/src/DeviceModelPKG/SandiaModels/include"
 fi
@@ -1087,8 +1059,8 @@ AC_CONFIG_FILES([Makefile
  src/IOInterfacePKG/Output/Makefile
  src/DakotaLinkPKG/Makefile 
  src/DeviceModelPKG/Makefile 
- src/DeviceModelPKG/OpenModels/Makefile 
  src/DeviceModelPKG/Core/Makefile 
+ src/DeviceModelPKG/OpenModels/Makefile 
  src/DeviceModelPKG/TCADModels/Makefile 
  src/DeviceModelPKG/NeuronModels/Makefile 
  src/DeviceModelPKG/ADMS/Makefile 
@@ -1106,9 +1078,9 @@ AC_CONFIG_FILES([Makefile
  src/test/XyceAsLibrary/Makefile
  src/test/FFTInterface/Makefile
  src/test/LinearAlgebraTest/Makefile
- src/test/XyceUnitTest/Makefile
  src/test/XygraTestHarnesses/Makefile
  src/IOInterfacePKG/include/N_IO_XMLPath.h
+ user_plugin/Makefile
  distribution/CPackConfig.cmake])
 
 #NOTE:

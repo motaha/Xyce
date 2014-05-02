@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.5.6.2 $
+// Revision Number: $Revision: 1.11 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:47 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -68,21 +68,21 @@ namespace N_NLS_NOX {
   //                 N_ERH_ErrorMsg::report(N_ERH_ErrorMsg::USR_ERROR_0, msg).
   //                 It throws "N_NLS_NOX Error" after calling report.
   //---------------------------------------------------------------------------
-  void error(const string msg);
+  void error(const std::string &msg);
 
   //---------------------------------------------------------------------------
   // Function      : error
   // Purpose       : This is simply a wrapper for
   //                 N_ERH_ErrorMsg::report(N_ERH_ErrorMsg::USR_WARNING_0, msg)
   //---------------------------------------------------------------------------
-  void warning(const string msg);
+  void warning(const std::string &msg);
 
   //---------------------------------------------------------------------------
   // Function      : error
   // Purpose       : This is simply a wrapper for
-  //                 N_ERH_ErrorMsg::report(N_ERH_ErrorMsg::USR_INFO_0, msg)
+  //                 lout() << msg)
   //---------------------------------------------------------------------------
-  void info(const string msg);
+  void info(const std::string &msg);
 
 } // namespace N_NLS_NOX
 

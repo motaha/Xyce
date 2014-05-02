@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.6.2.2 $
+// Revision Number: $Revision: 1.17 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/02/24 23:49:15 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -100,9 +100,10 @@ namespace Device {
 // Creation Date : 8/24/06
 //-----------------------------------------------------------------------------
 Region::Region( RegionData & rd,
-                            DeviceOptions & devOp,
-                            SolverState & solst, bool sourceOn)
- : name(rd.name),
+                const DeviceOptions & devOp,
+                const SolverState & solst,
+                bool sourceOn)
+  : name(rd.name),
     outputName(rd.outName),
     devOptions(devOp),
     solState(solst),
@@ -142,10 +143,10 @@ Region::Region( RegionData & rd,
 // Creation Date : 7/29/06
 //-----------------------------------------------------------------------------
 Region::Region ( RegionData & rd,
-                             DeviceOptions & devOp,
-                             SolverState & solst,
-                             N_DEV_ReactionNetwork & reactionNet)
-
+                 const DeviceOptions & devOp,
+                 const SolverState & solst,
+                 ReactionNetwork & reactionNet)
+  
   : name(rd.name),
     outputName(rd.outName),
     devOptions(devOp),
@@ -174,7 +175,7 @@ Region::Region ( RegionData & rd,
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions.debugLevel > 0)
   {
-    cout << theReactions << endl;
+    Xyce::dout() << theReactions << std::endl;
   }
 #endif
 }
@@ -201,7 +202,7 @@ Region::~Region ()
 // Creation Date : 7/29/06
 //-----------------------------------------------------------------------------
 void
-Region::createDefaultReactionNetwork(const string &reactionSpecFile)
+Region::createDefaultReactionNetwork(const std::string &reactionSpecFile)
 {
   theReactions.clear();
 
@@ -210,7 +211,7 @@ Region::createDefaultReactionNetwork(const string &reactionSpecFile)
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions.debugLevel > 0)
   {
-    cout << theReactions << endl;
+    Xyce::dout() << theReactions << std::endl;
   }
 #endif
 
@@ -226,7 +227,7 @@ Region::createDefaultReactionNetwork(const string &reactionSpecFile)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 3/29/06
 //-----------------------------------------------------------------------------
-void Region::initializeReactionNetwork(N_DEV_ScalingVars & sv)
+void Region::initializeReactionNetwork(ScalingVars & sv)
 {
 
   int cSize=theReactions.getNumConstants();
@@ -262,7 +263,7 @@ void Region::initializeReactionNetwork(N_DEV_ScalingVars & sv)
     int i;
     for (i=0; i<icSize; ++i)
     {
-      pair<string,double> theIC=theReactions.getInitialCondition(i);
+      std::pair<std::string,double> theIC=theReactions.getInitialCondition(i);
       int specIndex=theReactions.getReactantNum(theIC.first);
       if (specIndex < 0)
         theConstantConcentrations[-(specIndex+1)] = theIC.second;
@@ -281,7 +282,7 @@ void Region::initializeReactionNetwork(N_DEV_ScalingVars & sv)
 // Creator       :
 // Creation Date : 3/29/06
 //-----------------------------------------------------------------------------
-void Region::setInitialCondition(const string & reactantname, const double val)
+void Region::setInitialCondition(const std::string & reactantname, const double val)
 {
   int specIndex=theReactions.getReactantNum(reactantname);
   initialConcentrations[specIndex] = val;
@@ -295,7 +296,7 @@ void Region::setInitialCondition(const string & reactantname, const double val)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/4/06
 //-----------------------------------------------------------------------------
-void Region::addSource(string speciesName, N_UTL_Expression *expr)
+void Region::addSource(std::string speciesName, Util::Expression *expr)
 {
   theReactions.addSourceTerm(speciesName, expr);
 }
@@ -310,7 +311,7 @@ void Region::addSource(string speciesName, N_UTL_Expression *expr)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/4/06
 //-----------------------------------------------------------------------------
-void Region::addMasterSource(string speciesName)
+void Region::addMasterSource(std::string speciesName)
 {
   theReactions.addMasterSourceTerm(speciesName);
 }
@@ -334,7 +335,7 @@ void Region::setRateConstants(double T)
   if (!outputBefore1)
   {
     if (devOptions.debugLevel > 0)
-      cout << theReactions << endl;
+      Xyce::dout() << theReactions << std::endl;
     outputBefore1 = true;
   }
 
@@ -352,8 +353,8 @@ void Region::setRateConstants(double T)
   {
     if (devOptions.debugLevel > 0)
     {
-      cout << "Scaled Reactions: " << endl;
-      cout << theReactions << endl;
+      Xyce::dout() << "Scaled Reactions: " << std::endl;
+      Xyce::dout() << theReactions << std::endl;
     }
     outputBefore2=true;
   }
@@ -371,7 +372,7 @@ void Region::setRateConstants(double T)
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 6/01/06
 //----------------------------------------------------------------------------
-void Region::setupScalingVars (N_DEV_ScalingVars & sv)
+void Region::setupScalingVars (ScalingVars & sv)
 {
   t0 = sv.t0;
   C0 = sv.C0;
@@ -392,18 +393,18 @@ void Region::setupScalingVars (N_DEV_ScalingVars & sv)
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions.debugLevel > -2)
   {
-    cout << "N_DEV_Region::setupScalingVars:" << endl;
-    cout.width(20);
-    cout.precision(12);
-    cout << " " << endl;
-    cout << "t0 = " << t0 << endl;
-    cout << "x0 = " << x0 << endl;
-    cout << "a0 = " << a0 << endl;
-    cout << "C0 = " << C0 << endl;
-    cout << "D0 = " << D0 << endl;
-    cout << "R0 = " << R0 << endl;
-    cout << "k0 = " << k0 << endl;
-    cout << "rk0 = " << rk0 << endl;
+    Xyce::dout() << "N_DEV_Region::setupScalingVars:" << std::endl;
+    Xyce::dout().width(20);
+    Xyce::dout().precision(12);
+    Xyce::dout() << " " << std::endl;
+    Xyce::dout() << "t0 = " << t0 << std::endl;
+    Xyce::dout() << "x0 = " << x0 << std::endl;
+    Xyce::dout() << "a0 = " << a0 << std::endl;
+    Xyce::dout() << "C0 = " << C0 << std::endl;
+    Xyce::dout() << "D0 = " << D0 << std::endl;
+    Xyce::dout() << "R0 = " << R0 << std::endl;
+    Xyce::dout() << "k0 = " << k0 << std::endl;
+    Xyce::dout() << "rk0 = " << rk0 << std::endl;
   }
 #endif
 
@@ -574,18 +575,15 @@ bool Region::outputTecplot ()
   double step = solState.currTimeStep;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
-  const string dashedline="--------------------------------------------------"
-    "---------------------------";
   if (devOptions.debugLevel > 0 && solState.debugTimeFlag)
   {
-    cout << endl;
-    cout << dashedline << endl;
-    cout << "In N_DEV_DiodePDEInstance::outputTecplot.  filename = ";
-    cout << string(filename);
-    cout << " time = " << time;
-    cout << " step = " << step;
-    cout << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "In N_DEV_DiodePDEInstance::outputTecplot.  filename = ";
+    Xyce::dout() << std::string(filename);
+    Xyce::dout() << " time = " << time;
+    Xyce::dout() << " step = " << step;
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -658,8 +656,8 @@ bool Region::outputTecplot ()
 // Creator       : Eric R. Keiter
 // Creation Date : 7/19/06
 //-----------------------------------------------------------------------------
-void Region::setupJacStamp ( vector< vector<int> > & jacStamp,
-                                      vector<int> &colDep,
+void Region::setupJacStamp ( std::vector< std::vector<int> > & jacStamp,
+                                      std::vector<int> &colDep,
                                       int & firstReactant,
                                       int & lastIndex )
 {
@@ -669,8 +667,7 @@ void Region::setupJacStamp ( vector< vector<int> > & jacStamp,
   {
     if (colDep.size() != 2)
     {
-      cout << "Region::setupJacStamp ERROR:  colDep != 2 " << endl;
-      exit(0);
+      Report::DevelFatal0() << "Region::setupJacStamp ERROR:  colDep != 2 ";
     }
 
     int stampSize=jacStamp.size();
@@ -713,8 +710,8 @@ void Region::setupJacStamp ( vector< vector<int> > & jacStamp,
 // Creator       : Eric R. Keiter
 // Creation Date : 7/19/06
 //-----------------------------------------------------------------------------
-void Region::registerLIDs( const vector<int> & intLIDVec,
-                                    const vector<int> & extLIDVec,
+void Region::registerLIDs( const std::vector<int> & intLIDVec,
+                                    const std::vector<int> & extLIDVec,
                                     int & intIndex)
 {
 
@@ -728,7 +725,7 @@ void Region::registerLIDs( const vector<int> & intLIDVec,
 #ifdef Xyce_DEBUG_DEVICE
       if (devOptions.debugLevel > 0)
       {
-        cout << "  li_Concentrations: " <<  endl;
+        Xyce::dout() << "  li_Concentrations: " <<  std::endl;
       }
 #endif
       for (int i=0;i<rSize;++i)
@@ -738,7 +735,7 @@ void Region::registerLIDs( const vector<int> & intLIDVec,
 #ifdef Xyce_DEBUG_DEVICE
         if (devOptions.debugLevel > 0)
         {
-          cout << "  li_Concentrations["<< i << "] = " << li_Concentrations[i] << endl;
+          Xyce::dout() << "  li_Concentrations["<< i << "] = " << li_Concentrations[i] << std::endl;
         }
 #endif
       }
@@ -755,11 +752,11 @@ void Region::registerLIDs( const vector<int> & intLIDVec,
 // Creation Date : 7/20/06
 //-----------------------------------------------------------------------------
 void Region::augmentNameMap (
-    map<int,string> & intNameMap,
+    std::map<int,std::string> & intNameMap,
     DeviceInstance & di)
 {
 
-  string tmpstr;
+  std::string tmpstr;
 
   if ( !(regData.doNothing) )
   {
@@ -768,7 +765,7 @@ void Region::augmentNameMap (
       int rSize=theReactions.getNumSpecies();
       for (int i=0;i<rSize;++i)
       {
-        string speciesName=theReactions.getSpeciesName(i);
+        std::string speciesName=theReactions.getSpeciesName(i);
         tmpstr = name+"_Conc_"+speciesName;
         di.spiceInternalName(tmpstr);
         intNameMap[li_Concentrations[i]] = tmpstr;
@@ -786,7 +783,7 @@ void Region::augmentNameMap (
 // Creation Date : 7/20/06
 //-----------------------------------------------------------------------------
 void Region::registerStateLIDs
-   (const vector<int> & staLIDVec, int & i)
+   (const std::vector<int> & staLIDVec, int & i)
 {
   if (baseReactionIndex != -1)
   {
@@ -808,9 +805,9 @@ void Region::registerStateLIDs
 // Creation Date : 7/20/06
 //-----------------------------------------------------------------------------
 void Region::registerJacLIDs
-  ( const vector< vector<int> > & jacLIDVec,
-    const vector<int> &map,
-    const vector< vector<int> > &map2
+  ( const std::vector< std::vector<int> > & jacLIDVec,
+    const std::vector<int> &map,
+    const std::vector< std::vector<int> > &map2
   )
 {
   if ( !(regData.doNothing) )

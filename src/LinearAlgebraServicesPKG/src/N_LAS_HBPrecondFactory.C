@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.1.2.2 $
+// Revision Number: $Revision: 1.9 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -53,6 +53,7 @@
 #include <N_LAS_Preconditioner.h>
 #include <N_LAS_HBPrecondFactory.h>
 #include <N_LAS_HBBlockJacobiPrecond.h>
+#include <N_LAS_HBFDJacobianPrecond.h>
 
 #include <N_LAS_Problem.h>
 #include <N_LAS_System.h>
@@ -67,7 +68,7 @@
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_HBPrecondFactory::N_LAS_HBPrecondFactory
 // Purpose       :
-// Special Notes : 
+// Special Notes :
 // Scope         : Public
 // Creator       : Heidi Thornquist, SNL, Electrical & Microsystem Modeling
 // Creation Date : 10/01/07
@@ -79,7 +80,7 @@ N_LAS_HBPrecondFactory::N_LAS_HBPrecondFactory()
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_HBPrecondFactory::N_LAS_HBPrecondFactory
 // Purpose       :
-// Special Notes : 
+// Special Notes :
 // Scope         : Public
 // Creator       : Heidi Thornquist, SNL, Electrical & Microsystem Modeling
 // Creation Date : 10/01/07
@@ -89,8 +90,8 @@ N_LAS_HBPrecondFactory::N_LAS_HBPrecondFactory( const N_UTL_OptionBlock & OB )
   OB_ = Teuchos::rcp( new N_UTL_OptionBlock( OB ) );
   precType_ = "NONE";
 
-  list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
-  list<N_UTL_Param>::const_iterator end_tpL = OB.getParams().end();
+  std::list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator end_tpL = OB.getParams().end();
   for( ; it_tpL != end_tpL; ++it_tpL )
   {
     if( it_tpL->uTag() == "PREC_TYPE" && it_tpL->usVal() != "DEFAULT" )
@@ -100,12 +101,12 @@ N_LAS_HBPrecondFactory::N_LAS_HBPrecondFactory( const N_UTL_OptionBlock & OB )
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_HBPrecondFactory::create
 // Purpose       :
-// Special Notes : 
+// Special Notes :
 // Scope         : Public
 // Creator       : Heidi Thornquist, SNL, Electrical & Microsystem Modeling
 // Creation Date : 10/01/07
 //-----------------------------------------------------------------------------
-Teuchos::RCP<N_LAS_Preconditioner> 
+Teuchos::RCP<N_LAS_Preconditioner>
 N_LAS_HBPrecondFactory::create( const Teuchos::RCP<N_LAS_System> & lasSysPtr )
 {
   lasSysPtr_ = lasSysPtr;
@@ -119,27 +120,41 @@ N_LAS_HBPrecondFactory::create( const Teuchos::RCP<N_LAS_System> & lasSysPtr )
   else if (precType_ == "BLOCK_JACOBI") {
     precond = Teuchos::rcp( new N_LAS_HBBlockJacobiPrecond() );
     precond->setOptions( *OB_ );
-    
+
     // Register necessary classes for block Jacobi preconditioner.
-    Teuchos::RCP<N_LAS_HBBlockJacobiPrecond> tmpPrecond 
+    Teuchos::RCP<N_LAS_HBBlockJacobiPrecond> tmpPrecond
       = Teuchos::rcp_dynamic_cast<N_LAS_HBBlockJacobiPrecond>( precond );
 
     tmpPrecond->registerLinearSystem( lasSysPtr_ );
-    tmpPrecond->registerAppLoader( appLoaderPtr_ );
     tmpPrecond->registerAppBuilder( appBuilderPtr_ );
     tmpPrecond->registerHBLoader( hbLoaderPtr_ );
     tmpPrecond->registerHBBuilder( hbBuilderPtr_ );
-    tmpPrecond->registerMPDEState( statePtr_ );
-    tmpPrecond->registerDeviceInterface( devInterfacePtr_ );
     tmpPrecond->setFastTimes( times_ );
 
     // Initialize the graph for the preconditioner
     Teuchos::RCP<N_LAS_Problem> tmpProblem;
     tmpPrecond->initGraph( tmpProblem );
   }
+  else if (precType_ == "FD_JACOBIAN") {
+    precond = Teuchos::rcp( new N_LAS_HBFDJacobianPrecond() );
+    precond->setOptions( *OB_ );
+
+    // Register necessary classes for finite difference Jacobian preconditioner.
+    Teuchos::RCP<N_LAS_HBFDJacobianPrecond> tmpPrecond
+      = Teuchos::rcp_dynamic_cast<N_LAS_HBFDJacobianPrecond>( precond );
+
+    tmpPrecond->registerLinearSystem( lasSysPtr_ );
+    tmpPrecond->registerAppBuilder( appBuilderPtr_ );
+    tmpPrecond->registerHBLoader( hbLoaderPtr_ );
+    tmpPrecond->registerHBBuilder( hbBuilderPtr_ );
+    tmpPrecond->setTimeSteps( timeSteps_ );
+
+    // Initialize the graph for the preconditioner
+    Teuchos::RCP<N_LAS_Problem> tmpProblem;
+    tmpPrecond->initGraph( tmpProblem );
+  }
   else {
-    string msg = "N_LAS_HBPrecondFactory::create()";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_ERROR_0, msg + ", preconditioning type " + precType_ + " unrecognized!\n");
+    Xyce::Report::DevelFatal0().in("N_LAS_HBPrecondFactory::create()") << "preconditioning type " << precType_ << " unrecognized!";
   }
 
   return precond;

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.11.2.2 $
+// Revision Number: $Revision: 1.15 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/02/24 23:49:15 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -127,7 +127,7 @@ void DeviceState::unpack(char * buf, int bsize, int & pos, N_PDS_Comm * comm)
 
   //----- unpack ID
   comm->unpack( buf, bsize, pos, &length, 1 );
-  ID = string( (buf+pos), length);
+  ID = std::string( (buf+pos), length);
   pos += length;
 
   //----- unpack data
@@ -154,14 +154,14 @@ void DeviceState::unpack(char * buf, int bsize, int & pos, N_PDS_Comm * comm)
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 09/02/01
 //-----------------------------------------------------------------------------
-ostream & operator<<( ostream & os, const DeviceState & ds )
+std::ostream & operator<<( std::ostream & os, const DeviceState & ds )
 {
-  os << "Device State: " << ds.ID << endl;
-  os << " -------------" << endl;
+  os << "Device State: " << ds.ID << std::endl;
+  os << " -------------" << std::endl;
   for( int i = 0; i < ds.data.size(); ++i )
-    cout << " " << i << ": " << ds.data[i] << endl;
-  os << " -------------" << endl;
-  os << endl;
+    os << " " << i << ": " << ds.data[i] << std::endl;
+  os << " -------------" << std::endl;
+  os << std::endl;
 
   return os;
 }
@@ -174,7 +174,7 @@ ostream & operator<<( ostream & os, const DeviceState & ds )
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 11/03/04
 //-----------------------------------------------------------------------------
-void DeviceState::dump( ostream & os )
+void DeviceState::dump( std::ostream & os )
 {
   os << ID << " ";
 
@@ -204,7 +204,7 @@ void DeviceState::dump( ostream & os )
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 11/03/04
 //-----------------------------------------------------------------------------
-void DeviceState::restore( istream & is )
+void DeviceState::restore( std::istream & is )
 {
   is >> ID;
 

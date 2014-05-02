@@ -2,12 +2,13 @@
 # -- process files for this library ------------------------------------------
 
 # class source list
-set ( NeuronModels_SOURCES  
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_Neuron.C 
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_Neuron2.C 
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_Neuron3.C 
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_Neuron4.C 
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_Neuron5.C 
+set ( NeuronModels_SOURCES
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_RegisterNeuronDevices.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_Neuron.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_Neuron2.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_Neuron3.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_Neuron4.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_Neuron5.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_Neuron6.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_Neuron7.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_Neuron8.C
@@ -24,16 +25,12 @@ set ( NeuronModels_SOURCES
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_MembraneUserDefined.C
       CACHE INTERNAL "X_S" )
 
-  
 # add header files to project
-set ( XYCE_INCLUDE_DIRECTORIES ${XYCE_INCLUDE_DIRECTORIES} 
+set ( XYCE_INCLUDE_DIRECTORIES ${XYCE_INCLUDE_DIRECTORIES}
       ${CMAKE_CURRENT_SOURCE_DIR}/include
       CACHE INTERNAL "X_I" )
 
-
-
-
 # -- build requested libraries -----------------------------------------------
-set ( XYCE_PACKAGE_LIBRARIES ${XYCE_PACKAGE_LIBRARIES} 
-      NeuronModels 
+set ( XYCE_PACKAGE_LIBRARIES ${XYCE_PACKAGE_LIBRARIES}
+      NeuronModels
       CACHE INTERNAL "X_L" )

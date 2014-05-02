@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,85 +37,79 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.8.6.2 $
+// Revision Number: $Revision: 1.12 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
-// ----------   Xyce Includes   ----------
-
 #include <N_UTL_Timer.h>
 
 #include <N_PDS_Comm.h>
 
-// ---------  Other Includes  -----------
-
 #include <Epetra_Time.h>
 
-// Class N_UTL_Timer
+namespace Xyce {
+namespace Util {
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Timer
+// Function      : Timer
 // Purpose       : Constructor
 // Special Notes :
 // Scope         : Public
 // Creator       : Scott A. Hutchinson, SNL, Computational Sciences
 // Creation Date : 09/27/00
 //-----------------------------------------------------------------------------
-N_UTL_Timer::N_UTL_Timer(N_PDS_Comm & comm )
+Timer::Timer(N_PDS_Comm & comm )
 {
   aTimer_ = new Epetra_Time( *(comm.petraComm()) );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Timer
+// Function      : Timer
 // Purpose       : Constructor
 // Special Notes :
 // Scope         : Public
 // Creator       : Robert Hoekstra, SNL, Computational Sciences
 // Creation Date : 03/24/04
 //-----------------------------------------------------------------------------
-N_UTL_Timer::N_UTL_Timer( const Epetra_Comm & comm )
+Timer::Timer( const Epetra_Comm & comm )
 {
   aTimer_ = new Epetra_Time( comm );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Timer
+// Function      : Timer
 // Purpose       : Copy constructor
 // Special Notes :
 // Scope         : Public
 // Creator       : Scott A. Hutchinson, SNL, Computational Sciences
 // Creation Date : 09/27/00
 //-----------------------------------------------------------------------------
-N_UTL_Timer::N_UTL_Timer(const N_UTL_Timer &right)
+Timer::Timer(const Timer &right)
 {
   // Copy to a new Petra_Time object using Petra's copy constructor.
   aTimer_ = new Epetra_Time( *(right.aTimer_) );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : ~N_UTL_Timer
+// Function      : ~Timer
 // Purpose       : Destructor
 // Special Notes :
 // Scope         : Public
 // Creator       : Scott A. Hutchinson, SNL, Computational Sciences
 // Creation Date : 09/27/00
 //-----------------------------------------------------------------------------
-N_UTL_Timer::~N_UTL_Timer()
+Timer::~Timer()
 {
   delete aTimer_;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Timer::wallTime
+// Function      : Timer::wallTime
 // Purpose       : Returns the wall-clock time in seconds. A code section can
 //                 be timed by putting it between two calls to wallTime and
 //                 taking the difference of the times.
@@ -124,13 +118,13 @@ N_UTL_Timer::~N_UTL_Timer()
 // Creator       : Scott A. Hutchinson, SNL, Computational Sciences
 // Creation Date : 09/27/00
 //-----------------------------------------------------------------------------
-double N_UTL_Timer::wallTime() const
+double Timer::wallTime() const
 {
   return aTimer_->WallTime();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Timer::resetStartTime
+// Function      : Timer::resetStartTime
 // Purpose       : Resets the start time for the timer object to the current
 //                 time.  A code section can be timed by putting it between a
 //                 call to resetStartTime and elapsedTime.
@@ -139,25 +133,28 @@ double N_UTL_Timer::wallTime() const
 // Creator       : Scott A. Hutchinson, SNL, Computational Sciences
 // Creation Date : 09/27/00
 //-----------------------------------------------------------------------------
-void N_UTL_Timer::resetStartTime()
+void Timer::resetStartTime()
 {
   aTimer_->ResetStartTime();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Timer::elapsedTime
+// Function      : Timer::elapsedTime
 // Purpose       : Returns the elapsed time in seconds since the timer object
 //                 was constructed, or since the resetStartTime function was
 //                 called. A code section can be timed by putting it between
-//                 the N_UTL_Timer constructor and a call to elapsedTime, or
+//                 the Timer constructor and a call to elapsedTime, or
 //                 between a call to resetStartTime and elapsedTime.
 // Special Notes :
 // Scope         : Public
 // Creator       : Scott A. Hutchinson, SNL, Computational Sciences
 // Creation Date : 09/27/00
 //-----------------------------------------------------------------------------
-double N_UTL_Timer::elapsedTime() const
+double Timer::elapsedTime() const
 {
   return aTimer_->ElapsedTime();
 }
+
+} // namespace Util
+} // namespace Xyce
 

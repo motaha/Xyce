@@ -4,6 +4,7 @@ AM_CPPFLAGS = @Xyce_INCS@
 noinst_LTLIBRARIES = libNeuronModels.la
 
 libNeuronModels_la_SOURCES = \
+  $(srcdir)/src/N_DEV_RegisterNeuronDevices.C \
   $(srcdir)/src/N_DEV_Neuron.C \
   $(srcdir)/src/N_DEV_Neuron2.C \
   $(srcdir)/src/N_DEV_Neuron3.C \
@@ -23,6 +24,7 @@ libNeuronModels_la_SOURCES = \
   $(srcdir)/src/N_DEV_MembraneUserDefined.C \
   $(srcdir)/src/N_DEV_MembraneHH.C \
   $(srcdir)/src/N_DEV_MembraneCS.C \
+  $(srcdir)/include/N_DEV_RegisterNeuronDevices.h \
   $(srcdir)/include/N_DEV_Neuron.h \
   $(srcdir)/include/N_DEV_Neuron_Factory.h \
   $(srcdir)/include/N_DEV_Neuron2.h \

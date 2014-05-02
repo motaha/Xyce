@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.21.2.2 $
+// Revision Number: $Revision: 1.30.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Date  : $Date: 2014/02/26 20:42:38 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -54,77 +54,74 @@
 using Teuchos::RefCountPtr;
 using Teuchos::rcp;
 
-// ----------   Xyce Includes   ----------
 #include <N_DEV_fwd.h>
 #include <N_IO_fwd.h>
+#include <N_ANP_fwd.h>
+#include <N_TOP_fwd.h>
 #include <N_UTL_Xyce.h>
 #include <N_UTL_OptionBlock.h>
 #include <N_IO_PkgOptionsMgr.h>
 
-// ---------- Forward Declarations ----------
 class N_PDS_Manager;
 
-class N_TOP_Topology;
-
-class N_ANP_AnalysisInterface;
-
-class N_IO_CmdParse;
+namespace Xyce {
+namespace IO {
 
 //-----------------------------------------------------------------------------
-// Class         : N_IO_RestartMgr
+// Class         : RestartMgr
 // Purpose       :
 // Special Notes :
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 7/19/01
 //-----------------------------------------------------------------------------
-class N_IO_RestartMgr
+class RestartMgr
 {
 
 public:
 
   // Factory to generate singleton of class
-  static N_IO_RestartMgr * factory(N_IO_CmdParse & cp);
+  static RestartMgr * factory(CmdParse & cp);
 
   // Destructor
-  ~N_IO_RestartMgr() {}
+  ~RestartMgr() {}
 
 private:
 
-  N_IO_RestartMgr(N_IO_CmdParse & cp);
+  RestartMgr(CmdParse & cp);
 
   // Copy constructor (private)
-  N_IO_RestartMgr(const N_IO_RestartMgr & right);
+  RestartMgr(const RestartMgr & right);
 
   // Assignment operator
-  N_IO_RestartMgr & operator = (const N_IO_RestartMgr & right);
+  RestartMgr & operator = (const RestartMgr & right);
 
-  bool operator == (const N_IO_RestartMgr & right);
-  bool operator != (const N_IO_RestartMgr & right);
+  bool operator == (const RestartMgr & right);
+  bool operator != (const RestartMgr & right);
 
 public:
 
   // registration functions:
 
-  bool registerTopology(N_TOP_Topology * top) { return (topMgrPtr_ = top); }
+  bool registerTopology(Topo::Topology * top) { return (topMgrPtr_ = top); }
 
-  bool registerDeviceInterface(N_DEV_DeviceInterface * dev){return (devIntPtr_ = dev);}
+  bool registerDeviceInterface(Device::DeviceInterface * dev){return (devIntPtr_ = dev);}
 
   bool registeranaInt(N_ANP_AnalysisInterface * tia) { return (anaIntPtr_ = tia); }
 
   bool registerParallelServices(N_PDS_Manager * pds) { return (pdsMgrPtr_ = pds); }
 
   // Method to register the package options manager
-  bool registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr );
+  bool registerPkgOptionsMgr( PkgOptionsMgr *pkgOptPtr );
 
   // Restart flag accessor.
   bool isRestart() const { return restartFlag_; }
 
-  bool registerRestartOptions( const N_UTL_OptionBlock & OB );
+  bool registerRestartOptions( const Util::OptionBlock & OB );
 
   bool getRestartIntervals( double & initialInterval,
-                            vector< pair<double,double> > & intervalPairs );
+                            std::vector<std::pair<double,double> > & intervalPairs );
 
-  bool registerNodePartitioning( map<string,int> & nodeMap )
+  bool registerNodePartitioning(std::map<std::string,int> & nodeMap )
   {
     npMap_ = nodeMap;
     return true;
@@ -135,42 +132,47 @@ public:
 
   int restartDataSize();
 
-  struct N_IO_RestartMgr_OptionsReg : public N_IO_PkgOptionsReg
+  struct RestartMgr_OptionsReg : public PkgOptionsReg
   {
-    N_IO_RestartMgr_OptionsReg( N_IO_RestartMgr * mgr )
-    : Mgr(mgr)
+    RestartMgr_OptionsReg( RestartMgr * mgr )
+      : Mgr(mgr)
     {}
 
-    bool operator()( const N_UTL_OptionBlock & options )
+    bool operator()( const Util::OptionBlock & options )
     { return Mgr->registerRestartOptions( options ); }
 
-    N_IO_RestartMgr * Mgr;
+    RestartMgr * Mgr;
   };
 
 private:
 
   N_PDS_Manager * pdsMgrPtr_;
 
-  N_TOP_Topology * topMgrPtr_;
+  Topo::Topology * topMgrPtr_;
 
-  N_DEV_DeviceInterface * devIntPtr_;
+  Device::DeviceInterface * devIntPtr_;
   N_ANP_AnalysisInterface * anaIntPtr_;
   // package options manager
-  RCP<N_IO_PkgOptionsMgr> pkgOptMgrPtr_;
+  PkgOptionsMgr *pkgOptMgrPtr_;
 
   bool restartFlag_;
-  string restartFileName_;
-  string restartJobName_;
+  std::string restartFileName_;
+  std::string restartJobName_;
 
   double initialSaveInterval_;
-  vector< pair<double,double> > saveIntervalPairs_;
+  std::vector<std::pair<double,double> > saveIntervalPairs_;
 
-  map<string,int> npMap_;
+  std::map<std::string,int> npMap_;
 
   bool pack_;
 
   // command line object
-  N_IO_CmdParse & commandLine_;
+  CmdParse & commandLine_;
 };
+
+} // namespace IO
+} // namespace Xyce
+
+typedef Xyce::IO::RestartMgr N_IO_RestartMgr;
 
 #endif

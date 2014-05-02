@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,21 +36,16 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.13.2.2 $
+// Revision Number: $Revision: 1.19 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
 #include <map>
-
-// ---------- Xyce Includes --------------
 
 #include <N_TOP_Indexor.h>
 
@@ -60,16 +55,19 @@
 
 #include <Epetra_CrsGraph.h>
 
+namespace Xyce {
+namespace Topo {
+
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Indexor::globalToLocal
+// Function      : Indexor::globalToLocal
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 06/12/02
 //-----------------------------------------------------------------------------
-bool N_TOP_Indexor::globalToLocal( const string & map_name,
-                                   vector<int> & ids )
+bool Indexor::globalToLocal( const std::string & map_name,
+                                   std::vector<int> & ids )
 {
   N_PDS_ParMap * map;
 
@@ -87,15 +85,15 @@ bool N_TOP_Indexor::globalToLocal( const string & map_name,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Indexor::localToGlobal
+// Function      : Indexor::localToGlobal
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 04/28/10
 //-----------------------------------------------------------------------------
-bool N_TOP_Indexor::localToGlobal( const string & map_name,
-                                   vector<int> & ids )
+bool Indexor::localToGlobal( const std::string & map_name,
+                                   std::vector<int> & ids )
 {
   N_PDS_ParMap * map;
 
@@ -113,14 +111,14 @@ bool N_TOP_Indexor::localToGlobal( const string & map_name,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Indexor::setupAcceleratedMatrixIndexing
+// Function      : Indexor::setupAcceleratedMatrixIndexing
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 08/23/02
 //-----------------------------------------------------------------------------
-bool N_TOP_Indexor::setupAcceleratedMatrixIndexing( const string & graph_name )
+bool Indexor::setupAcceleratedMatrixIndexing( const std::string & graph_name )
 {
   Epetra_CrsGraph * graph = 0;
 
@@ -148,14 +146,14 @@ bool N_TOP_Indexor::setupAcceleratedMatrixIndexing( const string & graph_name )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Indexor::deleteAcceleratedMatrixIndexing
+// Function      : Indexor::deleteAcceleratedMatrixIndexing
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 08/23/02
 //-----------------------------------------------------------------------------
-bool N_TOP_Indexor::deleteAcceleratedMatrixIndexing()
+bool Indexor::deleteAcceleratedMatrixIndexing()
 {
   matrixIndexMap_.clear();
   accelMatrixIndex_ = false;
@@ -163,16 +161,16 @@ bool N_TOP_Indexor::deleteAcceleratedMatrixIndexing()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Indexor::matrixGlobalToLocal
+// Function      : Indexor::matrixGlobalToLocal
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 08/23/02
 //-----------------------------------------------------------------------------
-bool N_TOP_Indexor::matrixGlobalToLocal( const string & graph_name,
-                                         const vector<int> & gids,
-                                         vector< vector<int> > & stamp )
+bool Indexor::matrixGlobalToLocal( const std::string & graph_name,
+                                         const std::vector<int> & gids,
+                                         std::vector< std::vector<int> > & stamp )
 {
   Epetra_CrsGraph * graph = 0;
 
@@ -186,20 +184,6 @@ bool N_TOP_Indexor::matrixGlobalToLocal( const string & graph_name,
 
   int numElements;
   int * elements;
-
-#ifdef Xyce_DEBUG_DIRECT_ACCESS_MATRIX
-  int numGIDs = gids.size();
-  cout << "^^^^^^^^^^^^^^^^^^^^^^^^^\n";
-  cout << "N_TOP_Indexor:matrixGlobalToLocal " << graph_name << endl;
-  cout << "INITIAL:\n";
-
-  for( int i = 0; i < numGIDs; ++i )
-  {
-    cout << gids[i] << " " << graph->LCID(gids[i]) << ":";
-    if( i < numRows ) for( int j = 0; j < stamp[i].size(); ++j ) cout << " " << stamp[i][j];
-    cout << endl;
-  }
-#endif
 
   if( accelMatrixIndex_ )
   {
@@ -220,7 +204,7 @@ bool N_TOP_Indexor::matrixGlobalToLocal( const string & graph_name,
     {
       graph->ExtractMyRowView( graph->LRID(gids[i]), numElements, elements );
 
-      map<int,int> indexToOffsetMap;
+      std::map<int,int> indexToOffsetMap;
       for( int j = 0; j < numElements; ++j ) indexToOffsetMap[ elements[j] ] = j;
 
       int numCols = stamp[i].size();
@@ -233,17 +217,8 @@ bool N_TOP_Indexor::matrixGlobalToLocal( const string & graph_name,
     }
   }
 
-#ifdef Xyce_DEBUG_DIRECT_ACCESS_MATRIX
-  cout << "RESULT:\n";
-  for( int i = 0; i < numRows; ++i )
-  {
-    cout << gids[i] << " " << graph->LCID(gids[i]) << ":";
-    if( i < numRows ) for( int j = 0; j < stamp[i].size(); ++j ) cout << " " << stamp[i][j];
-    cout << endl;
-  }
-  cout << "^^^^^^^^^^^^^^^^^^^^^^^^^\n";
-#endif
-
   return true;
 }
 
+} // namespace Topo
+} // namespace Xyce

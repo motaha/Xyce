@@ -5,7 +5,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,39 +36,38 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.76.2.3 $
+// Revision Number: $Revision: 1.88 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:43 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
+#include <iostream>
 
 
-//---------- Standard Includes ------------------------------------------------
-
-#include "iostream"
-
-//---------- Xyce Includes ----------------------------------------------------
-
+#include <N_IO_fwd.h>
 #include <N_IO_DistributionTool.h>
 #include <N_PDS_Comm.h>
 #include <N_IO_PkgOptionsMgr.h>
 #include <N_IO_CircuitBlock.h>
 #include <N_IO_CmdParse.h>
 
+namespace Xyce {
+namespace IO {
+
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::N_IO_DistributionTool
+// Function      : DistributionTool::DistributionTool
 // Purpose       : ctor
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-N_IO_DistributionTool::N_IO_DistributionTool( N_IO_CircuitBlock * cktBlk,
-                                              N_IO_CmdParse & cp,
+DistributionTool::DistributionTool( CircuitBlock * cktBlk,
+                                              CmdParse & cp,
                                               N_PDS_Comm * pdsCommPtr = NULL )
 : cktBlk_( cktBlk ),
   currProc_(0),
@@ -93,41 +92,41 @@ N_IO_DistributionTool::N_IO_DistributionTool( N_IO_CircuitBlock * cktBlk,
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::~N_IO_DistributionTool
+// Function      : DistributionTool::~DistributionTool
 // Purpose       : dtor
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-N_IO_DistributionTool::~N_IO_DistributionTool()
+DistributionTool::~DistributionTool()
 {
 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::registerPkgOptionsMgr
+// Function      : DistributionTool::registerPkgOptionsMgr
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, 1437
 // Creation Date : 10/21/08
 //-----------------------------------------------------------------------------
-bool N_IO_DistributionTool::registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr )
+bool DistributionTool::registerPkgOptionsMgr( PkgOptionsMgr *pkgOptPtr )
 {
   pkgOptMgrPtr_ = pkgOptPtr;
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::deviceCount
+// Function      : DistributionTool::deviceCount
 // Purpose       : set total device count and determine device/proc ratio
 // Special Notes : a noop in serial
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_IO_DistributionTool::deviceCount( int devices )
+void DistributionTool::deviceCount( int devices )
 {
 
 #ifdef Xyce_PARALLEL_MPI
@@ -146,14 +145,14 @@ void N_IO_DistributionTool::deviceCount( int devices )
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::circuitContext
+// Function      : DistributionTool::circuitContext
 // Purpose       : send circuit context to all procs
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_IO_DistributionTool::circuitContext( N_IO_CircuitContext * const
+bool DistributionTool::circuitContext( CircuitContext * const
  circuitContexts )
 {
   // store until explicit send
@@ -190,7 +189,7 @@ bool N_IO_DistributionTool::circuitContext( N_IO_CircuitContext * const
 #ifdef Xyce_PARALLEL_MPI
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::bcastCircuitContext
+// Function      : DistributionTool::bcastCircuitContext
 // Purpose       : send circuit context to all procs
 // Special Notes : KRS, 12/14/07:  We're augmenting this to broadcast
 //                 info in commandLine_ to all procs (info related to creating
@@ -200,7 +199,7 @@ bool N_IO_DistributionTool::circuitContext( N_IO_CircuitContext * const
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_IO_DistributionTool::bcastCircuitContext()
+void DistributionTool::bcastCircuitContext()
 {
   int bsize = 0;
   int pos = 0;
@@ -217,9 +216,9 @@ void N_IO_DistributionTool::bcastCircuitContext()
 
 
   // transform booleans into integers and transmit them
-  bool netlistcopy = commandLine_.getNetlistCopy();
-  bool oneterm = commandLine_.getOneTerm();
-  bool nodcpath = commandLine_.getNoDCPath();
+  bool netlistcopy = commandLine_.getHangingResistor().getNetlistCopy();
+  bool oneterm = commandLine_.getHangingResistor().getOneTerm();
+  bool nodcpath = commandLine_.getHangingResistor().getNoDCPath();
 
   int nlcopyint = 0;
   int otint = 0;
@@ -236,8 +235,8 @@ void N_IO_DistributionTool::bcastCircuitContext()
   pdsCommPtr_->bcast(&otint,1,0);
   pdsCommPtr_->bcast(&nodcint,1,0);
 
-  string onetermres(commandLine_.getOneTermRes());
-  string nodcpathres(commandLine_.getNoDCPathRes());
+  std::string onetermres(commandLine_.getHangingResistor().getOneTermRes());
+  std::string nodcpathres(commandLine_.getHangingResistor().getNoDCPathRes());
   int otreslength = onetermres.size();
   int nodcreslength = nodcpathres.size();
 
@@ -250,7 +249,7 @@ void N_IO_DistributionTool::bcastCircuitContext()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::receiveCircuitContext
+// Function      : DistributionTool::receiveCircuitContext
 // Purpose       : receive circuit context from proc 0
 // Special Notes : KRS, 12/14/07:  We're augmenting this to receive info in
 //                 commandLine_ from proc 0 (info related to creating
@@ -261,7 +260,7 @@ void N_IO_DistributionTool::bcastCircuitContext()
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_IO_DistributionTool::receiveCircuitContext()
+bool DistributionTool::receiveCircuitContext()
 {
   int bsize = 0;
   int pos = 0;
@@ -292,26 +291,26 @@ bool N_IO_DistributionTool::receiveCircuitContext()
 
   //Set the appropriate booleans in commandLine_
   if (nlcopyint == 1)
-    commandLine_.setNetlistCopy(true);
+    commandLine_.getHangingResistor().setNetlistCopy(true);
   if (otint == 1)
-    commandLine_.setOneTerm(true);
+    commandLine_.getHangingResistor().setOneTerm(true);
   if (nodcint == 1)
-    commandLine_.setNoDCPath(true);
+    commandLine_.getHangingResistor().setNoDCPath(true);
 
   //Receive the strings
   int otreslength=0;
   pdsCommPtr_->bcast(&otreslength,1,0);
-  string onetermres;
+  std::string onetermres;
   onetermres.resize(otreslength);
   pdsCommPtr_->bcast(&onetermres[0],otreslength,0);
-  commandLine_.setOneTermRes(onetermres);
+  commandLine_.getHangingResistor().setOneTermRes(onetermres);
 
   int nodcreslength=0;
   pdsCommPtr_->bcast(&nodcreslength,1,0);
-  string nodcpathres;
+  std::string nodcpathres;
   nodcpathres.resize(nodcreslength);
   pdsCommPtr_->bcast(&nodcpathres[0],nodcreslength,0);
-  commandLine_.setNoDCPathRes(nodcpathres);
+  commandLine_.getHangingResistor().setNoDCPathRes(nodcpathres);
 
 return true;
 }
@@ -320,15 +319,15 @@ return true;
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::updateCircuitOptions
+// Function      : DistributionTool::updateCircuitOptions
 // Purpose       :
 // Special Notes :
 // Scope         :
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_IO_DistributionTool::updateCircuitOptions(
- const list< N_UTL_OptionBlock > & updatedOptionList )
+void DistributionTool::updateCircuitOptions(
+ const std::list< Util::OptionBlock > & updatedOptionList )
 {
   // clear old option block?
   options_.clear();
@@ -344,14 +343,14 @@ void N_IO_DistributionTool::updateCircuitOptions(
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::circuitOptions
+// Function      : DistributionTool::circuitOptions
 // Purpose       : stage options for tx
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_IO_DistributionTool::circuitOptions( const list< N_UTL_OptionBlock > &
+bool DistributionTool::circuitOptions( const std::list< Util::OptionBlock > &
   options )
 {
   // store until explicit send
@@ -361,8 +360,8 @@ bool N_IO_DistributionTool::circuitOptions( const list< N_UTL_OptionBlock > &
 
   // resize buffer if necessary
   int tmpSize = sizeof( int );
-  list< N_UTL_OptionBlock >::const_iterator it_obL = options_.begin();
-  list< N_UTL_OptionBlock >::const_iterator it_oeL = options_.end();
+  std::list< Util::OptionBlock >::const_iterator it_obL = options_.begin();
+  std::list< Util::OptionBlock >::const_iterator it_oeL = options_.end();
 
   for( ; it_obL != it_oeL; ++it_obL )
   {
@@ -390,20 +389,20 @@ bool N_IO_DistributionTool::circuitOptions( const list< N_UTL_OptionBlock > &
 #ifdef Xyce_PARALLEL_MPI
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::bcastCircuitOptions
+// Function      : DistributionTool::bcastCircuitOptions
 // Purpose       : send option blocks to all procs
 // Special Notes :
 // Scope         : private
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_IO_DistributionTool::bcastCircuitOptions()
+void DistributionTool::bcastCircuitOptions()
 {
   int bsize = 0;
   int pos = 0;
 
-  list< N_UTL_OptionBlock >::iterator it_obL = options_.begin();
-  list< N_UTL_OptionBlock >::iterator it_oeL = options_.end();
+  std::list< Util::OptionBlock >::iterator it_obL = options_.begin();
+  std::list< Util::OptionBlock >::iterator it_oeL = options_.end();
 
   // pack options
   int count = options_.size();
@@ -423,14 +422,14 @@ void N_IO_DistributionTool::bcastCircuitOptions()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::receiveCircuitOptions
+// Function      : DistributionTool::receiveCircuitOptions
 // Purpose       : receive option blocks from proc 0
 // Special Notes :
 // Scope         :
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_IO_DistributionTool::receiveCircuitOptions()
+bool DistributionTool::receiveCircuitOptions()
 {
   int bsize = 0;
   int pos = 0;
@@ -444,7 +443,7 @@ bool N_IO_DistributionTool::receiveCircuitOptions()
   pdsCommPtr_->unpack( charBuffer_, bsize, pos, &size, 1 );
   for( int i = 0; i < size; ++i )
   {
-    N_UTL_OptionBlock anOptionBlock;
+    Util::OptionBlock anOptionBlock;
     anOptionBlock.unpack( charBuffer_, bsize, pos, pdsCommPtr_ );
     options_.push_back( anOptionBlock );
   }
@@ -459,33 +458,33 @@ bool N_IO_DistributionTool::receiveCircuitOptions()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::registerCircuitOptions
+// Function      : DistributionTool::registerCircuitOptions
 // Purpose       : register options
 // Special Notes :
 // Scope         : private
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_IO_DistributionTool::registerCircuitOptions()
+bool DistributionTool::registerCircuitOptions()
 {
 
-  string netListFile("");
+  std::string netListFile("");
   if (commandLine_.getArgumentValue("netlist") != "")
   {
     netListFile = commandLine_.getArgumentValue("netlist");
   }
 
   // validate the ref count pointer we're going to use
-  if( Teuchos::is_null( pkgOptMgrPtr_ ) )
+  if( pkgOptMgrPtr_ == 0 )
   {
     N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL,
-	    "N_IO_DistributionTool::registerOptions() called with null N_IO_PkgOptionsMgr\n");
+	    "DistributionTool::registerOptions() called with null PkgOptionsMgr\n");
   }
 
 #if 1
 
-  list<N_UTL_OptionBlock>::iterator iterOB = options_.begin();
-  list<N_UTL_OptionBlock>::iterator endOB = options_.end();
+  std::list<N_UTL_OptionBlock>::iterator iterOB = options_.begin();
+  std::list<N_UTL_OptionBlock>::iterator endOB = options_.end();
 
   //register options with pkg option mgr (new options control technique)
   for( ; iterOB != endOB; ++iterOB )
@@ -530,10 +529,10 @@ bool N_IO_DistributionTool::registerCircuitOptions()
 
 #else
 
-  // FIXME this was incorrect... see N_IO_DistribMgr
+  // FIXME this was incorrect... see DistribMgr
 
-  list< N_UTL_OptionBlock >::const_iterator it_obL = options_.begin();
-  list< N_UTL_OptionBlock >::const_iterator it_oeL = options_.end();
+  std::list< Util::OptionBlock >::const_iterator it_obL = options_.begin();
+  std::list< Util::OptionBlock >::const_iterator it_oeL = options_.end();
 
   // register options with pkg option mgr (the new options control technique)
   for( ; it_obL != it_oeL; ++it_obL )
@@ -553,15 +552,14 @@ bool N_IO_DistributionTool::registerCircuitOptions()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::circuitDeviceLine
+// Function      : DistributionTool::circuitDeviceLine
 // Purpose       : Send a circuit device line to current proc
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_IO_DistributionTool::circuitDeviceLine(
- vector< N_IO_SpiceSeparatedFieldTool::StringToken > & deviceLine )
+bool DistributionTool::circuitDeviceLine(std::vector< SpiceSeparatedFieldTool::StringToken > & deviceLine )
 {
 
 #ifdef Xyce_PARALLEL_MPI
@@ -629,9 +627,6 @@ bool N_IO_DistributionTool::circuitDeviceLine(
         // broadcast to all procs to exit receive loop and begin processing
         pdsCommPtr_->bcast( &minus1, 1, 0 );
 
-        // no more data will be sent to far procs
-        N_ERH_ErrorMgr::startSafeBarrier();
-
         // proc 0 processes last inconsequential lines (e.g. comments, .END);
         currProc_ = 0;
         return false;
@@ -648,7 +643,6 @@ bool N_IO_DistributionTool::circuitDeviceLine(
       // switch to proc 0 if nearly complete
       if (currProc_ == numProcs_)
       {
-        N_ERH_ErrorMgr::startSafeBarrier();    // Master proc calls (5)
         currProc_ = 0;
       }
 
@@ -698,7 +692,7 @@ bool N_IO_DistributionTool::circuitDeviceLine(
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::endDeviceLines()
+// Function      : DistributionTool::endDeviceLines()
 // Purpose       : Make sure other processors have been told that device processing
 //                 is ended.  This can be a problem with small device count circuits
 // Special Notes :
@@ -706,7 +700,7 @@ bool N_IO_DistributionTool::circuitDeviceLine(
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 03/06/06
 //-----------------------------------------------------------------------------
-void N_IO_DistributionTool::endDeviceLines()
+void DistributionTool::endDeviceLines()
 {
 
 #ifdef Xyce_PARALLEL_MPI
@@ -728,8 +722,6 @@ void N_IO_DistributionTool::endDeviceLines()
       pdsCommPtr_->send( &minus1, 1, currProc_ );
     }
 
-    N_ERH_ErrorMgr::startSafeBarrier();    // Master proc calls (5)
-
     // complete any remaining parser action on node 0
     currProc_ = 0;
   }
@@ -739,7 +731,7 @@ void N_IO_DistributionTool::endDeviceLines()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::circuitStart
+// Function      : DistributionTool::circuitStart
 // Purpose       : change current subcircuit context after a new subcircuit is
 //               : started
 // Special Notes :
@@ -747,10 +739,10 @@ void N_IO_DistributionTool::endDeviceLines()
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_IO_DistributionTool::circuitStart( string const & subcircuitName,
-                                          list<string> const & nodes,
-					  string const & prefix,
-                                          vector<N_DEV_Param> const & params )
+bool DistributionTool::circuitStart( std::string const & subcircuitName,
+                                          std::list<std::string> const & nodes,
+					  std::string const & prefix,
+                                          std::vector<N_DEV_Param> const & params )
 {
 
 #ifdef Xyce_PARALLEL_MPI
@@ -773,14 +765,14 @@ bool N_IO_DistributionTool::circuitStart( string const & subcircuitName,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::setFileName
+// Function      : DistributionTool::setFileName
 // Purpose       : Change name of netlist file
 // Special Notes :
 // Scope         : public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 03/10/06
 //-----------------------------------------------------------------------------
-void N_IO_DistributionTool::setFileName(string const & fileNameIn)
+void DistributionTool::setFileName(std::string const & fileNameIn)
 {
 
 #ifdef Xyce_PARALLEL_MPI
@@ -805,17 +797,17 @@ void N_IO_DistributionTool::setFileName(string const & fileNameIn)
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::packSubcircuitData
+// Function      : DistributionTool::packSubcircuitData
 // Purpose       : pack subcircuit data into buffer; helper for circuitStart()
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_IO_DistributionTool::packSubcircuitData( string const & subcircuitName,
-                                                list<string> const & nodes,
-                                                string const & prefix,
-                                                vector<N_DEV_Param> const & params )
+bool DistributionTool::packSubcircuitData( std::string const & subcircuitName,
+                                                std::list<std::string> const & nodes,
+                                                std::string const & prefix,
+                                                std::vector<N_DEV_Param> const & params )
 {
   int size = 0;
 
@@ -826,8 +818,8 @@ bool N_IO_DistributionTool::packSubcircuitData( string const & subcircuitName,
   size += sizeof(int);
 
   // count node sizes and node chars
-  list<string>::const_iterator it_sbL = nodes.begin();
-  list<string>::const_iterator it_seL = nodes.end();
+  std::list<std::string>::const_iterator it_sbL = nodes.begin();
+  std::list<std::string>::const_iterator it_seL = nodes.end();
   for( ; it_sbL != it_seL; ++it_sbL  )
   {
     size += sizeof(int) + it_sbL->length();
@@ -840,8 +832,8 @@ bool N_IO_DistributionTool::packSubcircuitData( string const & subcircuitName,
   size += sizeof(int);
 
   // count params
-  vector<N_DEV_Param>::const_iterator it_pbL = params.begin();
-  vector<N_DEV_Param>::const_iterator it_peL = params.end();
+  std::vector<N_DEV_Param>::const_iterator it_pbL = params.begin();
+  std::vector<N_DEV_Param>::const_iterator it_peL = params.end();
   for( ; it_pbL != it_peL; ++it_pbL  )
   {
     size += it_pbL->packedByteCount();
@@ -896,14 +888,14 @@ bool N_IO_DistributionTool::packSubcircuitData( string const & subcircuitName,
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::circuitEnd
+// Function      : DistributionTool::circuitEnd
 // Purpose       : change current subcircuit context to previous context
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_IO_DistributionTool::circuitEnd()
+bool DistributionTool::circuitEnd()
 {
 
 #ifdef Xyce_PARALLEL_MPI
@@ -931,7 +923,7 @@ bool N_IO_DistributionTool::circuitEnd()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::done
+// Function      : DistributionTool::done
 // Purpose       : clean up after reaching the end of the entire circuit
 // Special Notes : far procs get cleaned up after switch to next proc
 //               : while they are in receive loop, not here
@@ -939,7 +931,7 @@ bool N_IO_DistributionTool::circuitEnd()
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_IO_DistributionTool::done()
+bool DistributionTool::done()
 {
 
 #ifdef Xyce_PARALLEL_MPI
@@ -975,14 +967,14 @@ bool N_IO_DistributionTool::done()
 #ifdef Xyce_PARALLEL_MPI
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::send
+// Function      : DistributionTool::send
 // Purpose       : send buffer from proc 0 and adjust buffer limits
 // Special Notes : size == -1, and no args send(), will force a transmission
 // Scope         :
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_IO_DistributionTool::send(int size)
+void DistributionTool::send(int size)
 {
 
   // transmit buffer if next set of object will fill it completely, or forced
@@ -1057,21 +1049,20 @@ void N_IO_DistributionTool::send(int size)
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::receive
+// Function      : DistributionTool::receive
 // Purpose       : receive all data from proc 0
 // Special Notes :
 // Scope         :
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_IO_DistributionTool::receive()
+bool DistributionTool::receive()
 {
   bool processingLine = true;
   int size, bsize, length, pos, i;
   char lineType;
 
-  N_ERH_ErrorMgr::safeBarrier(0);     // Slave procs call (3)
-  N_ERH_ErrorMgr::startSafeBarrier();     // Slave procs call (4)
+  N_ERH_ErrorMgr::safeBarrier(pdsCommPtr_->comm());     // Slave procs call (3)
 
   // receive buffer size
   pdsCommPtr_->bcast( &charBufferSize_, 1, 0 );
@@ -1089,12 +1080,12 @@ bool N_IO_DistributionTool::receive()
 
   if (!receiveCircuitOptions())
   {
-    string msg("Internal error registering/receiving circuit options");
+    std::string msg("Internal error registering/receiving circuit options");
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg );
   }
   else
   {
-    N_ERH_ErrorMgr::safeBarrier(0);     // Slave procs call (4)
+    N_ERH_ErrorMgr::safeBarrier(pdsCommPtr_->comm());     // Slave procs call (4)
   }
 
   receiveCircuitContext();
@@ -1104,14 +1095,12 @@ bool N_IO_DistributionTool::receive()
   // free memory
   // delete [] charBuffer_;
 
-  vector<char *> bufs;
-  vector<int> bufSize;
+  std::vector<char *> bufs;
+  std::vector<int> bufSize;
   char *currBuffer_;
   unsigned int ib;
 
 #ifdef PMPDE
-  N_ERH_ErrorMgr::startSafeBarrier();
-
   if( !usingMPDE_ )
   {
 #endif
@@ -1166,9 +1155,6 @@ bool N_IO_DistributionTool::receive()
 
 
 #ifndef PMPDE
-
-  N_ERH_ErrorMgr::startSafeBarrier();     // Slave procs call (5)
-
   // process received device lines, contexts info, and exit calls
   for (ib=0 ; ib<bufs.size() ; ++ib)
   {
@@ -1192,7 +1178,7 @@ bool N_IO_DistributionTool::receive()
         {
           // unpack the device line
           pdsCommPtr_->unpack( currBuffer_, bsize, pos, &size, 1 );
-          vector< N_IO_SpiceSeparatedFieldTool::StringToken > deviceLine( size );
+          std::vector< SpiceSeparatedFieldTool::StringToken > deviceLine( size );
 
           for( i = 0; i < size; ++i )
           {
@@ -1209,30 +1195,30 @@ bool N_IO_DistributionTool::receive()
         {
           // get the subcircuit name
           pdsCommPtr_->unpack( currBuffer_, bsize, pos, &length, 1 );
-          string subcircuitName(string( ( currBuffer_ + pos ), length ));
+          std::string subcircuitName(std::string( ( currBuffer_ + pos ), length ));
           pos += length;
 
           // get the nodes for this subcircuit call
-          list<string> nodes;
+          std::list<std::string> nodes;
           pdsCommPtr_->unpack( currBuffer_, bsize, pos, &size, 1 );
           for( i = 0; i < size; ++i )
           {
             pdsCommPtr_->unpack( currBuffer_, bsize, pos, &length, 1 );
-            nodes.push_back( string( ( currBuffer_ + pos ), length ) );
+            nodes.push_back( std::string( ( currBuffer_ + pos ), length ) );
             pos += length;
           }
 
           // get the prefix
           pdsCommPtr_->unpack( currBuffer_, bsize, pos, &length, 1 );
-          string prefix(string( ( currBuffer_ + pos ), length ));
+          std::string prefix(std::string( ( currBuffer_ + pos ), length ));
           pos += length;
 
           // get params
-          vector<N_DEV_Param> params;
+          std::vector<N_DEV_Param> params;
           pdsCommPtr_->unpack( currBuffer_, bsize, pos, &size, 1 );
           for( i = 0; i < size; ++i )
           {
-            N_DEV_Param param;
+            Device::Param param;
             param.unpack( currBuffer_, bsize, pos, pdsCommPtr_ );
             params.push_back( param );
           }
@@ -1255,7 +1241,7 @@ bool N_IO_DistributionTool::receive()
         case 'f': // change netlist file name
         {
           pdsCommPtr_->unpack( currBuffer_, bsize, pos, &length, 1 );
-          fileName_ = string( ( currBuffer_ + pos ), length );
+          fileName_ = std::string( ( currBuffer_ + pos ), length );
           pos += length;
           cktBlk_->setFileName(fileName_);
 
@@ -1264,7 +1250,7 @@ bool N_IO_DistributionTool::receive()
 
         default:  // something went wrong
         {
-          string msg("Node ");
+          std::string msg("Node ");
           msg += pdsCommPtr_->procID();
           msg += " received an invalid message type: \"";
           msg += lineType;
@@ -1288,15 +1274,15 @@ bool N_IO_DistributionTool::receive()
 
 #ifdef PMPDE
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::processReceivedLLines
+// Function      : DistributionTool::processReceivedLLines
 // Purpose       : unpack and parse netlist lines
 // Special Notes :
 // Scope         : private
 // Creator       : Eric Rankin
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_IO_DistributionTool::processReceivedLines( vector<char *> & bufs,
-  vector<int> & bufSize )
+void DistributionTool::processReceivedLines( std::vector<char *> & bufs,
+  std::vector<int> & bufSize )
 {
   bool processingLine = true;
   int size, bsize, length, pos, i;
@@ -1327,7 +1313,7 @@ void N_IO_DistributionTool::processReceivedLines( vector<char *> & bufs,
         {
           // unpack the device line
           pdsCommPtr_->unpack( currBuffer_, bsize, pos, &size, 1 );
-          vector< N_IO_SpiceSeparatedFieldTool::StringToken > deviceLine( size );
+          std::vector< SpiceSeparatedFieldTool::StringToken > deviceLine( size );
 
           for( i = 0; i < size; ++i )
           {
@@ -1344,30 +1330,30 @@ void N_IO_DistributionTool::processReceivedLines( vector<char *> & bufs,
         {
           // get the subcircuit name
           pdsCommPtr_->unpack( currBuffer_, bsize, pos, &length, 1 );
-          string subcircuitName(string( ( currBuffer_ + pos ), length ));
+          std::string subcircuitName(std::string( ( currBuffer_ + pos ), length ));
           pos += length;
 
           // get the nodes for this subcircuit call
-          list<string> nodes;
+          std::list<std::string> nodes;
           pdsCommPtr_->unpack( currBuffer_, bsize, pos, &size, 1 );
           for( i = 0; i < size; ++i )
           {
             pdsCommPtr_->unpack( currBuffer_, bsize, pos, &length, 1 );
-            nodes.push_back( string( ( currBuffer_ + pos ), length ) );
+            nodes.push_back( std::string( ( currBuffer_ + pos ), length ) );
             pos += length;
           }
 
           // get the prefix
           pdsCommPtr_->unpack( currBuffer_, bsize, pos, &length, 1 );
-          string prefix(string( ( currBuffer_ + pos ), length ));
+          std::string prefix(std::string( ( currBuffer_ + pos ), length ));
           pos += length;
 
           // get params
-          vector<N_DEV_Param> params;
+          std::vector<Device::Param> params;
           pdsCommPtr_->unpack( currBuffer_, bsize, pos, &size, 1 );
           for( i = 0; i < size; ++i )
           {
-            N_DEV_Param param;
+            Device::Param param;
             param.unpack( currBuffer_, bsize, pos, pdsCommPtr_ );
             params.push_back( param );
           }
@@ -1390,7 +1376,7 @@ void N_IO_DistributionTool::processReceivedLines( vector<char *> & bufs,
         case 'f': // change netlist file name
         {
           pdsCommPtr_->unpack( currBuffer_, bsize, pos, &length, 1 );
-          fileName_ = string( ( currBuffer_ + pos ), length );
+          fileName_ = std::string( ( currBuffer_ + pos ), length );
           pos += length;
           cktBlk_->setFileName(fileName_);
 
@@ -1399,7 +1385,7 @@ void N_IO_DistributionTool::processReceivedLines( vector<char *> & bufs,
 
         default:  // something went wrong
         {
-          string msg("Node ");
+          std::string msg("Node ");
           msg += pdsCommPtr_->procID();
           msg += " received an invalid message type: \"";
           msg += lineType;
@@ -1420,28 +1406,30 @@ void N_IO_DistributionTool::processReceivedLines( vector<char *> & bufs,
 #endif
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::checkNodeDevConflicts
+// Function      : DistributionTool::checkNodeDevConflicts
 // Purpose       : Check for name collisions between devices
 // Special Notes :
 // Scope         : public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 01/20/06
 //-----------------------------------------------------------------------------
-void N_IO_DistributionTool::checkNodeDevConflicts()
+void DistributionTool::checkNodeDevConflicts()
 {
 #ifdef Xyce_PARALLEL_MPI
   numProcs_ = pdsCommPtr_->numProc();
 
   if ( numProcs_ != 1 )
   {
-    vector<string> deviceNames;
-    vector<string>::iterator n_i, n_end;
+    std::vector<std::string> deviceNames;
+    std::vector<std::string>::iterator n_i, n_end;
     int byteCount, maxByteCount, length, pos, sendProc, recvProc, bsize;
     byteCount = cktBlk_->getDeviceNames(deviceNames);
-    N_ERH_ErrorMgr::safeBarrier(0);     // All procs call (5)
+
+    N_ERH_ErrorMgr::safeBarrier(pdsCommPtr_->comm());     // All procs call (5)
+
     pdsCommPtr_->maxAll(&byteCount, &maxByteCount, 1);
-    vector<char> sendBuffer(byteCount);
-    vector<char> recvBuffer(maxByteCount);
+    std::vector<char> sendBuffer(byteCount);
+    std::vector<char> recvBuffer(maxByteCount);
     n_end = deviceNames.end();
     pos = 0;
     for (n_i = deviceNames.begin() ; n_i != n_end ; ++n_i)
@@ -1468,39 +1456,35 @@ void N_IO_DistributionTool::checkNodeDevConflicts()
       while (pos < bsize)
       {
         pdsCommPtr_->unpack(&recvBuffer[0], bsize, pos, &length, 1);
-        deviceNames.push_back(string((&recvBuffer[0])+pos, length));
+        deviceNames.push_back(std::string((&recvBuffer[0])+pos, length));
         pos += length;
       }
-      N_ERH_ErrorMgr::startSafeBarrier();     // All procs call (5+N)
+
       cktBlk_->checkDeviceNames(deviceNames);
-      N_ERH_ErrorMgr::safeBarrier(0);          // All procs call (5+N)
+      N_ERH_ErrorMgr::safeBarrier(pdsCommPtr_->comm());          // All procs call (5+N)
       if (++sendProc == numProcs_) sendProc = 0;
       if (--recvProc == -1) recvProc = numProcs_-1;
     }
-
-    N_ERH_ErrorMgr::startSafeBarrier();     // All procs call (END)
   }
 #endif
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::start
+// Function      : DistributionTool::start
 // Purpose       : prepare proc 0 to distribute, others receive
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_IO_DistributionTool::start()
+bool DistributionTool::start()
 {
 
 #ifdef Xyce_PARALLEL_MPI
 
-  // prepare proc 0
-  N_ERH_ErrorMgr::startSafeBarrier();      // All procs call (3)
   // procID == 0 may not be true if we're running in a hierarchical parallel context
   // so check if numProc() == 1 too.
-  if( (pdsCommPtr_->procID() == 0) || (pdsCommPtr_->numProc() == 1) )
+  if (pdsCommPtr_->procID() == 0)
   {
     numProcs_ = pdsCommPtr_->numProc();
     ( numProcs_ == 1) ? currProc_ = 0 : currProc_ = 1;
@@ -1526,21 +1510,20 @@ bool N_IO_DistributionTool::start()
 #ifdef Xyce_PARALLEL_MPI
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::broadcastGlobalData
+// Function      : DistributionTool::broadcastGlobalData
 // Purpose       : send bufsize, options, metatdata, and context to procs
 // Special Notes :
 // Scope         : private
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_IO_DistributionTool::broadcastGlobalData()
+bool DistributionTool::broadcastGlobalData()
 {
   // make sure data is ready to tx
   if( circuitContextReady_ && circuitOptionsReady_ && numProcs_ >= 1 )
   {
 
-    N_ERH_ErrorMgr::safeBarrier(0);    // Master proc calls (3)
-    N_ERH_ErrorMgr::startSafeBarrier();    // Master proc calls (4)
+    N_ERH_ErrorMgr::safeBarrier(pdsCommPtr_->comm());    // Master proc calls (3)
 
     // reserve memory; including offset
     charBuffer_ = new char[charBufferSize_ + sizeof(char) + sizeof(int)];
@@ -1550,7 +1533,7 @@ bool N_IO_DistributionTool::broadcastGlobalData()
 
     // tx global data
     bcastCircuitOptions();
-    N_ERH_ErrorMgr::safeBarrier(0);    // Master proc calls (4)
+    N_ERH_ErrorMgr::safeBarrier(pdsCommPtr_->comm());    // Master proc calls (4)
     bcastCircuitContext();
 
     pdsCommPtr_->barrier();
@@ -1564,14 +1547,14 @@ bool N_IO_DistributionTool::broadcastGlobalData()
 
 #ifdef PMPDE
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DistributionTool::setupMPDE
+// Function      : DistributionTool::setupMPDE
 // Purpose       : setup distribution mode for MPDE
 // Special Notes :
 // Scope         : private
 // Creator       : Eric Rankin
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_IO_DistributionTool::setupMPDE()
+void DistributionTool::setupMPDE()
 {
   // flag mpde mode
   usingMPDE_ = true;
@@ -1586,3 +1569,5 @@ void N_IO_DistributionTool::setupMPDE()
 }
 #endif
 
+} // namespace IO
+} // namespace Xyce

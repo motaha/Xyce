@@ -4,6 +4,9 @@
 # class source list
 set ( ErrorHandling_SOURCES 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_ERH_ErrorMgr.C 
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_ERH_Message.C 
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_ERH_Messenger.C 
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_ERH_Progress.C 
       CACHE INTERNAL "X_S" )
 
 

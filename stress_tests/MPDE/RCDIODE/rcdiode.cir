@@ -1,0 +1,41 @@
+Simple RC-Diode circuit
+**********************************************************************
+*
+* This circuit has the voltage source applied directly to the
+* capacitor, with the resistor tied to ground and the diode
+* in parallel with the capacitor.
+*
+*
+* 1/30/03 Todd Coffey  <tscoffe@sandia.gov>
+*
+* A few mods by Eric Keiter <erkeite@sandia.gov>
+*
+**********************************************************************
+* high-frequency noise on top of low freqency sine
+*Vsrc	1 0	SFFM(0V 24V 100 0.5 1000)
+* symmetric sine wave
+Vin     1 0     DC 3V
+Vsrc	12 1	DC 0V SIN(0V 12V 200 0 0)
+*Vsrc	1 0	DC 0V SIN(0V 12V 200 0 0)
+* positive only pulse:
+*Vsrc	1 0	PULSE(0V 12V 1ms 1ms 1ms 5ms 10ms)
+* negative pulse:
+*Vsrc	1 0     PULSE(0V -12V 6ms 1ms 1ms 1ms 10ms)
+R1	12 2	20k 
+D1	2  3	DM
+C1  3 0 1u
+
+.model DM D( Is = 1.0e-14 )  
+.print tran  V(1) V(2) V(3) I(Vsrc)
+
+.tran 5e-5 50ms
+
+.options MPDE IC=1 n2=11 oscsrc=Vsrc T2=0.005
+
+.options timeint maxord=1 debuglevel=5 newdae=1
+
+.options device voltlim=0 debuglevel=-10
+.options nonlin searchmethod=2
+.options nonlin-tran searchmethod=2
+
+.END

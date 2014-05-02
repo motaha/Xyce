@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.9.2.2 $
+// Revision Number: $Revision: 1.14 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:50 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,70 +46,68 @@
 #ifndef N_TOP_CktGraphBasic_h
 #define N_TOP_CktGraphBasic_h 1
 
-// ---------- Standard Includes ----------
 #include <iosfwd>
 #include <string>
 #include <map>
 
-// ----------   Xyce Includes   ----------
-
+#include <N_TOP_fwd.h>
 #include <N_TOP_CktGraph.h>
-
 #include <N_UTL_Graph.h>
 
-// ---------- Forward Declarations ----------
+namespace Xyce {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Class         : N_DEV_CktGraphBasic
+// Class         : CktGraphBasic
 // Purpose       :
 // Special Notes :
 // Creator       : Rob Hoekstra, SNL, Electrical & Microsystems
 // Creation Date : 8/10/06
 //-----------------------------------------------------------------------------
-class N_TOP_CktGraphBasic : public N_TOP_CktGraph
+class CktGraphBasic : public CktGraph
 {
 
 public:
 
   // Default constructor.
-  N_TOP_CktGraphBasic(const int maxTries);
+  CktGraphBasic(const int maxTries);
 
   // Constructor
-  N_TOP_CktGraphBasic(const string & cgID, const int maxTries);
+  CktGraphBasic(const std::string & cgID, const int maxTries);
 
   // Constructor
-  N_TOP_CktGraphBasic(const string & cgID, const list <NodeID> & nodelist, const int maxTries);
+  CktGraphBasic(const std::string & cgID, const std::list<NodeID> & nodelist, const int maxTries);
 
   // Copy constructor.
-  N_TOP_CktGraphBasic(const N_TOP_CktGraphBasic & right);
+  CktGraphBasic(const CktGraphBasic & right);
 
   // Destructor
-  ~N_TOP_CktGraphBasic();
+  ~CktGraphBasic();
 
   // Inserts graph node for ckt node if does not exist
-  void InsertNode(N_TOP_CktNode * cktnode,
-                  const list <NodeID> & neighborList);
+  void InsertNode(CktNode * cktnode,
+                  const std::list<NodeID> & neighborList);
 
   // Destroys graph node and returns the ckt node
-  N_TOP_CktNode * ExtractNode(const NodeID & cnID);
+  CktNode * ExtractNode(const NodeID & cnID);
   // Destroys graph node and returns the ckt node
-  N_TOP_CktNode * ExtractNode(const int & cnID);
+  CktNode * ExtractNode(const int & cnID);
 
   // Returns pointer to specified ckt node
-  N_TOP_CktNode * FindCktNode(const NodeID & cnID);
+  CktNode * FindCktNode(const NodeID & cnID);
   // Returns pointer to specified ckt node
-  N_TOP_CktNode * FindCktNode(const int & cnID);
+  CktNode * FindCktNode(const int & cnID);
 
   // Breadth first, depth first, and basic traversals of graph
   //----------------------------------------------------------
 
   // Produces list of ckt nodes in breadth-first traversal order
-  list<N_TOP_CktNode*>* getBFSNodeList();
+  std::list<CktNode*>* getBFSNodeList();
   // Produces list of ckt nodes in depth-first traversal order
-  list<N_TOP_CktNode*>* getDFSNodeList();
+  std::list<CktNode*>* getDFSNodeList();
   
   // Returns the node list from the circuit graph without any specific ordering
-  const map<NodeID, N_TOP_CktNode *> getNodeList() { return cktgph.getData1Map(); }
+  const std::map<NodeID, CktNode *> getNodeList() { return cktgph.getData1Map(); }
 
   // Returns the number of nodes
   int returnNumNodes();
@@ -118,14 +116,14 @@ public:
   //----------------------------------------------------------
 
   // Loop through ordered node list and generate ordered list of global id's
-  void returnGIDList(list<int>& gidList);
+  void returnGIDList(std::list<int>& gidList);
 
   // Loop through node list and produce ordered list of global id's for soln
-  void returnSVGIDList(list<int>& svGIDList);
+  void returnSVGIDList(std::list<int>& svGIDList);
 
   // Loop through node list and produce ordered list or local id's (strings)
   // for nodes
-  void returnLIDList(list<NodeID>& lidList);
+  void returnLIDList(std::list<NodeID>& lidList);
 
   // assigns global ids to device int. and ext. vars
   //----------------------------------------------------------
@@ -138,19 +136,19 @@ public:
   void registerStoreGIDswithDevs();
 
   // Loop over nodes and register int and ext local ids with each device
-  void registerLIDswithDevs( N_TOP_Indexor & indexor );
+  void registerLIDswithDevs( Indexor & indexor );
   // Loop over nodes and register state local ids with each device
-  void registerStateLIDswithDevs( N_TOP_Indexor & indexor );
-  void registerStoreLIDswithDevs( N_TOP_Indexor & indexor );
+  void registerStateLIDswithDevs( Indexor & indexor );
+  void registerStoreLIDswithDevs( Indexor & indexor );
 
   // Loop over nodes and register dep. local ids with each device
-  void registerDepLIDswithDevs( N_TOP_Indexor & indexor );
+  void registerDepLIDswithDevs( Indexor & indexor );
   // Loop over nodes and register dep. state local ids with each device
-  void registerDepStateLIDswithDevs( N_TOP_Indexor & indexor );
-  void registerDepStoreLIDswithDevs( N_TOP_Indexor & indexor );
+  void registerDepStateLIDswithDevs( Indexor & indexor );
+  void registerDepStoreLIDswithDevs( Indexor & indexor );
 
   //Loop over nodes and register jacobian offsets with each device
-  void registerJacLIDswithDevs( N_TOP_Indexor & indexor );
+  void registerJacLIDswithDevs( Indexor & indexor );
 
   // methods used to build Zoltan Query Functions
   //----------------------------------------------------------
@@ -162,49 +160,49 @@ public:
   int returnNumEdges(const int & globalID);
 
   // Returns vector of adj ids
-  void returnAdjIDs( const NodeID & id, vector<NodeID> & adj_ids );
+  void returnAdjIDs( const NodeID & id, std::vector<NodeID> & adj_ids );
 
   // Returns vector of adj gids
-  void returnAdjGIDs( int gid, vector<int> & adj_gids );
+  void returnAdjGIDs( int gid, std::vector<int> & adj_gids );
 
-  // Creates and returns a N_TOP_NodeDevBlock for the specified GID
-  N_TOP_NodeDevBlock * returnNodeDevBlock( int gid );
-
-  // Loop over adjacent nodes creating ordered lists of neighboring global id's
-  // and owning processor numbers
-  void returnAdjNodes(const NodeID & id, list<int> & gidList,
-                      list<int> & svGIDList, list<int> & procList,
-                      list<NodeID> & idList);
+  // Creates and returns a NodeDevBlock for the specified GID
+  NodeDevBlock * returnNodeDevBlock( int gid );
 
   // Loop over adjacent nodes creating ordered lists of neighboring global id's
   // and owning processor numbers
-  void returnAdjNodes(const int & globalID, list<int> & gidList,
-                      list<int> & svGIDList, list<int> & procList,
-                      list<NodeID> & idList);
+  void returnAdjNodes(const NodeID & id, std::list<int> & gidList,
+                      std::list<int> & svGIDList, std::list<int> & procList,
+                      std::list<NodeID> & idList);
+
+  // Loop over adjacent nodes creating ordered lists of neighboring global id's
+  // and owning processor numbers
+  void returnAdjNodes(const int & globalID, std::list<int> & gidList,
+                      std::list<int> & svGIDList, std::list<int> & procList,
+                      std::list<NodeID> & idList);
 
   // Loop over adjacent nodes connected to ground creating ordered lists of
   // neighboring global id's and owning processor numbers 
-  void returnAdjNodesWithGround(const int & globalID, list<int> & gidList,
-  	list<int> & svGIDList, list<int> & procList,
-  	list<NodeID> & idList);
+  void returnAdjNodesWithGround(const int & globalID, std::list<int> & gidList,
+  	std::list<int> & svGIDList, std::list<int> & procList,
+  	std::list<NodeID> & idList);
 
   // Redo global index node map
   void regenerateGIDNodeMap();
   
   // supernode given nodes
-  N_TOP_CktNode * replaceNode( const NodeID nodeToBeReplaced, const NodeID nodeToKeep );
-  void removeRedundantDevices(vector< N_TOP_CktNode * > & removedDevices);
+  CktNode * replaceNode( const NodeID nodeToBeReplaced, const NodeID nodeToKeep );
+  void removeRedundantDevices(std::vector< CktNode * > & removedDevices);
 
 private:
 
   // circuit graph.
-  // pair = <id, node type>, int = gid, N_TOP_CktNode = data
-  N_UTL_Graph<NodeID,int,N_TOP_CktNode*> cktgph;
+  // pair = <id, node type>, int = gid, CktNode = data
+    N_UTL_Graph<NodeID,int,CktNode*> cktgph;
 
   // List of ckt nodes in breadth-first traversal order.
-  list<N_TOP_CktNode*> BFSNodeList_;
+  std::list<CktNode*> BFSNodeList_;
   // List of ckt nodes in depth-first traversal order.
-  list<N_TOP_CktNode*> DFSNodeList_;
+  std::list<CktNode*> DFSNodeList_;
 
   // Don't update traversals if not modified - flag.
   bool isModified_;
@@ -213,9 +211,12 @@ private:
   int maxTries_;
 
 public:
-
-  ostream & put(ostream & os) const;
-
+  std::ostream & put(std::ostream & os) const;
 };
+
+} // namespace Topo
+} // namespace Xyce
+
+typedef Xyce::Topo::CktGraphBasic N_TOP_CktGraphBasic;
 
 #endif

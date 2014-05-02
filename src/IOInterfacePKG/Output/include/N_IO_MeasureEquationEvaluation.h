@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,42 +36,50 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.5.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:41 $
+// Revision Number: $Revision: 1.13 $
+// Revision Date  : $Date: 2014/02/24 23:49:20 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #ifndef Xyce_N_IO_MeasureEquationEvaluation_h
 #define Xyce_N_IO_MeasureEquationEvaluation_h
 
-// ----------   Xyce Includes   ----------
 #include <N_IO_MeasureBase.h>
 
-// ---------- Forward Declarations ----------
-
+namespace Xyce {
+namespace IO {
+namespace Measure {
 
 //-------------------------------------------------------------------------
-// Class         : N_IO_MeasureEquationEvaluation
+// Class         : EquationEvaluation
 // Purpose       : Evaluates an equations based on measured variables
 // Special Notes :
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-------------------------------------------------------------------------
-class N_IO_MeasureEquationEvaluation : public N_IO_MeasureBase
+class EquationEvaluation : public Base
 {
 public:
-  N_IO_MeasureEquationEvaluation( const N_UTL_OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr );
-  ~N_IO_MeasureEquationEvaluation() {};
+  EquationEvaluation( const Util::OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr );
+  ~EquationEvaluation() {};
 
-  void updateTran( const double circuitTime, RCP< N_LAS_Vector > solnVecRCP);
-  void updateDC( const vector<N_ANP_SweepParam> & dcParamsVec, RCP< N_LAS_Vector > solnVecRCP);
-
+  void prepareOutputVariables();
+  void updateTran( const double circuitTime, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec);
+  void updateDC( const std::vector<N_ANP_SweepParam> & dcParamsVec, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec);
+  void updateAC( const double frequency, const N_LAS_Vector *solnVec, const N_LAS_Vector *imaginaryVec);
+ 
 private:
-  string type_;
+  std::string type_;
   int numOutVars_;
-  vector<double> outVarValues_;
+  std::vector<double> outVarValues_;
 
 
 };
+
+} // namespace Measure
+} // namespace IO
+} // namespace Xyce
+
+typedef Xyce::IO::Measure::EquationEvaluation N_IO_MeasureEquationEvaluation;
 
 #endif

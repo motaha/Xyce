@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.12.2.2 $
+// Revision Number: $Revision: 1.17 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -49,6 +49,8 @@
 // ---------- Standard Includes ----------
 
 // ----------   Xyce Includes   ----------
+
+#include <N_UTL_fwd.h>
 
 #include "N_NLS_NOX_PseudoTransientTest.h"
 #include "N_NLS_NOX_WeightedUpdateTest.h"
@@ -85,7 +87,7 @@ checkStatus(const NOX::Solver::Generic& problem,
   psts = dynamic_cast<const N_NLS_NOX::PseudoTransientBased*>(&problem);
 
   if (psts == 0) {
-    cout << "NOX::StatusTest::PseudoTransientTest::checkStatus - failed dynamic_cast solver to PseudoTransientBased!" << endl;
+    Xyce::dout() << "NOX::StatusTest::PseudoTransientTest::checkStatus - failed dynamic_cast solver to PseudoTransientBased!" << std::endl;
     throw "NOX Error";
   }
   currentStepSize_ = psts->getPseudoTransientStepSize();
@@ -106,7 +108,7 @@ std::ostream& PseudoTransientTest::print(std::ostream& stream, int indent) const
   stream << "Pseudo Transient Step Size = " 
 	 << NOX::Utils::sciformat(currentStepSize_, 5) 
 	 << " >= " << NOX::Utils::sciformat(maxStepSize_, 5);
-  stream << endl;
+  stream << std::endl;
 
   for (int j = 0; j < indent; ++j)
     stream << ' ';
@@ -114,7 +116,7 @@ std::ostream& PseudoTransientTest::print(std::ostream& stream, int indent) const
   stream << "Pseudo Transient Residual Reduction = " 
 	 << NOX::Utils::sciformat(currentNormF_, 5) 
 	 << " < " << NOX::Utils::sciformat(minNormF_, 5);
-  stream << endl;
+  stream << std::endl;
 
   return stream;
 }

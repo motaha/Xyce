@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.28.2.2 $
+// Revision Number: $Revision: 1.52.2.3 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:39 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //----------------------------------------------------------------------------
@@ -48,11 +48,15 @@
 
 // ----------   Xyce Includes   ----------
 #include <N_DEV_Const.h>
-#include <N_DEV_ThermalResistor.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_ThermalResistor.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
+
+#include <N_DEV_Resistor.h>
 
 #include <N_LAS_Matrix.h>
 #include <N_LAS_Vector.h>
@@ -62,132 +66,113 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<ThermalResistor::Instance>::ParametricData()
-{
-    setNumNodes(2);
-    setNumOptionalNodes(0);
-    setNumFillNodes(0);
-    setModelRequired(0);
-    setPrimaryParameter("R");
-    addModelType("R");
 
+namespace ThermalResistor {
+
+
+void Traits::loadInstanceParameters(ParametricData<ThermalResistor::Instance> &p)
+{
     // Set up double precision variables:
-    addPar ("R", 1000.0, false, ParameterType::TIME_DEP,
+    p.addPar ("R", 1000.0, false, ParameterType::TIME_DEP,
       &ThermalResistor::Instance::R,
       NULL, U_OHM, CAT_NONE, "Resistance");
 
-    addPar ("L", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("L", 0.0, false, ParameterType::NO_DEP,
       &ThermalResistor::Instance::length,
       NULL, U_METER, CAT_NONE, "Length of conductor");
 
-    addPar ("W", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("W", 0.0, false, ParameterType::NO_DEP,
       &ThermalResistor::Instance::width,
       NULL, U_METER, CAT_NONE, "Width of conductor");
 
-    addPar ("A", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("A", 0.0, false, ParameterType::NO_DEP,
       &ThermalResistor::Instance::area,
       NULL, U_METER2, CAT_NONE, "Area of conductor");
 
-    addPar ("THERMAL_L", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("THERMAL_L", 0.0, false, ParameterType::NO_DEP,
       &ThermalResistor::Instance::thermalLength,
       NULL, U_METER, CAT_NONE, "Length of material thermally coupled to conductor");
 
-    addPar ("THERMAL_A", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("THERMAL_A", 0.0, false, ParameterType::NO_DEP,
       &ThermalResistor::Instance::thermalArea,
       NULL, U_METER2, CAT_NONE, "Area of material thermally coupled to conductor");
 
 
      // This stuff is copied from the model:
-    addPar ("RESISTIVITY", 0.0, false, ParameterType::TIME_DEP,
+    p.addPar ("RESISTIVITY", 0.0, false, ParameterType::TIME_DEP,
       &ThermalResistor::Instance::resistivity,
       NULL, U_OHMM, CAT_NONE, "Resistor material resistivity");
 
-    addPar ("DENSITY", 0.0, false, ParameterType::TIME_DEP,
+    p.addPar ("DENSITY", 0.0, false, ParameterType::TIME_DEP,
       &ThermalResistor::Instance::density,
       NULL, U_KGMM3, CAT_NONE, "Resistor material density (unused)");
 
-    addPar ("HEATCAPACITY", 0.0, false, ParameterType::TIME_DEP,
+    p.addPar ("HEATCAPACITY", 0.0, false, ParameterType::TIME_DEP,
       &ThermalResistor::Instance::heatCapacity,
       NULL, U_JMM3KM1, CAT_NONE, "Resistor material volumetric heat capacity");
 
-    addPar ("THERMAL_HEATCAPACITY", 0.0, false, ParameterType::TIME_DEP,
+    p.addPar ("THERMAL_HEATCAPACITY", 0.0, false, ParameterType::TIME_DEP,
       &ThermalResistor::Instance::thermalHeatCapacity,
       NULL, U_JMM3KM1, CAT_NONE, "Volumetric heat capacity of material thermally coupled to conductor");
 
 
-    addPar ("TEMP", 0.0, false, ParameterType::TIME_DEP,
+    p.addPar ("TEMP", 0.0, false, ParameterType::TIME_DEP,
       &ThermalResistor::Instance::temp,
-      NULL, U_DEGC, CAT_NONE, "Temperature");
+      NULL, U_DEGC, CAT_NONE, "Device temperature");
 
     // Set up non-double precision variables:
-    addPar ("OUTPUTINTVARS", false, false, ParameterType::NO_DEP,
+    p.addPar ("OUTPUTINTVARS", false, false, ParameterType::NO_DEP,
       &ThermalResistor::Instance::outputInternalVarsFlag, NULL,
             U_NONE, CAT_CONTROL, "Debug Output switch");
 }
 
-template<>
-ParametricData<ThermalResistor::Model>::ParametricData()
+void Traits::loadModelParameters(ParametricData<ThermalResistor::Model> &p)
 {
-    addPar ("TC1",      0.0, false,   ParameterType::NO_DEP,
+    p.addPar ("TC1",      0.0, false,   ParameterType::NO_DEP,
       &ThermalResistor::Model::tempCoeff1, NULL,
        U_DEGCM1, CAT_NONE, "Linear Temperature Coefficient");
 
-    addPar ("TC2",      0.0, false,   ParameterType::NO_DEP,
+    p.addPar ("TC2",      0.0, false,   ParameterType::NO_DEP,
       &ThermalResistor::Model::tempCoeff2, NULL,
        U_DEGCM2, CAT_NONE, "Quadratic Temperature Coefficient");
 
-    addPar ("RSH",      0.0, false,   ParameterType::NO_DEP,
+    p.addPar ("RSH",      0.0, false,   ParameterType::NO_DEP,
       &ThermalResistor::Model::sheetRes, NULL,
        U_OHM,  CAT_NONE, "Sheet Resistance");
 
 
-    addPar ("RESISTIVITY", 0.0, false, ParameterType::TIME_DEP,
+    p.addPar ("RESISTIVITY", 0.0, false, ParameterType::TIME_DEP,
       &ThermalResistor::Model::resistivity, NULL,
        U_OHMM,  CAT_NONE,  "Resistor material resistivity");
 
-    addPar ("DENSITY", 0.0, false, ParameterType::TIME_DEP,
+    p.addPar ("DENSITY", 0.0, false, ParameterType::TIME_DEP,
       &ThermalResistor::Model::density, NULL,
        U_KGMM3,  CAT_NONE,  "Resistor material density (unused)");
 
-    addPar ("HEATCAPACITY", 0.0, false, ParameterType::TIME_DEP,
+    p.addPar ("HEATCAPACITY", 0.0, false, ParameterType::TIME_DEP,
       &ThermalResistor::Model::heatCapacity, NULL,
        U_JMM3KM1,  CAT_NONE,  "Resistor material volumetric heat capacity");
 
-    addPar ("THERMAL_HEATCAPACITY", 0.0, false, ParameterType::TIME_DEP,
+    p.addPar ("THERMAL_HEATCAPACITY", 0.0, false, ParameterType::TIME_DEP,
       &ThermalResistor::Model::thermalHeatCapacity, NULL,
        U_JMM3KM1,  CAT_NONE,  "Volumetric heat capacity of material thermally coupled to conductor");
 
-    addPar ("DEFW",     1.e-5, false, ParameterType::NO_DEP,
+    p.addPar ("DEFW",     1.e-5, false, ParameterType::NO_DEP,
       &ThermalResistor::Model::defWidth, NULL,
        U_METER,  CAT_NONE, "Default Instance Width");
 
-    addPar ("NARROW",   0.0, false,   ParameterType::NO_DEP,
+    p.addPar ("NARROW",   0.0, false,   ParameterType::NO_DEP,
       &ThermalResistor::Model::narrow, NULL,
        U_METER,  CAT_NONE, "Narrowing due to side etching");
 
-    addPar ("TNOM",     0.0, false,   ParameterType::NO_DEP,
+    p.addPar ("TNOM",     0.0, false,   ParameterType::NO_DEP,
       &ThermalResistor::Model::tnom, NULL,
        U_DEGC, CAT_NONE, "Parameter Measurement Temperature");
 }
 
-namespace ThermalResistor {
 
-vector< vector<int> > Instance::jacStamp;
+std::vector< std::vector<int> > Instance::jacStamp;
 
-
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
-}
-
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
 
 // Class Instance
 //-----------------------------------------------------------------------------
@@ -198,7 +183,7 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
 
   // now set the temperature related stuff.
@@ -216,20 +201,17 @@ bool Instance::processParams (string param)
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
 Instance::Instance(
-  InstanceBlock & IB,
-    Model & Riter,
-    MatrixLoadData & mlData1,
-    SolverState &ss1,
-    ExternData  &ed1,
-    DeviceOptions & do1)
-
-  : DeviceInstance(IB, mlData1, ss1, ed1, do1),
+  const Configuration & configuration,
+  const InstanceBlock & IB,
+  Model &               Riter,
+  const FactoryBlock &  factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(Riter),
     R(0.0), G(0.0),
     i0(0.0),
     length(0.0),
     width(0.0),
-    temp(getDeviceOptions().temp.dVal()),
+    temp(getDeviceOptions().temp.getImmutableValue<double>()),
     li_Pos(-1),
     li_Neg(-1),
     APosEquPosNodeOffset(-1),
@@ -249,11 +231,6 @@ Instance::Instance(
   numExtVars   = 2;
   numStateVars = 0;
   numLeadCurrentStoreVars = 1; // one potential lead current 
-
-  defaultParamName = "R";
-
-  setName(IB.getName());
-  setModelName(model_.getName());
 
   if( jacStamp.empty() )
   {
@@ -275,7 +252,7 @@ Instance::Instance(
 
   // Set any non-constant parameter defaults:
   if (!given("TEMP"))
-    temp = getDeviceOptions().temp.dVal();
+    temp = getDeviceOptions().temp.getImmutableValue<double>();
   if (!given("W"))
     width = model_.defWidth;;
 
@@ -307,7 +284,7 @@ Instance::Instance(
 
     if (!(model_.dependentParams.empty()))
     {
-      vector<sDepend> & model_dp = model_.dependentParams;
+      std::vector<sDepend> & model_dp = model_.dependentParams;
       int dpSize = model_dp.size();
 
       for (int i=0;i<dpSize;++i)
@@ -321,7 +298,7 @@ Instance::Instance(
         dpTmp.vectorIndex = -1;
 
         // dpTmp needs to point to a copy of the original expression.
-        dpTmp.expr = new N_UTL_Expression( *(model_dp[i].expr) );
+        dpTmp.expr = new Util::Expression( *(model_dp[i].expr) );
 
         double *Dval;
         if (dpTmp.name=="RESISTIVITY")
@@ -358,11 +335,9 @@ Instance::Instance(
     }
     else
     {
+      UserWarning(*this) << "Resistance is0, set to default of 1000 ohms " << getName();
+
       R = 1000;
-      string msg="***********\n";
-      msg += ": WARNING!  Resistance=0, ";
-      msg += "set to default of 1000 ohms " + getName() + "\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0,msg);
     }
   }
 
@@ -378,8 +353,7 @@ Instance::Instance(
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
 Instance::~Instance ()
-{
-}
+{}
 
 //-----------------------------------------------------------------------------
 // Function      : Instance::registerLIDs
@@ -389,41 +363,20 @@ Instance::~Instance ()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/12/02
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                                           const vector<int> & extLIDVecRef )
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                                           const std::vector<int> & extLIDVecRef )
 {
-  string msg;
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-  "-------------------------------------------------------------------------"
-  "----";
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl << dashedline << endl;
-    cout << "  ResistorInstance::registerLIDs" << endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "  ResistorInstance::registerLIDs" << std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -435,15 +388,15 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << "  li_Pos = " << li_Pos << endl;
-    cout << "  li_Neg = " << li_Neg << endl;
+    Xyce::dout() << "  li_Pos = " << li_Pos << std::endl;
+    Xyce::dout() << "  li_Neg = " << li_Neg << std::endl;
   }
 #endif
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 }
@@ -456,20 +409,9 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 06/12/02
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs(const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs(const std::vector<int> & staLIDVecRef )
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
   // Copy over the global ID lists:
   staLIDVec = staLIDVecRef;
@@ -487,20 +429,10 @@ void Instance::registerStateLIDs(const vector<int> & staLIDVecRef )
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 04/24/2013
 // ----------------------------------------------------------------------------
-void Instance::registerStoreLIDs(const vector<int> & stoLIDVecRef)
+void Instance::registerStoreLIDs(const std::vector<int> & stoLIDVecRef)
 {
-  string msg;
+  AssertLIDs(stoLIDVecRef.size() == getNumStoreVars());
 
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSto = stoLIDVecRef.size();
-
-  if (numSto != getNumStoreVars())
-  {
-    msg = "Instance::registerStoreLIDs:";
-    msg += "numSto != numStoreVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
   if( loadLeadCurrent )
   {
     li_store_dev_i = stoLIDVecRef[0];
@@ -515,16 +447,16 @@ void Instance::registerStoreLIDs(const vector<int> & stoLIDVecRef)
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 04/24/2013
 // ----------------------------------------------------------------------------
-map<int,string> & Instance::getStoreNameMap()
+std::map<int,std::string> & Instance::getStoreNameMap()
 {
   // set up the internal name map, if it hasn't been already.
   if( loadLeadCurrent && storeNameMap.empty ())
   {
     // change subcircuitname:devicetype_deviceName to
     // devicetype:subcircuitName:deviceName
-    string modName(getName());
+    std::string modName(getName());
     spiceInternalName(modName);
-    string tmpstr;
+    std::string tmpstr;
     tmpstr = modName+":DEV_I";
     storeNameMap[ li_store_dev_i ] = tmpstr;
   }
@@ -540,7 +472,7 @@ map<int,string> & Instance::getStoreNameMap()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 08/20/01
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -553,7 +485,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 08/27/01
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
 
@@ -658,13 +590,13 @@ bool Instance::outputPlotFiles ()
 
   if (tempModelEnabled && outputInternalVarsFlag)
   {
-    cout.width(28); cout.precision(20); cout.setf(ios::scientific);
+    Xyce::dout().width(28); Xyce::dout().precision(20); Xyce::dout().setf(std::ios::scientific);
     N_LAS_Vector * sta1VectorPtr = extData.nextStaVectorPtr;
     N_LAS_Vector * sta2VectorPtr = extData.currStaVectorPtr;
-    cout << "TEMP("<<getName()<<"):  " << getSolverState().currTime << "    "
+    Xyce::dout() << "TEMP("<<getName()<<"):  " << getSolverState().currTime << "    "
         << ((*sta1VectorPtr)[li_TempState]-CONSTCtoK) << "    "
         << ((*sta2VectorPtr)[li_TempState]-CONSTCtoK)
-        << endl;
+        << std::endl;
   }
 
   return bsuccess;
@@ -762,7 +694,7 @@ bool Instance::updateTemperature ( const double & temp_tmp)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   return true;
 }
@@ -775,11 +707,11 @@ bool Model::processParams (string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 03/23/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -797,10 +729,11 @@ bool Model::processInstanceParams(string param)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-                                                SolverState & ss1,
-                                                DeviceOptions & do1)
-  : DeviceModel(MB, ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
     tempCoeff1(0.0),
     tempCoeff2(0.0),
     sheetRes(0.0),
@@ -839,9 +772,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -859,28 +792,49 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i,isize;
   isize = instanceContainer.size();
-  os << endl;
-  os << "Number of Resistor Instances: " << isize << endl;
-  os << "    name     getModelName()  Parameters" << endl;
+  os << std::endl;
+  os << "Number of Resistor Instances: " << isize << std::endl;
+  os << "    name     model name  Parameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
+    os << getName();
     os << "\t\tR(Tnom) = " << (*iter)->R;
     os << "\tG(T) = " << (*iter)->G;
-    os << endl;
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 // ThermalResistor Master functions:
 
@@ -896,14 +850,15 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 {
   bool bsuccess = true;
 
-  // first loop over the models:
-  for (ModelMap::const_iterator model_it = getModelMap().begin(); model_it != getModelMap().end(); ++model_it)
-  {
-    // loop over the instances for this model.
-    InstanceVector::const_iterator first = (*model_it).second->instanceContainer.begin();
-    InstanceVector::const_iterator last = (*model_it).second->instanceContainer.end();
+  // // first loop over the models:
+  // for (ModelMap::const_iterator model_it = getModelMap().begin(); model_it != getModelMap().end(); ++model_it)
+  // {
+  //   // loop over the instances for this model.
+  //   InstanceVector::const_iterator first = (*model_it).second->instanceContainer.begin();
+  //   InstanceVector::const_iterator last = (*model_it).second->instanceContainer.end();
 
-    for (InstanceVector::const_iterator it = first; it != last; ++it)
+  //   for (InstanceVector::const_iterator it = first; it != last; ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
     {
       Instance & ri = *(*it);
 
@@ -922,7 +877,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
         }
       }
     }
-  }
+//  }
 
   return bsuccess;
 }
@@ -937,7 +892,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 //-----------------------------------------------------------------------------
 bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  double * storeLeadF, double * storeLeadQ)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & ri = *(*it);
     fVec[ri.li_Pos] += ri.i0;
@@ -964,7 +919,7 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 #ifdef _OMP
 #pragma omp parallel for
 #endif
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & ri = *(*it);
 #ifndef Xyce_NONPOINTER_MATRIX_LOAD
@@ -989,6 +944,21 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
   }
 
   return true;
+}
+
+Device *
+Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void
+registerDevice() 
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("r", 2)
+    .registerModelType("r", 2);
 }
 
 } // namespace ThermalResistor

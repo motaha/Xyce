@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.32.2.2 $
+// Revision Number: $Revision: 1.42 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/24 23:49:18 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -63,6 +63,7 @@
 #include <N_DEV_2DPDE.h>
 #include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_Message.h>
 
 #include <N_DEV_PDE_2DMesh.h>
 #include <N_DEV_SGF_Interface.h>
@@ -89,7 +90,7 @@ bool Instance::outputPlotFiles ()
   bool skipOutput = false;
 
   // usually, don't bother outputting nonlinear Poisson result.
-  if (equationSet == 0 && !(outputNLPoisson))  return bsuccess;
+  if (equationSet == 0 && !outputNLPoisson)  return bsuccess;
 
   // If using output interval, check if enough time has passed to do
   // another output.  (only applies for transient - not DCOP).
@@ -116,7 +117,7 @@ bool Instance::outputPlotFiles ()
   lastOutputTime = getSolverState().currTime;
 
 #ifdef Xyce_DEBUG_DEVICE
-  cout << endl << "Doing an output at time = " << getSolverState().currTime << endl;
+  Xyce::dout() << std::endl << "Doing an output at time = " << getSolverState().currTime << std::endl;
 #endif
 
   if (tecplotLevel > 0)
@@ -331,16 +332,13 @@ bool Instance::outputTecplot ()
   double time = getSolverState().currTime;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
-  const string dashedline="--------------------------------------------------"
-    "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << endl;
-    cout << dashedline << endl;
-    cout << "In Instance::outputTecplot.  filename = ";
-    cout << string(filename);
-    cout << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "In Instance::outputTecplot.  filename = ";
+    Xyce::dout() << std::string(filename);
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -681,16 +679,13 @@ bool Instance::outputTecplotVectors ()
   double time = getSolverState().currTime;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
-  const string dashedline="--------------------------------------------------"
-    "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << endl;
-    cout << dashedline << endl;
-    cout << "In Instance::outputTecplotVectors.  filename = ";
-    cout << string(filename);
-    cout << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "In Instance::outputTecplotVectors.  filename = ";
+    Xyce::dout() << std::string(filename);
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -746,20 +741,20 @@ bool Instance::outputTecplotVectors ()
   double D0x, D0y;
 
 #ifdef Xyce_DEBUG_DEVICE
-  cout << "outputTecplotVectors:\n";
-  cout << "DeltaX = " << DeltaX << endl;
-  cout << "DeltaY = " << DeltaY << endl;
+  Xyce::dout() << "outputTecplotVectors:\n";
+  Xyce::dout() << "DeltaX = " << DeltaX << std::endl;
+  Xyce::dout() << "DeltaY = " << DeltaY << std::endl;
 
-  cout << "xMax   = " << xMax   << endl;
-  cout << "xMin   = " << xMin   << endl;
-  cout << "yMax   = " << yMax   << endl;
-  cout << "yMin   = " << yMin   << endl;
+  Xyce::dout() << "xMax   = " << xMax   << std::endl;
+  Xyce::dout() << "xMin   = " << xMin   << std::endl;
+  Xyce::dout() << "yMax   = " << yMax   << std::endl;
+  Xyce::dout() << "yMin   = " << yMin   << std::endl;
 
-  cout << "dx     = " << dx  << endl;
-  cout << "dy     = " << dy  << endl;
+  Xyce::dout() << "dx     = " << dx  << std::endl;
+  Xyce::dout() << "dy     = " << dy  << std::endl;
 
-  cout << "inx    = " << inx << endl;
-  cout << "iny    = " << iny << endl;
+  Xyce::dout() << "inx    = " << inx << std::endl;
+  Xyce::dout() << "iny    = " << iny << std::endl;
 #endif
 
   if (equationSet == 0)
@@ -971,9 +966,7 @@ bool Instance::outputGnuplot ()
   if (!given("NX") || !given("NY"))
   {
     bsuccess = false;
-    string msg = "Instance::outputGnuplot:\n";
-    msg += "\tThis function only works if using the internal mesh.\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING, msg);
+    UserWarning(*this) << "Gnuplot only works if using the internal mesh.";
   }
   else
   {
@@ -1075,9 +1068,9 @@ bool Instance::outputTxtData ()
   fprintf(fp1,"%s","\n");
 
   // loop over the device interface nodes, sum the currents going into each one.
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin ();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end   ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin ();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end   ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
   for (iterDI=firstDI; iterDI!=lastDI; ++iterDI)
   {

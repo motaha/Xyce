@@ -1,0 +1,18 @@
+<map id="N_DEV_Resistor.C" name="N_DEV_Resistor.C">
+<area shape="rect" id="node3" href="$N__DEV__Resistor_8h.html" title="N_DEV_Resistor.h" alt="" coords="2224,80,2363,107"/>
+<area shape="rect" id="node36" href="$N__DEV__DeviceOptions_8h.html" title="N_DEV_DeviceOptions.h" alt="" coords="2005,229,2184,256"/>
+<area shape="rect" id="node37" href="$N__DEV__ExternData_8h.html" title="N_DEV_ExternData.h" alt="" coords="2505,304,2663,331"/>
+<area shape="rect" id="node38" href="$N__DEV__Message_8h.html" title="N_DEV_Message.h" alt="" coords="3094,80,3239,107"/>
+<area shape="rect" id="node4" href="$N__DEV__fwd_8h.html" title="N_DEV_fwd.h" alt="" coords="2617,379,2727,405"/>
+<area shape="rect" id="node11" href="$N__DEV__Configuration_8h.html" title="N_DEV_Configuration.h" alt="" coords="2208,229,2379,256"/>
+<area shape="rect" id="node19" href="$N__DEV__DeviceInstance_8h.html" title="N_DEV_DeviceInstance.h" alt="" coords="1312,155,1496,181"/>
+<area shape="rect" id="node28" href="$N__DEV__DeviceModel_8h.html" title="N_DEV_DeviceModel.h" alt="" coords="1646,155,1815,181"/>
+<area shape="rect" id="node30" href="$N__DEV__DeviceMaster_8h.html" title="N_DEV_DeviceMaster.h" alt="" coords="954,155,1128,181"/>
+<area shape="rect" id="node14" href="$N__DEV__Pars_8h.html" title="N_DEV_Pars.h" alt="" coords="1958,304,2073,331"/>
+<area shape="rect" id="node18" href="$N__DEV__Units_8h.html" title="N_DEV_Units.h" alt="" coords="2158,379,2276,405"/>
+<area shape="rect" id="node21" href="$N__DEV__DeviceEntity_8h.html" title="N_DEV_DeviceEntity.h" alt="" coords="1648,229,1812,256"/>
+<area shape="rect" id="node25" href="$N__DEV__DeviceSupport_8h.html" title="N_DEV_DeviceSupport.h" alt="" coords="1023,229,1201,256"/>
+<area shape="rect" id="node29" href="$N__DEV__Device_8h.html" title="N_DEV_Device.h" alt="" coords="1296,304,1425,331"/>
+<area shape="rect" id="node31" href="$N__DEV__DeviceBlock_8h.html" title="N_DEV_DeviceBlock.h" alt="" coords="401,229,564,256"/>
+<area shape="rect" id="node32" href="$N__DEV__Param_8h.html" title="N_DEV_Param.h" alt="" coords="813,304,941,331"/>
+</map>

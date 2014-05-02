@@ -46,12 +46,15 @@
 #ifndef Xyce_N_DEV_Neuron4_h
 #define Xyce_N_DEV_Neuron4_h
 
+#include <N_DEV_Configuration.h>
 #include <Sacado.hpp>
 
 // ----------   Xyce Includes   ----------
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceInstance.h>
 #include <N_DEV_DeviceModel.h>
+
+#include <N_DEV_Neuron.h>
 
 #ifdef HAVE_MATH_H
 #include <math.h>
@@ -61,8 +64,21 @@ namespace Xyce {
 namespace Device {
 namespace Neuron4 {
 
-// ---------- Forward Declarations ----------
 class Model;
+class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance, Neuron::Traits>
+{
+  static const char *name() {return "Neuron";}
+  static const char *deviceTypeName() {return "YNEURON level 4";}
+  static const int numNodes() {return 2;}
+  static const bool modelRequired() {return true;}
+  static const bool isLinearDevice() {return true;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : Instance
@@ -78,20 +94,15 @@ class Instance : public DeviceInstance
 {
   friend class ParametricData<Instance>;
   friend class Model;
-
+  friend class Traits;
+    
 public:
-  static ParametricData<Instance> &getParametricData();
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Instance(InstanceBlock & IB,
-           Model & Miter,
-           MatrixLoadData & mlData1,
-           SolverState &ss1,
-           ExternData  &ed1,
-           DeviceOptions & do1);
+  Instance(
+     const Configuration &       configuration,
+     const InstanceBlock &       IB,
+     Model &                     Miter,
+     const FactoryBlock &        factory_block);
 
   ~Instance();
 
@@ -100,16 +111,16 @@ private:
   Instance &operator=(const Instance &);
 
 public:
-  void registerLIDs( const vector<int> & intLIDVecRef,
-                     const vector<int> & extLIDVecRef );
-  void registerStateLIDs( const vector<int> & staLIDVecRef );
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
+  void registerStateLIDs( const std::vector<int> & staLIDVecRef );
 
-  map<int,string> & getIntNameMap ();
+  std::map<int,std::string> & getIntNameMap ();
   bool loadDeviceMask();
-  const vector< vector<int> > & jacobianStamp() const;
-  void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-  bool processParams (string param = "");
+  bool processParams ();
   bool updateTemperature(const double & temp_tmp);
 
   bool updateIntermediateVars ();
@@ -117,7 +128,7 @@ public:
   bool updateSecondaryState ();
   bool setIC ();
 
-  void varTypes( vector<char> & varTypeVec );
+  void varTypes( std::vector<char> & varTypeVec );
 
   // load functions, residual:
   bool loadDAEQVector ();
@@ -305,7 +316,7 @@ private:
     ScalarT powMC = MC * MC;
     ScalarT powCC = CC * CC * CC * CC;
     ScalarT r = memG * (VSeg - restV) + Kg * powN * (VSeg - Ke ) + NaG * powM * h * (VSeg - NaE )
-                + Ag * powA * b * (VSeg - Ae) + CaTg * powMC * HC * (VSeg - CaE) + KCaG * powCC * (VSeg - Ke) - gNext * (VSegN - VSeg) - gPrev * (VSegP - VSeg);
+      + Ag * powA * b * (VSeg - Ae) + CaTg * powMC * HC * (VSeg - CaE) + KCaG * powCC * (VSeg - Ke) - gNext * (VSegN - VSeg) - gPrev * (VSegP - VSeg);
     return r;
   }
 
@@ -505,7 +516,8 @@ private:
 public:
   // iterator reference to the Neuron model which owns this instance.
   // Getters and setters
-  Model &getModel() {
+  Model &getModel() 
+  {
     return model_;
   }
 
@@ -542,104 +554,104 @@ private:
 
   // conductance between segments -- calculated from radius, rInt and length and number of segments
   // gBackward connects to previous node. gForward connects to the next node
-  vector<double> gBackward;
-  vector<double> gForward;
+  std::vector<double> gBackward;
+  std::vector<double> gForward;
 
   // derrived quantities computed in updateIntermediateVars
   // and used in the load functions (no q terms on the external nodes)
   double kcl1Fvalue;
   double kcl2Fvalue;
   // internal segments
-  vector<double> segFvalue;
-  vector<double> segQvalue;
-  vector<double> segNEquFvalue, segNEquQvalue;
-  vector<double> segMEquFvalue, segMEquQvalue;
-  vector<double> segHEquFvalue, segHEquQvalue;
-  vector<double> segAEquFvalue, segAEquQvalue;
-  vector<double> segBEquFvalue, segBEquQvalue;
-  vector<double> segM_EquFvalue, segM_EquQvalue;
-  vector<double> segH_EquFvalue, segH_EquQvalue;
-  vector<double> segCEquFvalue, segCEquQvalue;
-  vector<double> segCaEquFvalue, segCaEquQvalue;
+  std::vector<double> segFvalue;
+  std::vector<double> segQvalue;
+  std::vector<double> segNEquFvalue, segNEquQvalue;
+  std::vector<double> segMEquFvalue, segMEquQvalue;
+  std::vector<double> segHEquFvalue, segHEquQvalue;
+  std::vector<double> segAEquFvalue, segAEquQvalue;
+  std::vector<double> segBEquFvalue, segBEquQvalue;
+  std::vector<double> segM_EquFvalue, segM_EquQvalue;
+  std::vector<double> segH_EquFvalue, segH_EquQvalue;
+  std::vector<double> segCEquFvalue, segCEquQvalue;
+  std::vector<double> segCaEquFvalue, segCaEquQvalue;
 
   // jacobian terms
   double dkcl1F_dVin, dkcl1F_dVs0;
   double dkcl2F_dVout, dkcl2F_dVsn;
   // internal equations
-  vector<double> segF_dVp, segF_dV, segF_dVn, segF_dn, segF_dm, segF_dh, segF_da, segF_db, segF_dM, segF_dH, segF_dc;
-  vector<double> segQ_dV;
-  vector<double> dnF_dV, dnF_dn, dnQ_dn;
-  vector<double> dmF_dV, dmF_dm, dmQ_dm;
-  vector<double> dhF_dV, dhF_dh, dhQ_dh;
-  vector<double> daF_dV, daF_da, daQ_da;
-  vector<double> dbF_dV, dbF_db, dbQ_db;
-  vector<double> dMF_dV, dMF_dM, dMQ_dM;
-  vector<double> dHF_dV, dHF_dH, dHQ_dH;
-  vector<double> dcF_dV, dcF_dc, dcF_dCa, dcQ_dc;
-  vector<double> dCaF_dV, dCaF_dM, dCaF_dH, dCaF_dCa, dCaQ_dCa;
+  std::vector<double> segF_dVp, segF_dV, segF_dVn, segF_dn, segF_dm, segF_dh, segF_da, segF_db, segF_dM, segF_dH, segF_dc;
+  std::vector<double> segQ_dV;
+  std::vector<double> dnF_dV, dnF_dn, dnQ_dn;
+  std::vector<double> dmF_dV, dmF_dm, dmQ_dm;
+  std::vector<double> dhF_dV, dhF_dh, dhQ_dh;
+  std::vector<double> daF_dV, daF_da, daQ_da;
+  std::vector<double> dbF_dV, dbF_db, dbQ_db;
+  std::vector<double> dMF_dV, dMF_dM, dMQ_dM;
+  std::vector<double> dHF_dV, dHF_dH, dHQ_dH;
+  std::vector<double> dcF_dV, dcF_dc, dcF_dCa, dcQ_dc;
+  std::vector<double> dCaF_dV, dCaF_dM, dCaF_dH, dCaF_dCa, dCaQ_dCa;
 
   // state variables
-  vector<double> potassiumCurrent;
-  vector<double> sodiumCurrent;
+  std::vector<double> potassiumCurrent;
+  std::vector<double> sodiumCurrent;
 
   // local state indices (offsets)
-  vector<int> li_KCurrentState;
-  vector<int> li_NaCurrentState;
+  std::vector<int> li_KCurrentState;
+  std::vector<int> li_NaCurrentState;
 
   // local solution indices (offsets)
   int li_Pos;      // local index to positive node on this device
   int li_Neg;      // local index to negative node on this device
   // local solution indices for internal vars (variable number of these)
-  vector<int> li_Vol;      // local index to segment voltage
-  vector<int> li_nPro;     // local index to n promoter value (Na current)
-  vector<int> li_mPro;     // local index to m promoter value (K current)
-  vector<int> li_hPro;     // local index to h promoter value (K current)
-  vector<int> li_aPro;     // local index to a promoter value
-  vector<int> li_bPro;     // local index to a promoter value
-  vector<int> li_MPro;     // local index to a promoter value
-  vector<int> li_HPro;     // local index to a promoter value
-  vector<int> li_cPro;     // local index to a promoter value
-  vector<int> li_CaPro;     // local index to a promoter value
+  std::vector<int> li_Vol;      // local index to segment voltage
+  std::vector<int> li_nPro;     // local index to n promoter value (Na current)
+  std::vector<int> li_mPro;     // local index to m promoter value (K current)
+  std::vector<int> li_hPro;     // local index to h promoter value (K current)
+  std::vector<int> li_aPro;     // local index to a promoter value
+  std::vector<int> li_bPro;     // local index to a promoter value
+  std::vector<int> li_MPro;     // local index to a promoter value
+  std::vector<int> li_HPro;     // local index to a promoter value
+  std::vector<int> li_cPro;     // local index to a promoter value
+  std::vector<int> li_CaPro;     // local index to a promoter value
 
   // Matrix equation index variables:
 
   // Offset variables corresponding to the above declared indices.
   int APosEquPosNodeOffset, APosEquNextNodeOffset;
   int ANegEquNegNodeOffset, ANegEquLastNodeOffset;
-  vector<int> SegVEqnVpreOffset;
-  vector<int> SegVEqnVsegOffset;
-  vector<int> SegVEqnVnexOffset;
-  vector<int> SegVEqnNOffset;
-  vector<int> SegVEqnMOffset;
-  vector<int> SegVEqnHOffset;
-  vector<int> SegVEqnAOffset;
-  vector<int> SegVEqnBOffset;
-  vector<int> SegVEqnM_Offset;
-  vector<int> SegVEqnH_Offset;
-  vector<int> SegVEqnCOffset;
-  vector<int> NEquVNodeOffset;
-  vector<int> NEquNNodeOffset;
-  vector<int> MEquVNodeOffset;
-  vector<int> MEquMNodeOffset;
-  vector<int> HEquVNodeOffset;
-  vector<int> HEquHNodeOffset;
-  vector<int> AEquVNodeOffset;
-  vector<int> AEquANodeOffset;
-  vector<int> BEquVNodeOffset;
-  vector<int> BEquBNodeOffset;
-  vector<int> M_EquVNodeOffset;
-  vector<int> M_EquM_NodeOffset;
-  vector<int> H_EquVNodeOffset;
-  vector<int> H_EquH_NodeOffset;
-  vector<int> CEquVNodeOffset;
-  vector<int> CEquCNodeOffset;
-  vector<int> CEquCaNodeOffset;
-  vector<int> CaEquVNodeOffset;
-  vector<int> CaEquM_NodeOffset;
-  vector<int> CaEquH_NodeOffset;
-  vector<int> CaEquCaNodeOffset;
+  std::vector<int> SegVEqnVpreOffset;
+  std::vector<int> SegVEqnVsegOffset;
+  std::vector<int> SegVEqnVnexOffset;
+  std::vector<int> SegVEqnNOffset;
+  std::vector<int> SegVEqnMOffset;
+  std::vector<int> SegVEqnHOffset;
+  std::vector<int> SegVEqnAOffset;
+  std::vector<int> SegVEqnBOffset;
+  std::vector<int> SegVEqnM_Offset;
+  std::vector<int> SegVEqnH_Offset;
+  std::vector<int> SegVEqnCOffset;
+  std::vector<int> NEquVNodeOffset;
+  std::vector<int> NEquNNodeOffset;
+  std::vector<int> MEquVNodeOffset;
+  std::vector<int> MEquMNodeOffset;
+  std::vector<int> HEquVNodeOffset;
+  std::vector<int> HEquHNodeOffset;
+  std::vector<int> AEquVNodeOffset;
+  std::vector<int> AEquANodeOffset;
+  std::vector<int> BEquVNodeOffset;
+  std::vector<int> BEquBNodeOffset;
+  std::vector<int> M_EquVNodeOffset;
+  std::vector<int> M_EquM_NodeOffset;
+  std::vector<int> H_EquVNodeOffset;
+  std::vector<int> H_EquH_NodeOffset;
+  std::vector<int> CEquVNodeOffset;
+  std::vector<int> CEquCNodeOffset;
+  std::vector<int> CEquCaNodeOffset;
+  std::vector<int> CaEquVNodeOffset;
+  std::vector<int> CaEquM_NodeOffset;
+  std::vector<int> CaEquH_NodeOffset;
+  std::vector<int> CaEquCaNodeOffset;
 
-  vector< vector<int> > jacStamp;
+  std::vector< std::vector<int> > jacStamp;
 };
 
 //-----------------------------------------------------------------------------
@@ -655,17 +667,13 @@ class Model : public DeviceModel
 
   friend class ParametricData<Model>;
   friend class Instance;
-
+  friend class Traits;
+    
 public:
-  static ParametricData<Model> &getParametricData();
-
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Model(const ModelBlock & MB,
-        SolverState & ss1,
-        DeviceOptions & do1);
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &          MB,
+     const FactoryBlock &        factory_block);
   ~Model();
 
 private:
@@ -674,10 +682,12 @@ private:
   Model &operator=(const Model &);
 
 public:
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
+    
   virtual std::ostream &printOutInstances(std::ostream &os) const;
 
-  bool processParams (string param = "");
-  bool processInstanceParams (string param = "");
+  bool processParams ();
+  bool processInstanceParams ();
 
 private:
 
@@ -745,19 +755,28 @@ private:
 
 
 public:
-  InstanceVector &getInstanceVector() {
+  void addInstance(Instance *instance) 
+  {
+    instanceContainer.push_back(instance);
+  }
+
+  InstanceVector &getInstanceVector() 
+  {
     return instanceContainer;
   }
 
-  const InstanceVector &getInstanceVector() const {
+  const InstanceVector &getInstanceVector() const 
+  {
     return instanceContainer;
   }
 
 private:
-  vector<Instance*> instanceContainer;
+  std::vector<Instance*> instanceContainer;
 };
 
-} // namespace Neuron2
+void registerDevice();
+
+} // namespace Neuron4
 } // namespace Device
 } // namespace Xyce
 

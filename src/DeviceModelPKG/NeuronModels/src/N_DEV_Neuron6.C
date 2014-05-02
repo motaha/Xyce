@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.37.2.1 $
+// Revision Number: $Revision: 1.57.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:33 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -51,16 +51,21 @@
 #include <N_UTL_Misc.h>
 
 // ----------   Xyce Includes   ----------
+#include <N_DEV_DeviceOptions.h>
+#include <N_DEV_DeviceMaster.h>
+#include <N_DEV_ExternData.h>
+#include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_MembraneCS.h>
+#include <N_DEV_MembraneHH.h>
+#include <N_DEV_MembranePassive.h>
+#include <N_DEV_MembraneUserDefined.h>
 #include <N_DEV_Neuron6.h>
 #include <N_DEV_Neuron_CommonEquations.h>
-#include <N_DEV_MembranePassive.h>
-#include <N_DEV_MembraneHH.h>
-#include <N_DEV_MembraneCS.h>
-#include <N_DEV_MembraneUserDefined.h>
-#include <N_DEV_ExternData.h>
 #include <N_DEV_SolverState.h>
-#include <N_DEV_DeviceOptions.h>
-#include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
+
+#include <N_DEV_Neuron.h>
 
 #include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
@@ -68,181 +73,161 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<Neuron6::Instance>::ParametricData()
-{
-  setNumNodes(2);
-  setNumOptionalNodes(0);
-  setNumFillNodes(0);
-  setModelRequired(1);
-  setPrimaryParameter("");
-  addModelType("NEURON");
 
-  // Set up map for double precision variables:
-  addPar ("R", 1.0, false, ParameterType::NO_DEP,
+namespace Neuron6 {
+
+
+void Traits::loadInstanceParameters(ParametricData<Neuron6::Instance> &p)
+{
+// Set up map for double precision variables:
+  p.addPar ("R", 1.0, false, ParameterType::NO_DEP,
           &Neuron6::Instance::rInt,
           &Neuron6::Instance::rIntGiven,
           U_OHMM, CAT_NONE, "Intracellular resistivity");
   // typical values 1-3 kOhm-mm; use 1 Kohm-mm which is the same as 1 Ohm-m
-  addPar ("A", 0.00025, false, ParameterType::NO_DEP,
+  p.addPar ("A", 0.00025, false, ParameterType::NO_DEP,
           &Neuron6::Instance::radius,
           &Neuron6::Instance::radiusGiven,
           U_METER, CAT_NONE, "Segment radius");
   // 250 microns, based on NEURON default diameter of 500 microns
-  addPar ("L", 0.0001, false, ParameterType::NO_DEP,
+  p.addPar ("L", 0.0001, false, ParameterType::NO_DEP,
           &Neuron6::Instance::length,
           &Neuron6::Instance::lengthGiven,
           U_METER, CAT_NONE, "Cable length");
   // 100 microns, based on NEURON default length
 
   // add non-double types
-  addPar("N", 1, false, ParameterType::NO_DEP,  &Neuron6::Instance::nSeg ,
+  p.addPar("N", 1, false, ParameterType::NO_DEP,  &Neuron6::Instance::nSeg ,
           &Neuron6::Instance::nSegGiven ,
          U_NONE, CAT_NONE, "Number of segments" );
 }
 
-template<>
-ParametricData<Neuron6::Model>::ParametricData()
+void Traits::loadModelParameters(ParametricData<Neuron6::Model> &p)
 {
   // Set up map for double precision variables:
-  addPar ("CMEM", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("CMEM", 0.0, false, ParameterType::NO_DEP,
           &Neuron6::Model::cMem,
           &Neuron6::Model::cMemGiven,
           U_FARADMM2, CAT_NONE, "Membrane capacitance");
 
-  addPar ("GMEM", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("GMEM", 0.0, false, ParameterType::NO_DEP,
           &Neuron6::Model::gMem,
           &Neuron6::Model::gMemGiven,
           U_OHMM1MM2, CAT_NONE, "Membrane conductance");
 
-  addPar ("VREST", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("VREST", 0.0, false, ParameterType::NO_DEP,
           &Neuron6::Model::vRest,
           &Neuron6::Model::vRestGiven,
           U_VOLT, CAT_NONE, "Resting potential");
 
-  addPar ("EK", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("EK", 0.0, false, ParameterType::NO_DEP,
           &Neuron6::Model::eK,
           &Neuron6::Model::eKGiven,
           U_VOLT, CAT_NONE, "Potassium resting potential");
 
-  addPar ("GK", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("GK", 0.0, false, ParameterType::NO_DEP,
           &Neuron6::Model::gK,
           &Neuron6::Model::gKGiven,
           U_OHMM1MM2, CAT_NONE, "Potassium base conductance");
 
-  addPar ("ENA", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("ENA", 0.0, false, ParameterType::NO_DEP,
           &Neuron6::Model::eNa,
           &Neuron6::Model::eNaGiven,
           U_VOLT, CAT_NONE, "Sodium resting potential");
 
-  addPar ("GNA", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("GNA", 0.0, false, ParameterType::NO_DEP,
           &Neuron6::Model::gNa,
           &Neuron6::Model::gNaGiven,
           U_OHMM1MM2, CAT_NONE, "Sodium base conductance");
 
-  addPar ("EA", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("EA", 0.0, false, ParameterType::NO_DEP,
           &Neuron6::Model::eA,
           &Neuron6::Model::eAGiven,
           U_VOLT, CAT_NONE, "a-current rest potential");
 
-  addPar ("GA",0.0, false, ParameterType::NO_DEP,
+  p.addPar ("GA",0.0, false, ParameterType::NO_DEP,
           &Neuron6::Model::gA,
           &Neuron6::Model::gAGiven,
           U_OHMM1MM2, CAT_NONE, "a-current base conductance");
 
-  addPar ("ECA", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("ECA", 0.0, false, ParameterType::NO_DEP,
           &Neuron6::Model::eCa,
           &Neuron6::Model::eCaGiven,
           U_VOLT, CAT_NONE, "Calcium rest potential");
 
-  addPar ("GCA", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("GCA", 0.0, false, ParameterType::NO_DEP,
           &Neuron6::Model::gCa,
           &Neuron6::Model::gCaGiven,
           U_OHMM1MM2, CAT_NONE, "Calcium base conductance");
 
-  addPar ("EKCA", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("EKCA", 0.0, false, ParameterType::NO_DEP,
           &Neuron6::Model::eKCa,
           &Neuron6::Model::eKCaGiven,
           U_VOLT, CAT_NONE, "Potassium-calcium rest potential");
 
-  addPar ("GKCA", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("GKCA", 0.0, false, ParameterType::NO_DEP,
           &Neuron6::Model::gKCa,
           &Neuron6::Model::gKCaGiven,
           U_OHMM1MM2, CAT_NONE, "Potassium-calcium base conductance");
 
-  addPar ("CAINIT", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("CAINIT", 0.0, false, ParameterType::NO_DEP,
           &Neuron6::Model::CaInit,
           &Neuron6::Model::CaInitGiven,
           U_MOLAR, CAT_NONE, "initial intra-cellular calcium concentration");
 
-  addPar ("CAGAMMA", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("CAGAMMA", 0.0, false, ParameterType::NO_DEP,
           &Neuron6::Model::CaGamma,
           &Neuron6::Model::CaGammaGiven,
           U_NONE, CAT_NONE, "calcium current to concentration multiplier");
 
-  addPar ("CATAU", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("CATAU", 0.0, false, ParameterType::NO_DEP,
           &Neuron6::Model::CaTau,
           &Neuron6::Model::CaTauGiven,
           U_SECOND, CAT_NONE, "calcium removal time constant");
 
-  addPar ("R", 1.0, false, ParameterType::NO_DEP,
+  p.addPar ("R", 1.0, false, ParameterType::NO_DEP,
           &Neuron6::Model::rInt,
           &Neuron6::Model::rIntGiven,
           U_OHMM, CAT_NONE, "Intracellular resistivity");
   // typical values 1-3 kOhm-mm; use 1 Kohm-mm which is the same as 1 Ohm-m
 
-  addPar ("A", 0.00025, false, ParameterType::NO_DEP,
+  p.addPar ("A", 0.00025, false, ParameterType::NO_DEP,
           &Neuron6::Model::radius,
           &Neuron6::Model::radiusGiven,
           U_METER, CAT_NONE, "Segment radius");
   // 250 microns, based on NEURON default diameter of 500 microns
 
-  addPar ("L", 0.0001, false, ParameterType::NO_DEP,
+  p.addPar ("L", 0.0001, false, ParameterType::NO_DEP,
           &Neuron6::Model::length,
           &Neuron6::Model::lengthGiven,
           U_METER, CAT_NONE, "Cable length");
   // 100 microns, based on NEURON default length
 
-  addPar ("I", 0.0, false, ParameterType::SOLN_DEP,
+  p.addPar ("I", 0.0, false, ParameterType::SOLN_DEP,
           &Neuron6::Model::I,
           NULL, U_AMP, CAT_NONE, "Current for user-defined current equation");
 
 
   // add non-double types
-  addPar("IONCHANNELMODEL", "", false, ParameterType::NO_DEP,  &Neuron6::Model::ionChannelModel ,
+  p.addPar("IONCHANNELMODEL", "", false, ParameterType::NO_DEP,  &Neuron6::Model::ionChannelModel ,
           &Neuron6::Model::ionChannelModelGiven , U_NONE, CAT_NONE, "Neuron6::Model to use for ion channels" );
-  addPar("N", 1, false, ParameterType::NO_DEP,  &Neuron6::Model::nSeg ,
+  p.addPar("N", 1, false, ParameterType::NO_DEP,  &Neuron6::Model::nSeg ,
           &Neuron6::Model::nSegGiven , U_NONE, CAT_NONE, "Number of segments" );
 
-  addPar("MM_CURRENT", vector<string>(), false, ParameterType::NO_DEP,  &Neuron6::Model::membraneCurrentEqus,
+  p.addPar("MM_CURRENT", std::vector<std::string>(), false, ParameterType::NO_DEP,  &Neuron6::Model::membraneCurrentEqus,
           & Neuron6::Model::membraneCurrentEqusGiven, U_NONE, CAT_NONE, "Contribution to membrane current" );
-  addPar("MM_INDVARS", vector<string>(), false, ParameterType::NO_DEP,  &Neuron6::Model::membraneIndpVars,
+  p.addPar("MM_INDVARS", std::vector<std::string>(), false, ParameterType::NO_DEP,  &Neuron6::Model::membraneIndpVars,
           & Neuron6::Model::membraneIndpVarsGiven, U_NONE, CAT_NONE, "Independant variables for ion channel equations" );
-  addPar("MM_INDFEQUS", vector<string>(), false, ParameterType::NO_DEP,  &Neuron6::Model::membraneIndpFEqus,
+  p.addPar("MM_INDFEQUS", std::vector<std::string>(), false, ParameterType::NO_DEP,  &Neuron6::Model::membraneIndpFEqus,
           & Neuron6::Model::membraneIndpFEqusGiven, U_NONE, CAT_NONE, "Independant variables: F equations" );
-  addPar("MM_INDQEQUS", vector<string>(), false, ParameterType::NO_DEP,  &Neuron6::Model::membraneIndpQEqus,
+  p.addPar("MM_INDQEQUS", std::vector<std::string>(), false, ParameterType::NO_DEP,  &Neuron6::Model::membraneIndpQEqus,
           & Neuron6::Model::membraneIndpQEqusGiven, U_NONE, CAT_NONE, "Independant variables: Q equations" );
-  addPar("MM_FUNCTIONS", vector<string>(), false, ParameterType::NO_DEP,  &Neuron6::Model::membraneFunctions,
+  p.addPar("MM_FUNCTIONS", std::vector<std::string>(), false, ParameterType::NO_DEP,  &Neuron6::Model::membraneFunctions,
           & Neuron6::Model::membraneFunctionsGiven, U_NONE, CAT_NONE, "Functions for membrane Neuron6::Model" );
-  addPar("MM_PARAMETERS", vector<string>(), false, ParameterType::NO_DEP,  &Neuron6::Model::membraneParameters,
+  p.addPar("MM_PARAMETERS", std::vector<std::string>(), false, ParameterType::NO_DEP,  &Neuron6::Model::membraneParameters,
           & Neuron6::Model::membraneParametersGiven, U_NONE, CAT_NONE, "Parameters for membrane Neuron6::Model" );
 }
 
-namespace Neuron6 {
-
-
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
-}
-
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
 
 // Class Instance
 
@@ -254,13 +239,12 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-Instance::Instance(InstanceBlock & IB,
-                   Model & Miter,
-                   MatrixLoadData & mlData1,
-                   SolverState &ss1,
-                   ExternData  &ed1,
-                   DeviceOptions & do1)
-  : DeviceInstance (IB, mlData1, ss1, ed1, do1),
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock &         IB,
+  Model &                       Miter,
+  const FactoryBlock &          factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(Miter),
     rInt(0.0),
     radius(0.0),
@@ -287,10 +271,6 @@ Instance::Instance(InstanceBlock & IB,
     ANegEquNegNodeOffset(0),
     ANegEquLastNodeOffset(0)
 {
-  setName(IB.getName());
-  setModelName(model_.getName());
-
-
   numExtVars   = 2;  // input and output voltage
 
   // Set params to constant default values:
@@ -477,19 +457,19 @@ Instance::Instance(InstanceBlock & IB,
 
   /*
   // print out jacStamp
-  std::cout << "jacStamp for Neuron6" << std::endl;
+  Xyce::dout() << "jacStamp for Neuron6" << std::endl;
   int numRows = jacStamp.size();
   for( int i=0; i< numRows; i++ )
   {
   int numCol = jacStamp[i].size();
-  std::cout << "jacStamp[ " << i << " ] = { ";
+  Xyce::dout() << "jacStamp[ " << i << " ] = { ";
   for(int j=0; j<numCol; j++)
   {
-  std::cout << jacStamp[i][j] << "  ";
+  Xyce::dout() << jacStamp[i][j] << "  ";
   }
-  std::cout << " } " <<  std::endl;
+  Xyce::dout() << " } " <<  std::endl;
   }
-  std::cout << std::endl;
+  Xyce::dout() << std::endl;
   */
 
 
@@ -635,7 +615,7 @@ Instance::~Instance()
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-bool Instance::processParams(string param)
+bool Instance::processParams()
 {
   // If there are any time dependent parameters, set their values at for
   // the current time.
@@ -668,41 +648,20 @@ bool Instance::updateTemperature ( const double & temp)
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs(const vector<int> & intLIDVecRef,
-                            const vector<int> & extLIDVecRef)
+void Instance::registerLIDs(const std::vector<int> & intLIDVecRef,
+                            const std::vector<int> & extLIDVecRef)
 {
-  string msg;
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "-------------------------------------------------------------------------"
-    "----";
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl << dashedline << endl;
-    cout << "  Instance::registerLIDs" << endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "  Instance::registerLIDs" << std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -747,23 +706,23 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
     #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 )
     {
-    cout << "  li_Pos = " << li_Pos << endl
-    << "  li_Neg = " << li_Neg << endl;
+    Xyce::dout() << "  li_Pos = " << li_Pos << std::endl
+    << "  li_Neg = " << li_Neg << std::endl;
     for( int i=0; i<nSeg; i++ )
     {
-    cout << "  li_Vol[ " << i << " ] = " << li_Vol[i] << endl;
+    Xyce::dout() << "  li_Vol[ " << i << " ] = " << li_Vol[i] << std::endl;
 
     if( model_.ConnorStevensOn_ )
     {
-    std::cout << "  li_nPro[ " << i << " ] = " << li_nPro[i] << endl
-    << "  li_mPro[ " << i << " ] = " << li_mPro[i] << endl
-    << "  li_hPro[ " << i << " ] = " << li_hPro[i] << endl
-    << "  li_aPro[ " << i << " ] = " << li_aPro[i] << endl
-    << "  li_bPro[ " << i << " ] = " << li_bPro[i] << endl
-    << "  li_MPro[ " << i << " ] = " << li_MPro[i] << endl
-    << "  li_HPro[ " << i << " ] = " << li_HPro[i] << endl
-    << "  li_cPro[ " << i << " ] = " << li_cPro[i] << endl
-    << "  li_CaPro[ " << i << " ] = " << li_CaPro[i] << endl;
+    Xyce::dout() << "  li_nPro[ " << i << " ] = " << li_nPro[i] << std::endl
+    << "  li_mPro[ " << i << " ] = " << li_mPro[i] << std::endl
+    << "  li_hPro[ " << i << " ] = " << li_hPro[i] << std::endl
+    << "  li_aPro[ " << i << " ] = " << li_aPro[i] << std::endl
+    << "  li_bPro[ " << i << " ] = " << li_bPro[i] << std::endl
+    << "  li_MPro[ " << i << " ] = " << li_MPro[i] << std::endl
+    << "  li_HPro[ " << i << " ] = " << li_HPro[i] << std::endl
+    << "  li_cPro[ " << i << " ] = " << li_cPro[i] << std::endl
+    << "  li_CaPro[ " << i << " ] = " << li_CaPro[i] << std::endl;
     }
     }
     }
@@ -772,7 +731,7 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
     #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 )
     {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
     }
     #endif
   */
@@ -786,17 +745,17 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
-    string tmpstr;
+    std::string tmpstr;
     for( int i=0; i<nSeg; i++)
     {
-      ostringstream segNumber;
+      std::ostringstream segNumber;
       segNumber << i;
-      string segNumStr = segNumber.str();
+      std::string segNumStr = segNumber.str();
 
       tmpstr = getName() + "_" + "V" + segNumStr;
       spiceInternalName (tmpstr);
@@ -855,20 +814,9 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
   // copy over the global ID lists.
   staLIDVec = staLIDVecRef;
@@ -904,7 +852,7 @@ bool Instance::loadDeviceMask ()
   bool returnVal=false;
   N_LAS_Vector * maskVectorPtr = extData.deviceMaskVectorPtr;
 
-//   std::cout << "Masking n, m and h" << std::endl;
+//   Xyce::dout() << "Masking n, m and h" << std::endl;
 //   (*maskVectorPtr)[li_nPro] = 0.0;
 //   (*maskVectorPtr)[li_mPro] = 0.0;
 //   (*maskVectorPtr)[li_hPro] = 0.0;
@@ -921,7 +869,7 @@ bool Instance::loadDeviceMask ()
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -934,7 +882,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
 
@@ -958,10 +906,10 @@ void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
   ANegEquNegNodeOffset = jacLIDVec[1][0];
   ANegEquLastNodeOffset = jacLIDVec[1][1];
   /*
-    std::cout << "APosEquPosNodeOffset = " << APosEquPosNodeOffset << std::endl;
-    std::cout << "APosEquNextNodeOffset = " << APosEquNextNodeOffset << std::endl;
-    std::cout << "ANegEquNegNodeOffset = " << ANegEquNegNodeOffset << std::endl;
-    std::cout << "ANegEquLastNodeOffset = " << ANegEquLastNodeOffset << std::endl;
+    Xyce::dout() << "APosEquPosNodeOffset = " << APosEquPosNodeOffset << std::endl;
+    Xyce::dout() << "APosEquNextNodeOffset = " << APosEquNextNodeOffset << std::endl;
+    Xyce::dout() << "ANegEquNegNodeOffset = " << ANegEquNegNodeOffset << std::endl;
+    Xyce::dout() << "ANegEquLastNodeOffset = " << ANegEquLastNodeOffset << std::endl;
   */
 
   if( model_.ConnorStevensOn_ )
@@ -1027,7 +975,7 @@ void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
       CaEquCaNodeOffset[i] = jacLIDVec[j+9][3];
 
       /*
-        std::cout <<  SegVEqnVpreOffset[i] << ", "
+        Xyce::dout() <<  SegVEqnVpreOffset[i] << ", "
         << SegVEqnVsegOffset[i] << ", "
         << SegVEqnNOffset[i] << ", "
         << SegVEqnMOffset[i] << ", "
@@ -1051,13 +999,13 @@ void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
 
     for(int i=0, j=2; i<nSeg; i++, j+=numIntVarsPerSegment )
     {
-      // std::cout << " i = " << i << " j = " << j << " jacLIDVec[ " << j << " ].size() = " << jacLIDVec[j].size() << std::endl;
+      // Xyce::dout() << " i = " << i << " j = " << j << " jacLIDVec[ " << j << " ].size() = " << jacLIDVec[j].size() << std::endl;
       SegVEqnVpreOffset[i] = jacLIDVec[j][0];
       SegVEqnVsegOffset[i] = jacLIDVec[j][1];
       SegVEqnVnexOffset[i] = jacLIDVec[j][2];
 
       /*
-        std::cout <<  SegVEqnVpreOffset[i] << ", "
+        Xyce::dout() <<  SegVEqnVpreOffset[i] << ", "
         << SegVEqnVsegOffset[i] << ", "
         << SegVEqnVnexOffset[i] << std::endl;
       */
@@ -1347,7 +1295,7 @@ bool Instance::setIC ()
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-void Instance::varTypes( vector<char> & varTypeVec )
+void Instance::varTypes( std::vector<char> & varTypeVec )
 {
   //varTypeVec.resize(1);
   //varTypeVec[0] = 'I';
@@ -1362,10 +1310,11 @@ void Instance::varTypes( vector<char> & varTypeVec )
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-              SolverState & ss1,
-              DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
     cMem(0.0),
     gMem(0.0),
     vRest(0.0),
@@ -1441,36 +1390,32 @@ Model::Model (const ModelBlock & MB,
     // should change the case on ionChannelModel and simplify this set of clauses
     if( ionChannelModel == "passive" || ionChannelModel == "PASSIVE" )
     {
-      membraneModel_ = rcp( new MembranePassive( solState, cMem, gMem, vRest) );
+      membraneModel_ = rcp( new MembranePassive( getSolverState(), cMem, gMem, vRest) );
 
     }
     else if( ionChannelModel == "hh" || ionChannelModel == "HH" )
     {
-      membraneModel_ = rcp( new MembraneHH( solState, cMem, gMem, vRest, eK, gK, eNa, gNa) );
+      membraneModel_ = rcp( new MembraneHH( getSolverState(), cMem, gMem, vRest, eK, gK, eNa, gNa) );
     }
     else if( ionChannelModel == "cs" || ionChannelModel == "CS")
     {
-      membraneModel_ = rcp( new MembraneCS( solState ) );
+      membraneModel_ = rcp( new MembraneCS( getSolverState() ) );
     }
     else if( ionChannelModel == "ud" || ionChannelModel == "UD")
     {
-      membraneModel_ = rcp( new MembraneUserDefined( solState, cMem, gMem, vRest,
+      membraneModel_ = rcp( new MembraneUserDefined( getSolverState(), cMem, gMem, vRest,
                                                            membraneCurrentEqus, membraneIndpVars, membraneIndpFEqus, membraneIndpQEqus, membraneFunctions, membraneParameters) );
     }
     else
     {
-      // issue error and stop
-      string msg("Model: unknown ion channel model given \"");
-      msg += ionChannelModel;
-      msg += "\"";
-      N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL, msg );
+      UserFatal0(*this) << "Model: unknown ion channel model given \"" << ionChannelModel << "\"";
     }
 
   }
   else
   {
     // no model given so assume passive
-    membraneModel_ = rcp( new MembranePassive( solState, cMem, gMem, vRest) );
+    membraneModel_ = rcp( new MembranePassive( getSolverState(), cMem, gMem, vRest) );
   }
 }
 
@@ -1485,9 +1430,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1505,7 +1450,7 @@ Model::~Model ()
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   return true;
 }
@@ -1518,12 +1463,12 @@ bool Model::processParams (string param)
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1542,24 +1487,59 @@ bool Model::processInstanceParams(string param)
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i, isize;
   isize = instanceContainer.size();
 
-  os << endl;
-  os << "Number of Neuron instances: " << isize << endl;
-  os << "    name=\t\tmodelName\tParameters" << endl;
+  os << std::endl;
+  os << "Number of Neuron instances: " << isize << std::endl;
+  os << "    name=\t\tmodelName\tParameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
+  return os;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new DeviceMaster<Traits>(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("neuron", 6)
+    .registerModelType("neuron", 6);
 }
 
 } // namespace Neuron6

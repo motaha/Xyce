@@ -1,0 +1,30 @@
+*-------------------------------------------------------------------------
+* Copyright Notice
+*
+* Copyright (c) 2000, Sandia Corporation, Albuquerque, NM.
+*-------------------------------------------------------------------------
+*
+*-------------------------------------------------------------------------
+* Filename       : $RCSfile: CVS-Netlist-Header,v $
+*
+* Purpose        : Describe the purpose of the contents of the file. If the
+*                  contains the header file of a class, provide a clear
+*                  description of the nature of the class.
+*
+* Special Notes  : Specify any "hidden" or subtle details of the class here.
+*                  Portability details, error handling information, etc.
+*
+* Creator        : {Name of the Creator of the File}
+*
+* Creation Date  : {mm/dd/yy}
+*
+* Revision Information:
+* ---------------------
+*
+* Revision Number: $Revision: 1.1 $
+*
+* Revision Date  : $Date: 2000/10/26 23:21:19 $
+*
+* Current Owner  : $Author: erkeite $
+*-------------------------------------------------------------------------
+

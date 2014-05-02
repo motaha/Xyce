@@ -5,7 +5,7 @@
 //   Copyright 2002 Sandia Corporation. Under the terms
 //   of Contract DE-AC04-94AL85000 with Sandia Corporation, the U.S.
 //   Government retains certain rights in this software.
-// 
+//
 //    Xyce(TM) Parallel Electrical Simulator
 //    Copyright (C) 2002-2011  Sandia Corporation
 //
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.2.6.1 $
+// Revision Number: $Revision: 1.3 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:44 $
+// Revision Date  : $Date: 2013/10/03 18:43:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------

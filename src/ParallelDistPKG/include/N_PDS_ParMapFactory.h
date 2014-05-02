@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.9.6.2 $
+// Revision Number: $Revision: 1.14 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,17 +46,11 @@
 #ifndef Xyce_N_PDS_ParMapFactory_h
 #define Xyce_N_PDS_ParMapFactory_h
 
-// ---------- Standard Includes ----------
-
 #include <vector>
 
-// ----------   Xyce Includes   ----------
-
 #include <N_UTL_Xyce.h>
+#include <N_PDS_fwd.h>
 
-// ----------   Fwd Declarations ----------
-
-class N_PDS_Comm;
 class N_PDS_ParMap;
 
 //-----------------------------------------------------------------------------
@@ -74,7 +68,7 @@ public:
   // Return a new ParMap
   static N_PDS_ParMap * create( int & numGlobalEntities,
                                 const int & numLocalEntities,
-                                const vector<int> & lbMap,
+                                const std::vector<int> & lbMap,
                                 const int index_base = 0,
                                 N_PDS_Comm * aComm = 0);
 

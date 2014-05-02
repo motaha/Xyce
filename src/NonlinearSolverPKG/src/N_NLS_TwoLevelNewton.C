@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,7 +36,7 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.120.2.3 $
+// Revision Number: $Revision: 1.132 $
 //
 // Revision Date  : $Date $
 //
@@ -539,13 +539,13 @@ bool N_NLS_TwoLevelNewton::initializeAll ()
 //-----------------------------------------------------------------------------
 bool N_NLS_TwoLevelNewton::setOptions(const N_UTL_OptionBlock & OB)
 {
-  list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
-  list<N_UTL_Param>::const_iterator end_tpL = OB.getParams().end();
+  std::list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator end_tpL = OB.getParams().end();
   for ( ; it_tpL != end_tpL; ++it_tpL)
   {
     if (it_tpL->uTag() == "MAXSTEP")
     {
-      maxOuterSteps_ = static_cast<int>(it_tpL->iVal());
+      maxOuterSteps_ = static_cast<int>(it_tpL->getImmutableValue<int>());
     }
   }
 
@@ -612,49 +612,49 @@ bool N_NLS_TwoLevelNewton::setTwoLevelOptions(const N_UTL_OptionBlock & OB)
 {
   N_UTL_OptionBlock OBtmp;
 
-  list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
-  list<N_UTL_Param>::const_iterator end_tpL = OB.getParams().end();
+  std::list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator end_tpL = OB.getParams().end();
   for ( ; it_tpL != end_tpL; ++it_tpL)
   {
     if (it_tpL->uTag() == "ALGORITHM")
     {
-      twoLevelAlgorithm_ = static_cast<int>(it_tpL->iVal());
+      twoLevelAlgorithm_ = static_cast<int>(it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag() == "NOX")
     {
-      noxFlagInner_ = it_tpL->iVal();
+      noxFlagInner_ = it_tpL->getImmutableValue<int>();
     }
     else if (it_tpL->uTag() == "MAXCONTSTEPS")
     {
-      maxContSteps_ = static_cast<int>(it_tpL->iVal());
+      maxContSteps_ = static_cast<int>(it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag() == "CONTINUATIONFLAG")
     {
-      int tmp = static_cast<int>(it_tpL->iVal());
+      int tmp = static_cast<int>(it_tpL->getImmutableValue<int>());
       continuationType_ = tmp;
     }
     else if (it_tpL->uTag() == "INNERFAIL")
     {
-      int tmp = static_cast<int>(it_tpL->iVal());
+      int tmp = static_cast<int>(it_tpL->getImmutableValue<int>());
       innerLoopFailFatal_ = (tmp!=0);
     }
     else if (it_tpL->uTag() == "EXITWITHFAILURE")
     {
-      int tmp = static_cast<int>(it_tpL->iVal());
+      int tmp = static_cast<int>(it_tpL->getImmutableValue<int>());
       totalSolveFailFatal_ = (tmp!=0);
     }
     else if (it_tpL->uTag() == "FULLNEWTONENFORCE")
     {
-      int tmp = static_cast<int>(it_tpL->iVal());
+      int tmp = static_cast<int>(it_tpL->getImmutableValue<int>());
       doFullNewtonFinalEnforcement_ = (tmp!=0);
     }
     else if (it_tpL->uTag() == "CONPARAM")
     {
-      paramNameList.push_back(it_tpL->sVal());
+      paramNameList.push_back(it_tpL->stringValue());
     }
     else if (it_tpL->uTag() == "VOLTLIMTOL")
     {
-      voltLimTol_ = static_cast<double>(it_tpL->dVal());
+      voltLimTol_ = static_cast<double>(it_tpL->getImmutableValue<double>());
     }
     else // anything that is not a "special" two-level param, push
           // back on the the tmp param list.
@@ -669,40 +669,26 @@ bool N_NLS_TwoLevelNewton::setTwoLevelOptions(const N_UTL_OptionBlock & OB)
 
   if (twoLevelAlgorithm_ < 0 || twoLevelAlgorithm_ > 5)
   {
-    string tmp =
-      " ***** WARNING: Right now the only two-level"
-     " algorithms are algorithm=0-5.  Resetting to 0.\n\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmp);
+    Xyce::lout() << "***** WARNING: Right now the only two-level algorithms are algorithm=0-5.  Resetting to 0.\n\n" << std::endl;
 
     twoLevelAlgorithm_=0;
   }
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-  const string dashedline =  "------------------------------------------------"
-    "-----------------------------";
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\n");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-           "\n***** 2-level Inner Loop Nonlinear solver options:\n");
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\talgorithm:\t\t\t", twoLevelAlgorithm_);
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\toutersteps:\t\t\t", maxOuterSteps_);
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\tmaxContSteps:\t\t\t", maxContSteps_);
-
+  Xyce::dout() << "\n" << std::endl
+               << Xyce::section_divider << std::endl
+               << "\n***** 2-level Inner Loop Nonlinear solver options:\n" << std::endl
+               << "\talgorithm:\t\t\t" <<  twoLevelAlgorithm_ << std::endl
+               << "\toutersteps:\t\t\t" <<  maxOuterSteps_ << std::endl
+               << "\tmaxContSteps:\t\t\t" <<  maxContSteps_ << std::endl;
+  
 #if 0
-  innerLoopParams.printParams();
+  innerLoopParams.printParams(Xyce::dout());
 #endif
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-           "\n***** Done printing Inner Loop Params:\n");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\n");
+  Xyce::dout() << "\n***** Done printing Inner Loop Params:\n" << std::endl
+               << Xyce::section_divider << std::endl
+               << "\n" << std::endl;
 #endif
 
   // Now that the loop is done allocate the param val array:
@@ -724,22 +710,22 @@ bool N_NLS_TwoLevelNewton::setTwoLevelTranOptions(const N_UTL_OptionBlock & OB)
 {
   setupTranParamsFlag_ = true;
 #ifdef Xyce_VERBOSE_NONLINEAR
-  cout << "In N_NLS_TwoLevelNewton::setTwoLevelTranOptions" << endl;
+  Xyce::dout() << "In N_NLS_TwoLevelNewton::setTwoLevelTranOptions" << std::endl;
 #endif
 
   N_UTL_OptionBlock OBtmp;
 
-  list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
-  list<N_UTL_Param>::const_iterator end_tpL = OB.getParams().end();
+  std::list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator end_tpL = OB.getParams().end();
   for ( ; it_tpL != end_tpL; ++it_tpL)
   {
     if (it_tpL->uTag() == "ALGORITHM")
     {
-      twoLevelAlgorithmTran_ = static_cast<int>(it_tpL->iVal());
+      twoLevelAlgorithmTran_ = static_cast<int>(it_tpL->getImmutableValue<int>());
     }
     else if ( it_tpL->uTag() == "MAXCONTSTEPS" )
     {
-      maxContStepsTran_ = static_cast<int>(it_tpL->iVal());
+      maxContStepsTran_ = static_cast<int>(it_tpL->getImmutableValue<int>());
     }
     else // anything that is not a "special" two-level param, push
           // back on the the tmp param list.
@@ -752,30 +738,21 @@ bool N_NLS_TwoLevelNewton::setTwoLevelTranOptions(const N_UTL_OptionBlock & OB)
 
   if (twoLevelAlgorithmTran_ < 0 || twoLevelAlgorithmTran_ > 3)
   {
-    string tmp =
-      " ***** WARNING: Right now the only two-level"
-     " algorithms are algorithm=0-3.  Resetting to 0.\n\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmp);
+    Xyce::lout() << "***** WARNING: Right now the only two-level algorithms are algorithm=0-3.  Resetting to 0.\n\n" << std::endl;
 
     twoLevelAlgorithmTran_=0;
   }
 
 #ifdef Xyce_VERBOSE_NONLINEAR
 #if 0
-  const string dashedline =  "------------------------------------------------"
-    "-----------------------------";
+  Xyce::lout() << "\n" << std::endl
+               << Xyce::section_divider << std::endl
+               << "\n***** 2-level Transient Inner Loop Nonlinear solver options:\n" << std::endl;
+  innerLoopTranParams.printParams(Xuce::lout());
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\n");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-           "\n***** 2-level Transient Inner Loop Nonlinear solver options:\n");
-
-  innerLoopTranParams.printParams();
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-           "\n***** Done printing Inner Loop Transient Params:\n");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\n");
+  Xyce::lout() << "\n***** Done printing Inner Loop Transient Params:\n" << std::endl
+               << Xyce::section_divider << std::endl
+               << "\n" << std::endl;
 #endif
 #endif
 
@@ -797,8 +774,8 @@ void N_NLS_TwoLevelNewton::setAnalysisMode (AnalysisMode mode)
 {
   // this should be 0,1 or 2  (DC_OP, DC_SWEEP, or TRANSIENT)
 #ifdef Xyce_VERBOSE_NONLINEAR
-  cout << endl;
-  cout << "Setting the externalAnalysisMode = " << mode << endl;
+  Xyce::dout() << std::endl;
+  Xyce::dout() << "Setting the externalAnalysisMode = " << mode << std::endl;
 #endif
   externalAnalysisMode = mode;
 
@@ -832,8 +809,6 @@ bool N_NLS_TwoLevelNewton::setPetraOptions(const N_UTL_OptionBlock & OB)
 }
 
 
-#ifdef Xyce_VERBOSE_NONLINEAR
-
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_TwoLevelNewton::printStepInfo_
 // Purpose       : Print out 2-level Newton step information.
@@ -848,28 +823,17 @@ void N_NLS_TwoLevelNewton::printStepInfo_
   char tmpChar[128];
   if (solveType==FULL_PROBLEM)
   {
-    sprintf(tmpChar,
- "---------- 2LNiter:%4d\t%5d\tFULL PROBLEM --------------------------------\n",
-           step, success);
+    Xyce::lout() << "---------- 2LNiter: " << step << "\t" << success << "\tFULL PROBLEM --------------------------------" << std::endl;
   }
   else if (solveType==INNER_PROBLEM)
   {
-    sprintf(tmpChar,
- "---------- 2LNiter:%4d\t%5d\tINNER PROBLEM ----------------------------\n",
-           step, success);
+    Xyce::lout() << "---------- 2LNiter: " << step << "\t" << success << "\tINNER PROBLEM ----------------------------" << std::endl;
   }
   else
   {
-    sprintf(tmpChar,
- "---------- 2LNiter:%4d\t%5d\tOUTER PROBLEM ----------------------------\n",
-           step, success);
+    Xyce::lout() << "---------- 2LNiter: " << step << "\t" << success << "\tOUTER PROBLEM ----------------------------" << std::endl;
   }
-
-  //string tmpStr(tmpChar);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmpChar);
 }
-
-#endif
 
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_TwoLevelNewton::zeroInnerLoopStatistics_
@@ -953,7 +917,7 @@ int N_NLS_TwoLevelNewton::algorithm0_()
   int status = -1;
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-  cout << endl << "Running algorithm 0:" << endl;
+  Xyce::dout() << std::endl << "Running algorithm 0:" << std::endl;
 #endif
 
   // set up the local algorithm variable:
@@ -1016,7 +980,7 @@ int N_NLS_TwoLevelNewton::algorithm1_()
   int status = -1;
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-  cout << endl << "Running algorithm 1:" << endl;
+  Xyce::dout() << std::endl << "Running algorithm 1:" << std::endl;
 #endif
 
   bool firstOuterStepTaken = false;
@@ -1078,7 +1042,7 @@ int N_NLS_TwoLevelNewton::algorithm1_()
 #ifdef Xyce_VERBOSE_NONLINEAR
   if (status >=0)
   {
-    cout << "TWO LEVEL Newton succeeded!" << endl;
+    Xyce::dout() << "TWO LEVEL Newton succeeded!" << std::endl;
   }
 #endif
 
@@ -1109,7 +1073,7 @@ int N_NLS_TwoLevelNewton::algorithm2_()
   bool firstOuterStepTaken = false;
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-  cout << endl << "Running algorithm 2:" << endl;
+  Xyce::dout() << std::endl << "Running algorithm 2:" << std::endl;
 #endif
 
   // Start out with a single step of the full problem:
@@ -1200,7 +1164,7 @@ int N_NLS_TwoLevelNewton::algorithm2_()
 #ifdef Xyce_VERBOSE_NONLINEAR
   if (status >0 && statInner > 0)
   {
-    cout << "TWO LEVEL Newton succeeded!" << endl;
+    Xyce::dout() << "TWO LEVEL Newton succeeded!" << std::endl;
   }
 #endif
 
@@ -1232,7 +1196,7 @@ int N_NLS_TwoLevelNewton::algorithm3_()
   bool firstOuterStepTaken = false;
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-  cout << endl << "Running algorithm 3:" << endl;
+  Xyce::dout() << std::endl << "Running algorithm 3:" << std::endl;
 #endif
 
   nlsPassingPtr_ = 0;
@@ -1312,8 +1276,8 @@ int N_NLS_TwoLevelNewton::algorithm3_()
       bool voltLimStat = (twoNormJDXP_ <= voltLimTol_);
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-      cout << endl;
-      cout << "   2-norm of voltage limiting vector: " << twoNormJDXP_ << endl;
+      Xyce::dout() << std::endl;
+      Xyce::dout() << "   2-norm of voltage limiting vector: " << twoNormJDXP_ << std::endl;
 #endif
 
       // exit?
@@ -1346,7 +1310,7 @@ int N_NLS_TwoLevelNewton::algorithm3_()
 #ifdef Xyce_VERBOSE_NONLINEAR
   if (status >0 && statInner > 0 && statFinal > 0)
   {
-    cout << "TWO LEVEL Newton succeeded!" << endl;
+    Xyce::dout() << "TWO LEVEL Newton succeeded!" << std::endl;
   }
 #endif
 
@@ -1382,9 +1346,9 @@ int N_NLS_TwoLevelNewton::algorithm4_()
   int stepsLeft = contMaxTmp;
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-  cout << endl << "Running algorithm 4:" << endl;
-  cout << endl << "Initial continuation steps: ";
-  cout << contMaxTmp << endl;
+  Xyce::dout() << std::endl << "Running algorithm 4:" << std::endl;
+  Xyce::dout() << std::endl << "Initial continuation steps: ";
+  Xyce::dout() << contMaxTmp << std::endl;
 #endif
 
   // The solves should be FULL newton solves.
@@ -1405,17 +1369,17 @@ int N_NLS_TwoLevelNewton::algorithm4_()
   double prevVal = initVal;
   double stepSizeEst;
 
-  vector<string>::iterator iter;
-  vector<string>::iterator begin = paramNameList.begin ();
-  vector<string>::iterator end   = paramNameList.end ();
+  std::vector<std::string>::iterator iter;
+  std::vector<std::string>::iterator begin = paramNameList.begin ();
+  std::vector<std::string>::iterator end   = paramNameList.end ();
 
-  vector<double>::iterator iterFinalVal;
-  vector<double>::iterator beginFinalVal = paramFinalVal.begin ();
-  vector<double>::iterator endFinalVal   = paramFinalVal.end ();
+  std::vector<double>::iterator iterFinalVal;
+  std::vector<double>::iterator beginFinalVal = paramFinalVal.begin ();
+  std::vector<double>::iterator endFinalVal   = paramFinalVal.end ();
 
-  vector<double>::iterator iterCurrentVal;
-  vector<double>::iterator beginCurrentVal = paramCurrentVal.begin ();
-  vector<double>::iterator endCurrentVal   = paramCurrentVal.end ();
+  std::vector<double>::iterator iterCurrentVal;
+  std::vector<double>::iterator beginCurrentVal = paramCurrentVal.begin ();
+  std::vector<double>::iterator endCurrentVal   = paramCurrentVal.end ();
 
   // Get the final values for each param., then set each to zero.
   for (iter=begin, iterFinalVal=beginFinalVal, iterCurrentVal=beginCurrentVal;
@@ -1442,8 +1406,8 @@ int N_NLS_TwoLevelNewton::algorithm4_()
     contStep_=1;
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-    cout << "Parameter = " << *iter;
-    cout << " finalVal = " << *iterFinalVal << endl;
+    Xyce::dout() << "Parameter = " << *iter;
+    Xyce::dout() << " finalVal = " << *iterFinalVal << std::endl;
 #endif
 
     // begin continuation Loop for the current parameter, *iter:
@@ -1466,19 +1430,19 @@ int N_NLS_TwoLevelNewton::algorithm4_()
 	}
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-        cout << endl << "Continuation Step: " << contStep_;
-        cout << "   Estimated Remaining Steps: " << stepsLeft;
-	cout << "  " << *iter;
-        cout << endl;
-        cout << "currVal= " << currVal;
-        cout << "  prevVal= " << prevVal;
-        cout << "  step= " << stepSizeEst;
-        cout << endl;
+        Xyce::dout() << std::endl << "Continuation Step: " << contStep_;
+        Xyce::dout() << "   Estimated Remaining Steps: " << stepsLeft;
+	Xyce::dout() << "  " << *iter;
+        Xyce::dout() << std::endl;
+        Xyce::dout() << "currVal= " << currVal;
+        Xyce::dout() << "  prevVal= " << prevVal;
+        Xyce::dout() << "  step= " << stepSizeEst;
+        Xyce::dout() << std::endl;
 #endif
 
 	if (stepsLeft < 0)
 	{
-	  string tmp = "Continuation step estimate broken.  Exiting\n";
+	  std::string tmp = "Continuation step estimate broken.  Exiting\n";
 	  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, tmp);
 	}
 
@@ -1528,11 +1492,11 @@ int N_NLS_TwoLevelNewton::algorithm4_()
 	  }
 
 #ifdef Xyce_DEBUG_NONLINEAR
-	  cout << "\nRight before outputHOMOTOPY:" << endl;
+	  Xyce::dout() << "\nRight before outputHOMOTOPY:" << std::endl;
 	  for (int ieric=0;ieric<paramNameList.size();++ieric)
 	  {
-	    cout << paramNameList[ieric] << "\t";
-	    cout << paramCurrentVal[ieric] << endl;
+	    Xyce::dout() << paramNameList[ieric] << "\t";
+	    Xyce::dout() << paramCurrentVal[ieric] << std::endl;
 	  }
 #endif
 
@@ -1568,13 +1532,13 @@ int N_NLS_TwoLevelNewton::algorithm4_()
     } // end of continuation loop.
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-    cout << "currVal= " << currVal;
-    cout << "  prevVal= " << prevVal;
-    cout << endl;
-    cout << endl;
-    cout << "Total number of failures = " << numTotalFailures << endl;
-    cout << "Number of actual steps   = " << contStep_-1;
-    cout << endl;
+    Xyce::dout() << "currVal= " << currVal;
+    Xyce::dout() << "  prevVal= " << prevVal;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "Total number of failures = " << numTotalFailures << std::endl;
+    Xyce::dout() << "Number of actual steps   = " << contStep_-1;
+    Xyce::dout() << std::endl;
 #endif
 
   } // end of parameter loop.
@@ -1603,7 +1567,7 @@ int N_NLS_TwoLevelNewton::algorithm5_()
   int status = -1;
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-  cout << endl << "Running algorithm 5:" << endl;
+  Xyce::dout() << std::endl << "Running algorithm 5:" << std::endl;
 #endif
 
   // set up the local algorithm variable:
@@ -1643,8 +1607,8 @@ int N_NLS_TwoLevelNewton::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
   // what algorithm is specified.
   if (tiaPtr_ == 0)
   {
-    cout << endl;
-    cout << "tiaPtr is null. exiting" << endl; exit(0);
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "tiaPtr is null. exiting" << std::endl; exit(0);
   }
 
   N_TIA_TimeIntInfo tiInfo;
@@ -1670,8 +1634,8 @@ int N_NLS_TwoLevelNewton::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
     numSubProblems_ = numInterfaceNodes_.size ();
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-    cout << endl;
-    cout << "numSubProblems_ = " << numSubProblems_ << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "numSubProblems_ = " << numSubProblems_ << std::endl;
 #endif
   }
 
@@ -1708,8 +1672,8 @@ int N_NLS_TwoLevelNewton::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
   }
   else
   {
-    string tmp =
-      " ***** ERROR: Two-Level Newton Algorithm set to invalid number.\n";
+    std::string tmp =
+      "Two-Level Newton Algorithm set to invalid number.\n";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, tmp);
   }
 
@@ -1723,8 +1687,8 @@ int N_NLS_TwoLevelNewton::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
     loaderPtr_->output();
 #endif
 
-    string tmp =
-      " ***** ERROR: Two-Level Newton Algorithm failed to converge.  Exiting.\n";
+    std::string tmp =
+      "Two-Level Newton Algorithm failed to converge.  Exiting.\n";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, tmp);
   }
 
@@ -1794,7 +1758,7 @@ bool N_NLS_TwoLevelNewton::calcCouplingTerms_ ()
     int numCoupleTerms = numInterfaceNodes_[iSubProblem];
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-    cout << "\n  numCoupleTerms = " << numCoupleTerms << endl;
+    Xyce::dout() << "\n  numCoupleTerms = " << numCoupleTerms << std::endl;
 #endif
 
     for (iCouple=0;iCouple<numCoupleTerms;++iCouple)
@@ -1892,24 +1856,24 @@ int N_NLS_TwoLevelNewton::continuationLoop_ ()
       stepsLeft = static_cast<int>((1.0-currentAlpha)/stepSizeEst) + 1;
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-      cout << endl << "Continuation Step: " << contStep_;
-      cout << "   Estimated Remaining Steps: " << stepsLeft;
-      cout << endl;
-      cout << "current alpha = " << currentAlpha;
-      cout << "  prev. alpha = " << previousAlpha;
-      cout << "  step = " << stepSizeEst;
-      cout << endl;
+      Xyce::dout() << std::endl << "Continuation Step: " << contStep_;
+      Xyce::dout() << "   Estimated Remaining Steps: " << stepsLeft;
+      Xyce::dout() << std::endl;
+      Xyce::dout() << "current alpha = " << currentAlpha;
+      Xyce::dout() << "  prev. alpha = " << previousAlpha;
+      Xyce::dout() << "  step = " << stepSizeEst;
+      Xyce::dout() << std::endl;
 #endif
       if (stepsLeft < 0)
       {
-        string tmp = "Continuation step estimate broken.  Exiting\n";
+        std::string tmp = "Continuation step estimate broken.  Exiting\n";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, tmp);
       }
 
       // save a copy of solution:
       (*savedNextSolPtr_) = (**nextSolVectorPtrPtr_);
 
-      string paramName = "pdealpha";
+      std::string paramName = "pdealpha";
       loaderPtr_->setParam (paramName, currentAlpha);
 
       // perform the nonlinear solve:
@@ -1923,7 +1887,7 @@ int N_NLS_TwoLevelNewton::continuationLoop_ ()
       // number, not positive.
 
 #ifdef Xyce_DEBUG_NONLINEAR
-      cout << "Status of inner loop solve:  " << statInner << endl;
+      Xyce::dout() << "Status of inner loop solve:  " << statInner << std::endl;
 #endif
       successBool = (statInner > 0);
 
@@ -1973,13 +1937,13 @@ int N_NLS_TwoLevelNewton::continuationLoop_ ()
   } // end of continuation loop.
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-  cout << "current alpha = " << currentAlpha;
-  cout << "  previous alpha = " << previousAlpha;
-  cout << endl;
-  cout << endl;
-  cout << "Total number of failures = " << numTotalFailures << endl;
-  cout << "Number of actual steps   = " << contStep_-1;
-  cout << endl;
+  Xyce::dout() << "current alpha = " << currentAlpha;
+  Xyce::dout() << "  previous alpha = " << previousAlpha;
+  Xyce::dout() << std::endl;
+  Xyce::dout() << std::endl;
+  Xyce::dout() << "Total number of failures = " << numTotalFailures << std::endl;
+  Xyce::dout() << "Number of actual steps   = " << contStep_-1;
+  Xyce::dout() << std::endl;
 #endif
 
   loaderPtr_->disablePDEContinuation ();
@@ -2013,9 +1977,9 @@ int N_NLS_TwoLevelNewton::locaLoop_ ()
   // Unfortunately, it doesn't work at the moment - the second time it gets
   // called, everything goes haywire.  ERK 2/25/04.
 #if 0
-  cout << "suggested steps are: " << suggestedSteps << endl;
+  Xyce::dout() << "suggested steps are: " << suggestedSteps << std::endl;
 
-  list<N_UTL_Param>::iterator it_tpL;
+  std::list<N_UTL_Param>::iterator it_tpL;
   for (it_tpL = innerSolverOptions_.params.begin();
        it_tpL != innerSolverOptions_.params.end();
        ++it_tpL)
@@ -2023,13 +1987,13 @@ int N_NLS_TwoLevelNewton::locaLoop_ ()
     ExtendedString tmpTag = it_tpL->tag ();
     tmpTag.toUpper ();
 
-    cout << "tmpTag = " << tmpTag << endl;
+    Xyce::dout() << "tmpTag = " << tmpTag << std::endl;
 
     if (tmpTag == "CONTINUATION")
     {
       if (suggestedSteps <= 1) // then just do one newton step.
       {
-        cout << "Setting the solver type to 0" << endl;
+        Xyce::dout() << "Setting the solver type to 0" << std::endl;
 	suggestedSteps = 1;
 	it_tpL->setVal(0);
       }
@@ -2073,11 +2037,9 @@ int N_NLS_TwoLevelNewton::locaLoop_ ()
 bool N_NLS_TwoLevelNewton::enableSensitivity ()
 {
 #ifdef Xyce_VERBOSE_NONLINEAR
-  const string dashedline =  "------------------------------------------------"
-    "-----------------------------";
-  cout << endl;
-  cout << dashedline << endl;
-  cout << "N_NLS_TwoLevelNewton::enableSensitivity " << endl;
+  Xyce::dout() << std::endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
+  Xyce::dout() << "N_NLS_TwoLevelNewton::enableSensitivity " << std::endl;
 #endif
   bool bsuccess = true;
   bool tmpBool = true;
@@ -2095,11 +2057,11 @@ bool N_NLS_TwoLevelNewton::enableSensitivity ()
     double maxNormRHS_=0, twoNormRHS_ = 0.0;
     rhsVectorPtr_->infNorm(&maxNormRHS_);
     rhsVectorPtr_->lpNorm(2, &twoNormRHS_);
-    cout.width(21); cout.precision(13); cout.setf(ios::scientific);
-    cout << endl;
-    cout << "Max. norm of full Newton RHS: " << maxNormRHS_ << endl;
-    cout << "   2-norm of full Newton RHS: " << twoNormRHS_ << endl;
-    cout << dashedline << endl;
+    Xyce::dout().width(21); Xyce::dout().precision(13); Xyce::dout().setf(std::ios::scientific);
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "Max. norm of full Newton RHS: " << maxNormRHS_ << std::endl;
+    Xyce::dout() << "   2-norm of full Newton RHS: " << twoNormRHS_ << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
 #endif
   //}
 

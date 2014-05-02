@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.50.2.5 $
+// Revision Number: $Revision: 1.73.2.3 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -53,11 +53,15 @@
 
 // ---------- Xyce Includes ----------
 #include <N_DEV_Const.h>
-#include <N_DEV_MOSFET2.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_ExternData.h>
+#include <N_DEV_MOSFET2.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
+
+#include <N_DEV_MOSFET1.h>
 
 #include <N_LAS_Matrix.h>
 #include <N_LAS_Vector.h>
@@ -65,289 +69,270 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<MOSFET2::Instance>::ParametricData()
+
+namespace MOSFET2 {
+
+
+void Traits::loadInstanceParameters(ParametricData<MOSFET2::Instance> &p)
 {
-    setNumNodes(4);
-    setNumOptionalNodes(0);
-    setNumFillNodes(0);
-    setModelRequired(1);
-    addModelType("NMOS");
-    addModelType("PMOS");
-
-    // Set up double precision variables:
-    addPar ("TEMP", 0.0, false, ParameterType::TIME_DEP,
+// Set up double precision variables:
+    p.addPar ("TEMP", 0.0, false, ParameterType::TIME_DEP,
       &MOSFET2::Instance::temp, NULL,
-       STANDARD, CAT_NONE, "");
+       STANDARD, CAT_NONE, "Device temperature");
 
-    addPar ("L", 0.0, true, ParameterType::NO_DEP,
+    p.addPar ("L", 0.0, true, ParameterType::NO_DEP,
       &MOSFET2::Instance::l, NULL,
        U_METER, CAT_GEOMETRY, "Channel length");
 
-    addPar ("W", 0.0, true, ParameterType::NO_DEP,
+    p.addPar ("W", 0.0, true, ParameterType::NO_DEP,
       &MOSFET2::Instance::w, NULL,
        U_METER, CAT_GEOMETRY, "Channel width");
 
-    addPar ("AD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("AD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Instance::drainArea, NULL,
        U_METER2, CAT_GEOMETRY, "Drain diffusion area");
 
-    addPar ("AS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("AS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Instance::sourceArea, NULL,
        U_METER2, CAT_GEOMETRY, "Source diffusion area");
 
-    addPar ("NRD", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("NRD", 1.0, false, ParameterType::NO_DEP,
       &MOSFET2::Instance::drainSquares, NULL,
        U_SQUARES, CAT_GEOMETRY, "Multiplier for RSH to yield parasitic resistance of drain");
 
-    addPar ("NRS", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("NRS", 1.0, false, ParameterType::NO_DEP,
       &MOSFET2::Instance::sourceSquares, NULL,
        U_SQUARES, CAT_GEOMETRY, "Multiplier for RSH to yield parasitic resistance of source");
 
-    addPar ("PD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Instance::drainPerimeter, NULL,
        U_METER, CAT_GEOMETRY, "Drain diffusion perimeter");
 
-    addPar ("PS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Instance::sourcePerimeter, NULL,
        U_METER, CAT_GEOMETRY, "Source diffusion perimeter");
 
-    addPar ("M", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("M", 1.0, false, ParameterType::NO_DEP,
       &MOSFET2::Instance::numberParallel, NULL,
        U_NONE, CAT_CONTROL, "Multiplier for M devices connected in parallel");
 
     // Initial conditions 
-    addPar ("IC1", 0.0, false, NO_DEP,
+    p.addPar ("IC1", 0.0, false, NO_DEP,
             &MOSFET2::Instance::icVDS,
             &MOSFET2::Instance::IC_GIVEN,
             U_VOLT, CAT_INITIAL, "Initial condition on Drain-Source voltage");
 
-    addPar ("IC2", 0.0, false, NO_DEP,
+    p.addPar ("IC2", 0.0, false, NO_DEP,
             &MOSFET2::Instance::icVGS,
             &MOSFET2::Instance::IC_GIVEN,
             U_VOLT, CAT_INITIAL, "Initial condition on Gate-Source voltage");
 
-    addPar ("IC3", 0.0, false, NO_DEP,
+    p.addPar ("IC3", 0.0, false, NO_DEP,
             &MOSFET2::Instance::icVBS,
             &MOSFET2::Instance::IC_GIVEN,
             U_VOLT, CAT_INITIAL, "Initial condition on Bulk-Source voltage");
 
-    makeVector ("IC",3);
+    p.makeVector ("IC",3);
 
     // Set up non-double precision variables:
-    addPar ("OFF",false,false, ParameterType::NO_DEP,
+    p.addPar ("OFF",false,false, ParameterType::NO_DEP,
             &MOSFET2::Instance::OFF,
             NULL, U_LOGIC, CAT_VOLT,
             "Initial condition of no voltage drops across device");
 }
 
-template<>
-ParametricData<MOSFET2::Model>::ParametricData()
+void Traits::loadModelParameters(ParametricData<MOSFET2::Model> &p)
 {
     // Set up double precision variables:
-    addPar ("L", 1e-4, false, ParameterType::NO_DEP,
+    p.addPar ("L", 1e-4, false, ParameterType::NO_DEP,
       &MOSFET2::Model::model_l, NULL,
        U_METER, CAT_GEOMETRY, "Default channel length");
 
-    addPar ("W", 1e-4, false, ParameterType::NO_DEP,
+    p.addPar ("W", 1e-4, false, ParameterType::NO_DEP,
       &MOSFET2::Model::model_w, NULL,
        U_METER, CAT_GEOMETRY, "Default channel width");
 
-    addPar ("VTO", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("VTO", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::vt0, NULL,
        U_VOLT, CAT_VOLT, "Zero-bias threshold voltage");
 
-    addPar ("KP", 2e-5, false, ParameterType::NO_DEP,
+    p.addPar ("KP", 2e-5, false, ParameterType::NO_DEP,
       &MOSFET2::Model::transconductance, NULL,
        U_AMPVM2, CAT_PROCESS, "Transconductance coefficient");
 
-    addPar ("GAMMA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("GAMMA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::gamma, NULL,
        U_VOLTH, CAT_PROCESS, "Bulk threshold parameter");
 
-    addPar ("PHI", 0.6, false, ParameterType::NO_DEP,
+    p.addPar ("PHI", 0.6, false, ParameterType::NO_DEP,
       &MOSFET2::Model::phi, NULL,
        U_VOLT, CAT_PROCESS, "Surface potential");
 
-    addPar ("LAMBDA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LAMBDA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::lambda, NULL,
        U_VOLTM1, CAT_PROCESS, "Channel-length modulation");
 
-    addPar ("RD", 0.0, false, ParameterType::MIN_RES,
+    p.addPar ("RD", 0.0, false, ParameterType::MIN_RES,
       &MOSFET2::Model::drainResistance, NULL,
        U_OHM, CAT_RES, "Drain ohmic resistance");
 
-    addPar ("RS", 0.0, false, ParameterType::MIN_RES,
+    p.addPar ("RS", 0.0, false, ParameterType::MIN_RES,
       &MOSFET2::Model::sourceResistance, NULL,
        U_OHM, CAT_RES, "Source ohmic resistance");
 
-    addPar ("CBD", 0.0, false, ParameterType::MIN_CAP,
+    p.addPar ("CBD", 0.0, false, ParameterType::MIN_CAP,
       &MOSFET2::Model::capBD,
       &MOSFET2::Model::capBDGiven,
        U_FARAD, CAT_CAP, "Zero-bias bulk-drain p-n capacitance");
 
-    addPar ("CBS", 0.0, false, ParameterType::MIN_CAP,
+    p.addPar ("CBS", 0.0, false, ParameterType::MIN_CAP,
       &MOSFET2::Model::capBS,
       &MOSFET2::Model::capBSGiven,
        U_FARAD, CAT_CAP, "Zero-bias bulk-source p-n capacitance");
 
-    addPar ("IS", 1e-14, false, ParameterType::NO_DEP,
+    p.addPar ("IS", 1e-14, false, ParameterType::NO_DEP,
       &MOSFET2::Model::jctSatCur, NULL,
        U_AMP, CAT_CURRENT, "Bulk p-n saturation current");
 
-    addPar ("PB", 0.8, false, ParameterType::NO_DEP,
+    p.addPar ("PB", 0.8, false, ParameterType::NO_DEP,
       &MOSFET2::Model::bulkJctPotential, NULL,
        U_VOLT, CAT_VOLT, "Bulk p-n bottom potential");
 
-    addPar ("CGSO", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CGSO", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::gateSourceOverlapCapFactor, NULL,
        U_FARADMM1, CAT_CAP, "Gate-source overlap capacitance/channel width");
 
-    addPar ("CGDO", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CGDO", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::gateDrainOverlapCapFactor, NULL,
        U_FARADMM1, CAT_CAP, "Gate-drain overlap capacitance/channel width");
 
-    addPar ("CGBO", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CGBO", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::gateBulkOverlapCapFactor, NULL,
        U_FARADMM1, CAT_CAP, "Gate-bulk overlap capacitance/channel length");
 
-    addPar ("RSH", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RSH", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::sheetResistance, NULL,
        U_OHM, CAT_RES, "Drain, source diffusion sheet resistance");
 
-    addPar ("CJ", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CJ", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::bulkCapFactor,
       &MOSFET2::Model::bulkCapFactorGiven,
        U_FARADMM2, CAT_CAP, "Bulk p-n zero-bias bottom capacitance/area");
 
-    addPar ("MJ", 0.5, false, ParameterType::NO_DEP,
+    p.addPar ("MJ", 0.5, false, ParameterType::NO_DEP,
       &MOSFET2::Model::bulkJctBotGradingCoeff, NULL,
        U_NONE, CAT_DOPING, "Bulk p-n bottom grading coefficient");
 
-    addPar ("CJSW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CJSW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::sideWallCapFactor,
       &MOSFET2::Model::sideWallCapFactorGiven,
        U_FARADMM2, CAT_CAP, "Bulk p-n zero-bias sidewall capacitance/area");
 
-    addPar ("MJSW", 0.5, false, ParameterType::NO_DEP,
+    p.addPar ("MJSW", 0.5, false, ParameterType::NO_DEP,
       &MOSFET2::Model::bulkJctSideGradingCoeff, NULL,
        U_NONE, CAT_DOPING, "Bulk p-n sidewall grading coefficient");
 
-    addPar ("JS", 0.0,false, ParameterType::NO_DEP,
+    p.addPar ("JS", 0.0,false, ParameterType::NO_DEP,
       &MOSFET2::Model::jctSatCurDensity, NULL,
        U_AMPMM2, CAT_PROCESS, "Bulk p-n saturation current density");
 
-    addPar ("TOX", 1e-7, true, ParameterType::NO_DEP,
+    p.addPar ("TOX", 1e-7, true, ParameterType::NO_DEP,
       &MOSFET2::Model::oxideThickness, NULL,
        U_METER, CAT_GEOMETRY, "Gate oxide thickness");
 
-    addPar ("LD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::latDiff, NULL,
        U_METER, CAT_DOPING, "Lateral diffusion length");
 
-    addPar ("UO", 600.0, false, ParameterType::NO_DEP,
+    p.addPar ("UO", 600.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::surfaceMobility, NULL,
        U_CMM2VM1SM1, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "Surface mobility");
 
-    addPar ("U0", 600.0, false, ParameterType::NO_DEP,
+    p.addPar ("U0", 600.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::surfaceMobility0, NULL,
        U_CMM2VM1SM1, CAT_PROCESS, "Surface mobility");
 
-    addPar ("FC", 0.5, false, ParameterType::NO_DEP,
+    p.addPar ("FC", 0.5, false, ParameterType::NO_DEP,
       &MOSFET2::Model::fwdCapDepCoeff, NULL,
        U_NONE, CAT_CAP, "Bulk p-n forward-bias capacitance coefficient");
 
-    addPar ("NSUB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("NSUB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::substrateDoping, NULL,
        U_CMM3, CAT_DOPING, "Substrate doping density");
 
-    addPar ("NSS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("NSS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::surfaceStateDensity, NULL,
        U_CMM2, CAT_PROCESS, "Surface state density");
 
 
 // mos2 (vs mos1) params.
-    addPar ("DELTA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("DELTA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::narrowFactor  , NULL,
        U_NONE, CAT_NONE, "Width effect on threshold");
 
-    addPar ("UEXP", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("UEXP", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::critFieldExp  , NULL,
        U_NONE, CAT_NONE, "Crit. field exp for mob. deg.");
 
-    addPar ("UCRIT", 1.0e4, false, ParameterType::NO_DEP,
+    p.addPar ("UCRIT", 1.0e4, false, ParameterType::NO_DEP,
       &MOSFET2::Model::critField  , NULL,
        U_NONE, CAT_NONE, "Crit. field for mob. degradation");
 
-    addPar ("VMAX", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("VMAX", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::maxDriftVel  , NULL,
        U_NONE, CAT_NONE, "Maximum carrier drift velocity");
 
-    addPar ("XJ", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("XJ", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::junctionDepth  , NULL,
        U_NONE, CAT_NONE, "Junction depth");
 
-    addPar ("NEFF", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("NEFF", 1.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::channelCharge  , NULL,
        U_NONE, CAT_NONE, "Total channel charge coeff.");
 
-    addPar ("NFS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("NFS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::fastSurfaceStateDensity  , NULL,
        U_NONE, CAT_NONE, "Fast surface state density");
 
 // end of mos2 (vs mos1) params.
 
-    addPar ("TNOM", 27.0, false, ParameterType::NO_DEP,
+    p.addPar ("TNOM", 27.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::tnom, NULL,
        STANDARD, CAT_NONE, "");
 
-    addPar ("KF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("KF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::fNcoef, NULL,
        U_NONE, CAT_FLICKER, "Flicker noise coefficient");
 
-    addPar ("AF", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("AF", 1.0, false, ParameterType::NO_DEP,
       &MOSFET2::Model::fNexp, NULL,
        U_NONE, CAT_FLICKER, "Flicker noise exponent");
 
     // Set up non-double precision variables:
-    addPar ("TPG", 0, false, ParameterType::NO_DEP,
+    p.addPar ("TPG", 0, false, ParameterType::NO_DEP,
             &MOSFET2::Model::gateType, NULL,
             U_NONE, CAT_MATERIAL, "Gate material type (-1 = same as substrate,"
                             " 0 = aluminum, 1 = opposite of substrate)");
 
-    DeviceModel::initThermalModel(*this);
+    DeviceModel::initThermalModel(p);
 }
 
-namespace MOSFET2 {
-
-vector< vector<int> > Instance::jacStamp_DC_SC;
-vector< vector<int> > Instance::jacStamp_DC;
-vector< vector<int> > Instance::jacStamp_SC;
-vector< vector<int> > Instance::jacStamp;
-
-vector<int> Instance::jacMap_DC_SC;
-vector<int> Instance::jacMap_DC;
-vector<int> Instance::jacMap_SC;
-vector<int> Instance::jacMap;
-
-vector< vector<int> > Instance::jacMap2_DC_SC;
-vector< vector<int> > Instance::jacMap2_DC;
-vector< vector<int> > Instance::jacMap2_SC;
-vector< vector<int> > Instance::jacMap2;
 
 
+std::vector< std::vector<int> > Instance::jacStamp_DC_SC;
+std::vector< std::vector<int> > Instance::jacStamp_DC;
+std::vector< std::vector<int> > Instance::jacStamp_SC;
+std::vector< std::vector<int> > Instance::jacStamp;
 
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
+std::vector<int> Instance::jacMap_DC_SC;
+std::vector<int> Instance::jacMap_DC;
+std::vector<int> Instance::jacMap_SC;
+std::vector<int> Instance::jacMap;
 
-  return parMap;
-}
-
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
+std::vector< std::vector<int> > Instance::jacMap2_DC_SC;
+std::vector< std::vector<int> > Instance::jacMap2_DC;
+std::vector< std::vector<int> > Instance::jacMap2_SC;
+std::vector< std::vector<int> > Instance::jacMap2;
 
 
 // Class Instance
@@ -359,7 +344,7 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
 
   // now set the temperature related stuff
@@ -377,14 +362,11 @@ bool Instance::processParams (string param)
 // Creation Date : 3/21/01
 //-----------------------------------------------------------------------------
 Instance::Instance(
-  InstanceBlock & IB,
+  const Configuration & configuration,
+  const InstanceBlock & IB,
  Model & Miter,
- MatrixLoadData & mlData1,
- SolverState &ss1,
- ExternData  &ed1,
- DeviceOptions & do1)
-
-  : DeviceInstance(IB,mlData1,ss1, ed1, do1),
+  const FactoryBlock &  factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(Miter),
     dNode(0),
     gNode(0),
@@ -403,7 +385,7 @@ Instance::Instance(
     sourcePerimeter(0.0),
     sourceConductance(0.0),
     drainConductance(0.0),
-  temp(getDeviceOptions().temp.dVal()),
+  temp(getDeviceOptions().temp.getImmutableValue<double>()),
     numberParallel(1),
     tTransconductance(0.0),
     tSurfMob(0.0),
@@ -619,9 +601,6 @@ Instance::Instance(
   devConMap[2] = 1;
   devConMap[3] = 3;
 
-  setName(IB.getName());
-  setModelName(model_.getName());
-
   blockHomotopyID =
     devSupport.getGainScaleBlockID(getDeviceOptions().numGainScaleBlocks);
   randomPerturb =
@@ -681,7 +660,7 @@ Instance::Instance(
 
   // Set any non-constant parameter defaults:
   if (!given("TEMP"))
-    temp = getDeviceOptions().temp.dVal();
+    temp = getDeviceOptions().temp.getImmutableValue<double>();
   if (!given("L"))
     l =model_.model_l;
   if (!given("W"))
@@ -742,10 +721,7 @@ Instance::Instance(
 
   if(l - 2 * model_.latDiff <=0)
   {
-    string msg = "Effective channel length less than zero.";
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Effective channel length less than zero.";
   }
 
   EffectiveLength=l - 2*model_.latDiff;
@@ -759,9 +735,9 @@ Instance::Instance(
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << ": name = " << getName() << endl;
-    cout << ": sourceConductance = " << sourceConductance << endl;
-    cout << ": drainConductance = " << drainConductance << endl;
+    Xyce::dout() << ": name = " << getName() << std::endl;
+    Xyce::dout() << ": sourceConductance = " << sourceConductance << std::endl;
+    Xyce::dout() << ": drainConductance = " << drainConductance << std::endl;
   }
 
 #endif
@@ -789,49 +765,24 @@ Instance::~Instance ()
 // Creator       : Robert Hoekstra, Computational Sciences
 // Creation Date : 6/21/02
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                                          const vector<int> & extLIDVecRef )
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                                          const std::vector<int> & extLIDVecRef )
 {
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << dashedline << endl;
-    cout << "  In Instance::register LIDs\n\n";
-    cout << "  name             = " << getName() << endl;
-  }
-#endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << "  number of internal variables: " << numInt << endl;
-    cout << "  number of external variables: " << numExt << endl;
-  }
-#endif
-
   numIntVars = (((sourceConductance == 0.0)?0:1)+((drainConductance == 0.0) ? 0:1));
 
-  if ( numIntVars != numInt)
-  {
-    string msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
-  if (numExt != numExtVars)
+#ifdef Xyce_DEBUG_DEVICE
+  if (getDeviceOptions().debugLevel > 0)
   {
-    string msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "  In Instance::register LIDs\n\n";
+    Xyce::dout() << "  name             = " << getName() << std::endl;
+    Xyce::dout() << "  number of internal variables: " << numIntVars << std::endl;
+    Xyce::dout() << "  number of external variables: " << numExtVars << std::endl;
   }
+#endif
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -861,15 +812,15 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "\n variable local indices:\n";
-    cout << "  li_Drain       = " << li_Drain << endl;
-    cout << "  li_DrainPrime  = " << li_DrainPrime << endl;
-    cout << "  li_Source      = " << li_Source << endl;
-    cout << "  li_SourcePrime = " << li_SourcePrime << endl;
-    cout << "  li_Gate        = " << li_Gate << endl;
-    cout << "  li_Bulk        = " << li_Bulk << endl;
+    Xyce::dout() << "\n variable local indices:\n";
+    Xyce::dout() << "  li_Drain       = " << li_Drain << std::endl;
+    Xyce::dout() << "  li_DrainPrime  = " << li_DrainPrime << std::endl;
+    Xyce::dout() << "  li_Source      = " << li_Source << std::endl;
+    Xyce::dout() << "  li_SourcePrime = " << li_SourcePrime << std::endl;
+    Xyce::dout() << "  li_Gate        = " << li_Gate << std::endl;
+    Xyce::dout() << "  li_Bulk        = " << li_Bulk << std::endl;
 
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -883,13 +834,13 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 05/13/05
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
     // set up the internal name map:
-    string tmpstr;
+    std::string tmpstr;
     if ( li_DrainPrime != li_Drain )
     {
       tmpstr = getName()+"_drainprime";
@@ -917,16 +868,16 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 4/3/2013
 //-----------------------------------------------------------------------------
-map<int,string> & N_DEV_MOSFET2Instance::getStoreNameMap ()
+std::map<int,std::string> & N_DEV_MOSFET2Instance::getStoreNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if( loadLeadCurrent && storeNameMap.empty ())
   {
     // change subcircuitname:devicetype_deviceName to
     // devicetype:subcircuitName:deviceName
-    string modName(getName());
+    std::string modName(getName());
     spiceInternalName(modName);
-    string tmpstr;
+    std::string tmpstr;
     tmpstr = modName+":DEV_ID";
     storeNameMap[ li_store_dev_id ] = tmpstr;
     tmpstr = modName+":DEV_IG";
@@ -948,36 +899,19 @@ map<int,string> & N_DEV_MOSFET2Instance::getStoreNameMap ()
 // Creator       : Robert Hoekstra, Computational Sciences
 // Creation Date : 6/21/02
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << endl;
-    cout << dashedline << endl;
-    cout << "  In Instance::registerStateLIDs\n\n";
-    cout << "  name             = " << getName() << endl;
-  }
-#endif
-
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    string msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
-    cout << "  Number of State LIDs: " << numSta << endl;
+  {
+    Xyce::dout() << std::endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "  In Instance::registerStateLIDs\n\n";
+    Xyce::dout() << "  name             = " << getName() << std::endl;
+    Xyce::dout() << "  Number of State LIDs: " << numStateVars << std::endl;
+  }
 #endif
 
   // Copy over the global ID lists:
@@ -1000,20 +934,20 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "  State local indices:" << endl;
-    cout << endl;
+    Xyce::dout() << "  State local indices:" << std::endl;
+    Xyce::dout() << std::endl;
 
-    cout << "  li_state_qgs           = " << li_state_qgs ;
-    cout << "  li_state_capgs         = " << li_state_capgs;
-    cout << "  li_state_capgd         = " << li_state_capgd;
-    cout << "  li_state_capgb         = " << li_state_capgb;
-    cout << "  li_state_qgd           = " << li_state_qgd;
-    cout << "  li_state_qgb           = " << li_state_qgb;
-    cout << "  li_state_qbs           = " << li_state_qbs;
-    cout << "  li_state_qbd           = " << li_state_qbd;
+    Xyce::dout() << "  li_state_qgs           = " << li_state_qgs ;
+    Xyce::dout() << "  li_state_capgs         = " << li_state_capgs;
+    Xyce::dout() << "  li_state_capgd         = " << li_state_capgd;
+    Xyce::dout() << "  li_state_capgb         = " << li_state_capgb;
+    Xyce::dout() << "  li_state_qgd           = " << li_state_qgd;
+    Xyce::dout() << "  li_state_qgb           = " << li_state_qgb;
+    Xyce::dout() << "  li_state_qbs           = " << li_state_qbs;
+    Xyce::dout() << "  li_state_qbd           = " << li_state_qbd;
 
-    cout << endl;
-    cout << dashedline << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -1027,37 +961,9 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 // Creator       : Eric Keiter, Computational Sciences
 // Creation Date : 12/9/11
 //-----------------------------------------------------------------------------
-void Instance::registerStoreLIDs( const vector<int> & stoLIDVecRef )
+void Instance::registerStoreLIDs( const std::vector<int> & stoLIDVecRef )
 {
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << endl;
-    cout << dashedline << endl;
-    cout << "  In Instance::registerStoreLIDs\n\n";
-    cout << "  name             = " << getName() << endl;
-  }
-#endif
-
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables.
-  int numSto = stoLIDVecRef.size();
-
-  if (numSto != getNumStoreVars())
-  {
-    string msg = "Instance::registerStoreLIDs:";
-    msg += "numSto != numStoreVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0)
-    cout << "  Number of Store LIDs: " << numSto << endl;
-#endif
+  AssertLIDs(stoLIDVecRef.size() == getNumStoreVars());
 
   // Copy over the global ID lists:
   stoLIDVec = stoLIDVecRef;
@@ -1076,22 +982,6 @@ void Instance::registerStoreLIDs( const vector<int> & stoLIDVecRef )
     li_store_dev_is = stoLIDVec[lid++];
     li_store_dev_ib = stoLIDVec[lid++];
   }
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << "  Store local indices:" << endl;
-    cout << endl;
-    cout << "  li_store_vbd           = " << li_store_vbd;
-    cout << "  li_store_vbs           = " << li_store_vbs;
-    cout << "  li_store_vgs           = " << li_store_vgs;
-    cout << "  li_store_vds           = " << li_store_vds;
-    cout << "  li_store_von           = " << li_store_von;
-    cout << endl;
-    cout << dashedline << endl;
-  }
-#endif
-
 }
 
 //-----------------------------------------------------------------------------
@@ -1102,7 +992,7 @@ void Instance::registerStoreLIDs( const vector<int> & stoLIDVecRef )
 // Creator       : Robert Hoekstra, Computational Sciences
 // Creation Date : 9/3/02
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   if( drainConductance != 0.0 && sourceConductance != 0.0 )
     return jacStamp_DC_SC;
@@ -1122,11 +1012,11 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Robert Hoekstra, Computational Sciences
 // Creation Date : 9/3/02
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
-  vector<int> map;
-  vector< vector<int> > map2;
+  std::vector<int> map;
+  std::vector< std::vector<int> > map2;
 
   if (drainConductance != 0.0)
   {
@@ -3014,13 +2904,12 @@ bool Instance::updateTemperature ( const double & temp_tmp)
   double tnom;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "  Instance::Begin of updateTemperature. \n";
-    cout <<" name = " << getName() << endl;
-    cout << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "  Instance::Begin of updateTemperature. \n";
+    Xyce::dout() <<" name = " << getName() << std::endl;
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -3038,9 +2927,9 @@ bool Instance::updateTemperature ( const double & temp_tmp)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Temperature = "<< temp << endl;
-    cout << "tnom = " << tnom << endl;
-    cout << "ratio = " << ratio << endl;
+    Xyce::dout() << "Temperature = "<< temp << std::endl;
+    Xyce::dout() << "tnom = " << tnom << std::endl;
+    Xyce::dout() << "ratio = " << ratio << std::endl;
   }
 #endif
 
@@ -3055,13 +2944,13 @@ bool Instance::updateTemperature ( const double & temp_tmp)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "vt = " << vt << endl;
-    cout << "ratio = " << ratio << endl;
-    cout << "fact2 = " << fact2 << endl;
-    cout << "kt = " << kt << endl;
-    cout << "egfet = " << egfet << endl;
-    cout << "arg = " << arg << endl;
-    cout << "pbfact = " << pbfact << endl;
+    Xyce::dout() << "vt = " << vt << std::endl;
+    Xyce::dout() << "ratio = " << ratio << std::endl;
+    Xyce::dout() << "fact2 = " << fact2 << std::endl;
+    Xyce::dout() << "kt = " << kt << std::endl;
+    Xyce::dout() << "egfet = " << egfet << std::endl;
+    Xyce::dout() << "arg = " << arg << std::endl;
+    Xyce::dout() << "pbfact = " << pbfact << std::endl;
   }
 #endif
 
@@ -3303,7 +3192,7 @@ bool Instance::updatePrimaryState ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   double wkfngs;
   double wkfng;
@@ -3386,11 +3275,9 @@ bool Model::processParams (string param)
     }
     else
     {
+      UserError0(*this) << "Nsub < Ni";
+
       substrateDoping = 0;
-      string msg = "Model:: Nsub < Ni \n";
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
     }
   }
 
@@ -3451,9 +3338,9 @@ bool Model::processParams (string param)
       }
       else
       {
+        UserError0(*this) << "Nsub < Ni";
+
         substrateDoping = 0;
-        string msg = "Model:: Nsub < Ni \n";
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, std::ostringstream() << "Error in " << netlistLocation() << "\n" << msg);
       }
     }
   }
@@ -3470,11 +3357,11 @@ bool Model::processParams (string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 03/23/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -3492,10 +3379,11 @@ bool Model::processInstanceParams(string param)
 // Creator       : Eric Keiter
 // Creation Date : 2/26/01
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-                                        SolverState & ss1,
-                                        DeviceOptions & do1)
-  : DeviceModel(MB, ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
   dtype(CONSTNMOS),
     tnom(getDeviceOptions().tnom),
   latDiff(0.0),
@@ -3558,11 +3446,7 @@ Model::Model (const ModelBlock & MB,
     }
     else
     {
-      string msg = "Could not recognize the type for model ";
-      msg += getName();
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+      UserError0(*this) << "Could not recognize the type for model " << getName();
     }
   }
 
@@ -3591,18 +3475,11 @@ Model::Model (const ModelBlock & MB,
   // calculate dependent (ie computed) params and check for errors:
   if (given("U0"))
   {
-    string msg =  " ******************* \n";
-    msg += ": WARNING: You have specified the surface mobility as u0 instead ";
-    msg += "of uo.  This is supported, but ill-advised.\n";
-    msg += " ***************** \n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg);
     if (given("UO"))
-    {
-      string msg = "Not only that, you specified both uo and u0, which is not allowed.";
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
-    }
+      UserError0(*this) << "You have specified both uo and u0, which is not allowed.";
+
+    UserWarning0(*this) << "You have specified the surface mobility as u0 instead of uo.  This is supported, but ill-advised.";
+
     surfaceMobility = surfaceMobility0;
   }
 
@@ -3619,9 +3496,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -3640,23 +3517,44 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i;
-  os << endl;
-  os << "    name     getModelName()  Parameters" << endl;
+  os << std::endl;
+  os << "    name     model name  Parameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 //-----------------------------------------------------------------------------
 // MOSFET2 Master functions:
@@ -3674,7 +3572,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 {
   bool bsuccess = true;
 
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & mi = *(*it);
     double * oldstaVec = mi.extData.currStaVectorRawPtr;
@@ -3761,7 +3659,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
 {
   double gmin1 = getDeviceOptions().gmin;
 
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & mi = *(*it);
 
@@ -3944,7 +3842,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
 //-----------------------------------------------------------------------------
 bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & mi = *(*it);
 
@@ -4082,7 +3980,7 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 //-----------------------------------------------------------------------------
 bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
   {
     Instance & mi = *(*it);
 
@@ -4210,6 +4108,20 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 }
 
 #endif
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("m", 2)
+    .registerModelType("pmos", 2)
+    .registerModelType("nmos", 2);
+}
 
 } // namespace MOSFET2
 } // namespace Device

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,32 +31,30 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.7.2.3 $
-// Revision Date  : $Date: 2013/12/03 23:30:12 $
-// Current Owner  : $Author: rlschie $
+// Revision Number: $Revision: 1.18 $
+// Revision Date  : $Date: 2014/02/24 23:49:20 $
+// Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
-
-// ----------   Xyce Includes   ----------
 #include <N_IO_MeasureRiseFallDelay.h>
 #include <N_ERH_ErrorMgr.h>
 
+namespace Xyce {
+namespace IO {
+namespace Measure {
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureRiseFallDelay::N_IO_MeasureRiseFallDelay()
+// Function      : RiseFallDelay::RiseFallDelay()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-N_IO_MeasureRiseFallDelay::N_IO_MeasureRiseFallDelay( const N_UTL_OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr):
-  N_IO_MeasureBase(measureBlock, outputMgr),
+RiseFallDelay::RiseFallDelay( const Util::OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr):
+  Base(measureBlock, outputMgr),
   trigVariableLengthHistoryNeeded_( false ),
   targVariableLengthHistoryNeeded_( false ),
   trigMax_(0.0),
@@ -74,14 +72,6 @@ N_IO_MeasureRiseFallDelay::N_IO_MeasureRiseFallDelay( const N_UTL_OptionBlock & 
 {
   // indicate that this measure type is supported and should be processed in simulation
   typeSupported_ = true;
-
-  // this measurement can involve up to three solution variables
-  numOutVars_ = depSolVarIterVector_.size();
-  outVarValues_.resize( numOutVars_ );
-  for( int i=0; i< numOutVars_; i++ )
-  {
-    outVarValues_[i] = 0.0;
-  }
 
   // check if this measure will need to record any history.  It will need history
   // info if trig_frac_max or targ_frac_max are given.  (These are cases where the
@@ -112,16 +102,22 @@ N_IO_MeasureRiseFallDelay::N_IO_MeasureRiseFallDelay( const N_UTL_OptionBlock & 
   }
 }
 
+void RiseFallDelay::prepareOutputVariables() 
+{
+  // this measurement can involve up to three solution variables
+  numOutVars_ = outputVars_.size();
+  outVarValues_.resize( numOutVars_, 0.0 );
+}
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureRiseFallDelay::updateTran()
+// Function      : RiseFallDelay::updateTran()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-void N_IO_MeasureRiseFallDelay::updateTran( const double circuitTime, RCP< N_LAS_Vector > solnVecRCP)
+void RiseFallDelay::updateTran( const double circuitTime, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec)
 {
   if( !calculationDone_ && withinTransientWindow( circuitTime ) )
   {
@@ -129,7 +125,7 @@ void N_IO_MeasureRiseFallDelay::updateTran( const double circuitTime, RCP< N_LAS
     // measure and see if it triggers any specified rise, fall, cross windowing.
     double tempResult = 0.0;
 
-    updateOutputVars( outVarValues_, circuitTime, solnVecRCP );
+    updateOutputVars( outVarValues_, circuitTime, solnVec, stateVec, storeVec, 0 );
 
     // outVarValues has our TRIG and TARG values so, first store them in
     // our history array if needed.
@@ -333,29 +329,33 @@ void N_IO_MeasureRiseFallDelay::updateTran( const double circuitTime, RCP< N_LAS
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureRiseFallDelay::updateMeasures()
+// Function      : RiseFallDelay::updateMeasures()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-void N_IO_MeasureRiseFallDelay::updateDC( const std::vector<N_ANP_SweepParam> & dcParmsVec, RCP< N_LAS_Vector > solnVecRCP)
+void RiseFallDelay::updateDC( const std::vector<N_ANP_SweepParam> & dcParmsVec, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec)
 {
 
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureRiseFallDelay::getMeasureResult()
+// Function      : RiseFallDelay::getMeasureResult()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 2/27/2012
 //-----------------------------------------------------------------------------
-double N_IO_MeasureRiseFallDelay::getMeasureResult()
+double RiseFallDelay::getMeasureResult()
 {
   calculationResult_=timeForTarg_ - timeForTrig_;
   return calculationResult_;
 }
+
+} // namespace Measure
+} // namespace IO
+} // namespace Xyce

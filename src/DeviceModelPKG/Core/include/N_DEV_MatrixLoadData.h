@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.14.2.2 $
+// Revision Number: $Revision: 1.18 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/24 23:49:14 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -86,49 +86,49 @@ public:
   int isizeNumJac;
 
   // temporary jacobian load structures:
-  vector<int>    cols;
-  vector<double> vals;
-  vector<double> Qvals;
+  std::vector<int>    cols;
+  std::vector<double> vals;
+  std::vector<double> Qvals;
 
   // temporary numerical jacobian load structures:
-  vector<valData> val_local;
-  vector<valData> Qval_local;
-  vector<colData> col_local;
-  vector<int>     row_local;
-  vector<int>     internalFlag;
+  std::vector<valData> val_local;
+  std::vector<valData> Qval_local;
+  std::vector<colData> col_local;
+  std::vector<int>     row_local;
+  std::vector<int>     internalFlag;
 
   // Structures used by the "testJacobian" function.
-  vector <vector <double> > numJac;
-  vector < vector<double> > saveJac;
-  vector < vector<double> > devJac;
-  vector < vector<double> > diffJac;
-  vector < vector<double> > relJac;
+  std::vector<std::vector<double> > numJac;
+  std::vector< std::vector<double> > saveJac;
+  std::vector< std::vector<double> > devJac;
+  std::vector< std::vector<double> > diffJac;
+  std::vector< std::vector<double> > relJac;
 
-  vector <vector <double> > numJacQ;
-  vector < vector<double> > saveJacQ;
-  vector < vector<double> > devJacQ;
-  vector < vector<double> > diffJacQ;
-  vector < vector<double> > relJacQ;
+  std::vector<std::vector<double> > numJacQ;
+  std::vector< std::vector<double> > saveJacQ;
+  std::vector< std::vector<double> > devJacQ;
+  std::vector< std::vector<double> > diffJacQ;
+  std::vector< std::vector<double> > relJacQ;
 
-  vector <vector <int> > status;
-  vector <vector <int> > stencil;
-  vector <vector <int> > statusQ;
+  std::vector<std::vector<int> > status;
+  std::vector<std::vector<int> > stencil;
+  std::vector<std::vector<int> > statusQ;
 
-  vector <double> saveRHS;
-  vector <double> pertRHS;
-  vector <double> origRHS;
-  vector <double> saveQ;
-  vector <double> pertQ;
-  vector <double> origQ;
+  std::vector<double> saveRHS;
+  std::vector<double> pertRHS;
+  std::vector<double> origRHS;
+  std::vector<double> saveQ;
+  std::vector<double> pertQ;
+  std::vector<double> origQ;
 
-  vector <double> saveSoln;
-  vector <double> pertSoln;
-  vector <double> saveCurrSoln;
+  std::vector<double> saveSoln;
+  std::vector<double> pertSoln;
+  std::vector<double> saveCurrSoln;
 
-  vector <double> saveLastState;
-  vector <double> saveCurrState;
-  vector <double> saveNextState;
-  vector <double> saveStateDerivs;
+  std::vector<double> saveLastState;
+  std::vector<double> saveCurrState;
+  std::vector<double> saveNextState;
+  std::vector<double> saveStateDerivs;
 };
 
 //-----------------------------------------------------------------------------
@@ -147,7 +147,7 @@ public:
 
 public:
   int isize;
-  vector<int> col;
+  std::vector<int> col;
 };
 
 //-----------------------------------------------------------------------------
@@ -169,7 +169,7 @@ private:
 protected:
 public:
   int isize;
-  vector<double> val;
+  std::vector<double> val;
 };
 
 } // namespace Device

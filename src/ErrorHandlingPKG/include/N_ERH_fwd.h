@@ -37,22 +37,28 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.2.2.2 $
+// Revision Number: $Revision: 1.11 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:39 $
+// Revision Date  : $Date: 2014/01/22 20:47:06 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: dgbaur $
 //-------------------------------------------------------------------------
 
 #ifndef Xyce_ERH_fwd_H
 #define Xyce_ERH_fwd_H
 
+#include <cstddef>
+
 namespace Xyce {
 namespace Report {
 
-class Message;
+typedef std::ptrdiff_t MessageId;
+
+struct MessageCode;
 
 } // namespace Report
 } // namespace Xyce
 
-#endif //Xyce_ERH_fwd_H
+namespace N_ERH_ErrorMgr = Xyce::Report;
+
+#endif // Xyce_ERH_fwd_H

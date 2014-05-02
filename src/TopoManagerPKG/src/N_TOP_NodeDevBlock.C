@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,45 +36,46 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.12.6.2 $
+// Revision Number: $Revision: 1.19 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
 #include <iostream>
 
 #include <N_TOP_NodeDevBlock.h>
 #include <N_PDS_Comm.h>
 
+namespace Xyce {
+namespace Topo {
+
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_NodeDevBlock::instance
+// Function      : NodeDevBlock::instance
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/13/00
 //-----------------------------------------------------------------------------
-Packable * N_TOP_NodeDevBlock::instance() const
+Packable * NodeDevBlock::instance() const
 {
-  return new N_TOP_NodeDevBlock();
+  return new NodeDevBlock();
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_NodeDevBlock::clear
+// Function      : NodeDevBlock::clear
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, Electrical and Microsystems modeling
 // Creation Date : 2/8/2010
 //-----------------------------------------------------------------------------
-void N_TOP_NodeDevBlock::clear()
+void NodeDevBlock::clear()
 {
   id_.erase();
   gID_=0;
@@ -84,14 +85,14 @@ void N_TOP_NodeDevBlock::clear()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_NodeBlock::packedByteCount
+// Function      : NodeBlock::packedByteCount
 // Purpose       : Counts number of bytes needed to pack object
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/13/00
 //-----------------------------------------------------------------------------
-int N_TOP_NodeDevBlock::packedByteCount() const
+int NodeDevBlock::packedByteCount() const
 {
   int byteCount = 0;
 
@@ -107,14 +108,14 @@ int N_TOP_NodeDevBlock::packedByteCount() const
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_NodeDevBlock::pack
+// Function      : NodeDevBlock::pack
 // Purpose       : Packs NodeDevBlock into char buffer using MPI_PACK
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 3/3/01
 //-----------------------------------------------------------------------------
-void N_TOP_NodeDevBlock::pack( char * buf, int bsize, int & pos, N_PDS_Comm * comm ) const
+void NodeDevBlock::pack( char * buf, int bsize, int & pos, N_PDS_Comm * comm ) const
 {
 
   int flag;
@@ -130,21 +131,21 @@ void N_TOP_NodeDevBlock::pack( char * buf, int bsize, int & pos, N_PDS_Comm * co
   if( isDevice() ) devBlock_.pack( buf, bsize, pos, comm );
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "Packed " << pos << " bytes for NodeDevBlock: " <<
-	id_ << endl;
+  Xyce::dout() << "Packed " << pos << " bytes for NodeDevBlock: " <<
+	id_ << std::endl;
 #endif
 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_NodeDevBlock::unpack
+// Function      : NodeDevBlock::unpack
 // Purpose       : Unpacks NodeDevBlock from char buffer using MPI_UNPACK
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 3/3/01
 //-----------------------------------------------------------------------------
-void N_TOP_NodeDevBlock::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * comm )
+void NodeDevBlock::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * comm )
 {
 
   int flag;
@@ -158,8 +159,8 @@ void N_TOP_NodeDevBlock::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * c
   if( flag == 1 ) devBlock_.unpack( pB, bsize, pos, comm );
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "Unpacked " << pos << " bytes for NodeDevBlock: " <<
-	id_ << endl;
+  Xyce::dout() << "Unpacked " << pos << " bytes for NodeDevBlock: " <<
+	id_ << std::endl;
 #endif
 }
 
@@ -171,11 +172,13 @@ void N_TOP_NodeDevBlock::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * c
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 3/3/01
 //-----------------------------------------------------------------------------
-ostream & operator<< ( ostream & os, const N_TOP_NodeDevBlock & ndb )
+std::ostream & operator<< ( std::ostream & os, const NodeDevBlock & ndb )
 {
-  os << "NodeDevBlock: " << ndb.id_ << endl;
-  os << ndb.nodeBlock_ << endl;
-  if( ndb.isDevice() ) os << ndb.devBlock_ << endl;
-  return os << endl;
+  os << "NodeDevBlock: " << ndb.id_ << std::endl;
+  os << ndb.nodeBlock_ << std::endl;
+  if( ndb.isDevice() ) os << ndb.devBlock_ << std::endl;
+  return os << std::endl;
 }
 
+} // namespace Topo
+} // namespace Xyce

@@ -226,6 +226,7 @@ case $PLAT in
     cp -v $INTEL_PATH/fc/current/lib/ia32/libifport.so*  $BUILDIR/lib/ 
 
     cp -v $INTEL_PATH/cc/current/lib/ia32/libimf.so*      $BUILDIR/lib/ 
+    cp -v $INTEL_PATH/cc/current/lib/ia32/libsvml.so*      $BUILDIR/lib/ 
     cp -v $INTEL_PATH/cc/current/lib/ia32/libiomp5.so*    $BUILDIR/lib/ 
     cp -v $INTEL_PATH/cc/current/lib/ia32/libirc.so*      $BUILDIR/lib/ 
     cp -v $INTEL_PATH/cc/current/lib/ia32/libintlc.so*    $BUILDIR/lib/ 
@@ -243,6 +244,7 @@ case $PLAT in
     cp -v $INTEL_PATH/fce/current/lib/intel64/libifport.so*    $BUILDIR/lib/ 
 
     cp -v $INTEL_PATH/cce/current/lib/intel64/libimf.so*    $BUILDIR/lib/ 
+    cp -v $INTEL_PATH/cce/current/lib/intel64/libsvml.so*    $BUILDIR/lib/ 
     cp -v $INTEL_PATH/cce/current/lib/intel64/libiomp5.so*  $BUILDIR/lib/ 
     cp -v $INTEL_PATH/cce/current/lib/intel64/libirc.so*    $BUILDIR/lib/ 
     cp -v $INTEL_PATH/cce/current/lib/intel64/libintlc.so*  $BUILDIR/lib/ 

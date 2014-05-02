@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -38,32 +38,19 @@
 //
 // Revision Number: $Revsion$
 //
-// Revision Date   : $Date: 2013/10/03 17:23:43 $
+// Revision Date   : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
-// ---------- Standard Includes ---------
-
-#include <N_UTL_Misc.h>
 
 #include <iostream>
-
-#ifdef HAVE_ALGORITHM
-#include <algorithm>
-#else
-#ifdef HAVE_ALGO_H
-#include <algo.h>
-#else
-#error Must have either <algorithm> or <algo.h>!
-#endif
-#endif
-
 #include <sstream>
 
+#include <N_UTL_fwd.h>
+#include <N_IO_Op.h>
 
-// ----------   Xyce Includes   ----------
 #include <N_DEV_DeviceBlock.h>
 
 #include <N_ERH_ErrorMgr.h>
@@ -72,24 +59,29 @@
 #include <N_IO_OptionBlock.h>
 #include <N_IO_ParameterBlock.h>
 #include <N_IO_DeviceBlock.h>
+#include <N_IO_Op.h>
 
 #include <N_UTL_Expression.h>
 #include <N_UTL_Misc.h>
+#include <N_UTL_fwd.h>
 
 #include <N_PDS_Comm.h>
 #include <N_IO_CircuitMetadata.h>
 
+namespace Xyce {
+namespace IO {
+
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::N_IO_CircuitContext
+// Function       : CircuitContext::CircuitContext
 // Purpose        : Constructor
 // Special Notes  :
 // Scope          :
 // Creator        : Lon Waters
 // Creation Date  : 01/21/2003
 //----------------------------------------------------------------------------
-N_IO_CircuitContext::N_IO_CircuitContext( N_IO_CircuitMetadata & md,
-                        list<N_IO_CircuitContext*> & cL,
-                        N_IO_CircuitContext *& ccPtr)
+CircuitContext::CircuitContext( CircuitMetadata & md,
+                        std::list<CircuitContext*> & cL,
+                        CircuitContext *& ccPtr)
   : name_(""),
     deviceCount_(0),
     resolved_(false),
@@ -108,18 +100,18 @@ N_IO_CircuitContext::N_IO_CircuitContext( N_IO_CircuitMetadata & md,
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::~N_IO_CircuitContext
+// Function       : CircuitContext::~CircuitContext
 // Purpose        : Destructor
 // Special Notes  :
 // Scope          :
 // Creator        : Lon Waters
 // Creation Date  : 01/21/2003
 //----------------------------------------------------------------------------
-N_IO_CircuitContext::~N_IO_CircuitContext()
+CircuitContext::~CircuitContext()
 {
   // Delete each subcircuit context in this context.
-  map< string, N_IO_CircuitContext * >::iterator itsc = circuitContextTable_.begin();
-  map< string, N_IO_CircuitContext * >::const_iterator itsc_end = circuitContextTable_.end();
+  std::map< std::string, CircuitContext * >::iterator itsc = circuitContextTable_.begin();
+  std::map< std::string, CircuitContext * >::const_iterator itsc_end = circuitContextTable_.end();
 
   for ( ; itsc != itsc_end; ++itsc )
   {
@@ -132,25 +124,22 @@ N_IO_CircuitContext::~N_IO_CircuitContext()
   // We delete all our own stored model pointers.  Because we also
   // delete all our subcircuit contexts, *their* destructors take care of
   // deleting their model pointers.
-  map<string, N_IO_ParameterBlock*>::iterator modelIter =
-    models_.begin();
-  map<string, N_IO_ParameterBlock*>::iterator modelIterEnd =
-    models_.end();
+  ModelMap::iterator modelIter = models_.begin();
+  ModelMap::iterator modelIterEnd = models_.end();
   for (; modelIter != modelIterEnd; ++modelIter)
     delete modelIter->second;
   models_.clear();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CircuitContext::operator=
+// Function      : CircuitContext::operator=
 // Purpose       : assignment operator
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 01/18/2006
 //-----------------------------------------------------------------------------
-N_IO_CircuitContext & N_IO_CircuitContext ::operator=
-   (const N_IO_CircuitContext & right)
+CircuitContext & CircuitContext ::operator=(const CircuitContext & right)
 {
     currentContextPtr_ = right.currentContextPtr_;
     parentContextPtr_ = right.parentContextPtr_;
@@ -188,31 +177,31 @@ N_IO_CircuitContext & N_IO_CircuitContext ::operator=
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::beginSubcircuitContext
+// Function       : CircuitContext::beginSubcircuitContext
 // Purpose        : Add a subcircuit context to the current context.
 // Special Notes  : This routine sets the current context to a newly
-//                  created N_IO_CircuitContext object. This context
+//                  created CircuitContext object. This context
 //                  remains the current context until it is explicitly
 //                  terminated with a call to endSubcircuitContext.
 // Scope          : public
 // Creator        : Lon Waters
 // Creation Date  : 01/24/2003
 //----------------------------------------------------------------------------
-void N_IO_CircuitContext::beginSubcircuitContext(
-    string const& netlistFileName,
-    vector<N_IO_SpiceSeparatedFieldTool::StringToken> & subcircuitLine)
+bool CircuitContext::beginSubcircuitContext(
+    std::string const& netlistFileName,
+    std::vector<N_IO_SpiceSeparatedFieldTool::StringToken> & subcircuitLine)
 
 {
 #ifdef Xyce_DEBUG_IO
-  cout << "N_IO_CircuitContext::beginSubcircuitContext" << endl;
-  cout << "*******************************************" << endl;
-  cout << " subcircuit file name: " << netlistFileName << endl;
-  cout << "  size of line vector: " << subcircuitLine.size() << endl;
+  Xyce::dout() << "CircuitContext::beginSubcircuitContext" << std::endl;
+  Xyce::dout() << "*******************************************" << std::endl;
+  Xyce::dout() << " subcircuit file name: " << netlistFileName << std::endl;
+  Xyce::dout() << "  size of line vector: " << subcircuitLine.size() << std::endl;
 #endif
 
-  // preprocessing hacketry
-  vector<N_IO_SpiceSeparatedFieldTool::StringToken>::iterator iterLine =
-   subcircuitLine.begin() + 2;
+  // remove parens
+  std::vector<N_IO_SpiceSeparatedFieldTool::StringToken>::iterator iterLine =
+   subcircuitLine.begin();
   while( iterLine != subcircuitLine.end() )
   {
     if ( iterLine->string_ == "(" || iterLine->string_ == ")" )
@@ -226,8 +215,8 @@ void N_IO_CircuitContext::beginSubcircuitContext(
   }
 
   // Create a new circuit context for the subcircuit.
-  N_IO_CircuitContext* subcircuitContextPtr =
-    new N_IO_CircuitContext(metadata_, contextList_, currentContextPtr_);
+  CircuitContext* subcircuitContextPtr =
+    new CircuitContext(metadata_, contextList_, currentContextPtr_);
 
   // Set the parent context, save the current context and reset it to the
   // newly created context.
@@ -238,24 +227,23 @@ void N_IO_CircuitContext::beginSubcircuitContext(
   // Extract the subcircuit data from subcircuitLine.
   int numFields = subcircuitLine.size();
 
+  if (numFields < 2)
+  {
+    Report::UserError0().at(netlistFileName, subcircuitLine[0].lineNumber_)
+      << "Subcircuit name required";
+    return false;
+  }
+
   if (numFields < 3)
   {
-    string msg("Not enough data on .subckt line");
-    if (numFields > 1)
-    {
-      msg += " for subcircuit name: " + subcircuitLine[1].string_ + "\n";
-    }
-    else
-    {
-      msg += ", no subcircuit name given\n";
-    }
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-        netlistFileName, subcircuitLine[0].lineNumber_);
+    Report::UserError0().at(netlistFileName, subcircuitLine[0].lineNumber_)
+      << "At least one node required for subcircuit " << subcircuitLine[1].string_;
+    return false;
   }
 
 #ifdef Xyce_DEBUG_IO
-  cout << "  Subcircuit name: " << subcircuitLine[1].string_ << endl;
-  cout << "  Number of fields on subckt line = " << numFields << endl;
+  Xyce::dout() << "  Subcircuit name: " << subcircuitLine[1].string_ << std::endl;
+  Xyce::dout() << "  Number of fields on subckt line = " << numFields << std::endl;
 #endif
 
   // Extract and set the subcircuit name.
@@ -283,74 +271,70 @@ void N_IO_CircuitContext::beginSubcircuitContext(
   }
 
   // Extract the subcircuit parameters.
-  N_UTL_Param parameter("","");
+  Util::Param parameter("","");
 
+  bool result = true;
   ++i; // Advance to start of parameters.
-  ExtendedString fieldES( "" );
   while (i+2 < numFields)
   {
-    fieldES =  subcircuitLine[i].string_;
+    ExtendedString fieldES = subcircuitLine[i].string_;
     fieldES.toUpper();
     if (!fieldES.possibleParam())
     {
-      string msg("Parameter name ");
-      msg += parameter.uTag();
-      msg += " contains illegal character(s)";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-          netlistFileName, subcircuitLine[i].lineNumber_);
+      Report::UserError0().at(netlistFileName, subcircuitLine[i].lineNumber_)
+        << "Parameter name " << subcircuitLine[i].string_ <<  " contains illegal character(s)";
+      result = false;
     }
     parameter.setTag( fieldES );
 
     if ( (parameter.uTag() == "TEMP") || (parameter.uTag() == "VT") ||
          (parameter.uTag() == "GMIN") || (parameter.uTag() == "TIME") )
     {
-      string msg("Parameter name ");
-      msg += parameter.uTag();
-      msg += " not allowed in subcircuit parameter list\n";
-      msg += " for subcircuit ";
-      msg += getName() + "\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-          netlistFileName, subcircuitLine[i].lineNumber_);
+      Report::UserError0().at(netlistFileName, subcircuitLine[i].lineNumber_)
+        << "Parameter name " << parameter.uTag() << " not allowed in subcircuit parameter list for subcircuit "
+        << getName();
+      result = false;
     }
 
     if ( subcircuitLine[i+1].string_ != "=" )
     {
-      string msg("Equal sign required between parameter and value in\n");
-      msg += "PARAM list for subcircuit ";
-      msg += getName() + "\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-          netlistFileName, subcircuitLine[0].lineNumber_);
+      Report::UserError0().at(netlistFileName, subcircuitLine[0].lineNumber_)
+        << "Equal sign required between parameter and value in PARAM list for subcircuit " << getName();
+      result = false;
     }
 
-    i+=2; // Advance past "=" sign
+    else {
+      i+=2; // Advance past "=" sign
 
-    fieldES =  subcircuitLine[i].string_;
-    fieldES.toUpper();
-    parameter.setVal(fieldES);
-    subcircuitContextPtr->subcircuitParameters_.push_back(parameter);
+      fieldES =  subcircuitLine[i].string_;
+      fieldES.toUpper();
+      parameter.setVal(fieldES);
+      subcircuitContextPtr->subcircuitParameters_.push_back(parameter);
 #ifdef Xyce_DEBUG_IO
-    cout << " Adding parameter " << parameter.uTag() << " with value " << fieldES << endl;
+      Xyce::dout() << " Adding parameter " << parameter.uTag() << " with value " << fieldES << std::endl;
 #endif
+    }
     ++i;
   }
 
   // check for truncated params: list
-  if ( i < numFields )
+  if ( result && i < numFields )
   {
-    string msg("Parameter list error in subcircuit ");
-    msg += getName() + "\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-    netlistFileName, subcircuitLine[0].lineNumber_);
+    Report::UserError0().at(netlistFileName, subcircuitLine[0].lineNumber_)
+      << "Parameter list error in subcircuit " << getName();
+    result = false;
   }
 
 #ifdef Xyce_DEBUG_IO
-  cout << "End of N_IO_CircuitContext::beginSubcircuitContext" << endl;
-  cout << "*******************************************" << endl;
+  Xyce::dout() << "End of CircuitContext::beginSubcircuitContext" << std::endl;
+  Xyce::dout() << "*******************************************" << std::endl;
 #endif
+
+  return result;
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::endSubcircuitContext
+// Function       : CircuitContext::endSubcircuitContext
 // Purpose        : End the current context, push it onto the previous context's
 //                  list of contexts, and reset the current context pointer to
 //                  the previous context.
@@ -359,10 +343,10 @@ void N_IO_CircuitContext::beginSubcircuitContext(
 // Creator        : Lon Waters
 // Creation Date  : 01/24/2003
 //----------------------------------------------------------------------------
-void N_IO_CircuitContext::endSubcircuitContext()
+void CircuitContext::endSubcircuitContext()
 {
 #ifdef Xyce_DEBUG_IO
-  cout << "N_IO_CircuitContext::endSubcircuitContext" << endl;
+  Xyce::dout() << "CircuitContext::endSubcircuitContext" << std::endl;
 #endif
   // Get the previous context from the stack.
   if ( ! contextList_.empty() )
@@ -380,58 +364,53 @@ void N_IO_CircuitContext::endSubcircuitContext()
 
   else
   {
-    string msg("Error encountered while traversing subcircuits.\n");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg );
+    Report::UserError0() << "Error encountered while traversing subcircuits.";
   }
 #ifdef Xyce_DEBUG_IO
-  cout << "End of N_IO_CircuitContext::endSubcircuitContext" << endl;
+  Xyce::dout() << "End of CircuitContext::endSubcircuitContext" << std::endl;
 #endif
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::addModel
+// Function       : CircuitContext::addModel
 // Purpose        : Add a model to the current context.
 // Special Notes  :
 // Scope          :
 // Creator        : Lon Waters
 // Creation Date  : 02/03/2003
 //----------------------------------------------------------------------------
-void N_IO_CircuitContext::addModel(N_IO_ParameterBlock * modelPtr)
+void CircuitContext::addModel(N_IO_ParameterBlock * modelPtr)
 {
   N_IO_ParameterBlock* tmpModel;
   if (findModel(modelPtr->getName(), tmpModel))
   {
-    string msg("Reading model named ");
-    msg += modelPtr->getName();
-    msg += " in the ";
+    Report::UserWarning0 message;
+    message << "Reading model named " << modelPtr->getName() << " in the ";
+
     if (getCurrentContextName() == "")
-      msg += "main circuit";
+      message << "main circuit";
     else
-    {
-      msg += "subcircuit ";
-      msg += getCurrentContextName();
-    }
-    msg += " and found one or more models previously defined in this scope.";
-    msg += "\n\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING_0, msg );
+      message << "subcircuit " << getCurrentContextName();
+
+    message << " and found one or more models previously defined in this scope";
   }
 
   currentContextPtr_->models_[modelPtr->getName()] = modelPtr;
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::addParams
+// Function       : CircuitContext::addParams
 // Purpose        : Add a set of .PARAM parameters to the current context.
 // Special Notes  :
 // Scope          :
 // Creator        : Lon Waters
 // Creation Date  : 02/03/2003
 //----------------------------------------------------------------------------
-void N_IO_CircuitContext::addParams(N_IO_OptionBlock const& param)
+void CircuitContext::addParams(N_IO_OptionBlock const& param)
 {
   int numberOfParams = param.getNumberOfParameters();
 
-  N_UTL_Param parameter;
+  Util::Param parameter;
   for (int i = 0; i < numberOfParams; ++i)
   {
     parameter = param.getParameter(i);
@@ -441,18 +420,18 @@ void N_IO_CircuitContext::addParams(N_IO_OptionBlock const& param)
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::addGlobalParams
+// Function       : CircuitContext::addGlobalParams
 // Purpose        : Add a set of .GLOBAL_PARAM parameters to the current context.
 // Special Notes  :
 // Scope          :
 // Creator        : Dave Shirley, PSSI
 // Creation Date  : 11/17/2005
 //----------------------------------------------------------------------------
-void N_IO_CircuitContext::addGlobalParams(N_IO_OptionBlock const& param)
+void CircuitContext::addGlobalParams(N_IO_OptionBlock const& param)
 {
   int numberOfParams = param.getNumberOfParameters();
 
-  N_UTL_Param parameter;
+  Util::Param parameter;
   for (int i = 0; i < numberOfParams; ++i)
   {
     parameter = param.getParameter(i);
@@ -462,20 +441,20 @@ void N_IO_CircuitContext::addGlobalParams(N_IO_OptionBlock const& param)
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::addGlobalNode
+// Function       : CircuitContext::addGlobalNode
 // Purpose        : Add a global node from a .GLOBAL line
 // Special Notes  :
 // Scope          :
 // Creator        : Dave Shirley, PSSI
 // Creation Date  : 10/02/2009
 //----------------------------------------------------------------------------
-void N_IO_CircuitContext::addGlobalNode( string & gnode)
+void CircuitContext::addGlobalNode( std::string & gnode)
 {
   currentContextPtr_->globalNodes_.insert(gnode);
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::resolveQuote
+// Function       : CircuitContext::resolveQuote
 // Purpose        : Resolve quoted parameters as soon as they are encountered.
 // Special Notes  : This avoids every processor in a parallel run trying to
 //                  access the same file.  Also exit handling does not work on
@@ -484,7 +463,7 @@ void N_IO_CircuitContext::addGlobalNode( string & gnode)
 // Creator        : Dave Shirley, PSSI
 // Creation Date  :
 //----------------------------------------------------------------------------
-void N_IO_CircuitContext::resolveQuote(N_UTL_Param & parameter)
+void CircuitContext::resolveQuote(Util::Param & parameter)
 {
   if (parameter.isQuoted())
   {
@@ -492,18 +471,17 @@ void N_IO_CircuitContext::resolveQuote(N_UTL_Param & parameter)
     // of time-value pairs in the file given by the value of the parameter.
     // Open and read these values, using them to build a "Table" expression
     // for the value of the parameter.
-    ifstream paramDataIn;
-    string parameterFile(parameter.sVal().substr(1,parameter.sVal().size()-2));
-    paramDataIn.open(parameterFile.c_str(), ios::in);
+    std::ifstream paramDataIn;
+    std::string parameterFile(parameter.stringValue().substr(1,parameter.stringValue().size()-2));
+    paramDataIn.open(parameterFile.c_str(), std::ios::in);
     if ( !paramDataIn.is_open() )
     {
-      string msg("Could not find file " + parameterFile + "\n");
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg );
+      Report::UserError0() << "Could not find file " << parameterFile;
     }
 
-    string table("table(time");
-    string time;
-    string value;
+    std::string table("table(time");
+    std::string time;
+    std::string value;
     while ( paramDataIn >> time )
     {
       if ( paramDataIn >> value )
@@ -512,9 +490,7 @@ void N_IO_CircuitContext::resolveQuote(N_UTL_Param & parameter)
       }
       else
       {
-        string msg("Reached end of file in ");
-        msg += parameterFile + " while expecting another value\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg );
+        Report::UserError0() << "Reached end of file in " << parameterFile << " while expecting another value";
       }
     }
 
@@ -522,41 +498,40 @@ void N_IO_CircuitContext::resolveQuote(N_UTL_Param & parameter)
 
     if( table.size() <= 10 ) // the length of "table(time" from above
     {
-      string msg("Failed to successfully read contents of " + parameterFile + "\n");
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg );
+      Report::UserError0() << "Failed to successfully read contents of " << parameterFile;
     }
 
     table += ")";
 
-    parameter.setVal( N_UTL_Expression(table) );
+    parameter.setVal( Util::Expression(table) );
     return;
   }
 }
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::addFunction
+// Function       : CircuitContext::addFunction
 // Purpose        : Add a .FUNC function to the current context.
 // Special Notes  :
 // Scope          :
 // Creator        : Lon Waters
 // Creation Date  : 02/03/2003
 //----------------------------------------------------------------------------
-void N_IO_CircuitContext::addFunction(N_IO_FunctionBlock const& function)
+void CircuitContext::addFunction(N_IO_FunctionBlock const& function)
 {
   currentContextPtr_->unresolvedFunctions_.push_back(function);
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::resolve
+// Function       : CircuitContext::resolve
 // Purpose        : Resolve parameters in the current context.
 // Special Notes  :
 // Scope          :
 // Creator        : Lon Waters
 // Creation Date  : 02/04/2003
 //----------------------------------------------------------------------------
-bool N_IO_CircuitContext::resolve( vector<N_DEV_Param> const& subcircuitInstanceParams )
+bool CircuitContext::resolve( std::vector<N_DEV_Param> const& subcircuitInstanceParams )
 {
-  vector<N_UTL_Param> retryParams;
-  vector<N_IO_FunctionBlock> retryFunctions;
+  std::vector<N_UTL_Param> retryParams;
+  std::vector<N_IO_FunctionBlock> retryFunctions;
 
   if (currentContextPtr_->subcircuitParameters_.empty() &&
       subcircuitInstanceParams.empty() &&
@@ -568,7 +543,7 @@ bool N_IO_CircuitContext::resolve( vector<N_DEV_Param> const& subcircuitInstance
   }
 
 #ifdef Xyce_DEBUG_IO
-  cout << " N_IO_CircuitContext::resolve have something to do..." << endl;
+  Xyce::dout() << " CircuitContext::resolve have something to do..." << std::endl;
 #endif
 
   currentContextPtr_->resolved_ = true;
@@ -579,10 +554,10 @@ bool N_IO_CircuitContext::resolve( vector<N_DEV_Param> const& subcircuitInstance
   currentContextPtr_->resolvedFunctions_.clear();
 
 
-  vector<N_UTL_Param> asYetUnresolvedSubcircuitParameters=currentContextPtr_->subcircuitParameters_;
-  vector<N_UTL_Param> asYetUnresolvedParameters=currentContextPtr_->unresolvedParams_;
-  vector<N_UTL_Param> asYetUnresolvedGlobalParameters=currentContextPtr_->unresolvedGlobalParams_;
-  vector<N_IO_FunctionBlock> asYetUnresolvedFunctions=currentContextPtr_->unresolvedFunctions_;
+  std::vector<N_UTL_Param> asYetUnresolvedSubcircuitParameters=currentContextPtr_->subcircuitParameters_;
+  std::vector<N_UTL_Param> asYetUnresolvedParameters=currentContextPtr_->unresolvedParams_;
+  std::vector<N_UTL_Param> asYetUnresolvedGlobalParameters=currentContextPtr_->unresolvedGlobalParams_;
+  std::vector<N_IO_FunctionBlock> asYetUnresolvedFunctions=currentContextPtr_->unresolvedFunctions_;
 
   bool resolvedSomethingThisLoop=true;
   bool somethingLeftToDo= (!(asYetUnresolvedSubcircuitParameters.empty()) ||
@@ -600,30 +575,30 @@ bool N_IO_CircuitContext::resolve( vector<N_DEV_Param> const& subcircuitInstance
 
     // Add subcircuitParameters_ to the set of resolved parameters.
     // currentContextPtr_->resolvedParams_.addParameters( currentContextPtr_->subcircuitParameters_ );
-    N_UTL_Param parameter;
-    vector<N_UTL_Param>::iterator paramIter;
-    vector<N_UTL_Param>::iterator start =
+    Util::Param parameter;
+    std::vector<N_UTL_Param>::iterator paramIter;
+    std::vector<N_UTL_Param>::iterator start =
       asYetUnresolvedSubcircuitParameters.begin();
-    vector<N_UTL_Param>::iterator end =
+    std::vector<N_UTL_Param>::iterator end =
       asYetUnresolvedSubcircuitParameters.end();
     for (paramIter = start; paramIter != end; ++paramIter)
     {
-      N_UTL_Param par = *paramIter;
+      Util::Param par = *paramIter;
 #ifdef Xyce_DEBUG_IO
-      cout << " N_IO_CircuitContext::resolve attempting to resolve" << par.uTag()<< endl;
+      Xyce::dout() << " CircuitContext::resolve attempting to resolve" << par.uTag()<< std::endl;
 #endif
-      if (par.getType() == STR && !par.isNumeric())
+      if (par.getType() == Xyce::Util::STR && !par.isNumeric())
       {
-        ExtendedString arg ( par.sVal() );
+        ExtendedString arg ( par.stringValue() );
         arg.toUpper();
         if (arg.possibleParam())
-          par.setVal(string("{" + arg + "}"));
+          par.setVal(std::string("{" + arg + "}"));
       }
 
       if (!resolveParameter(par))
       {
 #ifdef Xyce_DEBUG_IO
-        cout << "Unable to resolve subcircuit param " << par.uTag() << endl;
+        Xyce::dout() << "Unable to resolve subcircuit param " << par.uTag() << std::endl;
 #endif
         retryParams.push_back(par);
         somethingLeftToDo=true;
@@ -631,21 +606,21 @@ bool N_IO_CircuitContext::resolve( vector<N_DEV_Param> const& subcircuitInstance
       else
       {
 #ifdef Xyce_DEBUG_IO
-        cout << "resolveParameter returned true on parameter " << par.uTag() << " after resolution its type is " << par.getType() << "with value " ;
+        Xyce::dout() << "resolveParameter returned true on parameter " << par.uTag() << " after resolution its type is " << par.getType() << "with value " ;
         switch (par.getType()) {
-        case STR:
-          cout << par.sVal();
+        case Xyce::Util::STR:
+          Xyce::dout() << par.stringValue();
           break;
-        case DBLE:
-          cout << par.dVal();
+        case Xyce::Util::DBLE:
+          Xyce::dout() << par.getImmutableValue<double>();
           break;
-        case EXPR:
-          cout << par.ePtr()->get_expression();
+        case Xyce::Util::EXPR:
+          Xyce::dout() << par.getValue<Util::Expression>().get_expression();
           break;
         default:
-          cout << par.sVal();
+          Xyce::dout() << par.stringValue();
         }
-        cout << endl;
+        Xyce::dout() << std::endl;
 #endif
 
         currentContextPtr_->resolvedParams_.addParameter(par);
@@ -654,13 +629,13 @@ bool N_IO_CircuitContext::resolve( vector<N_DEV_Param> const& subcircuitInstance
 
       }
 #ifdef Xyce_DEBUG_IO
-      cout << " N_IO_CircuitContext::resolve done attempting to resolve" << par.uTag()<< endl;
+      Xyce::dout() << " CircuitContext::resolve done attempting to resolve" << par.uTag()<< std::endl;
 #endif
     }
     asYetUnresolvedSubcircuitParameters=retryParams;
     retryParams.clear();
 
-    N_UTL_Param* paramPtr;
+    Util::Param* paramPtr;
     // Reset the subcircuit parameter values with the instance parameter
     // values as needed.
     int i;
@@ -668,24 +643,24 @@ bool N_IO_CircuitContext::resolve( vector<N_DEV_Param> const& subcircuitInstance
     for ( i = 0; i < numInstanceParameters; ++i )
     {
 #ifdef Xyce_DEBUG_IO
-      cout << " N_IO_CircuitContext::resolve resetting subcircuit instance parameter" << subcircuitInstanceParams[i].uTag()<< " with value " << endl;
+      Xyce::dout() << " CircuitContext::resolve resetting subcircuit instance parameter" << subcircuitInstanceParams[i].uTag()<< " with value " << std::endl;
         switch (subcircuitInstanceParams[i].getType()) {
-        case STR:
-          cout << subcircuitInstanceParams[i].sVal();
+        case Xyce::Util::STR:
+          Xyce::dout() << subcircuitInstanceParams[i].stringValue();
           break;
-        case DBLE:
-          cout << subcircuitInstanceParams[i].dVal();
+        case Xyce::Util::DBLE:
+          Xyce::dout() << subcircuitInstanceParams[i].getImmutableValue<double>();
           break;
-        case EXPR:
+        case Xyce::Util::EXPR:
           {
-            N_UTL_Expression foo(subcircuitInstanceParams[i].eVal());
-            cout << "EXPR(" << foo.get_expression() << ")";
+            Util::Expression foo(subcircuitInstanceParams[i].getValue<Util::Expression>());
+            Xyce::dout() << "EXPR(" << foo.get_expression() << ")";
             break;
           }
         default:
-          cout << subcircuitInstanceParams[i].sVal();
+          Xyce::dout() << subcircuitInstanceParams[i].stringValue();
         }
-        cout << endl;
+        Xyce::dout() << std::endl;
 #endif
 
       // Look for the parameter in resolvedParams_, issue
@@ -698,15 +673,15 @@ bool N_IO_CircuitContext::resolve( vector<N_DEV_Param> const& subcircuitInstance
       {
         currentContextPtr_->resolvedParams_.addParameter(subcircuitInstanceParams[i]);
 #ifdef Xyce_DEBUG_IO
-        cout << " did not find in resolvdParams_, adding parameter " << subcircuitInstanceParams[i].uTag() << endl;
+        Xyce::dout() << " did not find in resolvdParams_, adding parameter " << subcircuitInstanceParams[i].uTag() << std::endl;
 #endif
       }
       else
       {
 #ifdef Xyce_DEBUG_IO
-        cout << " found in resolvdParams_, setting parameter " << paramPtr->uTag() << endl;
+        Xyce::dout() << " found in resolvdParams_, setting parameter " << paramPtr->uTag() << std::endl;
 #endif
-        paramPtr->setVal(subcircuitInstanceParams[i]);
+        paramPtr->setVal(static_cast<const Util::Param &>(subcircuitInstanceParams[i]));
       }
     }
 
@@ -742,7 +717,7 @@ bool N_IO_CircuitContext::resolve( vector<N_DEV_Param> const& subcircuitInstance
     {
       parameter = *paramIter;
 #ifdef Xyce_DEBUG_IO
-      cout << " N_IO_CircuitContext::resolve Attempting to resolve global parameter " << parameter.uTag();
+      Xyce::dout() << " CircuitContext::resolve Attempting to resolve global parameter " << parameter.uTag();
 #endif
 
       if (!resolveParameter(parameter))
@@ -752,63 +727,57 @@ bool N_IO_CircuitContext::resolve( vector<N_DEV_Param> const& subcircuitInstance
       }
       else
       {
-        if (parameter.getType() == EXPR)
+        if (parameter.getType() == Xyce::Util::EXPR)
         {
-          vector<string> nodes, instances, leads, variables, specials;
-          vector<string>::iterator s_i;
-          parameter.ePtr()->get_names(XEXP_NODE, nodes);
-          parameter.ePtr()->get_names(XEXP_INSTANCE, instances);
-          parameter.ePtr()->get_names(XEXP_LEAD, leads);
-          parameter.ePtr()->get_names(XEXP_VARIABLE, variables);
-          parameter.ePtr()->get_names(XEXP_SPECIAL, specials);
+          std::vector<std::string> nodes, instances, leads, variables, specials;
+
+          parameter.getValue<Util::Expression>().get_names(XEXP_NODE, nodes);
+          parameter.getValue<Util::Expression>().get_names(XEXP_INSTANCE, instances);
+          parameter.getValue<Util::Expression>().get_names(XEXP_LEAD, leads);
+          parameter.getValue<Util::Expression>().get_names(XEXP_VARIABLE, variables);
+          parameter.getValue<Util::Expression>().get_names(XEXP_SPECIAL, specials);
 
           if (!nodes.empty() || !instances.empty() || !leads.empty())
           {
+            Report::UserError0 message;
+            message << "The following are not allowed in global param expression: " << parameter.getValue<Util::Expression>().get_expression();
+            
             // This should be caught earlier, but just in case it is checked here
-            string msg("");
             if (!nodes.empty())
             {
-              msg += "node(s): ";
-              for (s_i=nodes.begin() ; s_i!=nodes.end() ; ++s_i)
+              message << std::endl << "node(s):";
+              for (std::vector<std::string>::iterator s_i=nodes.begin() ; s_i!=nodes.end() ; ++s_i)
               {
-                msg += *s_i;
-                msg += " ";
+                message << " " << *s_i;
               }
             }
             if (!instances.empty())
             {
-              msg += "instance(s): ";
-              for (s_i=instances.begin() ; s_i!=instances.end() ; ++s_i)
+              message << std::endl << "instance(s): ";
+              for (std::vector<std::string>::iterator s_i=instances.begin() ; s_i!=instances.end() ; ++s_i)
               {
-                msg += *s_i;
-                msg += " ";
+                message << " " << *s_i;
               }
             }
             if (!leads.empty())
             {
-              msg += "lead(s): ";
-              for (s_i=leads.begin() ; s_i!=leads.end() ; ++s_i)
+              message << std::endl << "lead(s): ";
+              for (std::vector<std::string>::iterator s_i=leads.begin() ; s_i!=leads.end() ; ++s_i)
               {
-                msg += *s_i;
-                msg += " ";
+                message << " " << *s_i;
               }
             }
-            msg += "Not allowed in global param expression: ";
-            msg += parameter.ePtr()->get_expression();
-            N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::DEV_FATAL_0, msg);
           }
+
           if (!variables.empty())
           {
             // If variables are found, they must be previously defined global params
-            for (s_i=variables.begin() ; s_i!=variables.end() ; ++s_i)
+            for (std::vector<std::string>::iterator s_i=variables.begin() ; s_i!=variables.end() ; ++s_i)
             {
               if (currentContextPtr_->resolvedGlobalParams_.findParameter(*s_i) == NULL)
               {
-                string msg("Unknown parameter (");
-                msg += *s_i;
-                msg += ") found in global param expression: ";
-                msg += parameter.ePtr()->get_expression();
-                N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_FATAL_0, msg);
+                Report::UserError0() << "Unknown parameter (" << *s_i << ") found in global param expression: "
+                                     << parameter.getValue<Util::Expression>().get_expression();
               }
             }
           }
@@ -816,13 +785,12 @@ bool N_IO_CircuitContext::resolve( vector<N_DEV_Param> const& subcircuitInstance
           {
             if (specials.size() > 1 || specials[0] != "TIME")
             {
-              string msg("Unknown special var(s):");
-              for (s_i=specials.begin() ; s_i!=specials.end() ; ++s_i)
+              Report::UserError0 message;
+              message << "Unknown special var(s):";
+              for (std::vector<std::string>::iterator s_i=specials.begin() ; s_i!=specials.end() ; ++s_i)
               {
-                msg += " ";
-                msg += *s_i;
+                message << " " << *s_i;
               }
-              N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::DEV_FATAL_0, msg);
             }
           }
         }
@@ -837,15 +805,15 @@ bool N_IO_CircuitContext::resolve( vector<N_DEV_Param> const& subcircuitInstance
     int numFunctions = asYetUnresolvedFunctions.size();
     for ( i = 0; i < numFunctions; ++i )
     {
-      // Define the N_UTL_Param for the function prototype (the function name
+      // Define the Util::Param for the function prototype (the function name
       // and arguments) and function body. Pass to the circuit for resolution.
-      string functionName(asYetUnresolvedFunctions[i].functionName);
-      string functionNameAndArgs(asYetUnresolvedFunctions[i].functionNameAndArgs);
-      string functionBody(asYetUnresolvedFunctions[i].functionBody);
+      std::string functionName(asYetUnresolvedFunctions[i].functionName);
+      std::string functionNameAndArgs(asYetUnresolvedFunctions[i].functionNameAndArgs);
+      std::string functionBody(asYetUnresolvedFunctions[i].functionBody);
 
-      vector<string> functionArgs =
+      std::vector<std::string> functionArgs =
         asYetUnresolvedFunctions[i].functionArgs;
-      N_UTL_Param functionParameter(functionNameAndArgs, functionBody);
+      Util::Param functionParameter(functionNameAndArgs, functionBody);
       // this is only an error if we have no parameters left to resolve
       if (!resolveParameter(functionParameter, functionArgs))
       {
@@ -856,8 +824,8 @@ bool N_IO_CircuitContext::resolve( vector<N_DEV_Param> const& subcircuitInstance
       {
         // After resolution, the only strings allowed in the function
         // are the function arguments, check that this holds.
-        N_UTL_Expression functionBodyExpression( functionParameter.sVal() );
-        vector<string> strings;
+        Util::Expression functionBodyExpression( functionParameter.stringValue() );
+        std::vector<std::string> strings;
         bool canResolveAll=true;
 
         functionBodyExpression.get_names(XEXP_STRING, strings);
@@ -866,7 +834,7 @@ bool N_IO_CircuitContext::resolve( vector<N_DEV_Param> const& subcircuitInstance
         for (int j = 0; j < numStrings; ++j)
         {
           // Look for string in functionArgs.
-          vector<string>::iterator stringIter =
+          std::vector<std::string>::iterator stringIter =
             find(functionArgs.begin(), functionArgs.end(), strings[j]);
           if (stringIter == functionArgs.end() &&
               currentContextPtr_->resolvedGlobalParams_.findParameter(strings[j]) == NULL)
@@ -880,183 +848,140 @@ bool N_IO_CircuitContext::resolve( vector<N_DEV_Param> const& subcircuitInstance
         if (canResolveAll)
         {
           // Reset the function body.
-          functionBody = functionParameter.sVal();
+          functionBody = functionParameter.stringValue();
 
           // Add the function to resolvedFunctions_.
           currentContextPtr_->resolvedFunctions_[functionName] =
-            N_UTL_Param(functionNameAndArgs, functionBody);
+            Util::Param(functionNameAndArgs, functionBody);
           resolvedSomethingThisLoop=true;
         }
       }
     }
     asYetUnresolvedFunctions=retryFunctions;
     retryFunctions.clear();
-
   }
 
-  if (somethingLeftToDo)
+  if (somethingLeftToDo)    // we failed to resolve everything, and the last loop did nothing.
   {
-    // we failed to resolve everything, and the last loop did nothing.
-    N_UTL_Param parameter;
-    vector<N_UTL_Param>::iterator paramIter;
-    vector<N_UTL_Param>::iterator start =
-      asYetUnresolvedSubcircuitParameters.begin();
-    vector<N_UTL_Param>::iterator end =
-      asYetUnresolvedSubcircuitParameters.end();
-    for (paramIter = start; paramIter != end; ++paramIter)
+    for (std::vector<N_UTL_Param>::iterator it = asYetUnresolvedSubcircuitParameters.begin(); it != asYetUnresolvedSubcircuitParameters.end(); ++it)
     {
-      string msg("Unable to resolve .subckt parameter ");
-      msg += paramIter->uTag();
-      msg += " found in .PARAM statement\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
+      Report::UserError0() << "Unable to resolve .subckt parameter " << (*it).uTag() << " found in .PARAM statement";
     }
 
-    start=asYetUnresolvedParameters.begin();
-    end=asYetUnresolvedParameters.end();
-    for (paramIter = start; paramIter != end; ++paramIter)
+    for (std::vector<N_UTL_Param>::iterator it = asYetUnresolvedParameters.begin(); it != asYetUnresolvedParameters.end(); ++it)
     {
-      string msg("Unable to resolve parameter ");
-      msg += paramIter->uTag();
-      msg += " found in .PARAM statement\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
+      Report::UserError0() << "Unable to resolve parameter " << (*it).uTag() << " found in .PARAM statement";
     }
 
-    start=asYetUnresolvedGlobalParameters.begin();
-    end=asYetUnresolvedGlobalParameters.end();
-    for (paramIter = start; paramIter != end; ++paramIter)
+    for (std::vector<N_UTL_Param>::iterator it = asYetUnresolvedGlobalParameters.begin(); it != asYetUnresolvedGlobalParameters.end(); ++it)
     {
-      string msg("Unable to resolve global parameter ");
-      msg += paramIter->uTag();
-      msg += " found in .PARAM statement\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
+      Report::UserError0() << "Unable to resolve global parameter " << (*it).uTag() << " found in .PARAM statement";
     }
 
-    vector<N_IO_FunctionBlock>::iterator funcIter;
-    vector<N_IO_FunctionBlock>::iterator funcStart =
-      asYetUnresolvedFunctions.begin();
-    vector<N_IO_FunctionBlock>::iterator funcEnd =
-      asYetUnresolvedFunctions.end();
-    for (funcIter = funcStart; funcIter != funcEnd; ++funcIter)
+    for (std::vector<N_IO_FunctionBlock>::iterator func_it = asYetUnresolvedFunctions.begin(); func_it != asYetUnresolvedFunctions.end(); ++func_it)
     {
-      string functionName(funcIter->functionName);
-      string functionNameAndArgs(funcIter->functionNameAndArgs);
-      string functionBody(funcIter->functionBody);
+      const std::string &functionName = (*func_it).functionName;
+      const std::string &functionNameAndArgs = (*func_it).functionNameAndArgs;
+      const std::string &functionBody = (*func_it).functionBody;
+      const std::vector<std::string> &functionArgs = (*func_it).functionArgs;
 
-      vector<string> functionArgs=funcIter->functionArgs;
-      string msg("Error resolving function " + functionName);
-      msg += ": \n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING_0, msg );
-
-      N_UTL_Param functionParameter(functionNameAndArgs, functionBody);
-      if (!resolveParameter(functionParameter, functionArgs))
+      Util::Param functionParameter(functionNameAndArgs, functionBody);
+      if (!resolveParameter(functionParameter, (*func_it).functionArgs))
       {
-        string msg("The function " + functionNameAndArgs);
-        msg += " contains an undefined parameter or function.\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING_0, msg );
+        Report::UserError0() << functionNameAndArgs << " contains an undefined parameter or function.";
       }
       else
       {
-        N_UTL_Expression functionBodyExpression( functionParameter.sVal() );
-        vector<string> strings;
-        functionBodyExpression.get_names(XEXP_STRING, strings);
+        std::vector<std::string> strings;
 
-        int numStrings = strings.size();
-        for (int i = 0; i < numStrings; ++i)
+        Util::Expression functionBodyExpression(functionParameter.stringValue());
+        functionBodyExpression.get_names(XEXP_STRING, strings);
+        for (std::vector<std::string>::const_iterator it = strings.begin(); it != strings.end(); ++it)
         {
-          // Look for string in functionArgs.
-          vector<string>::iterator stringIter =
-            find(functionArgs.begin(), functionArgs.end(), strings[i]);
-          if (stringIter == functionArgs.end() &&
-              currentContextPtr_->resolvedGlobalParams_.findParameter(strings[i]) == NULL)
+          if (find(functionArgs.begin(), functionArgs.end(), *it) == functionArgs.end() && currentContextPtr_->resolvedGlobalParams_.findParameter(*it) == NULL)
           {
-            string msg("Definition of function ");
-            msg += functionNameAndArgs;
-            msg += " contains unknown parameter " + strings[i] + "\n";
-            N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING_0, msg );
+            Report::UserError0() << functionNameAndArgs << " contains unknown parameter " << (*it);
           }
         }
       }
     }
-    string msg("Terminating parsing due to parameter/function resolution issues ");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg );
-
-
   }
 
   return true;
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::setContext
+// Function       : CircuitContext::setContext
 // Purpose        : Set the current context to that corresponding to the given
 //                  subcircuit name. Save the previous context on the stack for
 //                  later retrieval. If the given subcircuit name is not found,
-//                  delcare an error and abort.
+//                  declare an error and abort.
 // Special Notes  :
 // Scope          :
 // Creator        : Lon Waters
 // Creation Date  : 02/07/2003
 //----------------------------------------------------------------------------
-bool N_IO_CircuitContext::setContext(string const& subcircuitName,
-    string const& subcircuitPrefixIn,
-    list<string> const& instanceNodes,
-    N_IO_CircuitContext * previousContext )
+bool CircuitContext::setContext(
+  const std::string &                   subcircuitName,
+  const std::string &                   subcircuitPrefixIn,
+  const std::list<std::string> &        instanceNodes,
+  CircuitContext *                      previousContext ) const
 {
   bool success = false;
 
-  map< string, N_IO_CircuitContext* >::iterator ccIter =
+  std::map< std::string, CircuitContext* >::iterator ccIter =
    currentContextPtr_->circuitContextTable_.find( subcircuitName );
 
   if ( ccIter != currentContextPtr_->circuitContextTable_.end() )
   {
-      // Save current context and reset the current context pointer.
-      if (previousContext == NULL)
-        contextList_.push_front(currentContextPtr_);
-      else
-        contextList_.push_front(previousContext);
+    // Save current context and reset the current context pointer.
+    if (previousContext == NULL)
+      contextList_.push_front(currentContextPtr_);
+    else
+      contextList_.push_front(previousContext);
 
-      currentContextPtr_ = ccIter->second;
+    currentContextPtr_ = ccIter->second;
 
-      // If subcircuitPrefix and instanceNodes were given, set the prefix
-      // in the new context, and build the node map.
-      currentContextPtr_->nodeMap_.clear();
-      currentContextPtr_->subcircuitPrefix_ = subcircuitPrefixIn;
+    // If subcircuitPrefix and instanceNodes were given, set the prefix
+    // in the new context, and build the node map.
+    currentContextPtr_->nodeMap_.clear();
+    currentContextPtr_->subcircuitPrefix_ = subcircuitPrefixIn;
 
-      if (!instanceNodes.empty())
+    if (!instanceNodes.empty())
+    {
+      std::list<std::string>::const_iterator nodeIter = instanceNodes.begin();
+      for (int i = 0; i < currentContextPtr_->nodeList_.size() && nodeIter != instanceNodes.end(); ++i, ++nodeIter)
       {
-        list<string>::const_iterator nodeIter = instanceNodes.begin();
-        for (int i = 0; i < currentContextPtr_->nodeList_.size() && nodeIter != instanceNodes.end(); ++i, ++nodeIter)
+        if (currentContextPtr_->nodeMap_.find(currentContextPtr_->nodeList_[i]) !=
+            currentContextPtr_->nodeMap_.end())
         {
-          if (currentContextPtr_->nodeMap_.find(currentContextPtr_->nodeList_[i]) !=
-              currentContextPtr_->nodeMap_.end())
+          if (currentContextPtr_->nodeMap_[currentContextPtr_->nodeList_[i]] !=
+              *nodeIter)
           {
-            if (currentContextPtr_->nodeMap_[currentContextPtr_->nodeList_[i]] !=
-                *nodeIter)
+            Report::UserError0()
+              <<  "Duplicate nodes in .subckt " << subcircuitName << " point to different nodes in X line invocation";
+            return false;
+          }
+        }
+        else
+        {
+          if ((currentContextPtr_->nodeList_[i].size() >= 2 &&
+               currentContextPtr_->nodeList_[i].substr(0,2) == "$G") ||
+              globalNode(currentContextPtr_->nodeList_[i]))
+          {
+            if (currentContextPtr_->nodeList_[i] != *nodeIter)
             {
-              string msg = "Duplicate nodes in .subckt point to different nodes in X line invocation";
-              N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_INFO_0, msg);
+              Report::UserError0()
+                << "Global node in subcircuit invocation must match same name in .subckt";
               return false;
             }
           }
-          else
-          {
-            if ((currentContextPtr_->nodeList_[i].size() >= 2 &&
-                 currentContextPtr_->nodeList_[i].substr(0,2) == "$G") ||
-                 globalNode(currentContextPtr_->nodeList_[i]))
-            {
-              if (currentContextPtr_->nodeList_[i] != *nodeIter)
-              {
-                string msg = "Global node in subcircuit invocation must match same name in .subckt";
-                N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_INFO_0, msg);
-                return false;
-              }
-            }
-            currentContextPtr_->nodeMap_[currentContextPtr_->nodeList_[i]] = *nodeIter;
-          }
+          currentContextPtr_->nodeMap_[currentContextPtr_->nodeList_[i]] = *nodeIter;
         }
       }
+    }
 
-      return true;
+    return true;
   }
 
   // The context with the given name was not found in the current context,
@@ -1072,23 +997,22 @@ bool N_IO_CircuitContext::setContext(string const& subcircuitName,
     success = setContext(subcircuitName, subcircuitPrefixIn, instanceNodes, previousContext);
   }
 
-  if (!success)
-  {
-    string msg = "Global node in subcircuit invocation must match same name in .subckt";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_INFO_0, msg);
-  }
+  // if (!success)
+  // {
+  //   Report::UserError0() << "Global node in subcircuit invocation must match same name in .subckt";
+  // }
 
   return success;
 }
 
-void N_IO_CircuitContext::setContext(N_IO_CircuitContext* context)
+void CircuitContext::setContext(CircuitContext* context) const
 {
   contextList_.push_front(currentContextPtr_);
   currentContextPtr_ = context;
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::restorePreviousContext
+// Function       : CircuitContext::restorePreviousContext
 // Purpose        : Reset the context the context prior to the last invocation
 //                  of setContext.
 // Special Notes  :
@@ -1096,7 +1020,7 @@ void N_IO_CircuitContext::setContext(N_IO_CircuitContext* context)
 // Creator        : Lon Waters
 // Creation Date  : 02/07/2003
 //----------------------------------------------------------------------------
-void N_IO_CircuitContext::restorePreviousContext()
+void CircuitContext::restorePreviousContext() const
 {
   // Restore the previous context from the list of contexts unless
   // the list is empty.
@@ -1108,7 +1032,7 @@ void N_IO_CircuitContext::restorePreviousContext()
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::restorePreviousContext
+// Function       : CircuitContext::restorePreviousContext
 // Purpose        : Reset the context the context prior to the last invocation
 //                  of setContext.
 // Special Notes  :
@@ -1116,7 +1040,7 @@ void N_IO_CircuitContext::restorePreviousContext()
 // Creator        : Dave Shirley, PSSI
 // Creation Date  : 10/20/2009
 //----------------------------------------------------------------------------
-bool N_IO_CircuitContext::globalNode (const string &nodeName)
+bool CircuitContext::globalNode (const std::string &nodeName) const
 {
   bool stat;
 
@@ -1136,7 +1060,7 @@ bool N_IO_CircuitContext::globalNode (const string &nodeName)
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::resolveParameter
+// Function       : CircuitContext::resolveParameter
 // Purpose        : Parameter whose value may be an expression that must be
 //                  resolved. If the input parameter has an expression value,
 //                  replace replace the parameters and functions in the
@@ -1146,29 +1070,32 @@ bool N_IO_CircuitContext::globalNode (const string &nodeName)
 // Creator        : Lon Waters
 // Creation Date  : 02/10/2003
 //----------------------------------------------------------------------------
-bool N_IO_CircuitContext::resolveParameter(N_UTL_Param& parameter,
-    vector<string> exceptionStrings)
+bool CircuitContext::resolveParameter(Util::Param& parameter,
+    std::vector<std::string> exceptionStrings)
 {
-  if (parameter.hasExpressionValue() || parameter.hasExpressionTag() )
+  if (hasExpressionTag(parameter) || parameter.hasExpressionValue() )
   {
 #ifdef Xyce_DEBUG_IO
-    cout << "N_IO_CircuitContext::resolveParameter parameter " << parameter.uTag()
+    Xyce::dout() << "CircuitContext::resolveParameter parameter " << parameter.uTag()
          << " has expression value ";
 #endif
     // Extract the expression from the parameter value by stripping off
     // the enclosing braces.  Only strip if it's there!
-    string expressionString;
-    if (parameter.sVal()[0] == '{')
-      expressionString = parameter.sVal().substr(1, parameter.sVal().size()-2);
+    std::string expressionString;
+    if (parameter.stringValue()[0] == '{')
+      expressionString = parameter.stringValue().substr(1, parameter.stringValue().size()-2);
     else
-      expressionString = parameter.sVal();
+      expressionString = parameter.stringValue();
 
 #ifdef Xyce_DEBUG_IO
-    cout << expressionString << endl;
+    Xyce::dout() << expressionString << std::endl;
 #endif
 
     // Parse the expression:
-    N_UTL_Expression expression(expressionString);
+    Util::Expression expression(expressionString);
+
+    if (!expression.parsed())
+      return false;
 
     // Resolve the strings in the expression. Unresolved strings
     // may be parameters defined in a .PARAM statement or global
@@ -1199,70 +1126,71 @@ bool N_IO_CircuitContext::resolveParameter(N_UTL_Param& parameter,
       // expression, in which case the parameter value should be
       // expressionString. Also check for "specials", the only special
       // allowed is "time" for time dependent parameters.
-      vector<string> nodes, instances, leads, variables, specials;
+      std::vector<std::string> nodes, instances, leads, variables, specials, nodecomps;
       expression.get_names(XEXP_NODE, nodes);
       expression.get_names(XEXP_INSTANCE, instances);
       expression.get_names(XEXP_LEAD, leads);
       expression.get_names(XEXP_VARIABLE, variables);
       expression.get_names(XEXP_SPECIAL, specials);
+      expression.get_names(XEXP_NODAL_COMPUTATION, nodecomps);
 
       if (!nodes.empty() || !instances.empty() || !leads.empty() ||
-          !variables.empty() || !specials.empty())
+          !variables.empty() || !specials.empty() || !nodecomps.empty())
       {
 #ifdef Xyce_DEBUG_IO
-        cout << "N_IO_CircuitContext::resolveParameter:  nodes, instances, leads, variables or specials not empty. " << endl;
+        Xyce::dout() << "CircuitContext::resolveParameter:  nodes, instances, leads, variables or specials not empty. " << std::endl;
         if (!nodes.empty())
         {
-          cout << " Nodes: " << endl;
+          Xyce::dout() << " Nodes: " << std::endl;
           for (int foo=0; foo<nodes.size(); ++foo)
-            cout << foo << " : " << nodes[foo] << endl;
+            Xyce::dout() << foo << " : " << nodes[foo] << std::endl;
         }
         if (!instances.empty())
         {
-          cout << " Instances: " << endl;
+          Xyce::dout() << " Instances: " << std::endl;
           for (int foo=0; foo<instances.size(); ++foo)
-            cout << foo << " : " << instances[foo] << endl;
+            Xyce::dout() << foo << " : " << instances[foo] << std::endl;
         }
         if (!leads.empty())
         {
-          cout << " Leads: " << endl;
+          Xyce::dout() << " Leads: " << std::endl;
           for (int foo=0; foo<leads.size(); ++foo)
-            cout << foo << " : " << leads[foo] << endl;
+            Xyce::dout() << foo << " : " << leads[foo] << std::endl;
         }
         if (!variables.empty())
         {
-          cout << " Variables: " << endl;
+          Xyce::dout() << " Variables: " << std::endl;
           for (int foo=0; foo<variables.size(); ++foo)
-            cout << foo << " : " << variables[foo] << endl;
+            Xyce::dout() << foo << " : " << variables[foo] << std::endl;
         }
         if (!specials.empty())
         {
-          cout << " Specials: " << endl;
+          Xyce::dout() << " Specials: " << std::endl;
           for (int foo=0; foo<specials.size(); ++foo)
-            cout << foo << " : " << specials[foo] << endl;
+            Xyce::dout() << foo << " : " << specials[foo] << std::endl;
         }
 #endif
 
         parameter.setVal(expression);
 #ifdef Xyce_DEBUG_IO
-        cout << "N_IO_CircuitContext::resolveParameter: After all expression handling, get_expression returns "
-             << expression.get_expression() << endl;
-        cout << " after setting the parameter " << parameter.uTag() << ", its type is " << parameter.getType() << endl;
-        cout << " and its value is ";
+        Xyce::dout() << "CircuitContext::resolveParameter: After all expression handling, get_expression returns "
+             << expression.get_expression() << std::endl;
+        Xyce::dout() << " after setting the parameter " << parameter.uTag() << ", its type is " << parameter.getType() << std::endl;
+        Xyce::dout() << " and its value is ";
         switch (parameter.getType()) {
-        case STR:
-          cout << parameter.sVal();
+        case Xyce::Util::STR:
+          Xyce::dout() << parameter.stringValue();
           break;
-        case DBLE:
-          cout << parameter.dVal();
+        case Xyce::Util::DBLE:
+          Xyce::dout() << parameter.getImmutableValue<double>();
           break;
-        case EXPR:
-          cout << parameter.ePtr()->get_expression();
+        case Xyce::Util::EXPR:
+          Xyce::dout() << parameter.getValue<Util::Expression>().get_expression();
           break;
         default:
-          cout << parameter.sVal();
+          Xyce::dout() << parameter.stringValue();
         }
-        cout << endl;
+        Xyce::dout() << std::endl;
 #endif
       }
       else
@@ -1275,9 +1203,9 @@ bool N_IO_CircuitContext::resolveParameter(N_UTL_Param& parameter,
           parameter.setVal( value );
           // we have resolved the context so set it and the constant value to 
           // make later look ups easier.
-          parameter.setSimContextAndData( CONSTANT, value );
+          // parameter.addOp(Util::CONSTANT, new IO::ConstantOp(parameter.tag(), value));
 #ifdef Xyce_DEBUG_IO
-          cout << " N_IO_CircuitContext::resolveParameter --  Resetting parameter value from " << expressionString << " to " << value << " because exceptionStrings empty." << endl;
+          Xyce::dout() << " CircuitContext::resolveParameter --  Resetting parameter value from " << expressionString << " to " << value << " because exceptionStrings empty." << std::endl;
 #endif
         }
         else
@@ -1294,24 +1222,24 @@ bool N_IO_CircuitContext::resolveParameter(N_UTL_Param& parameter,
     }
 
 #ifdef Xyce_DEBUG_IO
-        cout << "N_IO_CircuitContext::resolveParameter: right before returns "
-             << endl;
-        cout << " after setting the parameter " << parameter.uTag() << ", its type is " << parameter.getType() << endl;
-        cout << " and its value is ";
+        Xyce::dout() << "CircuitContext::resolveParameter: right before returns "
+             << std::endl;
+        Xyce::dout() << " after setting the parameter " << parameter.uTag() << ", its type is " << parameter.getType() << std::endl;
+        Xyce::dout() << " and its value is ";
         switch (parameter.getType()) {
-        case STR:
-          cout << parameter.sVal();
+        case Xyce::Util::STR:
+          Xyce::dout() << parameter.stringValue();
           break;
-        case DBLE:
-          cout << parameter.dVal();
+        case Xyce::Util::DBLE:
+          Xyce::dout() << parameter.getImmutableValue<double>();
           break;
-        case EXPR:
-          cout << parameter.ePtr()->get_expression();
+        case Xyce::Util::EXPR:
+          Xyce::dout() << parameter.getValue<Util::Expression>().get_expression();
           break;
         default:
-          cout << parameter.sVal();
+          Xyce::dout() << parameter.stringValue();
         }
-        cout << endl;
+        Xyce::dout() << std::endl;
 #endif
 
     return stringsResolved && functionsResolved;
@@ -1327,7 +1255,7 @@ bool N_IO_CircuitContext::resolveParameter(N_UTL_Param& parameter,
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::resolveStrings
+// Function       : CircuitContext::resolveStrings
 // Purpose        : Determine if expression has any unresolved strings
 //                  and resolve appropriately. Return true if all strings are
 //                  resolved otherwise return false.
@@ -1336,8 +1264,8 @@ bool N_IO_CircuitContext::resolveParameter(N_UTL_Param& parameter,
 // Creator        : Lon Waters
 // Creation Date  : 02/11/2003
 //----------------------------------------------------------------------------
-bool N_IO_CircuitContext::resolveStrings( N_UTL_Expression & expression,
-    vector<string> exceptionStrings)
+bool CircuitContext::resolveStrings( Util::Expression & expression,
+    std::vector<std::string> exceptionStrings)
 {
   // Strings in the expression must be previously resolved parameters
   // that appear in paramList else there is an error.
@@ -1345,7 +1273,7 @@ bool N_IO_CircuitContext::resolveStrings( N_UTL_Expression & expression,
   if ( expression.get_num(XEXP_STRING) > 0 )
   {
     // Get the list of strings in the expression.
-    vector<string> strings;
+    std::vector<std::string> strings;
     expression.get_names(XEXP_STRING, strings);
 
     // If the expression is resolvable, each string in the current expression
@@ -1356,7 +1284,7 @@ bool N_IO_CircuitContext::resolveStrings( N_UTL_Expression & expression,
     for (int i = 0; i < numStrings; ++i)
     {
 #ifdef Xyce_DEBUG_IO
-      cout <<" N_IO_CircuitContext::resolveStrings resolving " << strings[i] << endl;
+      Xyce::dout() <<" CircuitContext::resolveStrings resolving " << strings[i] << std::endl;
 #endif
       // Skip the current string if it is in exception strings. This prevents
       // a function argument from being improperly resolved when there is
@@ -1364,13 +1292,13 @@ bool N_IO_CircuitContext::resolveStrings( N_UTL_Expression & expression,
       // argument.
       if (!exceptionStrings.empty())
       {
-        vector<string>::iterator stringIter = find(exceptionStrings.begin(),
+        std::vector<std::string>::iterator stringIter = find(exceptionStrings.begin(),
             exceptionStrings.end(),
             strings[i]);
         if (stringIter != exceptionStrings.end())
         {
 #ifdef Xyce_DEBUG_IO
-          cout <<" N_IO_CircuitContext::resolveStrings skipping exception string " << strings[i] << endl;
+          Xyce::dout() <<" CircuitContext::resolveStrings skipping exception string " << strings[i] << std::endl;
 #endif
           continue;
         }
@@ -1380,49 +1308,44 @@ bool N_IO_CircuitContext::resolveStrings( N_UTL_Expression & expression,
       parameterName = strings[i];
       parameterName.toUpper();
 
-      N_UTL_Param expressionParameter(parameterName, "");
+      Util::Param expressionParameter(parameterName, "");
       bool parameterFound = getResolvedParameter(expressionParameter);
       if (parameterFound)
       {
 #ifdef Xyce_DEBUG_IO
-        cout <<" N_IO_CircuitContext::resolveStrings string " << strings[i] << " is a resolved parameter " << expressionParameter.uTag() << " with type "
+        Xyce::dout() <<" CircuitContext::resolveStrings string " << strings[i] << " is a resolved parameter " << expressionParameter.uTag() << " with type "
              << expressionParameter.getType() << " and value ";
         switch (expressionParameter.getType()) {
-        case STR:
-          cout << expressionParameter.sVal();
+        case Xyce::Util::STR:
+          Xyce::dout() << expressionParameter.stringValue();
           break;
-        case DBLE:
-          cout << expressionParameter.dVal();
+        case Xyce::Util::DBLE:
+          Xyce::dout() << expressionParameter.getImmutableValue<double>();
           break;
-        case EXPR:
-          cout << "EXPR("<<expressionParameter.ePtr()->get_expression()<< ")";
+        case Xyce::Util::EXPR:
+          Xyce::dout() << "EXPR("<<expressionParameter.getValue<Util::Expression>().get_expression()<< ")";
           break;
         default:
-          cout << expressionParameter.sVal();
+          Xyce::dout() << expressionParameter.stringValue();
         }
-        cout << endl;
+        Xyce::dout() << std::endl;
 
 #endif
-        if ( expressionParameter.getType() == STR ||
-             expressionParameter.getType() == DBLE )
+        if ( expressionParameter.getType() == Xyce::Util::STR ||
+             expressionParameter.getType() == Xyce::Util::DBLE )
         {
-          if (!expression.make_constant(strings[i], expressionParameter.dVal()))
+          if (!expression.make_constant(strings[i], expressionParameter.getImmutableValue<double>()))
           {
-            string msg("Problem converting parameter " + parameterName);
-            msg += " to its value.\n";
-            N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING_0, msg );
+            Report::UserWarning0() << "Problem converting parameter " << parameterName << " to its value.";
           }
         }
-        else if (expressionParameter.getType() == EXPR)
+        else if (expressionParameter.getType() == Xyce::Util::EXPR)
         {
-          string expressionString=expression.get_expression();
-          if (expression.replace_var(strings[i], *(expressionParameter.ePtr())) != 0)
+          std::string expressionString=expression.get_expression();
+          if (expression.replace_var(strings[i], expressionParameter.getValue<Util::Expression>()) != 0)
           {
-            string msg("Problem inserting expression "+
-                       expressionParameter.ePtr()->get_expression()+
-                       " as substitute for " + parameterName +
-                       " in expression " + expressionString);
-            N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING_0, msg );
+            Report::UserWarning0() << "Problem inserting expression " << expressionParameter.getValue<Util::Expression>().get_expression()
+                                   << " as substitute for " << parameterName << " in expression " << expressionString;
           }
         }
       }
@@ -1430,41 +1353,37 @@ bool N_IO_CircuitContext::resolveStrings( N_UTL_Expression & expression,
       {
         parameterFound = getResolvedGlobalParameter(expressionParameter);
 #ifdef Xyce_DEBUG_IO
-	cout << "N_IO_CircuitContext::resolveStrings attempting to resolve "
-              <<  " parameter " << expressionParameter.uTag() << endl;
+        Xyce::dout() << "CircuitContext::resolveStrings attempting to resolve "
+              <<  " parameter " << expressionParameter.uTag() << std::endl;
         if (parameterFound)
         {
-            cout << "Found it." << endl;
+            Xyce::dout() << "Found it." << std::endl;
         }
         else
         {
-            cout << " Did not find a resolved global parameter named "
-                 << expressionParameter.uTag()	<< endl;
+            Xyce::dout() << " Did not find a resolved global parameter named "
+                 << expressionParameter.uTag()	<< std::endl;
         }
 #endif
         if (parameterFound)
         {
           if (!expression.make_var(strings[i]))
           {
-            string msg("Problem converting parameter " + parameterName);
-            msg += " to its value.\n";
-            N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING_0, msg );
+            Report::UserWarning0() << "Problem converting parameter " << parameterName <<" to its value";
           }
         }
         else
         {
-          if (N_UTL::isBool(strings[i]))
+          if (Util::isBool(strings[i]))
           {
             bool stat = false;
-            if (N_UTL::Bval(strings[i]))
+            if (Util::Bval(strings[i]))
               stat = expression.make_constant(strings[i], static_cast<double>(1));
             else
               stat = expression.make_constant(strings[i], static_cast<double>(0));
             if (!stat)
             {
-              string msg("Problem converting parameter " + parameterName);
-              msg += " to its value.\n";
-              N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING_0, msg );
+              Report::UserWarning0() << "Problem converting parameter " << parameterName << " to its value";
             }
           }
           else
@@ -1480,7 +1399,7 @@ bool N_IO_CircuitContext::resolveStrings( N_UTL_Expression & expression,
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::resolveFunctions
+// Function       : CircuitContext::resolveFunctions
 // Purpose        : Determine if expression has any unresolved functions
 //                  and resolve appropriately. Return true if all functions
 //                  are resolved otherwise return false.
@@ -1489,7 +1408,7 @@ bool N_IO_CircuitContext::resolveStrings( N_UTL_Expression & expression,
 // Creator        : Lon Waters
 // Creation Date  : 02/11/2003
 //----------------------------------------------------------------------------
-bool N_IO_CircuitContext::resolveFunctions(N_UTL_Expression & expression)
+bool CircuitContext::resolveFunctions(Util::Expression & expression)
 {
   // Functions in the expression must be previously defined functions
   // that appear in resolvedFunctions_ else there is an error.
@@ -1497,7 +1416,7 @@ bool N_IO_CircuitContext::resolveFunctions(N_UTL_Expression & expression)
   if ( expression.get_num(XEXP_FUNCTION) > 0)
   {
     // Get the list of strings in the expression.
-    vector<string> functions;
+    std::vector<std::string> functions;
     expression.get_names(XEXP_FUNCTION, functions);
 
     // If the expression is resolvable, each function in the current expression
@@ -1506,12 +1425,12 @@ bool N_IO_CircuitContext::resolveFunctions(N_UTL_Expression & expression)
     for (int i = 0; i < numFunctions; ++i)
     {
       // Look for the function in resolvedFunctions_.
-      N_UTL_Param functionParameter(functions[i], "");
+      Util::Param functionParameter(functions[i], "");
       bool functionfound = getResolvedFunction(functionParameter);
       if (functionfound)
       {
-        string functionPrototype(functionParameter.tag());
-        string functionBody(functionParameter.sVal());
+        std::string functionPrototype(functionParameter.tag());
+        std::string functionBody(functionParameter.stringValue());
 
         // The function prototype is defined here as a string whose
         // value is the  function name together with its parenthese
@@ -1521,26 +1440,22 @@ bool N_IO_CircuitContext::resolveFunctions(N_UTL_Expression & expression)
         // create an expression from the function definition and
         // order its names from that list. Finally, replace the
         // function in the expression to be resolved.
-        N_UTL_Expression prototypeExression(functionPrototype);
-        vector<string> arguments;
+        Util::Expression prototypeExression(functionPrototype);
+        std::vector<std::string> arguments;
         prototypeExression.get_names(XEXP_STRING, arguments);
-        N_UTL_Expression functionExpression(functionBody);
+        Util::Expression functionExpression(functionBody);
         functionExpression.order_names(arguments);
 
         if (expression.replace_func(functions[i], functionExpression,
             static_cast<int>(arguments.size())) < 0)
         {
-          string msg("Wrong number of arguments for user defined function: ");
-          msg += functionPrototype;
-          msg += " in expression: ";
-          msg += expression.get_expression();
-          N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg);
+          Report::UserError0() << "Wrong number of arguments for user defined function " << functionPrototype << " in expression " << expression.get_expression();
         }
 
         // Set the expression value.
 #ifdef Xyce_DEBUG_IO
-        cout << "N_IO_CircuitContext::resolveFunctions: After all expression handling, get_expression returns "
-             << expression.get_expression() << endl;
+        Xyce::dout() << "CircuitContext::resolveFunctions: After all expression handling, get_expression returns "
+                     << expression.get_expression() << std::endl;
 #endif
       }
       else
@@ -1554,7 +1469,7 @@ bool N_IO_CircuitContext::resolveFunctions(N_UTL_Expression & expression)
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::getResolvedParameter
+// Function       : CircuitContext::getResolvedParameter
 // Purpose        : Look for a parameter with tag parameterName in the current
 //                  context's set of resolved parameters. Check the current
 //                  context and recurively check parent contexts.
@@ -1563,11 +1478,11 @@ bool N_IO_CircuitContext::resolveFunctions(N_UTL_Expression & expression)
 // Creator        : Lon Waters
 // Creation Date  : 02/11/2003
 //----------------------------------------------------------------------------
-bool N_IO_CircuitContext::getResolvedParameter(N_UTL_Param & parameter)
+bool CircuitContext::getResolvedParameter(Util::Param & parameter)
 {
   bool success = false;
 
-  N_UTL_Param* parameterPtr =
+  Util::Param* parameterPtr =
     currentContextPtr_->resolvedParams_.findParameter(parameter);
   if (parameterPtr != NULL)
   {
@@ -1587,7 +1502,7 @@ bool N_IO_CircuitContext::getResolvedParameter(N_UTL_Param & parameter)
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::getResolvedGlobalParameter
+// Function       : CircuitContext::getResolvedGlobalParameter
 // Purpose        : Look for a parameter with tag parameterName in the current
 //                  context's set of resolved parameters. Check the current
 //                  context and recurively check parent contexts.
@@ -1596,11 +1511,11 @@ bool N_IO_CircuitContext::getResolvedParameter(N_UTL_Param & parameter)
 // Creator        : Dave Shirley, PSSI
 // Creation Date  : 11/17/2005
 //----------------------------------------------------------------------------
-bool N_IO_CircuitContext::getResolvedGlobalParameter(N_UTL_Param & parameter)
+bool CircuitContext::getResolvedGlobalParameter(Util::Param & parameter)
 {
   bool success = false;
 
-  N_UTL_Param* parameterPtr =
+  Util::Param* parameterPtr =
     currentContextPtr_->resolvedGlobalParams_.findParameter(parameter);
   if (parameterPtr != NULL)
   {
@@ -1620,7 +1535,7 @@ bool N_IO_CircuitContext::getResolvedGlobalParameter(N_UTL_Param & parameter)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CircuitContext::getResolvedFunction
+// Function      : CircuitContext::getResolvedFunction
 // Purpose       : Look for a function with functionName in resolvedFunctions_.
 //                 Check current context and recursively check each parent
 //                 context.
@@ -1629,11 +1544,11 @@ bool N_IO_CircuitContext::getResolvedGlobalParameter(N_UTL_Param & parameter)
 // Creator       : Lon Waters, SNL
 // Creation Date : 12/27/2001
 //-----------------------------------------------------------------------------
-bool N_IO_CircuitContext::getResolvedFunction(N_UTL_Param & parameter)
+bool CircuitContext::getResolvedFunction(Util::Param & parameter)
 {
   bool success = false;
 
-  string functionToFind(parameter.uTag());
+  std::string functionToFind(parameter.uTag());
 
   if (currentContextPtr_->resolvedFunctions_.find(functionToFind) !=
       currentContextPtr_->resolvedFunctions_.end())
@@ -1652,7 +1567,7 @@ bool N_IO_CircuitContext::getResolvedFunction(N_UTL_Param & parameter)
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::findModel
+// Function       : CircuitContext::findModel
 // Purpose        : Search the models in the current context for the model of
 //                  the given name. If it is not found, recursively
 //                  search each parent context. Return a pointer to
@@ -1664,14 +1579,14 @@ bool N_IO_CircuitContext::getResolvedFunction(N_UTL_Param & parameter)
 // Creator        : Lon Waters
 // Creation Date  : 02/12/2003
 //----------------------------------------------------------------------------
-bool N_IO_CircuitContext::findModel(string const& modelName,
-    N_IO_ParameterBlock* & modelPtr,
-    string& modelPrefix)
+bool CircuitContext::findModel(
+  const std::string &           modelName,
+  N_IO_ParameterBlock* &        modelPtr,
+  std::string &                 modelPrefix) const
 {
   bool success = false;
 
-  map<string, N_IO_ParameterBlock*>::iterator modelIter
-    = currentContextPtr_->models_.find(modelName);
+  ModelMap::const_iterator modelIter = currentContextPtr_->models_.find(modelName);
   if (modelIter != currentContextPtr_->models_.end())
   {
     modelPtr = modelIter->second;
@@ -1681,7 +1596,7 @@ bool N_IO_CircuitContext::findModel(string const& modelName,
     }
     else
     {
-      string prefix = currentContextPtr_->getCurrentContextName();
+      std::string prefix = currentContextPtr_->getCurrentContextName();
       if (prefix == "")
         modelPrefix = "";
       else
@@ -1704,7 +1619,7 @@ bool N_IO_CircuitContext::findModel(string const& modelName,
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::findModel
+// Function       : CircuitContext::findModel
 // Purpose        : Overloaded version of findModel for cases when the model
 //                  prefix is not needed.
 // Special Notes  :
@@ -1712,19 +1627,19 @@ bool N_IO_CircuitContext::findModel(string const& modelName,
 // Creator        : Lon Waters
 // Creation Date  : 02/13/2003
 //----------------------------------------------------------------------------
-bool N_IO_CircuitContext::findModel(
-    string const& modelName,
-    N_IO_ParameterBlock* & modelPtr)
+bool CircuitContext::findModel(
+  const std::string &           modelName,
+  N_IO_ParameterBlock* &        modelPtr) const
 {
   bool success;
-  string temp;
+  std::string temp;
   success = findModel(modelName, modelPtr, temp);
 
   return success;
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::hasSubcircuitParams
+// Function       : CircuitContext::hasSubcircuitParams
 // Purpose        : Check whether a subcircuit context is dependent on
 //                  subcircuit parameters. These are parameters on the
 //                  .subckt line identified by "params:" keyword. The result
@@ -1736,7 +1651,7 @@ bool N_IO_CircuitContext::findModel(
 // Creator        : Lon Waters
 // Creation Date  : 07/15/2003
 //----------------------------------------------------------------------------
-bool N_IO_CircuitContext::hasSubcircuitParams()
+bool CircuitContext::hasSubcircuitParams()
 {
   bool foundSubcircuitParams = false;
 
@@ -1755,7 +1670,7 @@ bool N_IO_CircuitContext::hasSubcircuitParams()
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::getTotalDeviceCount
+// Function       : CircuitContext::getTotalDeviceCount
 // Purpose        : Calculate the total number of devices starting at current
 //                  context and including all subcircuit instances.
 // Special Notes  :
@@ -1763,31 +1678,29 @@ bool N_IO_CircuitContext::hasSubcircuitParams()
 // Creator        : Lon Waters
 // Creation Date  : 02/13/2003
 //----------------------------------------------------------------------------
-int N_IO_CircuitContext::getTotalDeviceCount()
+int CircuitContext::getTotalDeviceCount()
 {
   // Get device count for the current context.
   int count = currentContextPtr_->deviceCount_;
 
   // Determine the device count associated with each subcircuit instance.
-  list<string>::iterator instanceIter;
-  list<string>::iterator start = currentContextPtr_->instanceList_.begin();
-  list<string>::iterator end = currentContextPtr_->instanceList_.end();
+  std::list<std::string>::iterator instanceIter;
+  std::list<std::string>::iterator start = currentContextPtr_->instanceList_.begin();
+  std::list<std::string>::iterator end = currentContextPtr_->instanceList_.end();
 
   for (instanceIter = start; instanceIter != end; ++instanceIter)
   {
     bool result = setContext(*instanceIter);
-    if (!result)
+    if (result)
     {
-      int lineNumber = currentContextPtr_->
-        instanceErrorInfo_[*instanceIter].first;
-      string fileName(currentContextPtr_->instanceErrorInfo_[*instanceIter].second);
-      string msg("Problem locating subcircuit: ");
-      msg += *instanceIter + "\n";
-      msg += "Check for missing or misspelled subcircuit name.\n";
-      N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_FATAL_0, msg,
-          fileName, lineNumber);
+      count += getTotalDeviceCount();
     }
-    count += getTotalDeviceCount();
+    // else
+    // {
+    //   Report::UserError0().at(currentContextPtr_->instanceErrorInfo_[*instanceIter])
+    //     << "Subcircuit " << *instanceIter << " has not been defined";
+    // }
+
     restorePreviousContext();
   }
 
@@ -1795,7 +1708,7 @@ int N_IO_CircuitContext::getTotalDeviceCount()
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::totalMutualInductanceCount
+// Function       : CircuitContext::totalMutualInductanceCount
 // Purpose        : Calculate the total number of MIs starting at current
 //                  context and including all subcircuit instances.
 // Special Notes  :
@@ -1803,31 +1716,29 @@ int N_IO_CircuitContext::getTotalDeviceCount()
 // Creator        : Rob Hoekstra
 // Creation Date  : 08/27/2004
 //----------------------------------------------------------------------------
-int N_IO_CircuitContext::totalMutualInductanceCount()
+int CircuitContext::totalMutualInductanceCount()
 {
   // Get device count for the current context.
   int count = currentContextPtr_->mutualInductances_.size();
 
   // Determine the device count associated with each subcircuit instance.
-  list<string>::iterator instanceIter;
-  list<string>::iterator start = currentContextPtr_->instanceList_.begin();
-  list<string>::iterator end = currentContextPtr_->instanceList_.end();
+  std::list<std::string>::iterator instanceIter;
+  std::list<std::string>::iterator start = currentContextPtr_->instanceList_.begin();
+  std::list<std::string>::iterator end = currentContextPtr_->instanceList_.end();
 
   for (instanceIter = start; instanceIter != end; ++instanceIter)
   {
     bool result = setContext(*instanceIter);
-    if (!result)
+    if (result)
     {
-      int lineNumber = currentContextPtr_->
-        instanceErrorInfo_[*instanceIter].first;
-      string fileName(currentContextPtr_->instanceErrorInfo_[*instanceIter].second);
-      string msg("Problem locating subcircuit: ");
-      msg += *instanceIter + "\n";
-      msg += "Check for missing or misspelled subcircuit name.\n";
-      N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_FATAL_0, msg,
-          fileName, lineNumber);
+      count += totalMutualInductanceCount();
     }
-    count += totalMutualInductanceCount();
+    // else
+    // {
+    //   Report::UserError0().at(currentContextPtr_->instanceErrorInfo_[*instanceIter])
+    //     << "Subcircuit " <<  *instanceIter << " has not been defined";
+    // }
+
     restorePreviousContext();
   }
 
@@ -1836,28 +1747,28 @@ int N_IO_CircuitContext::totalMutualInductanceCount()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CircuitContext::instance
+// Function      : CircuitContext::instance
 // Purpose       : implement packable
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-Packable * N_IO_CircuitContext::instance() const
+Packable * CircuitContext::instance() const
 {
-  return new N_IO_CircuitContext(metadata_, contextList_ , currentContextPtr_);
+  return new CircuitContext(metadata_, contextList_ , currentContextPtr_);
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CircuitContext::packedByteCount
+// Function      : CircuitContext::packedByteCount
 // Purpose       : Counts bytes needed to pack block.
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-int N_IO_CircuitContext::packedByteCount() const
+int CircuitContext::packedByteCount() const
 {
   int byteCount = 0;
   int size, i;
@@ -1870,8 +1781,8 @@ int N_IO_CircuitContext::packedByteCount() const
   byteCount += sizeof( int );
 
   // count models
-  map< string, N_IO_ParameterBlock* >::const_iterator it_spbM = models_.begin();
-  map< string, N_IO_ParameterBlock* >::const_iterator it_speM = models_.end();
+  ModelMap::const_iterator it_spbM = models_.begin();
+  ModelMap::const_iterator it_speM = models_.end();
   byteCount += sizeof( int );
   for( ; it_spbM != it_speM; ++it_spbM )
   {
@@ -1892,8 +1803,8 @@ int N_IO_CircuitContext::packedByteCount() const
   }
 
   // count instance list
-  list< string >::const_iterator it_stbL = instanceList_.begin();
-  list< string >::const_iterator it_steL = instanceList_.end();
+  std::list< std::string >::const_iterator it_stbL = instanceList_.begin();
+  std::list< std::string >::const_iterator it_steL = instanceList_.end();
   byteCount += sizeof( int );
   for( ; it_stbL != it_steL; ++it_stbL )
   {
@@ -1927,7 +1838,7 @@ int N_IO_CircuitContext::packedByteCount() const
   }
 
   // pack global node names
-  set<string>::const_iterator globalNodes_i, globalNodes_end;
+  std::set<std::string>::const_iterator globalNodes_i, globalNodes_end;
   globalNodes_i = globalNodes_.begin();
   globalNodes_end = globalNodes_.end();
   byteCount += sizeof( int );
@@ -1956,8 +1867,8 @@ int N_IO_CircuitContext::packedByteCount() const
   // count subcircuit contexts
   size = circuitContextTable_.size();
   byteCount += sizeof( int );
-  map< string, N_IO_CircuitContext * >::const_iterator itsc;
-  map< string, N_IO_CircuitContext * >::const_iterator itsc_end = circuitContextTable_.end();
+  std::map< std::string, CircuitContext * >::const_iterator itsc;
+  std::map< std::string, CircuitContext * >::const_iterator itsc_end = circuitContextTable_.end();
   for ( itsc = circuitContextTable_.begin(); itsc != itsc_end; ++itsc )
   {
     byteCount += sizeof( int );
@@ -1969,14 +1880,14 @@ int N_IO_CircuitContext::packedByteCount() const
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CircuitContext::pack
+// Function      : CircuitContext::pack
 // Purpose       : Packs circuit context into char buffer using MPI_PACK.
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_IO_CircuitContext::pack( char * buf, int bsize, int & pos, N_PDS_Comm * comm ) const
+void CircuitContext::pack( char * buf, int bsize, int & pos, N_PDS_Comm * comm ) const
 {
   int size, length, i;
 #ifdef Xyce_COUNT_PACKED_BYTES
@@ -1992,8 +1903,8 @@ void N_IO_CircuitContext::pack( char * buf, int bsize, int & pos, N_PDS_Comm * c
   comm->pack( &deviceCount_, 1, buf, bsize, pos );
 
   // pack models_
-  map< string, N_IO_ParameterBlock* >::const_iterator it_spbM = models_.begin();
-  map< string, N_IO_ParameterBlock* >::const_iterator it_speM = models_.end();
+  ModelMap::const_iterator it_spbM = models_.begin();
+  ModelMap::const_iterator it_speM = models_.end();
   size = models_.size();
   comm->pack( &size, 1, buf, bsize, pos );
   for( ; it_spbM != it_speM; ++it_spbM )
@@ -2016,8 +1927,8 @@ void N_IO_CircuitContext::pack( char * buf, int bsize, int & pos, N_PDS_Comm * c
   }
 
   // pack instance list
-  list< string >::const_iterator it_stbL = instanceList_.begin();
-  list< string >::const_iterator it_steL = instanceList_.end();
+  std::list< std::string >::const_iterator it_stbL = instanceList_.begin();
+  std::list< std::string >::const_iterator it_steL = instanceList_.end();
   size = instanceList_.size();
   comm->pack( &size, 1, buf, bsize, pos );
   for( ; it_stbL != it_steL; ++it_stbL )
@@ -2056,7 +1967,7 @@ void N_IO_CircuitContext::pack( char * buf, int bsize, int & pos, N_PDS_Comm * c
   // pack global node names
   size = globalNodes_.size();
   comm->pack( &size, 1, buf, bsize, pos );
-  set<string>::const_iterator globalNodes_i, globalNodes_end;
+  std::set<std::string>::const_iterator globalNodes_i, globalNodes_end;
   globalNodes_i = globalNodes_.begin();
   globalNodes_end = globalNodes_.end();
   for ( ; globalNodes_i != globalNodes_end ; ++globalNodes_i )
@@ -2085,8 +1996,8 @@ void N_IO_CircuitContext::pack( char * buf, int bsize, int & pos, N_PDS_Comm * c
   // pack circuitContextTable_
   size = circuitContextTable_.size();
   comm->pack( &size, 1, buf, bsize, pos );
-  map< string, N_IO_CircuitContext * >::const_iterator itsc = circuitContextTable_.begin();
-  map< string, N_IO_CircuitContext * >::const_iterator itsc_end = circuitContextTable_.end();
+  std::map< std::string, CircuitContext * >::const_iterator itsc = circuitContextTable_.begin();
+  std::map< std::string, CircuitContext * >::const_iterator itsc_end = circuitContextTable_.end();
   for ( ; itsc != itsc_end; ++itsc )
   {
     length = itsc->first.length();
@@ -2098,28 +2009,27 @@ void N_IO_CircuitContext::pack( char * buf, int bsize, int & pos, N_PDS_Comm * c
 #ifdef Xyce_COUNT_PACKED_BYTES
   if (pos != predictedPos)
   {
-    string msg("Predicted pos does not match actual pos in N_IO_CircuitContext::pack");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING, msg );
+    DevelFatal(*this, "CircuitContext::pack") << "Predicted pos does not match actual pos";
   }
 #endif
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CircuitContext::unpack
+// Function      : CircuitContext::unpack
 // Purpose       : Unpacks circuit context from char buffer using MPI_UNPACK.
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_IO_CircuitContext::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * comm )
+void CircuitContext::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * comm )
 {
   int size, length, i;
 
   // unpack name
   comm->unpack( pB, bsize, pos, &length, 1 );
-  name_ = string( ( pB + pos ), length );
+  name_ = std::string( ( pB + pos ), length );
   pos += length;
 
   // unpack device count
@@ -2133,7 +2043,7 @@ void N_IO_CircuitContext::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * 
 
     // ---- unpack key
     comm->unpack( pB, bsize, pos, &length, 1 );
-    string aString(string( ( pB + pos ), length ));
+    std::string aString(std::string( ( pB + pos ), length ));
     pos += length;
 
     // ---- unpack data
@@ -2155,7 +2065,7 @@ void N_IO_CircuitContext::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * 
   for( i = 0;  i < size; ++i )
   {
     comm->unpack( pB, bsize, pos, &length, 1 );
-    instanceList_.push_back( string( ( pB + pos ), length ) );
+    instanceList_.push_back( std::string( ( pB + pos ), length ) );
     pos += length;
   }
 
@@ -2164,7 +2074,7 @@ void N_IO_CircuitContext::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * 
   for (i = 0; i < size; ++i)
   {
     comm->unpack( pB, bsize, pos, &length, 1 );
-    nodeList_.push_back( string( ( pB + pos ), length ) );
+    nodeList_.push_back( std::string( ( pB + pos ), length ) );
     pos += length;
   }
 
@@ -2172,7 +2082,7 @@ void N_IO_CircuitContext::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * 
   comm->unpack( pB, bsize, pos, &size, 1 );
   for (i = 0; i < size; ++i)
   {
-    N_UTL_Param aParam;
+    Util::Param aParam;
     aParam.unpack( pB, bsize, pos, comm );
     subcircuitParameters_.push_back( aParam );
   }
@@ -2181,7 +2091,7 @@ void N_IO_CircuitContext::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * 
   comm->unpack( pB, bsize, pos, &size, 1 );
   for (i = 0; i < size; ++i)
   {
-    N_UTL_Param aParam;
+    Util::Param aParam;
     aParam.unpack( pB, bsize, pos, comm );
     unresolvedParams_.push_back( aParam );
   }
@@ -2191,7 +2101,7 @@ void N_IO_CircuitContext::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * 
   for( i = 0;  i < size; ++i )
   {
     comm->unpack( pB, bsize, pos, &length, 1 );
-    globalNodes_.insert( string( ( pB + pos ), length ) );
+    globalNodes_.insert( std::string( ( pB + pos ), length ) );
     pos += length;
   }
 
@@ -2199,7 +2109,7 @@ void N_IO_CircuitContext::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * 
   comm->unpack( pB, bsize, pos, &size, 1 );
   for (i = 0; i < size; ++i)
   {
-    N_UTL_Param aParam;
+    Util::Param aParam;
     aParam.unpack( pB, bsize, pos, comm );
     unresolvedGlobalParams_.push_back( aParam );
   }
@@ -2218,13 +2128,13 @@ void N_IO_CircuitContext::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * 
   for (i = 0; i < size; ++i)
   {
     comm->unpack( pB, bsize, pos, &length, 1 );
-    string tmp( ( pB + pos ), length );
+    std::string tmp( ( pB + pos ), length );
     pos += length;
-    pair< map< string, N_IO_CircuitContext *>::iterator, bool > p =
+    std::pair< std::map< std::string, CircuitContext *>::iterator, bool > p =
      circuitContextTable_.insert(
-      pair< string, N_IO_CircuitContext *>(
+      std::pair< std::string, CircuitContext *>(
        tmp,
-       new N_IO_CircuitContext( metadata_, contextList_, currentContextPtr_ ) ) );
+       new CircuitContext( metadata_, contextList_, currentContextPtr_ ) ) );
 
     // set the parent context of my children to me
     p.first->second->setParentContextPtr( this );
@@ -2235,17 +2145,17 @@ void N_IO_CircuitContext::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CircuitContext::MutualInductance::MutualInductance
+// Function      : CircuitContext::MutualInductance::MutualInductance
 // Purpose       : Constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra
 // Creation Date : 8/27/04
 //-----------------------------------------------------------------------------
-N_IO_CircuitContext::MutualInductance::MutualInductance( N_IO_DeviceBlock & device )
+CircuitContext::MutualInductance::MutualInductance( N_IO_DeviceBlock & device )
 {
     int numParameters = device.getNumberOfInstanceParameters();
-    N_DEV_Param parameter;
+    Device::Param parameter;
     bool first = true;
     for ( int i = 0; i < numParameters; ++i )
     {
@@ -2253,7 +2163,7 @@ N_IO_CircuitContext::MutualInductance::MutualInductance( N_IO_DeviceBlock & devi
 
       if ( parameter.tag() != "COUPLING" )
       {
-        string inductorName (parameter.uTag());
+        std::string inductorName (parameter.uTag());
 
         if( first )
         {
@@ -2264,7 +2174,7 @@ N_IO_CircuitContext::MutualInductance::MutualInductance( N_IO_DeviceBlock & devi
         inductors[inductorName] = 0.0;
       }
       else
-        coupling = parameter.sVal();
+        coupling = parameter.stringValue();
     }
 
     model = device.getModelName();
@@ -2275,14 +2185,14 @@ N_IO_CircuitContext::MutualInductance::MutualInductance( N_IO_DeviceBlock & devi
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CircuitContext::MutualInductance::packedByteCount
+// Function      : CircuitContext::MutualInductance::packedByteCount
 // Purpose       : Counts bytes needed to pack block.
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra
 // Creation Date : 8/27/04
 //-----------------------------------------------------------------------------
-int N_IO_CircuitContext::MutualInductance::packedByteCount() const
+int CircuitContext::MutualInductance::packedByteCount() const
 {
   int byteCount = 0;
 
@@ -2300,8 +2210,8 @@ int N_IO_CircuitContext::MutualInductance::packedByteCount() const
 
   // inductor info
   byteCount += sizeof(int);
-  map<string,double>::const_iterator iterI = inductors.begin();
-  map<string,double>::const_iterator  endI = inductors.end();
+  std::map<std::string,double>::const_iterator iterI = inductors.begin();
+  std::map<std::string,double>::const_iterator  endI = inductors.end();
   for( ; iterI != endI; ++iterI )
   {
     byteCount += sizeof(int);
@@ -2313,14 +2223,14 @@ int N_IO_CircuitContext::MutualInductance::packedByteCount() const
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CircuitContext::MutualInductance::pack
+// Function      : CircuitContext::MutualInductance::pack
 // Purpose       : Packs MI into char buffer using MPI_PACK.
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra
 // Creation Date : 08/27/04
 //-----------------------------------------------------------------------------
-void N_IO_CircuitContext::MutualInductance::pack( char * buf, int bsize, int & pos, N_PDS_Comm * comm ) const
+void CircuitContext::MutualInductance::pack( char * buf, int bsize, int & pos, N_PDS_Comm * comm ) const
 {
   int size, length;
 #ifdef Xyce_COUNT_PACKED_BYTES
@@ -2345,8 +2255,8 @@ void N_IO_CircuitContext::MutualInductance::pack( char * buf, int bsize, int & p
   // pack inductors
   size = inductors.size();
   comm->pack( &size, 1, buf, bsize, pos );
-  map<string,double>::const_iterator iterI = inductors.begin();
-  map<string,double>::const_iterator  endI = inductors.end();
+  std::map<std::string,double>::const_iterator iterI = inductors.begin();
+  std::map<std::string,double>::const_iterator  endI = inductors.end();
   for( ; iterI != endI; ++iterI )
   {
     length = iterI->first.length();
@@ -2357,21 +2267,20 @@ void N_IO_CircuitContext::MutualInductance::pack( char * buf, int bsize, int & p
 #ifdef Xyce_COUNT_PACKED_BYTES
   if (pos != predictedPos)
   {
-    string msg("Predicted pos does not match actual pos in MutualInductance::pack");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING, msg );
+    DevelFatal(*this, "CircuitContext::MutualInductance::pack") << "Predicted pos does not match actual pos";
   }
 #endif
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CircuitContext::MutualInductance::unpack
+// Function      : CircuitContext::MutualInductance::unpack
 // Purpose       : Unpacks MI from char buffer using MPI_UNPACK.
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra
 // Creation Date : 08/27/04
 //-----------------------------------------------------------------------------
-void N_IO_CircuitContext::MutualInductance::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * comm )
+void CircuitContext::MutualInductance::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * comm )
 {
   int size, length, i;
   double val;
@@ -2380,7 +2289,7 @@ void N_IO_CircuitContext::MutualInductance::unpack( char * pB, int bsize, int & 
   comm->unpack( pB, bsize, pos, &length, 1 );
   if( length )
   {
-    coupling = string( ( pB + pos ), length );
+    coupling = std::string( ( pB + pos ), length );
     pos += length;
   }
 
@@ -2388,7 +2297,7 @@ void N_IO_CircuitContext::MutualInductance::unpack( char * pB, int bsize, int & 
   comm->unpack( pB, bsize, pos, &length, 1 );
   if( length )
   {
-    model = string( ( pB + pos ), length );
+    model = std::string( ( pB + pos ), length );
     pos += length;
   }
 
@@ -2396,7 +2305,7 @@ void N_IO_CircuitContext::MutualInductance::unpack( char * pB, int bsize, int & 
   comm->unpack( pB, bsize, pos, &length, 1 );
   if( length )
   {
-    firstInductor = string( ( pB + pos ), length );
+    firstInductor = std::string( ( pB + pos ), length );
     pos += length;
   }
 
@@ -2406,7 +2315,7 @@ void N_IO_CircuitContext::MutualInductance::unpack( char * pB, int bsize, int & 
   for( i = 0; i < size; ++i )
   {
     comm->unpack( pB, bsize, pos, &length, 1 );
-    string name(string( ( pB + pos ), length ));
+    std::string name(std::string( ( pB + pos ), length ));
     pos += length;
     comm->unpack( pB, bsize, pos, &val, 1 );
     inductors[name] = val;
@@ -2414,20 +2323,20 @@ void N_IO_CircuitContext::MutualInductance::unpack( char * pB, int bsize, int & 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CircuitContext::bundleMIs
+// Function      : CircuitContext::bundleMIs
 // Purpose       : Convert all MIs into tokenized device lines
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_IO_CircuitContext::bundleMIs()
+void CircuitContext::bundleMIs()
 {
-  string type;
+  std::string type;
   int i, j, mTableSize, mTableRowSize;
   N_IO_SpiceSeparatedFieldTool::StringToken field;
-  vector< string > tmpInductorList, tmpCouplingList;
-  vector< N_IO_SpiceSeparatedFieldTool::StringToken > tmpLine;
+  std::vector< std::string > tmpInductorList, tmpCouplingList;
+  std::vector< N_IO_SpiceSeparatedFieldTool::StringToken > tmpLine;
 
   // retrieve number of K lines in this (sub)circuit
   mTableSize = currentContextPtr_->allIndexedMIs_.size();
@@ -2439,11 +2348,11 @@ void N_IO_CircuitContext::bundleMIs()
     tmpCouplingList.clear();
 
     // reset tmp vars
-    string tmpName("");
-    string tmpModel("");
+    std::string tmpName("");
+    std::string tmpModel("");
     tmpLine.clear();
 
-    vector< set< string > > & tmpTable =
+    std::vector< std::set< std::string > > & tmpTable =
      currentContextPtr_->getSharedInductorTable();
 
     mTableRowSize = currentContextPtr_->allIndexedMIs_[i].size();
@@ -2475,7 +2384,7 @@ void N_IO_CircuitContext::bundleMIs()
       }
 
       // assemble inductor list
-      map< string, double >::iterator mIter = mutind.inductors.begin();
+      std::map< std::string, double >::iterator mIter = mutind.inductors.begin();
       for( ; mIter != mutind.inductors.end(); ++mIter )
       {
         // add inductor data if not already present
@@ -2489,16 +2398,11 @@ void N_IO_CircuitContext::bundleMIs()
           //Do some error-checking to make sure that the inductor has been
           //defined elsewhere!
 
-          map<string,vector<string> >::iterator inducIter;
+          std::map<std::string,std::vector<std::string> >::iterator inducIter;
           inducIter = mutind.terminals.find((*mIter).first);
           if (inducIter == mutind.terminals.end())
           {
-            string msg("Undefined inductor ");
-            msg += (*mIter).first;
-            msg += " in mutual inductor ";
-            msg += mutind.name;
-            msg += " definition.";
-            N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0,msg);
+            Report::UserError0() << "Undefined inductor " << (*mIter).first << " in mutual inductor " << mutind.name << " definition.";
           }
           else
           {
@@ -2508,7 +2412,7 @@ void N_IO_CircuitContext::bundleMIs()
           }
 
           // retrieve the inductance value
-          stringstream cnvtr;
+          std::stringstream cnvtr;
           cnvtr << (*mIter).second;
           tmpInductorList.push_back( cnvtr.str() );
 
@@ -2532,7 +2436,7 @@ void N_IO_CircuitContext::bundleMIs()
       }
 
       // append coupling value to string
-      stringstream cnvtr;
+      std::stringstream cnvtr;
       cnvtr << mutind.coupling;
       tmpCouplingList.push_back( cnvtr.str() );
     }
@@ -2577,29 +2481,27 @@ void N_IO_CircuitContext::bundleMIs()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CircuitContext::getMILine
+// Function      : CircuitContext::getMILine
 // Purpose       : Retrieve one tokenized device line
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-vector< N_IO_SpiceSeparatedFieldTool::StringToken > &
- N_IO_CircuitContext::getMILine( int i )
+std::vector< N_IO_SpiceSeparatedFieldTool::StringToken > &
+ CircuitContext::getMILine( int i )
 {
   if( ( i < 0 ) || ( i > currentContextPtr_->kLines_.size() ) )
   {
     // bounds checking error exit
-    string msg("Request exceeds number of mutual induntances ");
-    msg += "in this subcircuit.\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL, msg );
+    Report::UserError() << "Request exceeds number of mutual inductances in this subcircuit";
   }
 
   return currentContextPtr_->kLines_[i];
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::augmentTotalDeviceCount
+// Function       : CircuitContext::augmentTotalDeviceCount
 // Purpose        : Augment total device count after we process k-lines
 //
 // Special Notes  :
@@ -2607,7 +2509,7 @@ vector< N_IO_SpiceSeparatedFieldTool::StringToken > &
 // Creator        : Keith Santarelli
 // Creation Date  : 09/22/08
 //----------------------------------------------------------------------------
-void N_IO_CircuitContext::augmentTotalDeviceCount(int kLineCount,
+void CircuitContext::augmentTotalDeviceCount(int kLineCount,
                                                   int coupledICount,
                                                   int YDeviceCount)
 {
@@ -2617,9 +2519,7 @@ void N_IO_CircuitContext::augmentTotalDeviceCount(int kLineCount,
 
   if (count < 0)
   {
-    string msg("Error in N_IO_CircuitContext::augmentTotalDeviceCount:  ");
-    msg += "augmented number of devices is less than 0.";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg );
+    Report::DevelFatal() << "Augmented number of devices is less than 0.";
   }
   else
   {
@@ -2627,3 +2527,5 @@ void N_IO_CircuitContext::augmentTotalDeviceCount(int kLineCount,
   }
 }
 
+} // namespace IO
+} // namespace Xyce

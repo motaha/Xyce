@@ -90,15 +90,14 @@ am__aclocal_m4_deps = $(top_srcdir)/config/libtool.m4 \
 	$(top_srcdir)/config/lt~obsolete.m4 \
 	$(top_srcdir)/config/xyce_check_bison.m4 \
 	$(top_srcdir)/config/xyce_check_braindamaged_random_shuffle.m4 \
-	$(top_srcdir)/config/xyce_check_flexible_insert.m4 \
 	$(top_srcdir)/config/xyce_check_iota.m4 \
-	$(top_srcdir)/config/xyce_check_stl_member_templates.m4 \
 	$(top_srcdir)/config/xyce_debug_option.m4 \
 	$(top_srcdir)/config/xyce_finite_number_check.m4 \
 	$(top_srcdir)/config/xyce_library_include.m4 \
 	$(top_srcdir)/config/xyce_library_option.m4 \
 	$(top_srcdir)/config/xyce_test_using_dec_cxx.m4 \
 	$(top_srcdir)/config/xyce_test_using_icclt11_cxx.m4 \
+	$(top_srcdir)/config/xyce_trilinos_library_option.m4 \
 	$(top_srcdir)/acinclude.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -114,7 +113,7 @@ am_libAnalysis_la_OBJECTS = N_ANP_AnalysisBase.lo \
 	N_ANP_MOR.lo N_ANP_InnerLevelSolve.lo N_ANP_ModelEvaluator.lo \
 	N_ANP_ModelEvaluator_Stateless.lo N_ANP_MPDE.lo \
 	N_ANP_OutputMgrAdapter.lo N_ANP_Step.lo N_ANP_SweepParam.lo \
-	N_ANP_Transient.lo
+	N_ANP_Transient.lo N_ANP_Report.lo
 libAnalysis_la_OBJECTS = $(am_libAnalysis_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -264,6 +263,7 @@ MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MAYBE_NONFREE = @MAYBE_NONFREE@
+MAYBE_PLUGIN = @MAYBE_PLUGIN@
 MAYBE_RAD = @MAYBE_RAD@
 MKDIR_P = @MKDIR_P@
 NM = @NM@
@@ -373,6 +373,8 @@ libAnalysis_la_SOURCES = \
   $(srcdir)/src/N_ANP_Step.C \
   $(srcdir)/src/N_ANP_SweepParam.C \
   $(srcdir)/src/N_ANP_Transient.C \
+  $(srcdir)/src/N_ANP_Report.C \
+  $(srcdir)/include/N_ANP_fwd.h \
   $(srcdir)/include/N_ANP_AnalysisBase.h \
   $(srcdir)/include/N_ANP_AnalysisInterface.h \
   $(srcdir)/include/N_ANP_AnalysisManager.h \
@@ -387,6 +389,7 @@ libAnalysis_la_SOURCES = \
   $(srcdir)/include/N_ANP_SweepParam.h \
   $(srcdir)/include/N_ANP_AC.h \
   $(srcdir)/include/N_ANP_MOR.h \
+  $(srcdir)/include/N_ANP_Report.h \
   $(srcdir)/include/N_ANP_Transient.h 
 
 all: all-am
@@ -457,6 +460,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_ANP_ModelEvaluator.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_ANP_ModelEvaluator_Stateless.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_ANP_OutputMgrAdapter.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_ANP_Report.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_ANP_Step.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_ANP_SweepParam.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_ANP_Transient.Plo@am__quote@
@@ -593,6 +597,13 @@ N_ANP_Transient.lo: $(srcdir)/src/N_ANP_Transient.C
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_ANP_Transient.C' object='N_ANP_Transient.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_ANP_Transient.lo `test -f '$(srcdir)/src/N_ANP_Transient.C' || echo '$(srcdir)/'`$(srcdir)/src/N_ANP_Transient.C
+
+N_ANP_Report.lo: $(srcdir)/src/N_ANP_Report.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_ANP_Report.lo -MD -MP -MF $(DEPDIR)/N_ANP_Report.Tpo -c -o N_ANP_Report.lo `test -f '$(srcdir)/src/N_ANP_Report.C' || echo '$(srcdir)/'`$(srcdir)/src/N_ANP_Report.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_ANP_Report.Tpo $(DEPDIR)/N_ANP_Report.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_ANP_Report.C' object='N_ANP_Report.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_ANP_Report.lo `test -f '$(srcdir)/src/N_ANP_Report.C' || echo '$(srcdir)/'`$(srcdir)/src/N_ANP_Report.C
 
 mostlyclean-libtool:
 	-rm -f *.lo

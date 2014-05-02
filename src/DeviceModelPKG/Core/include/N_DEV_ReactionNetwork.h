@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,20 +36,21 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.5.2.2 $
+// Revision Number: $Revision: 1.14.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 #ifndef N_DEV_ReactionNetwork_H
 #define N_DEV_ReactionNetwork_H
+
 #include <N_UTL_Misc.h>
+#include <N_UTL_fwd.h>
 #include <iosfwd>
 #include <vector>
 #include <map>
 #include <string>
-using namespace std;
 
 #include <N_DEV_Reaction.h>
 #include <N_DEV_Specie.h>
@@ -60,7 +61,8 @@ using namespace std;
 // inlined functions.
 #include <sstream>
 
-class N_UTL_Expression;
+namespace Xyce {
+namespace Device {
 
 //-----------------------------------------------------------------------------
 // Class         : N_DEV_ReactionNetwork
@@ -69,62 +71,59 @@ class N_UTL_Expression;
 // Creator       : Tom Russo, SNL
 // Creation Date : 03/20/2006
 //-----------------------------------------------------------------------------
-class N_DEV_ReactionNetwork
+class ReactionNetwork
 {
 public:
 
-  N_DEV_ReactionNetwork(string name="NoName");
-  N_DEV_ReactionNetwork(const N_DEV_ReactionNetwork & right);
-  virtual ~N_DEV_ReactionNetwork();
+  ReactionNetwork(const std::string &name = "NoName");
+  ReactionNetwork(const ReactionNetwork & right);
+  virtual ~ReactionNetwork();
 
   void setReactionNetworkFromFile(const std::string &fileName);
 
-  void addReaction(string name);
-  void addReaction(string name, N_DEV_Reaction &reaction);
-  void addReactant(string name, string reactant ,double stoich);
-  void addProduct(string name, string reactant ,double stoich);
+  void addReaction(const std::string &name);
+  void addReaction(const std::string &name, N_DEV_Reaction &reaction);
+  void addReactant(const std::string &name, const std::string &reactant, double stoich);
+  void addProduct(const std::string &name, const std::string &reactant, double stoich);
 
   // set rate constant calculator for each type of reaction
-  void setSimpleCalc(string name, double k);
-  void setCaptureCalc(string name, double sigma, double v);
-  void setEmissionCalc(string name, double sigma, double v, double N,
-                       double E);
-  void setElectronCaptureCalc(string name, double sigma);
-  void setElectronEmissionCalc(string name, double sigma, double E);
-  void setHoleCaptureCalc(string name, double sigma);
-  void setHoleEmissionCalc(string name, double sigma, double E);
-  void setComplexCalc(string name);
-  void setDecomplexCalc(string name, double bindingEnergy,
-                        double gammaAB, double gammaA, double gammaB,
-                        double concSi);
-  //
+  void setSimpleCalc(const std::string &name, double k);
+  void setCaptureCalc(const std::string &name, double sigma, double v);
+  void setEmissionCalc(const std::string &name, double sigma, double v, double N, double E);
+  void setElectronCaptureCalc(const std::string &name, double sigma);
+  void setElectronEmissionCalc(const std::string &name, double sigma, double E);
+  void setHoleCaptureCalc(const std::string &name, double sigma);
+  void setHoleEmissionCalc(const std::string &name, double sigma, double E);
+  void setComplexCalc(const std::string &name);
+  void setDecomplexCalc(const std::string &name, double bindingEnergy,
+                        double gammaAB, double gammaA, double gammaB, double concSi);
 
-  void setRateConstant(string name, double k);
-  void scaleRateConstant(string name, double kscale);
+  void setRateConstant(const std::string &name, double k);
+  void scaleRateConstant(const std::string &name, double kscale);
 
   void setScaleParams(double c, double t, double x);
 
   // Use rate constant calculators
-  void scaleRateConstantFromCalculator(string name);
-  void unscaleRateConstantFromCalculator(string name);
-  void setRateConstantFromCalculator(string name,double T);
+  void scaleRateConstantFromCalculator(const std::string &name);
+  void unscaleRateConstantFromCalculator(const std::string &name);
+  void setRateConstantFromCalculator(const std::string &name, double T);
   void setRateConstantsFromCalc(double T);
   void scaleRateConstantsFromCalc();
   void unscaleRateConstantsFromCalc();
 
-  void setSpecies(vector<N_DEV::Specie> &theSpeciesVect);
-  void addSpecie(const N_DEV::Specie &aSpecie);
-  void setConstants(vector<N_DEV::Specie> &theConstantsVect);
-  void addConstant(const N_DEV::Specie &aConstant);
+  void setSpecies(std::vector<Specie> &theSpeciesVect);
+  void addSpecie(const Specie &aSpecie);
+  void setConstants(std::vector<Specie> &theConstantsVect);
+  void addConstant(const Specie &aConstant);
 
-  int getReactionNum(string name);
+  int getReactionNum(const std::string name);
 
-  void addSourceTerm(string speciesName,string expressionStr);
-  void addSourceTerm(string speciesName,N_UTL_Expression *expression);
-  void addMasterSourceTerm(string speciesName);
+  void addSourceTerm(const std::string &speciesName, const std::string &expressionStr);
+  void addSourceTerm(const std::string &speciesName,Util::Expression *expression);
+  void addMasterSourceTerm(const std::string &speciesName);
 
-  void addInitialCondition(string speciesName,double value);
-  pair<string,double> getInitialCondition(int i);
+  void addInitialCondition(const std::string &speciesName, double value);
+  std::pair<std::string,double> getInitialCondition(int i);
   int getNumInitialConditions();
 
   void setSimTime(double time);
@@ -132,62 +131,62 @@ public:
   inline void setSourceScaleFac(double scf) {sourceScaleFac=scf;};
   inline void setMasterSourceValue(double msv) {masterSourceValue=msv;};
 
-  void getDdt(vector<double> &concs,vector<double> &constants,
-              vector<double> &ddt);
-  void getJac(vector<double> &concs, vector<double> &constants,
-              vector<vector<double> >&jac);
+  void getDdt(std::vector<double> &concs,std::vector<double> &constants,
+              std::vector<double> &ddt);
+  void getJac(std::vector<double> &concs, std::vector<double> &constants,
+              std::vector<std::vector<double> >&jac);
   void getDFdConst(const std::string &constantName,
-                   vector<double> &concs, vector<double> &constants,
-                   vector<double> &dFdConst);
+                   std::vector<double> &concs, std::vector<double> &constants,
+                   std::vector<double> &dFdConst);
 
-  double getRate(vector<double> &concs,vector<double> &constants,
-                 vector<int> &captureVect, vector<int> &emissionVect);
-  void getDRateDC(vector<double> &concs,vector<double> &constants,
-                    vector<int> &captureVect, vector<int> &emissionVect,
-                    vector<double>&dratedc);
+  double getRate(std::vector<double> &concs,std::vector<double> &constants,
+                 std::vector<int> &captureVect, std::vector<int> &emissionVect);
+  void getDRateDC(std::vector<double> &concs,std::vector<double> &constants,
+                  std::vector<int> &captureVect, std::vector<int> &emissionVect,
+                  std::vector<double>&dratedc);
 
-  void getDRateDConst(vector<double> &concs,vector<double> &constants,
-                      vector<int> &captureVect, vector<int> &emissionVect,
-                      vector<double>&dratedc);
+  void getDRateDConst(std::vector<double> &concs,std::vector<double> &constants,
+                      std::vector<int> &captureVect, std::vector<int> &emissionVect,
+                      std::vector<double>&dratedc);
 
-  double getCaptureLifetime(vector<double> &concs,vector<double> &constants,
-                 vector<int> &captureVect,double &concentration);
-  void getCaptureLifetimes(vector<double> &concs,vector<double> &constants,
-                           vector<int> &captureVect,double &concentration,
-                           vector<double> &lifetimes);
-  double getELifetime(vector<double>&concs,vector<double>&constants);
-  double getHLifetime(vector<double>&concs,vector<double>&constants);
-  void getELifetimes(vector<double>&concs,vector<double>&constants,
-                     vector<double> &lifetimes);
-  void getHLifetimes(vector<double>&concs,vector<double>&constants,
-                     vector<double> &lifetimes);
+  double getCaptureLifetime(std::vector<double> &concs,std::vector<double> &constants,
+                            std::vector<int> &captureVect,double &concentration);
+  void getCaptureLifetimes(std::vector<double> &concs,std::vector<double> &constants,
+                           std::vector<int> &captureVect,double &concentration,
+                           std::vector<double> &lifetimes);
+  double getELifetime(std::vector<double>&concs,std::vector<double>&constants);
+  double getHLifetime(std::vector<double>&concs,std::vector<double>&constants);
+  void getELifetimes(std::vector<double>&concs,std::vector<double>&constants,
+                     std::vector<double> &lifetimes);
+  void getHLifetimes(std::vector<double>&concs,std::vector<double>&constants,
+                     std::vector<double> &lifetimes);
 
-  double getERate(vector<double> &concs,vector<double> &constants);
-  double getHRate(vector<double> &concs,vector<double> &constants);
+  double getERate(std::vector<double> &concs,std::vector<double> &constants);
+  double getHRate(std::vector<double> &concs,std::vector<double> &constants);
 
-  void getDERateDC(vector<double> &concs,vector<double> &constants,
-                   vector<double>&dratedc);
-  void getDHRateDC(vector<double> &concs,vector<double> &constants,
-                   vector<double>&dratedc);
+  void getDERateDC(std::vector<double> &concs,std::vector<double> &constants,
+                   std::vector<double>&dratedc);
+  void getDHRateDC(std::vector<double> &concs,std::vector<double> &constants,
+                   std::vector<double>&dratedc);
 
-  void getDERateDConst(vector<double> &concs,vector<double> &constants,
-                       vector<double>&dratedConst);
-  void getDHRateDConst(vector<double> &concs,vector<double> &constants,
-                       vector<double>&dratedConst);
+  void getDERateDConst(std::vector<double> &concs,std::vector<double> &constants,
+                       std::vector<double>&dratedConst);
+  void getDHRateDConst(std::vector<double> &concs,std::vector<double> &constants,
+                       std::vector<double>&dratedConst);
 
   int getNumSpecies();
   int getNumConstants();
   const std::string & getSpeciesName(int i);
   const std::string & getConstantsName(int i);
-  int getSpeciesNum(string name);
-  int getConstantNum(string name);
-  int getReactantNum(string name);
-  bool reactantExist(string name);
-  bool constantExist(string name);
+  int getSpeciesNum(const std::string &name);
+  int getConstantNum(const std::string &name);
+  int getReactantNum(const std::string &name);
+  bool reactantExist(const std::string &name);
+  bool constantExist(const std::string &name);
 
-  void setName(string name);
+  void setName(const std::string &name);
   void clear();
-  void output(ostream & os) const;
+  void output(std::ostream & os) const;
 
   double getDiffusionCoefficient (const std::string & name, const double temp);
   double getDiffusionCoefficient (int specie, const double temp);
@@ -198,24 +197,24 @@ public:
   void setApplySources(bool flag);
 
 private:
-  N_DEV_Reaction &getReaction(string name);
+  N_DEV_Reaction &getReaction(const std::string &name);
   N_DEV_Reaction &getReaction(int i);
 
-  map <string,int> speciesMap;
-  vector<N_DEV::Specie> species;
-  map <string,int> constantsMap;
-  vector<N_DEV::Specie> constants;
-  vector<pair<string,double> > initialConditions;
-  vector<N_DEV_Reaction> theReactions;
-  map <string,int> reactionNamesMap;
+  std::map<std::string,int> speciesMap;
+  std::vector<Specie> species;
+  std::map<std::string,int> constantsMap;
+  std::vector<Specie> constants;
+  std::vector<std::pair<std::string,double> > initialConditions;
+  std::vector<Reaction> theReactions;
+  std::map<std::string,int> reactionNamesMap;
   std::vector<std::string> reactionNames;
-  string myName;
-  vector<int> electronCaptureReactions;
-  vector<int> holeCaptureReactions;
-  vector<int> electronEmissionReactions;
-  vector<int> holeEmissionReactions;
-  vector< pair<int,N_UTL_Expression *> > theSourceTerms;
-  vector<int> masterSourceSpecies;
+  std::string myName;
+  std::vector<int> electronCaptureReactions;
+  std::vector<int> holeCaptureReactions;
+  std::vector<int> electronEmissionReactions;
+  std::vector<int> holeEmissionReactions;
+  std::vector< std::pair<int,Util::Expression *> > theSourceTerms;
+  std::vector<int> masterSourceSpecies;
   double masterSourceValue;
   double sourceScaleFac;
   double C0;
@@ -226,14 +225,14 @@ private:
 };
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::clear
+// Function      : ReactionNetwork::clear
 // Purpose       : make the reaction network an empty one
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 3/20/06
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::clear()
+inline void ReactionNetwork::clear()
 {
   speciesMap.clear();
   species.clear();
@@ -245,59 +244,59 @@ inline void N_DEV_ReactionNetwork::clear()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setName
+// Function      : ReactionNetwork::setName
 // Purpose       : Accessor function to set network name
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 3/20/06
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::setName(string name)
+inline void ReactionNetwork::setName(const std::string &name)
 {
   myName=name;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getNumSpecies
+// Function      : ReactionNetwork::getNumSpecies
 // Purpose       : Accessor function to returning number of species recorded
 // Special Notes : Only solution species returned, does not include constants
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 3/20/06
 //-----------------------------------------------------------------------------
-inline int N_DEV_ReactionNetwork::getNumSpecies()
+inline int ReactionNetwork::getNumSpecies()
 {
   return (species.size());
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getNumConstants
+// Function      : ReactionNetwork::getNumConstants
 // Purpose       : Accessor function to returning number of constant species
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/10/06
 //-----------------------------------------------------------------------------
-inline int N_DEV_ReactionNetwork::getNumConstants()
+inline int ReactionNetwork::getNumConstants()
 {
   return (constants.size());
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getSpeciesName
+// Function      : ReactionNetwork::getSpeciesName
 // Purpose       : Accessor function to returning name of indicated species
 // Special Notes : Only returns solution species names, not constants
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 3/20/06
 //-----------------------------------------------------------------------------
-inline const std::string & N_DEV_ReactionNetwork::getSpeciesName(int i)
+inline const std::string & ReactionNetwork::getSpeciesName(int i)
 {
   return species[i].getName();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getConstantsName
+// Function      : ReactionNetwork::getConstantsName
 // Purpose       : Accessor function to returning name of indicated constant
 //                 species
 // Special Notes : Only returns solution constants names, not variable species
@@ -305,22 +304,22 @@ inline const std::string & N_DEV_ReactionNetwork::getSpeciesName(int i)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 3/20/06
 //-----------------------------------------------------------------------------
-inline const std::string & N_DEV_ReactionNetwork::getConstantsName(int i)
+inline const std::string & ReactionNetwork::getConstantsName(int i)
 {
   return constants[i].getName();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getSpeciesNum
+// Function      : ReactionNetwork::getSpeciesNum
 // Purpose       : Accessor function to return number of named variable specie
 // Special Notes :  returns -1 if the specified specie is not a variable
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 3/20/06
 //-----------------------------------------------------------------------------
-inline int N_DEV_ReactionNetwork::getSpeciesNum(string name)
+inline int ReactionNetwork::getSpeciesNum(const std::string &name)
 {
-  map<string,int>::iterator n_i;
+  std::map<std::string,int>::iterator n_i;
   n_i = speciesMap.find(name);
 
   if (n_i == speciesMap.end())
@@ -334,7 +333,7 @@ inline int N_DEV_ReactionNetwork::getSpeciesNum(string name)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::reactantExist
+// Function      : ReactionNetwork::reactantExist
 // Purpose       : Returns false if the named specie doesn't exist, or if
 //                 it is a constant.
 // Special Notes :
@@ -342,7 +341,7 @@ inline int N_DEV_ReactionNetwork::getSpeciesNum(string name)
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 4/24/07
 //-----------------------------------------------------------------------------
-inline bool N_DEV_ReactionNetwork::reactantExist(string name)
+inline bool ReactionNetwork::reactantExist(const std::string &name)
 {
   bool retFlag(true);
   int i=getSpeciesNum(name);
@@ -355,7 +354,7 @@ inline bool N_DEV_ReactionNetwork::reactantExist(string name)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::constantExist
+// Function      : ReactionNetwork::constantExist
 // Purpose       : Returns false if the named specie doesn't exist, or if
 //                 it is a constant.
 // Special Notes :
@@ -363,7 +362,7 @@ inline bool N_DEV_ReactionNetwork::reactantExist(string name)
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 4/24/07
 //-----------------------------------------------------------------------------
-inline bool N_DEV_ReactionNetwork::constantExist(string name)
+inline bool ReactionNetwork::constantExist(const std::string &name)
 {
   bool retFlag(true);
   int i=getConstantNum(name);
@@ -376,7 +375,7 @@ inline bool N_DEV_ReactionNetwork::constantExist(string name)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getReactantNum
+// Function      : ReactionNetwork::getReactantNum
 // Purpose       : Accessor function to return number of named specie
 // Special Notes :  Returns negative numbers for constants, positive for
 //                  variables
@@ -386,7 +385,7 @@ inline bool N_DEV_ReactionNetwork::constantExist(string name)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 3/20/06
 //-----------------------------------------------------------------------------
-inline int N_DEV_ReactionNetwork::getReactantNum(string name)
+inline int ReactionNetwork::getReactantNum(const std::string &name)
 {
   int i=getSpeciesNum(name);
   if (i == -1)
@@ -394,7 +393,7 @@ inline int N_DEV_ReactionNetwork::getReactantNum(string name)
     i=getConstantNum(name);
     if (i == -1)
     {
-      string msg="N_DEV_ReactionNetwork::getReactantNum: invalid species name specified: ";
+      std::string msg="ReactionNetwork::getReactantNum: invalid species name specified: ";
       msg += name;
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
     }
@@ -404,16 +403,16 @@ inline int N_DEV_ReactionNetwork::getReactantNum(string name)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getConstantNum
+// Function      : ReactionNetwork::getConstantNum
 // Purpose       : Accessor function to return number of named constant specie
 // Special Notes :  returns -1 if the specified specie is not a constant
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 3/20/06
 //-----------------------------------------------------------------------------
-inline int N_DEV_ReactionNetwork::getConstantNum(string name)
+inline int ReactionNetwork::getConstantNum(const std::string &name)
 {
-  map<string,int>::iterator n_i;
+  std::map<std::string,int>::iterator n_i;
   n_i = constantsMap.find(name);
 
   if (n_i == constantsMap.end())
@@ -427,21 +426,20 @@ inline int N_DEV_ReactionNetwork::getConstantNum(string name)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::addInitialCondition
+// Function      : ReactionNetwork::addInitialCondition
 // Purpose       : add an initial condition to the list
 //
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::addInitialCondition(string speciesName,
-                                                     double value)
+inline void ReactionNetwork::addInitialCondition(const std::string &speciesName, double value)
 {
-  initialConditions.push_back(pair<string,double>(speciesName,value));
+  initialConditions.push_back(std::pair<std::string,double>(speciesName,value));
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getNumInitialConditions
+// Function      : ReactionNetwork::getNumInitialConditions
 // Purpose       : get an initial condition from the list
 //
 // Scope         : public
@@ -449,35 +447,35 @@ inline void N_DEV_ReactionNetwork::addInitialCondition(string speciesName,
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
 inline int
-N_DEV_ReactionNetwork::getNumInitialConditions()
+ReactionNetwork::getNumInitialConditions()
 {
   return(initialConditions.size());
 }
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getInitialCondition
+// Function      : ReactionNetwork::getInitialCondition
 // Purpose       : get an initial condition from the list
 //
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-inline pair<string,double>
-N_DEV_ReactionNetwork::getInitialCondition(int i)
+inline std::pair<std::string,double>
+ReactionNetwork::getInitialCondition(int i)
 {
   return(initialConditions[i]);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getReactionNum
+// Function      : ReactionNetwork::getReactionNum
 // Purpose       : Accessor function to return number of named reaction
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 3/20/06
 //-----------------------------------------------------------------------------
-inline int N_DEV_ReactionNetwork::getReactionNum(string name)
+inline int ReactionNetwork::getReactionNum(std::string name)
 {
-  map<string,int>::iterator n_i;
+  std::map<std::string,int>::iterator n_i;
   n_i = reactionNamesMap.find(name);
 
   if (n_i == reactionNamesMap.end())
@@ -491,35 +489,34 @@ inline int N_DEV_ReactionNetwork::getReactionNum(string name)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getReaction
+// Function      : ReactionNetwork::getReaction
 // Purpose       : Accessor function to returning reference to indexed reaction
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 3/20/06
 //-----------------------------------------------------------------------------
-inline N_DEV_Reaction & N_DEV_ReactionNetwork::getReaction(int i)
+inline N_DEV_Reaction & ReactionNetwork::getReaction(int i)
 {
   return theReactions[i];
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getReaction
+// Function      : ReactionNetwork::getReaction
 // Purpose       : Accessor function to returning reference to named reaction
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 3/20/06
 //-----------------------------------------------------------------------------
-inline  N_DEV_Reaction
-&N_DEV_ReactionNetwork::getReaction(string name)
+inline  N_DEV_Reaction &ReactionNetwork::getReaction(const std::string &name)
 {
   int ni;
   ni=getReactionNum(name);
   if (ni == -1)
   {
-    ostringstream ost;
-    ost << " Attempt to access non-existant reaction " << name << endl;
+    std::ostringstream ost;
+    ost << " Attempt to access non-existant reaction " << name << std::endl;
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, ost.str());
   }
 
@@ -527,126 +524,119 @@ inline  N_DEV_Reaction
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setSimpleCalc
+// Function      : ReactionNetwork::setSimpleCalc
 // Purpose       : set the named reaction's rate calculator to type Simple
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/01/06
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::setSimpleCalc(string name, double k)
+inline void ReactionNetwork::setSimpleCalc(const std::string &name, double k)
 {
   getReaction(name).setSimpleRateCalculator(k,C0,t0,x0);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setCaptureCalc
+// Function      : ReactionNetwork::setCaptureCalc
 // Purpose       : set the named reaction's rate calculator to type Capture
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/01/06
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::setCaptureCalc(string name,
-                                                      double sigma, double v)
+inline void ReactionNetwork::setCaptureCalc(const std::string &name, double sigma, double v)
 {
   getReaction(name).setCaptureRateCalculator(sigma,v,C0,t0,x0);
 }
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setElectronCaptureCalc
+// Function      : ReactionNetwork::setElectronCaptureCalc
 // Purpose       : set the named reaction's rate calculator to type Capture
 // Special Notes : Specifically uses v_n=2.3e7 cm/s
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/01/06
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::setElectronCaptureCalc(string name,
-                                                      double sigma)
+inline void ReactionNetwork::setElectronCaptureCalc(const std::string &name, double sigma)
 {
   getReaction(name).setCaptureRateCalculator(sigma,2.3e7,C0,t0,x0);
 }
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setHoleCaptureCalc
+// Function      : ReactionNetwork::setHoleCaptureCalc
 // Purpose       : set the named reaction's rate calculator to type Capture
 // Special Notes : uses v_p=1.9e7 cm/s
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/01/06
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::setHoleCaptureCalc(string name,
-                                                      double sigma)
+inline void ReactionNetwork::setHoleCaptureCalc(const std::string &name, double sigma)
 {
   getReaction(name).setCaptureRateCalculator(sigma,1.9e7,C0,t0,x0);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setEmissionCalc
+// Function      : ReactionNetwork::setEmissionCalc
 // Purpose       : set the named reaction's rate calculator to type emission
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/01/06
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::setEmissionCalc(string name,
-                                                        double sigma, double v,
-                                                        double N, double E)
+inline void ReactionNetwork::setEmissionCalc(const std::string &name, double sigma, double v, double N, double E)
 {
   getReaction(name).setEmissionRateCalculator(sigma,v,N,E,C0,t0,x0);
 }
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setElectronEmissionCalc
+// Function      : ReactionNetwork::setElectronEmissionCalc
 // Purpose       : set the named reaction's rate calculator to type emission
 // Special Notes :Uses v_n=2.3e7 cm/s and N_c=2.86e19 cm^{-3}
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/01/06
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::setElectronEmissionCalc(string name,
-                                                        double sigma, double E)
+inline void ReactionNetwork::setElectronEmissionCalc(const std::string &name, double sigma, double E)
 {
   getReaction(name).setEmissionRateCalculator(sigma,2.3e7,2.86e19,E,C0,t0,x0);
 }
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setHoleEmissionCalc
+// Function      : ReactionNetwork::setHoleEmissionCalc
 // Purpose       : set the named reaction's rate calculator to type emission
 // Special Notes :  uses v_p=1.9e7 cm/s and N_v=2.66e19 cm^{-3}
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/01/06
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::setHoleEmissionCalc(string name,
-                                                        double sigma, double E)
+inline void ReactionNetwork::setHoleEmissionCalc(const std::string &name, double sigma, double E)
 {
   getReaction(name).setEmissionRateCalculator(sigma,1.9e7,2.66e19,E,C0,t0,x0);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setComplexCalc
+// Function      : ReactionNetwork::setComplexCalc
 // Purpose       : set the named reaction's rate calculator to type emission
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/01/06
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::setComplexCalc(string name)
+inline void ReactionNetwork::setComplexCalc(const std::string &name)
 {
   getReaction(name).setComplexRateCalculator(species,constants,C0,t0,x0);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setDecomplexCalc
+// Function      : ReactionNetwork::setDecomplexCalc
 // Purpose       : set the named reaction's rate calculator to type emission
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/01/06
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::setDecomplexCalc(string name,
-                                                         double bindingEnergy,
-                                                         double gammaAB,
-                                                         double gammaA,
-                                                         double gammaB,
-                                                         double concSi)
+inline void ReactionNetwork::setDecomplexCalc(const std::string &name,
+                                              double bindingEnergy,
+                                              double gammaAB,
+                                              double gammaA,
+                                              double gammaB,
+                                              double concSi)
 {
 
   getReaction(name).setDecomplexRateCalculator(species,constants,
@@ -657,22 +647,22 @@ inline void N_DEV_ReactionNetwork::setDecomplexCalc(string name,
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::output
+// Function      : ReactionNetwork::output
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 05/27/06
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::output(ostream & os) const
+inline void ReactionNetwork::output(std::ostream & os) const
 {
   int i;
 
   for (i=0;i< species.size();++i)
   {
-    os << "species["<<i<<"] = " << species[i].getName() << endl;
+    os << "species["<<i<<"] = " << species[i].getName() << std::endl;
   }
-  os << endl;
+  os << std::endl;
 
 
   for (i=0;i<theReactions.size();++i)
@@ -683,38 +673,38 @@ inline void N_DEV_ReactionNetwork::output(ostream & os) const
 
   if (electronCaptureReactions.size() != 0)
   {
-    os << "Electron Capture Reactions: " << endl;
+    os << "Electron Capture Reactions: " << std::endl;
     for ( i=0; i<electronCaptureReactions.size(); ++i)
     {
       os << "  Reaction number " << electronCaptureReactions[i] << "("
-         << reactionNames[electronCaptureReactions[i]] << ")" << endl;
+         << reactionNames[electronCaptureReactions[i]] << ")" << std::endl;
     }
   }
   if (holeCaptureReactions.size() != 0)
   {
-    os << "Hole Capture Reactions: " << endl;
+    os << "Hole Capture Reactions: " << std::endl;
     for ( i=0; i<holeCaptureReactions.size(); ++i)
     {
       os << "  Reaction number " << holeCaptureReactions[i] << "("
-         << reactionNames[holeCaptureReactions[i]] << ")" << endl;
+         << reactionNames[holeCaptureReactions[i]] << ")" << std::endl;
     }
   }
   if (electronEmissionReactions.size() != 0)
   {
-    os << "Electron Emission Reactions: " << endl;
+    os << "Electron Emission Reactions: " << std::endl;
     for ( i=0; i<electronEmissionReactions.size(); ++i)
     {
       os << "  Reaction number " << electronEmissionReactions[i] << "("
-         << reactionNames[electronEmissionReactions[i]] << ")" << endl;
+         << reactionNames[electronEmissionReactions[i]] << ")" << std::endl;
     }
   }
   if (holeEmissionReactions.size() != 0)
   {
-    os << "Hole Emission Reactions: " << endl;
+    os << "Hole Emission Reactions: " << std::endl;
     for ( i=0; i<holeEmissionReactions.size(); ++i)
     {
       os << "  Reaction number " << holeEmissionReactions[i] << "("
-         << reactionNames[holeEmissionReactions[i]] << ")" << endl;
+         << reactionNames[holeEmissionReactions[i]] << ")" << std::endl;
     }
   }
 
@@ -722,16 +712,16 @@ inline void N_DEV_ReactionNetwork::output(ostream & os) const
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::operator<<
+// Function      : ReactionNetwork::operator<<
 // Purpose       : "<<" operator
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 05/27/06
 //-----------------------------------------------------------------------------
-inline ostream & operator<<(ostream & os, const N_DEV_ReactionNetwork & rn)
+inline std::ostream & operator<<(std::ostream & os, const ReactionNetwork & rn)
 {
-  os << "Reaction Network: " << endl;
+  os << "Reaction Network: " << std::endl;
   rn.output(os);
 
   return os;
@@ -739,7 +729,7 @@ inline ostream & operator<<(ostream & os, const N_DEV_ReactionNetwork & rn)
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getERate
+// Function      : ReactionNetwork::getERate
 // Purpose       : Compute the total rate at which electrons are "consumed" or
 //                 "produced" by all the capture and emission reactions,
 //                 if there are any.  This can be used even if the electron
@@ -754,23 +744,23 @@ inline ostream & operator<<(ostream & os, const N_DEV_ReactionNetwork & rn)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-inline double N_DEV_ReactionNetwork::getERate(vector<double> &concs,
-                                            vector<double> &constant_vec)
+inline double ReactionNetwork::getERate(std::vector<double> &concs,
+                                        std::vector<double> &constant_vec)
 {
   return getRate(concs,constant_vec,electronCaptureReactions,
                  electronEmissionReactions);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getELifetime
+// Function      : ReactionNetwork::getELifetime
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 09/20/06
 //-----------------------------------------------------------------------------
-inline double N_DEV_ReactionNetwork::getELifetime(vector<double> &concs,
-                                            vector<double> &constant_vec)
+inline double ReactionNetwork::getELifetime(std::vector<double> &concs,
+                                            std::vector<double> &constant_vec)
 {
 
   double eConc;
@@ -783,20 +773,20 @@ inline double N_DEV_ReactionNetwork::getELifetime(vector<double> &concs,
 
 
   return getCaptureLifetime(concs,constant_vec,electronCaptureReactions,
-                 eConc);
+                            eConc);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getELifetimes
+// Function      : ReactionNetwork::getELifetimes
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 09/20/06
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::getELifetimes(vector<double> &concs,
-                                            vector<double> &constant_vec,
-                                            vector<double> &lifetimes)
+inline void ReactionNetwork::getELifetimes(std::vector<double> &concs,
+                                           std::vector<double> &constant_vec,
+                                           std::vector<double> &lifetimes)
 {
 
   double eConc;
@@ -813,7 +803,7 @@ inline void N_DEV_ReactionNetwork::getELifetimes(vector<double> &concs,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getDERateDC
+// Function      : ReactionNetwork::getDERateDC
 // Purpose       : compute vector of derivatives of net electron emission
 //                 rate (e.g. result of getERate) with respect to concentration
 //
@@ -821,16 +811,16 @@ inline void N_DEV_ReactionNetwork::getELifetimes(vector<double> &concs,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::getDERateDC(vector<double> &concs,
-                                            vector<double> &constant_vec,
-                                            vector<double> &dRatedC)
+inline void ReactionNetwork::getDERateDC(std::vector<double> &concs,
+                                         std::vector<double> &constant_vec,
+                                         std::vector<double> &dRatedC)
 {
   getDRateDC(concs,constant_vec,electronCaptureReactions,
-                 electronEmissionReactions,dRatedC);
+             electronEmissionReactions,dRatedC);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getDERateDConst
+// Function      : ReactionNetwork::getDERateDConst
 // Purpose       : compute vector of derivatives of net electron emission
 //                 rate (e.g. result of getERate) with respect to concentration
 //
@@ -838,16 +828,16 @@ inline void N_DEV_ReactionNetwork::getDERateDC(vector<double> &concs,
 // Creator       : Eric R. Keiter
 // Creation Date : 11/15/08
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::getDERateDConst(vector<double> &concs,
-                                                        vector<double> &constant_vec,
-                                                        vector<double> &dRatedConst)
+inline void ReactionNetwork::getDERateDConst(std::vector<double> &concs,
+                                             std::vector<double> &constant_vec,
+                                             std::vector<double> &dRatedConst)
 {
   getDRateDConst(concs,constant_vec,electronCaptureReactions,
-                  electronEmissionReactions,dRatedConst);
+                 electronEmissionReactions,dRatedConst);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getHRate
+// Function      : ReactionNetwork::getHRate
 // Purpose       : Compute the total rate at which holes are "consumed" or
 //                 "produced" by all the capture and emission reactions,
 //                 if there are any.  This can be used even if the electron
@@ -861,8 +851,8 @@ inline void N_DEV_ReactionNetwork::getDERateDConst(vector<double> &concs,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-inline double N_DEV_ReactionNetwork::getHRate(vector<double> &concs,
-                                            vector<double> &constant_vec)
+inline double ReactionNetwork::getHRate(std::vector<double> &concs,
+                                        std::vector<double> &constant_vec)
 {
   return getRate(concs,constant_vec,holeCaptureReactions,
                  holeEmissionReactions);;
@@ -870,15 +860,15 @@ inline double N_DEV_ReactionNetwork::getHRate(vector<double> &concs,
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getHLifetime
+// Function      : ReactionNetwork::getHLifetime
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 09/20/06
 //-----------------------------------------------------------------------------
-inline double N_DEV_ReactionNetwork::getHLifetime(vector<double> &concs,
-                                            vector<double> &constant_vec)
+inline double ReactionNetwork::getHLifetime(std::vector<double> &concs,
+                                            std::vector<double> &constant_vec)
 {
 
   double hConc;
@@ -890,20 +880,20 @@ inline double N_DEV_ReactionNetwork::getHLifetime(vector<double> &concs,
     hConc = concs[concNum];
 
   return getCaptureLifetime(concs,constant_vec,holeCaptureReactions,
-                 hConc);
+                            hConc);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getHLifetimes
+// Function      : ReactionNetwork::getHLifetimes
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 09/20/06
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::getHLifetimes(vector<double> &concs,
-                                            vector<double> &constant_vec,
-                                            vector<double> &lifetimes)
+inline void ReactionNetwork::getHLifetimes(std::vector<double> &concs,
+                                           std::vector<double> &constant_vec,
+                                           std::vector<double> &lifetimes)
 {
 
   double hConc;
@@ -920,7 +910,7 @@ inline void N_DEV_ReactionNetwork::getHLifetimes(vector<double> &concs,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getDHRateDC
+// Function      : ReactionNetwork::getDHRateDC
 // Purpose       : compute vector of derivatives of net hole emission
 //                 rate (e.g. result of getHRate) with respect to concentration
 //
@@ -928,16 +918,16 @@ inline void N_DEV_ReactionNetwork::getHLifetimes(vector<double> &concs,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::getDHRateDC(vector<double> &concs,
-                                            vector<double> &constant_vec,
-                                            vector<double> &dRatedC)
+inline void ReactionNetwork::getDHRateDC(std::vector<double> &concs,
+                                         std::vector<double> &constant_vec,
+                                         std::vector<double> &dRatedC)
 {
   getDRateDC(concs,constant_vec,holeCaptureReactions,
-                 holeEmissionReactions,dRatedC);
+             holeEmissionReactions,dRatedC);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getDHRateDConst
+// Function      : ReactionNetwork::getDHRateDConst
 // Purpose       : compute vector of derivatives of net hole emission
 //                 rate (e.g. result of getHRate) with respect to concentration
 //
@@ -945,22 +935,22 @@ inline void N_DEV_ReactionNetwork::getDHRateDC(vector<double> &concs,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::getDHRateDConst(vector<double> &concs,
-                                                        vector<double> &constant_vec,
-                                                        vector<double> &dRatedConst)
+inline void ReactionNetwork::getDHRateDConst(std::vector<double> &concs,
+                                             std::vector<double> &constant_vec,
+                                             std::vector<double> &dRatedConst)
 {
   getDRateDConst(concs,constant_vec,holeCaptureReactions,
                  holeEmissionReactions,dRatedConst);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getDiffusionCoefficient
+// Function      : ReactionNetwork::getDiffusionCoefficient
 // Purpose       :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-inline double N_DEV_ReactionNetwork::getDiffusionCoefficient
+inline double ReactionNetwork::getDiffusionCoefficient
 (const std::string & name, const double temp)
 {
   int num = getSpeciesNum(name);
@@ -975,14 +965,14 @@ inline double N_DEV_ReactionNetwork::getDiffusionCoefficient
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getDiffusionCoefficient
+// Function      : ReactionNetwork::getDiffusionCoefficient
 // Purpose       :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 10/31/06
 //-----------------------------------------------------------------------------
-inline double N_DEV_ReactionNetwork::getDiffusionCoefficient
-  (int specie, const double temp)
+inline double ReactionNetwork::getDiffusionCoefficient
+(int specie, const double temp)
 {
   double D = 0.0;
 
@@ -995,13 +985,13 @@ inline double N_DEV_ReactionNetwork::getDiffusionCoefficient
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getChargeState
+// Function      : ReactionNetwork::getChargeState
 // Purpose       :
 // Scope         : public
 // Creator       : Lawrence C Musson
 // Creation Date : 02/22/2012
 //-----------------------------------------------------------------------------
-inline int N_DEV_ReactionNetwork::getChargeState
+inline int ReactionNetwork::getChargeState
 (const std::string & name)
 {
   int num = getSpeciesNum(name);
@@ -1016,14 +1006,14 @@ inline int N_DEV_ReactionNetwork::getChargeState
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getChargeState
+// Function      : ReactionNetwork::getChargeState
 // Purpose       :
 // Scope         : public
 // Creator       : Lawrence C Musson
 // Creation Date : 10/31/06
 //-----------------------------------------------------------------------------
-inline int N_DEV_ReactionNetwork::getChargeState
-  (int specie)
+inline int ReactionNetwork::getChargeState
+(int specie)
 {
   int z = 0;
 
@@ -1036,15 +1026,18 @@ inline int N_DEV_ReactionNetwork::getChargeState
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setApplySources
+// Function      : ReactionNetwork::setApplySources
 // Purpose       :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 04/19/09
 //-----------------------------------------------------------------------------
-inline void N_DEV_ReactionNetwork::setApplySources(bool flag)
+inline void ReactionNetwork::setApplySources(bool flag)
 {
   applySources = flag;
 }
+
+} // namespace Device
+} // namespace Xyce
 
 #endif

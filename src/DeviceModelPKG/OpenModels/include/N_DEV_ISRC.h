@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.79.2.2 $
+// Revision Number: $Revision: 1.98.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -47,7 +47,8 @@
 #define Xyce_N_DEV_ISRC_h
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_DeviceTemplate.h>
+#include <N_DEV_Configuration.h>
+#include <N_DEV_DeviceMaster.h>
 #include <N_DEV_Source.h>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceInstance.h>
@@ -57,13 +58,26 @@
 
 #include <N_UTL_BreakPoint.h>
 
-// ---------- Forward Declarations ----------
 namespace Xyce {
 namespace Device {
 namespace ISRC {
 
 class Model;
 class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance>
+{
+  static const char *name() {return "Independent Current Source";}
+  static const char *deviceTypeName() {return "I level 1";}
+  static const int numNodes() {return 2;}
+  static const char *primaryParameter() {return "DCV0";}
+  static const char *instanceDefaultParameter() {return "DCV0";}
+  static const bool isLinearDevice() {return true;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : Instance
@@ -76,101 +90,99 @@ class Instance : public SourceInstance
 {
   friend class ParametricData<Instance>;
   friend class Model;
-  friend class Master;
+  friend class Traits;friend class Master;
 
-  public:
-  static ParametricData<Instance> &getParametricData();
+public:
+  Instance(
+     const Configuration &     configuration,
+     const InstanceBlock &     instance_block,
+     Model &                   model,
+     const FactoryBlock &      factory_block);
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
+  ~Instance();
 
-    Instance(const Instance &right);
-    Instance(InstanceBlock & IB,
-			   Model & Iiter,
-                        MatrixLoadData & mlData1,
-                        SolverState &ss1,
-                        ExternData  &ed1,
-                        DeviceOptions & do1);
+private:
+  Instance(const Instance &);
+  Instance &operator=(const Instance &);
 
-    ~Instance();
+public:
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef);
+  void registerStateLIDs( const std::vector<int> & staLIDVecRef);
 
-    void registerLIDs( const vector<int> & intLIDVecRef,
-	               const vector<int> & extLIDVecRef);
-    void registerStateLIDs( const vector<int> & staLIDVecRef);
+  void registerStoreLIDs(const std::vector<int> & stoLIDVecRef );
 
-    void registerStoreLIDs(const vector<int> & stoLIDVecRef );
+  std::map<int,std::string> & getStoreNameMap ();
 
-    map<int,string> & getStoreNameMap ();
+  const std::vector< std::vector<int> > & jacobianStamp() const;
 
-    const vector< vector<int> > & jacobianStamp() const;
+  bool processParams ();
 
-    bool processParams (string param = "");
+  bool updateIntermediateVars () { return true;};
+  bool updatePrimaryState ();
 
-    bool updateIntermediateVars () { return true;};
-    bool updatePrimaryState ();
+  bool loadTrivialMatrixStamp ();
+  bool loadTrivialDAE_FMatrixStamp ();
 
-    bool loadTrivialMatrixStamp ();
-    bool loadTrivialDAE_FMatrixStamp ();
+  // load functions, residual:
+  bool loadDAEQVector () { return true; }
+  bool loadDAEFVector ();
 
-    // load functions, residual:
-    bool loadDAEQVector () { return true; }
-    bool loadDAEFVector ();
+  // load functions, Jacobian:
+  bool loadDAEdQdx () { return true; }
+  bool loadDAEdFdx () { return true; }
 
-    // load functions, Jacobian:
-    bool loadDAEdQdx () { return true; }
-    bool loadDAEdFdx () { return true; }
+  bool loadBVectorsforAC (double * bVecReal, double * bVecImag);
 
-    bool loadBVectorsforAC (double * bVecReal, double * bVecImag);
+protected:
+private:
 
-  protected:
-  private:
-
-  public:
-    // iterator reference to the ISRC model that owns this instance.
+public:
+  // iterator reference to the ISRC model that owns this instance.
   // Getters and setters
-  Model &getModel() {
+  Model &getModel() 
+  {
     return model_;
   }
 
 private:
-  static vector< vector<int> > jacStamp;
+  static std::vector< std::vector<int> > jacStamp;
 
   Model &       model_;         //< Owning model
 
-    // index variables:
-    int li_Pos;
-    int li_Neg;
+  // index variables:
+  int li_Pos;
+  int li_Neg;
 
-    // Store variables
-    int li_store_dev_i;
+  // Store variables
+  int li_store_dev_i;
 
-    // Parameters
-    double DCV0;
-    double par0;
-    double par1;
-    double par2;
-    double par3;
-    double par4;
-    double par5;
-    double par6;
-    double par7;
-    double REPEATTIME;
-    double T;
-    double V;
-    int NUM;
-    int REPEAT;
-    int TRANSIENTSOURCETYPE;
-    bool TRANSIENTSOURCETYPEgiven;
-    int ACSOURCETYPE;
-    bool ACSOURCETYPEgiven;
-    int DCSOURCETYPE;
-    bool DCSOURCETYPEgiven;
-    bool gotParams;
+  // Parameters
+  double DCV0;
+  double par0;
+  double par1;
+  double par2;
+  double par3;
+  double par4;
+  double par5;
+  double par6;
+  double par7;
+  double REPEATTIME;
+  double T;
+  double V;
+  int NUM;
+  bool REPEAT;
+  int TRANSIENTSOURCETYPE;
+  bool TRANSIENTSOURCETYPEgiven;
+  int ACSOURCETYPE;
+  bool ACSOURCETYPEgiven;
+  int DCSOURCETYPE;
+  bool DCSOURCETYPEgiven;
+  bool gotParams;
 
 
-    double ACMAG;
-    double ACPHASE;
+  double ACMAG;
+  double ACPHASE;
 };
 
 //-----------------------------------------------------------------------------
@@ -185,19 +197,14 @@ class Model : public DeviceModel
   typedef std::vector<Instance *> InstanceVector;
 
   friend class Instance;
-  friend class Master;
+  friend class Traits;friend class Master;
 
-  public:
-  static ParametricData<Model> &getParametricData();
-
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-    Model  (const ModelBlock & MB,
-                            SolverState & ss1,
-                      DeviceOptions & do1);
-    ~Model ();
+public:
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &        MB,
+     const FactoryBlock &      factory_block);
+  ~Model ();
 
 private:
   Model();
@@ -205,23 +212,32 @@ private:
   Model &operator=(const Model &);
 
 public:
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
+
   virtual std::ostream &printOutInstances(std::ostream &os) const;
-  virtual bool processParams(std::string param = "");
-  virtual bool processInstanceParams(std::string param = "");
+  virtual bool processParams();
+  virtual bool processInstanceParams();
 
 public:
-  InstanceVector &getInstanceVector() {
+  void addInstance(Instance *instance) 
+  {
+    instanceContainer.push_back(instance);
+  }
+
+  InstanceVector &getInstanceVector() 
+  {
     return instanceContainer;
   }
 
-  const InstanceVector &getInstanceVector() const {
+  const InstanceVector &getInstanceVector() const 
+  {
     return instanceContainer;
   }
 
-  private:
-    vector<Instance*> instanceContainer;
+private:
+  std::vector<Instance*> instanceContainer;
 
-  private:
+private:
 };
 
 //-----------------------------------------------------------------------------
@@ -256,35 +272,31 @@ inline bool Instance::loadTrivialDAE_FMatrixStamp ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 11/26/08
 //-----------------------------------------------------------------------------
-class Master : public Xyce::Device::DeviceTemplate<Model, Instance>
+class Master : public DeviceMaster<Traits>
 {
-  public:
-    Master (
-      const std::string &dn,
-      const std::string &cn,
-      const std::string &dmName,
-           LinearDevice linearDev,
-           SolverState & ss1,
-           DeviceOptions & do1)
-      : Xyce::Device::DeviceTemplate<Model, Instance>(
-           dn, cn, dmName, linearDev, ss1, do1)
-    {
+  friend class Instance;
+  friend class Model;
 
-    }
+public:
+  Master(
+     const Configuration &       configuration,
+     const FactoryBlock &      factory_block,
+     const SolverState & ss1,
+     const DeviceOptions & do1)
+    : DeviceMaster<Traits>(configuration, factory_block, ss1, do1)
+  {}
 
-    virtual bool updateState (double * solVec, double * staVec, double * stoVec);
+  virtual bool updateState (double * solVec, double * staVec, double * stoVec);
 
-    // new DAE stuff:
-    // new DAE load functions, residual:
-    virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
+  // new DAE stuff:
+  // new DAE load functions, residual:
+  virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
 
-    // new DAE load functions, Jacobian:
-    virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
-
-    friend class Instance;
-    friend class Model;
+  // new DAE load functions, Jacobian:
+  virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
 };
 
+void registerDevice();
 
 } // namespace ISRC
 } // namespace Device

@@ -5,13 +5,10 @@ ac_cv_xyce_flexible_insert,
  AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([[#include <vector>
 #include <list>
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
 ]],
 [[
-  list<int> ipList(1,0);
-  vector<int> ipVec;
+  std::list<int> ipList(1,0);
+  std::vector<int> ipVec;
   
   ipVec.insert(ipVec.begin(),ipList.begin(),ipList.end());
 

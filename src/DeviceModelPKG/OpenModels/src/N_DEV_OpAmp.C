@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -40,11 +40,14 @@
 // ---------- Standard Includes ----------
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_OpAmp.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_DeviceMaster.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_OpAmp.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
 
 #include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
@@ -52,49 +55,31 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<OpAmp::Instance>::ParametricData()
-{
-    setNumNodes(3);
-    setNumOptionalNodes(0);
-    setNumFillNodes(0);
-    setModelRequired(1);
-    addModelType("OPAMP");
 
-    // Set up double precision variables:
-    addPar ("FAKEPARAM", 0.0, false, ParameterType::NO_DEP,
+namespace OpAmp {
+
+
+void Traits::loadInstanceParameters(ParametricData<OpAmp::Instance> &p)
+{
+// Set up double precision variables:
+    p.addPar ("FAKEPARAM", 0.0, false, ParameterType::NO_DEP,
             &OpAmp::Instance::FAKEPARAM,
         NULL, U_NONE,CAT_NONE,"");
 }
 
-template<>
-ParametricData<OpAmp::Model>::ParametricData()
+void Traits::loadModelParameters(ParametricData<OpAmp::Model> &p)
 {
 #if 0
     // Set up double precision variables:
-    addPar ("FAKEPARAM",0.0,false,Pars::NO_DEP,
+    p.addPar ("FAKEPARAM",0.0,false,Pars::NO_DEP,
         &OpAmp::Model::FAKEPARAM,
         NULL, U_NONE,CAT_NONE,"");
 #endif
 }
 
-namespace OpAmp {
-
-vector< vector<int> > Instance::jacStamp;
 
 
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
-}
-
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
+std::vector< std::vector<int> > Instance::jacStamp;
 
 // Class Instance
 //-----------------------------------------------------------------------------
@@ -105,14 +90,12 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Brian Fett, SNL
 // Creation Date : 08/05/07
 //-----------------------------------------------------------------------------
-Instance::Instance(InstanceBlock & IB,
-                                    Model & iter,
-                                    MatrixLoadData & mlData1,
-                                    SolverState &ss1,
-                                    ExternData  &ed1,
-                                    DeviceOptions & do1)
-
-  : DeviceInstance(IB,mlData1,ss1,ed1,do1),
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock &         IB,
+  Model &                       iter,
+  const FactoryBlock &          factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(iter),
   outCurrent(0.0),
   deltaVoltage(0.0),
@@ -177,7 +160,7 @@ Instance::~Instance ()
 // Creator       : Brian Fett, SNL
 // Creation Date : 08/05/05
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
 
   return true;
@@ -194,18 +177,16 @@ bool Instance::processParams (string param)
 // Creator       : Brian Fett, SNL
 // Creation Date : 08/05/05
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs ( const vector<int> & intLIDVecRef,
-	                                const vector<int> & extLIDVecRef)
+void Instance::registerLIDs ( const std::vector<int> & intLIDVecRef,
+	                                const std::vector<int> & extLIDVecRef)
 {
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-      "-----------------------------------------------------------------------------";
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << endl << dashedline << endl;
-    cout << "  OpAmpInstance::registerLIDs" << endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "  OpAmpInstance::registerLIDs" << std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
 
@@ -216,14 +197,14 @@ void Instance::registerLIDs ( const vector<int> & intLIDVecRef,
 
   if (numInt != numIntVars)
   {
-    string msg = "Instance::registerLIDs:";
+    std::string msg = "Instance::registerLIDs:";
     msg += "numInt != numIntVars";
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
   }
 
   if (numExt != numExtVars)
   {
-    string msg = "Instance::registerLIDs:";
+    std::string msg = "Instance::registerLIDs:";
     msg += "numExt != numExtVars";
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
   }
@@ -244,11 +225,11 @@ void Instance::registerLIDs ( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << "  li_Pos = " << li_Pos << endl;
-    cout << "  li_Neg = " << li_Neg << endl;
-    cout << "  li_Out = " << li_Out << endl;
-    cout << "  li_Bra = " << li_Bra << endl;
-    cout << dashedline << endl;
+    Xyce::dout() << "  li_Pos = " << li_Pos << std::endl;
+    Xyce::dout() << "  li_Neg = " << li_Neg << std::endl;
+    Xyce::dout() << "  li_Out = " << li_Out << std::endl;
+    Xyce::dout() << "  li_Bra = " << li_Bra << std::endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 }
@@ -261,18 +242,9 @@ void Instance::registerLIDs ( const vector<int> & intLIDVecRef,
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/20/02
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    string msg = "Instance::registerStateLIDs:";
-    msg += "numSTa != numStateVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 }
 
 //-----------------------------------------------------------------------------
@@ -283,7 +255,7 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 8/21/02
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -296,7 +268,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Brian Fett, SNL
 // Creation Date : 08/05/05
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
 
@@ -330,16 +302,15 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    const string dashedline2 = "---------------------";
-    cout << dashedline2 << endl;
-    cout << "  Instance::updateIntermediateVars" << endl;
-    cout << "  name = " << getName() <<endl;
-    cout << "  v_pos  = " << v_pos << endl;
-    cout << "  v_neg  = " << v_neg << endl;
-    cout << "  v_out  = " << v_out << endl;
-    cout << "  i_bra  = " << i_bra << endl;
-    cout << endl;
-    cout << dashedline2 << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "  Instance::updateIntermediateVars" << std::endl;
+    Xyce::dout() << "  name = " << getName() <<std::endl;
+    Xyce::dout() << "  v_pos  = " << v_pos << std::endl;
+    Xyce::dout() << "  v_neg  = " << v_neg << std::endl;
+    Xyce::dout() << "  v_out  = " << v_out << std::endl;
+    Xyce::dout() << "  i_bra  = " << i_bra << std::endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << subsection_divider << std::endl;
   }
 #endif
 
@@ -359,7 +330,7 @@ bool Instance::updatePrimaryState ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "  Instance::updatePrimaryState" << endl;
+    Xyce::dout() << "  Instance::updatePrimaryState" << std::endl;
   }
 #endif
   bool bsuccess = true;
@@ -385,14 +356,13 @@ bool Instance::loadDAEFVector ()
   // int i_pos_rhs, i_neg_rhs, i_bra_rhs;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "  Instance::loadDAEFVector" << endl;
-    cout << "  name       = " << getName() <<endl;
-    cout << "  Output Current = " << outCurrent << endl;
-    cout << "  Delta  Voltage = " << deltaVoltage << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "  Instance::loadDAEFVector" << std::endl;
+    Xyce::dout() << "  name       = " << getName() <<std::endl;
+    Xyce::dout() << "  Output Current = " << outCurrent << std::endl;
+    Xyce::dout() << "  Delta  Voltage = " << deltaVoltage << std::endl;
   }
 #endif
 
@@ -428,20 +398,19 @@ bool Instance::loadDAEdFdx ()
   N_LAS_Matrix * dFdxMatPtr = extData.dFdxMatrixPtr;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
 
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "name = " << getName() << endl;
-    cout << "\nOPAMP dFdx LOADS\n";
-    cout << "Pos,Bra: " << li_Out << ",";
-    cout << AOutEquBraVarOffset << ": " << 1.0 << endl;
-    cout << "Bra,Pos: " << li_Bra << ",";
-    cout << ABraEquPosNodeOffset << ": " << 1.0 << endl;
-    cout << "Bra,Neg: " << li_Bra << ",";
-    cout << ABraEquNegNodeOffset << ": " << -1.0 << endl;
-    cout << "DONE OPAMP dFdx LOAD\n";
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "name = " << getName() << std::endl;
+    Xyce::dout() << "\nOPAMP dFdx LOADS\n";
+    Xyce::dout() << "Pos,Bra: " << li_Out << ",";
+    Xyce::dout() << AOutEquBraVarOffset << ": " << 1.0 << std::endl;
+    Xyce::dout() << "Bra,Pos: " << li_Bra << ",";
+    Xyce::dout() << ABraEquPosNodeOffset << ": " << 1.0 << std::endl;
+    Xyce::dout() << "Bra,Neg: " << li_Bra << ",";
+    Xyce::dout() << ABraEquNegNodeOffset << ": " << -1.0 << std::endl;
+    Xyce::dout() << "DONE OPAMP dFdx LOAD\n";
   }
 #endif
 
@@ -464,10 +433,11 @@ bool Instance::loadDAEdFdx ()
 // Creator       : Brian Fett, SNL
 // Creation Date : 08/05/05
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-                                        SolverState & ss1,
-                                        DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
   FAKEPARAM(0.0)
 {
 }
@@ -482,8 +452,8 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for ( ; iter!=last; ++iter)
   {
@@ -503,21 +473,55 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
-  os << endl;
-  os << "    name     getModelName()  Parameters" << endl;
+  os << std::endl;
+  os << "    name     model name  Parameters" << std::endl;
   for (int i=0; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "      ";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new DeviceMaster<Traits>(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("opamp", 1)
+    .registerModelType("opamp", 1);
 }
 
 } // namespace OpAmp

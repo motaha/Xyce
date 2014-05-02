@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,35 +36,36 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.6.2.3 $
-// Revision Date  : $Date: 2013/12/03 23:30:11 $
-// Current Owner  : $Author: rlschie $
+// Revision Number: $Revision: 1.15 $
+// Revision Date  : $Date: 2014/02/24 23:49:20 $
+// Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #ifndef Xyce_N_IO_MeasureRiseFallDelay_h
 #define Xyce_N_IO_MeasureRiseFallDelay_h
 
-// ----------   Xyce Includes   ----------
 #include <N_IO_MeasureBase.h>
 
-// ---------- Forward Declarations ----------
-
+namespace Xyce {
+namespace IO {
+namespace Measure {
 
 //-------------------------------------------------------------------------
-// Class         : N_IO_MeasureRiseFallDelay
+// Class         : RiseFallDelay
 // Purpose       : Measure Rise/fall/delay times
 // Special Notes :
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-------------------------------------------------------------------------
-class N_IO_MeasureRiseFallDelay : public N_IO_MeasureBase
+class RiseFallDelay : public Base
 {
 public:
-  N_IO_MeasureRiseFallDelay( const N_UTL_OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr );
-  ~N_IO_MeasureRiseFallDelay() {};
+  RiseFallDelay( const Util::OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr );
+  ~RiseFallDelay() {};
 
-  void updateTran( const double circuitTime, RCP< N_LAS_Vector > solnVecRCP);
-  void updateDC( const vector<N_ANP_SweepParam> & dcParamsVec, RCP< N_LAS_Vector > solnVecRCP);
+    void prepareOutputVariables();
+  void updateTran( const double circuitTime, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec);
+  void updateDC( const std::vector<N_ANP_SweepParam> & dcParamsVec, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec);
   double getMeasureResult();
 
 private:
@@ -93,5 +94,11 @@ private:
   std::vector<double> targetVarHistory_;    // the target history
 
 };
+
+} // namespace Measure
+} // namespace IO
+} // namespace Xyce
+
+typedef Xyce::IO::Measure::RelativeError N_IO_MeasureRelativeError;
 
 #endif

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,8 +31,8 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.30.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:31 $
+// Revision Number: $Revision: 1.51 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 #include <Xyce_config.h>
@@ -51,51 +51,52 @@
 #include <N_MPDE_Manager.h>
 #include <N_IO_CmdParse.h>
 
+namespace Xyce {
+namespace Analysis {
+
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_DCSweep::setAnalysisParams
+// Function      : DCSweep::setAnalysisParams
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 6/22/10
 //-----------------------------------------------------------------------------
-bool N_ANP_DCSweep::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
+bool DCSweep::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
 {
 #ifdef Xyce_DEBUG_ANALYSIS
-  string dashedline = "-------------------------------------------------"
-                       "----------------------------\n";
   if (tiaParams.debugLevel > 0)
   {
-    std::cout << std::endl << dashedline << std::endl;
-    std::cout << "N_ANP_DCSweep::setDCAnalysisParams" << std::endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "DCSweep::setDCAnalysisParams" << std::endl;
   }
 #endif
 
-  list<N_UTL_Param>::const_iterator it_tp;
-  list<N_UTL_Param>::const_iterator it_param;
-  list<N_UTL_Param>::const_iterator it_type;
-  list<N_UTL_Param>::const_iterator first = paramsBlock.getParams().begin();
-  list<N_UTL_Param>::const_iterator last = paramsBlock.getParams().end();
+  std::list<N_UTL_Param>::const_iterator it_tp;
+  std::list<N_UTL_Param>::const_iterator it_param;
+  std::list<N_UTL_Param>::const_iterator it_type;
+  std::list<N_UTL_Param>::const_iterator first = paramsBlock.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator last = paramsBlock.getParams().end();
 
-  string msg;
+  std::string msg;
 
-  N_ANP_SweepParam sp;
+  SweepParam sp;
 #ifdef Xyce_DEBUG_ANALYSIS
   if (tiaParams.debugLevel > 0)
   {
     for (it_tp = first; it_tp != last; ++it_tp)
     {
-      std::cout << it_tp->uTag() ;
-      std::cout << "\t";
+      Xyce::dout() << it_tp->uTag() ;
+      Xyce::dout() << "\t";
       if (it_tp->uTag() == "PARAM" || it_tp->uTag() == "TYPE")
       {
-        std::cout << it_tp->sVal ();
+        Xyce::dout() << it_tp->stringValue();
       }
       else
       {
-        std::cout << it_tp->dVal ();
+        Xyce::dout() << it_tp->getImmutableValue<double>();
       }
-      std::cout << std::endl;
+      Xyce::dout() << std::endl;
     }
   }
 #endif
@@ -105,13 +106,13 @@ bool N_ANP_DCSweep::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
     if (it_tp->uTag() == "TYPE")
     {
       it_type = it_tp;
-      sp.type = it_tp->sVal();
+      sp.type = it_tp->stringValue();
     }
 
     if (it_tp->uTag() == "PARAM")
     {
       it_param = it_tp;
-      sp.name = it_tp->sVal ();
+      sp.name = it_tp->stringValue();
     }
   }
 
@@ -119,26 +120,26 @@ bool N_ANP_DCSweep::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
   ++it_tp;
   if (sp.type == "LIN") // default
   {
-    sp.startVal = it_tp->dVal (); ++it_tp;
-    sp.stopVal  = it_tp->dVal (); ++it_tp;
-    sp.stepVal  = it_tp->dVal (); ++it_tp;
+    sp.startVal = it_tp->getImmutableValue<double>(); ++it_tp;
+    sp.stopVal  = it_tp->getImmutableValue<double>(); ++it_tp;
+    sp.stepVal  = it_tp->getImmutableValue<double>(); ++it_tp;
   }
   else if (sp.type == "DEC" || sp.type == "OCT")
   {
-    sp.startVal = it_tp->dVal (); ++it_tp;
-    sp.stopVal  = it_tp->dVal (); ++it_tp;
-    sp.numSteps = it_tp->iVal (); ++it_tp;
+    sp.startVal = it_tp->getImmutableValue<double>(); ++it_tp;
+    sp.stopVal  = it_tp->getImmutableValue<double>(); ++it_tp;
+    sp.numSteps = it_tp->getImmutableValue<int>(); ++it_tp;
   }
   else if (sp.type == "LIST")
   {
     for (;it_tp!=last;++it_tp)
     {
-      sp.valList.push_back(it_tp->dVal());
+      sp.valList.push_back(it_tp->getImmutableValue<double>());
     }
   }
   else
   {
-    msg =  "N_ANP_DCSweep::setDCParams: ";
+    msg =  "DCSweep::setDCParams: ";
     msg += " unsupported DC type\n";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   }
@@ -160,35 +161,29 @@ bool N_ANP_DCSweep::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_DCSweep::outputFailureStats
+// Function      : DCSweep::outputFailureStats
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 6/21/2010
 //-----------------------------------------------------------------------------
-bool N_ANP_DCSweep::outputFailureStats ()
+bool DCSweep::outputFailureStats(std::ostream &os)
 {
   if (!(dcSweepFailures_.empty()))
   {
-    string msg = ("\tFailed DC sweep steps:\t\t");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg);
-    list<int>::iterator first = dcSweepFailures_.begin();
-    list<int>::iterator last  = dcSweepFailures_.end();
-    list<int>::iterator iter;
-
-    for (iter = first; iter != last; ++iter)
+    os << "\tFailed DC sweep steps:\t\t" << std::endl;
+    
+    for (std::list<int>::iterator iter = dcSweepFailures_.begin(); iter != dcSweepFailures_.end(); ++iter)
     {
-      int itmp = *iter;
-      msg = "\t\tDC Step # ";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg, itmp);
+      os << "\t\tDC Step # " << *iter << std::endl;
     }
   }
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_DCSweep::run()
+// Function      : DCSweep::run()
 // Purpose       : This is the main controlling loop for DC sweep analysis.
 //                 This loop calls a series of operating point calculations
 //                 (ie calculations in which there is no time integration,
@@ -198,7 +193,7 @@ bool N_ANP_DCSweep::outputFailureStats ()
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 1/28/08
 //-----------------------------------------------------------------------------
-bool N_ANP_DCSweep::run()
+bool DCSweep::run()
 {
   bool bsuccess = true;
   bsuccess = init();
@@ -208,14 +203,14 @@ bool N_ANP_DCSweep::run()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_DCSweep::init()
+// Function      : DCSweep::init()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 1/28/08
 //-----------------------------------------------------------------------------
-bool N_ANP_DCSweep::init()
+bool DCSweep::init()
 {
   bool bsuccess = true;
 
@@ -233,9 +228,9 @@ bool N_ANP_DCSweep::init()
 #ifdef Xyce_DEBUG_ANALYSIS
     if (tiaParams.debugLevel > 0)
     {
-      std::cout << std::endl << std::endl;
-      std::cout << "-----------------" << std::endl;
-      std::cout << "N_ANP_DCSweep::run()" << std::endl;
+      Xyce::dout() << std::endl << std::endl
+                   << Xyce::subsection_divider << std::endl
+                   << "DCSweep::run()" << std::endl;
     }
 #endif
 
@@ -262,7 +257,7 @@ bool N_ANP_DCSweep::init()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_DCSweep::initializeSolution()
+// Function      : DCSweep::initializeSolution()
 // Purpose       : Move solution-initialization steps to separate routine so
 //                 the process may be repeated cleanly when necessary.
 // Special Notes :
@@ -270,35 +265,35 @@ bool N_ANP_DCSweep::init()
 // Creator       : Tom Russo, SNL, Electrical and Microsystem Modeling
 // Creation Date : 2/17/2010
 //-----------------------------------------------------------------------------
-void N_ANP_DCSweep::initializeSolution_()
+void DCSweep::initializeSolution_()
 {
   // set initial guess, if there is one to be set.
   // this setInitialGuess call is to up an initial guess in the
   // devices that have them (usually PDE devices).  This is different than
   // the "intializeProblem" call, which sets IC's.  (initial conditions are
   // different than initial guesses.
-  loaderRCPtr_->setInitialGuess (dsRCPtr_->nextSolutionPtr);
+  loaderRCPtr_->setInitialGuess (anaManagerRCPtr_->getTIADataStore()->nextSolutionPtr);
 
   // If available, set initial solution (.IC, .NODESET, etc).
   inputOPFlag_ =
-    outputMgrAdapterRCPtr_->setupInitialConditions( *(dsRCPtr_->nextSolutionPtr),
-                        *(dsRCPtr_->flagSolutionPtr));
+    outputMgrAdapterRCPtr_->setupInitialConditions( *(anaManagerRCPtr_->getTIADataStore()->nextSolutionPtr),
+                        *(anaManagerRCPtr_->getTIADataStore()->flagSolutionPtr));
 
   // Set a constant history for operating point calculation
-  dsRCPtr_->setConstantHistory();
-  dsRCPtr_->computeDividedDifferences();
+  anaManagerRCPtr_->getTIADataStore()->setConstantHistory();
+  anaManagerRCPtr_->getTIADataStore()->computeDividedDifferences();
   wimRCPtr_->obtainCorrectorDeriv();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_DCSweep::loopProcess()
+// Function      : DCSweep::loopProcess()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 1/28/08
 //-----------------------------------------------------------------------------
-bool N_ANP_DCSweep::loopProcess()
+bool DCSweep::loopProcess()
 {
   bool bsuccess = true;
   // DC Sweep loop:
@@ -310,14 +305,14 @@ bool N_ANP_DCSweep::loopProcess()
     outputMgrAdapterRCPtr_->setDCAnalysisStepNumber( currentStep );
 
 #ifdef Xyce_VERBOSE_TIME
-    this->printStepHeader();
-    secRCPtr_->outputTimeInfo();
+    printStepHeader(Xyce::lout());
+    secRCPtr_->outputTimeInfo(Xyce::lout());
 #endif
 
     updateSweepParams_(currentStep, *dcParamVec_);
     if (currentStep != 0 &&(anaManagerRCPtr_->getSweepSourceResetFlag()))
     {
-      dsRCPtr_->setZeroHistory();
+      anaManagerRCPtr_->getTIADataStore()->setZeroHistory();
       initializeSolution_();
     }
 
@@ -344,7 +339,7 @@ bool N_ANP_DCSweep::loopProcess()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_DCSweep::processSuccessfulStep()
+// Function      : DCSweep::processSuccessfulStep()
 //
 // Purpose       : Used by both function dcSweepLoop and 2-level solve
 //                 function calls to process successful DC steps.
@@ -353,18 +348,19 @@ bool N_ANP_DCSweep::loopProcess()
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 1/28/08
 //-----------------------------------------------------------------------------
-bool N_ANP_DCSweep::processSuccessfulStep()
+bool DCSweep::processSuccessfulStep()
 {
   bool bsuccess = true;
   loaderRCPtr_->stepSuccess(anaManagerRCPtr_->currentMode_);
 
   // This output call is for device-specific output, such as .OP,
-  // or internal plot output from PDE(TCAD) devices.  
+  // or internal plot output from PDE(TCAD) devices.
   loaderRCPtr_->output();
 
   if (sensFlag_ && !firstDoubleDCOPStep_() )
   {
-    nlsMgrRCPtr_->calcSensitivity();
+    nlsMgrRCPtr_->calcSensitivity(objectiveVec_, 
+        dOdpVec_, dOdpAdjVec_, scaled_dOdpVec_, scaled_dOdpAdjVec_);
   }
 
   // Do some statistics, as long as this isn't the first "double"
@@ -377,12 +373,12 @@ bool N_ANP_DCSweep::processSuccessfulStep()
   }
 
   // update the data arrays, output:
-  dsRCPtr_->updateSolDataArrays();
+  anaManagerRCPtr_->getTIADataStore()->updateSolDataArrays();
 
 #ifdef Xyce_DEBUG_ANALYSIS
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams.debugLevel > 1)
-    dsRCPtr_->outputSolDataArrays();
+    anaManagerRCPtr_->getTIADataStore()->outputSolDataArrays(Xyce::dout());
 #endif
 #endif
 
@@ -396,14 +392,14 @@ bool N_ANP_DCSweep::processSuccessfulStep()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_DCSweep::processFailedStep()
+// Function      : DCSweep::processFailedStep()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 1/28/08
 //-----------------------------------------------------------------------------
-bool N_ANP_DCSweep::processFailedStep()
+bool DCSweep::processFailedStep()
 {
   loaderRCPtr_->stepFailure (anaManagerRCPtr_->currentMode_);
 
@@ -416,19 +412,19 @@ bool N_ANP_DCSweep::processFailedStep()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_DCSweep::finish()
+// Function      : DCSweep::finish()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 1/28/08
 //-----------------------------------------------------------------------------
-bool N_ANP_DCSweep::finish()
+bool DCSweep::finish()
 {
   bool bsuccess = true;
 
 #ifdef Xyce_DEBUG_ANALYSIS
-  std::cout << "Calling N_ANP_DCSweep::finish() outputs!" << std::endl;
+  Xyce::dout() << "Calling DCSweep::finish() outputs!" << std::endl;
 #endif
 
   outputMgrAdapterRCPtr_->finishOutput();
@@ -441,16 +437,16 @@ bool N_ANP_DCSweep::finish()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_DCSweep::handlePredictor
+// Function      : DCSweep::handlePredictor
 // Purpose       :
 // Special Notes :
 // Scope         : private
 // Creator       : Eric Keiter, SNL
 // Creation Date : 06/24/2013
 //-----------------------------------------------------------------------------
-bool N_ANP_DCSweep::handlePredictor()
+bool DCSweep::handlePredictor()
 {
-  dsRCPtr_->setErrorWtVector();
+  anaManagerRCPtr_->getTIADataStore()->setErrorWtVector();
   wimRCPtr_->obtainPredictor();
   wimRCPtr_->obtainPredictorDeriv();
 
@@ -462,19 +458,19 @@ bool N_ANP_DCSweep::handlePredictor()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_DCSweep::takeStep_
+// Function      : DCSweep::takeStep_
 // Purpose       : Take a DC Sweep integration step.
 // Special Notes :
 // Scope         : private
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 01/24/08
 //-----------------------------------------------------------------------------
-void N_ANP_DCSweep::takeStep_()
+void DCSweep::takeStep_()
 {
   handlePredictor();
   loaderRCPtr_->updateSources();
   secRCPtr_->newtonConvergenceStatus = nlsMgrRCPtr_->solve();
-  dsRCPtr_->stepLinearCombo ();
+  anaManagerRCPtr_->getTIADataStore()->stepLinearCombo ();
   gatherStepStatistics_ ();
   secRCPtr_->evaluateStepError ();
 
@@ -482,7 +478,7 @@ void N_ANP_DCSweep::takeStep_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_DCSweep::twoLevelStep
+// Function      : DCSweep::twoLevelStep
 //
 // Purpose       : Used by 2-level Newton solves to execute a single DC sweep
 //                 step.
@@ -495,11 +491,11 @@ void N_ANP_DCSweep::takeStep_()
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/10/06
 //-----------------------------------------------------------------------------
-bool N_ANP_DCSweep::twoLevelStep()
+bool DCSweep::twoLevelStep()
 {
   loaderRCPtr_->updateSources();
   secRCPtr_->newtonConvergenceStatus = nlsMgrRCPtr_->solve();
-  dsRCPtr_->stepLinearCombo ();
+  anaManagerRCPtr_->getTIADataStore()->stepLinearCombo ();
   gatherStepStatistics_ ();
   secRCPtr_->evaluateStepError ();
 
@@ -507,14 +503,14 @@ bool N_ANP_DCSweep::twoLevelStep()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_DCSweep::dcSweepOutput
+// Function      : DCSweep::dcSweepOutput
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 1/31/08
 //-----------------------------------------------------------------------------
-void N_ANP_DCSweep::dcSweepOutput()
+void DCSweep::dcSweepOutput()
 {
   // if this is an MPDE run, don't output anything.
   bool mpdeFlag = anaManagerRCPtr_->getMPDEFlag();
@@ -522,16 +518,20 @@ void N_ANP_DCSweep::dcSweepOutput()
 
   // Make sure this isn't the NLP step of a PDE DCOP.
   if ( !mpdeFlag  )
-  { 
+  {
     if (!firstDoubleDCOPStep_())
     {
-      outputMgrAdapterRCPtr_->dcOutput( 
-          stepNumber, 
-          *dsRCPtr_->currSolutionPtr, 
-          *dsRCPtr_->currStatePtr, 
-          *dsRCPtr_->currStorePtr );
+      // conventional .PRINT output
+      outputMgrAdapterRCPtr_->dcOutput(
+          stepNumber,
+          *(anaManagerRCPtr_->getTIADataStore()->currSolutionPtr),
+          *(anaManagerRCPtr_->getTIADataStore()->currStatePtr),
+          *(anaManagerRCPtr_->getTIADataStore()->currStorePtr),
+          objectiveVec_,
+          dOdpVec_, dOdpAdjVec_, scaled_dOdpVec_, scaled_dOdpAdjVec_);
 
-      outputMgrAdapterRCPtr_->outputDCOP( *(dsRCPtr_->currSolutionPtr) );
+      // output for DCOP restart
+      outputMgrAdapterRCPtr_->outputDCOP( *(anaManagerRCPtr_->getTIADataStore()->currSolutionPtr) );
     }
   }
   else
@@ -542,75 +542,74 @@ void N_ANP_DCSweep::dcSweepOutput()
       Teuchos::RefCountPtr<N_LAS_BlockVector> timeDomainSolnVec;
       Teuchos::RefCountPtr<N_LAS_BlockVector> freqDomainSolnVecReal;
       Teuchos::RefCountPtr<N_LAS_BlockVector> freqDomainSolnVecImaginary;
-  
-      Teuchos::RCP<const N_ANP_AnalysisBase> analysisObject 
+      Teuchos::RefCountPtr<N_LAS_BlockVector> timeDomainStoreVec;
+      Teuchos::RefCountPtr<N_LAS_BlockVector> freqDomainStoreVecReal;
+      Teuchos::RefCountPtr<N_LAS_BlockVector> freqDomainStoreVecImaginary;  
+
+
+      Teuchos::RCP<const AnalysisBase> analysisObject
         = anaManagerRCPtr_->getAnalysisObject();
- 
-      Teuchos::rcp_dynamic_cast<const N_ANP_HB>( analysisObject )->prepareHBOutput(
-          *(dsRCPtr_->currSolutionPtr), 
-          timePoints, 
-          freqPoints, 
-          timeDomainSolnVec, 
-          freqDomainSolnVecReal, 
-          freqDomainSolnVecImaginary
+
+      Teuchos::rcp_dynamic_cast<const HB>( analysisObject )->prepareHBOutput(
+          *(anaManagerRCPtr_->getTIADataStore()->currSolutionPtr),
+          timePoints,
+          freqPoints,
+          timeDomainSolnVec,
+          freqDomainSolnVecReal,
+          freqDomainSolnVecImaginary,
+          timeDomainStoreVec,
+          freqDomainStoreVecReal,
+          freqDomainStoreVecImaginary
         );
 
       outputMgrAdapterRCPtr_->outputHB(
           timePoints,
           freqPoints,
           *timeDomainSolnVec,
-          *freqDomainSolnVecReal, 
-          *freqDomainSolnVecImaginary
+          *freqDomainSolnVecReal,
+          *freqDomainSolnVecImaginary,
+          *timeDomainStoreVec,
+          *freqDomainStoreVecReal,
+          *freqDomainStoreVecImaginary
         );
 
     }
-  } 
+  }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_DCSweep::printStepHeader()
+// Function      : DCSweep::printStepHeader()
 // Purpose       : Prints out time step information.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/26/00
 //-----------------------------------------------------------------------------
-void N_ANP_DCSweep::printStepHeader()
+void DCSweep::printStepHeader(std::ostream &os)
 {
 #ifdef Xyce_VERBOSE_TIME
-
-#ifdef Xyce_DEBUG_ANALYSIS
-  string netListFile = commandLine_.getArgumentValue("netlist");
-  string banner = "***** " + netListFile + "  ";
-#else
-  string banner = "***** ";
+  lout() << std::endl << std::endl
+         << "***** "<< (DEBUG_ANALYSIS ? commandLine_.getArgumentValue("netlist") : "") << "  Start of DCOP STEP                        # " << stepNumber+1
+         << std::endl << std::endl;
 #endif
-  string crStr("\n");
-  string tmpStr;
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, crStr);
-
-  tmpStr = banner + "Start of DCOP STEP                        # ";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmpStr,
-                           stepNumber+1, crStr);
-#endif
-
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_DCSweep::printLoopInfo
+// Function      : DCSweep::printLoopInfo
 // Purpose       :
 // Scope         : public
 // Creator       : Eric Keiter
 // Creation Date : 12/14/2010
 //-----------------------------------------------------------------------------
-bool N_ANP_DCSweep::printLoopInfo(int start, int finish)
+bool DCSweep::printLoopInfo(int start, int finish)
 {
-  bool bsuccess = N_ANP_AnalysisBase::printLoopInfo(start, finish);
+  bool bsuccess = AnalysisBase::printLoopInfo(start, finish);
   if (start == 0 && finish == 0)
   {
-    outputFailureStats ();
+    outputFailureStats(Xyce::lout());
   }
   return bsuccess;
 }
 
+} // namespace Analysis
+} // namespace Xyce

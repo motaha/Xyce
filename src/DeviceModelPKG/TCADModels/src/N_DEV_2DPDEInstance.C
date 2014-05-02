@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -42,9 +42,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.132.2.3 $
+// Revision Number: $Revision: 1.152 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/24 23:49:18 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -57,12 +57,16 @@
 
 // ----------   Xyce Includes   ----------
 #include <N_DEV_2DPDE.h>
-#include <N_DEV_SolverState.h>
-#include <N_DEV_ExternData.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_DeviceMaster.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
 #include <N_DEV_PDE_2DMesh.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
 #include <N_DEV_SourceData.h>
+
+#include <N_DEV_DiodePDE.h>
 
 #include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
@@ -74,91 +78,105 @@
 
 namespace Xyce {
 namespace Device {
-
-template<>
-ParametricData<TwoDPDE::Instance>::ParametricData()
-{
-  // Set up configuration constants:
-  setNumNodes(2);
-  setNumOptionalNodes(100);
-  setNumFillNodes(2);
-  setModelRequired(1);
-  addModelType("ZOD");
-
-  // Set up map for double precision variables:
-  addPar("AREA", 1.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::area, NULL, U_NONE,CAT_NONE,"");
-  addPar("NA", 1.0e+15, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::Na, NULL, U_NONE,CAT_NONE,"");
-  addPar("ND", 1.0e+15, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::Nd, NULL, U_NONE,CAT_NONE,"");
-  addPar("WJ", 1.0e-4, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::WJ, NULL, U_NONE,CAT_NONE,"");
-  addPar("TEMP", 0.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::Temp, NULL, U_NONE,CAT_NONE,"");
-  addPar("X0", 1.0e-4, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::x0_user, NULL, U_NONE,CAT_NONE,"");
-  addPar("XSTART", 0.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::xstart, NULL, U_NONE,CAT_NONE,"");
-  addPar("YSTART", 0.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::ystart, NULL, U_NONE,CAT_NONE,"");
-  addPar("XEND", 0.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::xend, NULL, U_NONE,CAT_NONE,"");
-  addPar("YEND", 0.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::yend, NULL, U_NONE,CAT_NONE,"");
-  addPar("PH.A1", 0.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::photoA1, NULL, U_NONE,CAT_NONE,"");
-  addPar("PH.TSTART", 0.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::photoTstart, NULL, U_NONE,CAT_NONE,"");
-  addPar("PH.TSTOP", 0.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::photoTstop, NULL, U_NONE,CAT_NONE,"");
-  addPar("INT", 0.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::intensity, NULL, U_NONE,CAT_NONE,"");
-  addPar("L", 1.0e-3, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::deviceLength, NULL, U_NONE,CAT_NONE,"");
-  addPar("W", 1.0e-3, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::deviceWidth, NULL, U_NONE,CAT_NONE,"");
-  addPar("MAXVOLTDELTA", 0.025, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::maxVoltDelta, NULL, U_NONE,CAT_NONE,"");
-  addPar("PH.TD", 0.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::photoTd, NULL, U_NONE,CAT_NONE,"");
-  addPar("PH.TR", 0.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::photoTr, NULL, U_NONE,CAT_NONE,"");
-  addPar("PH.TF", 0.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::photoTf, NULL, U_NONE,CAT_NONE,"");
-  addPar("PH.PW", 0.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::photoPw, NULL, U_NONE,CAT_NONE,"");
-  addPar("PH.PER", 0.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::photoPer, NULL, U_NONE,CAT_NONE,"");
-  addPar("OUTPUTINTERVAL", 0.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::outputInterval, NULL, U_NONE,CAT_NONE,"");
-  addPar("PENALTYPREFAC", 1.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::penaltyPrefac, &TwoDPDE::Instance::penaltyPrefacGiven, U_NONE,CAT_NONE,"");
-  addPar("PENALTYPOW", 2.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::penaltyPow, &TwoDPDE::Instance::penaltyPowGiven, U_NONE,CAT_NONE,"");
-  addPar("PULSEDATA", 0.0, false, ParameterType::TIME_DEP, &TwoDPDE::Instance::PulseData, NULL, U_NONE,CAT_NONE,"");
-
-  // Set up map for non-double precision variables:
-  addPar("MESHFILE", string("internal.msh"), false, ParameterType::NO_DEP, &TwoDPDE::Instance::meshFileName);
-  addPar("GRADED", false, false, ParameterType::NO_DEP, &TwoDPDE::Instance::gradedJunctionFlag);
-  addPar("MOBMODEL", string("ARORA"), false, ParameterType::NO_DEP, &TwoDPDE::Instance::mobModelName);
-  addPar("BULKMATERIAL", string("SI"), false, ParameterType::NO_DEP, &TwoDPDE::Instance::bulkMaterial);
-#ifdef Xyce_OXIDE_ENABLED
-  addPar("ALLOXIDE", false, false, Pars::NO_DEP, &TwoDPDE::Instance::allOxideFlag);
-#endif
-  addPar("DISPLCUR", false, false, ParameterType::NO_DEP, &TwoDPDE::Instance::displCurrentFlag);
-  addPar("PHOTOGEN", false, false, ParameterType::NO_DEP, &TwoDPDE::Instance::photogenOnFlag);
-  addPar("PH.TYPE", string("UNIFORM"), false, ParameterType::NO_DEP, &TwoDPDE::Instance::photoString);
-  addPar("TECPLOTLEVEL", 1, false, ParameterType::NO_DEP, &TwoDPDE::Instance::tecplotLevel);
-  addPar("INTERPGRIDSIZE", 20, false, ParameterType::NO_DEP, &TwoDPDE::Instance::interpGridSize);
-  addPar("SGPLOTLEVEL", 0, false, ParameterType::NO_DEP, &TwoDPDE::Instance::sgplotLevel);
-  addPar("GNUPLOTLEVEL", 0, false, ParameterType::NO_DEP, &TwoDPDE::Instance::gnuplotLevel);
-  addPar("TXTDATALEVEL", 1, false, ParameterType::NO_DEP, &TwoDPDE::Instance::txtDataLevel);
-  addPar("VOLTLIM", false, false, ParameterType::NO_DEP, &TwoDPDE::Instance::voltLimFlag);
-  addPar("USEMATRIXGID", false, false, ParameterType::NO_DEP, &TwoDPDE::Instance::useMatrixGIDFlag);
-  addPar("USEVECTORGID", false, false, ParameterType::NO_DEP, &TwoDPDE::Instance::useVectorGIDFlag);
-  addPar("CONSTBOUNDARY", false, false, ParameterType::NO_DEP, &TwoDPDE::Instance::constBoundaryFlag);
-  addPar("NX", 11, false, ParameterType::NO_DEP, &TwoDPDE::Instance::numMeshPointsX);
-  addPar("NY", 11, false, ParameterType::NO_DEP, &TwoDPDE::Instance::numMeshPointsY);
-  addPar("CYL", false, false, ParameterType::NO_DEP, &TwoDPDE::Instance::cylGeomFlag);
-  addPar("OUTPUTNLPOISSON", false, false, ParameterType::NO_DEP, &TwoDPDE::Instance::outputNLPoisson);
-  addPar("PENALTY", false, false, ParameterType::NO_DEP, &TwoDPDE::Instance::penaltyFlag);
-  addPar("TYPE", string("PNP"), false, ParameterType::NO_DEP, &TwoDPDE::Instance::deviceType);
-  addPar("USEOLDNI", false, false, ParameterType::NO_DEP, &TwoDPDE::Instance::useOldNi, &TwoDPDE::Instance::useOldNiGiven, U_LOGIC, CAT_NONE, "Flag for using old (inaccurate) intrinsic carrier calculation.");
-
-  addComposite ("NODE", PDE_2DElectrode::getParametricData(), &TwoDPDE::Instance::nodeMap);
-  addComposite ("DOPINGPROFILES", DopeInfo::getParametricData(), &TwoDPDE::Instance::regionMap);
-  addComposite ("REGION", DopeInfo::getParametricData(), &TwoDPDE::Instance::regionMap);
-}
-
 namespace TwoDPDE {
-
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
-}
-
 
 // note that this macros is only a default - it will probably not be used.
 // default maximum number of nonzero entries in a matrix row
-#define MAX_COLS_PER_ROW 10
+static const int MAX_COLS_PER_ROW = 10;
+
+
+void Traits::loadInstanceParameters(ParametricData<TwoDPDE::Instance> &p)
+{
+  p.addPar("AREA", 1.0, &TwoDPDE::Instance::area)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("NA", 1.0e+15, &TwoDPDE::Instance::Na)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("ND", 1.0e+15, &TwoDPDE::Instance::Nd)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("WJ", 1.0e-4, &TwoDPDE::Instance::WJ)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("TEMP", 0.0, &TwoDPDE::Instance::Temp)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("X0", 1.0e-4, &TwoDPDE::Instance::x0_user)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("XSTART", 0.0, &TwoDPDE::Instance::xstart)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("YSTART", 0.0, &TwoDPDE::Instance::ystart)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("XEND", 0.0, &TwoDPDE::Instance::xend)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("YEND", 0.0, &TwoDPDE::Instance::yend)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("PH.A1", 0.0, &TwoDPDE::Instance::photoA1)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("PH.TSTART", 0.0, &TwoDPDE::Instance::photoTstart)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("PH.TSTOP", 0.0, &TwoDPDE::Instance::photoTstop)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("INT", 0.0, &TwoDPDE::Instance::intensity)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("L", 1.0e-3, &TwoDPDE::Instance::deviceLength)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("W", 1.0e-3, &TwoDPDE::Instance::deviceWidth)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("MAXVOLTDELTA", 0.025, &TwoDPDE::Instance::maxVoltDelta)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("PH.TD", 0.0, &TwoDPDE::Instance::photoTd)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("PH.TR", 0.0, &TwoDPDE::Instance::photoTr)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("PH.TF", 0.0, &TwoDPDE::Instance::photoTf)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("PH.PW", 0.0, &TwoDPDE::Instance::photoPw)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("PH.PER", 0.0, &TwoDPDE::Instance::photoPer)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("OUTPUTINTERVAL", 0.0, &TwoDPDE::Instance::outputInterval)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("PENALTYPREFAC", 1.0, &TwoDPDE::Instance::penaltyPrefac)
+    .setGivenMember(&TwoDPDE::Instance::penaltyPrefacGiven)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("PENALTYPOW", 2.0, &TwoDPDE::Instance::penaltyPow)
+    .setGivenMember(&TwoDPDE::Instance::penaltyPowGiven)
+    .setExpressionAccess(TIME_DEP);
+  p.addPar("PULSEDATA", 0.0, &TwoDPDE::Instance::PulseData)
+    .setExpressionAccess(TIME_DEP);
+
+  // Set up map for non-double precision variables:
+  p.addPar("MESHFILE", std::string("internal.msh"), &TwoDPDE::Instance::meshFileName);
+  p.addPar("GRADED", false, &TwoDPDE::Instance::gradedJunctionFlag);
+  p.addPar("MOBMODEL", std::string("ARORA"), &TwoDPDE::Instance::mobModelName);
+  p.addPar("BULKMATERIAL", std::string("SI"), &TwoDPDE::Instance::bulkMaterial);
+#ifdef Xyce_OXIDE_ENABLED
+  p.addPar("ALLOXIDE", false, false, Pars::NO_DEP, &TwoDPDE::Instance::allOxideFlag);
+#endif
+  p.addPar("DISPLCUR", false, &TwoDPDE::Instance::displCurrentFlag);
+  p.addPar("PHOTOGEN", false, &TwoDPDE::Instance::photogenOnFlag);
+  p.addPar("PH.TYPE", std::string("UNIFORM"), &TwoDPDE::Instance::photoString);
+  p.addPar("TECPLOTLEVEL", 1, &TwoDPDE::Instance::tecplotLevel);
+  p.addPar("INTERPGRIDSIZE", 20, &TwoDPDE::Instance::interpGridSize);
+  p.addPar("SGPLOTLEVEL", 0, &TwoDPDE::Instance::sgplotLevel);
+  p.addPar("GNUPLOTLEVEL", 0, &TwoDPDE::Instance::gnuplotLevel);
+  p.addPar("TXTDATALEVEL", 1, &TwoDPDE::Instance::txtDataLevel);
+  p.addPar("VOLTLIM", false, &TwoDPDE::Instance::voltLimFlag);
+  p.addPar("USEMATRIXGID", false, &TwoDPDE::Instance::useMatrixGIDFlag);
+  p.addPar("USEVECTORGID", false, &TwoDPDE::Instance::useVectorGIDFlag);
+  p.addPar("CONSTBOUNDARY", false, &TwoDPDE::Instance::constBoundaryFlag);
+  p.addPar("NX", 11, &TwoDPDE::Instance::numMeshPointsX);
+  p.addPar("NY", 11, &TwoDPDE::Instance::numMeshPointsY);
+  p.addPar("CYL", false, &TwoDPDE::Instance::cylGeomFlag);
+  p.addPar("OUTPUTNLPOISSON", false, &TwoDPDE::Instance::outputNLPoisson);
+  p.addPar("PENALTY", false, &TwoDPDE::Instance::penaltyFlag);
+  p.addPar("TYPE", std::string("PNP"), &TwoDPDE::Instance::deviceType);
+  p.addPar("USEOLDNI", false, &TwoDPDE::Instance::useOldNi)
+    .setGivenMember(&TwoDPDE::Instance::useOldNiGiven)
+    .setUnit(U_LOGIC)
+    .setDescription("Flag for using old (inaccurate) intrinsic carrier calculation.");
+
+  p.addComposite ("NODE", PDE_2DElectrode::getParametricData(), &TwoDPDE::Instance::electrodeMap);
+  p.addComposite ("DOPINGPROFILES", DopeInfo::getParametricData(), &TwoDPDE::Instance::dopeInfoMap);
+  p.addComposite ("REGION", DopeInfo::getParametricData(), &TwoDPDE::Instance::dopeInfoMap);
+}
 
 // Class Instance
 
@@ -170,14 +188,12 @@ ParametricData<Instance> &Instance::getParametricData() {
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 11/14/01
 //-----------------------------------------------------------------------------
-Instance::Instance(InstanceBlock & IB,
-                   Model & Miter,
-                   MatrixLoadData & mlData1,
-                   SolverState &ss1,
-                   ExternData  &ed1,
-                   DeviceOptions & do1)
-
-  : DevicePDEInstance (IB,mlData1, ss1, ed1,do1),
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock &               IB,
+  Model &                       Miter,
+  const FactoryBlock &factory_block)
+  : DevicePDEInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(Miter),
     Is(1.0e-14),
     Id(0.0),
@@ -355,8 +371,8 @@ Instance::Instance(InstanceBlock & IB,
 
   for (iter_t = begin_t; iter_t !=  end_t;  ++iter_t)
   {
-    cout << "Tag: " << iter_t->tag();
-    cout << "  Value = " << iter_t->sVal() << "  Given: " << iter_t->given() << endl;
+    Xyce::dout() << "Tag: " << iter_t->tag();
+    Xyce::dout() << "  Value = " << iter_t->sVal() << "  Given: " << iter_t->given() << endl;
   }
 #endif
 
@@ -369,7 +385,7 @@ Instance::Instance(InstanceBlock & IB,
 
   // Set any non-constant parameter defaults:
   if (!given("TEMP"))
-    Temp = getDeviceOptions().temp.dVal();
+    Temp = getDeviceOptions().temp.getImmutableValue<double>();
 
   // Calculate any parameters specified as expressions:
   updateDependentParameters();
@@ -392,7 +408,7 @@ Instance::Instance(InstanceBlock & IB,
       photoType = _PULSE_DATA;
     else
     {
-      string msg = "::: ph.type not recognized.\n";
+      std::string msg = "::: ph.type not recognized.\n";
       N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
     }
   }
@@ -406,7 +422,7 @@ Instance::Instance(InstanceBlock & IB,
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
-    cout << "Doing standard initialization of ."<<endl;
+    Xyce::dout() << "Doing standard initialization of ."<< std::endl;
 #endif
   bool bsuccess = setupMesh ();
   bool bs1 = true;
@@ -453,9 +469,9 @@ Instance::~Instance()
   // Loop over the dopeInfoMap (if it is not empty) and delete its contents.
   if (!(dopeInfoMap.empty()))
   {
-    map <string,DopeInfo *>::iterator iter;
-    map <string,DopeInfo *>::iterator begin = dopeInfoMap.begin();
-    map <string,DopeInfo *>::iterator end   = dopeInfoMap.end  ();
+    std::map<std::string,DopeInfo *>::iterator iter;
+    std::map<std::string,DopeInfo *>::iterator begin = dopeInfoMap.begin();
+    std::map<std::string,DopeInfo *>::iterator end   = dopeInfoMap.end  ();
 
     for(iter=begin;iter!=end;++iter)
     {
@@ -466,9 +482,9 @@ Instance::~Instance()
   // Loop over the electrodeMap (if it is not empty) and delete its contents.
   if (!(electrodeMap.empty()))
   {
-    map <string, PDE_2DElectrode * >::iterator iterE;
-    map <string, PDE_2DElectrode * >::iterator beginE = electrodeMap.begin();
-    map <string, PDE_2DElectrode * >::iterator endE   = electrodeMap.end  ();
+    std::map<std::string, PDE_2DElectrode * >::iterator iterE;
+    std::map<std::string, PDE_2DElectrode * >::iterator beginE = electrodeMap.begin();
+    std::map<std::string, PDE_2DElectrode * >::iterator endE   = electrodeMap.end  ();
 
     for(iterE=beginE;iterE!=endE;++iterE)
     {
@@ -485,7 +501,7 @@ Instance::~Instance()
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 05/09/05
 //-----------------------------------------------------------------------------
-CompositeParam *Instance::constructComposite(string & compositeName, string & paramName)
+CompositeParam *Instance::constructComposite(const std::string & compositeName, const std::string & paramName)
 {
   if (compositeName == "DOPINGPROFILES" || compositeName == "REGION")
   {
@@ -511,7 +527,7 @@ CompositeParam *Instance::constructComposite(string & compositeName, string & pa
     electrodeMap[paramName] = n;
     return (static_cast<CompositeParam *> (n));
   }
-  string msg =
+  std::string msg =
     "Instance::constructComposite: unrecognized composite name: ";
   msg += compositeName;
   N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
@@ -536,12 +552,10 @@ bool Instance::updateIntermediateVars ()
   bool bs1 = true;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "updateIntermediateVars.  name = " << getName() << endl;
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "updateIntermediateVars.  name = " << getName() << std::endl;
   }
 #endif
 
@@ -576,7 +590,7 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -597,19 +611,17 @@ bool Instance::calcTerminalCurrents ()
   bool bsuccess = true;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "calcTerminalCurrents.  name = " << getName() << endl;
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "calcTerminalCurrents.  name = " << getName() << std::endl;
   }
 #endif
 
   // loop over the device interface nodes, sum the currents going into each one.
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin ();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end   ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin ();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end   ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
   int ind=1;
   for (iterDI=firstDI; iterDI!=lastDI; ++iterDI, ++ind)
@@ -620,9 +632,9 @@ bool Instance::calcTerminalCurrents ()
 
     mLabel * labelPtr = meshContainerPtr->getLabel(iterDI->eName);
 
-    vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
-    vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
-    vector<int>::iterator iterI;
+    std::vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
+    std::vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
+    std::vector<int>::iterator iterI;
 
     iterDI->currentSum = 0.0;
 
@@ -633,18 +645,18 @@ bool Instance::calcTerminalCurrents ()
       // loop over neighbor nodes/edges to get current sum for this node.
       mNode * nodePtr = meshContainerPtr->getNode(*iterI);
 
-      vector<EDGEINFO>::iterator firstEI = nodePtr->edgeInfoVector.begin();
-      vector<EDGEINFO>::iterator lastEI  = nodePtr->edgeInfoVector.end  ();
-      vector<EDGEINFO>::iterator iterEI;
+      std::vector<EDGEINFO>::iterator firstEI = nodePtr->edgeInfoVector.begin();
+      std::vector<EDGEINFO>::iterator lastEI  = nodePtr->edgeInfoVector.end  ();
+      std::vector<EDGEINFO>::iterator iterEI;
 
       double sum       = 0.0; // total current for this node
 
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
       {
-        cout << " --------------- " << endl;
-        cout << "name = " << iterDI->eName;
-        cout << "  node      = " << *iterI <<endl;
+        Xyce::dout() << " --------------- " << std::endl;
+        Xyce::dout() << "name = " << iterDI->eName;
+        Xyce::dout() << "  node      = " << *iterI << std::endl;
       }
 #endif
 
@@ -663,9 +675,9 @@ bool Instance::calcTerminalCurrents ()
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
       {
-        cout << " sum*scalingVars.a0 = "<< sum*scalingVars.a0 <<endl;
-        cout << " sum    = " << sum << endl;
-        cout << " --------------- " << endl;
+        Xyce::dout() << " sum*scalingVars.a0 = "<< sum*scalingVars.a0 << std::endl;
+        Xyce::dout() << " sum    = " << sum << std::endl;
+        Xyce::dout() << " --------------- " << std::endl;
       }
 #endif
       // total scaled current mult. by total scaled area for this node.
@@ -695,9 +707,9 @@ bool Instance::calcTerminalCurrents ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout.setf(ios::scientific);
-      cout << "  " << iterDI->eName;
-      cout << " Ickt = " << iterDI->currentSum << endl;
+      Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << "  " << iterDI->eName;
+      Xyce::dout() << " Ickt = " << iterDI->currentSum << std::endl;
     }
 #endif
   }  // iterDI loop.
@@ -706,7 +718,7 @@ bool Instance::calcTerminalCurrents ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -755,12 +767,12 @@ bool Instance::pdTerminalCurrents ()
 {
   bool bsuccess = true;
 
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin ();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin ();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
-  string msg;
-  string semi(bulkMaterial);
+  std::string msg;
+  std::string semi(bulkMaterial);
 
   int nodeIndex;
   int iedge  = 0;
@@ -790,7 +802,7 @@ bool Instance::pdTerminalCurrents ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "------------------"<<endl;
+      Xyce::dout() << Xyce::subsection_divider << std::endl;
     }
 #endif
 
@@ -799,13 +811,13 @@ bool Instance::pdTerminalCurrents ()
     mLabel * labelPtr = meshContainerPtr->getLabel(iterDI->eName);
 
     // obtain the node indices for the current label, loop over them.
-    vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
-    vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
-    vector<int>::iterator iterI;
+    std::vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
+    std::vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
+    std::vector<int>::iterator iterI;
 
-    vector<EDGEINFO>::iterator firstEI;
-    vector<EDGEINFO>::iterator lastEI;
-    vector<EDGEINFO>::iterator iterEI;
+    std::vector<EDGEINFO>::iterator firstEI;
+    std::vector<EDGEINFO>::iterator lastEI;
+    std::vector<EDGEINFO>::iterator iterEI;
 
     // for the "new" boundary conditions, the currents coming into
     // the electrode have a direct dependency on the voltage at
@@ -857,11 +869,11 @@ bool Instance::pdTerminalCurrents ()
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
       {
-        cout.setf(ios::left);
-        cout << iterDI->eName<< ":";
-        cout << " KCL pdTerminalCurrent row = " << iterDI->gid;
-        cout << " contrib = " << tmpsum;
-        cout << " dIdVckt = " << iterDI->dIdVckt << endl;
+        Xyce::dout().setf(std::ios::left);
+        Xyce::dout() << iterDI->eName<< ":";
+        Xyce::dout() << " KCL pdTerminalCurrent row = " << iterDI->gid;
+        Xyce::dout() << " contrib = " << tmpsum;
+        Xyce::dout() << " dIdVckt = " << iterDI->dIdVckt << std::endl;
       }
 #endif
 
@@ -874,7 +886,7 @@ bool Instance::pdTerminalCurrents ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "------------------"<<endl;
+    Xyce::dout() << Xyce::subsection_divider << std::endl;
   }
 #endif
 #endif // Xyce_NEW_BC
@@ -954,18 +966,18 @@ bool Instance::pdTerminalCurrents ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "-----" <<endl;
-      cout << "neighbor nodes for boundary: " << iterDI->eName << endl;
-      cout << "-----" <<endl;
+      Xyce::dout() << "-----" << std::endl;
+      Xyce::dout() << "neighbor nodes for boundary: " << iterDI->eName << std::endl;
+      Xyce::dout() << "-----" << std::endl;
       for (iNeighbor=0;iNeighbor<numNeighbor;++iNeighbor)
       {
         int inode = iterDI->neighborNodes[iNeighbor];
-        cout << "\t"<<iNeighbor<<"  "<< inode << endl;
+        Xyce::dout() << "\t"<<iNeighbor<<"  "<< inode << std::endl;
       }
 
-      cout << "-----" <<endl;
-      cout << "dFdVckt vector for boundary: " << iterDI->eName << endl;
-      cout << "-----" <<endl;
+      Xyce::dout() << "-----" << std::endl;
+      Xyce::dout() << "dFdVckt vector for boundary: " << iterDI->eName << std::endl;
+      Xyce::dout() << "-----" << std::endl;
 
       iNeighbor=0;
       int idf = 0;
@@ -992,22 +1004,22 @@ bool Instance::pdTerminalCurrents ()
           if (labelNameVector[inodeB]!= iterDI->eName) continue;
 
           dfdV = iterDI->dFdVckt[idf];
-          cout << "\t"<<idf;
-          cout << "  \tv_"<<inode<<"\t"<<Vrow<<"\t"<<dfdV<<endl;
+          Xyce::dout() << "\t"<<idf;
+          Xyce::dout() << "  \tv_"<<inode<<"\t"<<Vrow<<"\t"<<dfdV<< std::endl;
           ++idf;
 
           dfdV = iterDI->dFdVckt[idf];
-          cout << "\t"<<idf;
-          cout << "  \tn_"<<inode<<"\t"<<Nrow<<"\t"<<dfdV<<endl;
+          Xyce::dout() << "\t"<<idf;
+          Xyce::dout() << "  \tn_"<<inode<<"\t"<<Nrow<<"\t"<<dfdV<< std::endl;
           ++idf;
 
           dfdV = iterDI->dFdVckt[idf];
-          cout << "\t"<<idf;
-          cout << "  \tp_"<<inode<<"\t"<<Prow<<"\t"<<dfdV<<endl;
+          Xyce::dout() << "\t"<<idf;
+          Xyce::dout() << "  \tp_"<<inode<<"\t"<<Prow<<"\t"<<dfdV<< std::endl;
           ++idf;
         }// end of iNN loop
       } // end of iNeighbor loop
-      cout << "-----" <<endl;
+      Xyce::dout() << "-----" << std::endl;
     }
 #endif
   }
@@ -1033,13 +1045,13 @@ bool Instance::pdTerminalCurrents ()
     // obtain the node indices for the current label, loop over them.
     // for each edge node, add an extra column entry to the colarray.
 
-    vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
-    vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
-    vector<int>::iterator iterI;
+    std::vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
+    std::vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
+    std::vector<int>::iterator iterI;
 
-    vector<EDGEINFO>::iterator firstEI;
-    vector<EDGEINFO>::iterator lastEI;
-    vector<EDGEINFO>::iterator iterEI;
+    std::vector<EDGEINFO>::iterator firstEI;
+    std::vector<EDGEINFO>::iterator lastEI;
+    std::vector<EDGEINFO>::iterator iterEI;
 
     int iVcol = 0;
     int iNcol = 0;
@@ -1105,7 +1117,7 @@ bool Instance::pdTerminalCurrents ()
 
         iterDI->dIdX[cnt2] += Vcoef*scalingVars.J0*scalingVars.a0;
 
-        cout << iterDI->eName;
+        Xyce::dout() << iterDI->eName;
       }
 
       col1 = iterDI->Ncol[iNcol];
@@ -1249,14 +1261,14 @@ bool Instance::pdTerminalCurrents ()
     {
       int size = iterDI->dIdXcols.size();
       int size2= iterDI->dIdX.size ();
-      cout << "dIdX for electrode: " << iterDI->eName << endl;
+      Xyce::dout() << "dIdX for electrode: " << iterDI->eName << std::endl;
       for (int ididx=0;ididx<size;++ididx)
       {
-        cout << "\t"<< iterDI->dIdXcols[ididx];
-        cout << "\t"<< iterDI->dIdX[ididx] << endl;
+        Xyce::dout() << "\t"<< iterDI->dIdXcols[ididx];
+        Xyce::dout() << "\t"<< iterDI->dIdX[ididx] << std::endl;
       }
     }
-    cout << "Done with Instance::pdTerminalCurrents" << endl;
+    Xyce::dout() << "Done with Instance::pdTerminalCurrents" << std::endl;
   }
 #endif
 
@@ -1283,18 +1295,17 @@ bool Instance::calcTerminalCharges ()
   bool bsuccess = true;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "calcTerminalCharges.  name = " << getName() << endl;
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "calcTerminalCharges.  name = " << getName() << std::endl;
   }
 #endif
 
   // loop over the device interface nodes, sum the currents going into each one.
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin ();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end   ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin ();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end   ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
   for (iterDI=firstDI; iterDI!=lastDI; ++iterDI)
   {
@@ -1304,9 +1315,9 @@ bool Instance::calcTerminalCharges ()
 
     mLabel * labelPtr = meshContainerPtr->getLabel(iterDI->eName);
 
-    vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
-    vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
-    vector<int>::iterator iterI;
+    std::vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
+    std::vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
+    std::vector<int>::iterator iterI;
 
     iterDI->chargeSum = 0.0;
 
@@ -1317,18 +1328,18 @@ bool Instance::calcTerminalCharges ()
       // loop over neighbor nodes/edges to get charge sum for this node.
       mNode * nodePtr = meshContainerPtr->getNode(*iterI);
 
-      vector<EDGEINFO>::iterator firstEI = nodePtr->edgeInfoVector.begin();
-      vector<EDGEINFO>::iterator lastEI  = nodePtr->edgeInfoVector.end  ();
-      vector<EDGEINFO>::iterator iterEI;
+      std::vector<EDGEINFO>::iterator firstEI = nodePtr->edgeInfoVector.begin();
+      std::vector<EDGEINFO>::iterator lastEI  = nodePtr->edgeInfoVector.end  ();
+      std::vector<EDGEINFO>::iterator iterEI;
 
       double sum       = 0.0; // total charge for this node
 
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
       {
-        cout << " --------------- " << endl;
-        cout << "name = " << iterDI->eName;
-        cout << "  node      = " << *iterI <<endl;
+        Xyce::dout() << " --------------- " << std::endl;
+        Xyce::dout() << "name = " << iterDI->eName;
+        Xyce::dout() << "  node      = " << *iterI << std::endl;
       }
 #endif
 
@@ -1348,9 +1359,9 @@ bool Instance::calcTerminalCharges ()
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
         {
-          cout << "neighbor = "<< neighbor;
-          cout << " Efield = " << EfieldVec[iedge];
-          cout << " contrib = " << contrib << endl;
+          Xyce::dout() << "neighbor = "<< neighbor;
+          Xyce::dout() << " Efield = " << EfieldVec[iedge];
+          Xyce::dout() << " contrib = " << contrib << std::endl;
         }
 #endif
       }
@@ -1359,9 +1370,9 @@ bool Instance::calcTerminalCharges ()
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
       {
-        cout << " sum*scalingVars.a0 = "<< sum*tmp <<endl;
-        cout << " sum    = " << sum << endl;
-        cout << " --------------- " << endl;
+        Xyce::dout() << " sum*scalingVars.a0 = "<< sum*tmp << std::endl;
+        Xyce::dout() << " sum    = " << sum << std::endl;
+        Xyce::dout() << " --------------- " << std::endl;
       }
 #endif
       // total scaled charge mult. by total scaled area for this node.
@@ -1374,9 +1385,9 @@ bool Instance::calcTerminalCharges ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout.setf(ios::scientific);
-      cout << "  " << iterDI->eName;
-      cout << " terminal charge = " << iterDI->chargeSum << endl;
+      Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << "  " << iterDI->eName;
+      Xyce::dout() << " terminal charge = " << iterDI->chargeSum << std::endl;
     }
 #endif
   }  // iterDI loop.
@@ -1385,7 +1396,7 @@ bool Instance::calcTerminalCharges ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -1423,11 +1434,11 @@ bool Instance::pdTerminalCharges ()
 {
   bool bsuccess = true;
 
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin ();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin ();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
-  string msg;
+  std::string msg;
 
   int nodeIndex;
   int iedge  = 0;
@@ -1453,7 +1464,7 @@ bool Instance::pdTerminalCharges ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "------------------"<<endl;
+      Xyce::dout() << Xyce::subsection_divider << std::endl;
     }
 #endif
 
@@ -1462,13 +1473,13 @@ bool Instance::pdTerminalCharges ()
     mLabel * labelPtr = meshContainerPtr->getLabel(iterDI->eName);
 
     // obtain the node indices for the current label, loop over them.
-    vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
-    vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
-    vector<int>::iterator iterI;
+    std::vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
+    std::vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
+    std::vector<int>::iterator iterI;
 
-    vector<EDGEINFO>::iterator firstEI;
-    vector<EDGEINFO>::iterator lastEI;
-    vector<EDGEINFO>::iterator iterEI;
+    std::vector<EDGEINFO>::iterator firstEI;
+    std::vector<EDGEINFO>::iterator lastEI;
+    std::vector<EDGEINFO>::iterator iterEI;
 
     // for the "new" boundary conditions, the currents coming into
     // the electrode have a direct dependency on the voltage at
@@ -1514,11 +1525,11 @@ bool Instance::pdTerminalCharges ()
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
       {
-        cout.setf(ios::left);
-        cout << iterDI->eName<<":";
-        cout << " KCL pdTerminalCharges row = " << iterDI->gid;
-        cout << " contrib = " << tmpsum;
-        cout << " dQdVckt = " << iterDI->dQdVckt << endl;
+        Xyce::dout().setf(std::ios::left);
+        Xyce::dout() << iterDI->eName<<":";
+        Xyce::dout() << " KCL pdTerminalCharges row = " << iterDI->gid;
+        Xyce::dout() << " contrib = " << tmpsum;
+        Xyce::dout() << " dQdVckt = " << iterDI->dQdVckt << std::endl;
       }
 #endif
 
@@ -1532,7 +1543,7 @@ bool Instance::pdTerminalCharges ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "------------------"<<endl;
+    Xyce::dout() << Xyce::subsection_divider << std::endl;
   }
 #endif
 #endif // Xyce_NEW_BC
@@ -1552,13 +1563,13 @@ bool Instance::pdTerminalCharges ()
     // obtain the node indices for the current label, loop over them.
     // for each edge node, add an extra column entry to the colarray.
 
-    vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
-    vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
-    vector<int>::iterator iterI;
+    std::vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
+    std::vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
+    std::vector<int>::iterator iterI;
 
-    vector<EDGEINFO>::iterator firstEI;
-    vector<EDGEINFO>::iterator lastEI;
-    vector<EDGEINFO>::iterator iterEI;
+    std::vector<EDGEINFO>::iterator firstEI;
+    std::vector<EDGEINFO>::iterator lastEI;
+    std::vector<EDGEINFO>::iterator iterEI;
 
     int iVcol = 0;
     int iNcol = 0;
@@ -1655,14 +1666,14 @@ bool Instance::pdTerminalCharges ()
     {
       int size = iterDI->dIdXcols.size();
       int size2= iterDI->dQdX.size ();
-      cout << "dQdX for electrode: " << iterDI->eName << endl;
+      Xyce::dout() << "dQdX for electrode: " << iterDI->eName << std::endl;
       for (int ididx=0;ididx<size;++ididx)
       {
-        cout << "\t"<< iterDI->dIdXcols[ididx];
-        cout << "\t"<< iterDI->dQdX[ididx] << endl;
+        Xyce::dout() << "\t"<< iterDI->dIdXcols[ididx];
+        Xyce::dout() << "\t"<< iterDI->dQdX[ididx] << std::endl;
       }
     }
-    cout << "Done with Instance::pdTerminalCharges" << endl;
+    Xyce::dout() << "Done with Instance::pdTerminalCharges" << std::endl;
   }
 #endif
 
@@ -1832,16 +1843,14 @@ bool Instance::calcConductance (int iElectrode, const N_LAS_Vector * dxdvPtr)
   for (int ich = 0; ich < 256; ++ich)
   { filename1[ich] = 0; }
 
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "calcConductances  name = " << getName() << endl;
-    cout << "electrode = " << dIVec[iElectrode].eName;
-    cout << "  dIdVckt = " << dIVec[iElectrode].dIdVckt;
-    cout << endl;
-    cout << endl;
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "calcConductances  name = " << getName() << std::endl;
+    Xyce::dout() << "electrode = " << dIVec[iElectrode].eName;
+    Xyce::dout() << "  dIdVckt = " << dIVec[iElectrode].dIdVckt;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -1955,12 +1964,12 @@ bool Instance::calcConductance (int iElectrode, const N_LAS_Vector * dxdvPtr)
       sprintf(outstring,
               "(%2d,%2d): dotPr=%12.4e G=%12.4e",
               iEqu,iElectrode,dIidVj_chain,Gij);
-      cout << string(outstring) << endl;
+      Xyce::dout() << std::string(outstring) << std::endl;
 
       sprintf(outstring,
               "(%2d,%2d): G=%12.4e G*V=%12.4e I=%12.4e V=%12.4e",
               iEqu,iElectrode,Gij,GV,Itmp,Vtmp);
-      cout << string(outstring) << endl;
+      Xyce::dout() << std::string(outstring) << std::endl;
     }
 #endif
   }
@@ -1968,7 +1977,7 @@ bool Instance::calcConductance (int iElectrode, const N_LAS_Vector * dxdvPtr)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -1989,9 +1998,9 @@ bool Instance::updatePrimaryState ()
   updateIntermediateVars ();
   N_LAS_Vector * staVectorPtr = extData.nextStaVectorPtr;
 
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI  = firstDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI  = firstDI;
 
   for (; iterDI!=lastDI;++iterDI)
   {
@@ -2076,9 +2085,9 @@ bool Instance::updateSecondaryState ()
 
   N_LAS_Vector * staVectorPtr = extData.nextStaVectorPtr;
 
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI  = firstDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI  = firstDI;
 
   for (; iterDI!=lastDI;++iterDI)
   {
@@ -2152,7 +2161,7 @@ bool Instance::updateSecondaryState ()
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
-    cout << "  Maximum displacement current:  " << dcmax << endl;
+    Xyce::dout() << "  Maximum displacement current:  " << dcmax << std::endl;
 #endif
 
   return bsuccess;
@@ -2186,7 +2195,7 @@ bool Instance::setInitialGuess ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Instance::setInitialGuess\n";
+    Xyce::dout() << "Instance::setInitialGuess\n";
   }
 #endif
 
@@ -2243,7 +2252,7 @@ bool Instance::loadVecNLPoisson (double scalar, N_LAS_Vector * vecPtr)
 {
   bool bsuccess = true;
   bool bs1 = true;
-  string semi(bulkMaterial);
+  std::string semi(bulkMaterial);
   int i;
   int Vrow, Nrow, Prow;
   double coef, coef2;
@@ -2257,17 +2266,15 @@ bool Instance::loadVecNLPoisson (double scalar, N_LAS_Vector * vecPtr)
   Ut = Vt/scalingVars.V0;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "Instance::loadVecNLPoisson\n";
-    cout << "       name = " << getName() <<"\n";
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "Instance::loadVecNLPoisson\n";
+    Xyce::dout() << "       name = " << getName() <<"\n";
 
-    cout << "      Vt    = " << Vt << "\n";
-    cout << "      Ut    = " << Ut << "\n";
-    cout << "      scalingVars.V0    = " << scalingVars.V0 << "\n";
+    Xyce::dout() << "      Vt    = " << Vt << "\n";
+    Xyce::dout() << "      Ut    = " << Ut << "\n";
+    Xyce::dout() << "      scalingVars.V0    = " << scalingVars.V0 << "\n";
 
   }
 #endif
@@ -2278,10 +2285,10 @@ bool Instance::loadVecNLPoisson (double scalar, N_LAS_Vector * vecPtr)
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "--------" << endl;
-      cout << "Mesh Point i =  " << i;
-      cout << "  x = " << xVec[i] *scalingVars.x0;
-      cout << "  y = " << yVec[i] *scalingVars.x0 << endl;
+      Xyce::dout() << "--------" << std::endl;
+      Xyce::dout() << "Mesh Point i =  " << i;
+      Xyce::dout() << "  x = " << xVec[i] *scalingVars.x0;
+      Xyce::dout() << "  y = " << yVec[i] *scalingVars.x0 << std::endl;
     }
 #endif
 
@@ -2323,9 +2330,9 @@ bool Instance::loadVecNLPoisson (double scalar, N_LAS_Vector * vecPtr)
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
         {
-          cout << "BC  load:  Vrow = " << Vrow << " coef = " << coef << endl;
-          cout << "    vtmp = " << vtmp << endl;
-          cout << "    Vckt = " << dIVec[DIindex].Vckt << endl;
+          Xyce::dout() << "BC  load:  Vrow = " << Vrow << " coef = " << coef << std::endl;
+          Xyce::dout() << "    vtmp = " << vtmp << std::endl;
+          Xyce::dout() << "    Vckt = " << dIVec[DIindex].Vckt << std::endl;
         }
 #endif
         if( useVectorGIDFlag )
@@ -2358,9 +2365,9 @@ bool Instance::loadVecNLPoisson (double scalar, N_LAS_Vector * vecPtr)
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "--------" << endl;
-      cout << "Interior:  mesh point: " << i << "  Vrow = " << Vrow;
-      cout << endl;
+      Xyce::dout() << "--------" << std::endl;
+      Xyce::dout() << "Interior:  mesh point: " << i << "  Vrow = " << Vrow;
+      Xyce::dout() << std::endl;
     }
 #endif
 
@@ -2377,17 +2384,17 @@ bool Instance::loadVecNLPoisson (double scalar, N_LAS_Vector * vecPtr)
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
       {
-        cout << "----" << endl;
-        cout << "  iedge  = " << iedge << endl;
-        cout << "  Vlocal = " << VVec[i] <<endl;
-        cout << "  Vneigh = " << VVec[inodeB] <<endl;
-        cout << "  efield = " << efield_loc << endl;
-        cout << "  elen   = " << elen <<endl;
-        cout << "  ilen   = " << ilen << endl;
-        cout << "  inodeB = " << inodeB;
-        cout << "  x[b] = " << xVec[inodeB]*scalingVars.x0;
-        cout << "  y[b] = " << yVec[inodeB]*scalingVars.x0 <<endl;
-        cout << endl;
+        Xyce::dout() << "----" << std::endl;
+        Xyce::dout() << "  iedge  = " << iedge << std::endl;
+        Xyce::dout() << "  Vlocal = " << VVec[i] << std::endl;
+        Xyce::dout() << "  Vneigh = " << VVec[inodeB] << std::endl;
+        Xyce::dout() << "  efield = " << efield_loc << std::endl;
+        Xyce::dout() << "  elen   = " << elen << std::endl;
+        Xyce::dout() << "  ilen   = " << ilen << std::endl;
+        Xyce::dout() << "  inodeB = " << inodeB;
+        Xyce::dout() << "  x[b] = " << xVec[inodeB]*scalingVars.x0;
+        Xyce::dout() << "  y[b] = " << yVec[inodeB]*scalingVars.x0 << std::endl;
+        Xyce::dout() << std::endl;
       }
 #endif
     }
@@ -2409,15 +2416,15 @@ bool Instance::loadVecNLPoisson (double scalar, N_LAS_Vector * vecPtr)
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "--------" << endl;
-      cout << "  holeD = " << holeDens <<endl;
-      cout << "  elecD = " << elecDens <<endl;
-      cout << "  dopeD = " << CVec[i] <<endl;
-      cout << "  coef2 = " << coef2 << endl;
-      cout << "  scalingVars.L0    = " << scalingVars.L0 * matSupport.getRelPerm(semi)   << endl;
-      cout << "  nodeArea  = " << nodeArea  << endl;
-      cout << "  coef  = " << coef  << endl;
-      cout << "--------" << endl;
+      Xyce::dout() << "--------" << std::endl;
+      Xyce::dout() << "  holeD = " << holeDens << std::endl;
+      Xyce::dout() << "  elecD = " << elecDens << std::endl;
+      Xyce::dout() << "  dopeD = " << CVec[i] << std::endl;
+      Xyce::dout() << "  coef2 = " << coef2 << std::endl;
+      Xyce::dout() << "  scalingVars.L0    = " << scalingVars.L0 * matSupport.getRelPerm(semi)   << std::endl;
+      Xyce::dout() << "  nodeArea  = " << nodeArea  << std::endl;
+      Xyce::dout() << "  coef  = " << coef  << std::endl;
+      Xyce::dout() << "--------" << std::endl;
     }
 #endif
 
@@ -2441,7 +2448,7 @@ bool Instance::loadVecNLPoisson (double scalar, N_LAS_Vector * vecPtr)
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
 #endif
 
   return bsuccess;
@@ -2460,7 +2467,7 @@ bool Instance::loadVecDDForm
 {
   bool bsuccess = true;
   bool bs1 = true;
-  string semi(bulkMaterial);
+  std::string semi(bulkMaterial);
   int i;
   int iNN;
   int Vrow, Nrow, Prow;
@@ -2474,20 +2481,18 @@ bool Instance::loadVecDDForm
 #endif
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "\n"<<dashedline << endl;
-    cout << "Instance::loadVecDDForm\n";
-    cout << "         name = " << getName()  << "\n";
+    Xyce::dout() << "\n"<<section_divider << std::endl;
+    Xyce::dout() << "Instance::loadVecDDForm\n";
+    Xyce::dout() << "         name = " << getName()  << "\n";
   }
 #endif
 
   // KCL equations for the various connecting terminals:
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI  = firstDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI  = firstDI;
 
   // if this is the inner loop of a multilevel Newton solve, don't do the
   // KCL-related loads.
@@ -2513,9 +2518,9 @@ bool Instance::loadVecDDForm
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
       {
-        cout << "KCL for "<< iterDI->eName << ":\n";
-        cout << " row = " << iterDI->gid << "\n";
-        cout << "coef = " << coef << "\n";
+        Xyce::dout() << "KCL for "<< iterDI->eName << ":\n";
+        Xyce::dout() << " row = " << iterDI->gid << "\n";
+        Xyce::dout() << "coef = " << coef << "\n";
       }
 #endif
 
@@ -2528,10 +2533,10 @@ bool Instance::loadVecDDForm
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
     {
-      cout << "--------" << endl;
-      cout << "Mesh Point i =  " << i;
-      cout << "  x = " << xVec[i]*scalingVars.x0;
-      cout << "  y = " << yVec[i]*scalingVars.x0 << endl;
+      Xyce::dout() << "--------" << std::endl;
+      Xyce::dout() << "Mesh Point i =  " << i;
+      Xyce::dout() << "  x = " << xVec[i]*scalingVars.x0;
+      Xyce::dout() << "  y = " << yVec[i]*scalingVars.x0 << std::endl;
     }
 #endif
 
@@ -2593,11 +2598,11 @@ bool Instance::loadVecDDForm
 #ifdef Xyce_DEBUG_DEVICE
           if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
           {
-            cout << "BC  load:  Vrow = " << Vrow;
-            cout << " coef = " << coef << endl;
-            cout << "    vtmp = " << vtmp << endl;
-            cout << "    Vckt = " << dIVec[DIindex].Vckt << endl;
-            cout << "    Vequ = " << dIVec[DIindex].VequVec[ilocal] << endl;
+            Xyce::dout() << "BC  load:  Vrow = " << Vrow;
+            Xyce::dout() << " coef = " << coef << std::endl;
+            Xyce::dout() << "    vtmp = " << vtmp << std::endl;
+            Xyce::dout() << "    Vckt = " << dIVec[DIindex].Vckt << std::endl;
+            Xyce::dout() << "    Vequ = " << dIVec[DIindex].VequVec[ilocal] << std::endl;
           }
 #endif
           doneFlagV = true;
@@ -2622,10 +2627,10 @@ bool Instance::loadVecDDForm
 #ifdef Xyce_DEBUG_DEVICE
           if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
           {
-            cout << "BC  load:  Nrow = ";
-            cout << Nrow << " coef = " << coef << endl;
-            cout << "    ntmp = " << ntmp << endl;
-            cout << "    nnbc = " << dIVec[DIindex].nnbcVec[ilocal] << endl;
+            Xyce::dout() << "BC  load:  Nrow = ";
+            Xyce::dout() << Nrow << " coef = " << coef << std::endl;
+            Xyce::dout() << "    ntmp = " << ntmp << std::endl;
+            Xyce::dout() << "    nnbc = " << dIVec[DIindex].nnbcVec[ilocal] << std::endl;
           }
 #endif
           doneFlagN = true;
@@ -2651,10 +2656,10 @@ bool Instance::loadVecDDForm
 #ifdef Xyce_DEBUG_DEVICE
           if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
           {
-            cout << "BC  load:  Prow = ";
-            cout << Prow << " coef = " << coef << endl;
-            cout << "    ptmp = " << ptmp << endl;
-            cout << "    npbc = " << dIVec[DIindex].npbcVec[ilocal] << endl;
+            Xyce::dout() << "BC  load:  Prow = ";
+            Xyce::dout() << Prow << " coef = " << coef << std::endl;
+            Xyce::dout() << "    ptmp = " << ptmp << std::endl;
+            Xyce::dout() << "    npbc = " << dIVec[DIindex].npbcVec[ilocal] << std::endl;
           }
 #endif
           doneFlagP = true;
@@ -2676,9 +2681,9 @@ bool Instance::loadVecDDForm
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
     {
-      cout << "--------" << endl;
-      cout << "Interior:  mesh point: " << i << "  Vrow = " << Vrow;
-      cout << endl;
+      Xyce::dout() << "--------" << std::endl;
+      Xyce::dout() << "Interior:  mesh point: " << i << "  Vrow = " << Vrow;
+      Xyce::dout() << std::endl;
     }
 #endif
 
@@ -2688,8 +2693,8 @@ bool Instance::loadVecDDForm
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
       {
-        cout << "--------" << endl;
-        cout << "  Poisson equ:";
+        Xyce::dout() << "--------" << std::endl;
+        Xyce::dout() << "  Poisson equ:";
       }
 #endif
 
@@ -2707,17 +2712,17 @@ bool Instance::loadVecDDForm
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
         {
-          cout << "----" << endl;
-          cout << "  iedge  = " << iedge << endl;
-          cout << "  Vlocal = " << VVec[i] <<endl;
-          cout << "  Vneigh = " << VVec[inodeB] <<endl;
-          cout << "  efield = " << efield_loc << endl;
-          cout << "  elen   = " << elen <<endl;
-          cout << "  ilen   = " << ilen << endl;
-          cout << "  inodeB = " << inodeB;
-          cout << "  x[b] = " << xVec[inodeB]*scalingVars.x0;
-          cout << "  y[b] = " << yVec[inodeB]*scalingVars.x0 <<endl;
-          cout << endl;
+          Xyce::dout() << "----" << std::endl;
+          Xyce::dout() << "  iedge  = " << iedge << std::endl;
+          Xyce::dout() << "  Vlocal = " << VVec[i] << std::endl;
+          Xyce::dout() << "  Vneigh = " << VVec[inodeB] << std::endl;
+          Xyce::dout() << "  efield = " << efield_loc << std::endl;
+          Xyce::dout() << "  elen   = " << elen << std::endl;
+          Xyce::dout() << "  ilen   = " << ilen << std::endl;
+          Xyce::dout() << "  inodeB = " << inodeB;
+          Xyce::dout() << "  x[b] = " << xVec[inodeB]*scalingVars.x0;
+          Xyce::dout() << "  y[b] = " << yVec[inodeB]*scalingVars.x0 << std::endl;
+          Xyce::dout() << std::endl;
         }
 #endif
       }
@@ -2739,15 +2744,15 @@ bool Instance::loadVecDDForm
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
       {
-        cout << "--------" << endl;
-        cout << "  holeD = " << holeDens <<endl;
-        cout << "  elecD = " << elecDens <<endl;
-        cout << "  dopeD = " << CVec[i] <<endl;
-        cout << "  coef2 = " << coef2 << endl;
-        cout << "  scalingVars.L0    = " << scalingVars.L0 * matSupport.getRelPerm(semi)   << endl;
-        cout << "  nodeArea  = " << nodeArea  << endl;
-        cout << "  coef  = " << coef  << endl;
-        cout << "--------" << endl;
+        Xyce::dout() << "--------" << std::endl;
+        Xyce::dout() << "  holeD = " << holeDens << std::endl;
+        Xyce::dout() << "  elecD = " << elecDens << std::endl;
+        Xyce::dout() << "  dopeD = " << CVec[i] << std::endl;
+        Xyce::dout() << "  coef2 = " << coef2 << std::endl;
+        Xyce::dout() << "  scalingVars.L0    = " << scalingVars.L0 * matSupport.getRelPerm(semi)   << std::endl;
+        Xyce::dout() << "  nodeArea  = " << nodeArea  << std::endl;
+        Xyce::dout() << "  coef  = " << coef  << std::endl;
+        Xyce::dout() << "--------" << std::endl;
       }
 #endif
       if ( getSolverState().chargeHomotopy )
@@ -2777,8 +2782,8 @@ bool Instance::loadVecDDForm
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
       {
-        cout << "--------" << endl;
-        cout << "  Electron equ:";
+        Xyce::dout() << "--------" << std::endl;
+        Xyce::dout() << "  Electron equ:";
       }
 #endif
 
@@ -2815,17 +2820,17 @@ bool Instance::loadVecDDForm
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
         {
-          cout << "----" << endl;
-          cout << "  iedge  = " << iedge << endl;
-          cout << "  Jn     = " << JnVec[iedge] << endl;
-          cout << "  nlocal = " << nnVec[i] <<endl;
-          cout << "  nneigh = " << nnVec[inodeB] <<endl;
-          cout << "  elen   = " << elen <<endl;
-          cout << "  ilen   = " << ilen << endl;
-          cout << "  inodeB = " << inodeB;
-          cout << "  x[b] = " << xVec[inodeB]*scalingVars.x0;
-          cout << "  y[b] = " << yVec[inodeB]*scalingVars.x0 <<endl;
-          cout << endl;
+          Xyce::dout() << "----" << std::endl;
+          Xyce::dout() << "  iedge  = " << iedge << std::endl;
+          Xyce::dout() << "  Jn     = " << JnVec[iedge] << std::endl;
+          Xyce::dout() << "  nlocal = " << nnVec[i] << std::endl;
+          Xyce::dout() << "  nneigh = " << nnVec[inodeB] << std::endl;
+          Xyce::dout() << "  elen   = " << elen << std::endl;
+          Xyce::dout() << "  ilen   = " << ilen << std::endl;
+          Xyce::dout() << "  inodeB = " << inodeB;
+          Xyce::dout() << "  x[b] = " << xVec[inodeB]*scalingVars.x0;
+          Xyce::dout() << "  y[b] = " << yVec[inodeB]*scalingVars.x0 << std::endl;
+          Xyce::dout() << std::endl;
         }
 #endif
       }
@@ -2841,16 +2846,16 @@ bool Instance::loadVecDDForm
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
       {
-        cout << "--------" << endl;
-        cout.setf(ios::left);
-        cout << "  row  = " << Nrow;
-        cout.setf(ios::scientific);
-        cout << "  coef=" << coef;
-        cout << " nodeArea ="<<nodeArea;
-        cout << " R[i]="<<RVec[i];
-        cout << " dndt="<<dndt;
-        cout << "\n";
-        cout << "--------" << endl;
+        Xyce::dout() << "--------" << std::endl;
+        Xyce::dout().setf(std::ios::left);
+        Xyce::dout() << "  row  = " << Nrow;
+        Xyce::dout().setf(std::ios::scientific);
+        Xyce::dout() << "  coef=" << coef;
+        Xyce::dout() << " nodeArea ="<<nodeArea;
+        Xyce::dout() << " R[i]="<<RVec[i];
+        Xyce::dout() << " dndt="<<dndt;
+        Xyce::dout() << "\n";
+        Xyce::dout() << "--------" << std::endl;
       }
 #endif
 
@@ -2875,8 +2880,8 @@ bool Instance::loadVecDDForm
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
       {
-        cout << "--------" << endl;
-        cout << "  Hole equ:";
+        Xyce::dout() << "--------" << std::endl;
+        Xyce::dout() << "  Hole equ:";
       }
 #endif
 
@@ -2910,17 +2915,17 @@ bool Instance::loadVecDDForm
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
         {
-          cout << "----" << endl;
-          cout << "  iedge  = " << iedge << endl;
-          cout << "  Jp     = " << JpVec[iedge] << endl;
-          cout << "  plocal = " << npVec[i] <<endl;
-          cout << "  pneigh = " << npVec[inodeB] <<endl;
-          cout << "  elen   = " << elen <<endl;
-          cout << "  ilen   = " << ilen << endl;
-          cout << "  inodeB = " << inodeB;
-          cout << "  x[b] = " << xVec[inodeB]*scalingVars.x0;
-          cout << "  y[b] = " << yVec[inodeB]*scalingVars.x0 <<endl;
-          cout << endl;
+          Xyce::dout() << "----" << std::endl;
+          Xyce::dout() << "  iedge  = " << iedge << std::endl;
+          Xyce::dout() << "  Jp     = " << JpVec[iedge] << std::endl;
+          Xyce::dout() << "  plocal = " << npVec[i] << std::endl;
+          Xyce::dout() << "  pneigh = " << npVec[inodeB] << std::endl;
+          Xyce::dout() << "  elen   = " << elen << std::endl;
+          Xyce::dout() << "  ilen   = " << ilen << std::endl;
+          Xyce::dout() << "  inodeB = " << inodeB;
+          Xyce::dout() << "  x[b] = " << xVec[inodeB]*scalingVars.x0;
+          Xyce::dout() << "  y[b] = " << yVec[inodeB]*scalingVars.x0 << std::endl;
+          Xyce::dout() << std::endl;
         }
 #endif
       }
@@ -2936,16 +2941,16 @@ bool Instance::loadVecDDForm
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
       {
-        cout << "--------" << endl;
-        cout.setf(ios::left);
-        cout << "  row  = " << Prow;
-        cout.setf(ios::scientific);
-        cout << "  coef=" << coef;
-        cout << " nodeArea ="<<nodeArea;
-        cout << " RVec[i]="<<RVec[i];
-        cout << " dpdt="<<dpdt;
-        cout << "\n";
-        cout << "--------" << endl;
+        Xyce::dout() << "--------" << std::endl;
+        Xyce::dout().setf(std::ios::left);
+        Xyce::dout() << "  row  = " << Prow;
+        Xyce::dout().setf(std::ios::scientific);
+        Xyce::dout() << "  coef=" << coef;
+        Xyce::dout() << " nodeArea ="<<nodeArea;
+        Xyce::dout() << " RVec[i]="<<RVec[i];
+        Xyce::dout() << " dpdt="<<dpdt;
+        Xyce::dout() << "\n";
+        Xyce::dout() << "--------" << std::endl;
       }
 #endif
 
@@ -2967,7 +2972,7 @@ bool Instance::loadVecDDForm
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
 #endif
 
   return bsuccess;
@@ -2990,21 +2995,18 @@ bool Instance::loadMatNLPoisson (N_LAS_Matrix * matPtr)
   int Vrow, Nrow, Prow;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
-  const string dashedline2 = "---------------------";
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "Instance::loadJacNonlinPoisson" << "\n";
-    cout << "  name = " << getName() <<"\n";
-    cout << "\n";
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "Instance::loadJacNonlinPoisson" << "\n";
+    Xyce::dout() << "  name = " << getName() <<"\n";
+    Xyce::dout() << "\n";
   }
 #endif
 
   int i,j;
   int count  = 0;
-  string semi(bulkMaterial);
+  std::string semi(bulkMaterial);
   Ut = Vt/scalingVars.V0;
   double pre = 1.0/Ut;
 
@@ -3020,14 +3022,14 @@ bool Instance::loadMatNLPoisson (N_LAS_Matrix * matPtr)
   double q   = charge;
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << "pre = " << pre << "\n";
-    cout << "Vt  = " << Vt  << "\n";
-    cout << "eps = " << eps << "\n";
-    cout << "q   = " << q   << "\n";
-    cout << "Na  = " << Na  << "\n";
-    cout << "Nd  = " << Nd  << "\n";
-    cout << "NpMax  = " << NpMax  << "\n";
-    cout << "NnMax  = " << NnMax  << "\n";
+    Xyce::dout() << "pre = " << pre << "\n";
+    Xyce::dout() << "Vt  = " << Vt  << "\n";
+    Xyce::dout() << "eps = " << eps << "\n";
+    Xyce::dout() << "q   = " << q   << "\n";
+    Xyce::dout() << "Na  = " << Na  << "\n";
+    Xyce::dout() << "Nd  = " << Nd  << "\n";
+    Xyce::dout() << "NpMax  = " << NpMax  << "\n";
+    Xyce::dout() << "NnMax  = " << NnMax  << "\n";
   }
 #endif
 
@@ -3048,9 +3050,9 @@ bool Instance::loadMatNLPoisson (N_LAS_Matrix * matPtr)
     vals[j] = 0.0;
   }
 
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin ();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin ();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
   // If this PDE device is not coupled (always true for the nonlinear
   // poisson) to the ckt, put some 1's on the
@@ -3075,7 +3077,7 @@ bool Instance::loadMatNLPoisson (N_LAS_Matrix * matPtr)
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
       {
-        cout << "\nmesh point i = " << i << endl;
+        Xyce::dout() << "\nmesh point i = " << i << std::endl;
       }
 #endif
       for (j=0;j<numCol;++j)
@@ -3124,12 +3126,12 @@ bool Instance::loadMatNLPoisson (N_LAS_Matrix * matPtr)
 #ifdef Xyce_DEBUG_DEVICE
             if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
             {
-              cout << "BC  load:  Vrow = " << Vrow <<endl;
+              Xyce::dout() << "BC  load:  Vrow = " << Vrow << std::endl;
               for (int eric=0;eric<count;++eric)
               {
-                cout << "  cols["<<eric<<"] = " << cols[eric];
-                cout << "  vals["<<eric<<"] = " << vals[eric];
-                cout << endl;
+                Xyce::dout() << "  cols["<<eric<<"] = " << cols[eric];
+                Xyce::dout() << "  vals["<<eric<<"] = " << vals[eric];
+                Xyce::dout() << std::endl;
               }
             }
 #endif
@@ -3146,8 +3148,8 @@ bool Instance::loadMatNLPoisson (N_LAS_Matrix * matPtr)
 #ifdef Xyce_DEBUG_DEVICE
             if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
             {
-              cout << "BC  load:  Nrow = " << Nrow;
-              cout << "  coef = " << vals[0] <<endl;
+              Xyce::dout() << "BC  load:  Nrow = " << Nrow;
+              Xyce::dout() << "  coef = " << vals[0] << std::endl;
             }
 #endif
           }
@@ -3164,8 +3166,8 @@ bool Instance::loadMatNLPoisson (N_LAS_Matrix * matPtr)
 #ifdef Xyce_DEBUG_DEVICE
             if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
             {
-              cout << "BC  load:  Prow = " << Vrow;
-              cout << "  coef = " << vals[0] <<endl;
+              Xyce::dout() << "BC  load:  Prow = " << Vrow;
+              Xyce::dout() << "  coef = " << vals[0] << std::endl;
             }
 #endif
           }
@@ -3226,14 +3228,14 @@ bool Instance::loadMatNLPoisson (N_LAS_Matrix * matPtr)
       }
       else
       {
-        cout << "    center point: i="<<i;
-        cout << "    xVec[i] = " << xVec[i];
-        cout << "    yVec[i] = " << yVec[i];
-        cout << endl;
-        cout << "    label = " << labelNameVector[i] << endl;
-        cout << "    boundarySten = " << boundarySten[i] << endl;
-        cout << "    Vcolarray[i][0] = ";
-        cout << Vcolarray[i][0] << endl;
+        Xyce::dout() << "    center point: i="<<i;
+        Xyce::dout() << "    xVec[i] = " << xVec[i];
+        Xyce::dout() << "    yVec[i] = " << yVec[i];
+        Xyce::dout() << std::endl;
+        Xyce::dout() << "    label = " << labelNameVector[i] << std::endl;
+        Xyce::dout() << "    boundarySten = " << boundarySten[i] << std::endl;
+        Xyce::dout() << "    Vcolarray[i][0] = ";
+        Xyce::dout() << Vcolarray[i][0] << std::endl;
       }
 
       // neighbor points:
@@ -3243,9 +3245,9 @@ bool Instance::loadMatNLPoisson (N_LAS_Matrix * matPtr)
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
         {
-          cout << "non-center point: i="<<i;
-          cout << "  Vcolarray[i]["<<iNN+1<<"] = ";
-          cout << Vcolarray[i][iNN+1] << endl;
+          Xyce::dout() << "non-center point: i="<<i;
+          Xyce::dout() << "  Vcolarray[i]["<<iNN+1<<"] = ";
+          Xyce::dout() << Vcolarray[i][iNN+1] << std::endl;
         }
 #endif
         if (Vcolarray[i][iNN+1] == -1) continue;
@@ -3265,16 +3267,16 @@ bool Instance::loadMatNLPoisson (N_LAS_Matrix * matPtr)
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
       {
-        cout << "\n";
-        cout.setf(ios::left);
-        cout << " POISSON LOAD: row = " << Vrow;
-        cout << " count = " << count << "\n";
-        cout.setf(ios::scientific);
+        Xyce::dout() << "\n";
+        Xyce::dout().setf(std::ios::left);
+        Xyce::dout() << " POISSON LOAD: row = " << Vrow;
+        Xyce::dout() << " count = " << count << "\n";
+        Xyce::dout().setf(std::ios::scientific);
         for (j=0;j<count;++j)
         {
-          cout << "  cols["<<j<<"] = " << cols[j];
-          cout << "  vals["<<j<<"] = " << vals[j];
-          cout << endl;
+          Xyce::dout() << "  cols["<<j<<"] = " << cols[j];
+          Xyce::dout() << "  vals["<<j<<"] = " << vals[j];
+          Xyce::dout() << std::endl;
         }
       }
 #endif
@@ -3286,7 +3288,7 @@ bool Instance::loadMatNLPoisson (N_LAS_Matrix * matPtr)
       }
       else
       {
-        cout << "OOOPS!" <<endl;
+        Xyce::dout() << "OOOPS!" << std::endl;
         exit(0);
       }
 
@@ -3310,7 +3312,7 @@ bool Instance::loadMatNLPoisson (N_LAS_Matrix * matPtr)
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
       {
-        cout << dashedline2 << "\n";
+        Xyce::dout() << subsection_divider << "\n";
       }
 #endif
     } // mesh point for loop
@@ -3323,9 +3325,9 @@ bool Instance::loadMatNLPoisson (N_LAS_Matrix * matPtr)
       Nrow = li_Nrowarray[i];
       Prow = li_Prowarray[i];
 
-      vector <int> & Voff = li_VoffsetArray[i];
-      vector <int> & Noff = li_NoffsetArray[i];
-      vector <int> & Poff = li_PoffsetArray[i];
+      std::vector<int> & Voff = li_VoffsetArray[i];
+      std::vector<int> & Noff = li_NoffsetArray[i];
+      std::vector<int> & Poff = li_PoffsetArray[i];
 
 #ifdef Xyce_NEW_BC
       if (boundarySten[i]) continue;
@@ -3431,7 +3433,7 @@ bool Instance::loadMatNLPoisson (N_LAS_Matrix * matPtr)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -3456,13 +3458,13 @@ bool Instance::loadMatKCLDDForm (N_LAS_Matrix * matPtr)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Starting Instance::loadJacKCLDDFormulation" << endl;
+    Xyce::dout() << "Starting Instance::loadJacKCLDDFormulation" << std::endl;
   }
 #endif
 
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin ();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin ();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
   if( useMatrixGIDFlag )
   {
@@ -3494,16 +3496,16 @@ bool Instance::loadMatKCLDDForm (N_LAS_Matrix * matPtr)
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
       {
-        cout << "\n";
-        cout.setf(ios::left);
-        cout << "  KCL new BC LOAD: row = " << iterDI->gid;
-        cout << " count = " << count;
-        cout << " name = " << iterDI->eName << "\n";
+        Xyce::dout() << "\n";
+        Xyce::dout().setf(std::ios::left);
+        Xyce::dout() << "  KCL new BC LOAD: row = " << iterDI->gid;
+        Xyce::dout() << " count = " << count;
+        Xyce::dout() << " name = " << iterDI->eName << "\n";
 
-        cout.setf(ios::scientific);
-        cout << "  cols[0] = " << cols[0];
-        cout << "  vals[0] = " << vals[0];
-        cout << endl;
+        Xyce::dout().setf(std::ios::scientific);
+        Xyce::dout() << "  cols[0] = " << cols[0];
+        Xyce::dout() << "  vals[0] = " << vals[0];
+        Xyce::dout() << std::endl;
       }
 #endif
       bs1 = matPtr->sumIntoRow (iterDI->gid, count, &vals[0], &cols[0]);
@@ -3517,18 +3519,18 @@ bool Instance::loadMatKCLDDForm (N_LAS_Matrix * matPtr)
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
       {
-        cout << "\n";
-        cout.setf(ios::left);
-        cout << "  KCL LOAD: row = " << iterDI->gid;
-        cout << " count = " << count;
-        cout << " name = " << iterDI->eName << "\n";
+        Xyce::dout() << "\n";
+        Xyce::dout().setf(std::ios::left);
+        Xyce::dout() << "  KCL LOAD: row = " << iterDI->gid;
+        Xyce::dout() << " count = " << count;
+        Xyce::dout() << " name = " << iterDI->eName << "\n";
 
-        cout.setf(ios::scientific);
+        Xyce::dout().setf(std::ios::scientific);
         for (j=0;j<count;++j)
         {
-          cout << "  cols["<<j<<"] = " << iterDI->dIdXcols[j];
-          cout << "  vals["<<j<<"] = " << iterDI->dIdX[j];
-          cout << endl;
+          Xyce::dout() << "  cols["<<j<<"] = " << iterDI->dIdXcols[j];
+          Xyce::dout() << "  vals["<<j<<"] = " << iterDI->dIdX[j];
+          Xyce::dout() << std::endl;
         }
       }
 #endif
@@ -3564,10 +3566,10 @@ bool Instance::loadMatKCLDDForm (N_LAS_Matrix * matPtr)
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
         {
-          cout << "dIdX["<<i<<"] = " << iterDI->dIdX[i];
-          cout << "  dIdXcols["<<i<<"] = " << iterDI->dIdXcols[i];
-          cout << "  dIdXoffset["<<i<<"] = " << iterDI->dIdXoffset[i];
-          cout << endl;
+          Xyce::dout() << "dIdX["<<i<<"] = " << iterDI->dIdX[i];
+          Xyce::dout() << "  dIdXcols["<<i<<"] = " << iterDI->dIdXcols[i];
+          Xyce::dout() << "  dIdXoffset["<<i<<"] = " << iterDI->dIdXoffset[i];
+          Xyce::dout() << std::endl;
         }
 #endif
       }
@@ -3577,7 +3579,7 @@ bool Instance::loadMatKCLDDForm (N_LAS_Matrix * matPtr)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Done with Instance::loadJacKCLDDFormulation" << endl;
+    Xyce::dout() << "Done with Instance::loadJacKCLDDFormulation" << std::endl;
   }
 #endif
   return bsuccess;
@@ -3605,9 +3607,9 @@ bool Instance::loadMatCktTrivial (N_LAS_Matrix * matPtr)
   int numCol = cols.size();
   if (vals.size () < cols.size()) numCol = vals.size();
 
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin ();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin ();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
   if( useMatrixGIDFlag )
   {
@@ -3650,14 +3652,12 @@ bool Instance::loadMatDDForm
   int Vrow, Nrow, Prow;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << "\n"<<dashedline << "\n";
-    cout << "Instance::loadMatDDForm" << "\n";
-    cout << "  name = " << getName() <<"\n";
-    cout << "\n";
+    Xyce::dout() << "\n"<<section_divider << "\n";
+    Xyce::dout() << "Instance::loadMatDDForm" << "\n";
+    Xyce::dout() << "  name = " << getName() <<"\n";
+    Xyce::dout() << "\n";
   }
 #endif
 
@@ -3677,7 +3677,6 @@ bool Instance::loadMatDDForm
   if (vals.size () < cols.size()) numCol = vals.size();
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
 #endif
 
   // obtain partial time derivatives, scale by scalingVars.t0:
@@ -3711,12 +3710,12 @@ bool Instance::loadMatDDForm
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
       {
-        cout << dashedline2 << "\n";
-        cout << "mesh point i = " << i;
-        cout << "  Vrow = " << Vrow;
-        cout << "  Nrow = " << Nrow;
-        cout << "  Prow = " << Prow;
-        cout << "\n";
+        Xyce::dout() << subsection_divider << "\n";
+        Xyce::dout() << "mesh point i = " << i;
+        Xyce::dout() << "  Vrow = " << Vrow;
+        Xyce::dout() << "  Nrow = " << Nrow;
+        Xyce::dout() << "  Prow = " << Prow;
+        Xyce::dout() << "\n";
       }
 #endif
 
@@ -3741,7 +3740,7 @@ bool Instance::loadMatDDForm
 #ifdef Xyce_DEBUG_DEVICE
             if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
             {
-              cout << "BC  load:  Vrow = " << Vrow <<endl;
+              Xyce::dout() << "BC  load:  Vrow = " << Vrow << std::endl;
             }
 #endif
             count = 0;
@@ -3767,12 +3766,12 @@ bool Instance::loadMatDDForm
 #ifdef Xyce_DEBUG_DEVICE
               if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
               {
-                cout << "BC  load:  Vrow = " << Vrow <<endl;
+                Xyce::dout() << "BC  load:  Vrow = " << Vrow << std::endl;
                 for (int eric=0;eric<count;++eric)
                 {
-                  cout << "  cols["<<eric<<"] = " << cols[eric];
-                  cout << "  vals["<<eric<<"] = " << vals[eric];
-                  cout << endl;
+                  Xyce::dout() << "  cols["<<eric<<"] = " << cols[eric];
+                  Xyce::dout() << "  vals["<<eric<<"] = " << vals[eric];
+                  Xyce::dout() << std::endl;
                 }
               }
 #endif
@@ -3794,12 +3793,12 @@ bool Instance::loadMatDDForm
 #ifdef Xyce_DEBUG_DEVICE
               if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
               {
-                cout << "BC  load:  Nrow = " << Nrow <<endl;
+                Xyce::dout() << "BC  load:  Nrow = " << Nrow << std::endl;
                 for (int eric=0;eric<count;++eric)
                 {
-                  cout << "  cols["<<eric<<"] = " << cols[eric];
-                  cout << "  vals["<<eric<<"] = " << vals[eric];
-                  cout << endl;
+                  Xyce::dout() << "  cols["<<eric<<"] = " << cols[eric];
+                  Xyce::dout() << "  vals["<<eric<<"] = " << vals[eric];
+                  Xyce::dout() << std::endl;
                 }
               }
 #endif
@@ -3820,12 +3819,12 @@ bool Instance::loadMatDDForm
 #ifdef Xyce_DEBUG_DEVICE
               if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
               {
-                cout << "BC  load:  Prow = " << Prow <<endl;
+                Xyce::dout() << "BC  load:  Prow = " << Prow << std::endl;
                 for (int eric=0;eric<count;++eric)
                 {
-                  cout << "  cols["<<eric<<"] = " << cols[eric];
-                  cout << "  vals["<<eric<<"] = " << vals[eric];
-                  cout << endl;
+                  Xyce::dout() << "  cols["<<eric<<"] = " << cols[eric];
+                  Xyce::dout() << "  vals["<<eric<<"] = " << vals[eric];
+                  Xyce::dout() << std::endl;
                 }
               }
 #endif
@@ -3842,7 +3841,7 @@ bool Instance::loadMatDDForm
 #endif // Xyce_NEW_BC
 
       // if load is not done yet, then do an interior point load:
-      string semi(bulkMaterial);
+      std::string semi(bulkMaterial);
       // Poisson's equation:
       mNode * nodePtr = meshContainerPtr->getNode(i);
       nodeArea = nodePtr->area;
@@ -3875,8 +3874,8 @@ bool Instance::loadMatDDForm
 #ifdef Xyce_DEBUG_DEVICE
         else
         {
-          cout << "    center point: i="<<i;
-          cout << "  Vcolarray[i][0] = " << Vcolarray[i][0] << endl;
+          Xyce::dout() << "    center point: i="<<i;
+          Xyce::dout() << "  Vcolarray[i][0] = " << Vcolarray[i][0] << std::endl;
         }
 #endif
 
@@ -3888,9 +3887,9 @@ bool Instance::loadMatDDForm
 #ifdef Xyce_DEBUG_DEVICE
           if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
           {
-            cout << "non-center point: i="<<i;
-            cout << "  Vcolarray[i]["<<iNN+1<<"] = ";
-            cout << Vcolarray[i][iNN+1] << endl;
+            Xyce::dout() << "non-center point: i="<<i;
+            Xyce::dout() << "  Vcolarray[i]["<<iNN+1<<"] = ";
+            Xyce::dout() << Vcolarray[i][iNN+1] << std::endl;
           }
 #endif
           int tmpCol = Vcolarray[i][iNN+1];
@@ -3949,16 +3948,16 @@ bool Instance::loadMatDDForm
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
         {
-          cout << "\n";
-          cout.setf(ios::left);
-          cout << " POISSON LOAD: row = " << Vrow;
-          cout << "  count = " << count << "\n";
-          cout.setf(ios::scientific);
+          Xyce::dout() << "\n";
+          Xyce::dout().setf(std::ios::left);
+          Xyce::dout() << " POISSON LOAD: row = " << Vrow;
+          Xyce::dout() << "  count = " << count << "\n";
+          Xyce::dout().setf(std::ios::scientific);
           for (j=0;j<count;++j)
           {
-            cout << "  cols["<<j<<"] = " << cols[j];
-            cout << "  vals["<<j<<"] = " << vals[j];
-            cout << endl;
+            Xyce::dout() << "  cols["<<j<<"] = " << cols[j];
+            Xyce::dout() << "  vals["<<j<<"] = " << vals[j];
+            Xyce::dout() << std::endl;
           }
         }
 #endif
@@ -3970,7 +3969,7 @@ bool Instance::loadMatDDForm
         }
         else
         {
-          cout << "OOOPS 1!" <<endl;
+          Xyce::dout() << "OOOPS 1!" << std::endl;
           exit(0);
         }
         doneFlagV = true;
@@ -4136,16 +4135,16 @@ bool Instance::loadMatDDForm
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
         {
-          cout << "\n";
-          cout.setf(ios::left);
-          cout << "ELECTRON LOAD:  row = " << Nrow;
-          cout << "  count = " << count<< "\n";
-          cout.setf(ios::scientific);
+          Xyce::dout() << "\n";
+          Xyce::dout().setf(std::ios::left);
+          Xyce::dout() << "ELECTRON LOAD:  row = " << Nrow;
+          Xyce::dout() << "  count = " << count<< "\n";
+          Xyce::dout().setf(std::ios::scientific);
           for (j=0;j<count;++j)
           {
-            cout << "  cols["<<j<<"] = " << cols[j];
-            cout << "  vals["<<j<<"] = " << vals[j];
-            cout << endl;
+            Xyce::dout() << "  cols["<<j<<"] = " << cols[j];
+            Xyce::dout() << "  vals["<<j<<"] = " << vals[j];
+            Xyce::dout() << std::endl;
           }
         }
 #endif
@@ -4157,7 +4156,7 @@ bool Instance::loadMatDDForm
         }
         else
         {
-          cout << "OOOPS 2!" <<endl;
+          Xyce::dout() << "OOOPS 2!" << std::endl;
           exit(0);
         }
 
@@ -4323,16 +4322,16 @@ bool Instance::loadMatDDForm
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
         {
-          cout << "\n";
-          cout.setf(ios::left);
-          cout << "    HOLE LOAD:  row = " << Prow;
-          cout << "  count = " << count<< "\n";
-          cout.setf(ios::scientific);
+          Xyce::dout() << "\n";
+          Xyce::dout().setf(std::ios::left);
+          Xyce::dout() << "    HOLE LOAD:  row = " << Prow;
+          Xyce::dout() << "  count = " << count<< "\n";
+          Xyce::dout().setf(std::ios::scientific);
           for (j=0;j<count;++j)
           {
-            cout << "  cols["<<j<<"] = " << cols[j];
-            cout << "  vals["<<j<<"] = " << vals[j];
-            cout << endl;
+            Xyce::dout() << "  cols["<<j<<"] = " << cols[j];
+            Xyce::dout() << "  vals["<<j<<"] = " << vals[j];
+            Xyce::dout() << std::endl;
           }
         }
 #endif
@@ -4344,7 +4343,7 @@ bool Instance::loadMatDDForm
         }
         else
         {
-          cout << "OOOPS 3!" <<endl;
+          Xyce::dout() << "OOOPS 3!" << std::endl;
           exit(0);
         }
 
@@ -4355,7 +4354,7 @@ bool Instance::loadMatDDForm
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
       {
-        cout << dashedline2 << "\n";
+        Xyce::dout() << subsection_divider << "\n";
       }
 #endif
     } // mesh loop.
@@ -4370,9 +4369,9 @@ bool Instance::loadMatDDForm
       Nrow = li_Nrowarray[i];
       Prow = li_Prowarray[i];
 
-      vector <int> & Voff = li_VoffsetArray[i];
-      vector <int> & Noff = li_NoffsetArray[i];
-      vector <int> & Poff = li_PoffsetArray[i];
+      std::vector<int> & Voff = li_VoffsetArray[i];
+      std::vector<int> & Noff = li_NoffsetArray[i];
+      std::vector<int> & Poff = li_PoffsetArray[i];
 
       bool doneFlagV = false;
       bool doneFlagN = false;
@@ -4382,7 +4381,7 @@ bool Instance::loadMatDDForm
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
       {
-        cout << "mesh point i = " << i << endl;
+        Xyce::dout() << "mesh point i = " << i << std::endl;
       }
 #endif
 
@@ -4397,7 +4396,7 @@ bool Instance::loadMatDDForm
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
         {
-          cout << "  Doing BC load" << endl;
+          Xyce::dout() << "  Doing BC load" << std::endl;
         }
 #endif
         int DIindex = labelDIMap[labelNameVector[i]];
@@ -4454,10 +4453,10 @@ bool Instance::loadMatDDForm
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
       {
-        cout << "  Doing Poisson load" << endl;
+        Xyce::dout() << "  Doing Poisson load" << std::endl;
       }
 #endif
-      string semi(bulkMaterial);
+      std::string semi(bulkMaterial);
       if (!doneFlagV)
       {
         for (iNN=0;iNN<nodePtr->cnode;++iNN)
@@ -4506,7 +4505,7 @@ bool Instance::loadMatDDForm
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
       {
-        cout << "  Doing electron load" << endl;
+        Xyce::dout() << "  Doing electron load" << std::endl;
       }
 #endif
 
@@ -4635,7 +4634,7 @@ bool Instance::loadMatDDForm
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
       {
-        cout << "  Doing hole load" << endl;
+        Xyce::dout() << "  Doing hole load" << std::endl;
       }
 #endif
       if (!doneFlagP)
@@ -4764,7 +4763,7 @@ bool Instance::loadMatDDForm
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
+    Xyce::dout() << section_divider << "\n";
   }
 #endif
 
@@ -4786,12 +4785,10 @@ bool Instance::calcLifetimes ()
   int i;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "Instance::calcLifetimes" << "\n";
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "Instance::calcLifetimes" << "\n";
   }
 #endif
 
@@ -4806,15 +4803,15 @@ bool Instance::calcLifetimes ()
   {
     for (i=0;i<numMeshPoints;++i)
     {
-      cout << "  tnVec["<<i<<"] = " <<tnVec[i];
-      cout << "  tpVec["<<i<<"] = " <<tpVec[i];
-      cout << "\n";
+      Xyce::dout() << "  tnVec["<<i<<"] = " <<tnVec[i];
+      Xyce::dout() << "  tpVec["<<i<<"] = " <<tpVec[i];
+      Xyce::dout() << "\n";
     }
   }
 
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
+    Xyce::dout() << section_divider << "\n";
   }
 #endif
 
@@ -4841,12 +4838,10 @@ bool Instance::calcMobilities ()
   int i;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "Instance::calcMobilities" << "\n";
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "Instance::calcMobilities" << "\n";
   }
 #endif
 
@@ -4880,14 +4875,14 @@ bool Instance::calcMobilities ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << "Nodal Mobilities:" << endl;
+    Xyce::dout() << "Nodal Mobilities:" << std::endl;
     for (i=0;i<numMeshPoints;++i)
     {
-      cout << "  unVec["<<i<<"] = " << unVec[i];
-      cout << "  upVec["<<i<<"] = " << upVec[i];
-      cout << "\n";
+      Xyce::dout() << "  unVec["<<i<<"] = " << unVec[i];
+      Xyce::dout() << "  upVec["<<i<<"] = " << upVec[i];
+      Xyce::dout() << "\n";
     }
-    cout << endl;
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -4922,10 +4917,10 @@ bool Instance::calcMobilities ()
 #ifdef Xyce_DEBUG_DEVICE
       if (ci.n != 0.0 && !(ci.n > 0.0) && !(ci.n < 0.0))
       {
-        cout << "ci.n is nan" << endl;
-        cout << "nnVec[A] = " << nnVec[inodeA];
-        cout << "nnVec[B] = " << nnVec[inodeB];
-        cout << endl;
+        Xyce::dout() << "ci.n is nan" << std::endl;
+        Xyce::dout() << "nnVec[A] = " << nnVec[inodeA];
+        Xyce::dout() << "nnVec[B] = " << nnVec[inodeB];
+        Xyce::dout() << std::endl;
         exit(0);
       }
 #endif
@@ -4944,18 +4939,18 @@ bool Instance::calcMobilities ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << "Edge Mobilities" << endl;
+    Xyce::dout() << "Edge Mobilities" << std::endl;
     for (i=0;i<meshContainerPtr->getNumEdges();++i)
     {
-      cout << "  unE_Vec["<<i<<"] = " << unE_Vec[i];
-      cout << "  upE_Vec["<<i<<"] = " << upE_Vec[i];
-      cout << "\n";
+      Xyce::dout() << "  unE_Vec["<<i<<"] = " << unE_Vec[i];
+      Xyce::dout() << "  upE_Vec["<<i<<"] = " << upE_Vec[i];
+      Xyce::dout() << "\n";
     }
   }
 
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -5033,12 +5028,10 @@ bool Instance::calcVoltDepDensities ()
   Ut = Vt/scalingVars.V0;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "Instance::calcVoltDepDensities\n";
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "Instance::calcVoltDepDensities\n";
   }
 #endif
 
@@ -5051,7 +5044,7 @@ bool Instance::calcVoltDepDensities ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
+    Xyce::dout() << section_divider << "\n";
   }
 #endif
 
@@ -5075,12 +5068,10 @@ bool Instance::calcDopingProfile ()
   // set up the initial doping array:
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << dashedline << "\n";
-    cout << "Instance::calcDopingProfile\n";
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "Instance::calcDopingProfile\n";
   }
 #endif
 
@@ -5148,11 +5139,11 @@ bool Instance::calcDopingProfile ()
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
         {
-          cout << "deviceWidth  = " << deviceWidth  << endl;
-          cout << "midpoint     = " << midpoint << endl;
-          cout << "XL           = " << XL << endl;
-          cout << "XR           = " << XR << endl;
-          cout << "WJ           = " << WJ << endl;
+          Xyce::dout() << "deviceWidth  = " << deviceWidth  << std::endl;
+          Xyce::dout() << "midpoint     = " << midpoint << std::endl;
+          Xyce::dout() << "XL           = " << XL << std::endl;
+          Xyce::dout() << "XR           = " << XR << std::endl;
+          Xyce::dout() << "WJ           = " << WJ << std::endl;
         }
 #endif
 
@@ -5348,23 +5339,21 @@ bool Instance::calcDopingProfile ()
       else
         // more than four electrodes?  not ready yet...
       {
-        // Error in given expression.
-        string msg = "Too many electrodes specified.  numElectrodes =";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg, numElectrodes);
+        UserFatal(*this) << "Too many electrodes specified.  numElectrodes = " << numElectrodes;
       }
     }
     else // use the "new" doping specification:
     {
       // loop over the dope info map, and sum contributions from each
       // doping entity into the total doping array, CVec.
-      map<string, DopeInfo *>::iterator iter;
-      map<string, DopeInfo *>::iterator start = dopeInfoMap.begin();
-      map<string, DopeInfo *>::iterator end   = dopeInfoMap.end();
+      std::map<std::string, DopeInfo *>::iterator iter;
+      std::map<std::string, DopeInfo *>::iterator start = dopeInfoMap.begin();
+      std::map<std::string, DopeInfo *>::iterator end   = dopeInfoMap.end();
 
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0)
       {
-        cout << "dope info map:" << endl;
+        Xyce::dout() << "dope info map:" << std::endl;
       }
 #endif
       for ( iter = start; iter != end; ++iter )
@@ -5374,7 +5363,7 @@ bool Instance::calcDopingProfile ()
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 0)
         {
-          cout << di;
+          Xyce::dout() << di;
         }
 #endif
         di.setupInfo2d(CVec,CdonorVec,CacceptorVec,xVec,yVec,devSupport);
@@ -5396,21 +5385,21 @@ bool Instance::calcDopingProfile ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout.width(20);
-    cout.precision(12);
-    cout.setf(ios::scientific);
-    cout << endl;
-    cout << "Na = " << Na << endl;
-    cout << "Nd = " << Nd << endl<<endl;
+    Xyce::dout().width(20);
+    Xyce::dout().precision(12);
+    Xyce::dout().setf(std::ios::scientific);
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "Na = " << Na << std::endl;
+    Xyce::dout() << "Nd = " << Nd << std::endl<< std::endl;
   }
 
   if (getDeviceOptions().debugLevel > 0)
   {
     for (int inode=0;inode<numMeshPoints;++inode)
     {
-      cout << xVec[inode];
-      cout << "  " << yVec[inode];
-      cout << "  CVec["<<inode<<"] = " << CVec[inode] << endl;
+      Xyce::dout() << xVec[inode];
+      Xyce::dout() << "  " << yVec[inode];
+      Xyce::dout() << "  CVec["<<inode<<"] = " << CVec[inode] << std::endl;
     }
   }
 #endif
@@ -5418,7 +5407,7 @@ bool Instance::calcDopingProfile ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << dashedline <<endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -5501,20 +5490,20 @@ bool Instance::setupScalingVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl;
-    cout << "  scalingVars.x0 = " << scalingVars.x0 << "\n";
-    cout << "  scalingVars.a0 = " << scalingVars.a0 << "\n";
-    cout << "  scalingVars.T0 = " << scalingVars.T0 << "\n";
-    cout << "  scalingVars.V0 = " << scalingVars.V0 << "\n";
-    cout << "  scalingVars.C0 = " << scalingVars.C0 << "\n";
-    cout << "  scalingVars.D0 = " << scalingVars.D0 << "\n";
-    cout << "  scalingVars.u0 = " << scalingVars.u0 << "\n";
-    cout << "  scalingVars.R0 = " << scalingVars.R0 << "\n";
-    cout << "  scalingVars.t0 = " << scalingVars.t0 << "\n";
-    cout << "  scalingVars.E0 = " << scalingVars.E0 << "\n";
-    cout << "  scalingVars.J0 = " << scalingVars.J0 << "\n";
-    cout << "  scalingVars.L0 = " << scalingVars.L0 << endl;
-    cout << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "  scalingVars.x0 = " << scalingVars.x0 << "\n";
+    Xyce::dout() << "  scalingVars.a0 = " << scalingVars.a0 << "\n";
+    Xyce::dout() << "  scalingVars.T0 = " << scalingVars.T0 << "\n";
+    Xyce::dout() << "  scalingVars.V0 = " << scalingVars.V0 << "\n";
+    Xyce::dout() << "  scalingVars.C0 = " << scalingVars.C0 << "\n";
+    Xyce::dout() << "  scalingVars.D0 = " << scalingVars.D0 << "\n";
+    Xyce::dout() << "  scalingVars.u0 = " << scalingVars.u0 << "\n";
+    Xyce::dout() << "  scalingVars.R0 = " << scalingVars.R0 << "\n";
+    Xyce::dout() << "  scalingVars.t0 = " << scalingVars.t0 << "\n";
+    Xyce::dout() << "  scalingVars.E0 = " << scalingVars.E0 << "\n";
+    Xyce::dout() << "  scalingVars.J0 = " << scalingVars.J0 << "\n";
+    Xyce::dout() << "  scalingVars.L0 = " << scalingVars.L0 << std::endl;
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -5556,9 +5545,9 @@ bool Instance::scaleVariables ()
   bsuccess = meshContainerPtr->scaleMesh(scalingVars.x0);
 
   // scale boundary conditions:
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI  = firstDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI  = firstDI;
 
   for (;iterDI!=lastDI;++iterDI)
   {
@@ -5662,9 +5651,9 @@ bool Instance::unScaleVariables ()
   bsuccess = meshContainerPtr->scaleMesh(1.0/scalingVars.x0);
 
   // scale boundary conditions:
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI  = firstDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI  = firstDI;
 
   for (;iterDI!=lastDI;++iterDI)
   {
@@ -5759,9 +5748,9 @@ bool Instance::scaleDopeVariables ()
   NpMax /= scalingVars.C0;
 
   // scale boundary conditions:
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI  = firstDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI  = firstDI;
 
   for (;iterDI!=lastDI;++iterDI)
   {
@@ -5866,13 +5855,11 @@ bool Instance::calcInitialGuess ()
 #endif
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << dashedline << endl;
-    cout << "Instance::calcInitialGuess"<<endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "Instance::calcInitialGuess"<< std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
 
@@ -5901,9 +5888,9 @@ bool Instance::calcInitialGuess ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << "nnVec[" << i << "] = " << nnVec[i];
-      cout << "  npVec[" << i << "] = " << npVec[i];
-      cout << endl;
+      Xyce::dout() << "nnVec[" << i << "] = " << nnVec[i];
+      Xyce::dout() << "  npVec[" << i << "] = " << npVec[i];
+      Xyce::dout() << std::endl;
     }
 #endif
   }
@@ -5924,7 +5911,7 @@ bool Instance::calcInitialGuess ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << "VVec[" << i << "] = " << VVec[i] << endl;
+      Xyce::dout() << "VVec[" << i << "] = " << VVec[i] << std::endl;
     }
 #endif
   }
@@ -5937,15 +5924,15 @@ bool Instance::calcInitialGuess ()
   double VminBC  = +1.0e+99;
   double VmaxBC  = -1.0e+99;
 
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
   for (iterDI=firstDI;iterDI!=lastDI;++iterDI)
   {
     mLabel * labelPtr = meshContainerPtr->getLabel(iterDI->eName);
-    vector<int>::iterator iterNode = labelPtr->mNodeVector.begin();
-    vector<int>::iterator lastNode = labelPtr->mNodeVector.end ();
+    std::vector<int>::iterator iterNode = labelPtr->mNodeVector.begin();
+    std::vector<int>::iterator lastNode = labelPtr->mNodeVector.end ();
 
     for ( ;iterNode!=lastNode;++iterNode)
     {
@@ -5966,10 +5953,10 @@ bool Instance::calcInitialGuess ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "Voffset  = " << Voffset <<  endl;
-    cout << "VtotDiff = " << VtotDiff << endl;
-    cout << "VBCDiff  = " << VBCDiff << endl;
-    cout << "Vscale   = " << Vscale << endl;
+    Xyce::dout() << "Voffset  = " << Voffset <<  std::endl;
+    Xyce::dout() << "VtotDiff = " << VtotDiff << std::endl;
+    Xyce::dout() << "VBCDiff  = " << VBCDiff << std::endl;
+    Xyce::dout() << "Vscale   = " << Vscale << std::endl;
   }
 #endif
 
@@ -5990,7 +5977,7 @@ bool Instance::calcInitialGuess ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << "VVec[" << i << "] = " << VVec[i] << endl;
+      Xyce::dout() << "VVec[" << i << "] = " << VVec[i] << std::endl;
     }
 #endif
 
@@ -6057,18 +6044,18 @@ bool Instance::calcInitialGuess ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl;
-    cout.setf(ios::scientific);
-    cout << "Vmax = " << VmaxExp << endl;
-    cout << "Vmin = " << VminExp << endl;
-    cout << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout().setf(std::ios::scientific);
+    Xyce::dout() << "Vmax = " << VmaxExp << std::endl;
+    Xyce::dout() << "Vmin = " << VminExp << std::endl;
+    Xyce::dout() << std::endl;
   }
 #endif
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -6092,59 +6079,57 @@ bool Instance::calcVequBCs ()
   int i;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << dashedline << endl;
-    cout << "Instance::calcVequBCs"<<endl;
-    cout << "  name = " << getName() << endl;
-    cout << "  Na = "<< Na << endl;
-    cout << "  Nd = "<< Nd << endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "Instance::calcVequBCs"<< std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
+    Xyce::dout() << "  Na = "<< Na << std::endl;
+    Xyce::dout() << "  Nd = "<< Nd << std::endl;
   }
 #endif
 
   double VminBC =+1.0e+99;
   double VmaxBC =-1.0e+99;
 
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
   for (iterDI=firstDI;iterDI!=lastDI;++iterDI)
   {
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << "DI name = " << iterDI->eName <<endl;
-      cout << "material = " << iterDI->material << endl;
+      Xyce::dout() << "DI name = " << iterDI->eName << std::endl;
+      Xyce::dout() << "material = " << iterDI->material << std::endl;
       if (iterDI->materialGiven)
       {
-        cout << "material was given" << endl;
+        Xyce::dout() << "material was given" << std::endl;
       }
       else
       {
-        cout << "material was NOT given" << endl;
+        Xyce::dout() << "material was NOT given" << std::endl;
       }
 
       if (iterDI->oxideBndryFlag)
       {
-        cout << "This is a boundary WITH an oxide." << endl;
+        Xyce::dout() << "This is a boundary WITH an oxide." << std::endl;
       }
       else
       {
-        cout << "This is a boundary WITHOUT an oxide." << endl;
+        Xyce::dout() << "This is a boundary WITHOUT an oxide." << std::endl;
       }
 
-      cout.setf(ios::scientific);
+      Xyce::dout().setf(std::ios::scientific);
     }
 #endif
 
-    string insul = "sio2";  // oxide layers can only be sio2...
+    std::string insul = "sio2";  // oxide layers can only be sio2...
 
     mLabel * labelPtr = meshContainerPtr->getLabel(iterDI->eName);
-    vector<int>::iterator iterNode = labelPtr->mNodeVector.begin();
-    vector<int>::iterator lastNode = labelPtr->mNodeVector.end ();
+    std::vector<int>::iterator iterNode = labelPtr->mNodeVector.begin();
+    std::vector<int>::iterator lastNode = labelPtr->mNodeVector.end ();
 
     for (i=0;i<iterDI->numBoundaryPoints;++i,++iterNode)
     {
@@ -6215,8 +6200,8 @@ bool Instance::calcVequBCs ()
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0)
       {
-        cout << "Vequ["<<i<<"]=" << iterDI->VequVec[i];
-        cout << endl;
+        Xyce::dout() << "Vequ["<<i<<"]=" << iterDI->VequVec[i];
+        Xyce::dout() << std::endl;
       }
 #endif
     }
@@ -6225,7 +6210,7 @@ bool Instance::calcVequBCs ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "After offset:" << endl;
+    Xyce::dout() << "After offset:" << std::endl;
   }
 #endif
 
@@ -6237,8 +6222,8 @@ bool Instance::calcVequBCs ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << "DI name = " << iterDI->eName <<endl;
-      cout.setf(ios::scientific);
+      Xyce::dout() << "DI name = " << iterDI->eName << std::endl;
+      Xyce::dout().setf(std::ios::scientific);
     }
 #endif
 
@@ -6248,7 +6233,7 @@ bool Instance::calcVequBCs ()
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0)
       {
-        cout << "VequVec["<<i<<"] = " << iterDI->VequVec[i] << endl;
+        Xyce::dout() << "VequVec["<<i<<"] = " << iterDI->VequVec[i] << std::endl;
       }
 #endif
     }
@@ -6257,7 +6242,7 @@ bool Instance::calcVequBCs ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -6280,17 +6265,15 @@ bool Instance::calcVequBCs ()
 bool Instance::calcDensityBCs ()
 {
   bool bsuccess = true;
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << dashedline<<endl;
-    cout << endl << "In Instance::calcDensityBCs" << endl;
+    Xyce::dout() << section_divider<< std::endl;
+    Xyce::dout() << std::endl << "In Instance::calcDensityBCs" << std::endl;
   }
 #endif
 
@@ -6305,7 +6288,7 @@ bool Instance::calcDensityBCs ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << iterDI->eName<< ":" << endl;
+      Xyce::dout() << iterDI->eName<< ":" << std::endl;
     }
 #endif
 
@@ -6335,9 +6318,9 @@ bool Instance::calcDensityBCs ()
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0)
       {
-        cout << "\tCVec["<<nIndex<<"] = " << CVec[nIndex]<<endl;
-        cout << "\tnnbc["<<i<<"] = " << iterDI->nnbcVec[i] << endl;
-        cout << "\tnpbc["<<i<<"] = " << iterDI->npbcVec[i] << endl;
+        Xyce::dout() << "\tCVec["<<nIndex<<"] = " << CVec[nIndex]<< std::endl;
+        Xyce::dout() << "\tnnbc["<<i<<"] = " << iterDI->nnbcVec[i] << std::endl;
+        Xyce::dout() << "\tnpbc["<<i<<"] = " << iterDI->npbcVec[i] << std::endl;
       }
 #endif
     }
@@ -6345,8 +6328,8 @@ bool Instance::calcDensityBCs ()
     // Set the boundaries to reflect nnbc and npbc.  This is neccessary so
     // that the correct Vequ is calculated in function calcVequBCs.
     mLabel * labelPtr = meshContainerPtr->getLabel(iterDI->eName);
-    vector<int>::iterator iterNode = labelPtr->mNodeVector.begin();
-    vector<int>::iterator lastNode = labelPtr->mNodeVector.end ();
+    std::vector<int>::iterator iterNode = labelPtr->mNodeVector.begin();
+    std::vector<int>::iterator lastNode = labelPtr->mNodeVector.end ();
 
     for ( ;iterNode!=lastNode;++iterNode)
     {
@@ -6362,12 +6345,12 @@ bool Instance::calcDensityBCs ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl;
-    cout << "NnMax = " << NnMax << endl;
-    cout << "NpMax = " << NpMax << endl;
-    cout << "NnMin = " << NnMin << endl;
-    cout << "NpMin = " << NpMin << endl;
-    cout << dashedline<<endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "NnMax = " << NnMax << std::endl;
+    Xyce::dout() << "NpMax = " << NpMax << std::endl;
+    Xyce::dout() << "NnMin = " << NnMin << std::endl;
+    Xyce::dout() << "NpMin = " << NpMin << std::endl;
+    Xyce::dout() << section_divider<< std::endl;
   }
 #endif
 
@@ -6393,17 +6376,15 @@ bool Instance::calcBoundaryConditions ()
 {
   bool bsuccess = true;
   int i;
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl << dashedline << endl;
-    cout << endl << "In Instance::calcBoundaryConditions" << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << std::endl << "In Instance::calcBoundaryConditions" << std::endl;
   }
 #endif
 
@@ -6428,8 +6409,8 @@ bool Instance::calcBoundaryConditions ()
     // if using the "new" boundary conditions, go through the V,n,p
     // arrays and impose the electrode boundary values.
     mLabel * labelPtr = meshContainerPtr->getLabel(iterDI->eName);
-    vector<int>::iterator iterNode = labelPtr->mNodeVector.begin();
-    vector<int>::iterator lastNode = labelPtr->mNodeVector.end ();
+    std::vector<int>::iterator iterNode = labelPtr->mNodeVector.begin();
+    std::vector<int>::iterator lastNode = labelPtr->mNodeVector.end ();
 
     for ( ;iterNode!=lastNode;++iterNode)
     {
@@ -6443,15 +6424,15 @@ bool Instance::calcBoundaryConditions ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << iterDI->eName << ":" << endl;
+      Xyce::dout() << iterDI->eName << ":" << std::endl;
       for (i=0;i<iterDI->numBoundaryPoints;++i)
       {
-        cout<<"Vbc["<<i<<"] = "<<iterDI->VbcVec[i]<<", "<<iterDI->VbcVec[i]*scalingVars.V0;
-        cout << " nnbc["<<i<<"] = "<< iterDI->nnbcVec[i];
-        cout << ", "<<iterDI->nnbcVec[i]*scalingVars.C0;
-        cout << " npbc["<<i<<"] = "<< iterDI->npbcVec[i];
-        cout << ", "<<iterDI->npbcVec[i]*scalingVars.C0;
-        cout << endl;
+        Xyce::dout()<<"Vbc["<<i<<"] = "<<iterDI->VbcVec[i]<<", "<<iterDI->VbcVec[i]*scalingVars.V0;
+        Xyce::dout() << " nnbc["<<i<<"] = "<< iterDI->nnbcVec[i];
+        Xyce::dout() << ", "<<iterDI->nnbcVec[i]*scalingVars.C0;
+        Xyce::dout() << " npbc["<<i<<"] = "<< iterDI->npbcVec[i];
+        Xyce::dout() << ", "<<iterDI->npbcVec[i]*scalingVars.C0;
+        Xyce::dout() << std::endl;
       }
     }
 #endif
@@ -6460,7 +6441,7 @@ bool Instance::calcBoundaryConditions ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > -5 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -6490,20 +6471,18 @@ bool Instance::obtainNodeVoltages ()
   bool bsuccess = true;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl << dashedline << endl;
-    cout << endl << "In Instance::obtainNodeVoltages" << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << std::endl << "In Instance::obtainNodeVoltages" << std::endl;
   }
 #endif
 
   N_LAS_Vector * solVectorPtr = extData.nextSolVectorPtr;
 
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
   for (iterDI=firstDI;iterDI!=lastDI;++iterDI)
   {
@@ -6525,8 +6504,8 @@ bool Instance::obtainNodeVoltages ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << iterDI->eName << "  Vckt = " << iterDI->Vckt;
-      cout << "  Vckt*scalingVars.V0 = " << (iterDI->Vckt * scalingVars.V0) << endl;
+      Xyce::dout() << iterDI->eName << "  Vckt = " << iterDI->Vckt;
+      Xyce::dout() << "  Vckt*scalingVars.V0 = " << (iterDI->Vckt * scalingVars.V0) << std::endl;
     }
 #endif
   }
@@ -6534,7 +6513,7 @@ bool Instance::obtainNodeVoltages ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -6558,17 +6537,15 @@ bool Instance::applyVoltageLimiting ()
 {
   bool bsuccess = true;
 
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << endl << dashedline << endl;
-    cout << "device:    " << getName() << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "device:    " << getName() << std::endl;
   }
 #endif
 
@@ -6588,14 +6565,14 @@ bool Instance::applyVoltageLimiting ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "electrode  = " << iterDI->eName << endl;
-      cout << "v1         = " << v1 << endl;
-      cout << "v1_old     = " << v1_old << endl;
-      cout << "v1_orig    = " << v1_orig << endl;
-      cout << "v1/scalingVars.V0      = " << v1/scalingVars.V0 << endl;
-      cout << "v1_old/scalingVars.V0  = " << v1_old/scalingVars.V0 << endl;
-      cout << "v1_orig/scalingVars.V0 = " << v1_orig/scalingVars.V0 << endl;
-      cout << endl;
+      Xyce::dout() << "electrode  = " << iterDI->eName << std::endl;
+      Xyce::dout() << "v1         = " << v1 << std::endl;
+      Xyce::dout() << "v1_old     = " << v1_old << std::endl;
+      Xyce::dout() << "v1_orig    = " << v1_orig << std::endl;
+      Xyce::dout() << "v1/scalingVars.V0      = " << v1/scalingVars.V0 << std::endl;
+      Xyce::dout() << "v1_old/scalingVars.V0  = " << v1_old/scalingVars.V0 << std::endl;
+      Xyce::dout() << "v1_orig/scalingVars.V0 = " << v1_orig/scalingVars.V0 << std::endl;
+      Xyce::dout() << std::endl;
     }
 #endif
 
@@ -6606,7 +6583,7 @@ bool Instance::applyVoltageLimiting ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -6630,13 +6607,11 @@ bool Instance::obtainSolution ()
   N_LAS_Vector * solVectorPtr = extData.nextSolVectorPtr;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "Instance::obtainSolution\n";
-    cout << "solVectorPtr = " << solVectorPtr <<endl;
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "Instance::obtainSolution\n";
+    Xyce::dout() << "solVectorPtr = " << solVectorPtr << std::endl;
   }
 #endif
 
@@ -6672,13 +6647,13 @@ bool Instance::obtainSolution ()
   {
     for (i=0;i<numMeshPoints;++i)
     {
-      cout << "VVec["<<i<<"]=\t";
-      cout.width(20);
-      cout.precision(12);
-      cout.setf(ios::scientific);
-      cout << VVec[i];
-      cout << "  " << VVec[i]*scalingVars.V0;
-      cout << "\n";
+      Xyce::dout() << "VVec["<<i<<"]=\t";
+      Xyce::dout().width(20);
+      Xyce::dout().precision(12);
+      Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << VVec[i];
+      Xyce::dout() << "  " << VVec[i]*scalingVars.V0;
+      Xyce::dout() << "\n";
     }
   }
 #endif
@@ -6693,10 +6668,10 @@ bool Instance::obtainSolution ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "  About to get the density.\n";
-    if (getSolverState().dcopFlag) cout << "DCOP load" <<endl;
-    else                   cout << "Transient load" <<endl;
-    cout << "  doubleDCOPStep = " << getSolverState().doubleDCOPStep << "\n";
+    Xyce::dout() << "  About to get the density.\n";
+    if (getSolverState().dcopFlag) Xyce::dout() << "DCOP load" << std::endl;
+    else                   Xyce::dout() << "Transient load" << std::endl;
+    Xyce::dout() << "  doubleDCOPStep = " << getSolverState().doubleDCOPStep << "\n";
   }
 #endif
 
@@ -6732,7 +6707,7 @@ bool Instance::obtainSolution ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout<<"  Obtaining densities from solution vector (not voltage dep.)\n";
+      Xyce::dout()<<"  Obtaining densities from solution vector (not voltage dep.)\n";
     }
 #endif
     for (i=0;i<numMeshPoints;++i)
@@ -6809,21 +6784,21 @@ bool Instance::obtainSolution ()
   {
     for (i=0;i<numMeshPoints;++i)
     {
-      cout << "nnVec["<<i<<"]=\t";
-      cout.width(14);
-      cout.precision(6);
-      cout.setf(ios::scientific);
-      cout << nnVec[i];
-      cout << "  " << nnVec[i]*scalingVars.C0;
+      Xyce::dout() << "nnVec["<<i<<"]=\t";
+      Xyce::dout().width(14);
+      Xyce::dout().precision(6);
+      Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << nnVec[i];
+      Xyce::dout() << "  " << nnVec[i]*scalingVars.C0;
 
-      cout << "  npVec["<<i<<"]=\t";
-      cout.width(14);
-      cout.precision(6);
-      cout.setf(ios::scientific);
-      cout << npVec[i];
-      cout << "  " << npVec[i]*scalingVars.C0;
+      Xyce::dout() << "  npVec["<<i<<"]=\t";
+      Xyce::dout().width(14);
+      Xyce::dout().precision(6);
+      Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << npVec[i];
+      Xyce::dout() << "  " << npVec[i]*scalingVars.C0;
 
-      cout << endl;
+      Xyce::dout() << std::endl;
     }
   }
 #endif
@@ -6853,7 +6828,7 @@ bool Instance::obtainSolution ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -6876,13 +6851,11 @@ bool Instance::calcRecombination ()
   double Rsrh, Raug;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "Instance::calcRecombination\n";
-    cout << "\n";
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "Instance::calcRecombination\n";
+    Xyce::dout() << "\n";
   }
 #endif
 
@@ -6902,20 +6875,20 @@ bool Instance::calcRecombination ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
     {
-      cout.precision(4);
-      cout << " nnVec="<<n<<" npVec="<<p;
-      cout << " tnVec="<<tn<<" tpVec="<<tp;
-      cout << " Rsrh="<<Rsrh;
-      cout << " Raug="<<Raug;
-      cout << " RVec["<<i<<"]="<<RVec[i];
-      cout << "\n";
+      Xyce::dout().precision(4);
+      Xyce::dout() << " nnVec="<<n<<" npVec="<<p;
+      Xyce::dout() << " tnVec="<<tn<<" tpVec="<<tp;
+      Xyce::dout() << " Rsrh="<<Rsrh;
+      Xyce::dout() << " Raug="<<Raug;
+      Xyce::dout() << " RVec["<<i<<"]="<<RVec[i];
+      Xyce::dout() << "\n";
     }
 
     if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
     {
-      cout.precision(4);
-      cout << " RVec["<<i<<"]="<<RVec[i];
-      cout << endl;
+      Xyce::dout().precision(4);
+      Xyce::dout() << " RVec["<<i<<"]="<<RVec[i];
+      Xyce::dout() << std::endl;
     }
 #endif
   }
@@ -6923,7 +6896,7 @@ bool Instance::calcRecombination ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -6947,7 +6920,7 @@ bool Instance::setupPhotogen ()
 {
   bool bsuccess = true;
   Param ndParam;
-  N_UTL_Expression expr;
+  Util::Expression expr;
 
   // for now just supporting "pulse" and "const".
   switch (photoType)
@@ -7016,23 +6989,21 @@ bool Instance::calcPhotogen ()
   double val;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
 
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "Instance::calcPhotogen\n";
-    cout << "time = " << time;
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "Instance::calcPhotogen\n";
+    Xyce::dout() << "time = " << time;
 
     if (photogenOnFlag &&
         time >= photoTstart &&
         time <= photoTstop)
-    { cout << "  photogen is on right now." << endl; }
+    { Xyce::dout() << "  photogen is on right now." << std::endl; }
     else
-    { cout << "  photogen is off right now." << endl; }
+    { Xyce::dout() << "  photogen is off right now." << std::endl; }
 
-    cout << "\n";
+    Xyce::dout() << "\n";
   }
 #endif
 
@@ -7064,8 +7035,8 @@ bool Instance::calcPhotogen ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Value of photogen source = " << val << endl;
-    cout << dashedline << endl;
+    Xyce::dout() << "Value of photogen source = " << val << std::endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -7152,12 +7123,12 @@ bool Instance::calcPenalty ()
   {
     for (i=0;i<numMeshPoints;++i)
     {
-      cout << "  e- Pen["<<i<<"] = " << elecPenalty[i];
-      cout << "  e- den["<<i<<"] = " << nnVec[i];
+      Xyce::dout() << "  e- Pen["<<i<<"] = " << elecPenalty[i];
+      Xyce::dout() << "  e- den["<<i<<"] = " << nnVec[i];
 
-      cout << "  h+ Pen["<<i<<"] = " << holePenalty[i];
-      cout << "  h+ den["<<i<<"] = " << npVec[i];
-      cout << endl;
+      Xyce::dout() << "  h+ Pen["<<i<<"] = " << holePenalty[i];
+      Xyce::dout() << "  h+ den["<<i<<"] = " << npVec[i];
+      Xyce::dout() << std::endl;
     }
   }
 #endif
@@ -7263,14 +7234,12 @@ bool Instance::sumSources ()
   int i;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
 
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "Instance::sumSources\n";
-    cout << "\n";
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "Instance::sumSources\n";
+    Xyce::dout() << "\n";
   }
 #endif
 
@@ -7282,9 +7251,9 @@ bool Instance::sumSources ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
     {
-      cout << "RVec["<<i<<"] = " << RVec[i];
-      cout << "  SVec["<<i<<"] = " << SVec[i];
-      cout << "  totSrcVec["<<i<<"] = " << totSrcVec[i] << "\n";
+      Xyce::dout() << "RVec["<<i<<"] = " << RVec[i];
+      Xyce::dout() << "  SVec["<<i<<"] = " << SVec[i];
+      Xyce::dout() << "  totSrcVec["<<i<<"] = " << totSrcVec[i] << "\n";
     }
 #endif
   }
@@ -7292,7 +7261,7 @@ bool Instance::sumSources ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -7328,13 +7297,11 @@ bool Instance::pdRecombination ()
 #endif
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "Instance::pdRecombination\n";
-    cout << "\n";
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "Instance::pdRecombination\n";
+    Xyce::dout() << "\n";
   }
 #endif
 
@@ -7369,13 +7336,13 @@ bool Instance::pdRecombination ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
     {
-      cout << "  dRsrhdn = " << dRsrhdn << "  dRsrhdp = " << dRsrhdp;
-      cout << "\n";
-      cout << "  nnVec = " << nnVec[i] << "  npVec = " << npVec[i] << "\n";
-      cout << "  tnVec = " << tnVec[i] << "  tpVec = " << tpVec[i] << "\n";
-      cout << "  A1 = " << A1 << "  B1 = " << B1 << "  C1 = " << C1 << "\n";
-      cout << "  dAdn = " << dAdn << "  dBdn = " << dBdn << "\n";
-      cout << "  dAdp = " << dAdp << "  dBdp = " << dBdp << "\n";
+      Xyce::dout() << "  dRsrhdn = " << dRsrhdn << "  dRsrhdp = " << dRsrhdp;
+      Xyce::dout() << "\n";
+      Xyce::dout() << "  nnVec = " << nnVec[i] << "  npVec = " << npVec[i] << "\n";
+      Xyce::dout() << "  tnVec = " << tnVec[i] << "  tpVec = " << tpVec[i] << "\n";
+      Xyce::dout() << "  A1 = " << A1 << "  B1 = " << B1 << "  C1 = " << C1 << "\n";
+      Xyce::dout() << "  dAdn = " << dAdn << "  dBdn = " << dBdn << "\n";
+      Xyce::dout() << "  dAdp = " << dAdp << "  dBdp = " << dBdp << "\n";
     }
 #endif
 
@@ -7393,10 +7360,10 @@ bool Instance::pdRecombination ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
     {
-      cout << "  dRaugdn = " << dRaugdn << "  dRaugdp = " << dRaugdp <<"\n";
-      cout << "  A1 = " << A1 << "  B1 = " << B1 << "\n";
-      cout << "  dAdn = " << dAdn << "  dBdn = " << dBdn <<"\n";
-      cout << "  dAdp = " << dAdp << "  dBdp = " << dBdp <<"\n";
+      Xyce::dout() << "  dRaugdn = " << dRaugdn << "  dRaugdp = " << dRaugdp <<"\n";
+      Xyce::dout() << "  A1 = " << A1 << "  B1 = " << B1 << "\n";
+      Xyce::dout() << "  dAdn = " << dAdn << "  dBdn = " << dBdn <<"\n";
+      Xyce::dout() << "  dAdp = " << dAdp << "  dBdp = " << dBdp <<"\n";
     }
 #endif
 
@@ -7424,9 +7391,9 @@ bool Instance::pdRecombination ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
     {
-      cout << "  dRdnVec["<<i<<"] = " << dRdnVec[i];
-      cout << "  dRdpVec["<<i<<"] = " << dRdpVec[i];
-      cout << "\n";
+      Xyce::dout() << "  dRdnVec["<<i<<"] = " << dRdnVec[i];
+      Xyce::dout() << "  dRdpVec["<<i<<"] = " << dRdpVec[i];
+      Xyce::dout() << "\n";
     }
 #endif
   }
@@ -7434,7 +7401,7 @@ bool Instance::pdRecombination ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -7460,13 +7427,11 @@ bool Instance::calcElectronCurrent ()
 
 #ifdef Xyce_DEBUG_DEVICE
   int iMaxIndex = 0;
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "Instance::calcElectronCurrent\n";
-    cout << "\n";
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "Instance::calcElectronCurrent\n";
+    Xyce::dout() << "\n";
   }
 #endif
 
@@ -7477,8 +7442,8 @@ bool Instance::calcElectronCurrent ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
     {
-      cout << "\n";
-      cout << "i="<<i<<"\n";
+      Xyce::dout() << "\n";
+      Xyce::dout() << "i="<<i<<"\n";
     }
 #endif
 
@@ -7502,7 +7467,7 @@ bool Instance::calcElectronCurrent ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
     {
-      cout << "  J*scalingVars.J0="<<JnVec[i]*scalingVars.J0; cout << "\n";
+      Xyce::dout() << "  J*scalingVars.J0="<<JnVec[i]*scalingVars.J0; Xyce::dout() << "\n";
     }
 #endif
 
@@ -7515,29 +7480,29 @@ bool Instance::calcElectronCurrent ()
     double xScale = 1.0;
     if (variablesScaled) { jScale = scalingVars.J0; xScale = scalingVars.x0; }
 
-    cout.setf(ios::scientific);
-    cout << "  Max Electron current = " << jnMax;
-    cout << "  jScale = " << jScale;
-    cout << "\n";
+    Xyce::dout().setf(std::ios::scientific);
+    Xyce::dout() << "  Max Electron current = " << jnMax;
+    Xyce::dout() << "  jScale = " << jScale;
+    Xyce::dout() << "\n";
 
     mEdge * edgePtr = meshContainerPtr->getEdge(iMaxIndex);
     int    inodeA = edgePtr->inodeA;
     int    inodeB = edgePtr->inodeB;
 
-    cout << "  max locations A: (x,y) = (" << xVec[inodeA]*xScale<<", ";
-    cout << yVec[inodeA]*xScale<<")\n";
-    cout << "  max locations B: (x,y) = (" << xVec[inodeB]*xScale<<", ";
-    cout << yVec[inodeB]*xScale<<")\n";
-    cout << "  nodes: inodeA = "<<inodeA<<"  inodeB = " << inodeB<<endl;
+    Xyce::dout() << "  max locations A: (x,y) = (" << xVec[inodeA]*xScale<<", ";
+    Xyce::dout() << yVec[inodeA]*xScale<<")\n";
+    Xyce::dout() << "  max locations B: (x,y) = (" << xVec[inodeB]*xScale<<", ";
+    Xyce::dout() << yVec[inodeB]*xScale<<")\n";
+    Xyce::dout() << "  nodes: inodeA = "<<inodeA<<"  inodeB = " << inodeB<< std::endl;
 
-    cout << "  VVec["<<inodeA<<"] = " << VVec[inodeA];
-    cout << "  VVec["<<inodeB<<"] = " << VVec[inodeB] <<endl;
+    Xyce::dout() << "  VVec["<<inodeA<<"] = " << VVec[inodeA];
+    Xyce::dout() << "  VVec["<<inodeB<<"] = " << VVec[inodeB] << std::endl;
 
-    cout << "  nnVec["<<inodeA<<"] = " << nnVec[inodeA];
-    cout << "  nnVec["<<inodeB<<"] = " << nnVec[inodeB] <<endl;
+    Xyce::dout() << "  nnVec["<<inodeA<<"] = " << nnVec[inodeA];
+    Xyce::dout() << "  nnVec["<<inodeB<<"] = " << nnVec[inodeB] << std::endl;
 
-    cout << "  elen = " << edgePtr->elen << endl;
-    cout << dashedline <<endl;
+    Xyce::dout() << "  elen = " << edgePtr->elen << std::endl;
+    Xyce::dout() << section_divider << std::endl;
 
   }
 #endif
@@ -7562,14 +7527,11 @@ bool Instance::pdElectronCurrent ()
   Ut = Vt/scalingVars.V0;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "Instance::pdElectronCurrent\n";
-    cout << "\n";
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "Instance::pdElectronCurrent\n";
+    Xyce::dout() << "\n";
   }
 #endif
 
@@ -7579,8 +7541,8 @@ bool Instance::pdElectronCurrent ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
     {
-      cout << dashedline2 <<"\n";
-      cout << "i="<<i;
+      Xyce::dout() << subsection_divider <<"\n";
+      Xyce::dout() << "i="<<i;
     }
 #endif
     mEdge * edgePtr = meshContainerPtr->getEdge(i);
@@ -7604,11 +7566,11 @@ bool Instance::pdElectronCurrent ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
     {
-      cout << " dJndn1="<<dJndn1Vec[i];
-      cout << " dJndn2="<<dJndn2Vec[i];
-      cout << " dJndV1="<<dJndV1Vec[i];
-      cout << " dJndV2="<<dJndV2Vec[i];
-      cout << "\n";
+      Xyce::dout() << " dJndn1="<<dJndn1Vec[i];
+      Xyce::dout() << " dJndn2="<<dJndn2Vec[i];
+      Xyce::dout() << " dJndV1="<<dJndV1Vec[i];
+      Xyce::dout() << " dJndV2="<<dJndV2Vec[i];
+      Xyce::dout() << "\n";
     }
 #endif
   }
@@ -7616,7 +7578,7 @@ bool Instance::pdElectronCurrent ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -7641,13 +7603,11 @@ bool Instance::calcHoleCurrent ()
 
 #ifdef Xyce_DEBUG_DEVICE
   int iMaxIndex = 0;
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "Instance::calcHoleCurrent\n";
-    cout << "\n";
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "Instance::calcHoleCurrent\n";
+    Xyce::dout() << "\n";
   }
 #endif
 
@@ -7657,8 +7617,8 @@ bool Instance::calcHoleCurrent ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
     {
-      cout << "\n";
-      cout << "i="<<i<<"\n";
+      Xyce::dout() << "\n";
+      Xyce::dout() << "i="<<i<<"\n";
     }
 #endif
 
@@ -7682,7 +7642,7 @@ bool Instance::calcHoleCurrent ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
     {
-      cout << "  J*scalingVars.J0="<<JpVec[i]*scalingVars.J0; cout <<"\n";
+      Xyce::dout() << "  J*scalingVars.J0="<<JpVec[i]*scalingVars.J0; Xyce::dout() <<"\n";
     }
 #endif
 
@@ -7695,29 +7655,29 @@ bool Instance::calcHoleCurrent ()
     double xScale = 1.0;
     if (variablesScaled) { jScale = scalingVars.J0; xScale = scalingVars.x0; }
 
-    cout.setf(ios::scientific);
-    cout << "  Max Hole current = " << jpMax;
-    cout << "  jScale = " << jScale;
-    cout << "\n";
+    Xyce::dout().setf(std::ios::scientific);
+    Xyce::dout() << "  Max Hole current = " << jpMax;
+    Xyce::dout() << "  jScale = " << jScale;
+    Xyce::dout() << "\n";
 
     mEdge * edgePtr = meshContainerPtr->getEdge(iMaxIndex);
     int    inodeA = edgePtr->inodeA;
     int    inodeB = edgePtr->inodeB;
 
-    cout << "  max locations A: (x,y) = (" << xVec[inodeA]*xScale<<", ";
-    cout << yVec[inodeA]*xScale<<")\n";
-    cout << "  max locations B: (x,y) = (" << xVec[inodeB]*xScale<<", ";
-    cout << yVec[inodeB]*xScale<<")\n";
-    cout << "  nodes: inodeA = "<<inodeA<<"  inodeB = " << inodeB<<endl;
+    Xyce::dout() << "  max locations A: (x,y) = (" << xVec[inodeA]*xScale<<", ";
+    Xyce::dout() << yVec[inodeA]*xScale<<")\n";
+    Xyce::dout() << "  max locations B: (x,y) = (" << xVec[inodeB]*xScale<<", ";
+    Xyce::dout() << yVec[inodeB]*xScale<<")\n";
+    Xyce::dout() << "  nodes: inodeA = "<<inodeA<<"  inodeB = " << inodeB<< std::endl;
 
-    cout << "  VVec["<<inodeA<<"] = " << VVec[inodeA];
-    cout << "  VVec["<<inodeB<<"] = " << VVec[inodeB] <<endl;
+    Xyce::dout() << "  VVec["<<inodeA<<"] = " << VVec[inodeA];
+    Xyce::dout() << "  VVec["<<inodeB<<"] = " << VVec[inodeB] << std::endl;
 
-    cout << "  npVec["<<inodeA<<"] = " << npVec[inodeA];
-    cout << "  npVec["<<inodeB<<"] = " << npVec[inodeB] <<endl;
+    Xyce::dout() << "  npVec["<<inodeA<<"] = " << npVec[inodeA];
+    Xyce::dout() << "  npVec["<<inodeB<<"] = " << npVec[inodeB] << std::endl;
 
-    cout << "  elen = " << edgePtr->elen << endl;
-    cout << dashedline <<endl;
+    Xyce::dout() << "  elen = " << edgePtr->elen << std::endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -7741,15 +7701,12 @@ bool Instance::pdHoleCurrent ()
   Ut = Vt/scalingVars.V0;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "Instance::pdHoleCurrent\n";
-    cout << "\n";
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "Instance::pdHoleCurrent\n";
+    Xyce::dout() << "\n";
   }
-  const string dashedline2 = "---------------------";
 #endif
 
 
@@ -7759,9 +7716,9 @@ bool Instance::pdHoleCurrent ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
     {
-      cout << dashedline2 <<"\n";
-      cout << "i="<<i;
-      cout << "\n";
+      Xyce::dout() << subsection_divider <<"\n";
+      Xyce::dout() << "i="<<i;
+      Xyce::dout() << "\n";
     }
 #endif
     mEdge * edgePtr = meshContainerPtr->getEdge(i);
@@ -7785,11 +7742,11 @@ bool Instance::pdHoleCurrent ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
     {
-      cout << " dJpdn1="<<dJpdn1Vec[i];
-      cout << " dJpdn2="<<dJpdn2Vec[i];
-      cout << " dJpdV1="<<dJpdV1Vec[i];
-      cout << " dJpdV2="<<dJpdV2Vec[i];
-      cout << "\n" << "\n";
+      Xyce::dout() << " dJpdn1="<<dJpdn1Vec[i];
+      Xyce::dout() << " dJpdn2="<<dJpdn2Vec[i];
+      Xyce::dout() << " dJpdV1="<<dJpdV1Vec[i];
+      Xyce::dout() << " dJpdV2="<<dJpdV2Vec[i];
+      Xyce::dout() << "\n" << "\n";
     }
 #endif
 
@@ -7798,7 +7755,7 @@ bool Instance::pdHoleCurrent ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -7828,13 +7785,11 @@ bool Instance::calcEfield ()
 #ifdef Xyce_DEBUG_DEVICE
   int iMaxIndex = 0;
 
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "Instance::calcEfield\n";
-    cout << "\n";
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "Instance::calcEfield\n";
+    Xyce::dout() << "\n";
   }
 #endif
 
@@ -7854,20 +7809,20 @@ bool Instance::calcEfield ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
     {
-      cout << "  VV[A] = " << VVec[inodeA];
-      cout << "  VV[B] = " << VVec[inodeB];
-      cout << "  elen  = " << elen;
+      Xyce::dout() << "  VV[A] = " << VVec[inodeA];
+      Xyce::dout() << "  VV[B] = " << VVec[inodeB];
+      Xyce::dout() << "  elen  = " << elen;
 
-      cout << "  EfieldVec["<<i<<"] = " << EfieldVec[i];
-      cout << "  E*scalingVars.E0 = " << EfieldVec[i]*scalingVars.E0;
-      cout << "\n";
+      Xyce::dout() << "  EfieldVec["<<i<<"] = " << EfieldVec[i];
+      Xyce::dout() << "  E*scalingVars.E0 = " << EfieldVec[i]*scalingVars.E0;
+      Xyce::dout() << "\n";
     }
 #endif
     if (elen <= 0.00)
     {
-      cout << "  edge = " << i;
-      cout << "  elen = " << elen;
-      cout << "  elen less than zero.  Exiting" << endl;
+      Xyce::dout() << "  edge = " << i;
+      Xyce::dout() << "  elen = " << elen;
+      Xyce::dout() << "  elen less than zero.  Exiting" << std::endl;
       exit(0);
     }
 
@@ -7894,24 +7849,24 @@ bool Instance::calcEfield ()
 
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout.setf(ios::scientific);
-    cout << "  Max Efield = " << Emax;
-    cout << "  eScale     = " << eScale;
-    cout << "\n";
+    Xyce::dout().setf(std::ios::scientific);
+    Xyce::dout() << "  Max Efield = " << Emax;
+    Xyce::dout() << "  eScale     = " << eScale;
+    Xyce::dout() << "\n";
 
     mEdge * edgePtr = meshContainerPtr->getEdge(iMaxIndex);
     int    inodeA = edgePtr->inodeA;
     int    inodeB = edgePtr->inodeB;
 
-    cout << "  max locations A: (x,y) = (" << xVec[inodeA]*xScale<<", ";
-    cout << yVec[inodeA]*xScale<<")\n";
-    cout << "  max locations B: (x,y) = (" << xVec[inodeB]*xScale<<", ";
-    cout << yVec[inodeB]*xScale<<")\n";
-    cout << "  nodes: inodeA = "<<inodeA<<"  inodeB = " << inodeB<<endl;
-    cout << "  VVec["<<inodeA<<"] = " << VVec[inodeA];
-    cout << "  VVec["<<inodeB<<"] = " << VVec[inodeB] <<endl;
-    cout << "  elen = " << edgePtr->elen << endl;
-    cout << dashedline <<endl;
+    Xyce::dout() << "  max locations A: (x,y) = (" << xVec[inodeA]*xScale<<", ";
+    Xyce::dout() << yVec[inodeA]*xScale<<")\n";
+    Xyce::dout() << "  max locations B: (x,y) = (" << xVec[inodeB]*xScale<<", ";
+    Xyce::dout() << yVec[inodeB]*xScale<<")\n";
+    Xyce::dout() << "  nodes: inodeA = "<<inodeA<<"  inodeB = " << inodeB<< std::endl;
+    Xyce::dout() << "  VVec["<<inodeA<<"] = " << VVec[inodeA];
+    Xyce::dout() << "  VVec["<<inodeB<<"] = " << VVec[inodeB] << std::endl;
+    Xyce::dout() << "  elen = " << edgePtr->elen << std::endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -7939,21 +7894,19 @@ bool Instance::enablePDEContinuation ()
   bool bnoChange = true;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > -5 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "Instance::enableContinuation.  " << outputName;
-    cout << endl;
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "Instance::enableContinuation.  " << outputName;
+    Xyce::dout() << std::endl;
   }
 #endif
 
   continuationAlpha = 1.0;
 
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
   // Save the old value, if this function has never been called before.
   // The old value really needs to represent what Vckt was the last time
@@ -8013,18 +7966,18 @@ bool Instance::enablePDEContinuation ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > -5 && getSolverState().debugTimeFlag)
     {
-      cout << endl;
-      cout << outputName << " ";
-      cout.width(10);
-      cout << iterDI->eName;
-      cout.width(10); cout.precision(2);
-      cout << ":  dV = " << dV;
-      cout << "  Vckt_final = " << iterDI->Vckt_final;
-      cout << "  Vckt_old   = " << iterDI->Vckt_old << endl;
-      cout << "  delta      = " << iterDI->Vckt_delta;
-      cout << "  deltaC     = " << iterDI->Vckt_deltaC;
-      cout << "  steps      = " << getSolverState().maxPDEContinuationSteps;
-      cout << endl;
+      Xyce::dout() << std::endl;
+      Xyce::dout() << outputName << " ";
+      Xyce::dout().width(10);
+      Xyce::dout() << iterDI->eName;
+      Xyce::dout().width(10); Xyce::dout().precision(2);
+      Xyce::dout() << ":  dV = " << dV;
+      Xyce::dout() << "  Vckt_final = " << iterDI->Vckt_final;
+      Xyce::dout() << "  Vckt_old   = " << iterDI->Vckt_old << std::endl;
+      Xyce::dout() << "  delta      = " << iterDI->Vckt_delta;
+      Xyce::dout() << "  deltaC     = " << iterDI->Vckt_deltaC;
+      Xyce::dout() << "  steps      = " << getSolverState().maxPDEContinuationSteps;
+      Xyce::dout() << std::endl;
     }
 #endif
 
@@ -8037,7 +7990,7 @@ bool Instance::enablePDEContinuation ()
 
   if (photogenOnFlag)
   {
-    string msg = "Instance::enablePDEContinuation: PhotogenContinuation not supported";
+    std::string msg = "Instance::enablePDEContinuation: PhotogenContinuation not supported";
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
   }
 
@@ -8046,8 +7999,8 @@ bool Instance::enablePDEContinuation ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > -5 && getSolverState().debugTimeFlag)
   {
-    if (bnoChange) cout << "bnoChange is TRUE" << endl;
-    else           cout << "bnoChange is FALSE" << endl;
+    if (bnoChange) Xyce::dout() << "bnoChange is TRUE" << std::endl;
+    else           Xyce::dout() << "bnoChange is FALSE" << std::endl;
   }
 #endif
 
@@ -8056,7 +8009,7 @@ bool Instance::enablePDEContinuation ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > -5 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -8079,9 +8032,9 @@ bool Instance::enablePDEContinuation ()
 //-----------------------------------------------------------------------------
 bool Instance::disablePDEContinuation ()
 {
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
   for (iterDI=firstDI;iterDI!=lastDI;++iterDI)
   {
@@ -8104,17 +8057,15 @@ bool Instance::disablePDEContinuation ()
 void Instance::setPDEContinuationAlpha (double alpha)
 {
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
-  cout << dashedline << endl;
-  cout << "Instance::setPDEContinuationAlpha" << endl;
+  Xyce::dout() << section_divider << std::endl;
+  Xyce::dout() << "Instance::setPDEContinuationAlpha" << std::endl;
 #endif
 
 
   // First do the voltage boundary conditions:
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
   for (iterDI=firstDI;iterDI!=lastDI;++iterDI)
   {
@@ -8135,13 +8086,13 @@ void Instance::setPDEContinuationAlpha (double alpha)
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << outputName << " ";
-      cout.width(10);
-      cout <<iterDI->eName;
-      cout << "\tVckt_ramp = " << iterDI->Vckt_ramp;
-      cout << "\tVckt_old = " << iterDI->Vckt_old;
-      cout << "\talpha = " << alpha;
-      cout << endl;
+      Xyce::dout() << outputName << " ";
+      Xyce::dout().width(10);
+      Xyce::dout() <<iterDI->eName;
+      Xyce::dout() << "\tVckt_ramp = " << iterDI->Vckt_ramp;
+      Xyce::dout() << "\tVckt_old = " << iterDI->Vckt_old;
+      Xyce::dout() << "\talpha = " << alpha;
+      Xyce::dout() << std::endl;
     }
 #endif
   }
@@ -8162,8 +8113,8 @@ void Instance::setPDEContinuationAlpha (double alpha)
   }
 
 #ifdef Xyce_DEBUG_DEVICE
-  cout << "  photoA1_ramp = " << photoA1_ramp << endl;
-  cout << dashedline << endl;
+  Xyce::dout() << "  photoA1_ramp = " << photoA1_ramp << std::endl;
+  Xyce::dout() << section_divider << std::endl;
 #endif
 
 }
@@ -8179,24 +8130,38 @@ void Instance::setPDEContinuationAlpha (double alpha)
 void Instance::setPDEContinuationBeta (double beta)
 {
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
-  cout << dashedline << endl;
-  cout << "Instance::setPDEContinuationBeta" << endl;
+  Xyce::dout() << section_divider << std::endl;
+  Xyce::dout() << "Instance::setPDEContinuationBeta" << std::endl;
 #endif
 
   // First do the voltage boundary conditions:
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
   for (iterDI=firstDI;iterDI!=lastDI;++iterDI)
   {
     iterDI->Vckt_ramp = iterDI->Vckt*beta;
 #ifdef Xyce_DEBUG_DEVICE
-    cout << "  " << iterDI->eName << "  Vckt_ramp = " << iterDI->Vckt_ramp << endl;
+    Xyce::dout() << "  " << iterDI->eName << "  Vckt_ramp = " << iterDI->Vckt_ramp << std::endl;
 #endif
   }
+}
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  Device *device = new DeviceMaster<Traits>(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+
+  return device;
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("pde", 2)
+    .registerModelType("pde", 2)
+    .registerModelType("zod", 2);
 }
 
 } // namespace TwoDPDE

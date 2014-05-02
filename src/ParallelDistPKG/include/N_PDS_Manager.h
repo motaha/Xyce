@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.26.2.2 $
+// Revision Number: $Revision: 1.35 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -47,11 +47,8 @@
 #ifndef Xyce_N_PDS_Manager_h
 #define Xyce_N_PDS_Manager_h
 
-// ---------- Forward Declarations -------
-
-class N_PDS_Comm;
-
-class N_TOP_Topology;
+#include <N_PDS_fwd.h>
+#include <N_TOP_fwd.h>
 
 class N_PDS_GlobalAccessor;
 class N_PDS_ParMap;
@@ -95,11 +92,7 @@ class N_PDS_Manager
 
 public:
   //Constructors
-  N_PDS_Manager(bool & isSerial, bool & procFlag, int iargs = 0, char * cargs[] = 0
-#ifdef Xyce_PARALLEL_MPI
-                , MPI_Comm * comm = 0
-#endif
-               );
+    N_PDS_Manager(bool & isSerial, bool & procFlag, int iargs = 0, char **cargs = 0, Xyce::Parallel::Machine comm = 0);
 
   //Destructor
   ~N_PDS_Manager();
@@ -108,32 +101,32 @@ public:
 
   // Parallel Map manipulators
   // add map to stl::map container.
-  bool addParallelMap(const string & name, N_PDS_ParMap * map);
+  bool addParallelMap(const std::string & name, N_PDS_ParMap * map);
 
   // Delete map from stl::map container.
-  bool deleteParallelMap(const string & name);
+  bool deleteParallelMap(const std::string & name);
 
   // Gets the parallel map object.
-  N_PDS_ParMap * getParallelMap(const string & name);
+  N_PDS_ParMap * getParallelMap(const std::string & name);
 
   // Create a parallel map from a global id array:
   // if num_global = -1, num_global will be calculated and returned
   N_PDS_ParMap * createParallelMap(int & num_global,
                                    const int & num_local,
-                                   const vector<int> & gid_map,
+                                   const std::vector<int> & gid_map,
                                    const int index_base = 0 );
   
   // Add a global accessor object associated with a parallel map.
-  bool addGlobalAccessor(const string & name);
+  bool addGlobalAccessor(const std::string & name);
 
   // Delete a global accessor object associated with a parallel map.
-  bool deleteGlobalAccessor(const string & name);
+  bool deleteGlobalAccessor(const std::string & name);
 
   // Method which greats a global accessor object.
-  N_PDS_GlobalAccessor * createGlobalAccessor(const string & name = "");
+  N_PDS_GlobalAccessor * createGlobalAccessor(const std::string & name = "");
 
   // Gets a global accessor object.
-  N_PDS_GlobalAccessor * getGlobalAccessor(const string & name);
+  N_PDS_GlobalAccessor * getGlobalAccessor(const std::string & name);
 
   // Return ptr to common Comm object owned by Mgr.
   N_PDS_Comm * getPDSComm() const { return Comm_; }
@@ -145,15 +138,15 @@ public:
   N_PDS_ParDir * createParDir() const;
 
   // Add a matrix graph object
-  bool addMatrixGraph( const string & name,
+  bool addMatrixGraph( const std::string & name,
                        Epetra_CrsGraph * graph,
                        EpetraExt::CrsGraph_View * trans = 0 );
 
   // Gets a matrix graph object.
-  Epetra_CrsGraph * getMatrixGraph(const string & name);
+  Epetra_CrsGraph * getMatrixGraph(const std::string & name);
 
   // Delete a matrix graph object
-  bool deleteMatrixGraph(const string & name);
+  bool deleteMatrixGraph(const std::string & name);
 
 private:
 
@@ -177,11 +170,11 @@ private:
   // Pointer to the topology object.
   N_TOP_Topology * Topo_;
 
-  map<string, N_PDS_ParMap*> pm_Map_;
-  map<string, N_PDS_GlobalAccessor*> ga_Map_;
+  std::map<std::string, N_PDS_ParMap*> pm_Map_;
+  std::map<std::string, N_PDS_GlobalAccessor*> ga_Map_;
 
-  map< string, Epetra_CrsGraph*> mg_Map_;
-  map< string, EpetraExt::CrsGraph_View* > mgvt_Map_;
+  std::map< std::string, Epetra_CrsGraph*> mg_Map_;
+  std::map< std::string, EpetraExt::CrsGraph_View* > mgvt_Map_;
 
 };
 

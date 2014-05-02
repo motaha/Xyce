@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -42,9 +42,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.17.2.3 $
+// Revision Number: $Revision: 1.26 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/24 23:49:18 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -93,9 +93,9 @@ bool Instance::loadDAEFVector ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "loadDAEFVector:  doubleDCOPStep="<<getSolverState().doubleDCOPStep;
-    if (getSolverState().dcopFlag) cout << "  DCOP load" <<endl;
-    else                   cout << "  Transient load" <<endl;
+    Xyce::dout() << "loadDAEFVector:  doubleDCOPStep="<<getSolverState().doubleDCOPStep;
+    if (getSolverState().dcopFlag) Xyce::dout() << "  DCOP load" <<std::endl;
+    else                   Xyce::dout() << "  Transient load" <<std::endl;
   }
 #endif
 
@@ -119,7 +119,7 @@ bool Instance::loadDAEFVector ()
     }
     else
     {
-      string msg = "Instance::loadDAEFVector."
+      std::string msg = "Instance::loadDAEFVector."
                    "Invalid coupling Mode";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
     }
@@ -176,8 +176,6 @@ bool Instance::loadDAEFExtractedConductance ()
   bool bsuccess = true;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-    "---------------------------";
 #endif
 
   return bsuccess;
@@ -199,9 +197,9 @@ bool Instance::loadDAEQVector ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "loadDAEQVector:  doubleDCOPStep="<<getSolverState().doubleDCOPStep;
-    if (getSolverState().dcopFlag) cout << "  DCOP load" <<endl;
-    else                   cout << "  Transient load" <<endl;
+    Xyce::dout() << "loadDAEQVector:  doubleDCOPStep="<<getSolverState().doubleDCOPStep;
+    if (getSolverState().dcopFlag) Xyce::dout() << "  DCOP load" <<std::endl;
+    else                   Xyce::dout() << "  Transient load" <<std::endl;
   }
 #endif
 
@@ -225,7 +223,7 @@ bool Instance::loadDAEQVector ()
     }
     else
     {
-      string msg = "Instance::loadDAEQVector."
+      std::string msg = "Instance::loadDAEQVector."
                    "Invalid coupling Mode";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
     }
@@ -331,9 +329,7 @@ bool Instance::loadDAEdFdx ()
     }
     else
     {
-      string msg = "Instance::loadDAEdFdx."
-                   "Invalid coupling Mode";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg, numElectrodes);
+      Report::DevelFatal().in("Instance::loadDAEdFdx") << "Invalid coupling Mode" << numElectrodes;
     }
   }
 
@@ -404,14 +400,12 @@ bool Instance::loadDAEdFdxExtractedConductance ()
   bool bsuccess = true;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-    "---------------------------";
 
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << endl;
-    cout << dashedline << endl;
-    cout << "Instance::loadDAEdFdxExtractedConductance" << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "Instance::loadDAEdFdxExtractedConductance" << std::endl;
   }
 
 #endif
@@ -463,9 +457,7 @@ bool Instance::loadDAEdQdx ()
     }
     else
     {
-      string msg = "Instance::loadDAEdQdx."
-                   "Invalid coupling Mode";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg, numElectrodes);
+      Report::DevelFatal().in("Instance::loadDAEdQdx") << "Invalid coupling Mode" << numElectrodes;
     }
   }
 
@@ -518,7 +510,7 @@ bool Instance::loadDAEdQdxDDFormulation ()
       }
       else
       {
-        cout << "OOOPS 1!" <<endl;
+        Xyce::dout() << "OOOPS 1!" <<std::endl;
         exit(0);
       }
 
@@ -538,7 +530,7 @@ bool Instance::loadDAEdQdxDDFormulation ()
       }
       else
       {
-        cout << "OOOPS 2!" <<endl;
+        Xyce::dout() << "OOOPS 2!" <<std::endl;
         exit(0);
       }
 
@@ -553,8 +545,8 @@ bool Instance::loadDAEdQdxDDFormulation ()
       Nrow = li_Nrowarray[i];
       Prow = li_Prowarray[i];
 
-      vector <int> & Noff = li_NoffsetArray[i];
-      vector <int> & Poff = li_PoffsetArray[i];
+      std::vector<int> & Noff = li_NoffsetArray[i];
+      std::vector<int> & Poff = li_PoffsetArray[i];
 
       QMatrix[Nrow][Noff[0]] += -scalingVars.t0;
       QMatrix[Prow][Poff[0]] += -scalingVars.t0;

@@ -36,11 +36,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.8.2.1 $
+// Revision Number: $Revision: 1.12 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:33 $
+// Revision Date  : $Date: 2014/01/23 16:19:04 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: dgbaur $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
@@ -68,7 +68,11 @@ namespace Device {
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 08/11/2010
 //-----------------------------------------------------------------------------
-MembranePassive::MembranePassive(SolverState & ss1, double cMem, double gMem, double vRest) : MembraneModel(ss1), gMem_(gMem), cMem_(cMem), vRest_(vRest)
+MembranePassive::MembranePassive(const SolverState & ss1, double cMem, double gMem, double vRest)
+  : MembraneModel(ss1),
+    gMem_(gMem),
+    cMem_(cMem),
+    vRest_(vRest)
 {
   // passive membrane just has voltage as its unknown variable
   // so set up numIndependentVars_ for that
@@ -83,7 +87,7 @@ MembranePassive::MembranePassive(SolverState & ss1, double cMem, double gMem, do
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 08/11/2010
 //-----------------------------------------------------------------------------
-void MembranePassive::setJacStamp( int numExtVars, int segmentNumber, int vOffset, vector< vector< int > > & segmentJacStamp )
+void MembranePassive::setJacStamp( int numExtVars, int segmentNumber, int vOffset, std::vector< std::vector< int > > & segmentJacStamp )
 {
   // In a passive cable the membrane is just two passive elements, a capacitor and a resistor
   // thus the membrane current, I = f(Vsegment).
@@ -99,14 +103,14 @@ void MembranePassive::setJacStamp( int numExtVars, int segmentNumber, int vOffse
   {
     if( segmentJacStamp[ offset ][0] != offset )
     {
-      std::cout << "Potential error in MembranePassive::setJacStamp().  segmentJacStamp[ " << offset << " ][0] != " << offset << std::endl;
+      Xyce::dout() << "Potential error in MembranePassive::setJacStamp().  segmentJacStamp[ " << offset << " ][0] != " << offset << std::endl;
     }
   }
   else if( jacobianRowSize > 1 )
   {
     if( segmentJacStamp[ offset ][1] != offset )
     {
-      std::cout << "Potential error in MembranePassive::setJacStamp().  segmentJacStamp[ " << offset << " ][1] != " << offset << std::endl;
+      Xyce::dout() << "Potential error in MembranePassive::setJacStamp().  segmentJacStamp[ " << offset << " ][1] != " << offset << std::endl;
     }
   }
   */
@@ -121,7 +125,7 @@ void MembranePassive::setJacStamp( int numExtVars, int segmentNumber, int vOffse
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 08/11/2010
 //-----------------------------------------------------------------------------
-void MembranePassive::loadDAEQVector( int segmentNumber, vector< int > & lidIndexVector,  N_LAS_Vector * solnVecPtr, N_LAS_Vector * daeQVecPtr, double segArea)
+void MembranePassive::loadDAEQVector( int segmentNumber, std::vector< int > & lidIndexVector,  N_LAS_Vector * solnVecPtr, N_LAS_Vector * daeQVecPtr, double segArea)
 {
   // Each segment will have numIndependentVars_ with segment voltage being the first
   // so, the cMem dV/dt term will be at segmentNumber * numIndependentVars_.
@@ -137,7 +141,7 @@ void MembranePassive::loadDAEQVector( int segmentNumber, vector< int > & lidInde
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 08/11/2010
 //-----------------------------------------------------------------------------
-void MembranePassive::loadDAEFVector( int segmentNumber, vector< int > & lidIndexVector, N_LAS_Vector * solnVecPtr, N_LAS_Vector * daeFVecPtr, double segArea)
+void MembranePassive::loadDAEFVector( int segmentNumber, std::vector< int > & lidIndexVector, N_LAS_Vector * solnVecPtr, N_LAS_Vector * daeFVecPtr, double segArea)
 {
   // Each segment will have numIndependentVars_ with segment voltage being the first
   // so, the cMem dV/dt term will be at segmentNumber * numIndependentVars_.
@@ -153,7 +157,7 @@ void MembranePassive::loadDAEFVector( int segmentNumber, vector< int > & lidInde
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 08/11/2010
 //-----------------------------------------------------------------------------
-void MembranePassive::loadDAEdQdx( int segmentNumber, int vOffset, vector< int > & lidIndexVector, vector< vector< int > > & jacobianOffsets, N_LAS_Vector * solnVecPtr, N_LAS_Matrix * dQdxMatPtr, double segArea)
+void MembranePassive::loadDAEdQdx( int segmentNumber, int vOffset, std::vector< int > & lidIndexVector, std::vector< std::vector< int > > & jacobianOffsets, N_LAS_Vector * solnVecPtr, N_LAS_Matrix * dQdxMatPtr, double segArea)
 {
    // while lidIndexVector lists LID's for just the segment variables (just V in the case
    // of a passive cable). The jacobianOffsets includes the Vin and Vout as the first
@@ -176,7 +180,7 @@ void MembranePassive::loadDAEdQdx( int segmentNumber, int vOffset, vector< int >
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 08/11/2010
 //-----------------------------------------------------------------------------
-void MembranePassive::loadDAEdFdx( int segmentNumber, int vOffset, vector< int > & lidIndexVector, vector< vector< int > > & jacobianOffsets, N_LAS_Vector * solnVecPtr, N_LAS_Matrix * dFdxMatPtr, double segArea)
+void MembranePassive::loadDAEdFdx( int segmentNumber, int vOffset, std::vector< int > & lidIndexVector, std::vector< std::vector< int > > & jacobianOffsets, N_LAS_Vector * solnVecPtr, N_LAS_Matrix * dFdxMatPtr, double segArea)
 {
    // while lidIndexVector lists LID's for just the segment variables (just V in the case
    // of a passive cable). The jacobianOffsets includes the Vin and Vout as the first

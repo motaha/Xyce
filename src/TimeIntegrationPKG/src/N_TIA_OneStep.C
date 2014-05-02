@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.44.2.2 $
+// Revision Number: $Revision: 1.60 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -71,6 +71,10 @@
 
 #include <N_PDS_Comm.h>
 #include <N_PDS_Manager.h>
+
+using std::min;
+using std::max;
+using std::abs;
 
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_OneStep::N_TIA_OneStep
@@ -128,73 +132,70 @@ void N_TIA_OneStep::obtainPredictor()
   }
 
 #ifdef Xyce_DEBUG_TIME
-  cout.width(21); cout.precision(13); cout.setf(ios::scientific);
+  Xyce::dout().width(21); Xyce::dout().precision(13); Xyce::dout().setf(std::ios::scientific);
 
-  const string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
   if (tiaParams.debugLevel > 1)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           "  N_TIA_OneStep::obtainPredictor");
-    cout << "\n currentOrder = " << sec.currentOrder_ << endl;
-    cout << "\n sec.nscsco_: " << sec.nscsco_ << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() <<
+                           "  N_TIA_OneStep::obtainPredictor" << std::endl;
+    Xyce::dout() << "\n currentOrder = " << sec.currentOrder_ << std::endl;
+    Xyce::dout() << "\n sec.nscsco_: " << sec.nscsco_ << std::endl;
     for (int i=0; i<=sec.currentOrder_ ; ++i)
-      cout << "\n sec.beta_[" << i << "] = " << sec.beta_[i] << "\n" << endl;
+      Xyce::dout() << "\n sec.beta_[" << i << "] = " << sec.beta_[i] << "\n" << std::endl;
     for (int i=0; i<=sec.currentOrder_ ; ++i)
     {
-      cout << "\n xHistory["<< i << "]: \n" << endl;
-      (ds.xHistory[i])->printPetraObject();
-      cout << endl;
+      Xyce::dout() << "\n xHistory["<< i << "]: \n" << std::endl;
+      (ds.xHistory[i])->printPetraObject(Xyce::dout());
+      Xyce::dout() << std::endl;
     }
     for (int i=0; i<=sec.currentOrder_ ; ++i)
     {
-      cout << "\n qHistory["<< i << "]: \n" << endl;
-      (ds.qHistory[i])->printPetraObject();
-      cout << endl;
+      Xyce::dout() << "\n qHistory["<< i << "]: \n" << std::endl;
+      (ds.qHistory[i])->printPetraObject(Xyce::dout());
+      Xyce::dout() << std::endl;
     }
     for (int i=0; i<=sec.currentOrder_ ; ++i)
     {
-      cout << "\n sHistory["<< i << "]: \n" << endl;
-      (ds.sHistory[i])->printPetraObject();
-      cout << endl;
+      Xyce::dout() << "\n sHistory["<< i << "]: \n" << std::endl;
+      (ds.sHistory[i])->printPetraObject(Xyce::dout());
+      Xyce::dout() << std::endl;
     }
     for (int i=0; i<=sec.currentOrder_ ; ++i)
     {
-      cout << "\n stoHistory["<< i << "]: \n" << endl;
-      (ds.stoHistory[i])->printPetraObject();
-      cout << endl;
+      Xyce::dout() << "\n stoHistory["<< i << "]: \n" << std::endl;
+      (ds.stoHistory[i])->printPetraObject(Xyce::dout());
+      Xyce::dout() << std::endl;
     }
     for (int i=0; i<=sec.currentOrder_ ; ++i)
     {
-      cout << "\n stoLeadCurrQCompHistory["<< i << "]: \n" << endl;
-      (ds.stoLeadCurrQCompHistory[i])->printPetraObject();
-      cout << endl;
+      Xyce::dout() << "\n stoLeadCurrQCompHistory["<< i << "]: \n" << std::endl;
+      (ds.stoLeadCurrQCompHistory[i])->printPetraObject(Xyce::dout());
+      Xyce::dout() << std::endl;
     }
-    cout << "\n xn0: \n" << endl;
-    ds.xn0Ptr->printPetraObject();
-    cout << endl;
-    cout << "\n qn0: \n" << endl;
-    ds.qn0Ptr->printPetraObject();
-    cout << endl;
-    cout << "\n qpn0: \n" << endl;
-    ds.qpn0Ptr->printPetraObject();
-    cout << endl;
-    cout << "\n sn0: \n" << endl;
-    ds.sn0Ptr->printPetraObject();
-    cout << endl;
-    cout << "\n spn0: \n" << endl;
-    ds.spn0Ptr->printPetraObject();
-    cout << endl;
-    cout << "\n stoQCn0Ptr: \n" << endl;
-    ds.stoQCn0Ptr->printPetraObject();
-    cout << endl;
-    cout << "\n stoQCpn0Ptr: \n" << endl;
-    ds.stoQCpn0Ptr->printPetraObject();
-    cout << endl;
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+    Xyce::dout() << "\n xn0: \n" << std::endl;
+    ds.xn0Ptr->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "\n qn0: \n" << std::endl;
+    ds.qn0Ptr->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "\n qpn0: \n" << std::endl;
+    ds.qpn0Ptr->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "\n sn0: \n" << std::endl;
+    ds.sn0Ptr->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "\n spn0: \n" << std::endl;
+    ds.spn0Ptr->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "\n stoQCn0Ptr: \n" << std::endl;
+    ds.stoQCn0Ptr->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "\n stoQCpn0Ptr: \n" << std::endl;
+    ds.stoQCpn0Ptr->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
   }
 #endif // Xyce_DEBUG_TIME
   // copy the prediction into the next solution:
@@ -218,31 +219,28 @@ void N_TIA_OneStep::obtainResidual()
   ds.RHSVectorPtr->linearCombo(1.0,*ds.daeQVectorPtr,-1.0,*ds.qn0Ptr);
   
 #ifdef Xyce_DEBUG_TIME
-  const string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
   if (tiaParams.debugLevel > 1)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           "  N_TIA_OneStep::obtainResidual");
-    cout << "\n t = " << sec.nextTime << "\n" << endl;
-    cout << "\n solution: \n" << endl;
-    ds.nextSolutionPtr->printPetraObject();
-    cout << "\n daeQVector: \n" << endl;
-    ds.daeQVectorPtr->printPetraObject();
-    cout << "\n qn0: \n" << endl;
-    ds.qn0Ptr->printPetraObject();
-    cout << "\n qpn0: \n" << endl;
-    ds.qpn0Ptr->printPetraObject();
-    cout << "\n sec.alphas_/hn: " << sec.alphas_/sec.currentTimeStep << "\n" << endl;
-    cout << "\n daeFVector: \n" << endl;
-    ds.daeFVectorPtr->printPetraObject();
+    Xyce::dout() << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() <<
+                           "  N_TIA_OneStep::obtainResidual" << std::endl;
+    Xyce::dout() << "\n t = " << sec.nextTime << "\n" << std::endl;
+    Xyce::dout() << "\n solution: \n" << std::endl;
+    ds.nextSolutionPtr->printPetraObject(Xyce::dout());
+    Xyce::dout() << "\n daeQVector: \n" << std::endl;
+    ds.daeQVectorPtr->printPetraObject(Xyce::dout());
+    Xyce::dout() << "\n qn0: \n" << std::endl;
+    ds.qn0Ptr->printPetraObject(Xyce::dout());
+    Xyce::dout() << "\n qpn0: \n" << std::endl;
+    ds.qpn0Ptr->printPetraObject(Xyce::dout());
+    Xyce::dout() << "\n sec.alphas_/hn: " << sec.alphas_/sec.currentTimeStep << "\n" << std::endl;
+    Xyce::dout() << "\n daeFVector: \n" << std::endl;
+    ds.daeFVectorPtr->printPetraObject(Xyce::dout());
 
-    cout << "\n dQdt-vector: \n" << endl;
-    ds.RHSVectorPtr->printPetraObject();
-    cout << endl;
+    Xyce::dout() << "\n dQdt-vector: \n" << std::endl;
+    ds.RHSVectorPtr->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -266,18 +264,23 @@ void N_TIA_OneStep::obtainResidual()
     (ds.RHSVectorPtr)->daxpy(
       *(ds.RHSVectorPtr), +1.0, *(ds.dQdxdVpVectorPtr));
 
+    double fscalar(1.0);
+
+    if (sec.currentOrder_  == 2)
+  	fscalar =1.0/2.0;
+
     (ds.RHSVectorPtr)->daxpy(
-      *(ds.RHSVectorPtr), +1.0, *(ds.dFdxdVpVectorPtr));
+      *(ds.RHSVectorPtr), fscalar, *(ds.dFdxdVpVectorPtr));
   }
 
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams.debugLevel > 1)
   {
-    cout << "\n Residual-vector: \n" << endl;
-    cout << "-(qpn0-(sec.alpha_s/h)*(Q-qn0)+F-B) \n" << endl;
-    ds.RHSVectorPtr->printPetraObject();
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-    cout << endl;
+    Xyce::dout() << "\n Residual-vector: \n" << std::endl;
+    Xyce::dout() << "-(qpn0-(sec.alpha_s/h)*(Q-qn0)+F-B) \n" << std::endl;
+    ds.RHSVectorPtr->printPetraObject(Xyce::dout());
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -295,15 +298,12 @@ void N_TIA_OneStep::obtainJacobian()
 {
 
 #ifdef Xyce_DEBUG_TIME
-  const string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
   if (tiaParams.debugLevel > 1)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           "  N_TIA_OneStep::obtainJacobian");
+    Xyce::dout() << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() <<
+                           "  N_TIA_OneStep::obtainJacobian" << std::endl;
   }
 #endif
   // output: ds.JMatrixPtr
@@ -327,17 +327,17 @@ void N_TIA_OneStep::obtainJacobian()
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams.debugLevel > 1)
   {
-    cout << "\n dFdx:" <<endl;
-    dFdx.printPetraObject();
-    cout << "\n Total Jacobian:" <<endl;
-    Jac.printPetraObject();
+    Xyce::dout() << "\n dFdx:" <<std::endl;
+    dFdx.printPetraObject(Xyce::dout());
+    Xyce::dout() << "\n Total Jacobian:" <<std::endl;
+    Jac.printPetraObject(Xyce::dout());
 //    for (int i=0;i<3;++i)
 //    {
 //      printf("[ %25.20g\t%25.20g\t%25.20g ]\n",Jac[i][0],Jac[i][1],Jac[i][2]);
 //    }
 
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-    cout << endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -351,7 +351,7 @@ void N_TIA_OneStep::obtainJacobian()
 // Creation Date : 11/16/07
 //-----------------------------------------------------------------------------
 bool N_TIA_OneStep::interpolateSolution(double timepoint, 
-    	N_LAS_Vector * tmpSolVectorPtr, vector<N_LAS_Vector*> & historyVec)
+    	N_LAS_Vector * tmpSolVectorPtr, std::vector<N_LAS_Vector*> & historyVec)
 {
   // this is a very course approximation to determine if we are too 
   // close to the actual time step to do an interpolation.
@@ -404,18 +404,20 @@ bool N_TIA_OneStep::interpolateSolution(double timepoint,
 bool N_TIA_OneStep::interpolateMPDESolution(std::vector<double>& timepoint, 
     	N_LAS_Vector * tmpSolVectorPtr)
 {
+/*
 #ifdef Xyce_PARALLEL_MPI
-  string msg = "N_TIA_OneStep::interpolateMPDESolution: ";
+  std::string msg = "N_TIA_OneStep::interpolateMPDESolution: ";
   msg += "Not set up for Parallel yet";
   N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   return(false);
 #endif
+*/
 
   N_LAS_BlockVector * blockTempSolVectorPtr = 
      dynamic_cast<N_LAS_BlockVector*>(tmpSolVectorPtr);
   if (blockTempSolVectorPtr == NULL)
   {
-    string msg = "N_TIA_OneStep::interpolateMPDESolution: ";
+    std::string msg = "N_TIA_OneStep::interpolateMPDESolution: ";
     msg += "N_LAS_Vector tmpSolVectorPtr is not of type N_LAS_BlockVector";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
     return(false);
@@ -427,7 +429,7 @@ bool N_TIA_OneStep::interpolateMPDESolution(std::vector<double>& timepoint,
   int blockCount = blockTempSolVectorPtr->blockCount();
   if (numblocks > blockCount)
   {
-    string msg = "N_TIA_OneStep::interpolateMPDESolution: ";
+    std::string msg = "N_TIA_OneStep::interpolateMPDESolution: ";
     msg += "Number of time points requested is greater than number of fast time points in MPDE block vector";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
     return(false);
@@ -471,9 +473,7 @@ bool N_TIA_OneStep::interpolateMPDESolution(std::vector<double>& timepoint,
         dynamic_cast<N_LAS_BlockVector*>(ds.xHistory[j]);
       if (blockXHistoryVectorPtr == NULL)
       {
-        string msg = "N_TIA_OneStep::interpolateMPDESolution: ";
-        msg += "N_LAS_Vector ds.xHistory[j] is not of type N_LAS_BlockVector\n j = ";
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg, j);
+        Xyce::Report::DevelFatal0().in("N_TIA_OneStep::interpolateMPDESolution") << "N_LAS_Vector ds.xHistory[j] is not of type N_LAS_BlockVector\n j = " << j;
         return(false);
       }
       xHistoryVectorPtr = &(blockXHistoryVectorPtr->block(i));
@@ -498,15 +498,12 @@ bool N_TIA_OneStep::printMPDEOutputSolution(
         const std::vector<double> & fastTimes )
 {
 #ifdef Xyce_DEBUG_TIME
-  const string dashedline =
-	"---------------------------------------------------------------"
-	"-------------";
   if (tiaParams.debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-      "  N_TIA_OneStep::printMPDEOutputSolution");
+    Xyce::dout() << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() <<
+      "  N_TIA_OneStep::printMPDEOutputSolution" << std::endl;
   }
 #endif // Xyce_DEBUG_TIME
   double timestep = sec.lastAttemptedTimeStep;
@@ -520,13 +517,13 @@ bool N_TIA_OneStep::printMPDEOutputSolution(
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams.debugLevel > 0)
   {
-    cout << "timestep = " << timestep << endl;
-    cout << "lasttime = " << lasttime << endl;
-    cout << "tn = " << tn << endl;
-    cout << "beg_of_output_time_interval = " << beg_of_output_time_interval << endl;
-    cout << "end_of_output_time_interval = " << end_of_output_time_interval << endl;
-    cout << "start_time = " << start_time << endl;
-    cout << "stop_time = " << stop_time << endl;
+    Xyce::dout() << "timestep = " << timestep << std::endl;
+    Xyce::dout() << "lasttime = " << lasttime << std::endl;
+    Xyce::dout() << "tn = " << tn << std::endl;
+    Xyce::dout() << "beg_of_output_time_interval = " << beg_of_output_time_interval << std::endl;
+    Xyce::dout() << "end_of_output_time_interval = " << end_of_output_time_interval << std::endl;
+    Xyce::dout() << "start_time = " << start_time << std::endl;
+    Xyce::dout() << "stop_time = " << stop_time << std::endl;
   }
 #endif // Xyce_DEBUG_TIME
 
@@ -535,7 +532,7 @@ bool N_TIA_OneStep::printMPDEOutputSolution(
     dynamic_cast<N_LAS_BlockVector*>(ds.tmpSolVectorPtr);
   if (blockTmpSolVectorPtr == NULL)
   {
-    string msg = "N_TIA_OneStep::printMPDEOutputSolution: ";
+    std::string msg = "N_TIA_OneStep::printMPDEOutputSolution: ";
     msg += "N_LAS_Vector ds.tmpSolVectorPtr is not of type N_LAS_BlockVector";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
     return(false);
@@ -559,23 +556,23 @@ bool N_TIA_OneStep::printMPDEOutputSolution(
   }
   if (s_ind_0 == -1)
   {
-    string msg = "N_TIA_OneStep::printMPDEOutputSolution: ";
+    std::string msg = "N_TIA_OneStep::printMPDEOutputSolution: ";
     msg += "Cannot find where characteristic curve crosses fast time slice at start_time";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
     return(false);
   }
-  vector<double> h2(blockCount,0);
+  std::vector<double> h2(blockCount,0);
   for (int j=0 ; j < blockCount ; ++j)
   {
     h2[j] = fastTimes[j+1] - fastTimes[j];
   }
-  vector<double> ti;
+  std::vector<double> ti;
   //double first_interp = floor(start_time/T2)*T2 + fastTimes[s_ind_0];
   double first_interp = start_time - charcross + fastTimes[s_ind_0];
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams.debugLevel > 0)
   {
-    cout << "first_interp = " << first_interp << endl;
+    Xyce::dout() << "first_interp = " << first_interp << std::endl;
   }
 #endif // Xyce_DEBUG_TIME
   if (s_ind_0 == blockCount) { s_ind_0 = 0; };
@@ -589,7 +586,7 @@ bool N_TIA_OneStep::printMPDEOutputSolution(
 #ifdef Xyce_DEBUG_TIME
     if (tiaParams.debugLevel > 0)
     {
-      cout << "Moving first_interp forward to avoid duplicate outputs:  " << first_interp << endl;
+      Xyce::dout() << "Moving first_interp forward to avoid duplicate outputs:  " << first_interp << std::endl;
     }
 #endif // Xyce_DEBUG_TIME
   }
@@ -605,16 +602,16 @@ bool N_TIA_OneStep::printMPDEOutputSolution(
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams.debugLevel > 0)
   {
-    cout << "T2 = " << T2 << endl;
-    cout << "charcross = " << charcross << endl;
-    cout << "s_ind_0 = " << s_ind_0 << endl;
-    cout << "Expecting to interpolate the following points:" << endl;
+    Xyce::dout() << "T2 = " << T2 << std::endl;
+    Xyce::dout() << "charcross = " << charcross << std::endl;
+    Xyce::dout() << "s_ind_0 = " << s_ind_0 << std::endl;
+    Xyce::dout() << "Expecting to interpolate the following points:" << std::endl;
     unsigned int numinterp = ti.size();
     for (unsigned int i=0 ; i < numinterp ; ++i)
     {
-      cout << ti[i] << endl;
+      Xyce::dout() << ti[i] << std::endl;
     }
-    cout << "Total of " << numinterp << " points" << endl;
+    Xyce::dout() << "Total of " << numinterp << " points" << std::endl;
   }
 #endif // Xyce_DEBUG_TIME
   timept_ = start_time;  // used later for interpolating stop_time
@@ -638,19 +635,23 @@ bool N_TIA_OneStep::printMPDEOutputSolution(
       for (int j=0 ; j < num_interp_this_cycle ; ++j)
       {
         timept_ = timepoint_vec[s];
-        outputMgrAdapterRCPtr->tranOutput(timept_, blockTmpSolVectorPtr->block(s), *ds.tmpStaVectorPtr, *ds.tmpStoVectorPtr  );
+        outputMgrAdapterRCPtr->tranOutput(
+            timept_, blockTmpSolVectorPtr->block(s), 
+            *ds.tmpStaVectorPtr, *ds.tmpStoVectorPtr,
+            ds.objectiveVec_, ds.dOdpVec_, ds.dOdpAdjVec_,
+            ds.scaled_dOdpVec_, ds.scaled_dOdpAdjVec_);
         total_interp++;
         s++;
         if (s >= blockCount) { s = 0; }
 #ifdef Xyce_DEBUG_TIME
-        cout << "Interpolated to t = " << timept_ << endl;
+        Xyce::dout() << "Interpolated to t = " << timept_ << std::endl;
 #endif // Xyce_DEBUG_TIME
       }
       num_interp_this_cycle = 0;
     }
   }
 #ifdef Xyce_DEBUG_TIME
-  cout << "Total of " << total_interp << " points" << endl;
+  Xyce::dout() << "Total of " << total_interp << " points" << std::endl;
 #endif // Xyce_DEBUG_TIME
 
   // Now we interpolate stop_time unless its too close to the last timept interpolated.
@@ -661,8 +662,8 @@ bool N_TIA_OneStep::printMPDEOutputSolution(
 #ifdef Xyce_DEBUG_TIME
     if (tiaParams.debugLevel > 0)
     {
-      cout << "Previous timept = " << timept_ << endl;
-      cout << "Expecting to interpolate the following point: " << stop_time << endl;
+      Xyce::dout() << "Previous timept = " << timept_ << std::endl;
+      Xyce::dout() << "Expecting to interpolate the following point: " << stop_time << std::endl;
     }
 #endif // Xyce_DEBUG_TIME
     N_LAS_Vector* tmpSolnVecPtr = solnVecPtr;
@@ -678,14 +679,14 @@ bool N_TIA_OneStep::printMPDEOutputSolution(
       dynamic_cast<N_LAS_BlockVector*>(tmpVecPtr);
     if (blockTmpSolnVecPtr == NULL)
     {
-      string msg = "N_TIA_OneStep::printMPDEOutputSolution: ";
+      std::string msg = "N_TIA_OneStep::printMPDEOutputSolution: ";
       msg += "N_LAS_Vector tmpSolnVecPtr is not of type N_LAS_BlockVector";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
       return(false);
     }
     if (blockTmpVecPtr == NULL)
     {
-      string msg = "N_TIA_OneStep::printMPDEOutputSolution: ";
+      std::string msg = "N_TIA_OneStep::printMPDEOutputSolution: ";
       msg += "N_LAS_Vector tmpVecPtr is not of type N_LAS_BlockVector";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
       return(false);
@@ -713,7 +714,7 @@ bool N_TIA_OneStep::printMPDEOutputSolution(
     }
     if (s_ind_1 == -1)
     {
-      string msg = "N_TIA_OneStep::printMPDEOutputSolution: ";
+      std::string msg = "N_TIA_OneStep::printMPDEOutputSolution: ";
       msg += "Cannot find where characteristic curve crosses fast time slice at stop_time";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
       return(false);
@@ -726,22 +727,25 @@ bool N_TIA_OneStep::printMPDEOutputSolution(
     double dt = h2[s_ind_1];
     timept_ = stop_time;
 #ifdef Xyce_DEBUG_TIME
-    cout << "charcross = " << charcross << endl;
-    cout << "s_ind_1 = " << s_ind_1 << endl;
-    cout << "sp = " << sp << endl;
-    cout << "sm = " << sm << endl;
-    cout << "dt = " << dt << endl;
-    cout << "timept = " << timept_ << endl;
-    cout << "coeff_sm = " << coeff_sm << endl;
-    cout << "coeff_sp = " << coeff_sp << endl;
+    Xyce::dout() << "charcross = " << charcross << std::endl;
+    Xyce::dout() << "s_ind_1 = " << s_ind_1 << std::endl;
+    Xyce::dout() << "sp = " << sp << std::endl;
+    Xyce::dout() << "sm = " << sm << std::endl;
+    Xyce::dout() << "dt = " << dt << std::endl;
+    Xyce::dout() << "timept = " << timept_ << std::endl;
+    Xyce::dout() << "coeff_sm = " << coeff_sm << std::endl;
+    Xyce::dout() << "coeff_sp = " << coeff_sp << std::endl;
 #endif // Xyce_DEBUG_TIME
     blockTmpVecPtr->block(0).linearCombo(
         coeff_sm/dt, blockTmpSolnVecPtr->block(sm),
         coeff_sp/dt, blockTmpSolnVecPtr->block(sp)  
         );
-    outputMgrAdapterRCPtr->tranOutput(timept_, blockTmpVecPtr->block(0), *ds.tmpStaVectorPtr, *ds.tmpStoVectorPtr  );
+    outputMgrAdapterRCPtr->tranOutput(timept_, blockTmpVecPtr->block(0), 
+        *ds.tmpStaVectorPtr, *ds.tmpStoVectorPtr,
+        ds.objectiveVec_, ds.dOdpVec_, ds.dOdpAdjVec_,
+            ds.scaled_dOdpVec_, ds.scaled_dOdpAdjVec_);
 #ifdef Xyce_DEBUG_TIME
-    cout << "Interpolated to t = " << timept_ << endl;
+    Xyce::dout() << "Interpolated to t = " << timept_ << std::endl;
 #endif // Xyce_DEBUG_TIME
   }
 #ifdef Xyce_DEBUG_TIME
@@ -749,13 +753,13 @@ bool N_TIA_OneStep::printMPDEOutputSolution(
   {
     if (tiaParams.debugLevel > 0)
     {
-      cout << "No further interpolation required." << endl;
+      Xyce::dout() << "No further interpolation required." << std::endl;
     }
   }
 #endif // Xyce_DEBUG_TIME
 
 #ifdef Xyce_DEBUG_TIME
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+  Xyce::dout() << Xyce::section_divider << std::endl;
 #endif // Xyce_DEBUG_TIME
   return true;
 }
@@ -777,15 +781,12 @@ bool N_TIA_OneStep::printWaMPDEOutputSolution(
         const int phiGID )
 {
 #ifdef Xyce_DEBUG_TIME
-  const string dashedline =
-	"---------------------------------------------------------------"
-	"-------------";
   if (tiaParams.debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-      "  N_TIA_OneStep::printWaMPDEOutputSolution");
+    Xyce::dout() << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() <<
+      "  N_TIA_OneStep::printWaMPDEOutputSolution" << std::endl;
   }
 #endif // Xyce_DEBUG_TIME
   double timestep = sec.lastAttemptedTimeStep;
@@ -799,8 +800,8 @@ bool N_TIA_OneStep::printWaMPDEOutputSolution(
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams.debugLevel > 0)
   {
-    cout << "start_time = " << start_time << endl;
-    cout << "stop_time = " << stop_time << endl;
+    Xyce::dout() << "start_time = " << start_time << std::endl;
+    Xyce::dout() << "stop_time = " << stop_time << std::endl;
   }
 #endif // Xyce_DEBUG_TIME
   
@@ -834,21 +835,21 @@ bool N_TIA_OneStep::printWaMPDEOutputSolution(
     dynamic_cast<N_LAS_BlockVector*>(ds.tmpXn0BPtr);
   if (blockTmpSolVectorPtr == NULL)
   {
-    string msg = "N_TIA_OneStep::printWaMPDEOutputSolution: ";
+    std::string msg = "N_TIA_OneStep::printWaMPDEOutputSolution: ";
     msg += "N_LAS_Vector ds.tmpSolVectorPtr is not of type N_LAS_BlockVector";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
     return(false);
   }
   if (blockTmpXn0APtr == NULL)
   {
-    string msg = "N_TIA_OneStep::printWaMPDEOutputSolution: ";
+    std::string msg = "N_TIA_OneStep::printWaMPDEOutputSolution: ";
     msg += "N_LAS_Vector ds.tmpXn0APtr is not of type N_LAS_BlockVector";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
     return(false);
   }
   if (blockTmpXn0BPtr == NULL)
   {
-    string msg = "N_TIA_OneStep::printWaMPDEOutputSolution: ";
+    std::string msg = "N_TIA_OneStep::printWaMPDEOutputSolution: ";
     msg += "N_LAS_Vector ds.tmpXn0BPtr is not of type N_LAS_BlockVector";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
     return(false);
@@ -860,9 +861,9 @@ bool N_TIA_OneStep::printWaMPDEOutputSolution(
 #ifdef Xyce_DEBUG_TIME
     if (tiaParams.debugLevel > 0)
     {
-      cout << " sec.usedOrder_ = " << sec.usedOrder_ << endl;
-      cout << " sec.currentTime_ = " << sec.currentTime << endl;
-      cout << " lasttime = " << lasttime << endl;
+      Xyce::dout() << " sec.usedOrder_ = " << sec.usedOrder_ << std::endl;
+      Xyce::dout() << " sec.currentTime_ = " << sec.currentTime << std::endl;
+      Xyce::dout() << " lasttime = " << lasttime << std::endl;
     }
 #endif // Xyce_DEBUG_TIME
 
@@ -875,7 +876,7 @@ bool N_TIA_OneStep::printWaMPDEOutputSolution(
       junk = interpolateSolution(timeA,ds.tmpXn0APtr, ds.xHistory);
       if (!junk) 
       {
-        string msg = "interpolateSolution returned false!";
+        std::string msg = "interpolateSolution returned false!";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0,msg);
       }
     }
@@ -890,14 +891,14 @@ bool N_TIA_OneStep::printWaMPDEOutputSolution(
 #ifdef Xyce_DEBUG_TIME
     if (tiaParams.debugLevel > 0)
     {
-      cout << "Interpolating in [ " << timeA << ", " << timeB << " ]" << endl;
-      cout << "timeA = " << timeA << endl;
-      cout << "timeB = " << timeB << endl;
+      Xyce::dout() << "Interpolating in [ " << timeA << ", " << timeB << " ]" << std::endl;
+      Xyce::dout() << "timeA = " << timeA << std::endl;
+      Xyce::dout() << "timeB = " << timeB << std::endl;
     }
 #endif // Xyce_DEBUG_TIME
 
     // Now we can interpolate [tmpXn0APtr,tmpXn0BPtr] in [timeA,timeB].
-    vector<double> t1vals;
+    std::vector<double> t1vals;
     double T2 = fastTimes.back(); 
     int blockCount = blockTmpSolVectorPtr->blockCount();
     double h2 = T2/blockCount; // Average mesh width in fast time-scale
@@ -913,10 +914,16 @@ bool N_TIA_OneStep::printWaMPDEOutputSolution(
     {
       t1vals.push_back(timeB);
     }
-    vector<double> t2vals;
-    double phiA, phiB;
-    phiA = (*ds.tmpXn0APtr)[phiLID]; // Get from MPDE Manager
-    phiB = (*ds.tmpXn0BPtr)[phiLID]; // Get from MPDE Manager
+    std::vector<double> t2vals, phiAB(2);
+    std::vector<double> tmpPhiAB(2, 0.0);
+    if (phiLID >= 0)
+    {
+      tmpPhiAB[0] = (*ds.tmpXn0APtr)[phiLID]; // Get from MPDE Manager
+      tmpPhiAB[1] = (*ds.tmpXn0BPtr)[phiLID]; // Get from MPDE Manager
+    }
+    blockTmpSolVectorPtr->pmap()->pdsComm()->sumAll( &tmpPhiAB[0], &phiAB[0], 2 );
+
+    double phiA = phiAB[0], phiB = phiAB[1];
     for (unsigned int j=0 ; j<t1vals.size() ; ++j)
     {
       double phi = (1/(timeB-timeA))*(phiA*(timeB-t1vals[j])+phiB*(t1vals[j]-timeA));
@@ -925,17 +932,17 @@ bool N_TIA_OneStep::printWaMPDEOutputSolution(
 #ifdef Xyce_DEBUG_TIME
     if (tiaParams.debugLevel > 0)
     {
-      cout << "t1vals = " << endl;
+      Xyce::dout() << "t1vals = " << std::endl;
       for (unsigned int j=0 ; j < t1vals.size() ; ++j)
       {
-        cout << t1vals[j] << endl;
+        Xyce::dout() << t1vals[j] << std::endl;
       }
-      cout << "phi(" << timeA << ") = " << phiA << endl;
-      cout << "phi(" << timeB << ") = " << phiB << endl;
-      cout << "t2vals = " << endl;
+      Xyce::dout() << "phi(" << timeA << ") = " << phiA << std::endl;
+      Xyce::dout() << "phi(" << timeB << ") = " << phiB << std::endl;
+      Xyce::dout() << "t2vals = " << std::endl;
       for (unsigned int j=0 ; j< t2vals.size() ; ++j)
       {
-        cout << t2vals[j] << endl;
+        Xyce::dout() << t2vals[j] << std::endl;
       }
     }
 #endif // Xyce_DEBUG_TIME
@@ -964,13 +971,13 @@ bool N_TIA_OneStep::printWaMPDEOutputSolution(
     double s2 = fastTimes[b1+1]; // Note:  fastTimes[blockCount] = T2
     if ((s < s1) || (s > s2)) 
     {
-      string msg = "N_TIA_OneStep::printWaMPDEOutputSolution: ";
+      std::string msg = "N_TIA_OneStep::printWaMPDEOutputSolution: ";
       msg += "  Interpolator cannot find a fast time block containing the first point  ";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
     }
 #ifdef Xyce_DEBUG_TIME
-    cout << "Found s = " << s << " in block " << b1; 
-    cout << " with boundary = [" << s1 << "," << s2 << "]" << endl;
+    Xyce::dout() << "Found s = " << s << " in block " << b1; 
+    Xyce::dout() << " with boundary = [" << s1 << "," << s2 << "]" << std::endl;
 #endif // Xyce_DEBUG_TIME
     for (unsigned int j=0 ; j < t1vals.size() ; ++j)
     {
@@ -981,7 +988,7 @@ bool N_TIA_OneStep::printWaMPDEOutputSolution(
       if ( (s < s1) || (s > s2) ) 
       {
 #ifdef Xyce_DEBUG_TIME
-        cout << "Incrementing fast time block for next interpolation." << endl;
+        Xyce::dout() << "Incrementing fast time block for next interpolation." << std::endl;
 #endif // Xyce_DEBUG_TIME
         b1++;
         if (b1 == blockCount)
@@ -1000,7 +1007,7 @@ bool N_TIA_OneStep::printWaMPDEOutputSolution(
       if ((s < s1) || (s > s2)) 
       {
 #ifdef Xyce_DEBUG_TIME
-        cout << "Searching for fast time block for next interpolation." << endl;
+        Xyce::dout() << "Searching for fast time block for next interpolation." << std::endl;
 #endif // Xyce_DEBUG_TIME
         b1 = -2;
         for (int j2=0 ; j2 < blockCount ; ++j2)
@@ -1021,7 +1028,7 @@ bool N_TIA_OneStep::printWaMPDEOutputSolution(
       // If a block surrounding s can't be found, then quit.
       if ((s < s1) || (s > s2)) 
       {
-        string msg = "N_TIA_OneStep::printWaMPDEOutputSolution: ";
+        std::string msg = "N_TIA_OneStep::printWaMPDEOutputSolution: ";
         msg += "  Interpolator moved fast time block but new point is not in this block  ";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
       }
@@ -1037,9 +1044,9 @@ bool N_TIA_OneStep::printWaMPDEOutputSolution(
 #ifdef Xyce_DEBUG_TIME
       if (tiaParams.debugLevel > 0)
       {
-        cout << "Interpolating in the block:" << endl;
-        cout << "(t1,t2) = (" << t1 << "," << t2 << ")" << endl;
-        cout << "(s1,s2) = (" << s1 << "," << s2 << ")" << endl;
+        Xyce::dout() << "Interpolating in the block:" << std::endl;
+        Xyce::dout() << "(t1,t2) = (" << t1 << "," << t2 << ")" << std::endl;
+        Xyce::dout() << "(s1,s2) = (" << s1 << "," << s2 << ")" << std::endl;
       }
 #endif // Xyce_DEBUG_TIME
       double denom = (t2-t1)*(s2-s1);
@@ -1057,16 +1064,19 @@ bool N_TIA_OneStep::printWaMPDEOutputSolution(
       // erkeite 2/24/07. This is needed because currently the interpolation goes back to t=-1.0.
       if (t >= 0.0) 
       {
-        outputMgrAdapterRCPtr->tranOutput(t, blockTmpSolVectorPtr->block(b1), *ds.tmpStaVectorPtr, *ds.tmpStoVectorPtr );
+        outputMgrAdapterRCPtr->tranOutput(t, blockTmpSolVectorPtr->block(b1), 
+            *ds.tmpStaVectorPtr, *ds.tmpStoVectorPtr,
+            ds.objectiveVec_, ds.dOdpVec_, ds.dOdpAdjVec_,
+            ds.scaled_dOdpVec_, ds.scaled_dOdpAdjVec_);
 #ifdef Xyce_DEBUG_TIME
-        cout << "Interpolated to (t,phi(t)) = (" << t << "," << s << ")" << endl;
+        Xyce::dout() << "Interpolated to (t,phi(t)) = (" << t << "," << s << ")" << std::endl;
 #endif // Xyce_DEBUG_TIME
       }
     }
   }
   
 #ifdef Xyce_DEBUG_TIME
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+  Xyce::dout() << Xyce::section_divider << std::endl;
 #endif // Xyce_DEBUG_TIME
   return true;
 }
@@ -1085,20 +1095,17 @@ bool N_TIA_OneStep::printOutputSolution(
         const double time,
         N_LAS_Vector * solnVecPtr,
         const bool doNotInterpolate,
-        const vector<double> &outputInterpolationTimes,
+        const std::vector<double> &outputInterpolationTimes,
         bool skipPrintLineOutput)
 {
 #ifdef Xyce_DEBUG_TIME
-  const string dashedline =
-	"---------------------------------------------------------------"
-	"-------------";
   if (tiaParams.debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-      "  N_TIA_OneStep::printOutputSolution");
-    cout << "usedOrder_ = " << sec.usedOrder_ << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() <<
+      "  N_TIA_OneStep::printOutputSolution" << std::endl;
+    Xyce::dout() << "usedOrder_ = " << sec.usedOrder_ << std::endl;
   }
 #endif // Xyce_DEBUG_TIME
   double timestep = sec.lastAttemptedTimeStep;
@@ -1129,7 +1136,9 @@ bool N_TIA_OneStep::printOutputSolution(
       interpolateSolution(outputInterpolationTimes[i], ds.tmpStaVectorPtr, ds.sHistory);    // interpolate state vector
       interpolateSolution(outputInterpolationTimes[i], ds.tmpStoVectorPtr, ds.stoHistory);  // interpolate store vector
       outputMgrAdapterRCPtr->tranOutput(outputInterpolationTimes[i], *ds.tmpSolVectorPtr, 
-        *ds.tmpStaVectorPtr, *ds.tmpStoVectorPtr, skipPrintLineOutput);
+        *ds.tmpStaVectorPtr, *ds.tmpStoVectorPtr, 
+        ds.objectiveVec_, ds.dOdpVec_, ds.dOdpAdjVec_,
+            ds.scaled_dOdpVec_, ds.scaled_dOdpAdjVec_);
     }
   }
 
@@ -1138,11 +1147,15 @@ bool N_TIA_OneStep::printOutputSolution(
   // interpoloate.
   if (outputInterpolationTimes.empty() || doNotInterpolate)
   {
-    outputMgrAdapterRCPtr->tranOutput(time, *ds.currSolutionPtr, *ds.currStatePtr, *ds.currStorePtr, skipPrintLineOutput);
+    outputMgrAdapterRCPtr->tranOutput(time, *ds.currSolutionPtr, 
+        *ds.currStatePtr, *ds.currStorePtr, 
+        ds.objectiveVec_, ds.dOdpVec_, ds.dOdpAdjVec_, 
+        ds.scaled_dOdpVec_, ds.scaled_dOdpAdjVec_,
+        skipPrintLineOutput);
   }
 
 #ifdef Xyce_DEBUG_TIME
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+  Xyce::dout() << Xyce::section_divider << std::endl;
 #endif // Xyce_DEBUG_TIME
   return true;
 }
@@ -1163,15 +1176,12 @@ bool N_TIA_OneStep::saveOutputSolution  (
                   const bool doNotInterpolate)
 {
 #ifdef Xyce_DEBUG_TIME
-  const string dashedline =
-	"---------------------------------------------------------------"
-	"-------------";
   if (tiaParams.debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-      "  N_TIA_BackwardDifferentiation15::saveOutputSolution");
+    Xyce::dout() << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() <<
+      "  N_TIA_BackwardDifferentiation15::saveOutputSolution" << std::endl;
   }
 #endif // Xyce_DEBUG_TIME
 
@@ -1183,7 +1193,7 @@ bool N_TIA_OneStep::saveOutputSolution  (
   outputMgrAdapterRCPtr->outputDCOP( *(ds.currSolutionPtr) );
 
 #ifdef Xyce_DEBUG_TIME
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+  Xyce::dout() << Xyce::section_divider << std::endl;
 #endif // Xyce_DEBUG_TIME
   return true;
 }
@@ -1200,35 +1210,32 @@ void N_TIA_OneStep::updateHistory()
 {
 
 #ifdef Xyce_DEBUG_TIME
-  const string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
   if (tiaParams.debugLevel > 1)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           "  N_TIA_OneStep::updateHistory");
-    cout << "\n Before updates \n" << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() <<
+                           "  N_TIA_OneStep::updateHistory" << std::endl;
+    Xyce::dout() << "\n Before updates \n" << std::endl;
     for (int i=0; i<=sec.maxOrder_ ; ++i)
     {
-      cout << "\n xHistory["<< i << "]: \n" << endl;
-      (ds.xHistory[i])->printPetraObject();
-      cout << endl;
+      Xyce::dout() << "\n xHistory["<< i << "]: \n" << std::endl;
+      (ds.xHistory[i])->printPetraObject(Xyce::dout());
+      Xyce::dout() << std::endl;
     }
     for (int i=0; i<=sec.maxOrder_ ; ++i)
     {
-      cout << "\n qHistory["<< i << "]: \n" << endl;
-      (ds.qHistory[i])->printPetraObject();
-      cout << endl;
+      Xyce::dout() << "\n qHistory["<< i << "]: \n" << std::endl;
+      (ds.qHistory[i])->printPetraObject(Xyce::dout());
+      Xyce::dout() << std::endl;
     }
     for (int i=0; i<=sec.maxOrder_ ; ++i)
     {
-      cout << "\n sHistory["<< i << "]: \n" << endl;
-      (ds.sHistory[i])->printPetraObject();
-      cout << endl;
+      Xyce::dout() << "\n sHistory["<< i << "]: \n" << std::endl;
+      (ds.sHistory[i])->printPetraObject(Xyce::dout());
+      Xyce::dout() << std::endl;
     }
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+    Xyce::dout() << Xyce::section_divider << std::endl;
   }
 #endif // Xyce_DEBUG_TIME
 
@@ -1256,36 +1263,36 @@ void N_TIA_OneStep::updateHistory()
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams.debugLevel > 1)
   {
-    cout << "\n After updates \n" << endl;
-    cout << "\n newtonCorrectionPtr: " << endl;
-    ds.newtonCorrectionPtr->printPetraObject();
-    cout << "\n qnewtonCorrectionPtr: " << endl;
-    ds.qNewtonCorrectionPtr->printPetraObject();
+    Xyce::dout() << "\n After updates \n" << std::endl;
+    Xyce::dout() << "\n newtonCorrectionPtr: " << std::endl;
+    ds.newtonCorrectionPtr->printPetraObject(Xyce::dout());
+    Xyce::dout() << "\n qnewtonCorrectionPtr: " << std::endl;
+    ds.qNewtonCorrectionPtr->printPetraObject(Xyce::dout());
     for (int i=0; i<=sec.maxOrder_ ; ++i)
     {
-      cout << "\n xHistory["<< i << "]: \n" << endl;
-      (ds.xHistory[i])->printPetraObject();
-      cout << endl;
+      Xyce::dout() << "\n xHistory["<< i << "]: \n" << std::endl;
+      (ds.xHistory[i])->printPetraObject(Xyce::dout());
+      Xyce::dout() << std::endl;
     }
     for (int i=0; i<=sec.maxOrder_ ; ++i)
     {
-      cout << "\n qHistory["<< i << "]: \n" << endl;
-      (ds.qHistory[i])->printPetraObject();
-      cout << endl;
+      Xyce::dout() << "\n qHistory["<< i << "]: \n" << std::endl;
+      (ds.qHistory[i])->printPetraObject(Xyce::dout());
+      Xyce::dout() << std::endl;
     }
-    cout << "\n sNewtonCorrectionPtr: " << endl;
-    ds.sNewtonCorrectionPtr->printPetraObject();
-    cout << endl;
-    cout << "\n nextStatePtr: " << endl;
-    ds.nextStatePtr->printPetraObject();
-    cout << endl;
+    Xyce::dout() << "\n sNewtonCorrectionPtr: " << std::endl;
+    ds.sNewtonCorrectionPtr->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "\n nextStatePtr: " << std::endl;
+    ds.nextStatePtr->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
     for (int i=0; i<=sec.maxOrder_ ; ++i)
     {
-      cout << "\n sHistory["<< i << "]: \n" << endl;
-      (ds.sHistory[i])->printPetraObject();
-      cout << endl;
+      Xyce::dout() << "\n sHistory["<< i << "]: \n" << std::endl;
+      (ds.sHistory[i])->printPetraObject(Xyce::dout());
+      Xyce::dout() << std::endl;
     }
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+    Xyce::dout() << Xyce::section_divider << std::endl;
   }
 #endif // Xyce_DEBUG_TIME
 }
@@ -1306,36 +1313,33 @@ void N_TIA_OneStep::restoreHistory()
     sec.psi_[i-1] = sec.psi_[i];
   }
 #ifdef Xyce_DEBUG_TIME
-  const string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
   if (tiaParams.debugLevel > 1)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           "  N_TIA_OneStep::restoreHistory");
+    Xyce::dout() << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() <<
+                           "  N_TIA_OneStep::restoreHistory" << std::endl;
     for (int i=1;i<=sec.currentOrder_;++i)
-      cout << "\n sec.psi_[i] = " << sec.psi_[i] << endl;
+      Xyce::dout() << "\n sec.psi_[i] = " << sec.psi_[i] << std::endl;
     for (int i=0; i<=sec.maxOrder_ ; ++i)
     {
-      cout << "\n xHistory["<< i << "]: \n" << endl;
-      (ds.xHistory[i])->printPetraObject();
-      cout << endl;
+      Xyce::dout() << "\n xHistory["<< i << "]: \n" << std::endl;
+      (ds.xHistory[i])->printPetraObject(Xyce::dout());
+      Xyce::dout() << std::endl;
     }
     for (int i=0; i<=sec.maxOrder_ ; ++i)
     {
-      cout << "\n qHistory["<< i << "]: \n" << endl;
-      (ds.qHistory[i])->printPetraObject();
-      cout << endl;
+      Xyce::dout() << "\n qHistory["<< i << "]: \n" << std::endl;
+      (ds.qHistory[i])->printPetraObject(Xyce::dout());
+      Xyce::dout() << std::endl;
     }
     for (int i=0; i<=sec.maxOrder_ ; ++i)
     {
-    cout << "\n sHistory["<< i << "]: \n" << endl;
-    (ds.sHistory[i])->printPetraObject();
-    cout << endl;
+    Xyce::dout() << "\n sHistory["<< i << "]: \n" << std::endl;
+    (ds.sHistory[i])->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
     }
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+    Xyce::dout() << Xyce::section_divider << std::endl;
   }
 #endif // Xyce_DEBUG_TIME
 } 
@@ -1353,26 +1357,23 @@ void N_TIA_OneStep::updateCoeffs()
   // synchronize with Step Error Control
 //  sec.psi_[0] = sec.currentTimeStep;
 #ifdef Xyce_DEBUG_TIME
-  const string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
   if (tiaParams.debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+    Xyce::dout() << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
 
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           "  N_TIA_OneStep::updateCoeffs");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  currentTimeStep = ", sec.currentTimeStep);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  numberOfSteps_ = ", sec.numberOfSteps_);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  currentOrder_ = ", sec.currentOrder_);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  nscsco_ = ", sec.nscsco_);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  psi_[0] = ", sec.psi_[0]);
+    Xyce::dout() <<
+                           "  N_TIA_OneStep::updateCoeffs" << std::endl;
+    Xyce::dout() <<
+            "  currentTimeStep = " <<  sec.currentTimeStep << std::endl;
+    Xyce::dout() <<
+            "  numberOfSteps_ = " <<  sec.numberOfSteps_ << std::endl;
+    Xyce::dout() <<
+            "  currentOrder_ = " <<  sec.currentOrder_ << std::endl;
+    Xyce::dout() <<
+            "  nscsco_ = " <<  sec.nscsco_ << std::endl;
+    Xyce::dout() <<
+            "  psi_[0] = " <<  sec.psi_[0] << std::endl;
   }
 #endif
   
@@ -1407,65 +1408,65 @@ void N_TIA_OneStep::updateCoeffs()
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams.debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  nscsco_ = ", sec.nscsco_);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  beta_[0] = ", sec.beta_[0]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  beta_[1] = ", sec.beta_[1]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  beta_[2] = ", sec.beta_[2]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  beta_[3] = ", sec.beta_[3]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  beta_[4] = ", sec.beta_[4]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  alpha_[0] = ", sec.alpha_[0]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  alpha_[1] = ", sec.alpha_[1]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  alpha_[2] = ", sec.alpha_[2]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  alpha_[3] = ", sec.alpha_[3]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  alpha_[4] = ", sec.alpha_[4]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  alphas_ = ", sec.alphas_);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  alpha0_ = ", sec.alpha0_);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  gamma_[0] = ", sec.gamma_[0]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  gamma_[1] = ", sec.gamma_[1]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  gamma_[2] = ", sec.gamma_[2]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  gamma_[3] = ", sec.gamma_[3]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  gamma_[4] = ", sec.gamma_[4]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  psi_[0] = ", sec.psi_[0]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  psi_[1] = ", sec.psi_[1]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  psi_[2] = ", sec.psi_[2]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  psi_[3] = ", sec.psi_[3]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  psi_[4] = ", sec.psi_[4]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  sigma_[0] = ", sec.sigma_[0]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  sigma_[1] = ", sec.sigma_[1]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  sigma_[2] = ", sec.sigma_[2]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  sigma_[3] = ", sec.sigma_[3]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  sigma_[4] = ", sec.sigma_[4]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  ck_ = ", sec.ck_);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+    Xyce::dout() <<
+            "  nscsco_ = " <<  sec.nscsco_ << std::endl;
+    Xyce::dout() <<
+            "  beta_[0] = " <<  sec.beta_[0] << std::endl;
+    Xyce::dout() <<
+            "  beta_[1] = " <<  sec.beta_[1] << std::endl;
+    Xyce::dout() <<
+            "  beta_[2] = " <<  sec.beta_[2] << std::endl;
+    Xyce::dout() <<
+            "  beta_[3] = " <<  sec.beta_[3] << std::endl;
+    Xyce::dout() <<
+            "  beta_[4] = " <<  sec.beta_[4] << std::endl;
+    Xyce::dout() <<
+            "  alpha_[0] = " <<  sec.alpha_[0] << std::endl;
+    Xyce::dout() <<
+            "  alpha_[1] = " <<  sec.alpha_[1] << std::endl;
+    Xyce::dout() <<
+            "  alpha_[2] = " <<  sec.alpha_[2] << std::endl;
+    Xyce::dout() <<
+            "  alpha_[3] = " <<  sec.alpha_[3] << std::endl;
+    Xyce::dout() <<
+            "  alpha_[4] = " <<  sec.alpha_[4] << std::endl;
+    Xyce::dout() <<
+            "  alphas_ = " <<  sec.alphas_ << std::endl;
+    Xyce::dout() <<
+            "  alpha0_ = " <<  sec.alpha0_ << std::endl;
+    Xyce::dout() <<
+            "  gamma_[0] = " <<  sec.gamma_[0] << std::endl;
+    Xyce::dout() <<
+            "  gamma_[1] = " <<  sec.gamma_[1] << std::endl;
+    Xyce::dout() <<
+            "  gamma_[2] = " <<  sec.gamma_[2] << std::endl;
+    Xyce::dout() <<
+            "  gamma_[3] = " <<  sec.gamma_[3] << std::endl;
+    Xyce::dout() <<
+            "  gamma_[4] = " <<  sec.gamma_[4] << std::endl;
+    Xyce::dout() <<
+            "  psi_[0] = " <<  sec.psi_[0] << std::endl;
+    Xyce::dout() <<
+            "  psi_[1] = " <<  sec.psi_[1] << std::endl;
+    Xyce::dout() <<
+            "  psi_[2] = " <<  sec.psi_[2] << std::endl;
+    Xyce::dout() <<
+            "  psi_[3] = " <<  sec.psi_[3] << std::endl;
+    Xyce::dout() <<
+            "  psi_[4] = " <<  sec.psi_[4] << std::endl;
+    Xyce::dout() <<
+            "  sigma_[0] = " <<  sec.sigma_[0] << std::endl;
+    Xyce::dout() <<
+            "  sigma_[1] = " <<  sec.sigma_[1] << std::endl;
+    Xyce::dout() <<
+            "  sigma_[2] = " <<  sec.sigma_[2] << std::endl;
+    Xyce::dout() <<
+            "  sigma_[3] = " <<  sec.sigma_[3] << std::endl;
+    Xyce::dout() <<
+            "  sigma_[4] = " <<  sec.sigma_[4] << std::endl;
+    Xyce::dout() <<
+            "  ck_ = " <<  sec.ck_ << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
   }
 #endif // Xyce_DEBUG_TIME
 }
@@ -1561,11 +1562,11 @@ void N_TIA_OneStep::initialize()
 #ifdef Xyce_VERBOSE_TIME
   if (tiaParams.errorAnalysisOption == 1)
   {
-      cout << "ERROROPTION=1:  DeltaT Grow = 2" << "\n" << endl;
-      cout << "ERROROPTION=1:  DeltaT Cut = 0.125" << "\n" << endl;
-      cout << "ERROROPTION=1:  NL MIN = " << tiaParams.NLmin << "\n" << endl;
-      cout << "ERROROPTION=1:  NL MAX = " << tiaParams.NLmax << "\n" << endl;
-      cout << "ERROROPTION=1:  DELMAX = " << sec.maxTimeStep << "\n" << endl;
+      Xyce::dout() << "ERROROPTION=1:  DeltaT Grow = 2" << "\n" << std::endl;
+      Xyce::dout() << "ERROROPTION=1:  DeltaT Cut = 0.125" << "\n" << std::endl;
+      Xyce::dout() << "ERROROPTION=1:  NL MIN = " << tiaParams.NLmin << "\n" << std::endl;
+      Xyce::dout() << "ERROROPTION=1:  NL MAX = " << tiaParams.NLmax << "\n" << std::endl;
+      Xyce::dout() << "ERROROPTION=1:  DELMAX = " << sec.maxTimeStep << "\n" << std::endl;
   } 
 #endif //Xyce_VERBOSE_TIME
  
@@ -1602,33 +1603,30 @@ void N_TIA_OneStep::initialize()
   sec.cj_ = 1/sec.psi_[0];
   sec.nscsco_ = 0;
 #ifdef Xyce_DEBUG_TIME
-  const string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
   if (tiaParams.debugLevel > 1)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           "  N_TIA_OneStep::initialize");
-    cout << "\n xHistory: \n" << endl;
-    (ds.xHistory[0])->printPetraObject();
-    cout << endl;
-    (ds.xHistory[1])->printPetraObject();
-    cout << endl;
-    cout << "\n qHistory: \n" << endl;
-    (ds.qHistory[0])->printPetraObject();
-    cout << endl;
-    (ds.qHistory[1])->printPetraObject();
-    cout << endl;
-    cout << "\n sHistory: \n" << endl;
-    (ds.sHistory[0])->printPetraObject();
-    cout << endl;
-    (ds.sHistory[1])->printPetraObject();
-    cout << endl;
-    cout << "\n" << "currentTimeStep = " << currentTimeStep << "\n" << endl;
-    cout << "\n" << "time_to_stop = " << time_to_stop << "\n" << endl;
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+    Xyce::dout() << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() <<
+                           "  N_TIA_OneStep::initialize" << std::endl;
+    Xyce::dout() << "\n xHistory: \n" << std::endl;
+    (ds.xHistory[0])->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
+    (ds.xHistory[1])->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "\n qHistory: \n" << std::endl;
+    (ds.qHistory[0])->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
+    (ds.qHistory[1])->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "\n sHistory: \n" << std::endl;
+    (ds.sHistory[0])->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
+    (ds.sHistory[1])->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "\n" << "currentTimeStep = " << currentTimeStep << "\n" << std::endl;
+    Xyce::dout() << "\n" << "time_to_stop = " << time_to_stop << "\n" << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
   }
 #endif // Xyce_DEBUG_TIME
 }
@@ -1712,17 +1710,14 @@ void N_TIA_OneStep::rejectStep()
 tiaParams.TimeStepLimitedbyBP = false;
 
 #ifdef Xyce_DEBUG_TIME
-  const string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
 
   if (tiaParams.debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+    Xyce::dout() << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
 
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           "  N_TIA_OneStep::rejectStep");
+    Xyce::dout() <<
+                           "  N_TIA_OneStep::rejectStep" << std::endl;
   }
 #endif
 
@@ -1751,7 +1746,7 @@ tiaParams.TimeStepLimitedbyBP = false;
 
       if (sec.nef_ >= sec.max_LET_fail_)  
       {
-        string msg = "N_TIA_OneStep::rejectStep: ";
+        std::string msg = "N_TIA_OneStep::rejectStep: ";
         msg += "  Maximum number of local error test failures.  ";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
       }
@@ -1803,71 +1798,71 @@ tiaParams.TimeStepLimitedbyBP = false;
 #ifdef Xyce_DEBUG_TIME
       if (tiaParams.debugLevel > 0)
       {
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  currentTimeStep = ", sec.currentTimeStep);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  numberOfSteps_ = ", sec.numberOfSteps_);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  currentOrder_ = ", sec.currentOrder_);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  nscsco_ = ", sec.nscsco_);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  alpha_[0] = ", sec.alpha_[0]);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  alpha_[1] = ", sec.alpha_[1]);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  alpha_[2] = ", sec.alpha_[2]);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  alpha_[3] = ", sec.alpha_[3]);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  alpha_[4] = ", sec.alpha_[4]);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  psi_[0] = ", sec.psi_[0]);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  psi_[1] = ", sec.psi_[1]);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  psi_[2] = ", sec.psi_[2]);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  psi_[3] = ", sec.psi_[3]);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  psi_[4] = ", sec.psi_[4]);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  sigma_[0] = ", sec.sigma_[0]);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  sigma_[1] = ", sec.sigma_[1]);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  sigma_[2] = ", sec.sigma_[2]);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  sigma_[3] = ", sec.sigma_[3]);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  sigma_[4] = ", sec.sigma_[4]);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                              "  rr = ", rr);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                              "  r_factor_ = ", sec.r_factor_);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                              "  r_safety_ = ", sec.r_safety_);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                              "  Est_ = ", sec.Est_);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                              "  nef_ = ", sec.nef_);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                              "  r_fudge_ = ", sec.r_fudge_);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                              "  newOrder_ = ", sec.newOrder_);
+        Xyce::dout() <<
+                "  currentTimeStep = " <<  sec.currentTimeStep << std::endl;
+        Xyce::dout() <<
+                "  numberOfSteps_ = " <<  sec.numberOfSteps_ << std::endl;
+        Xyce::dout() <<
+                "  currentOrder_ = " <<  sec.currentOrder_ << std::endl;
+        Xyce::dout() <<
+                "  nscsco_ = " <<  sec.nscsco_ << std::endl;
+        Xyce::dout() <<
+                "  alpha_[0] = " <<  sec.alpha_[0] << std::endl;
+        Xyce::dout() <<
+                "  alpha_[1] = " <<  sec.alpha_[1] << std::endl;
+        Xyce::dout() <<
+                "  alpha_[2] = " <<  sec.alpha_[2] << std::endl;
+        Xyce::dout() <<
+                "  alpha_[3] = " <<  sec.alpha_[3] << std::endl;
+        Xyce::dout() <<
+                "  alpha_[4] = " <<  sec.alpha_[4] << std::endl;
+        Xyce::dout() <<
+                "  psi_[0] = " <<  sec.psi_[0] << std::endl;
+        Xyce::dout() <<
+                "  psi_[1] = " <<  sec.psi_[1] << std::endl;
+        Xyce::dout() <<
+                "  psi_[2] = " <<  sec.psi_[2] << std::endl;
+        Xyce::dout() <<
+                "  psi_[3] = " <<  sec.psi_[3] << std::endl;
+        Xyce::dout() <<
+                "  psi_[4] = " <<  sec.psi_[4] << std::endl;
+        Xyce::dout() <<
+                "  sigma_[0] = " <<  sec.sigma_[0] << std::endl;
+        Xyce::dout() <<
+                "  sigma_[1] = " <<  sec.sigma_[1] << std::endl;
+        Xyce::dout() <<
+                "  sigma_[2] = " <<  sec.sigma_[2] << std::endl;
+        Xyce::dout() <<
+                "  sigma_[3] = " <<  sec.sigma_[3] << std::endl;
+        Xyce::dout() <<
+                "  sigma_[4] = " <<  sec.sigma_[4] << std::endl;
+        Xyce::dout() <<
+                              "  rr = " <<  rr << std::endl;
+        Xyce::dout() <<
+                              "  r_factor_ = " <<  sec.r_factor_ << std::endl;
+        Xyce::dout() <<
+                              "  r_safety_ = " <<  sec.r_safety_ << std::endl;
+        Xyce::dout() <<
+                              "  Est_ = " <<  sec.Est_ << std::endl;
+        Xyce::dout() <<
+                              "  nef_ = " <<  sec.nef_ << std::endl;
+        Xyce::dout() <<
+                              "  r_fudge_ = " <<  sec.r_fudge_ << std::endl;
+        Xyce::dout() <<
+                              "  newOrder_ = " <<  sec.newOrder_ << std::endl;
 
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                              "  currentTimeStep = ", sec.currentTimeStep);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                              "  newTimeStep_ = ", newTimeStep_);
+        Xyce::dout() <<
+                              "  currentTimeStep = " <<  sec.currentTimeStep << std::endl;
+        Xyce::dout() <<
+                              "  newTimeStep_ = " <<  newTimeStep_ << std::endl;
       }
 #endif // Xyce_DEBUG_TIME
     }
   }
   else if ((sec.stepAttemptStatus == false) & (!adjustStep))
   {
-    string tmp = "  OneStep:rejectStep: Warning: Local error test failed with constant step-size.\n";
-    N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_INFO_0, tmp);
+    std::string tmp = "  OneStep:rejectStep: Warning: Local error test failed with constant step-size.\n";
+    Xyce::dout() << tmp << std::endl;
   }
 
   // If the step needs to be adjusted:
@@ -1893,10 +1888,10 @@ tiaParams.TimeStepLimitedbyBP = false;
 #ifdef Xyce_DEBUG_TIME
     if (tiaParams.debugLevel >0)
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-              "  newTimeStep_ = ", newTimeStep_);
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-              "  nextTime = ", sec.nextTime);
+      Xyce::dout() <<
+              "  newTimeStep_ = " <<  newTimeStep_ << std::endl;
+      Xyce::dout() <<
+              "  nextTime = " <<  sec.nextTime << std::endl;
     }
 #endif // Xyce_DEBUG_TIME
 
@@ -1920,7 +1915,7 @@ tiaParams.TimeStepLimitedbyBP = false;
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams.debugLevel >0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+    Xyce::dout() << Xyce::section_divider << std::endl;
   }
 #endif // Xyce_DEBUG_TIME
 }
@@ -1959,17 +1954,14 @@ void N_TIA_OneStep::completeStep()
 
 
 #ifdef Xyce_DEBUG_TIME
-  const string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
 
   if (tiaParams.debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+    Xyce::dout() << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
 
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           "  N_TIA_OneStep::completeStep");
+    Xyce::dout() <<
+                           "  N_TIA_OneStep::completeStep" << std::endl;
   }
 #endif
 
@@ -1998,22 +1990,22 @@ void N_TIA_OneStep::completeStep()
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams.debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                          "  initialPhase_ = ", sec.initialPhase_);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                          "  rr = ", rr);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                          "  currentTimeStep = ", sec.currentTimeStep);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                          "  currentTime = ", sec.currentTime);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                          "  nextTime = ", sec.nextTime);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                          "  newTimeStep_ = ", newTimeStep_);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                          "  minTimeStep = ", sec.minTimeStep);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                          "  maxTimeStep = ", sec.maxTimeStep);
+    Xyce::dout() <<
+                          "  initialPhase_ = " <<  sec.initialPhase_ << std::endl;
+    Xyce::dout() <<
+                          "  rr = " <<  rr << std::endl;
+    Xyce::dout() <<
+                          "  currentTimeStep = " <<  sec.currentTimeStep << std::endl;
+    Xyce::dout() <<
+                          "  currentTime = " <<  sec.currentTime << std::endl;
+    Xyce::dout() <<
+                          "  nextTime = " <<  sec.nextTime << std::endl;
+    Xyce::dout() <<
+                          "  newTimeStep_ = " <<  newTimeStep_ << std::endl;
+    Xyce::dout() <<
+                          "  minTimeStep = " <<  sec.minTimeStep << std::endl;
+    Xyce::dout() <<
+                          "  maxTimeStep = " <<  sec.maxTimeStep << std::endl;
   }
 #endif
   // 03/22/04 tscoffe:  Note that updating the history has nothing to do with
@@ -2074,20 +2066,20 @@ void N_TIA_OneStep::completeStep()
 #ifdef Xyce_DEBUG_TIME
       if (tiaParams.debugLevel > 0)
       {
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                              "  currentOrder_ = ", sec.currentOrder_);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                              "  r_safety = ", sec.r_safety_);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                              "  r_fudge_ = ", sec.r_fudge_);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                              "  r_hincr_ = ", sec.r_hincr_);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                              "  r_hincr_test_ = ", sec.r_hincr_test_);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                              "  Est = ", sec.Est_);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                              "  raw rr = ", rr);
+        Xyce::dout() <<
+                              "  currentOrder_ = " <<  sec.currentOrder_ << std::endl;
+        Xyce::dout() <<
+                              "  r_safety = " <<  sec.r_safety_ << std::endl;
+        Xyce::dout() <<
+                              "  r_fudge_ = " <<  sec.r_fudge_ << std::endl;
+        Xyce::dout() <<
+                              "  r_hincr_ = " <<  sec.r_hincr_ << std::endl;
+        Xyce::dout() <<
+                              "  r_hincr_test_ = " <<  sec.r_hincr_test_ << std::endl;
+        Xyce::dout() <<
+                              "  Est = " <<  sec.Est_ << std::endl;
+        Xyce::dout() <<
+                              "  raw rr = " <<  rr << std::endl;
       }
 #endif
 
@@ -2144,10 +2136,10 @@ void N_TIA_OneStep::completeStep()
 #ifdef Xyce_DEBUG_TIME
       if (tiaParams.debugLevel >0)
       {
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  nextTime = ", sec.nextTime);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "  newTimeStep_ = ", newTimeStep_);
+        Xyce::dout() <<
+                "  nextTime = " <<  sec.nextTime << std::endl;
+        Xyce::dout() <<
+                "  newTimeStep_ = " <<  newTimeStep_ << std::endl;
       }
 #endif
 
@@ -2175,7 +2167,7 @@ void N_TIA_OneStep::completeStep()
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams.debugLevel >0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+    Xyce::dout() << Xyce::section_divider << std::endl;
   }
 #endif
 
@@ -2213,17 +2205,17 @@ void N_TIA_OneStep::updateStateDeriv ()
 #ifdef Xyce_DEBUG_TIME
     if (tiaParams.debugLevel > 1)
     {
-    cout << "\n next state Ptr: \n" << endl;
-    ds.nextStatePtr->printPetraObject();
-    cout << endl;
+    Xyce::dout() << "\n next state Ptr: \n" << std::endl;
+    ds.nextStatePtr->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
 
-    cout << "\n sn0: \n" << endl;
-    ds.sn0Ptr->printPetraObject();
-    cout << endl;
+    Xyce::dout() << "\n sn0: \n" << std::endl;
+    ds.sn0Ptr->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
 
-    cout << "\n next State Deriv: \n" << endl;
-    ds.nextStateDerivPtr->printPetraObject();
-    cout << endl;
+    Xyce::dout() << "\n next State Deriv: \n" << std::endl;
+    ds.nextStateDerivPtr->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
     
     }
 #endif
@@ -2255,9 +2247,9 @@ void N_TIA_OneStep::updateLeadCurrent ()
 #ifdef Xyce_DEBUG_TIME
     if (tiaParams.debugLevel > 1)
     {
-    cout << "\n next store Ptr: \n" << endl;
-    ds.nextStorePtr->printPetraObject();
-    cout << endl;
+    Xyce::dout() << "\n next store Ptr: \n" << std::endl;
+    ds.nextStorePtr->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
     
     }
 #endif
@@ -2295,7 +2287,7 @@ void N_TIA_OneStep::setupTwoLevelError(N_TIA_TwoLevelError & tle)
   tle.innerSize    = ds.globalLength ();
 
 #ifdef Xyce_DEBUG_TIME
-  cout << tle;
+  Xyce::dout() << tle;
 #endif
 }
 

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -56,60 +56,57 @@
 #include <list>
 #include <vector>
 
+#include <N_ANP_fwd.h>
 #include <N_IO_fwd.h>
-
-class N_LAS_Vector;
-class N_ANP_AnalysisInterface;
-class N_UTL_Param;
-
-#ifdef Xyce_PARALLEL_MPI
-class N_PDS_Comm;
-#endif /* Xyce_PARALLEL_MPI */
-
-class N_TOP_Topology;
-class N_UTL_Expression;
-
+#include <N_PDS_fwd.h>
+#include <N_UTL_fwd.h>
+#include <N_UTL_Op.h>
 #include <N_UTL_Xyce.h>
 
-class N_UTL_ExpressionData
+class N_LAS_Vector;
+
+namespace Xyce {
+namespace Util {
+
+class ExpressionData
 {
   public:
-    N_UTL_ExpressionData (const string & expression1,
-        N_IO_OutputMgr * outputMgrPtr
-	    );
+    ExpressionData (const std::string &expression, IO::OutputMgr &output_manager);
+    ExpressionData (const Expression &expression, IO::OutputMgr &output_manager);
 
-	N_UTL_ExpressionData (const N_UTL_Expression * expressionPointer,
-        N_IO_OutputMgr * outputMgrPtrIn
-    );
-
-    ~N_UTL_ExpressionData ();
+    ~ExpressionData ();
 
     int setup ();
-    double evaluate (const N_LAS_Vector *solVecPtr, const N_LAS_Vector *stateVecPtr, const N_LAS_Vector * stoVecPtr);
-    int getNumUnresolvedStrings() const { return numUnresolvedStrings; };
+    double evaluate (const N_LAS_Vector *solnVecPtr, const N_LAS_Vector *stateVecPtr, const N_LAS_Vector * stoVecPtr, const N_LAS_Vector *solnVecImagPtr=0);
+    int getNumUnresolvedStrings() const { return numUnresolvedStrings; }
+    bool getUnresolvedStringsChecked() const { return numUnresolvedStringsChecked; }
+    void setUnresolvedStringsChecked(bool checked) { numUnresolvedStringsChecked = checked; }
 
-  public:
-    N_UTL_Expression * expPtr;
-    N_IO_OutputMgr * outputMgrPtr_;
-
-    string         expression;
-
-    int            numVars;
-    int            numSpecialVars;       // non solution vars like TIME
-    int            numLeads;
-    int            numUnresolvedStrings; // number of unresolved strings after setup() is called.
-    vector<string> varNames;
-    vector<string> specialVarNames;      // non solution vars like TIME
-    vector<string> currentParam;
-    vector<int>    varGIDs;
-    list<N_UTL_Param> expressionVars_;  // all vars from expression for evaluation by OutputMgr.
-    vector<double> varVals;
-    double         val;
-
-    bool setupCalled;
-    bool numUnresolvedStringsChecked;
+    const std::string &getExpression() {
+      return expression_;
+    }
+    
   private:
-    int procID_;
+    Expression *                expPtr_;
+    IO::OutputMgr &            outputManager_;
+    std::string                 expression_;
+    int                         numUnresolvedStrings;
+    std::vector<std::string>    varNames;
+    OpList                      expressionVars_;      // all vars from
+    std::vector<double>         varVals;
+    double                      val;
+
+    bool                        setupCalled;
+    bool                        numUnresolvedStringsChecked;
+
+  private:
+    std::list<Param>            implicitParamList_;  // this is to hold implicit vars on which an expression may depend
+                                                     // Currently, just SDT and DDT are implicitly dependent on TIME 
 };
+
+} // namespace Util
+} // namespace Xyce
+
+typedef Xyce::Util::ExpressionData N_UTL_ExpressionData;
 
 #endif  // N_UTL_ExpressionData_H

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,42 +36,46 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.6.6.2 $
+// Revision Number: $Revision: 1.11 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ----------   Xyce Includes   ----------
 #include <N_TOP_CktNode_Ckt.h>
 #include <N_TOP_CktGraph.h>
 
+namespace Xyce {
+namespace Topo {
+
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNode_Ckt::put
+// Function      : CktNode_Ckt::put
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-ostream& N_TOP_CktNode_Ckt::put(ostream& os) const
+std::ostream& CktNode_Ckt::put(std::ostream& os) const
 {
-  os << "CN_Ckt: " << id_ << endl;
-  os << "   GID: " << gID_ << "  Proc: " << procNum_ << endl;
+  os << "CN_Ckt: " << id_ << std::endl;
+  os << "   GID: " << gID_ << "  Proc: " << procNum_ << std::endl;
   os << "   Soln Var GID List: ";
-  list<int>::const_iterator it_iL = solnVarGIDList_.begin();
-  list<int>::const_iterator it_iL_end = solnVarGIDList_.end();
+  std::list<int>::const_iterator it_iL = solnVarGIDList_.begin();
+  std::list<int>::const_iterator it_iL_end = solnVarGIDList_.end();
   for( ; it_iL != it_iL_end; ++it_iL )
   {
     os << *it_iL << "  ";
   }
-  os << endl;
+  os << std::endl;
 
-  os << *cktGphPtr_ << endl;
+  os << *cktGphPtr_ << std::endl;
 
   return os;
 }
+
+} // namespace Topo
+} // namespace Xyce

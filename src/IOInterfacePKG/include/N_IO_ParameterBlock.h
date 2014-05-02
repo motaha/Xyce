@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -40,9 +40,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.32.2.2 $
+// Revision Number: $Revision: 1.41.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Date  : $Date: 2014/02/26 20:42:38 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -70,169 +70,172 @@
 
 #include <N_DEV_DeviceBlock.h>
 
-// ---------- Forward Declarations ----------
+namespace Xyce {
+namespace IO {
 
 //-----------------------------------------------------------------------------
-// Class         : N_IO_ParameterBlock
+// Class         : ParameterBlock
 // Purpose       :
 // Special Notes :
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/10/2001
 //-----------------------------------------------------------------------------
 
-class N_IO_ParameterBlock : public Packable
+class ParameterBlock : public Packable
 {
-  public:
-    // Constructor.
-    N_IO_ParameterBlock(){};
+public:
+  // Constructor.
+  ParameterBlock(){};
 
-    // Constructor.
-    N_IO_ParameterBlock(
-        string const& fileName,
-        vector<N_IO_SpiceSeparatedFieldTool::StringToken>
-        const& parsedInputLine);
+  // Constructor.
+  ParameterBlock(
+     std::string const& fileName,
+     std::vector<N_IO_SpiceSeparatedFieldTool::StringToken>
+     const& parsedInputLine);
 
-    // Copy Constructor.
-    N_IO_ParameterBlock(N_IO_ParameterBlock const& rhsPB)
+  // Copy Constructor.
+  ParameterBlock(ParameterBlock const& rhsPB)
     : netlistFileName_(rhsPB.netlistFileName_),
       expressionValuedParams_(rhsPB.expressionValuedParams_),
       parsedLine(rhsPB.parsedLine),
       modelData(rhsPB.modelData)
-      { };
+  { };
 
-    // Destructor.
-    ~N_IO_ParameterBlock(){};
+  // Destructor.
+  ~ParameterBlock(){};
 
-    // Public data.
-    vector<N_IO_SpiceSeparatedFieldTool::StringToken> parsedLine;
-    N_DEV_ModelBlock modelData;
+  // Public data.
+  std::vector<N_IO_SpiceSeparatedFieldTool::StringToken> parsedLine;
+  Device::ModelBlock modelData;
 
-    map < string, vector <vector<N_DEV_Param> > > inputCompositeParamVecMap;
+  std::map< std::string, std::vector<std::vector<Device::Param> > > inputCompositeParamVecMap;
 
-    // Public methods.
+  // Public methods.
 
-    void print();
-    // Prints the details of an ParameterBlock to standard out.
+  void print();
+  // Prints the details of an ParameterBlock to standard out.
 
-    bool extractModelData( N_IO_CircuitMetadata & metadata );
-    // Extract model data from parsedLine using model metadata.
+  bool extractModelData( N_IO_CircuitMetadata & metadata );
+  // Extract model data from parsedLine using model metadata.
 
-    void addDefaultModelParameters( N_IO_CircuitMetadata & metadata );
-    // Add the default parameters for a model from metadata.
+  void addDefaultModelParameters( N_IO_CircuitMetadata & metadata );
+  // Add the default parameters for a model from metadata.
 
-    bool hasExpressionValuedParams(){return !expressionValuedParams_.empty();};
+  bool hasExpressionValuedParams(){return !expressionValuedParams_.empty();};
 
-    void setParameterValues(N_IO_CircuitContext* contextPtr);
-    // Check each parameter to see if it is an expression, if
-    // so, evaluate the parameter.
+  void setParameterValues(N_IO_CircuitContext* contextPtr);
+  // Check each parameter to see if it is an expression, if
+  // so, evaluate the parameter.
 
-    void setName( string const& name );
-    void setType( string const& type );
-    void setLevel( string const& level );
-    void setLineNumber( string & netlistFile, int lineNumber );
-    void addParameter( N_DEV_Param const& parameter );
-    void addParameters( vector<N_DEV_Param> const& parameters );
-    void setParameter( int const& i, N_DEV_Param const& parameter );
+  void setName( std::string const& name );
+  void setType( std::string const& type );
+  void setLevel( std::string const& level );
+  void setLineNumber( std::string & netlistFile, int lineNumber );
+  void addParameter( Device::Param const& parameter );
+  void addParameters( std::vector<Device::Param> const& parameters );
+  void setParameter( int const& i, Device::Param const& parameter );
 
-    const string& getName() const;
-    const string& getType() const;
-    int getLevel() const;
-    vector<N_DEV_Param> & getParams();
+  NetlistLocation netlistLocation() const;
+    
+  const std::string& getName() const;
+  const std::string& getType() const;
+  int getLevel() const;
+  std::vector<Device::Param> & getParams();
 
-    N_DEV_Param* findParameter( N_DEV_Param const& parameter );
-    int getNumberOfParameters() const;
-    N_DEV_Param getParameter( int const& i ) const;
+  Device::Param* findParameter( Device::Param const& parameter );
+  int getNumberOfParameters() const;
+  Device::Param getParameter( int const& i ) const;
 
-    N_IO_ParameterBlock & operator=(N_IO_ParameterBlock const& rhsPB)
-    {
-      netlistFileName_ = rhsPB.netlistFileName_;
-      expressionValuedParams_ = rhsPB.expressionValuedParams_;
-      parsedLine = rhsPB.parsedLine;
-      modelData = rhsPB.modelData;
-      return *this;
-    };
+  ParameterBlock & operator=(ParameterBlock const& rhsPB)
+  {
+    netlistFileName_ = rhsPB.netlistFileName_;
+    expressionValuedParams_ = rhsPB.expressionValuedParams_;
+    parsedLine = rhsPB.parsedLine;
+    modelData = rhsPB.modelData;
+    return *this;
+  };
 
-    bool operator==(string const& name);
-    bool operator!=(string const& name);
+  bool operator==(std::string const& name);
+  bool operator!=(std::string const& name);
 
-    // Packing functionality.
-    Packable * instance() const;
+  // Packing functionality.
+  Packable * instance() const;
 
-    // Counts bytes needed to pack block.
-    int packedByteCount() const;
+  // Counts bytes needed to pack block.
+  int packedByteCount() const;
 
-    // Packs OptionBlock into char buffer using MPI_PACK.
-    void pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) const;
+  // Packs OptionBlock into char buffer using MPI_PACK.
+  void pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) const;
 
-    // Unpacks OptionBlock from char buffer using MPI_UNPACK.
-    void unpack(char * pB, int bsize, int & pos, N_PDS_Comm * comm);
+  // Unpacks OptionBlock from char buffer using MPI_UNPACK.
+  void unpack(char * pB, int bsize, int & pos, N_PDS_Comm * comm);
 
 
-  private:
-    string netlistFileName_;
-    int lineNumber_;
-    bool defaultApplied_;
-    vector<N_DEV_Param> expressionValuedParams_;
+private:
+  std::string netlistFileName_;
+  int lineNumber_;
+  bool defaultApplied_;
+  std::vector<Device::Param> expressionValuedParams_;
 
-    void addDefaultCompositeModelParameters_
-       ( N_IO_CircuitMetadata & metadata,
-         N_DEV_Param & baseParam ,
-        map<string,bool> & paramMetadataExistMap);
+  void addDefaultCompositeModelParameters_
+  ( N_IO_CircuitMetadata & metadata,
+    Device::Param & baseParam ,
+    std::map<std::string,bool> & paramMetadataExistMap);
 
 };
 
-inline bool N_IO_ParameterBlock::operator==(string const& rhsName)
+inline bool ParameterBlock::operator==(std::string const& rhsName)
 {
   return (getName() == rhsName);
 }
 
-inline bool N_IO_ParameterBlock::operator!=(string const& rhsName)
+inline bool ParameterBlock::operator!=(std::string const& rhsName)
 {
   return (getName() != rhsName);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::setName
+// Function      : ParameterBlock::setName
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-inline void N_IO_ParameterBlock::setName( string const& nameIn )
+inline void ParameterBlock::setName( std::string const& nameIn )
 {
   modelData.name = nameIn;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::setType
+// Function      : ParameterBlock::setType
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-inline void N_IO_ParameterBlock::setType( string const& typeIn )
+inline void ParameterBlock::setType( std::string const& typeIn )
 {
   modelData.type = typeIn;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::setLevel
+// Function      : ParameterBlock::setLevel
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-inline void N_IO_ParameterBlock::setLevel( string const& levelIn )
+inline void ParameterBlock::setLevel( std::string const& levelIn )
 {
-  N_DEV_Param levelParam( "LEVEL", levelIn);
-  modelData.level = levelParam.iVal();
+  Device::Param levelParam( "LEVEL", levelIn);
+  modelData.level = levelParam.getImmutableValue<int>();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::setLineNumber
+// Function      : ParameterBlock::setLineNumber
 // Purpose       : Pass netlist file name and line number to Parameter Block
 //               : for error reporting
 // Special Notes :
@@ -240,96 +243,96 @@ inline void N_IO_ParameterBlock::setLevel( string const& levelIn )
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 01/02/2006
 //-----------------------------------------------------------------------------
-inline void N_IO_ParameterBlock::setLineNumber( string & netlistFile,
-                                        int lineNumber )
+inline void ParameterBlock::setLineNumber( std::string & netlistFile,
+                                           int lineNumber )
 {
   modelData.netlistFileName_ = netlistFile;
   modelData.lineNumber_ = lineNumber;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::getName
+// Function      : ParameterBlock::getName
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-inline const string& N_IO_ParameterBlock::getName() const
+inline const std::string& ParameterBlock::getName() const
 {
   return modelData.name;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::getType
+// Function      : ParameterBlock::getType
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-inline const string& N_IO_ParameterBlock::getType() const
+inline const std::string& ParameterBlock::getType() const
 {
   return modelData.type;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::getLevel
+// Function      : ParameterBlock::getLevel
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-inline int N_IO_ParameterBlock::getLevel() const
+inline int ParameterBlock::getLevel() const
 {
-  N_DEV_Param levelParam( "LEVEL", modelData.level );
-  return levelParam.iVal();
+  Device::Param levelParam( "LEVEL", modelData.level );
+  return levelParam.getImmutableValue<int>();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::getParams
+// Function      : ParameterBlock::getParams
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 08/26/05
 //-----------------------------------------------------------------------------
-inline vector<N_DEV_Param> & N_IO_ParameterBlock::getParams()
+inline std::vector<Device::Param> & ParameterBlock::getParams()
 {
   return modelData.params;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::addParameter
+// Function      : ParameterBlock::addParameter
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-inline void N_IO_ParameterBlock::addParameter( N_DEV_Param const& parameter )
+inline void ParameterBlock::addParameter( Device::Param const& parameter )
 {
   modelData.params.push_back( parameter );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::addParameters
+// Function      : ParameterBlock::addParameters
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-inline void N_IO_ParameterBlock::addParameters(
-    vector<N_DEV_Param> const& parametersIn )
+inline void ParameterBlock::addParameters(
+   std::vector<Device::Param> const& parametersIn )
 {
   modelData.params.insert( modelData.params.end(),
                            parametersIn.begin(), parametersIn.end() );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::setParamter
+// Function      : ParameterBlock::setParamter
 // Purpose       :
 // Special Notes : It is assumed that getNumberOfParemeters was called to
 //                 ensure that i is in range.
@@ -337,27 +340,27 @@ inline void N_IO_ParameterBlock::addParameters(
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-inline void N_IO_ParameterBlock::setParameter( int const& i,
-                                          N_DEV_Param const& parameter )
+inline void ParameterBlock::setParameter( int const& i,
+                                          Device::Param const& parameter )
 {
-  modelData.params[i].setVal(parameter.sVal());
+  modelData.params[i].setVal(parameter.stringValue());
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::getNumberOfParameters
+// Function      : ParameterBlock::getNumberOfParameters
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-inline int N_IO_ParameterBlock::getNumberOfParameters() const
+inline int ParameterBlock::getNumberOfParameters() const
 {
   return modelData.params.size();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::getParameter
+// Function      : ParameterBlock::getParameter
 // Purpose       :
 // Special Notes : It is assumed getNumberOfParameters was called to ensure
 //                 that i is in range.
@@ -365,10 +368,14 @@ inline int N_IO_ParameterBlock::getNumberOfParameters() const
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-inline N_DEV_Param N_IO_ParameterBlock::getParameter( int const& i ) const
+inline Device::Param ParameterBlock::getParameter( int const& i ) const
 {
   return modelData.params[i];
 }
 
+} // namespace IO
+} // namespace Xyce
+
+typedef Xyce::IO::ParameterBlock N_IO_ParameterBlock;
 
 #endif

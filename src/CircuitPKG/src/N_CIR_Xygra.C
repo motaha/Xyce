@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.3.6.2 $
+// Revision Number: $Revision: 1.8 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:32 $
+// Revision Date  : $Date: 2014/02/24 23:49:13 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -47,33 +47,6 @@
 // ----------   Xyce Includes   ----------
 #include <N_CIR_Xygra.h>
 #include <N_DEV_DeviceInterface.h>
-
-//-----------------------------------------------------------------------------
-// Function      : N_DEV_Xygra::N_DEV_Xygra
-// Purpose       : ctor
-// Special Notes : 
-// Scope         : public
-// Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
-// Creation Date : 8/21/08
-//-----------------------------------------------------------------------------
-
-N_CIR_Xygra::N_CIR_Xygra()
-  : N_CIR_Xyce()
-{
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_DEV_Xygra::~N_DEV_Xygra
-// Purpose       : dtor
-// Special Notes : 
-// Scope         : public
-// Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
-// Creation Date : 8/21/08
-//-----------------------------------------------------------------------------
-
-N_CIR_Xygra::~N_CIR_Xygra()
-{
-}
 
 //-----------------------------------------------------------------------------
 // Function      : N_DEV_Xygra::getDeviceNames
@@ -85,8 +58,8 @@ N_CIR_Xygra::~N_CIR_Xygra()
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/25/08
 //-----------------------------------------------------------------------------
-bool N_CIR_Xygra::getDeviceNames(const string & deviceType, 
-                      vector<string> & deviceNames)
+bool N_CIR_Xygra::getDeviceNames(const std::string & deviceType, 
+                      std::vector<std::string> & deviceNames)
 {
   return devIntPtr_->getDeviceNames(deviceType,deviceNames);
 }
@@ -99,7 +72,7 @@ bool N_CIR_Xygra::getDeviceNames(const string & deviceType,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/25/08
 //-----------------------------------------------------------------------------
-int N_CIR_Xygra::xygraGetNumNodes(const string & deviceName)
+int N_CIR_Xygra::xygraGetNumNodes(const std::string & deviceName)
 {
   return devIntPtr_->xygraGetNumNodes(deviceName);
 }
@@ -112,7 +85,7 @@ int N_CIR_Xygra::xygraGetNumNodes(const string & deviceName)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/25/08
 //-----------------------------------------------------------------------------
-int N_CIR_Xygra::xygraGetNumWindings(const string & deviceName)
+int N_CIR_Xygra::xygraGetNumWindings(const std::string & deviceName)
 {
   return devIntPtr_->xygraGetNumWindings(deviceName);
 }
@@ -126,8 +99,8 @@ int N_CIR_Xygra::xygraGetNumWindings(const string & deviceName)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 9/15/08
 //-----------------------------------------------------------------------------
-void N_CIR_Xygra::xygraGetCoilWindings(const string & deviceName,
-                                      vector<int> & cW)
+void N_CIR_Xygra::xygraGetCoilWindings(const std::string & deviceName,
+                                      std::vector<int> & cW)
 {
   devIntPtr_->xygraGetCoilWindings(deviceName,cW);
 }
@@ -141,8 +114,8 @@ void N_CIR_Xygra::xygraGetCoilWindings(const string & deviceName,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 9/29/08
 //-----------------------------------------------------------------------------
-void N_CIR_Xygra::xygraGetCoilNames(const string & deviceName,
-                                      vector<string> & cN)
+void N_CIR_Xygra::xygraGetCoilNames(const std::string & deviceName,
+                                      std::vector<std::string> & cN)
 {
   devIntPtr_->xygraGetCoilNames(deviceName,cN);
 }
@@ -155,8 +128,8 @@ void N_CIR_Xygra::xygraGetCoilNames(const string & deviceName,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/26/08
 //-----------------------------------------------------------------------------
-bool N_CIR_Xygra::xygraSetConductances(const string & deviceName, 
-                                  const vector<vector<double> > & cM)
+bool N_CIR_Xygra::xygraSetConductances(const std::string & deviceName, 
+                                  const std::vector<std::vector<double> > & cM)
 {
   return devIntPtr_->xygraSetConductances(deviceName, cM);
 }
@@ -169,8 +142,8 @@ bool N_CIR_Xygra::xygraSetConductances(const string & deviceName,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/26/08
 //-----------------------------------------------------------------------------
-bool N_CIR_Xygra::xygraSetK(const string & deviceName, 
-                            const vector<vector<double> > & kM,
+bool N_CIR_Xygra::xygraSetK(const std::string & deviceName, 
+                            const std::vector<std::vector<double> > & kM,
                             const double t)
 {
   return devIntPtr_->xygraSetK(deviceName, kM, t);
@@ -184,8 +157,8 @@ bool N_CIR_Xygra::xygraSetK(const string & deviceName,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 9/18/2008
 //-----------------------------------------------------------------------------
-bool N_CIR_Xygra::xygraSetSources(const string & deviceName, 
-                                  const vector<double > & sV,
+bool N_CIR_Xygra::xygraSetSources(const std::string & deviceName, 
+                                  const std::vector<double > & sV,
                                   const double t)
 {
   return devIntPtr_->xygraSetSources(deviceName, sV, t);
@@ -200,8 +173,8 @@ bool N_CIR_Xygra::xygraSetSources(const string & deviceName,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 9/18/2008
 //-----------------------------------------------------------------------------
-bool N_CIR_Xygra::xygraGetVoltages(const string & deviceName, 
-                                   vector<double > & vN)
+bool N_CIR_Xygra::xygraGetVoltages(const std::string & deviceName, 
+                                   std::vector<double > & vN)
 {
   return devIntPtr_->xygraGetVoltages(deviceName, vN);
 }

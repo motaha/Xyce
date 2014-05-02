@@ -1,0 +1,11 @@
+<map id="Xyce::Device::BJT::Master" name="Xyce::Device::BJT::Master">
+<area shape="rect" id="node2" href="$classXyce_1_1Device_1_1DeviceMaster.html" title="Xyce::Device::DeviceMaster\l\&lt; Traits \&gt;" alt="" coords="1061,107,1256,149"/>
+<area shape="rect" id="node3" href="$classXyce_1_1Device_1_1Device.html" title="The Device class is an interface for device implementations." alt="" coords="390,69,541,96"/>
+<area shape="rect" id="node10" href="$classXyce_1_1Device_1_1DeviceMaster.html" title="DeviceMaster instantiates a device as described by the device traits T." alt="" coords="718,115,946,141"/>
+<area shape="rect" id="node4" href="$classXyce_1_1Device_1_1DeviceOptions.html" title="Xyce::Device::DeviceOptions" alt="" coords="365,5,565,32"/>
+<area shape="rect" id="node5" href="$classXyce_1_1Device_1_1SolverState.html" title="Xyce::Device::SolverState" alt="" coords="375,236,556,263"/>
+<area shape="rect" id="node6" href="$classN__NLS__NonLinInfo.html" title="N_NLS_NonLinInfo" alt="" coords="21,251,165,277"/>
+<area shape="rect" id="node7" href="$classN__TIA__TimeIntInfo.html" title="N_TIA_TimeIntInfo" alt="" coords="23,200,164,227"/>
+<area shape="rect" id="node8" href="$classXyce_1_1Device_1_1Configuration.html" title="Class Configuration contains device configuration data." alt="" coords="369,135,561,161"/>
+<area shape="rect" id="node9" href="$classXyce_1_1Device_1_1ParametricData_3_01void_01_4.html" title="Class ParametricData&lt;void&gt; manages the configuration information and the parameter binding map..." alt="" coords="5,127,181,169"/>
+</map>

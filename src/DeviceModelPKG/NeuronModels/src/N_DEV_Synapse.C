@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.21.2.1 $
+// Revision Number: $Revision: 1.41.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:33 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //----------------------------------------------------------------------------
@@ -51,82 +51,67 @@
 // ----------   Xyce Includes   ----------
 //
 #include <N_DEV_Const.h>
-#include <N_DEV_Synapse.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_DeviceMaster.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Synapse.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
 
 #include <N_LAS_Matrix.h>
 #include <N_LAS_Vector.h>
 
 namespace Xyce {
 namespace Device {
-template<>
-ParametricData<Synapse::Instance>::ParametricData()
+
+namespace Synapse {
+
+
+void Traits::loadInstanceParameters(ParametricData<Synapse::Instance> &p)
 {
   // Set up configuration constants:
-  setNumNodes(2);
-  setNumOptionalNodes(0);
-  setNumFillNodes(0);
-  setModelRequired(0);
-  addModelType("SYNAPSE");
 }
 
-template<>
-ParametricData<Synapse::Model>::ParametricData()
+void Traits::loadModelParameters(ParametricData<Synapse::Model> &p)
 {
   // Default values are taken from Destexhe 98, values for AMPA receptor
-  addPar ("GMAX", 1.0E-9, false, ParameterType::NO_DEP,
-          &Synapse::Model::gMax, NULL,
-          U_OHMM1, CAT_NONE, "Maximal Synaptic Conductance");
+  p.addPar ("GMAX", 1.0E-9, &Synapse::Model::gMax)
+    .setUnit(U_OHMM1)
+    .setDescription("Maximal Synaptic Conductance");
 
-  addPar ("EREV", 0.0, false, ParameterType::NO_DEP,
-          &Synapse::Model::eRev, NULL,
-          U_VOLT, CAT_NONE, "Reversal Potential");
+  p.addPar ("EREV", 0.0, &Synapse::Model::eRev)
+    .setUnit(U_VOLT)
+    .setDescription("Reversal Potential");
 
-  addPar ("ALPHA", 1.1E-6, false, ParameterType::NO_DEP,
-          &Synapse::Model::alpha, NULL,
-          U_SECM1, CAT_NONE, "Forward rate constant for receptor opening");
+  p.addPar ("ALPHA", 1.1E-6, &Synapse::Model::alpha)
+    .setUnit(U_SECM1)
+    .setDescription("Forward rate constant for receptor opening");
 
-  addPar ("BETA", 190.0, false, ParameterType::NO_DEP,
-          &Synapse::Model::beta, NULL,
-          U_SECM1, CAT_NONE, "Backward rate constant for receptor opening");
+  p.addPar ("BETA", 190.0, &Synapse::Model::beta)
+    .setUnit(U_SECM1)
+    .setDescription("Backward rate constant for receptor opening");
 
-  addPar ("VP", 0.002, false, ParameterType::NO_DEP,
-          &Synapse::Model::vP, NULL,
-          U_VOLT, CAT_NONE, "Presynaptic voltage at which neurotransmitter concentration is half-maximal");
+  p.addPar ("VP", 0.002, &Synapse::Model::vP)
+    .setUnit(U_VOLT)
+    .setDescription("Presynaptic voltage at which neurotransmitter concentration is half-maximal");
 
   // KP should NOT be 0
-  addPar ("KP", 0.005, false, ParameterType::NO_DEP,
-          &Synapse::Model::kP, NULL,
-          U_VOLT, CAT_NONE, "Steepness parameter for neurotransmitter concentration");
+  p.addPar ("KP", 0.005, &Synapse::Model::kP)
+    .setUnit(U_VOLT)
+    .setDescription("Steepness parameter for neurotransmitter concentration");
 
-  addPar ("TMAX", 0.001, false, ParameterType::NO_DEP,
-          &Synapse::Model::tMax, NULL,
-          U_NONE, CAT_NONE, "Maximal neurotransmitter concentration");
+  p.addPar ("TMAX", 0.001, &Synapse::Model::tMax)
+    .setDescription("Maximal neurotransmitter concentration");
 
   // NOTE:  not including concentration units - TMAX should be in moles/liter, and
   // alpha has concentration in the denominator; they cancel out
 }
 
-namespace Synapse {
-
-vector< vector<int> > Instance::jacStamp;
 
 
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
-}
-
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
+std::vector< std::vector<int> > Instance::jacStamp;
 
 // Class Instance
 //-----------------------------------------------------------------------------
@@ -137,7 +122,7 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
   // now set the temperature related stuff.
   //updateTemperature(temp);
@@ -154,14 +139,12 @@ bool Instance::processParams (string param)
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
 Instance::Instance(
-  InstanceBlock & IB,
+  const Configuration & configuration,
+  const InstanceBlock & IB,
   Model & Riter,
-  MatrixLoadData & mlData1,
-  SolverState &ss1,
-  ExternData  &ed1,
-  DeviceOptions & do1)
+  const FactoryBlock &  factory_block)
 
-  : DeviceInstance(IB, mlData1, ss1, ed1, do1),
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(Riter),
     li_Prev(-1),
     li_Post(-1),
@@ -177,9 +160,6 @@ Instance::Instance(
   numIntVars   = 1;
   numExtVars   = 2;
   numStateVars = 0;
-
-  setName(IB.getName());
-  setModelName(model_.getName());
 
   if( jacStamp.empty() )
   {
@@ -230,41 +210,20 @@ Instance::~Instance ()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/12/02
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                             const vector<int> & extLIDVecRef )
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                             const std::vector<int> & extLIDVecRef )
 {
-  string msg;
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "-------------------------------------------------------------------------"
-    "----";
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl << dashedline << endl;
-    cout << "  SynapseInstance::registerLIDs" << endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "  SynapseInstance::registerLIDs" << std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -276,8 +235,8 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << "  li_Prev = " << li_Prev << endl;
-    cout << "  li_Post = " << li_Post << endl;
+    Xyce::dout() << "  li_Prev = " << li_Prev << std::endl;
+    Xyce::dout() << "  li_Post = " << li_Post << std::endl;
   }
 #endif
 
@@ -286,7 +245,7 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 }
@@ -299,12 +258,12 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Christina Warrender, SNL, Cognitive Modeling
 // Creation Date : 10/17/11
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
-    string tmpstr;
+    std::string tmpstr;
 
     tmpstr = getName() + "_r";
     spiceInternalName (tmpstr);
@@ -323,20 +282,9 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 06/12/02
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs(const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs(const std::vector<int> & staLIDVecRef )
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 }
 
 //-----------------------------------------------------------------------------
@@ -347,7 +295,7 @@ void Instance::registerStateLIDs(const vector<int> & staLIDVecRef )
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 08/20/01
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -360,7 +308,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 08/27/01
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
 
@@ -577,7 +525,7 @@ bool Instance::updateTemperature ( const double & temp_tmp)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   if (kP == 0.0)
     kP = 0.001;
@@ -593,12 +541,12 @@ bool Model::processParams (string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 03/23/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -616,10 +564,11 @@ bool Model::processInstanceParams(string param)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-              SolverState & ss1,
-              DeviceOptions & do1)
-  : DeviceModel(MB, ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
     gMax(0.0),
     eRev(0.0),
     alpha(0.0),
@@ -654,9 +603,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -674,24 +623,46 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i,isize;
   isize = instanceContainer.size();
-  os << endl;
-  os << "Number of Synapse Instances: " << isize << endl;
-  os << "    name     getModelName()  Parameters" << endl;
+  os << std::endl;
+  os << "Number of Synapse Instances: " << isize << std::endl;
+  os << "    name     model name  Parameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
+  return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 // Synapse Master functions:
 
@@ -705,7 +676,7 @@ std::ostream &Model::printOutInstances(std::ostream &os) const
 //-----------------------------------------------------------------------------
 bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     (*it)->updateIntermediateVars();
   }
@@ -724,6 +695,19 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 bool Master::updateSecondaryState ( double * staDerivVec, double * stoVec )
 {
   return true;
+}
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("synapse", 1)
+    .registerModelType("synapse", 1);
 }
 
 } // namespace Synapse

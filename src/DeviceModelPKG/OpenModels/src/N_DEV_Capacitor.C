@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,95 +36,128 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.231.2.5 $
+// Revision Number: $Revision: 1.261.2.4 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
-#include <N_UTL_Misc.h>
-
-#ifdef HAVE_CMATH
-#include <cmath>
-#else
-#include <math.h>
-#endif
-
-// ----------   Xyce Includes   ----------
-#include <N_DEV_Const.h>
-#include <N_DEV_Factory.h>
 #include <N_DEV_Capacitor.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
+
+#include <N_UTL_Expression.h>
+#include <N_UTL_Misc.h>
+#include <N_UTL_Math.h>
+#include <N_UTL_LogStream.h>
+
+#include <N_DEV_Const.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_Message.h>
+#include <N_DEV_SolverState.h>
 
 #include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
 
-#include <N_UTL_Expression.h>
 
 namespace Xyce {
 namespace Device {
-
-template<>
-ParametricData<Capacitor::Instance>::ParametricData()
-{
-  // Set up configuration constants:
-  setNumNodes(2);
-  setNumOptionalNodes(0);
-  setNumFillNodes(0);
-  setModelRequired(0);
-  setPrimaryParameter("C");
-  addModelType("C");
-
-  // Set up double precision variables:
-  addPar ("C", 1.e-6,false, ParameterType::SOLN_DEP, &Capacitor::Instance::C, NULL, U_FARAD, CAT_NONE, "Capacitance");
-  addPar ("IC", 0.0, false, ParameterType::NO_DEP, &Capacitor::Instance::IC, &Capacitor::Instance::ICGiven, STANDARD, CAT_NONE, "");
-  addPar ("L", 1.0, false, ParameterType::NO_DEP, &Capacitor::Instance::length, NULL, U_METER, CAT_NONE, "Semiconductor capacitor width");
-  addPar ("W", 1.e-6,false, ParameterType::NO_DEP, &Capacitor::Instance::width, NULL, U_METER, CAT_NONE, "Semiconductor capacitor length");
-  addPar ("AGE",0.0, false, ParameterType::NO_DEP, &Capacitor::Instance::age, NULL,U_HOUR, CAT_NONE, "Age of capacitor");
-  addPar ("D", 0.0233, false, ParameterType::NO_DEP, &Capacitor::Instance::ageCoef, NULL, U_NONE, CAT_NONE, "Age degradation coefficient");
-  addPar ("TEMP", 0.0, false,ParameterType::TIME_DEP, &Capacitor::Instance::temp, NULL, STANDARD, CAT_NONE, "");
-  /* Genie 121412. Support TC for capacitor instances*/
-  addPar ("TC1",   0.0, false,   ParameterType::NO_DEP, &Capacitor::Instance::tempCoeff1, &Capacitor::Instance::tempCoeff1Given, U_DEGCM1, CAT_NONE, "Linear Temperature Coefficient");
-  addPar ("TC2",   0.0, false,   ParameterType::NO_DEP, &Capacitor::Instance::tempCoeff2, &Capacitor::Instance::tempCoeff2Given, U_DEGCM2, CAT_NONE, "Quadratic Temperature Coefficient");
-  makeVector ("TC", 2);
-}
-
-template<>
-ParametricData<Capacitor::Model>::ParametricData()
-{
-  // Set up double precision variables:
-  addPar ("CJ", 0.0, false, ParameterType::NO_DEP, &Capacitor::Model::cj, NULL, U_FARADMM2, CAT_NONE, "Junction bottom capacitance");
-  addPar ("CJSW", 0.0, false, ParameterType::NO_DEP, &Capacitor::Model::cjsw, NULL, U_FARADMM1, CAT_NONE, "Junction sidewall capacitance");
-  addPar ("DEFW", 1.e-6, false, ParameterType::NO_DEP, &Capacitor::Model::defWidth, NULL, U_METER, CAT_NONE, "Default device width");
-  addPar ("NARROW", 0.0, false, ParameterType::NO_DEP, &Capacitor::Model::narrow, NULL, U_METER, CAT_NONE, "Narrowing due to side etching");
-  addPar ("TC1", 0.0, false, ParameterType::NO_DEP, &Capacitor::Model::tempCoeff1, NULL, STANDARD, CAT_NONE, "");
-  addPar ("TC2", 0.0, false, ParameterType::NO_DEP, &Capacitor::Model::tempCoeff2, NULL, STANDARD, CAT_NONE, "");
-  addPar ("TNOM", 0.0, false, ParameterType::NO_DEP, &Capacitor::Model::tnom, NULL, STANDARD, CAT_NONE, "");
-}
-
 namespace Capacitor {
 
 
+//-----------------------------------------------------------------------------
+// Function      : Xyce::Device::Capacitor::Traits::loadInstanceParameters
+// Purpose       : 
+// Special Notes : The addPar calls here were refactored and moved here
+//                 from the instance constructor.  Those addPars had been
+//                 in place from 2/4/2005.
+// Scope         : private
+// Creator       : David Baur
+// Creation Date : 1/27/2014
+//-----------------------------------------------------------------------------
+///
+/// Loads the parameter definition into the instance parameter map.
+///
+/// @param p     instance parameter map
+///
+/// @see Xyce::Device::Resistor::Traits::loadInstanceParameters
+///
+void Traits::loadInstanceParameters(ParametricData<Capacitor::Instance> &p)
+{
+  p.addPar("C", 1.e-6, &Capacitor::Instance::C)
+    .setExpressionAccess(ParameterType::SOLN_DEP)
+    .setUnit(U_FARAD)
+    .setDescription("Capacitance");
+  p.addPar("IC", 0.0, &Capacitor::Instance::IC)
+    .setGivenMember(&Capacitor::Instance::ICGiven)
+    .setUnit(STANDARD);
+  p.addPar("L", 1.0, &Capacitor::Instance::length)
+    .setUnit(U_METER)
+    .setDescription("Semiconductor capacitor width");
+  p.addPar("W", 1.e-6, &Capacitor::Instance::width)
+    .setUnit(U_METER)
+    .setDescription("Semiconductor capacitor length");
+  p.addPar("AGE", 0.0, &Capacitor::Instance::age)
+    .setUnit(U_HOUR)
+    .setDescription("Age of capacitor");
+  p.addPar("D", 0.0233, &Capacitor::Instance::ageCoef)
+    .setDescription("Age degradation coefficient");
+  p.addPar("TEMP", 0.0, &Capacitor::Instance::temp)
+    .setExpressionAccess(ParameterType::TIME_DEP)
+    .setUnit(STANDARD)
+    .setDescription("Device temperature");
 
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
+  p.addPar("TC1", 0.0, &Capacitor::Instance::tempCoeff1)
+    .setGivenMember(&Capacitor::Instance::tempCoeff1Given)
+    .setUnit(U_DEGCM1)
+    .setDescription("Linear Temperature Coefficient");
+  p.addPar("TC2", 0.0, &Capacitor::Instance::tempCoeff2)
+    .setGivenMember(&Capacitor::Instance::tempCoeff2Given)
+    .setUnit(U_DEGCM2)
+    .setDescription("Quadratic Temperature Coefficient");
+  p.makeVector("TC", 2);
 }
 
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
+//-----------------------------------------------------------------------------
+// Function      : Xyce::Device::Capacitor::Traits::loadModelParameters
+// Purpose       : 
+// Special Notes : The addPar calls here were refactored and moved here
+//                 from the model constructor.  Those addPars had been
+//                 in place from 2/4/2005.
+// Scope         : private
+// Creator       : David Baur
+// Creation Date : 1/27/2014
+//-----------------------------------------------------------------------------
+///
+/// Loads the parameter definition into the model parameter map.
+///
+/// @param p     model parameter map
+///
+/// @see Xyce::Device::Resistor::Traits::loadInstanceParameters
+///
+void Traits::loadModelParameters(ParametricData<Capacitor::Model> &p)
+{
+  p.addPar("CJ", 0.0, &Capacitor::Model::cj)
+    .setUnit(U_FARADMM2)
+    .setDescription("Junction bottom capacitance");
+  p.addPar("CJSW", 0.0, &Capacitor::Model::cjsw)
+    .setUnit(U_FARADMM1)
+    .setDescription("Junction sidewall capacitance");
+  p.addPar("DEFW", 1.e-6, &Capacitor::Model::defWidth)
+    .setUnit(U_METER)
+    .setDescription("Default device width");
+  p.addPar("NARROW", 0.0, &Capacitor::Model::narrow)
+    .setUnit(U_METER)
+    .setDescription("Narrowing due to side etching");
+  p.addPar("TC1", 0.0, &Capacitor::Model::tempCoeff1)
+    .setUnit(STANDARD);
+  p.addPar("TC2", 0.0, &Capacitor::Model::tempCoeff2)
+    .setUnit(STANDARD);
+  p.addPar("TNOM", 0.0, &Capacitor::Model::tnom)
+    .setUnit(STANDARD);
 }
 
 // Class Instance
@@ -136,18 +169,35 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+/// Process parameters.
+///
+/// @return true on success
+///
+/// In general, the processParams method is intended as a place for complex
+/// manipulation of parameters that must happen if temperature or other
+/// external changes happen.  
+///
+/// The Capacitor device supports an "AGE" parameter and a degradation
+/// rate parameter that together determine how to modify the
+/// capacitance given on the instance line.  Further, Xyce supports a
+/// "semiconductor capacitor" model which allows the user to specify
+/// the capacitance through a combination of model parameters (junction
+/// capacitance and junction sidewall capacitance) and instance parameters
+/// (length and width).
+///
+/// Both of these methods of capacitance value determination need to
+/// be done after the normal processing of netlist parameters.  That
+/// processing is done here.
+///
+/// @author Eric Keiter, SNL, Parallel Computational Sciences
+/// @date   6/03/02
+bool Instance::processParams ()
 {
 
   baseCap = C;
   if (!given("C") && given("AGE"))
   {
-    string msg =
-      "Age defined, but no base capacitance given.  Can't use age-aware with ";
-    msg += "semiconductor capacitor options.";
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Age defined, but no base capacitance given.  Can't use age-aware with semiconductor capacitor options";
   }
 
   // the age aware capacitor simply modifies the base capacitance.
@@ -158,26 +208,25 @@ bool Instance::processParams (string param)
 
   if (!given("C") && !given("L"))
   {
-    string msg = "Could find neither C parameter or L in instance.";
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Could find neither C parameter or L in instance.";
   }
 
   // Now we know we have either cap or length specified.
   if (!given("C"))
   {
-#ifdef Xyce_DEBUG_DEVICE
-    if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+    if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "Doing semiconductor capacitor! "<< endl;
-      cout << " cj = " << model_.cj << endl;
-      cout << " cjsw = " << model_.cjsw << endl;
-      cout << " width = " << width << endl;
-      cout << " length = " << length << endl;
-      cout << " narrow = " << model_.narrow << endl;
+      dout() << "Semiconductor capacitor " <<  getName() 
+        //<< Util::push << std::endl
+        << std::endl
+             << "cj = " << model_.cj << std::endl
+             << "cjsw = " << model_.cjsw << std::endl
+             << "width = " << width << std::endl
+             << "length = " << length << std::endl
+             << "narrow = " << model_.narrow << 
+             //Util::pop << std::endl;
+             std::endl;
     }
-#endif
 
     baseCap = C =
               model_.cj*(length-model_.narrow)*(width-model_.narrow) +
@@ -200,32 +249,46 @@ bool Instance::processParams (string param)
 // Creator       : Tom Russo, Component Information and Models
 // Creation Date : 02/27/01
 //-----------------------------------------------------------------------------
+///
+/// Update the parameters that depend on the temperature of the device
+///
+/// @param temp_tmp temperature
+///
+/// Xyce has a number of mechanisms that allow temperature to be changed
+/// after a device has been instantiated.  These include .STEP loops over
+/// temperature.  When temperature is changed, any device that has parameters
+/// that depend on temperature must be updated.  That updating happens here.
+///
+/// The capacitor device  supports temperature-dependent resistance through its
+/// TC1 (linear dependence) and TC2 (quadratic dependence) parameters.
+/// If these parameters are specified, the capacitance must be updated.
+///
 bool Instance::updateTemperature ( const double & temp_tmp)
 {
   bool bsuccess = true;
   double difference, factor;
 
   difference = temp - model_.tnom;
-  //factor = 1.0 + (model_.tempCoeff1)*difference +
-  //(model_.tempCoeff2)*difference*difference;
-  factor = 1.0 + tempCoeff1*difference +  //support specifying TC at the instance line
+  factor = 1.0 + tempCoeff1*difference +  
            tempCoeff2*difference*difference;
   C = baseCap*factor;
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Instance::updateTemperature.  C = " << C << endl;
-    cout << "   temp = " << temp << endl;
-    cout << "   temp_tmp = " << temp_tmp << endl;
-    cout << "   tnom = " << model_.tnom << endl;
-    cout << "   difference = " << difference << endl;
-    cout << "   tempCoeff1 = " << tempCoeff1 << endl;
-    cout << "   tempCoeff2 = " << tempCoeff2 << endl;
-    cout << "   baseCap = " << baseCap << endl;
-    cout << "   factor = " << factor  << endl;
+    dout() << "Capacitor " << getName() << " updateTemperature()" 
+      //<< Util::push << std::endl
+      << std::endl
+           << "C = " << C << std::endl
+           << "temp = " << temp << std::endl
+           << "temp_tmp = " << temp_tmp << std::endl
+           << "tnom = " << model_.tnom << std::endl
+           << "difference = " << difference << std::endl
+           << "tempCoeff1 = " << tempCoeff1 << std::endl
+           << "tempCoeff2 = " << tempCoeff2 << std::endl
+           << "baseCap = " << baseCap << std::endl
+           //<< "factor = " << factor  << Util::pop << std::endl;
+           << "factor = " << factor  << std::endl;
   }
-#endif
 
   return bsuccess;
 }
@@ -238,19 +301,27 @@ bool Instance::updateTemperature ( const double & temp_tmp)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
+///
+/// Construct a Capacitor model from a "model block" that was created
+/// by the netlist parser.
+///
+/// @param configuration
+/// @param model_block
+/// @param factory_block
+///
+/// @author Eric Keiter, SNL, Parallel Computational Sciences
+/// @date   3/16/00
 Instance::Instance(
-  InstanceBlock &      IB,
-  Model & Citer,
-  MatrixLoadData &     mlData1,
-  SolverState &        ss1,
-  ExternData &         ed1,
-  DeviceOptions &            do1)
-  : DeviceInstance(IB, mlData1, ss1, ed1, do1),
-    model_(Citer),
+  const Configuration & configuration,
+  const InstanceBlock & instance_block,
+  Model &               model,
+  const FactoryBlock &  factory_block)
+  : DeviceInstance(instance_block, configuration.getInstanceParameters(), factory_block),
+    model_(model),
     expNumVars(0),
     expPtr(0),
     baseCap(0.0),
-    temp(getDeviceOptions().temp.dVal()),
+    temp(getDeviceOptions().temp.getImmutableValue<double>()),
     tempGiven(0),
     tempCoeff1(0.0),
     tempCoeff2(0.0),
@@ -298,11 +369,105 @@ Instance::Instance(
   devConMap[0] = 1;
   devConMap[1] = 2;
 
-  defaultParamName = "C";
-
-  setName(IB.getName());
-  setModelName(model_.getName());
-
+  /// Unlike the resistor, the capacitor's jacobian stamp is set up directly
+  /// in the constructor, and is not static.  This is because the capacitor
+  /// supports some options that the resistor does not:
+  ///
+  ///  - The capacitor instance line may be given an IC=value that
+  ///    will be used as the initial voltage drop across the
+  ///    capacitance at the operating point.
+  ///
+  ///  - The capacitance on the instance line may be an expression
+  ///    that is permitted to be a function of other solution variables (such 
+  ///    as voltages elsewhere in the circuit).
+  ///
+  ///  Both of these require that the Jacobian stamp for the device be modified.
+  ///  Use of a static Jacobian stamp would prevent this flexibility, because
+  ///  the static stamp would be used by all capacitor devices, even those
+  ///  that do not make use of the options.
+  ///
+  /// Since the setting of the Jacobian stamp in this otherwise simple device
+  /// is so complex, we will document how it is set here.
+  ///
+  /// In its simplest form, the charge \f$q_0\f$ on the capacitor is
+  /// \f$C(V_+-V_-)\f$.  Thus, the current out of the positive node is
+  /// \f$d(q_0)/dt\f$, and the current "out" of the negative node is
+  /// \f$-d(q0)/dt\f$.  In the Xyce formulation, we load \f$q_0\f$ into
+  /// the Q vector for the positive node, and \f$-q_0\f$ into the Q
+  /// vector for the negative node; the time integator will later
+  /// differentiate this to obtain the currents.  Thus, the contribution
+  /// to the Jacobian from the capacitor (with constant capacitance and
+  /// no initial condition) will require loading the dQdx matrix with the
+  /// derivatives of \f$q_0\f$ with respect to the voltage nodes:
+  /// \f[
+  /// \left[\begin{array}{cc}
+  /// C & -C \\
+  /// -C & C  
+  /// \end{array} \right] \f]
+  ///
+  /// The jacobian stamp in this case is the same as the one defined by
+  /// the resistor: it has two rows, one for the positive node equation
+  /// and one for negative node equation, and two columns, one for the
+  /// positive node and one for the negative.  Column 0's value in each
+  /// row is 0 to reflect that the first nonzero value of the jacobian
+  /// row is the one corresponding to the positive node, and column 1's value
+  /// is 1 to reflect that the second nonzero corresponds to the dependence  on
+  /// the negative node.
+  /// 
+  /// If an initial condition is present, however, the circuit at DC is
+  /// the same as if there were only a voltage source across the
+  /// positive and negative nodes, and in transient it is the same as
+  /// the capacitor without the voltage source present.  Thus, at DC the
+  /// current out of the positive node would be equal to the voltage
+  /// source branch current, and the current out of the negative node
+  /// would be the negative of that.  Since these quantities are not
+  /// differentiated they would be placed in the F vector, no the Q
+  /// vector.  An extra equation, called the "branch equation"
+  /// stipulates that the voltage drop between the positive and negative
+  /// node be equal to the initial condition, so this element of 
+  /// the F vector would be loaded with \f$(V_+-V_-)-V_{ic}\f$.
+  /// Therefore in DC the dFdx matrix would be loaded with:
+  /// \f[
+  /// \left[ \begin{array}{ccc}
+  /// 0 & 0 & 1 \\
+  /// 0 & 0 & -1 \\
+  /// 1 & -1 & 0
+  /// \end{array}\right]  \f]
+  /// The the first two rows are for the positive and negative node
+  /// equations, and the third row is for the branch equation.  The
+  /// third column is for the branch current variable. At DC nothing
+  /// would be loaded into either the Q vector or its derivative.
+  ///
+  /// In transient, the loads into the Q vector are the same as
+  /// without the initial condition.  Xyce requires that a single jacobian
+  /// stamp be used for both the dFdx and dQdx matrices, and does not allow
+  /// this matrix to vary between DC and transient.  Thus the dQdx matrix would
+  /// be loaded with:
+  /// \f[
+  /// \left[ \begin{array}{ccc}
+  /// C  & -C & 0 \\
+  /// -C &  C & 0 \\
+  /// 0  &  0 & 0
+  /// \end{array}\right]  \f]
+  /// The dFdx matrix must be loaded with a single value to turn off the
+  /// branch equation and prevent a singular Jacobian:
+  /// \f[
+  /// \left[ \begin{array}{ccc}
+  /// 0 & 0 & 0 \\
+  /// 0 & 0 & 0 \\
+  /// 0 & 0 & 1
+  /// \end{array}\right]  \f]
+  /// The net result of this modification is that now, irrespective of whether
+  /// we are at DC or in transient, every element of the 3x3 matrix is potentially
+  /// nonzero in one or the other of dFdx or dQdx, and therefore our jacobian
+  /// stamp is also a dense 3x3 matrix, with each column's value equal to that
+  /// column's number.
+  ///
+  /// Finally, if the capacitance is solution-variable dependent, each of the
+  /// rows for positive and negative nodes must be augmented with an additional
+  /// column for each variable that the capacitance depends on.  These rows
+  /// are similarly dense, and each value of the jacobian stamp for each column
+  /// is equal to its column number.
   if( jacStamp.empty() )
   {
     jacStamp_IC.resize(3);
@@ -333,14 +498,14 @@ Instance::Instance(
   setDefaultParams ();
 
   // Set params according to instance line and constant defaults from metadata:
-  setParams (IB.params);
+  setParams (instance_block.params);
 
   //  Set any non-constant parameter defaults:
 
   if (!given("W"))
     width = model_.defWidth;
   if (!given("TEMP"))
-    temp = getDeviceOptions().temp.dVal();
+    temp = getDeviceOptions().temp.getImmutableValue<double>();
 
   if (!tempCoeff1Given)
     tempCoeff1=model_.tempCoeff1;
@@ -352,73 +517,74 @@ Instance::Instance(
   // Handle case where capacitance is solution-variable dependent:
   if (dependentParams.size()>0)
   {
-    vector<sDepend>::iterator d;
-    vector<sDepend>::iterator begin=dependentParams.begin();
-    vector<sDepend>::iterator end=dependentParams.end();
+    std::vector<sDepend>::iterator d;
+    std::vector<sDepend>::iterator begin=dependentParams.begin();
+    std::vector<sDepend>::iterator end=dependentParams.end();
 
     for (d=begin; d!=end; ++d)
     {
       if (d->name != "C")
       {
-        string msg="Error: Solution-variable-dependent parameter other than C detected for device ";
-        msg += getName();
-        std::ostringstream oss;
-        oss << "Error in " << netlistLocation() << "\n" << msg;
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+        UserError0(*this) << "Solution-variable-dependent parameter other than C detected";
       }
       else
       {
         expNumVars = d->n_vars;
         expPtr = d->expr;
-        solVarDepC = true;
-        // To do the proper integration of the charge, we need to save the
-        // voltage drop, the old capacitance and
-        // the derivatives of Q and C from the last step.
-        numStateVars += 2+2*expNumVars;
 
-        if (expPtr->getNumDdt() != 0)
+        if (expNumVars > 0 || expPtr->isTimeDependent())
         {
-          string msg="Error: Solution-variable-dependent expression for device ";
-          msg += getName();
-          msg += " contains time derivatives.  Feature not supported.\n";
-          std::ostringstream oss;
-          oss << "Error in " << netlistLocation() << "\n" << msg;
-          N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+          solVarDepC = true;
+          // To do the proper integration of the charge, we need to save the
+          // voltage drop, the old capacitance and
+          // the derivatives of Q and C from the last step.
+          numStateVars += 2+2*expNumVars;
+          
+          if (expPtr->getNumDdt() != 0)
+          {
+            UserError0(*this) << "Solution-variable-dependent expression contains time derivatives";
+          }
+          
+          if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0)
+          {
+            dout() << "Capacitor " << getName()
+                   << ": Found solution-dependent parameter C depending on " << expNumVars << " variables" << std::endl;
+            if (expPtr->isTimeDependent())
+            {
+              dout() << "     " << "Expression is time-dependent."  << std::endl;
+            }
+            else
+            {
+              dout() << "     " << "Expression is not time-dependent."  << std::endl;
+            }
+            dout() << "     " << "Expression depends on " << expPtr->num_vars() << " quantity, of which " << expPtr->num_vars()-expNumVars << " are not solution vars. " << std::endl;
+            
+          }
+          
+          // We now need to extend the pos and neg rows of the jacstamps
+          // to account for the additional dependencies:
+          
+          jacStamp[0].resize(2+expNumVars);
+          jacStamp[1].resize(2+expNumVars);
+          jacStamp_IC[0].resize(3+expNumVars);
+          jacStamp_IC[1].resize(3+expNumVars);
+          for (int i=0; i<expNumVars; ++i)
+          {
+            jacStamp[0][2+i]=2+i;
+            jacStamp[1][2+i]=2+i;
+            
+            jacStamp_IC[0][3+i]=3+i;
+            jacStamp_IC[1][3+i]=3+i;
+          }
+          
+          // finally, allocate space to hold the derivatives of C w.r.t.
+          // the variables it depends on:
+          expVarDerivs.resize(expNumVars);
+          // and LIDs for state vector
+          li_dQdXState.resize(expNumVars);
+          li_dCdXState.resize(expNumVars);
+          
         }
-
-#ifdef Xyce_DEBUG_DEVICE
-        if (getDeviceOptions().debugLevel > 0 )
-        {
-          cout << " Instance::Instance:\n";
-          cout << "   name=" << getName() << endl;
-          cout << " Found solution-dependent parameter C depending on "
-               << expNumVars << " variables." << endl;
-        }
-#endif
-
-        // We now need to extend the pos and neg rows of the jacstamps
-        // to account for the additional dependencies:
-
-        jacStamp[0].resize(2+expNumVars);
-        jacStamp[1].resize(2+expNumVars);
-        jacStamp_IC[0].resize(3+expNumVars);
-        jacStamp_IC[1].resize(3+expNumVars);
-        for (int i=0; i<expNumVars; ++i)
-        {
-          jacStamp[0][2+i]=2+i;
-          jacStamp[1][2+i]=2+i;
-
-          jacStamp_IC[0][3+i]=3+i;
-          jacStamp_IC[1][3+i]=3+i;
-        }
-
-        // finally, allocate space to hold the derivatives of C w.r.t.
-        // the variables it depends on:
-        expVarDerivs.resize(expNumVars);
-        // and LIDs for state vector
-        li_dQdXState.resize(expNumVars);
-        li_dCdXState.resize(expNumVars);
-
       }
     }
   }
@@ -457,30 +623,37 @@ Instance::~Instance()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/20/02
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                             const vector<int> & extLIDVecRef)
+///
+/// Register local IDs
+///
+/// Register the local internal and external node IDs.
+///
+/// @param intLIDVecRef internal local IDs from topology package
+/// @param extLIDVecRef external local IDs from topology package
+/// 
+/// Instantiation (calling the device constructor) of the device
+/// sets up variables numIntVars and numExtVars, the numbers of internal and
+/// external variables associated with the device.  This information is then
+/// used by the Topology package to assign locations in the solution vector
+/// (and all other vectors of the same shape) for those variables.
+/// The "Local IDs" (LIDs) of these locations are provided by Topology
+/// so the device can know where to load its data.
+///
+/// This method saves the LIDs from Topology and associates each one with
+/// a particular local name for the internal or external variable.  They 
+/// are then used when we load the F and Q vectors.
+///
+/// The Capacitor device has no internal variables, so this method makes no use 
+/// of the intLIDVecRef array.
+///
+/// @author Robert Hoekstra, SNL, Parallel Computational Sciences
+/// @date   6/20/02
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                             const std::vector<int> & extLIDVecRef)
 
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
   // Copy over the local ID lists:
   intLIDVec = intLIDVecRef;
@@ -499,26 +672,20 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
     li_Bra = intLIDVec[0];
   }
 
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "-----------------------------------------------------------------------------";
-  if (getDeviceOptions().debugLevel > 0 )
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0)
   {
-    cout << dashedline << endl;
+    dout() << "Capacitor " << getName() << " Instance::registerLIDs" 
+     // << Util::push << std::endl
+      << std::endl
+           << "li_Pos_ = " << li_Pos << std::endl
+           << "li_Neg_ = " << li_Neg << std::endl;
 
-    cout << "::registerLIDs:\n";
-    cout << "  name = " << getName() << endl;
-
-    cout << "\nsolution indices:\n";
-    cout << "  li_Pos = "<< li_Pos << endl;
-    cout << "  li_Neg = "<< li_Neg<< endl;
     if (ICGiven)
-      cout << "  li_Bra = "<< li_Bra<< endl;
+      dout() << "li_Bra = "<< li_Bra<< std::endl;
 
-    cout << dashedline << endl;
+    //dout() << Util::pop << std::endl;
+    dout() << std::endl;
   }
-#endif
-
 }
 
 //-----------------------------------------------------------------------------
@@ -529,21 +696,33 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/20/02
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef)
+///
+/// Register the local state IDs
+///
+/// @param staLIDVecRef State variable local IDs
+///
+/// In general, devices may declare at construction that they require storage
+/// locations in the "state vector."  Topology assigns locations in the 
+/// state vector and returns "Local IDs" (LIDs) for devices to use for their
+/// state vector entries.  If a device uses state vector entries, it
+/// uses the registerStateLIDs method to save the local IDs for later use.
+/// 
+/// The capacitor has at least one state variable (the charge) and as many
+/// as three (the charge plus state variables used to support the "voltage
+/// dependent capacitance" feature) plus the number of variables on whihc
+/// the capacitance depends.
+///
+/// @note The storage of the charge as a state variable when the capacitance
+/// is a constant is a holdover from older implementations, and in the future
+/// may be saved only as part of the voltage-dependent capacitance feature.
+///
+/// @author Robert Hoekstra, SNL, Parallel Computational Sciences
+/// @date   06/20/02
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef)
 {
-  string msg;
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables.
-  int numSta = staLIDVecRef.size();
   int i=0;
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
 
   // Copy over the global ID lists:
   staLIDVec = staLIDVecRef;
@@ -576,22 +755,29 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef)
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, Electrical Systems Modeling
-// Creation Date : 01/23/2012
+// Creation Date : 01/23/2013
 //-----------------------------------------------------------------------------
-void Instance::registerStoreLIDs(const vector<int> & stoLIDVecRef )
+/// Register the local store IDs
+///
+/// In addition to state vector, Xyce maintains a separate datastructure
+/// called a "store" vector.  As with other such vectors, the device
+/// declares at construction time how many store vector entries it needs,
+/// and later Topology assigns locations for devices, returning LIDs.
+///
+/// These LIDs are stored in this method for later use.
+///
+/// The Capacitor device uses exactly one "store vector" element, where
+/// it keeps the "lead current" that may be used on .PRINT lines as
+/// "I(C1)" for the current through resistor R1.
+///
+/// @param stoLIDVecRef Store variable local IDs
+///
+/// @author Richard Schiek, Electrical Systems Modeling
+/// @date   1/23/2013
+void Instance::registerStoreLIDs(const std::vector<int> & stoLIDVecRef )
 {
-  string msg;
+  AssertLIDs(stoLIDVecRef.size() == getNumStoreVars());
 
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSto = stoLIDVecRef.size();
-
-  if (numSto != getNumStoreVars())
-  {
-    msg = "Instance::registerStoreLIDs:";
-    msg += "numSto != numStoreVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
   if( loadLeadCurrent )
   {
     li_store_dev_i = stoLIDVecRef[0];
@@ -607,14 +793,25 @@ void Instance::registerStoreLIDs(const vector<int> & stoLIDVecRef )
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 05/13/05
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+/// Set up names for purely internal solution variables
+///
+/// The capacitor device's initial condition code is implemented as
+/// putting a DC voltage source of the given value across the capacitor,
+/// to assure that the circuit is completely consistent at the operating
+/// point with having that voltage across the capacitor.
+///
+/// In the event that an initial condition is given, there is an extra 
+/// solution variable, the branch current of the voltage source.  We give it
+///  name that is the name of this capacitor with "_branch" appended.
+///
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (ICGiven)
   {
     if (intNameMap.empty ())
     {
-      string tmpstr;
+      std::string tmpstr;
       tmpstr = getName()+"_branch";
       spiceInternalName (tmpstr);
       intNameMap[li_Bra] = tmpstr;
@@ -632,11 +829,26 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Rich Schiek, SNL, Electrical Systems Modeling
 // Creation Date : 01/23/2013
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getStoreNameMap ()
+/// Populates and returns the store name map.
+///
+/// If the DeviceInstance::storeNameMap is empty, populate it.
+///
+/// @return reference to the DeviceInstance::storeNameMap
+///
+/// For the purpose of lead currents, store vector elements must be given 
+/// names that can be used to locate lead currents at print time.
+/// When a netlist attempts to print, say, "I(C1)" the output code looks for
+/// an entry in the store vector named C1:DEV_I.
+/// 
+/// This method does the assignment of names to store vector elements.
+///
+/// @author Richard Schiek, Electrical Systems Modeling
+/// @date   1/23/2013
+std::map<int,std::string> & Instance::getStoreNameMap ()
 {
   if( loadLeadCurrent && storeNameMap.empty () )
   {
-    string tmpstr(getName());
+    std::string tmpstr(getName());
     spiceInternalName (tmpstr);
     tmpstr = getName()+":DEV_I";
     storeNameMap[li_store_dev_i] = tmpstr;
@@ -654,7 +866,24 @@ map<int,string> & Instance::getStoreNameMap ()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 08/27/02
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+///
+/// Return Jacobian stamp that informs topology of the layout of the
+/// resistor jacobian.
+///
+/// @return const reference to a std::vector of std::vector of
+/// integers describing Jacobian stamp shape
+//
+/// The Jacobian stamp describes the shape of the Jacobian to the
+/// Topology subsystem.  The Topology subsystem, in turn, returns
+/// the offsets into the matrix and solution vectors where this
+/// instance data is located.
+///
+/// The Jacobian stamp of the capacitor depends on whether an initial
+/// condition is given or not.  
+///
+/// @author Robert Hoekstra
+/// @date 8/20/2001
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   if (ICGiven)
     return jacStamp_IC;
@@ -670,7 +899,38 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 08/27/02
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+///
+/// Register the Jacobian local IDs
+///
+/// @param jacLIDVec Jacobian local Ids
+///
+/// @see Xyce::Device::Capacitor::Instance::Capacitor
+///
+/// Having established local IDs for the solution variables, Topology must
+/// also assign local IDs for the elements of the Jacobian matrix.
+///
+/// For each non-zero element that was identified in the jacobianStamp,
+/// Topology will assign a Jacobian LID.  The jacLIDVec will have the 
+/// same structure as the JacStamp, but the values in the jacLIDVec will
+/// be offsets into the row of the sparse Jacobian matrix corresponding
+/// to the non-zero identified in the stamp.
+/// 
+/// These offsets are stored in this method for use later when we load
+/// the Jacobian.
+///
+/// @note Because the capacitor's Jacobian stamp depends on whether an
+/// initial condition was given or not, this method is slightly more
+/// complex than the corresponding method in the Resistor.  The method
+/// is further complicated by the possibilty that the capacitance may
+/// be given as an expression depending on solution variables; in this case,
+/// the capacitor jacstamp has extra columns for the device's dependence on
+/// those other variables. 
+///
+/// @see Xyce::Device::Resistor::Instance::registerJacLIDs
+///
+/// @author Robert Hoekstra, SNL, Parallel Computational Sciences
+/// @date   08/27/02
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
 
@@ -706,34 +966,31 @@ void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
     }
   }
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "-----------------------------------------\n";
-    cout << "Instance::registerJacLIDs\n";
-    cout << " APosEquPosNodeOffset: " << APosEquPosNodeOffset << endl;
-    cout << " APosEquNegNodeOffset: " << APosEquNegNodeOffset << endl;
-    cout << " ANegEquPosNodeOffset: " << ANegEquPosNodeOffset << endl;
-    cout << " ANegEquNegNodeOffset: " << ANegEquNegNodeOffset << endl;
-    cout << " APosEquBraNodeOffset: " << APosEquBraNodeOffset << endl;
-    cout << " ANegEquBraNodeOffset: " << ANegEquBraNodeOffset << endl;
-    cout << " ABraEquPosNodeOffset: " << ABraEquPosNodeOffset << endl;
-    cout << " ABraEquNegNodeOffset: " << ABraEquNegNodeOffset << endl;
-    cout << " ABraEquBraNodeOffset: " << ABraEquBraNodeOffset << endl;
+    dout() << "Capacitor " << getName() << " Instance::registerJacLIDs" 
+      //<< Util::push << std::endl
+      << std::endl
+           << "APosEquPosNodeOffset: " << APosEquPosNodeOffset << std::endl
+           << "APosEquNegNodeOffset: " << APosEquNegNodeOffset << std::endl
+           << "ANegEquPosNodeOffset: " << ANegEquPosNodeOffset << std::endl
+           << "ANegEquNegNodeOffset: " << ANegEquNegNodeOffset << std::endl
+           << "APosEquBraNodeOffset: " << APosEquBraNodeOffset << std::endl
+           << "ANegEquBraNodeOffset: " << ANegEquBraNodeOffset << std::endl
+           << "ABraEquPosNodeOffset: " << ABraEquPosNodeOffset << std::endl
+           << "ABraEquNegNodeOffset: " << ABraEquNegNodeOffset << std::endl
+           << "ABraEquBraNodeOffset: " << ABraEquBraNodeOffset << std::endl;
     if (solVarDepC)
     {
       for ( int i=0; i<expNumVars; ++i)
       {
-        cout << " APosEquDepVarOffsets["<<i<<"]: " << APosEquDepVarOffsets[i]
-             << endl;
-        cout << " ANegEquDepVarOffsets["<<i<<"]: " << ANegEquDepVarOffsets[i]
-             << endl;
+        dout() << "APosEquDepVarOffsets["<<i<<"]: " << APosEquDepVarOffsets[i] << std::endl
+               << "ANegEquDepVarOffsets["<<i<<"]: " << ANegEquDepVarOffsets[i] << std::endl;
       }
     }
-    cout << "-----------------------------------------\n";
+    //dout() << Util::pop << std::endl;
+    dout() << std::endl;
   }
-#endif
-
 }
 
 //-----------------------------------------------------------------------------
@@ -744,6 +1001,30 @@ void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
 // Creator       : Eric Keiter, SNL
 // Creation Date : 11/30/08
 //-----------------------------------------------------------------------------
+///
+/// Setup direct access pointer to solution matrix and vectors.
+///
+/// @see Xyce::Device::Capacitor::Instance::registerJacLIDs
+///
+/// As an alternative to the row offsets defined in registerJacLIDs, it 
+/// is also possible to obtain direct pointers of the Jacobian elements.
+///
+/// This method uses the offsets obtained in registerJacLIDs to retrieve
+/// the pointers.
+///
+/// In the resistor device the pointers to the matrix are only saved
+/// (and are only used for matrix access) if
+/// Xyce_NONPOINTER_MATRIX_LOAD is NOT defined at compile time.  For
+/// some devices the use of pointers instead of array indexing can be
+/// a performance enhancement.
+///
+/// Use of pointers in this device is disabled by defining
+/// Xyce_NONPOINTER_MATRIX_LOAD at compile time.  When disabled, array
+/// indexing with the offsets from registerJacLIDs is used in
+/// the matrix load methods.
+///
+/// @author Eric Keiter, SNL
+/// @date   11/30/08
 void Instance::setupPointers ()
 {
 #ifndef Xyce_NONPOINTER_MATRIX_LOAD
@@ -789,6 +1070,35 @@ void Instance::setupPointers ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 01/29/01
 //-----------------------------------------------------------------------------
+///
+/// Update the state variables.
+///
+/// @return true on success
+///
+/// The capacitor's state variables are used to store the charge on
+/// the capacitor.  In the case of a constant capacitance the charge
+/// is \f$q_0=CV\f$, but the computation is much more complex if the
+/// capacitance is variable.
+///
+/// @note This method is called by the default implementation of the
+/// loadState master function. While the Capacitor class reimplements
+/// the "Master" "loadState" function that loads the contributions
+/// from all capacitor devices in a single loop, because this method
+/// is so complicated for the case of solution-dependent capacitances,
+/// the overloaded method falls back on this function in that case.
+///
+/// @note Even though this method IS called in some cases, note that it does
+/// NOT call updateIntermediateVars as other device updatePrimaryState methods
+/// do.  The capacitor device doesn't actually *HAVE* an updateIntermediateVars
+/// method, and all the hard work is done either in the Master class
+/// updateState function directly for the simple, constant-capacitance
+/// case, or here, for the solution-variable-dependent-capacitance case.
+/// 
+/// @see Xyce::Device::Capacitor::Master::updateState
+///
+/// @author Eric Keiter, SNL, Parallel Computational Sciences
+/// @date   01/29/01
+///
 bool Instance::updatePrimaryState ()
 {
   double * solVec = extData.nextSolVectorRawPtr;
@@ -796,13 +1106,11 @@ bool Instance::updatePrimaryState ()
   double v_pos = solVec[li_Pos];
   double v_neg = solVec[li_Neg];
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << " ----------------------------------" << endl;
-    cout << "Instance::updatePrimaryState:" << endl;
+    dout() << " ----------------------------------" << std::endl;
+    dout() << "Instance::updatePrimaryState:" << std::endl;
   }
-#endif
 
   vcap = v_pos-v_neg;
 
@@ -816,110 +1124,20 @@ bool Instance::updatePrimaryState ()
   }
   else
   {
-    // For solution-variable dependent cap, can't use the same formulation.
-    // The capacitance is *strictly* dQ/dV, so must integrate CdV to get
-    // charge.  We do this by incrementally adding C'*deltaV as V changes.
-    // C' is the average capacitance between this and the previous step.
-    // Using the average assures charge conservation, at least when C is
-    // a function of vcap alone.
-    // When C is not a function of vcap alone, we have additional derivative
-    // terms that must also be integrated.  Ick.
+    // The capacitance depends on solution variables, the work load just
+    // went up.
 
+    // here, we're just calling evaluate
+    // to get the derivatives of C, and discarding the actual value
+    // of C (which has already been stored)    
+    double junk;
+    expPtr->evaluate(junk,expVarDerivs);
+      
+
+    // At DC, the charge really still is V*C.
     if (getSolverState().dcopFlag)
     {
       q0 = vcap*C;
-    }
-    else
-    {
-      double * oldstaVector = extData.currStaVectorRawPtr;
-      double oldC;
-      double oldVcap;
-      q0=oldstaVector[li_QState];
-      oldC=oldstaVector[li_capState];
-      oldVcap=oldstaVector[li_vcapState];
-
-      q0 += 0.5*(oldC+C)*(vcap-oldVcap);
-    }
-    staVec[li_QState] = q0;
-    staVec[li_vcapState]=vcap;
-    staVec[li_capState]=C;
-  }
-
-  return true;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : Instance::updateSecondaryState
-// Purpose       :
-// Special Notes :
-// Scope         : public
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 01/29/01
-//-----------------------------------------------------------------------------
-bool Instance::updateSecondaryState ()
-{
-  double * staDerivVec = extData.nextStaDerivVectorRawPtr;
-  double * staVec = extData.nextStaVectorRawPtr;
-  double * stoVec = extData.nextStoVectorRawPtr;
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
-  {
-    cout << " ----------------------------------" << endl;
-    cout << "Instance::updateSecondaryState:" << endl;
-  }
-#endif
-
-  if (solVarDepC)
-  {
-    // In other devices, at this point we'd handle all the DDT issues in
-    // the expression before doing the evaluation, then redo the computation
-    // of C with the updated time derivatives.  But for now, we're going to
-    // disallow use of ddt in C, so we don't have to.  This restriction is
-    // enforced in the constructor, where we throw a fatal error if the user
-    // gives us a ddt-dependent C.
-    // So here, we're just calling evaluate to get the derivatives of C,
-    // and discarding the actual value of C (which has already been stored)
-    // This code is in updateSecondaryState merely for consistency with
-    // other devices that put similar code here (and because it'll need to be
-    // here when/if we implement "ddt" handling.
-    double junk;
-    expPtr->evaluate(junk,expVarDerivs);
-
-#ifdef Xyce_DEBUG_DEVICE
-    if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
-    {
-      cout << "  Derivatives of C w.r.t variables: " << endl;
-      for (int i=0;i<expNumVars;++i)
-      {
-        cout << " expVarDerivs[ "<< i << " ] = " << expVarDerivs[i] << endl;
-      }
-    }
-#endif
-
-    // Now we have some trickiness because we are integrating CdV to get Q.
-    // In order to get dQ/dX we have two cases:
-    //   X is one of our capacitor's voltage nodes:  dQ/dX = C or -C depending
-    //       on whether X is the pos or negative node
-    //  X is NOT one of our nodes: dQ/dX = integral( dC/dX *dV)
-
-    // For now, because we don't have an easy way to tell which of our
-    // expression nodes is which, we'll just calculate all the dC/dX and dQ/dX
-    // the same way.  When it comes time to assemble the jacobian, we'll use
-    // the node/equation offsets to know when to skip adding in this component.
-
-    // The logic here is similar to the computation of the charge itself.
-    // We'll use "expVarDerivs" to hold the final dQ/dX values.
-
-
-    // Need to save the dC/dX value for next step.
-    for (int i=0;i<expNumVars; ++i)
-    {
-      staVec[li_dCdXState[i]] = expVarDerivs[i];
-    }
-
-    if (getSolverState().dcopFlag)
-    {
       // dQ/dX is just dC/dX*vcap
       for (int i=0;i<expNumVars; ++i)
       {
@@ -928,32 +1146,98 @@ bool Instance::updateSecondaryState ()
     }
     else
     {
+      ///
+      /// For solution-variable dependent cap in transient, we can't
+      /// use the expression \f$q_0=CV\f$ because the capacitance is
+      /// actually dQ/dV, not Q/V.  We must integrate CdV to get the
+      /// charge.  We approximate this by incrementally adding
+      /// C'*deltaV as V changes.  C' is the average capacitance
+      /// between this and the previous step.  Using the average
+      /// assures charge conservation, at least when C is a function
+      /// of vcap alone.
+      ///
       double * oldstaVector = extData.currStaVectorRawPtr;
-      // otherwise we have to integrate
+      double oldC;
+      double oldVcap;
+      q0=oldstaVector[li_QState];
+      oldC=oldstaVector[li_capState];
+      oldVcap=oldstaVector[li_vcapState];
 
+      q0 += 0.5*(oldC+C)*(vcap-oldVcap);
+
+      if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+      {
+        dout() << "  Derivatives of C w.r.t variables: " << std::endl;
+        for (int i=0;i<expNumVars;++i)
+        {
+          dout() << " expVarDerivs[ "<< i << " ] = " << expVarDerivs[i] << std::endl;
+        }
+      }
+      ///
+      /// When C is not a function of vcap alone, we have additional derivative
+      /// terms that must also be integrated for proper computation of 
+      /// all dQdx entries.  
+      ///
+      // If expressions contain the "ddt" (time differentiation)
+      // function, everything becomes harder.  So for now, we're going
+      // to disallow use of ddt in C, so we don't have to deal with
+      // that added complexity.  This restriction is enforced in the
+      // constructor, where we throw a fatal error if the user gives
+      // us a ddt-dependent C.  This code is NOT sufficient if ddt is allowed
+      // in capacitance expressions.
+      //
+      // Now we have some trickiness because we are integrating CdV to get Q.
+      // In order to get dQ/dX we have two cases:
+      //   X is one of our capacitor's voltage nodes:  dQ/dX = C or -C depending
+      //       on whether X is the pos or negative node
+      //  X is NOT one of our nodes: dQ/dX = integral( dC/dX *dV)
+      
+      // For now, because we don't have an easy way to tell which of our
+      // expression nodes is which, we'll just calculate all the dC/dX and dQ/dX
+      // the same way.  When it comes time to assemble the jacobian, we'll use
+      // the node/equation offsets to know when to skip adding in this component.
+      
+      // The logic here is similar to the computation of the charge itself.
+      // We'll use "expVarDerivs" to hold the final dQ/dX values.
+      
+      
+      // Need to save the dC/dX value for next step.
+      for (int i=0;i<expNumVars; ++i)
+      {
+        staVec[li_dCdXState[i]] = expVarDerivs[i];
+      }
+      
+      // we have to integrate
+      
       // dQ/dx = olddQdX + .5*(olddCdX+newdCdX)*(vcap-oldvcap)
-
+      
       for (int i=0; i< expNumVars; ++i)
       {
         expVarDerivs[i] = oldstaVector[li_dQdXState[i]]
-                          + 0.5*(oldstaVector[li_dCdXState[i]]+expVarDerivs[i])*
-                          (vcap-oldstaVector[li_vcapState]);
-
+          + 0.5*(oldstaVector[li_dCdXState[i]]+expVarDerivs[i])*
+          (vcap-oldstaVector[li_vcapState]);
+        
       }
     }
     // Regardless of whether it's dcop or not, expVarDerivs now contains
     // dQ/dX for all the X's.  It's WRONG if X is one of our voltage nodes,
-    // so we have to be careful not to use it in that case.
+    // so we have to be careful not to use it in that case.  This logic
+    // is handled down in loadDAEdQdx
     // Save to state:
     for (int i=0;i<expNumVars; ++i)
     {
       staVec[li_dQdXState[i]] = expVarDerivs[i];
     }
+    
 
-  }
 
+    staVec[li_QState] = q0;
+    staVec[li_vcapState]=vcap;
+    staVec[li_capState]=C;
+  }  
   return true;
 }
+
 
 //-----------------------------------------------------------------------------
 // Function      : Instance::loadDAEQVector
@@ -970,10 +1254,42 @@ bool Instance::updateSecondaryState ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 01/24/03
 //-----------------------------------------------------------------------------
+///
+/// Load the DAE Q vector.
+///
+/// @return true on success
+///
+/// The Xyce DAE formulation solves the differential-algebraic
+/// equations \f$F(x)+dQ(x)/dt=0\f$ These are vector equations
+/// resulting from the modified nodal analysis of the circuit.
+/// 
+/// This method loads the Q-vector contributions for a single capacitor
+/// instance.
+///
+/// In this method, the offsets defined in registerLIDs are used to
+/// store the device's Q contributions into the Q vector.
+///
+/// The Q vector is used for devices that store charge or magnetic
+/// energy.  The capacitor is such a device
+///
+/// @note This method is called by the default implementation of the
+/// loadDAEVectors master function. Since the capacitor class
+/// reimplements the "Master" "loadDAEVectors" function that loads the
+/// contributions from all capacitor devices in a single loop, THIS
+/// FUNCTION IS NOT ACTUALLY USED.  The loadDAEQVector method is only
+/// called when a device class does not re-implement the master class.
+/// This can be a source of confusion when attempting to modify the Capacitor
+/// device, or any other device that reimplements the Master classes.
+///
+/// @see Xyce::Device::Capacitor::Master::loadDAEVectors
+///
+/// @author Eric Keiter, SNL, Parallel Computational Sciences
+/// @date   01/24/03
 bool Instance::loadDAEQVector ()
 {
-  (*extData.daeQVectorPtr)[li_Pos] += q0;
-  (*extData.daeQVectorPtr)[li_Neg] += -q0;
+  double * qVec = extData.daeQVectorRawPtr;
+  qVec[li_Pos] += q0;
+  qVec[li_Neg] += -q0;
 
   return true;
 }
@@ -995,6 +1311,38 @@ bool Instance::loadDAEQVector ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 01/24/03
 //-----------------------------------------------------------------------------
+///
+/// Load the DAE F vector.
+///
+/// @return true on success
+///
+/// The Xyce DAE formulation solves the differential-algebraic
+/// equations \f$F(x)+dQ(x)/dt=0\f$ These are vector equations
+/// resulting from the modified nodal analysis of the circuit.
+/// 
+/// This method loads the F-vector contributions for a single capacitor
+/// instance.
+///
+/// In this method, the offsets defined in registerLIDs are used to
+/// store the device's F contributions into the F vector.
+///
+/// The only time a capacitor adds anything to the F vector is in the 
+/// DC phase of a computation if and only if an initial condition is given
+/// on the capacitor instance line. 
+///
+/// @note This method is called by the default implementation of the
+/// loadDAEVectors master function. Since the Capacitor class
+/// reimplements the "Master" "loadDAEVectors" function that loads the
+/// contributions from all capacitor devices in a single loop, THIS
+/// FUNCTION IS NOT ACTUALLY USED.  The loadDAEFVector method is only
+/// called when a device class does not re-implement the master class.
+/// This can be a source of confusion when attempting to modify the Capacitor
+/// device, or any other device that reimplements the Master classes.
+///
+/// @see Xyce::Device::Capacitor::Master::loadDAEVectors
+///
+/// @author Eric Keiter, SNL, Parallel Computational Sciences
+/// @date   01/24/03
 bool Instance::loadDAEFVector ()
 {
   bool bsuccess = true;
@@ -1053,6 +1401,33 @@ bool Instance::loadDAEFVector ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 03/05/04
 //-----------------------------------------------------------------------------
+///
+/// Load the DAE the derivative of the Q vector with respect to the
+/// solution vector x, dFdx
+///
+/// Loads the contributions for a single resistor instance to the 
+/// dFdx matrix (the Q contribution to the Jacobian).
+///
+/// This method uses the Jacobian LIDs (row offsets) that were stored by
+/// registerJacLIDs.
+///
+/// @see Xyce::Device::Capacitor::Instance::registerJacLIDs
+///
+/// @note This method is called by the default implementation of the
+/// loadDAEMatrices master function. Since the Capacitor class
+/// reimplements the "Master" "loadDAEMatrices" function that loads the
+/// contributions from all capacitor devices in a single loop, THIS
+/// FUNCTION IS NOT ACTUALLY USED.  The loadDAEdFdx method is only
+/// called when a device class does not re-implement the master class.
+/// This can be a source of confusion when attempting to modify the capacitor
+/// device, or any other device that reimplements the Master classes.
+///
+/// @see Xyce::Device::Capacitor::Master::loadDAEMatrices
+///
+/// @return true on success
+///
+/// @author Eric Keiter, SNL, Parallel Computational Sciences
+/// @date   03/05/04
 bool Instance::loadDAEdQdx ()
 {
   if (!(ICGiven&& getSolverState().dcopFlag))
@@ -1064,12 +1439,12 @@ bool Instance::loadDAEdQdx ()
     dQdx[li_Neg][ANegEquNegNodeOffset] += C;
 
 
-    // Remember the comments in updateSecondaryState:
-    // expVarDerivs contains dQ/dX, but only when X is not one of our
-    // nodal voltages.  If X *IS* one of our nodal voltages, dQ/dX is either
-    // C or -C and is already handled above.  We need only do the stuff
-    // below for the dependencies on voltages that are NOT our nodal
-    // voltages.
+    // Remember the comments in updatePrimaryState: expVarDerivs
+    // contains dQ/dX, but they are only correct when X is not one of
+    // our nodal voltages.  If X *IS* one of our nodal voltages, dQ/dX
+    // is either C or -C and is already handled above.  We need only
+    // do the stuff below for the dependencies on voltages that are
+    // NOT our nodal voltages.
     if (solVarDepC)
     {
       for (int i=0; i< expNumVars; ++i)
@@ -1108,6 +1483,36 @@ bool Instance::loadDAEdQdx ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 03/05/04
 //-----------------------------------------------------------------------------
+///
+/// Load the DAE the derivative of the F vector with respect to the
+/// solution vector x, dFdx
+///
+/// Loads the contributions for a single capacitor instance to the 
+/// dFdx matrix (the F contribution to the Jacobian).
+///
+/// This method uses the Jacobian LIDs (row offsets) that were stored by
+/// registerJacLIDs.
+///
+/// @see Xyce::Device::Capacitor::Instance::registerJacLIDs
+///
+/// The capacitor only loads the dFdx matrix when an initial condition is
+/// given on the instance line for the device.
+///
+/// @note This method is called by the default implementation of the
+/// loadDAEMatrices master function. Since the Capacitor class
+/// reimplements the "Master" "loadDAEMatrices" function that loads the
+/// contributions from all capacitor devices in a single loop, THIS
+/// FUNCTION IS NOT ACTUALLY USED.  The loadDAEdFdx method is only
+/// called when a device class does not re-implement the master class.
+/// This can be a source of confusion when attempting to modify the Capacitor
+/// device, or any other device that reimplements the Master classes.
+///
+/// @see Xyce::Device::Capacitor::Master::loadDAEMatrices
+///
+/// @return true on success
+///
+/// @author Eric Keiter, SNL, Parallel Computational Sciences
+/// @date   03/05/04
 bool Instance::loadDAEdFdx ()
 {
   N_LAS_Matrix & dFdx = *(extData.dFdxMatrixPtr);
@@ -1175,7 +1580,7 @@ bool Instance::setIC ()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 02/17/04
 //-----------------------------------------------------------------------------
-void Instance::varTypes( vector<char> & varTypeVec )
+void Instance::varTypes( std::vector<char> & varTypeVec )
 {
   if (ICGiven)
   {
@@ -1194,7 +1599,14 @@ void Instance::varTypes( vector<char> & varTypeVec )
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+///
+/// Process model parameters
+///
+/// @return true on success
+///
+/// @author Eric Keiter, SNL, Parallel Computational Sciences
+/// @date   6/03/02
+bool Model::processParams ()
 {
 
   if (!tnomGiven)
@@ -1216,12 +1628,22 @@ bool Model::processParams (string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 03/23/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+///
+/// Process the instance parameters of instance owned by this model
+///
+/// This method simply loops over all instances associated with this
+/// model and calls their processParams method.
+///
+/// @return true
+///
+/// @author Dave Shirely, PSSI
+/// @date   03/23/06
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1233,17 +1655,27 @@ bool Model::processInstanceParams(string param)
 
 //-----------------------------------------------------------------------------
 // Function      : Model::Model
-// Purpose       : block constructor
+// Purpose       : model block constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/17/00
 //-----------------------------------------------------------------------------
-
-Model::Model(const ModelBlock & MB,
-             SolverState & ss1,
-             DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1),
+///
+/// Construct a capacitor model from a "model block" that was created
+/// by the netlist parser.
+///
+/// @param configuration
+/// @param model_block
+/// @param factory_block
+///
+/// @author Eric Keiter, SNL, Parallel Computational Sciences
+/// @date   5/17/00
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    model_block,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(model_block, configuration.getModelParameters(), factory_block),
     cj(0.0),
     cjsw(0.0),
     defWidth(10e-6),
@@ -1252,14 +1684,13 @@ Model::Model(const ModelBlock & MB,
     tempCoeff2(0.0),
     tnom(getDeviceOptions().tnom),
     tnomGiven(0)
-
 {
 
   // Set params to constant default values :
   setDefaultParams ();
 
   // Set params according to .model line and constant defaults from metadata:
-  setModParams (MB.params);
+  setModParams(model_block.params);
 
   // Set any non-constant parameter defaults:
   if (!given("TNOM"))
@@ -1285,9 +1716,9 @@ Model::Model(const ModelBlock & MB,
 
 Model::~Model()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1307,30 +1738,51 @@ Model::~Model()
 
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i,isize;
 
   isize = instanceContainer.size();
-  os << endl;
-  os << "Number of capacitor instances: " << isize << endl;
-  os << "    name\t\tmodelName\tParameters" << endl;
+  os << std::endl;
+  os << "Number of capacitor instances: " << isize << std::endl;
+  os << "    name\t\tmodelName\tParameters" << std::endl;
 
   for (i = 0, iter = first; iter != last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
+    os << getName();
     os << "\t\tC = " << (*iter)->C;
     os << "\tIC = " << (*iter)->IC;
-    os << endl;
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 // Capacitor Master functions:
 
@@ -1342,9 +1794,33 @@ std::ostream &Model::printOutInstances(std::ostream &os) const
 // Creator       : Eric Keiter, SNL
 // Creation Date : 11/26/08
 //-----------------------------------------------------------------------------
+///
+/// Update state for all capacitor instances, regardless of model.
+///
+/// @param solVec solution vector
+/// @param staVec state vector
+/// @param stoVec store vector
+///
+/// @return true on success
+///
+/// @note Because the capacitor device re-implements the base-class
+/// Master::updateState, the Instance::updatePrimaryState method is never
+/// called, nor is the Instance::updateIntermediateVars method.  This method
+/// replaces those, and does the same work but inside a loop over all
+/// capacitor instances.
+///
+/// Because the computation of state variables is so complex in the
+/// event that the capacitance is given by an expression that depends
+/// on solution variables, this method falls back on calling the
+/// instance's updatePrimaryState method instead of reimplementing the
+/// computation here.
+///
+/// @see Xyce::Device::Capacitor::Instance::updatePrimaryState
+/// @author Eric Keiter, SNL
+/// @date   11/26/08
 bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & ci = *(*it);
 
@@ -1375,30 +1851,6 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : Master::updateSecondaryState
-// Purpose       :
-// Special Notes :
-// Scope         : public
-// Creator       : Eric Keiter, SNL
-// Creation Date : 11/26/08
-//-----------------------------------------------------------------------------
-bool Master::updateSecondaryState ( double * staDerivVec, double * stoVec )
-{
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
-  {
-    Instance & ci = *(*it);
-
-    if (ci.solVarDepC)
-    {
-      // fall back on old-style code if we've got one of these
-      ci.updateSecondaryState();
-    }
-  }
-
-  return true;
-}
-
-//-----------------------------------------------------------------------------
 // Function      : Master::loadDAEVectors
 // Purpose       :
 // Special Notes :
@@ -1406,18 +1858,36 @@ bool Master::updateSecondaryState ( double * staDerivVec, double * stoVec )
 // Creator       : Eric Keiter, SNL
 // Creation Date : 11/26/08
 //-----------------------------------------------------------------------------
-bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  double * storeLeadF, double * storeLeadQ)
+///
+/// Load DAE vectors of all capacitor instances, regardless of model
+///
+/// @param solVec solution vector
+/// @param fVec f vector
+/// @param qVec q vector
+/// @param storeLeadF store lead current f vector
+/// @param storeLeadQ store lead current q vector
+///
+/// @return true on success
+///
+/// @note Because the capacitor device re-implements the base-class
+/// Master::loadDAEVectors, the Instance::loadDAEFVector method is
+/// never called.  This method replaces those, and does the same work
+/// but inside a loop over all capacitor instances.
+///
+/// @see Xyce::Device::Capacitor::Instance::loadDAEFVector
+///
+/// @author Eric Keiter, SNL
+/// @date   11/26/08
+bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec, double * storeLeadF, double * storeLeadQ)
 {
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << " ----------------------------------" << endl;
-    cout << " Master::loadDAEVectors: " << endl;
+    dout() << " ----------------------------------" << std::endl;
+    dout() << " Master::loadDAEVectors: " << std::endl;
   }
-#endif
 
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & ci = *(*it);
     if (ci.ICGiven)
@@ -1427,12 +1897,10 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
       // Initial condition
       if (getSolverState().dcopFlag)
       {
-#ifdef Xyce_DEBUG_DEVICE
-        if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+        if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
         {
-          cout << " loading dcop F vector for cap " << ci.getName() << ":" << endl;
+          dout() << " loading dcop F vector for cap " << ci.getName() << ":" << std::endl;
         }
-#endif
         // If doing the DCOP and have IC=, get current from branch equation
         // ci.i0   = solVec[ci.li_Bra]; moved to CapacitorMaster::updateState() where stovec is passed in.
         Vpos    = solVec[ci.li_Pos];
@@ -1455,13 +1923,11 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
           storeLeadF[ci.li_store_dev_i] = solVec[ci.li_Bra];
         }
 
-#ifdef Xyce_DEBUG_DEVICE
-        if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+        if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
         {
-          cout << " f[ " << ci.li_Pos << " ] += " << solVec[ci.li_Bra]<< endl;
-          cout << " f[ " << ci.li_Neg << " ] += " << -solVec[ci.li_Bra] << endl;
+          dout() << " f[ " << ci.li_Pos << " ] += " << solVec[ci.li_Bra]<< std::endl;
+          dout() << " f[ " << ci.li_Neg << " ] += " << -solVec[ci.li_Bra] << std::endl;
         }
-#endif
 
         v_tmp= (Vpos-Vneg-ci.IC);
       }
@@ -1469,12 +1935,10 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
       // Do this only if there's a Branch equation
       fVec[ci.li_Bra] += v_tmp;
 
-#ifdef Xyce_DEBUG_DEVICE
-      if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+      if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
       {
-        cout << " f[ " << ci.li_Bra << " ] += " << v_tmp << endl;
+        dout() << " f[ " << ci.li_Bra << " ] += " << v_tmp << std::endl;
       }
-#endif
     }
 
     qVec[ci.li_Pos] += ci.q0;
@@ -1498,15 +1962,13 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
       storeLeadF[ci.li_store_dev_i] = 0;
     }
 
-#ifdef Xyce_DEBUG_DEVICE
-    if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+    if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << " loading Q vector for cap " << ci.getName() << ":" << endl;
-      cout << " q[ " << ci.li_Pos << " ] += " << ci.q0 << endl;
-      cout << " q[ " << ci.li_Neg <<  " ] += " << -ci.q0 << endl;
+      dout() << " loading Q vector for cap " << ci.getName() << ":" << std::endl;
+      dout() << " q[ " << ci.li_Pos << " ] += " << ci.q0 << std::endl;
+      dout() << " q[ " << ci.li_Neg <<  " ] += " << -ci.q0 << std::endl;
 
     }
-#endif
 
   }
   return true;
@@ -1520,26 +1982,40 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
 // Creator       : Eric Keiter, SNL
 // Creation Date : 11/26/08
 //-----------------------------------------------------------------------------
+///
+/// Load DAE matrices for all capacitor instances, regardless of model
+///
+/// @param dFdx matrix of derivatives of F vector with respect to solution
+/// @param dQdx matrix of derivatives of Q vector with respect to solution
+///
+/// @return true on success
+///
+/// @note Because the capacitor device re-implements the base-class
+/// Master::loadDAEMatrices, the Instance::loadDAEdFdx method is
+/// never called.  This method replaces those, and does the same work
+/// but inside a loop over all capacitor instances.
+///
+/// @see Xyce::Device::Capacitor::Instance::loadDAEdFdx
+///
+/// @author Eric Keiter, SNL
+/// @date   11/26/08
 bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 {
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << " ----------------------------------" << endl;
-    cout << " Master::loadDAEMatrices: " << endl;
+    dout() << " ----------------------------------" << std::endl;
+    dout() << " Master::loadDAEMatrices: " << std::endl;
   }
-#endif
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & ci = *(*it);
 
-#ifdef Xyce_DEBUG_DEVICE
-    if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+    if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << " loads for capacitor " << ci.getName() << endl;
+      dout() << " loads for capacitor " << ci.getName() << std::endl;
     }
-#endif
 
     if (ci.ICGiven && getSolverState().dcopFlag)
     {
@@ -1592,23 +2068,21 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
           {
             *(ci.qNegEquDepVarsPtrs[i]) -= ci.expVarDerivs[i];
           }
-#ifdef Xyce_DEBUG_DEVICE
-          if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+          if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
           {
             if ((ci.qPosEquDepVarsPtrs[i] != ci.qPosEquPosNodePtr)
                 && (ci.qPosEquDepVarsPtrs[i] != ci.qPosEquNegNodePtr))
             {
-              cout << " q[pos][ " << ci.APosEquDepVarOffsets[i] << " ] += "
-                   << ci.expVarDerivs[i] << endl;
+              dout() << " q[pos][ " << ci.APosEquDepVarOffsets[i] << " ] += "
+                   << ci.expVarDerivs[i] << std::endl;
             }
             if ((ci.qNegEquDepVarsPtrs[i] != ci.qNegEquPosNodePtr)
                 && (ci.qNegEquDepVarsPtrs[i] != ci.qNegEquNegNodePtr))
             {
-              cout << " q[neg][ " << ci.ANegEquDepVarOffsets[i] << " ] += "
-                   << ci.expVarDerivs[i] << endl;
+              dout() << " q[neg][ " << ci.ANegEquDepVarOffsets[i] << " ] += "
+                   << ci.expVarDerivs[i] << std::endl;
             }
           }
-#endif
 
         }
       }
@@ -1634,23 +2108,22 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
             dQdx[ci.li_Neg][ci.ANegEquDepVarOffsets[i]] -=
               ci.expVarDerivs[i];
           }
-#ifdef Xyce_DEBUG_DEVICE
-          if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+
+          if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
           {
             if ( (ci.APosEquDepVarOffsets[i] != ci.APosEquPosNodeOffset)
                  && (ci.APosEquDepVarOffsets[i] != ci.APosEquNegNodeOffset))
             {
-              cout << " q[pos][ " << ci.APosEquDepVarOffsets[i] << " ] += "
-                   << expVarDerivs[i] << endl;
+              dout() << " q[pos][ " << ci.APosEquDepVarOffsets[i] << " ] += "
+                   << expVarDerivs[i] << std::endl;
             }
             if ( (ci.ANegEquDepVarOffsets[i] != ci.ANegEquPosNodeOffset)
                  && (ci.ANegEquDepVarOffsets[i] != ci.ANegEquNegNodeOffset))
             {
-              cout << " q[neg][ " << ci.ANegEquDepVarOffsets[i] << " ] += "
-                   << ci.expVarDerivs[i] << endl;
+              dout() << " q[neg][ " << ci.ANegEquDepVarOffsets[i] << " ] += "
+                   << ci.expVarDerivs[i] << std::endl;
             }
           }
-#endif
         }
       }
 
@@ -1659,6 +2132,50 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
   }
 
   return true;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Xyce::Device::Capacitor::Traits::factory
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 
+//-----------------------------------------------------------------------------
+///
+/// Create a new instance of the Capacitor device.
+///
+/// @param configuration
+/// @param factory_block
+///
+Device *
+Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Xyce::Device::Capacitor::registerDevice
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 
+//-----------------------------------------------------------------------------
+///
+/// Define how to use the device in a netlist.
+///
+/// This method is called from the Xyce::Device::registerOpenDevices
+/// function, which in turn is called by the device manager.
+///
+/// The device is declared here to be an "R" device, which may optionally
+/// take a model card of type "R".  This device will correspond to model
+/// level 1 of capacitor models.
+void registerDevice() 
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("c", 1)
+    .registerModelType("c", 1);
 }
 
 } // namespace Capacitor

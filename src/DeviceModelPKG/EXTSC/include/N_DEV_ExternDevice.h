@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.41.2.2 $
+// Revision Number: $Revision: 1.59 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:35 $
+// Revision Date  : $Date: 2014/02/24 23:49:16 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,23 +46,21 @@
 #ifndef Xyce_N_DEV_ExternDevice_h
 #define Xyce_N_DEV_ExternDevice_h
 
+#include <N_DEV_Configuration.h>
 #include <N_DEV_fwd.h>
+#include <N_PDS_fwd.h>
 
-// ----------   Xyce Includes   ----------
 #include <N_TIA_TwoLevelError.h>
 
 #include <N_DEV_Device.h>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_Configuration.h>
 #include <N_DEV_DeviceInstance.h>
-#include <N_DEV_DeviceTemplate.h>
+#include <N_DEV_DeviceMaster.h>
 #include <N_DEV_DeviceModel.h>
 
 #include <N_DEV_Param.h>
 #include <N_DEV_CompositeParam.h>
-
-// ---------- Forward Declarations ----------
-class N_PDS_Comm;
 
 namespace Xyce {
 namespace Device {
@@ -92,26 +90,23 @@ namespace Device {
 //-----------------------------------------------------------------------------
 class VoltageNode : public CompositeParam
 {
-  friend class ParametricData<VoltageNode>;
+    friend class ParametricData<VoltageNode>;
 
-public:
-  static ParametricData<VoltageNode> &getParametricData();
+  public:
+    static ParametricData<VoltageNode> &getParametricData();
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
+    VoltageNode();
 
-  VoltageNode ();
-  void processParams ();
+    void processParams ();
 
-private:
+  private:
 
-public:
-  string vsrcName;   // name of the electrode, set by the user.
-  double initVal;    // initial value of the node, set by the user.
+  public:
+    std::string vsrcName;   // name of the electrode, set by the user.
+    double initVal;    // initial value of the node, set by the user.
 
-  double limValHigh; // voltage limiter high value
-  double limValLow;  // voltage limiter low  value
+    double limValHigh; // voltage limiter high value
+    double limValLow;  // voltage limiter low  value
 };
 
 
@@ -119,6 +114,20 @@ public:
 namespace ExternDevice {
 
 class Model;
+class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance>
+{
+    static const char *name() {return "External Device";}
+    static const char *deviceTypeName() {return "YEXT level 1 (External Device)";};
+    static const int numNodes() {return 2;}
+    static const int numOptionalNodes() {return 1000;}
+    static const bool isLinearDevice() {return false;}
+
+    static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+    static void loadModelParameters(ParametricData<Model> &model_parameters);
+    static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : Instance
@@ -131,22 +140,15 @@ class Instance : public DeviceInstance
 {
   friend class ParametricData<Instance>;
   friend class Model;
-  friend class Xyce::Device::DeviceTemplate<Model, Instance>;
+    friend class Traits;friend class DeviceMaster<Traits>;
 
 public:
-  static ParametricData<Instance> &getParametricData();
-
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
 
   Instance(
-    InstanceBlock & instance_block,
-    Model &               model,
-    MatrixLoadData &      matrix_load_data,
-    SolverState &         solver_state,
-    ExternData  &         extern_data,
-    DeviceOptions &       device_options);
+    const Configuration &       configuration,
+    const InstanceBlock &     instance_block,
+    Model &             model,
+    const FactoryBlock &factory_block);
 
   ~Instance();
 
@@ -155,14 +157,14 @@ private:
   Instance &operator=(const Instance &);
 
 public:
-  void registerLIDs( const vector<int> & intLIDVecRef,
-                     const vector<int> & extLIDVecRef );
-  void registerStateLIDs( const vector<int> & staLIDVecRef );
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
+  void registerStateLIDs( const std::vector<int> & staLIDVecRef );
 
-  const vector< vector<int> > & jacobianStamp() const;
-  void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-  bool processParams (string param = "");
+  bool processParams ();
   bool updateTemperature ( const double & temp = -999.0 );
 
   bool updateIntermediateVars ();
@@ -170,7 +172,7 @@ public:
   bool updateSecondaryState ();
 
   bool isInnerSolveConverged();
-  bool getBreakPoints (vector<N_UTL_BreakPoint> &breakPointTimes);
+  bool getBreakPoints (std::vector<N_UTL_BreakPoint> &breakPointTimes);
 
   bool runExternalDevice();
 
@@ -186,7 +188,7 @@ public:
   void setOwningProc(int proc) { owningProc_ = proc; }
   void setComm(N_PDS_Comm* comm) { comm_ = comm; }
 
-  void homotopyStepSuccess(const vector<string> & paramNames, const vector<double> & paramVals);
+  void homotopyStepSuccess(const std::vector<std::string> & paramNames, const std::vector<double> & paramVals);
 
   void homotopyStepFailure ();
 
@@ -196,39 +198,36 @@ public:
   bool getInnerLoopErrorSum (N_TIA_TwoLevelError & tle);
   bool updateStateArrays();
   bool startTimeStep ();
-  bool setInternalParam (string & name, double val);
+  bool setInternalParam (std::string & name, double val);
   bool initialize ();
 
-  CompositeParam *constructComposite (string &, string &);
+  CompositeParam *constructComposite(const std::string &composite_name, const std::string &);
 
-
-protected:
 private:
   bool setupVoltageLimiting_ ();
   bool calcVoltLimFactors_ ();
 
 public:
-  map <string,CompositeParam *> nodeMap;
+  std::map<std::string,CompositeParam *> nodeMap;
 
-protected:
+  Model &getModel() {
+    return model_;
+  }
+
 private:
-  string externCode_;
-  string netlistFileName_;
-  vector< vector <int> > jacStamp;
-  vector< vector <int> > jacLIDs;
+  std::string externCode_;
+  std::string netlistFileName_;
+  std::vector< std::vector<int> > jacStamp;
+  std::vector< std::vector<int> > jacLIDs;
   N_TIA_TwoLevelError tlError_;
 
   // vector of electrode data:
-  vector<VoltageNode *> voltageNodeVec;
+  std::vector<VoltageNode *> voltageNodeVec;
 
   ExternCodeInterface * extCodePtr_;
 
   // iterator reference to the resistor model which owns this instance.
   // Getters and setters
-  Model &getModel() {
-    return model_;
-  }
-
 private:
 
   Model &       model_;         //< Owning model
@@ -237,18 +236,18 @@ private:
 
   bool innerSolveStatus_;
 
-  map <string,double> voltageInputMap_;
-  vector <double> currentOutputVector_;
-  vector <vector <double> > conductanceJacobian_;
+  std::map<std::string,double> voltageInputMap_;
+  std::vector<double> currentOutputVector_;
+  std::vector<std::vector<double> > conductanceJacobian_;
 
   // voltage vectors used in limiting:
-  vector <double> voltageOld_;
-  vector <double> voltageOrig_;
-  vector <double> voltageLastCall_;
-  vector <double> voltageDiff_;
-  vector <double> voltageFactor_;
+  std::vector<double> voltageOld_;
+  std::vector<double> voltageOrig_;
+  std::vector<double> voltageLastCall_;
+  std::vector<double> voltageDiff_;
+  std::vector<double> voltageFactor_;
 
-  vector <int> voltageStateID_;
+  std::vector<int> voltageStateID_;
   int newtonIterOld;
   bool voltageLimiterFlag;
   bool initJctGiven_;
@@ -257,6 +256,7 @@ private:
   bool locallyConnected_;
   int  owningProc_;
   N_PDS_Comm * comm_;
+  const IO::CmdParse &      commandLine_;
 };
 
 //-----------------------------------------------------------------------------
@@ -272,33 +272,35 @@ class Model : public DeviceModel
 
   friend class ParametricData<Model>;
   friend class Instance;
-  friend class Xyce::Device::DeviceTemplate<Model, Instance>;
+    friend class Traits;friend class DeviceMaster<Traits>;
 
 public:
-  static ParametricData<Model> &getParametricData();
-
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Model(SolverState & ss1,
-                    DeviceOptions & do1);
-  Model(const ModelBlock &MB,
-                    SolverState & ss1,
-                    DeviceOptions & do1);
+  Model(
+    const Configuration &       configuration,
+    const ModelBlock &          MB,
+    const FactoryBlock &        factory_block);
   ~Model();
 
 private:
   Model();
+  Model(const Model &);
   Model &operator=(const Model &);
 
 public:
-  virtual std::ostream &printOutInstances(std::ostream &os) const;
-  bool processParams (string param = "");
-  virtual bool processInstanceParams(std::string param = "")
-    {}
+    virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
+
+    virtual std::ostream &printOutInstances(std::ostream &os) const;
+
+    bool processParams ();
+  virtual bool processInstanceParams() {
+    return true;
+  }
 
 public:
+    void addInstance(Instance *instance) {
+      instanceContainer.push_back(instance);
+    }
+
   InstanceVector &getInstanceVector() {
     return instanceContainer;
   }
@@ -308,7 +310,7 @@ public:
   }
 
 private:
-  vector<Instance*> instanceContainer;
+  std::vector<Instance*> instanceContainer;
 
 };
 
@@ -334,17 +336,19 @@ inline bool Instance::isInnerSolveConverged()
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/03/06
 //-----------------------------------------------------------------------------
-inline ostream & operator<<(ostream & os, const VoltageNode & vn)
+inline std::ostream & operator<<(std::ostream & os, const VoltageNode & vn)
 {
-  os << vn.getName() << ":\n";
-  os << "  vsrcName   = " << vn.vsrcName << "\n";
-  os << "  initVal    = " << vn.initVal << "\n";
-  os << "  limValHigh = " << vn.limValHigh << "\n";
-  os << "  limValLow  = " << vn.limValLow << "\n";
-  os << endl;
+  os << "VoltageNode:\n"
+     << "  vsrcName   = " << vn.vsrcName << "\n"
+     << "  initVal    = " << vn.initVal << "\n"
+     << "  limValHigh = " << vn.limValHigh << "\n"
+     << "  limValLow  = " << vn.limValLow << "\n"
+     << std::endl;
 
   return os;
 }
+
+void registerDevice();
 
 } // namespace ExternDevice
 } // namespace Device

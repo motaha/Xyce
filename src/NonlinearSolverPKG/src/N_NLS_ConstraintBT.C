@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -164,7 +164,7 @@ int N_NLS_ConstraintBT::operator!=(const N_NLS_ConstraintBT & right) const
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 10/29/02
 //-----------------------------------------------------------------------------
-bool N_NLS_ConstraintBT::initializeAll 
+bool N_NLS_ConstraintBT::initializeAll
     (N_LAS_System * lasSysPtr, const N_NLS_NLParams & nlParams)
 {
   // create and initialize constraint backtracking vectors:
@@ -200,11 +200,6 @@ void N_NLS_ConstraintBT::updateThetaBoundNeg(const N_LAS_Vector * oldSoln,
                                              const N_LAS_Vector * solnUpdate)
 
 {
-
-#ifdef Xyce_DEBUG_NONLINEAR
-  string msg = "N_NLS_ConstraintBT::updateThetaBoundNeg: ";
-#endif
-
   N_LAS_Vector * solnPtr;
   N_LAS_Vector * solnUpdatePtr;
 
@@ -221,26 +216,18 @@ void N_NLS_ConstraintBT::updateThetaBoundNeg(const N_LAS_Vector * oldSoln,
     else
       (*(constraintTempVector_))[i] = N_UTL_MachineDependentParams::DoubleMax();
 
-#ifdef Xyce_DEBUG_NONLINEAR
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + "min: ",
-                           (*(constraintMinVector_))[i], "\n");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + "soln: ",
-                           (*(solnPtr))[i], "\n");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + "solnUpdate: ",
-                           (*(solnUpdatePtr))[i], "\n");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + "constraint: ",
-                           (*(constraintTempVector_))[i], "\n");
-#endif
+    if (Xyce::DEBUG_NONLINEAR)
+      Xyce::dout() << "N_NLS_ConstraintBT::updateThetaBoundNeg: min: " << (*(constraintMinVector_))[i] << "\n"
+                   << "N_NLS_ConstraintBT::updateThetaBoundNeg: soln: " << (*(solnPtr))[i] << "\n"
+                   << "N_NLS_ConstraintBT::updateThetaBoundNeg: solnUpdate: " << (*(solnUpdatePtr))[i] << "\n"
+                   << "N_NLS_ConstraintBT::updateThetaBoundNeg: constraint: " << (*(constraintTempVector_))[i];
   }
 
   // Find minimum
   constraintTempVector_->minValue(&thetaBoundNeg_);
 
-#ifdef Xyce_DEBUG_NONLINEAR
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
-                         "thetaBoundNeg_: ", thetaBoundNeg_, "\n");
-#endif
-
+  if (Xyce::DEBUG_NONLINEAR)
+    Xyce::dout() << "N_NLS_ConstraintBT::updateThetaBoundNeg: thetaBoundNeg_: " << thetaBoundNeg_;
 }
 
 //-----------------------------------------------------------------------------
@@ -258,11 +245,6 @@ void N_NLS_ConstraintBT::updateThetaBoundPos(const N_LAS_Vector * oldSoln,
                                              const N_LAS_Vector * solnUpdate)
 
 {
-
-#ifdef Xyce_DEBUG_NONLINEAR
-  string msg = "N_NLS_ConstraintBT::updateThetaBoundPos: ";
-#endif
-
   N_LAS_Vector * solnPtr;
   N_LAS_Vector * solnUpdatePtr;
 
@@ -279,26 +261,18 @@ void N_NLS_ConstraintBT::updateThetaBoundPos(const N_LAS_Vector * oldSoln,
     else
       (*(constraintTempVector_))[i] = N_UTL_MachineDependentParams::DoubleMax();
 
-#ifdef Xyce_DEBUG_NONLINEAR
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + "max: ",
-                           (*(constraintMaxVector_))[i], "\n");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + "soln: ",
-                           (*(solnPtr))[i], "\n");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + "solnUpdate: ",
-                           (*(solnUpdatePtr))[i], "\n");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + "constraint: ",
-                           (*(constraintTempVector_))[i], "\n");
-#endif
+    if (Xyce::DEBUG_NONLINEAR)
+      Xyce::dout() << "N_NLS_ConstraintBT::updateThetaBoundPos: max: " << (*(constraintMaxVector_))[i] << "\n"
+                   << "N_NLS_ConstraintBT::updateThetaBoundPos: soln: " << (*(solnPtr))[i] << "\n"
+                   << "N_NLS_ConstraintBT::updateThetaBoundPos: solnUpdate: " << (*(solnUpdatePtr))[i] << "\n"
+                   << "N_NLS_ConstraintBT::updateThetaBoundPos: constraint: " << (*(constraintTempVector_))[i];
   }
 
   // Find minimum
   constraintTempVector_->minValue(&thetaBoundPos_);
 
-#ifdef Xyce_DEBUG_NONLINEAR
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
-                         "thetaBoundPos_: ", thetaBoundPos_, "\n");
-#endif
-
+  if (Xyce::DEBUG_NONLINEAR)
+    Xyce::dout() << "N_NLS_ConstraintBT::updateThetaBoundPos: thetaBoundPos_: " << thetaBoundPos_;
 }
 
 //-----------------------------------------------------------------------------
@@ -321,11 +295,6 @@ void N_NLS_ConstraintBT::updateThetaChange(const N_LAS_Vector * oldSoln,
                                            const N_LAS_Vector * solnUpdate)
 
 {
-
-#ifdef Xyce_DEBUG_NONLINEAR
-  string msg = "N_NLS_ConstraintBT::updateThetaChange: ";
-#endif
-
   N_LAS_Vector * solnPtr;
   N_LAS_Vector * solnUpdatePtr;
 
@@ -344,21 +313,15 @@ void N_NLS_ConstraintBT::updateThetaChange(const N_LAS_Vector * oldSoln,
     else
       (*(constraintTempVector_))[i] = N_UTL_MachineDependentParams::DoubleMax();
 
-#ifdef Xyce_DEBUG_NONLINEAR
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + "change: ",
-                           (*(constraintChangeVector_))[i], "\n");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + "constraint: ",
-                           (*(constraintTempVector_))[i], "\n");
-#endif
+    if (Xyce::DEBUG_NONLINEAR)
+      Xyce::dout() << "N_NLS_ConstraintBT::updateThetaChange: change: " << (*(constraintChangeVector_))[i] << "\n"
+                   << "N_NLS_ConstraintBT::updateThetaChange: constraint: " << (*(constraintTempVector_))[i];
   }
 
   // Find minimum
   constraintTempVector_->minValue(&thetaChange_);
 
-#ifdef Xyce_DEBUG_NONLINEAR
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + "thetaChange_: ",
-                         thetaChange_, "\n");
-#endif
-
+  if (Xyce::DEBUG_NONLINEAR)
+    Xyce::dout() << "N_NLS_ConstraintBT::updateThetaChange: thetaChange_: " << thetaChange_;
 }
 

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -29,16 +29,16 @@
 //
 // Special Notes  : 
 //
-// Creator        : David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+// Creator        : David G. Baur  Raytheon  Sandia National Laboratories 1355 
 //
 // Creation Date  : 2013/04/18 18:01:27
 //
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.5.2.3 $
+// Revision Number: $Revision: 1.11.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/03/03 18:29:29 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -57,10 +57,10 @@ namespace Xyce {
  * Return negative if the first differing character of s1 is less than
  * s2.  Return 0 is they are equal, otherize positive.
  *
- * @param s0
  * @param s1
+ * @param s2
  *
- * @return Negative if s0 is less than s1, positive if s0 is greater than s1, zero otherwise
+ * @return Negative if s1 is less than s2, positive if s1 is greater than s2, zero otherwise
  */
 int compare_nocase(const char *s1, const char *s2);
 
@@ -74,7 +74,8 @@ int compare_nocase(const char *s1, const char *s2);
  *
  * @return true if s0 is less than s1, case insensitively
  */
-inline bool less_nocase(const std::string &s0, const std::string &s1) {
+inline bool less_nocase(const std::string &s0, const std::string &s1) 
+{
   return compare_nocase(s0.c_str(), s1.c_str()) < 0;
 }
 
@@ -88,8 +89,10 @@ inline bool less_nocase(const std::string &s0, const std::string &s1) {
  *
  * @return true if s0 is less than s1, case insensitively
  */
-struct LessNoCase : public std::binary_function<std::string,std::string,bool> {
-  bool operator()(const std::string &s0, const std::string &s1 ) const {
+struct LessNoCase : public std::binary_function<std::string,std::string,bool> 
+ {
+  bool operator()(const std::string &s0, const std::string &s1 ) const 
+  {
     return less_nocase(s0, s1);
   }
 };
@@ -104,7 +107,8 @@ struct LessNoCase : public std::binary_function<std::string,std::string,bool> {
  *
  * @return true if s0 is equal to s1, case insensitively
  */
-inline bool equal_nocase(const std::string &s0, const std::string &s1) {
+inline bool equal_nocase(const std::string &s0, const std::string &s1) 
+{
   return compare_nocase(s0.c_str(), s1.c_str()) == 0;
 }
 
@@ -118,30 +122,34 @@ inline bool equal_nocase(const std::string &s0, const std::string &s1) {
  *
  * @return true if s0 is equal to s1, case insensitively
  */
-struct EqualNoCase : public std::binary_function<std::string,std::string,bool> {
-  bool operator()(const std::string &s0, const std::string &s1 ) const {
+struct EqualNoCase : public std::binary_function<std::string,std::string,bool> 
+ {
+  bool operator()(const std::string &s0, const std::string &s1 ) const 
+  {
     return equal_nocase(s0, s1);
   }
 };
 
 /**
- * Functor to compare two strings for equality, case insensitively.
+ * Predicate to compare string for equality, case insensitively.
  *
- * Return true if s0 is equal to s1, case insensitively.
+ * Return true if predicate string is equal to s, case insensitively.
  *
  * @param s0
  * @param s1
  *
- * @return true if s0 is equal to s1, case insensitively
+ * @return true if predicate string is equal to s, case insensitively
  */
-struct EqualNoCaseOp : public std::binary_function<std::string,std::string,bool> {
-    EqualNoCaseOp(const std::string &s)
-      : s_(s)
-    {}
-
-    bool operator()(const std::string &s) const {
-      return equal_nocase(s_, s);
-    }
+struct EqualNoCasePred : public std::binary_function<std::string,std::string,bool> 
+{
+  EqualNoCasePred(const std::string &s)
+    : s_(s)
+  {}
+  
+  bool operator()(const std::string &s) const 
+  {
+    return equal_nocase(s_, s);
+  }
 
   private:
     const std::string s_;

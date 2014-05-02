@@ -90,15 +90,14 @@ am__aclocal_m4_deps = $(top_srcdir)/config/libtool.m4 \
 	$(top_srcdir)/config/lt~obsolete.m4 \
 	$(top_srcdir)/config/xyce_check_bison.m4 \
 	$(top_srcdir)/config/xyce_check_braindamaged_random_shuffle.m4 \
-	$(top_srcdir)/config/xyce_check_flexible_insert.m4 \
 	$(top_srcdir)/config/xyce_check_iota.m4 \
-	$(top_srcdir)/config/xyce_check_stl_member_templates.m4 \
 	$(top_srcdir)/config/xyce_debug_option.m4 \
 	$(top_srcdir)/config/xyce_finite_number_check.m4 \
 	$(top_srcdir)/config/xyce_library_include.m4 \
 	$(top_srcdir)/config/xyce_library_option.m4 \
 	$(top_srcdir)/config/xyce_test_using_dec_cxx.m4 \
 	$(top_srcdir)/config/xyce_test_using_icclt11_cxx.m4 \
+	$(top_srcdir)/config/xyce_trilinos_library_option.m4 \
 	$(top_srcdir)/acinclude.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -108,7 +107,8 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libErrorHandling_la_LIBADD =
-am_libErrorHandling_la_OBJECTS = N_ERH_ErrorMgr.lo
+am_libErrorHandling_la_OBJECTS = N_ERH_ErrorMgr.lo N_ERH_Message.lo \
+	N_ERH_Messenger.lo N_ERH_Progress.lo
 libErrorHandling_la_OBJECTS = $(am_libErrorHandling_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -258,6 +258,7 @@ MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MAYBE_NONFREE = @MAYBE_NONFREE@
+MAYBE_PLUGIN = @MAYBE_PLUGIN@
 MAYBE_RAD = @MAYBE_RAD@
 MKDIR_P = @MKDIR_P@
 NM = @NM@
@@ -352,9 +353,15 @@ AM_CPPFLAGS = @Xyce_INCS@
 noinst_LTLIBRARIES = libErrorHandling.la
 libErrorHandling_la_SOURCES = \
   $(srcdir)/src/N_ERH_ErrorMgr.C \
+  $(srcdir)/src/N_ERH_Message.C \
+  $(srcdir)/src/N_ERH_Messenger.C \
+  $(srcdir)/src/N_ERH_Progress.C \
   $(srcdir)/include/mpi_filebuf.h \
   $(srcdir)/include/null_streambuf.h \
   $(srcdir)/include/N_ERH_ErrorMgr.h \
+  $(srcdir)/include/N_ERH_Message.h \
+  $(srcdir)/include/N_ERH_Messenger.h \
+  $(srcdir)/include/N_ERH_Progress.h \
   $(srcdir)/include/N_ERH_fwd.h
 
 all: all-am
@@ -413,6 +420,9 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_ERH_ErrorMgr.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_ERH_Message.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_ERH_Messenger.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_ERH_Progress.Plo@am__quote@
 
 .C.o:
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -441,6 +451,27 @@ N_ERH_ErrorMgr.lo: $(srcdir)/src/N_ERH_ErrorMgr.C
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_ERH_ErrorMgr.C' object='N_ERH_ErrorMgr.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_ERH_ErrorMgr.lo `test -f '$(srcdir)/src/N_ERH_ErrorMgr.C' || echo '$(srcdir)/'`$(srcdir)/src/N_ERH_ErrorMgr.C
+
+N_ERH_Message.lo: $(srcdir)/src/N_ERH_Message.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_ERH_Message.lo -MD -MP -MF $(DEPDIR)/N_ERH_Message.Tpo -c -o N_ERH_Message.lo `test -f '$(srcdir)/src/N_ERH_Message.C' || echo '$(srcdir)/'`$(srcdir)/src/N_ERH_Message.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_ERH_Message.Tpo $(DEPDIR)/N_ERH_Message.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_ERH_Message.C' object='N_ERH_Message.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_ERH_Message.lo `test -f '$(srcdir)/src/N_ERH_Message.C' || echo '$(srcdir)/'`$(srcdir)/src/N_ERH_Message.C
+
+N_ERH_Messenger.lo: $(srcdir)/src/N_ERH_Messenger.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_ERH_Messenger.lo -MD -MP -MF $(DEPDIR)/N_ERH_Messenger.Tpo -c -o N_ERH_Messenger.lo `test -f '$(srcdir)/src/N_ERH_Messenger.C' || echo '$(srcdir)/'`$(srcdir)/src/N_ERH_Messenger.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_ERH_Messenger.Tpo $(DEPDIR)/N_ERH_Messenger.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_ERH_Messenger.C' object='N_ERH_Messenger.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_ERH_Messenger.lo `test -f '$(srcdir)/src/N_ERH_Messenger.C' || echo '$(srcdir)/'`$(srcdir)/src/N_ERH_Messenger.C
+
+N_ERH_Progress.lo: $(srcdir)/src/N_ERH_Progress.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_ERH_Progress.lo -MD -MP -MF $(DEPDIR)/N_ERH_Progress.Tpo -c -o N_ERH_Progress.lo `test -f '$(srcdir)/src/N_ERH_Progress.C' || echo '$(srcdir)/'`$(srcdir)/src/N_ERH_Progress.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_ERH_Progress.Tpo $(DEPDIR)/N_ERH_Progress.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_ERH_Progress.C' object='N_ERH_Progress.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_ERH_Progress.lo `test -f '$(srcdir)/src/N_ERH_Progress.C' || echo '$(srcdir)/'`$(srcdir)/src/N_ERH_Progress.C
 
 mostlyclean-libtool:
 	-rm -f *.lo

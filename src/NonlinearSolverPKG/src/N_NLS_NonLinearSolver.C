@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -39,9 +39,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.114.2.3 $
+// Revision Number: $Revision: 1.125 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -53,7 +53,7 @@
 
 // ----------   Xyce Includes   ----------
 
-//#include <N_UTL_Misc.h>
+#include <N_UTL_fwd.h>
 #include <N_UTL_OptionBlock.h>
 #include <N_NLS_Manager.h>
 #include <N_NLS_NonLinearSolver.h>
@@ -114,11 +114,9 @@ N_NLS_NonLinearSolver::N_NLS_NonLinearSolver(N_IO_CmdParse &cp)
     pdsMgrPtr_(0),
     anaIntPtr_(0),
     netlistFileName_(""),
-#ifdef Xyce_DEBUG_NONLINEAR
     outputStepNumber_(0),
     debugTimeFlag_(true),
     contStep_(0),
-#endif
     matrixFreeFlag_(false)
 {
   N_NLS_NonLinearSolver::resetCountersAndTimers_();
@@ -209,7 +207,7 @@ bool N_NLS_NonLinearSolver::setPetraOptions(const N_UTL_OptionBlock & OB)
 //-----------------------------------------------------------------------------
 bool N_NLS_NonLinearSolver::setDCOPRestartOptions(const N_UTL_OptionBlock& OB)
 {
-  string msg = "DCOP restart options not supported for this solver.  Use nox instead. ";
+  std::string msg = "DCOP restart options not supported for this solver.  Use nox instead. ";
 	N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   return true;
 }
@@ -224,7 +222,7 @@ bool N_NLS_NonLinearSolver::setDCOPRestartOptions(const N_UTL_OptionBlock& OB)
 //-----------------------------------------------------------------------------
 bool N_NLS_NonLinearSolver::setICOptions(const N_UTL_OptionBlock& OB)
 {
-  string msg = ".IC options not supported for this nonlinear solver.  Use nox instead. ";
+  std::string msg = ".IC options not supported for this nonlinear solver.  Use nox instead. ";
 	N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   return true;
 }
@@ -239,7 +237,7 @@ bool N_NLS_NonLinearSolver::setICOptions(const N_UTL_OptionBlock& OB)
 //-----------------------------------------------------------------------------
 bool N_NLS_NonLinearSolver::setNodeSetOptions(const N_UTL_OptionBlock& OB)
 {
-  string msg = ".NODESET options not supported for this nonlinear solver.  Use nox instead. ";
+  std::string msg = ".NODESET options not supported for this nonlinear solver.  Use nox instead. ";
 	N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   return true;
 }
@@ -254,7 +252,7 @@ bool N_NLS_NonLinearSolver::setNodeSetOptions(const N_UTL_OptionBlock& OB)
 //-----------------------------------------------------------------------------
 bool N_NLS_NonLinearSolver::setLocaOptions (const N_UTL_OptionBlock& OB)
 {
-  string msg = "N_NLS_NonLinearSolver::setLocaOptions - not implemented for this solver. Use nox instead. ";
+  std::string msg = "N_NLS_NonLinearSolver::setLocaOptions - not implemented for this solver. Use nox instead. ";
 	N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   return true;
 }
@@ -269,7 +267,7 @@ bool N_NLS_NonLinearSolver::setLocaOptions (const N_UTL_OptionBlock& OB)
 //-----------------------------------------------------------------------------
 bool N_NLS_NonLinearSolver::setTwoLevelLocaOptions (const N_UTL_OptionBlock& OB)
 {
-  string msg = "N_NLS_NonLinearSolver::setTwoLevelLocaOptions - not implemented for this solver.  Use nox instead.";
+  std::string msg = "N_NLS_NonLinearSolver::setTwoLevelLocaOptions - not implemented for this solver.  Use nox instead.";
 	N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   return true;
 }
@@ -302,8 +300,8 @@ bool N_NLS_NonLinearSolver::setTwoLevelTranOptions (const N_UTL_OptionBlock& OB)
 
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_NonLinearSolver::registerRHSVector
-// Purpose       : 
-// Special Notes : 
+// Purpose       :
+// Special Notes :
 // Return Type   : boolean
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
@@ -317,8 +315,8 @@ bool N_NLS_NonLinearSolver::registerRHSVector(N_LAS_Vector* tmp_RHSVecPtr)
 
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_NonLinearSolver::registerLoader
-// Purpose       : 
-// Special Notes : 
+// Purpose       :
+// Special Notes :
 // Return Type   : boolean
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
@@ -332,8 +330,8 @@ bool N_NLS_NonLinearSolver::registerLoader(N_LOA_Loader* tmp_LoaderPtr)
 
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_NonLinearSolver::registerLinearSystem
-// Purpose       : 
-// Special Notes : 
+// Purpose       :
+// Special Notes :
 // Return Type   : boolean
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
@@ -348,8 +346,8 @@ bool N_NLS_NonLinearSolver::registerLinearSystem(N_LAS_System* tmp_LasSysPtr)
 
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_NonLinearSolver::registerPrecondFactory
-// Purpose       : 
-// Special Notes : 
+// Purpose       :
+// Special Notes :
 // Return Type   : boolean
 // Scope         : public
 // Creator       : Heidi Thornquist, SNL, Electrical & Microsystem Modeling
@@ -363,8 +361,8 @@ bool N_NLS_NonLinearSolver::registerPrecondFactory(const RefCountPtr<N_LAS_Preco
 
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_NonLinearSolver::registerParallelMgr
-// Purpose       : 
-// Special Notes : 
+// Purpose       :
+// Special Notes :
 // Return Type   : boolean
 // Scope         : public
 // Creator       : Eric Keiter, Sandia
@@ -378,8 +376,8 @@ bool N_NLS_NonLinearSolver::registerParallelMgr(N_PDS_Manager * pdsMgrPtr)
 
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_NonLinearSolver::registerAnalysisInterface
-// Purpose       : 
-// Special Notes : 
+// Purpose       :
+// Special Notes :
 // Return Type   : boolean
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
@@ -528,25 +526,6 @@ bool N_NLS_NonLinearSolver::initializeAll()
     lasProblemRCPtr_ = rcp( new N_LAS_Problem( jacobianMatrixRCPtr,
                                     NewtonVectorRCPtr,
                                     rhsVectorRCPtr) );
-    // before we make the solver, we need to check and see if this
-    // is a parallel binary running on one processor.  If so, we'll
-    // need to set extra options so that the correct solver is
-    // created
-    if( lasSysPtr_->getPDSManager()->getPDSComm()->isSerial() )
-    {
-      N_UTL_OptionBlock::ParameterList::iterator currentParam = petraOptionBlockPtr_->begin();
-      N_UTL_OptionBlock::ParameterList::iterator endParam = petraOptionBlockPtr_->end();
-      while( currentParam != endParam )
-      {
-        if( (currentParam->uTag() == "TYPE") && (currentParam->sVal() == "DEFAULT") )
-        {
-          currentParam->setVal("KLU");
-        }
-        currentParam++;
-      }
-      petraOptionBlockPtr_->getParams().push_back( N_UTL_Param( "TR_PARTITION", 0 ) );
-
-    }
   }
   else
   {
@@ -584,13 +563,9 @@ bool N_NLS_NonLinearSolver::initializeAll()
   }
 
 #ifdef Xyce_DEBUG_NONLINEAR
-    ostringstream ost;
-  ost << "size of solution vector: " << lasSysPtr_->getGlobalSolutionSize();
-  ost << endl;
-  ost << "size of state vector: " << lasSysPtr_->getGlobalStateSize();
-  ost << endl;
-  ost << "End of N_NLS_NonLinearSolver::initializeAll\n";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, ost.str());
+  Xyce::dout() << "size of solution vector: " << lasSysPtr_->getGlobalSolutionSize() << std::endl
+               << "size of state vector: " << lasSysPtr_->getGlobalStateSize() << std::endl
+               << "End of N_NLS_NonLinearSolver::initializeAll\n";
 #endif
 
   return bsuccess;
@@ -640,9 +615,8 @@ void N_NLS_NonLinearSolver::debugOutput1
 
   if (screenOutput == 1)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0,
-                          "\n\t***** Jacobian matrix:\n");
-    jacobian.printPetraObject();
+    Xyce::dout() << "\n\t***** Jacobian matrix:" << std::endl;
+    jacobian.printPetraObject(Xyce::dout());
   }
 
   if (debugLevel >= 3)
@@ -660,10 +634,9 @@ void N_NLS_NonLinearSolver::debugOutput1
 
   if (screenOutput == 1)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0,
-              "\n\t***** RHS vector:\n");
+    Xyce::dout() << "\n\t***** RHS vector:" << std::endl;
 
-    rhs.printPetraObject();
+    rhs.printPetraObject(Xyce::dout());
   }
 
   rhs.writeToFile(filename2);
@@ -790,7 +763,7 @@ void N_NLS_NonLinearSolver::debugOutputDAE()
   N_LAS_Vector *daeFlim = lasSysPtr_->getdFdxdVpVector ();
   N_LAS_Vector *daeQlim = lasSysPtr_->getdQdxdVpVector ();
 
-  //cout << "In debugOutputDAE" << endl;
+  //Xyce::dout() << "In debugOutputDAE" << std::endl;
 
   if (debugLevel >= 3)
   {
@@ -880,8 +853,7 @@ void N_NLS_NonLinearSolver::debugOutput3
 #if 0
   if (nlParams.getScreenOutputFlag () )
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0,
-                         "\n\t***** Update vector:\n\n");
+    Xyce::dout() << "\n\t***** Update vector:" << std::endl << std::endl;
     //searchDirectionPtr_->printPetraObject();
     dxVector.printPetraObject();
   }
@@ -905,8 +877,7 @@ void N_NLS_NonLinearSolver::debugOutput3
 #if 0
   if (nlParams.getScreenOutputFlag () )
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0,
-                           "\n\t***** Solution vector:\n");
+    Xyce::dout() << "\n\t***** Solution vector:" << std::endl;
     //x->printPetraObject();
     xVector.printPetraObject();
   }
@@ -1047,7 +1018,7 @@ bool N_NLS_NonLinearSolver::newton_()
   {
     N_UTL_Param param( "Iterations", 0 );
     lasSolverPtr_->getInfo( param );
-    totalNumLinearIters_ += param.iVal();
+    totalNumLinearIters_ += param.getImmutableValue<int>();
 
     if( solutionStatus ) ++numFailedLinearSolves_;
   }
@@ -1055,7 +1026,7 @@ bool N_NLS_NonLinearSolver::newton_()
   {
     N_UTL_Param param( "Refactored", 0 );
     lasSolverPtr_->getInfo( param );
-    if( param.iVal() ) ++numJacobianFactorizations_;
+    if( param.getImmutableValue<int>() ) ++numJacobianFactorizations_;
     if( solutionStatus ) ++numFailedLinearSolves_;
   }
 

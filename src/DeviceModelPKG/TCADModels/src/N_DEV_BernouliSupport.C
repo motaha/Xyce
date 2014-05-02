@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.14.2.2 $
+// Revision Number: $Revision: 1.22 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/24 23:49:18 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -284,24 +284,24 @@ BernouliSupport::BernouliSupport ():
 
 #ifdef Xyce_DEBUG_DEVICE
 #if 0
-  cout << "---------------------------------------" << endl;
-  cout.width(21); cout.precision(13); cout.setf(ios::scientific);
-  cout << endl;
-  cout << "Bernouli function breakpoints: " <<endl;
-  cout << "bp0_AUX1  = " << bp0_AUX1  << endl;
-  cout << "bp1_AUX1  = " << bp1_AUX1  << endl;
-  cout << "bp0_DAUX1 = " << bp0_DAUX1 << endl;
-  cout << "bp1_DAUX1 = " << bp1_DAUX1 << endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
+  Xyce::dout().width(21); Xyce::dout().precision(13); Xyce::dout().setf(std::ios::scientific);
+  Xyce::dout() << std::endl;
+  Xyce::dout() << "Bernouli function breakpoints: " <<endl;
+  Xyce::dout() << "bp0_AUX1  = " << bp0_AUX1  << std::endl;
+  Xyce::dout() << "bp1_AUX1  = " << bp1_AUX1  << std::endl;
+  Xyce::dout() << "bp0_DAUX1 = " << bp0_DAUX1 << std::endl;
+  Xyce::dout() << "bp1_DAUX1 = " << bp1_DAUX1 << std::endl;
 
-  cout << "bp0_AUX2  = " << bp0_AUX2  << endl;
-  cout << "bp1_AUX2  = " << bp1_AUX2  << endl;
-  cout << "bp2_AUX2  = " << bp2_AUX2  << endl;
-  cout << "bp0_DAUX2 = " << bp0_DAUX2 << endl;
-  cout << "bp1_DAUX2 = " << bp1_DAUX2 << endl;
-  cout << "bp2_DAUX2 = " << bp2_DAUX2 << endl;
-  cout << "bp3_DAUX2 = " << bp3_DAUX2 << endl;
-  cout << "bp0_MISC  = " << bp0_MISC << endl;
-  cout << "---------------------------------------" << endl;
+  Xyce::dout() << "bp0_AUX2  = " << bp0_AUX2  << std::endl;
+  Xyce::dout() << "bp1_AUX2  = " << bp1_AUX2  << std::endl;
+  Xyce::dout() << "bp2_AUX2  = " << bp2_AUX2  << std::endl;
+  Xyce::dout() << "bp0_DAUX2 = " << bp0_DAUX2 << std::endl;
+  Xyce::dout() << "bp1_DAUX2 = " << bp1_DAUX2 << std::endl;
+  Xyce::dout() << "bp2_DAUX2 = " << bp2_DAUX2 << std::endl;
+  Xyce::dout() << "bp3_DAUX2 = " << bp3_DAUX2 << std::endl;
+  Xyce::dout() << "bp0_MISC  = " << bp0_MISC << std::endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
 #endif
 #endif
 }
@@ -374,7 +374,7 @@ double BernouliSupport::Bisection
   }
   else
   {
-    string msg = "BernouliSupport::Bisection ";
+    std::string msg = "BernouliSupport::Bisection ";
     msg += " Initial interval may not contain a root";
     N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
   }
@@ -430,7 +430,7 @@ double BernouliSupport::Secant(FUNC func1, FUNC func2, double x1)
       if (++iteration > MAX_ITERATIONS)
       {
         if (fabs(f2) <= 100.0 * PRECISION) return(x2);
-	string msg = "BernouliSupport::Secant ";
+	std::string msg = "BernouliSupport::Secant ";
 	msg += " method not converging.";
 	N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
       }

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.70.2.2 $
+// Revision Number: $Revision: 1.86.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:35 $
+// Revision Date  : $Date: 2014/02/26 20:16:31 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -50,6 +50,7 @@
 // ----------   Standard Includes   ----------
 
 // ----------   Xyce Includes   ----------
+#include <N_DEV_Configuration.h>
 #include <N_DEV_fwd.h>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DevicePDEInstance.h>
@@ -57,6 +58,8 @@
 
 #include <N_DEV_DeviceInterfaceNode.h>
 #include <N_DEV_PDE_2DMesh.h>
+
+#include <N_DEV_DiodePDE.h>
 
 #include <N_UTL_BreakPoint.h>
 
@@ -71,6 +74,23 @@ namespace Device {
 namespace TwoDPDE {
 
 class Model;
+class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance, DiodePDE::Traits>
+{
+  static const char *name() {return "2D PDE Device";}
+  static const char *deviceTypeName () {return "PDE level 2";}
+  static const int numNodes() {return 2;}
+  static const int numOptionalNodes() {return 100;}
+  static const int numFillNodes() {return 2;}
+  static const bool modelRequired() {return true;}
+  static const bool isPDEDevice() {return true;}
+  static const bool isLinearDevice() {return false;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : Instance
@@ -84,21 +104,16 @@ class Instance : public DevicePDEInstance
 {
   friend class ParametricData<Instance>;
   friend class Model;
-
+  friend class Traits;
+    
   // functions
 public:
-  static ParametricData<Instance> &getParametricData();
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Instance(InstanceBlock & IB,
-                    Model & Miter,
-                    MatrixLoadData & mlData1,
-                    SolverState &ss1,
-                    ExternData  &ed1,
-                    DeviceOptions & do1);
+  Instance(
+     const Configuration &       configuration,
+     const InstanceBlock &             IB,
+     Model &                     model,
+     const FactoryBlock &factory_block);
   ~Instance();
 
 private:
@@ -106,27 +121,27 @@ private:
   Instance &operator=(const Instance &right);
 
 public:
-  void registerGIDs (const list<index_pair> & intGIDListRef,
-                     const list<index_pair> & extGIDListRef );
+  void registerGIDs (const std::list<index_pair> & intGIDListRef,
+                     const std::list<index_pair> & extGIDListRef );
 
   void setupIntNameMap  ();
   void setupRowColPairs ();
 
-  void registerStateGIDs (const list<index_pair> & staGIDListRef);
+  void registerStateGIDs (const std::list<index_pair> & staGIDListRef);
 
-  void registerLIDs( const vector<int> & intLIDVecRef,
-                     const vector<int> & extLIDVecRef );
-  void registerStateLIDs( const vector<int> & staLIDVecRef );
-  map<int,string> & getIntNameMap ();
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
+  void registerStateLIDs( const std::vector<int> & staLIDVecRef );
+  std::map<int,std::string> & getIntNameMap ();
 
-  const vector< vector<int> > & jacobianStamp() const;
-  void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-  bool processParams (string param = "");
+  bool processParams ();
 
   bool processOneTimeParams( Param & ndParam );
 
-  bool processDopingParams (Param & ndParam, string param);
+  bool processDopingParams (Param & ndParam, std::string param);
 
   bool processElectrodeParams (Param & ndParam);
 
@@ -253,12 +268,13 @@ public:
 
   bool outputPlotFiles ();
 
-  CompositeParam *constructComposite (string & compositeName, string & paramName);
+  CompositeParam *constructComposite (const std::string & compositeName, const std::string & paramName);
 
 public:
   // iterator reference to the resistor model which owns this instance.
   // Getters and setters
-  Model &getModel() {
+  Model &getModel() 
+  {
     return model_;
   }
 
@@ -279,7 +295,7 @@ private:
   double VmaxExp;   // minimum potential (V), used in exponential expressions
 
   // device interface node vector:
-  vector<DeviceInterfaceNode> dIVec;
+  std::vector<DeviceInterfaceNode> dIVec;
 
   bool penaltyPrefacGiven;
   bool penaltyPowGiven;
@@ -312,8 +328,8 @@ private:
   bool useOldNi;
   bool useOldNiGiven;
 
-  string meshFileName;
-  string deviceType;
+  std::string meshFileName;
+  std::string deviceType;
   bool usingInternalMesh;
   bool deviceInitialized;
   bool meshPerturbed;
@@ -380,64 +396,64 @@ private:
   PDE_2DMesh * meshCopyContainerPtr;
 
   // array pointers:
-  vector<double> xVec;   // x locations
-  vector<double> yVec;   // y locations
-  vector<double> CVec;   // doping
-  vector<double> CdonorVec;   // doping
-  vector<double> CacceptorVec;   // doping
+  std::vector<double> xVec;   // x locations
+  std::vector<double> yVec;   // y locations
+  std::vector<double> CVec;   // doping
+  std::vector<double> CdonorVec;   // doping
+  std::vector<double> CacceptorVec;   // doping
 
-  vector<double> minDXVec; // minimum mesh spacing connected to this node.
+  std::vector<double> minDXVec; // minimum mesh spacing connected to this node.
 
-  vector<double> areaVec;
+  std::vector<double> areaVec;
 
-  vector<double> VVec;   // electrostatic potential
-  vector<double> nnVec;  // electron density
-  vector<double> npVec;  // hole density
+  std::vector<double> VVec;   // electrostatic potential
+  std::vector<double> nnVec;  // electron density
+  std::vector<double> npVec;  // hole density
 
-  vector<double> totSrcVec; // total source term.
-  vector<double> RVec;      // recombination.
-  vector<double> SVec;      // radiation source term.
+  std::vector<double> totSrcVec; // total source term.
+  std::vector<double> RVec;      // recombination.
+  std::vector<double> SVec;      // radiation source term.
 
-  vector<double> elecPenalty;  // penalty term for negative e- density.
-  vector<double> holePenalty;  // penalty term for negative h+ density.
-  vector<double> pdElecPenalty; // penalty deriv. term for negative e- density.
-  vector<double> pdHolePenalty; // penalty deriv. term for negative h+ density.
+  std::vector<double> elecPenalty;  // penalty term for negative e- density.
+  std::vector<double> holePenalty;  // penalty term for negative h+ density.
+  std::vector<double> pdElecPenalty; // penalty deriv. term for negative e- density.
+  std::vector<double> pdHolePenalty; // penalty deriv. term for negative h+ density.
 
-  vector<double> unVec;  // spatially dependent mobility, electron
-  vector<double> upVec;  // spatially dependent mobility, hole
-  vector<double> unE_Vec; // mobility along edge, electron
-  vector<double> upE_Vec; // mobility along edge, hole
-  vector<double> tnVec;  // spatially dependent lifetimes, electron
-  vector<double> tpVec;  // spatially dependent lifetimes, hole
+  std::vector<double> unVec;  // spatially dependent mobility, electron
+  std::vector<double> upVec;  // spatially dependent mobility, hole
+  std::vector<double> unE_Vec; // mobility along edge, electron
+  std::vector<double> upE_Vec; // mobility along edge, hole
+  std::vector<double> tnVec;  // spatially dependent lifetimes, electron
+  std::vector<double> tpVec;  // spatially dependent lifetimes, hole
 
-  vector<double> EfieldVec; // electric field along an edge.
+  std::vector<double> EfieldVec; // electric field along an edge.
 
-  vector<double> JnVec; // electron current density, along an edge
-  vector<double> JpVec; // hole current density, along an edge
+  std::vector<double> JnVec; // electron current density, along an edge
+  std::vector<double> JpVec; // hole current density, along an edge
 
-  vector<double> displPotential;  // time derivative of potential at a node,
+  std::vector<double> displPotential;  // time derivative of potential at a node,
   // used in calculating displacement current.
 
-  vector<double> displCurrent;  // displacement current along an edge.
+  std::vector<double> displCurrent;  // displacement current along an edge.
 
-  vector<double> outputVec;
+  std::vector<double> outputVec;
 
   // derivative arrays:
 
   // derivatives of recombination terms:
-  vector<double> dRdpVec;  // derivative of R w.r.t. np  (at a node)
-  vector<double> dRdnVec;  // derivative of R w.r.t. nn  (at a node)
+  std::vector<double> dRdpVec;  // derivative of R w.r.t. np  (at a node)
+  std::vector<double> dRdnVec;  // derivative of R w.r.t. nn  (at a node)
 
   // derivatives of current density terms:
-  vector<double> dJndn1Vec;
-  vector<double> dJndn2Vec;
-  vector<double> dJndV1Vec;
-  vector<double> dJndV2Vec;
+  std::vector<double> dJndn1Vec;
+  std::vector<double> dJndn2Vec;
+  std::vector<double> dJndV1Vec;
+  std::vector<double> dJndV2Vec;
 
-  vector<double> dJpdn1Vec;
-  vector<double> dJpdn2Vec;
-  vector<double> dJpdV1Vec;
-  vector<double> dJpdV2Vec;
+  std::vector<double> dJpdn1Vec;
+  std::vector<double> dJpdn2Vec;
+  std::vector<double> dJpdV1Vec;
+  std::vector<double> dJpdV2Vec;
 
   // matrix index arrays:
   // external variable information is in the dIVec data structure.
@@ -446,83 +462,83 @@ private:
   // This array is set to 1 if we are on a mesh node which has a
   // nearest neighbor node which is a boundary condition node.
   // 0 if not.
-  vector<int> boundarySten;
-  vector<int> boundaryStenV;
-  vector<int> boundaryStenN;
-  vector<int> boundaryStenP;
+  std::vector<int> boundarySten;
+  std::vector<int> boundaryStenV;
+  std::vector<int> boundaryStenN;
+  std::vector<int> boundaryStenP;
 
-  vector<int> boundaryTest;
+  std::vector<int> boundaryTest;
 
   // boundary neighbor stencil
   // This array is set to 1 if we are next to a boundary,  but not on
   // a boundary.  0 if not.  A node directly on the boundary
   // does should return a zero.
-  vector<int> boundaryNeighborSten;
+  std::vector<int> boundaryNeighborSten;
 
   // internal variable index arrays:
 
   // index arrays for poisson's equation:
-  vector<int>           Vrowarray;
-  vector< vector<int> > Vcolarray;
+  std::vector<int>           Vrowarray;
+  std::vector< std::vector<int> > Vcolarray;
 
   // index arrays for electron continuity:
-  vector<int>           Nrowarray;
-  vector< vector<int> > Ncolarray;
+  std::vector<int>           Nrowarray;
+  std::vector< std::vector<int> > Ncolarray;
 
   // index arrays for hole continuity:
-  vector<int>           Prowarray;
-  vector< vector<int> > Pcolarray;
+  std::vector<int>           Prowarray;
+  std::vector< std::vector<int> > Pcolarray;
 
   // variable ownership arrays.
-  vector<int>  vOwnVec; // on processor tag, for voltage variables.
-  vector<int> nnOwnVec; // on processor tag, for elec. density variables.
-  vector<int> npOwnVec; // on processor tag, for hole density variables.
+  std::vector<int>  vOwnVec; // on processor tag, for voltage variables.
+  std::vector<int> nnOwnVec; // on processor tag, for elec. density variables.
+  std::vector<int> npOwnVec; // on processor tag, for hole density variables.
 
   //local id's (offsets)
-  vector<int>     li_Vrowarray;
-  vector<int>     li_Nrowarray;
-  vector<int>     li_Prowarray;
+  std::vector<int>     li_Vrowarray;
+  std::vector<int>     li_Nrowarray;
+  std::vector<int>     li_Prowarray;
 
-  vector< vector<int> > li_VoffsetArray;
-  vector< vector<int> > li_NoffsetArray;
-  vector< vector<int> > li_PoffsetArray;
+  std::vector< std::vector<int> > li_VoffsetArray;
+  std::vector< std::vector<int> > li_NoffsetArray;
+  std::vector< std::vector<int> > li_PoffsetArray;
 
-  vector<int> MESHtoLID_V;
-  vector<int> MESHtoLID_N;
-  vector<int> MESHtoLID_P;
+  std::vector<int> MESHtoLID_V;
+  std::vector<int> MESHtoLID_N;
+  std::vector<int> MESHtoLID_P;
 
 
   // minor arrays used in tecplot output:
-  vector<UINT> aiEdge;
-  vector<UINT> aiEdge_nf;
-  //vector<UINT> electrodeEdge;
+  std::vector<UINT> aiEdge;
+  std::vector<UINT> aiEdge_nf;
+  //std::vector<UINT> electrodeEdge;
   UINT iNumPlotEdges;
   UINT iNumPlotEdges_nf;
 
   // this map is mostly used for processing the netlist information
   // regarding boundary conditions.
-  map<string,string> tmpBCmap;
+  std::map<std::string,std::string> tmpBCmap;
 
   // label index array (of numMeshPoints length)
-  vector<int> labelIndex;
-  vector<string> labelNameVector;
-  map<string,int> labelDIMap;
+  std::vector<int> labelIndex;
+  std::vector<std::string> labelNameVector;
+  std::map<std::string,int> labelDIMap;
 
   // map between a mesh point index and a list of nearest neighbors
   // for that mesh point.
-  multimap < int, int* > meshNeighborMultiMap;
+  std::multimap < int, int* > meshNeighborMultiMap;
 
   // vector of electrode data:
-  map<string,PDE_2DElectrode*> electrodeMap;
+  std::map<std::string,PDE_2DElectrode*> electrodeMap;
 
   // displacement current state variable information:
-  vector<int> stateDispl;
-  vector<int> stateDispl_owned;  // this is an int array because
+  std::vector<int> stateDispl;
+  std::vector<int> stateDispl_owned;  // this is an int array because
   // bool arrays are problematic,
   // esp. with some STL implementations.
 
   //local id's (offsets)
-  vector<int> li_stateDispl;
+  std::vector<int> li_stateDispl;
 
   int numMeshPoints;
   int numInterfaceMeshPoints; // number of mesh points that
@@ -534,16 +550,16 @@ private:
   int numElectrodes;
 
   // 2d array of conductances, for 2-level "ckt phase" loads.
-  vector< vector<double> > condVec;
+  std::vector< std::vector<double> > condVec;
 
   // 2d array of capacitances,
-  vector< vector<double> > capVec;
+  std::vector< std::vector<double> > capVec;
 
   bool  pdTermsAllocated;
 
   // data related to DMA matrix loads.
-  vector<int> meshToLID;
-  vector< vector<int> > jacStamp;
+  std::vector<int> meshToLID;
+  std::vector< std::vector<int> > jacStamp;
 };
 
 //-----------------------------------------------------------------------------
@@ -559,18 +575,15 @@ class Model  : public DevicePDEModel
 
   friend class ParametricData<Model>;
   friend class Instance;
-
+  friend class Traits;
+    
 public:
-  static ParametricData<Model> &getParametricData();
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &          MB,
+     const FactoryBlock &        factory_block);
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Model    (const ModelBlock & MB,
-                     SolverState & ss1,
-                     DeviceOptions & do1);
-  ~Model   ();
+  ~Model();
 
 private:
   Model();
@@ -578,26 +591,37 @@ private:
   Model &operator=(const Model &);
 
 public:
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
+    
   virtual std::ostream &printOutInstances(std::ostream &os) const;
 
-  bool processParams (string param = "");
-  bool processInstanceParams (string param = "");
+  bool processParams ();
+  bool processInstanceParams ();
 
 
 public:
-  InstanceVector &getInstanceVector() {
+  void addInstance(Instance *instance) 
+  {
+    instanceContainer.push_back(instance);
+  }
+
+  InstanceVector &getInstanceVector() 
+  {
     return instanceContainer;
   }
 
-  const InstanceVector &getInstanceVector() const {
+  const InstanceVector &getInstanceVector() const 
+  {
     return instanceContainer;
   }
 
 private:
-  vector<Instance*> instanceContainer;
+  std::vector<Instance*> instanceContainer;
 
 private:
 };
+
+void registerDevice();
 
 } // namespace TwoDPDE
 } // namespace Device

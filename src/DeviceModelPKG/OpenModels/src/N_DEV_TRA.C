@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,42 +36,27 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.147.2.2 $
+// Revision Number: $Revision: 1.171.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
-#include <Xyce_config.h>
 
-// ---------- Standard Includes ----------
+#include <Xyce_config.h>
 
 #include <N_UTL_Misc.h>
 
-#ifdef HAVE_CSTDIO
-#include <cstdio>
-#else
-#include <stdio.h>
-#endif
-
-#ifdef HAVE_ALGORITHM
-#include <algorithm>
-#else
-#ifdef HAVE_ALGO_H
-#include <algo.h>
-#else
-#error Must have either <algorithm> or <algo.h>!
-#endif
-#endif
-
-// ----------   Xyce Includes   ----------
-#include <N_DEV_TRA.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
+#include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceOptions.h>
 #include <N_DEV_DeviceState.h>
-#include <N_DEV_DeviceBlock.h>
+#include <N_DEV_DeviceMaster.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_TRA.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
 
 #include <N_LAS_Matrix.h>
 #include <N_LAS_Vector.h>
@@ -82,60 +67,34 @@
 
 namespace Xyce {
 namespace Device {
-template<>
-ParametricData<TRA::Instance>::ParametricData()
-{
-    // Set up configuration constants:
-    setNumNodes(4);
-    setNumOptionalNodes(0);
-    setNumFillNodes(0);
-    setModelRequired(0);
-
-    // Set up double precision variables:
-    addPar ("Z0", 0.0, false, ParameterType::NO_DEP,
-      &TRA::Instance::Z0,
-      NULL,U_OHM,CAT_NONE,"Characteristic Impedance");
-
-    addPar ("ZO", 0.0, false, ParameterType::NO_DEP,
-      &TRA::Instance::ZO,
-      NULL,U_OHM,CAT_NONE,"Characteristic Impedance");
-
-    addPar ("TD", 0.0, false, ParameterType::NO_DEP,
-      &TRA::Instance::td,
-      NULL,U_SECOND,CAT_NONE,"Time delay");
-
-    addPar ("F", 0.0, false, ParameterType::NO_DEP,
-      &TRA::Instance::freq,
-      NULL,U_HZ,CAT_NONE,"Frequency");
-
-    addPar ("NL", 0.0, false, ParameterType::NO_DEP,
-      &TRA::Instance::NL,
-      NULL,U_NONE,CAT_NONE,"Length in wavelengths");
-}
-
-template<>
-ParametricData<TRA::Model>::ParametricData()
-{
-}
-
 namespace TRA {
 
-vector< vector<int> > Instance::jacStamp;
+void Traits::loadInstanceParameters(ParametricData<TRA::Instance> &p)
+{
+  p.addPar("Z0", 0.0, &TRA::Instance::Z0)
+    .setUnit(U_OHM)
+    .setDescription("Characteristic Impedance");
 
+  p.addPar("ZO", 0.0, &TRA::Instance::ZO)
+    .setUnit(U_OHM)
+    .setDescription("Characteristic Impedance");
 
+  p.addPar("TD", 0.0, &TRA::Instance::td)
+    .setUnit(U_SECOND)
+    .setDescription("Time delay");
 
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
+  p.addPar("F", 0.0, &TRA::Instance::freq)
+    .setUnit(U_HZ)
+    .setDescription("Frequency");
 
-  return parMap;
+  p.addPar("NL", 0.0, &TRA::Instance::NL)
+    .setDescription("Length in wavelengths");
 }
 
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
+void Traits::loadModelParameters(ParametricData<TRA::Model> &p)
+{}
 
-  return parMap;
-}
-
+std::vector< std::vector<int> > Instance::jacStamp;
 
 // Class Instance
 //-----------------------------------------------------------------------------
@@ -147,15 +106,13 @@ ParametricData<Model> &Model::getParametricData() {
 // Creation Date : 6/15/01
 //-----------------------------------------------------------------------------
 
-Instance::Instance(InstanceBlock & IB,
-                                     Model & Miter,
-                                     MatrixLoadData & mlData1,
-                                     SolverState &ss1,
-                                     ExternData  &ed1,
-                                     DeviceOptions & do1)
-
-  : DeviceInstance(IB,mlData1,ss1,ed1,do1),
-    model_(Miter),
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock & instance_block,
+  Model &               model,
+  const FactoryBlock &  factory_block)
+  : DeviceInstance(instance_block, configuration.getInstanceParameters(), factory_block),
+    model_(model),
     Z0(0.0),
     G0(0.0),
     td(0.0),
@@ -252,7 +209,7 @@ Instance::Instance(InstanceBlock & IB,
   setDefaultParams ();
 
   // Set params according to instance line and constant defaults from metadata:
-  setParams (IB.params);
+  setParams (instance_block.params);
 
   // Set any non-constant parameter defaults:
 
@@ -266,10 +223,7 @@ Instance::Instance(InstanceBlock & IB,
       Z0 = ZO;
     else
     {
-      string msg = "Z0 not given.";
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr:: report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+      UserError0(*this) << "Z0 not given.";
     }
   }
   if (Z0>0)
@@ -278,26 +232,17 @@ Instance::Instance(InstanceBlock & IB,
   }
   else
   {
-     string msg = "Invalid (zero or negative) impedance given.";
-     std::ostringstream oss;
-     oss << "Error in " << netlistLocation() << "\n" << msg;
-     N_ERH_ErrorMgr:: report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Invalid (zero or negative) impedance given.";
   }
 
   // Must give either TD or F.
   if (!given("TD") && !given("F"))
   {
-    string msg = "Neither time delay (TD) nor frequency (F) given.";
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr:: report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Neither time delay (TD) nor frequency (F) given.";
   }
   if (given("TD") && given("F"))
   {
-    string msg = "Both time delay (TD) and frequency (F) given.  Pick one.";
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr:: report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Both time delay (TD) and frequency (F) given.  Pick one.";
   }
 
   if (!given("TD") && freq > 0)
@@ -306,17 +251,11 @@ Instance::Instance(InstanceBlock & IB,
   }
   else if (!given("TD"))
   {
-    string msg = "Zero or negative frequency given.";
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr:: report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Zero or negative frequency given.";
   }
   if (td == 0)
   {
-    string msg = "Zero time delay.";
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr:: report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Zero time delay.";
   }
 
 
@@ -325,10 +264,10 @@ Instance::Instance(InstanceBlock & IB,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    std::cout << " Z0 = " << Z0 << std::endl;
-    std::cout << " td = " << td << std::endl;
-    std::cout << " freq = " << freq << std::endl;
-    std::cout << " NL = " << NL << std::endl;
+    Xyce::dout() << " Z0 = " << Z0 << std::endl;
+    Xyce::dout() << " td = " << td << std::endl;
+    Xyce::dout() << " freq = " << freq << std::endl;
+    Xyce::dout() << " NL = " << NL << std::endl;
   }
 #endif
 }
@@ -341,7 +280,7 @@ Instance::Instance(InstanceBlock & IB,
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 7/02/04
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
   bool bsuccess = true;
   return bsuccess;
@@ -369,50 +308,22 @@ Instance::~Instance ()
 // Creator       : Robert Hoekstra, SNL, Computational Sciences
 // Creation Date : 6/21/02
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                                      const vector<int> & extLIDVecRef )
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                                      const std::vector<int> & extLIDVecRef )
 {
-  string msg;
-
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    std::cout << std::endl << dashedline << std::endl;
-    std::cout << "In Instance::registerLIDs\n\n";
-    std::cout << "name             = " << getName() << std::endl;
-  }
-#endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    std::cout << "number of internal variables: " << numInt << std::endl;
-    std::cout << "number of external variables: " << numExt << std::endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "In Instance::registerLIDs\n\n";
+    Xyce::dout() << "name             = " << getName() << std::endl;
+    Xyce::dout() << "number of internal variables: " << numIntVars << std::endl;
+    Xyce::dout() << "number of external variables: " << numExtVars << std::endl;
   }
 #endif
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -436,18 +347,18 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    std::cout << " VARIABLE Indicies " << std::endl;
-    std::cout << "li_Pos1 = " << li_Pos1 << std::endl;
-    std::cout << "li_Neg1 = " << li_Neg1 << std::endl;
-    std::cout << "li_Int1 = " << li_Int1 << std::endl;
-    std::cout << "li_Ibr1 = " << li_Ibr1 << std::endl;
-    std::cout << "li_Pos2 = " << li_Pos2 << std::endl;
-    std::cout << "li_Neg2 = " << li_Neg2 << std::endl;
-    std::cout << "li_Int2 = " << li_Int2 << std::endl;
-    std::cout << "li_Ibr2 = " << li_Ibr2 << std::endl;
+    Xyce::dout() << " VARIABLE Indicies " << std::endl;
+    Xyce::dout() << "li_Pos1 = " << li_Pos1 << std::endl;
+    Xyce::dout() << "li_Neg1 = " << li_Neg1 << std::endl;
+    Xyce::dout() << "li_Int1 = " << li_Int1 << std::endl;
+    Xyce::dout() << "li_Ibr1 = " << li_Ibr1 << std::endl;
+    Xyce::dout() << "li_Pos2 = " << li_Pos2 << std::endl;
+    Xyce::dout() << "li_Neg2 = " << li_Neg2 << std::endl;
+    Xyce::dout() << "li_Int2 = " << li_Int2 << std::endl;
+    Xyce::dout() << "li_Ibr2 = " << li_Ibr2 << std::endl;
 
-    std::cout << "\nEnd of Instance::register LIDs\n";
-    std::cout << dashedline << std::endl;
+    Xyce::dout() << "\nEnd of Instance::register LIDs\n";
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 }
@@ -459,14 +370,14 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 05/13/05
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
 
     // set up internal name map
-    string tmpstr;
+    std::string tmpstr;
     tmpstr = getName()+"_int1"; spiceInternalName (tmpstr);
     intNameMap[ li_Int1 ] = tmpstr;
 
@@ -493,21 +404,9 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Robert Hoekstra, SNL, Computational Sciences
 // Creation Date : 6/21/02
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef)
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef)
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
-
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 }
 
 //-----------------------------------------------------------------------------
@@ -518,20 +417,10 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef)
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 04/05/2013
 //-----------------------------------------------------------------------------
-void N_DEV_TRAInstance::registerStoreLIDs(const vector<int> & stoLIDVecRef )
+void N_DEV_TRAInstance::registerStoreLIDs(const std::vector<int> & stoLIDVecRef )
 {
-  string msg;
+  AssertLIDs(stoLIDVecRef.size() == getNumStoreVars());
 
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSto = stoLIDVecRef.size();
-
-  if (numSto != getNumStoreVars())
-  {
-    msg = "N_DEV_TRAInstance::registerStoreLIDs:";
-    msg += "numSto != numStoreVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
   if( loadLeadCurrent )
   {
     li_store_dev_i1 = stoLIDVecRef[0];
@@ -547,16 +436,16 @@ void N_DEV_TRAInstance::registerStoreLIDs(const vector<int> & stoLIDVecRef )
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 04/05/2013
 //-----------------------------------------------------------------------------
-map<int,string> & N_DEV_TRAInstance::getStoreNameMap ()
+std::map<int,std::string> & N_DEV_TRAInstance::getStoreNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if( loadLeadCurrent && storeNameMap.empty ())
   {
     // change subcircuitname:devicetype_deviceName to
     // devicetype:subcircuitName:deviceName
-    string modName(getName());
+    std::string modName(getName());
     spiceInternalName(modName);
-    string tmpstr;
+    std::string tmpstr;
     tmpstr = modName+":DEV_I1";
     storeNameMap[ li_store_dev_i1 ] = tmpstr;
     tmpstr = modName+":DEV_I2";
@@ -575,7 +464,7 @@ map<int,string> & N_DEV_TRAInstance::getStoreNameMap ()
 // Creator       : Robert Hoekstra, SNL, Computational Sciences
 // Creation Date : 9/2/02
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -588,7 +477,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Robert Hoekstra, SNL, Computational Sciences
 // Creation Date : 9/2/02
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
   APos1EquPos1NodeOffset = jacLIDVec[0][0];
@@ -651,12 +540,11 @@ bool Instance::loadDAEFVector ()
   double * fVec = extData.daeFVectorRawPtr;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    std::cout << dashedline2 << std::endl;
-    std::cout << "  Instance::loadDAEFVector" << std::endl;
-    std::cout << "  name = " << getName() <<std::endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "  Instance::loadDAEFVector" << std::endl;
+    Xyce::dout() << "  name = " << getName() <<std::endl;
   }
 #endif
 
@@ -761,11 +649,10 @@ bool Instance::loadDAEdFdx ()
   N_LAS_Matrix & dFdx = *(extData.dFdxMatrixPtr);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    std::cout << dashedline2 << std::endl;
-    std::cout << "  name             = " << getName() << std::endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "  name             = " << getName() << std::endl;
   }
 #endif
 
@@ -830,7 +717,7 @@ bool Instance::loadDAEdFdx ()
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
-    std::cout << dashedline2 << std::endl;
+    Xyce::dout() << subsection_divider << std::endl;
 #endif
 
   return true;
@@ -847,14 +734,13 @@ bool Instance::loadDAEdFdx ()
 bool Instance::updatePrimaryState()
 {
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    std::cout << std::endl << dashedline2 << std::endl;
-    std::cout << "In TRA::updatePrimaryState\n";
-    std::cout << " last_t is " << last_t << std::endl;
-    std::cout << " v1 is " << v1 << std::endl;
-    std::cout << " v2 is " << v2 << std::endl;
+    Xyce::dout() << std::endl << subsection_divider << std::endl;
+    Xyce::dout() << "In TRA::updatePrimaryState\n";
+    Xyce::dout() << " last_t is " << last_t << std::endl;
+    Xyce::dout() << " v1 is " << v1 << std::endl;
+    Xyce::dout() << " v2 is " << v2 << std::endl;
   }
 #endif
 
@@ -874,11 +760,10 @@ bool Instance::updateIntermediateVars ()
   double * solVec = extData.nextSolVectorRawPtr;    // the current guess
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    std::cout << std::endl << dashedline2 << std::endl;
-    std::cout << "  In ::updateIntermediateVars\n\n";
+    Xyce::dout() << std::endl << subsection_divider << std::endl;
+    Xyce::dout() << "  In ::updateIntermediateVars\n\n";
   }
 #endif
 
@@ -896,14 +781,14 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    std::cout << " Vpos1 = " << Vpos1 << std::endl;
-    std::cout << " Vneg1 = " << Vneg1 << std::endl;
-    std::cout << " Vint1 = " << Vint1 << std::endl;
-    std::cout << " Ibr1 = " << Ibr1 << std::endl;
-    std::cout << " Vpos2 = " << Vpos2 << std::endl;
-    std::cout << " Vneg2 = " << Vneg2 << std::endl;
-    std::cout << " Vint2 = " << Vint2 << std::endl;
-    std::cout << " Ibr2 = " << Ibr2 << std::endl;
+    Xyce::dout() << " Vpos1 = " << Vpos1 << std::endl;
+    Xyce::dout() << " Vneg1 = " << Vneg1 << std::endl;
+    Xyce::dout() << " Vint1 = " << Vint1 << std::endl;
+    Xyce::dout() << " Ibr1 = " << Ibr1 << std::endl;
+    Xyce::dout() << " Vpos2 = " << Vpos2 << std::endl;
+    Xyce::dout() << " Vneg2 = " << Vneg2 << std::endl;
+    Xyce::dout() << " Vint2 = " << Vint2 << std::endl;
+    Xyce::dout() << " Ibr2 = " << Ibr2 << std::endl;
   }
 #endif
 
@@ -916,7 +801,7 @@ bool Instance::updateIntermediateVars ()
     v2 = (Vpos1-Vneg1)+Z0*Ibr1;
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
-      std::cout << "DC Mode, V1 = " << v1 <<  ", V2 = " << v2  << std::endl;
+      Xyce::dout() << "DC Mode, V1 = " << v1 <<  ", V2 = " << v2  << std::endl;
 #endif
   }
   else
@@ -926,9 +811,9 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      std::cout << "Not DC, newtonIter = " << getSolverState().newtonIter;
-      std::cout << " Time is " << currentTime << std::endl;
-      std::cout << "        newtonIterOld = " << newtonIterOld << " timeOld is " << timeOld << std::endl;
+      Xyce::dout() << "Not DC, newtonIter = " << getSolverState().newtonIter;
+      Xyce::dout() << " Time is " << currentTime << std::endl;
+      Xyce::dout() << "        newtonIterOld = " << newtonIterOld << " timeOld is " << timeOld << std::endl;
     }
 #endif
     // Transient operation
@@ -951,10 +836,10 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
         {
-          std::cout << "Transient, first time, T = ";
-          std::cout << currentTime;
-          std::cout << ", V1 = " << v1;
-          std::cout << ", V2 = " << v2  << std::endl;
+          Xyce::dout() << "Transient, first time, T = ";
+          Xyce::dout() << currentTime;
+          Xyce::dout() << ", V1 = " << v1;
+          Xyce::dout() << ", V2 = " << v2  << std::endl;
         }
 #endif
       }
@@ -968,11 +853,11 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
         {
-          std::cout << "  Done with interpolation to delayedTime=";
-          std::cout << delayedTime;
-          std::cout << ", have v1="<<v1 << " and v2=" << v2 << std::endl;
-          std::cout << " INTERP " << delayedTime << " " << v1 << " " << v2 << std::endl;
-          std::cout << " Set last_t to " << currentTime << std::endl;
+          Xyce::dout() << "  Done with interpolation to delayedTime=";
+          Xyce::dout() << delayedTime;
+          Xyce::dout() << ", have v1="<<v1 << " and v2=" << v2 << std::endl;
+          Xyce::dout() << " INTERP " << delayedTime << " " << v1 << " " << v2 << std::endl;
+          Xyce::dout() << " Set last_t to " << currentTime << std::endl;
         }
 #endif
         // now save the current time so we can have it next time
@@ -989,8 +874,8 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
       {
-        std::cout << "second or later iteration, t is " << currentTime;
-        std::cout << " have last_t = " << last_t << " v1="<<v1 << " and v2=" << v2 << std::endl;
+        Xyce::dout() << "second or later iteration, t is " << currentTime;
+        Xyce::dout() << " have last_t = " << last_t << " v1="<<v1 << " and v2=" << v2 << std::endl;
       }
 #endif
     }
@@ -1016,20 +901,20 @@ void Instance::pruneHistory(double t1)
   // so this routine drops everything off the head but the most recent 2 that
   // are older than t.
 
-  vector<History>::iterator first = history.begin();
-  vector<History>::iterator it1;
-  vector<History>::iterator last = history.end();
+  std::vector<History>::iterator first = history.begin();
+  std::vector<History>::iterator it1;
+  std::vector<History>::iterator last = history.end();
   int i;
 
   last--; // point to last stored item, not end of the list!
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    std::cout << "----------------------------------" << std::endl;
-    std::cout << "Pruning for time t1="<<t1 << std::endl;
-    std::cout << " Oldest in list is t="<<first->t<<" v1 = "<<first->v1 <<
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() << "Pruning for time t1="<<t1 << std::endl;
+    Xyce::dout() << " Oldest in list is t="<<first->t<<" v1 = "<<first->v1 <<
       " v2="<<first->v2 << std::endl;
-    std::cout << " latest in list is t="<<last->t<<" v1 = "<<last->v1
+    Xyce::dout() << " latest in list is t="<<last->t<<" v1 = "<<last->v1
          << " v2="<<last->v2 << std::endl;
   }
 #endif
@@ -1039,9 +924,9 @@ void Instance::pruneHistory(double t1)
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      std::cout << "i = " << i << " t = " << it1->t;
-      std::cout << " v1 = " << it1->v1;
-      std::cout << " v2 = " << it1->v2 << std::endl;
+      Xyce::dout() << "i = " << i << " t = " << it1->t;
+      Xyce::dout() << " v1 = " << it1->v1;
+      Xyce::dout() << " v2 = " << it1->v2 << std::endl;
     }
 #endif
   }
@@ -1049,7 +934,7 @@ void Instance::pruneHistory(double t1)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    std::cout << "   i ="<<i << std::endl;
+    Xyce::dout() << "   i ="<<i << std::endl;
   }
 #endif
 
@@ -1059,7 +944,7 @@ void Instance::pruneHistory(double t1)
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
       {
-        std::cout << "Need to prune.  Keeping " << it1->t << std::endl;
+        Xyce::dout() << "Need to prune.  Keeping " << it1->t << std::endl;
       }
 #endif
       // if i>2 we have  too many old ones.
@@ -1068,7 +953,7 @@ void Instance::pruneHistory(double t1)
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
       {
-        std::cout << "                Keeping " << it1->t << std::endl;
+        Xyce::dout() << "                Keeping " << it1->t << std::endl;
       }
 #endif
 
@@ -1076,7 +961,7 @@ void Instance::pruneHistory(double t1)
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
       {
-        std::cout << "                Keeping " << it1->t << std::endl;
+        Xyce::dout() << "                Keeping " << it1->t << std::endl;
       }
 #endif
       // delete everything from the first to it1, not counting it1
@@ -1086,7 +971,7 @@ void Instance::pruneHistory(double t1)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    std::cout << "----------------------------------" << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
   }
 #endif
 }
@@ -1104,9 +989,9 @@ void Instance::pruneHistory(double t1)
 void Instance::InterpV1V2FromHistory(double t, double * v1p,
                                               double *v2p)
 {
-  vector<History>::iterator first = history.begin();
-  vector<History>::iterator it1;
-  vector<History>::iterator last = history.end();
+  std::vector<History>::iterator first = history.begin();
+  std::vector<History>::iterator it1;
+  std::vector<History>::iterator last = history.end();
   double t1,t2,t3;
   double dt1,dt2,dt3;
   double v11,v21,v12,v22,v13,v23;
@@ -1115,7 +1000,7 @@ void Instance::InterpV1V2FromHistory(double t, double * v1p,
 
   if (history.size() <= 0)
   {
-    string msg;
+    std::string msg;
     msg="Instance::InterpV1V2FromHistory called but history list is"
       " empty.  Might be due to trying to restart this netlist.\n"
       "Restarts of netlists with transmission lines does not work yet.\n";
@@ -1129,7 +1014,7 @@ void Instance::InterpV1V2FromHistory(double t, double * v1p,
   if (t - first->t < -N_UTL_MachineDependentParams::MachinePrecision()
       || t - last->t > N_UTL_MachineDependentParams::MachinePrecision() )
   {
-    string msg;
+    std::string msg;
     char msg2[256];
     sprintf(msg2, "Instance::InterpV1V2FromHistory: "
             "Asked to interpolate to a time (%20.17lg) prior to oldest(%20.17g) or "
@@ -1141,7 +1026,7 @@ void Instance::InterpV1V2FromHistory(double t, double * v1p,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    std::cout << " interpolating for t = " << t  << std::endl;
+    Xyce::dout() << " interpolating for t = " << t  << std::endl;
   }
 #endif
 
@@ -1179,9 +1064,9 @@ void Instance::InterpV1V2FromHistory(double t, double * v1p,
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      std::cout << "Using time t3="<<t3<<" v1(t3)="<<v13<<" v2(t3)="<<v23  << std::endl;
-      std::cout << "Using time t2="<<t2<<" v1(t2)="<<v12<<" v2(t2)="<<v22  << std::endl;
-      std::cout << "Using time t1="<<t1<<" v1(t1)="<<v11<<" v2(t1)="<<v21  << std::endl;
+      Xyce::dout() << "Using time t3="<<t3<<" v1(t3)="<<v13<<" v2(t3)="<<v23  << std::endl;
+      Xyce::dout() << "Using time t2="<<t2<<" v1(t2)="<<v12<<" v2(t2)="<<v22  << std::endl;
+      Xyce::dout() << "Using time t1="<<t1<<" v1(t1)="<<v11<<" v2(t1)="<<v21  << std::endl;
     }
 #endif
 
@@ -1251,7 +1136,7 @@ void Instance::InterpV1V2FromHistory(double t, double * v1p,
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 06/08/01
 //-----------------------------------------------------------------------------
-bool Instance::getInstanceBreakPoints ( vector<N_UTL_BreakPoint> & breakPointTimes )
+bool Instance::getInstanceBreakPoints ( std::vector<N_UTL_BreakPoint> & breakPointTimes )
 {
   bool bsuccess = true;
 
@@ -1274,9 +1159,9 @@ bool Instance::getInstanceBreakPoints ( vector<N_UTL_BreakPoint> & breakPointTim
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
       {
-        std::cout << " In Instance::getBreakPoints "<<std::endl;
-        std::cout << " First time step, I don't get to set breakpoints.  Time is ";
-        std::cout << currentTime << std::endl;
+        Xyce::dout() << " In Instance::getBreakPoints "<<std::endl;
+        Xyce::dout() << " First time step, I don't get to set breakpoints.  Time is ";
+        Xyce::dout() << currentTime << std::endl;
       }
 #endif
   }
@@ -1310,7 +1195,7 @@ void Instance::acceptStep()
     // values from this
     // step
 
-    vector<History>::iterator last = history.end();
+    std::vector<History>::iterator last = history.end();
 
     last--;  // point to last item, not past last item.
 
@@ -1324,9 +1209,9 @@ void Instance::acceptStep()
     double oVi1,oVi2;
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      std::cout << " In Instance::acceptStep "<<std::endl;
-      std::cout << "I want breakpoints.  Time is " << currentTime << std::endl;
-      std::cout << "   timeOld is " << timeOld << std::endl;
+      Xyce::dout() << " In Instance::acceptStep "<<std::endl;
+      Xyce::dout() << "I want breakpoints.  Time is " << currentTime << std::endl;
+      Xyce::dout() << "   timeOld is " << timeOld << std::endl;
     }
 #endif
 
@@ -1365,18 +1250,18 @@ void Instance::acceptStep()
 
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      std::cout << " ----- New time step -----" << std::endl;
-      std::cout << " Last solution : " << std::endl;
-      std::cout << " vpos1 = " << oVp1 << std::endl;
-      std::cout << " vneg1 = " << oVn1 << std::endl;
-      std::cout << " vint1 = " << oVi1 << std::endl;
-      std::cout << " ibr1 = " << oI1 << std::endl;
-      std::cout << " vpos2 = " << oVp2 << std::endl;
-      std::cout << " vneg2 = " << oVn2 << std::endl;
-      std::cout << " vint2 = " << oVi2 << std::endl;
-      std::cout << " ibr2 = " << oI2 << std::endl;
-      std::cout << "in set breakpoints, saving for time=" << currentTime << ", V1 = " << ov1 <<  ", V2 = " << ov2  << std::endl;
-      std::cout << " V1V2DBG " << currentTime << " " << ov1 << " " << ov2 << std::endl;
+      Xyce::dout() << " ----- New time step -----" << std::endl;
+      Xyce::dout() << " Last solution : " << std::endl;
+      Xyce::dout() << " vpos1 = " << oVp1 << std::endl;
+      Xyce::dout() << " vneg1 = " << oVn1 << std::endl;
+      Xyce::dout() << " vint1 = " << oVi1 << std::endl;
+      Xyce::dout() << " ibr1 = " << oI1 << std::endl;
+      Xyce::dout() << " vpos2 = " << oVp2 << std::endl;
+      Xyce::dout() << " vneg2 = " << oVn2 << std::endl;
+      Xyce::dout() << " vint2 = " << oVi2 << std::endl;
+      Xyce::dout() << " ibr2 = " << oI2 << std::endl;
+      Xyce::dout() << "in set breakpoints, saving for time=" << currentTime << ", V1 = " << ov1 <<  ", V2 = " << ov2  << std::endl;
+      Xyce::dout() << " V1V2DBG " << currentTime << " " << ov1 << " " << ov2 << std::endl;
     }
 #endif
 
@@ -1390,9 +1275,9 @@ void Instance::acceptStep()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      std::cout << "tmp_t="  << tmp_t  << " last->t =" << last->t << std::endl;
-      std::cout << "tmp_v1=" << tmp_v1 << " last->v1=" << last->v1 << std::endl;
-      std::cout << "tmp_v2=" << tmp_v2 << " last->v2=" << last->v2 << std::endl;
+      Xyce::dout() << "tmp_t="  << tmp_t  << " last->t =" << last->t << std::endl;
+      Xyce::dout() << "tmp_v1=" << tmp_v1 << " last->v1=" << last->v1 << std::endl;
+      Xyce::dout() << "tmp_v2=" << tmp_v2 << " last->v2=" << last->v2 << std::endl;
     }
 #endif
     d11 = (tmp_v1-last->v1)/(tmp_t-last->t);
@@ -1402,9 +1287,9 @@ void Instance::acceptStep()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      std::cout << "tmp_t="  << tmp_t  << " last->t =" << last->t << std::endl;
-      std::cout << "tmp_v1=" << tmp_v1 << " last->v1=" << last->v1 << std::endl;
-      std::cout << "tmp_v2=" << tmp_v2 << " last->v2=" << last->v2 << std::endl;
+      Xyce::dout() << "tmp_t="  << tmp_t  << " last->t =" << last->t << std::endl;
+      Xyce::dout() << "tmp_v1=" << tmp_v1 << " last->v1=" << last->v1 << std::endl;
+      Xyce::dout() << "tmp_v2=" << tmp_v2 << " last->v2=" << last->v2 << std::endl;
     }
 #endif
     d21 = (tmp_v1-last->v1)/(tmp_t-last->t);
@@ -1412,11 +1297,11 @@ void Instance::acceptStep()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      std::cout << "Derivs are " << d11 << " " << d21 << std::endl;
-      std::cout << "   and " << d12 << " " <<d22 << std::endl;
-      std::cout << " fabs(d11-d21) = " << fabs(d11-d21) << std::endl;
-      std::cout << " fabs(d12-d22) = " << fabs(d12-d22) << std::endl;
-      std::cout << "D1D2DBG " << currentTime << " " << d11 << " " << d12 << std::endl;
+      Xyce::dout() << "Derivs are " << d11 << " " << d21 << std::endl;
+      Xyce::dout() << "   and " << d12 << " " <<d22 << std::endl;
+      Xyce::dout() << " fabs(d11-d21) = " << fabs(d11-d21) << std::endl;
+      Xyce::dout() << " fabs(d12-d22) = " << fabs(d12-d22) << std::endl;
+      Xyce::dout() << "D1D2DBG " << currentTime << " " << d11 << " " << d12 << std::endl;
     }
 #endif
 
@@ -1426,9 +1311,9 @@ void Instance::acceptStep()
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
       {
-        std::cout << "Derivative is changing enough, I want to set a break point ";
-        std::cout << td << " ahead of discontinuity, which is ";
-        std::cout << tmp_t+td<<std::endl;
+        Xyce::dout() << "Derivative is changing enough, I want to set a break point ";
+        Xyce::dout() << td << " ahead of discontinuity, which is ";
+        Xyce::dout() << tmp_t+td<<std::endl;
       }
 #endif
       newBreakPointTime = (tmp_t+td);
@@ -1472,26 +1357,26 @@ DeviceState * Instance::getInternalState()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    std::cout << "---------------------------------------------------------------- "
+    Xyce::dout() << Xyce::section_divider
          << std::endl;
-    std::cout << " In Instance::getInternalState " << std::endl;
-    std::cout << "   name=" << getName() << std::endl;
-    std::cout << "   history size = " << hsize << std::endl;
-    std::cout << "   history  data: " << std::endl;
+    Xyce::dout() << " In Instance::getInternalState " << std::endl;
+    Xyce::dout() << "   name=" << getName() << std::endl;
+    Xyce::dout() << "   history size = " << hsize << std::endl;
+    Xyce::dout() << "   history  data: " << std::endl;
     for (i = 0 ; i < hsize ; ++i)
     {
-      std::cout << "   (" << history[i].t << ", " << history[i].v1 << ", "
+      Xyce::dout() << "   (" << history[i].t << ", " << history[i].v1 << ", "
            << history[i].v2 << ")"<< std::endl;
     }
 
-    std::cout << "   DeviceState ID = " << myState->ID << std::endl;
-    std::cout << "   DeviceState data size " << myState->data.size() << std::endl;
-    std::cout << "   Device State data: " << std::endl;
+    Xyce::dout() << "   DeviceState ID = " << myState->ID << std::endl;
+    Xyce::dout() << "   DeviceState data size " << myState->data.size() << std::endl;
+    Xyce::dout() << "   Device State data: " << std::endl;
     for (i = 0 ; i < myState->data.size() ; ++i)
     {
-      std::cout << "    " << myState->data[i] << std::endl;
+      Xyce::dout() << "    " << myState->data[i] << std::endl;
     }
-    std::cout << "---------------------------------------------------------------- "
+    Xyce::dout() << Xyce::section_divider
          << std::endl;
   }
 #endif
@@ -1515,7 +1400,7 @@ bool Instance::setInternalState(const DeviceState &state)
   int hsize,i,j;
   if ( state.ID != getName())
   {
-    string msg;
+    std::string msg;
     msg = "Instance::setInternalState:  ID ("+state.ID+")";
     msg += "from restart does not match my name ("+getName()+")!\n";
     N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL, msg);
@@ -1523,7 +1408,7 @@ bool Instance::setInternalState(const DeviceState &state)
 
   if (dsize%3 != 0)
   {
-    string msg;
+    std::string msg;
     char msg2[256];
     sprintf(msg2, "Instance::setInternalState: "
             "Data size from restart (%d) not a multiple of 3!",
@@ -1546,26 +1431,26 @@ bool Instance::setInternalState(const DeviceState &state)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    std::cout << "---------------------------------------------------------------- "
+    Xyce::dout() << Xyce::section_divider
          << std::endl;
-    std::cout << " In Instance::setInternalState " << std::endl;
-    std::cout << "   name=" << getName() << std::endl;
-    std::cout << "   history size = " << hsize << std::endl;
-    std::cout << "   history  data: " << std::endl;
+    Xyce::dout() << " In Instance::setInternalState " << std::endl;
+    Xyce::dout() << "   name=" << getName() << std::endl;
+    Xyce::dout() << "   history size = " << hsize << std::endl;
+    Xyce::dout() << "   history  data: " << std::endl;
     for (i = 0 ; i < hsize ; ++i)
     {
-      std::cout << "   (" << history[i].t << ", " << history[i].v1 << ", "
+      Xyce::dout() << "   (" << history[i].t << ", " << history[i].v1 << ", "
            << history[i].v2 << ")"<< std::endl;
     }
 
-    std::cout << "   DeviceState ID = " << state.ID << std::endl;
-    std::cout << "   DeviceState data size " << state.data.size() << std::endl;
-    std::cout << "   Device State data: " << std::endl;
+    Xyce::dout() << "   DeviceState ID = " << state.ID << std::endl;
+    Xyce::dout() << "   DeviceState data size " << state.data.size() << std::endl;
+    Xyce::dout() << "   Device State data: " << std::endl;
     for (i = 0 ; i < state.data.size() ; ++i)
     {
-      std::cout << "    " << state.data[i] << std::endl;
+      Xyce::dout() << "    " << state.data[i] << std::endl;
     }
-    std::cout << "---------------------------------------------------------------- "
+    Xyce::dout() << Xyce::section_divider
          << std::endl;
   }
 #endif
@@ -1582,7 +1467,7 @@ bool Instance::setInternalState(const DeviceState &state)
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 9/25/02
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   // there are no model parameters to process.
   return true;
@@ -1596,12 +1481,12 @@ bool Model::processParams (string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 03/23/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1619,10 +1504,11 @@ bool Model::processInstanceParams(string param)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-                                      SolverState & ss1,
-                                      DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1)
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block)
 {
 }
 
@@ -1637,9 +1523,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1657,17 +1543,17 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i;
   os << std::endl;
-  os << "    name     getModelName()  Parameters" << std::endl;
+  os << "    name     model name  Parameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "      ";
-    os << (*iter)->getModelName();
+    os << getName();
 
     os << std::endl;
     os << "Z0 = " << (*iter)->Z0 << std::endl;
@@ -1682,6 +1568,27 @@ std::ostream &Model::printOutInstances(std::ostream &os) const
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 //-----------------------------------------------------------------------------
 // Function      : Instance::getMaxTimeStepSize
@@ -1748,6 +1655,18 @@ History::History(const History &right)
 History::History(double a, double b, double c)
   : t(a),v1(b),v2(c)
 {
+}
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new DeviceMaster<Traits>(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("t", 1);
 }
 
 } // namespace TRA

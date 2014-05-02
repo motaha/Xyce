@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.13.2.2 $
+// Revision Number: $Revision: 1.21 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:30 $
+// Revision Date  : $Date: 2014/02/24 23:49:11 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -51,39 +51,40 @@
 using Teuchos::RefCountPtr;
 using Teuchos::rcp;
 
-// ----------   Xyce Includes   ----------
+#include <N_ANP_fwd.h>
 
-// ---------- Forward Declarations ----------
-class N_ANP_AnalysisManager;
+#include <N_UTL_OptionBlock.h>
+#include <N_TIA_TIAParams.h>
+
 class N_TIA_Assembler;
-class N_TIA_DataStore;
 class N_LAS_System;
 class N_LOA_Loader;
 class N_NLS_Manager;
-class N_ANP_OutputMgrAdapter;
 class N_TIA_StepErrorControl;
 class N_TIA_WorkingIntegrationMethod;
-class N_ANP_SweepParam;
+
+namespace Xyce {
+namespace Analysis {
 
 //-------------------------------------------------------------------------
-// Class         : N_ANP_AnalysisBase
+// Class         : AnalysisBase
 // Purpose       : Base class for common analysis functions
 // Special Notes : 
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 01/24/08
 //-------------------------------------------------------------------------
-class N_ANP_AnalysisBase
+class AnalysisBase
 {
   public: 
 
-    N_ANP_AnalysisBase( N_ANP_AnalysisManager * anaManagerPtr );
-    virtual ~N_ANP_AnalysisBase();
+    AnalysisBase( AnalysisManager * anaManagerPtr );
+    virtual ~AnalysisBase();
 
     virtual bool setAnalysisParams(const N_UTL_OptionBlock & paramsBlock) {return true;};
     virtual bool outputFailureStats () {return true;};
 
     virtual void setParamsWithOutputMgrAdapter 
-      (RefCountPtr< N_ANP_OutputMgrAdapter > & outputMgrAdapterRCPtr) {};
+      (RefCountPtr< OutputMgrAdapter > & outputMgrAdapterRCPtr) {};
 
     virtual int getStepIter () { return 0; }
     virtual int getStepNumber () { return stepNumber; }
@@ -93,29 +94,39 @@ class N_ANP_AnalysisBase
     virtual int getTranStepNumber () { return tranStepNumber; }
     virtual void setSensFlag() {sensFlag_=true;}
 
-    virtual bool run();
-    virtual bool init();
-    virtual bool loopProcess();
-    virtual bool processSuccessfulStep();
-    virtual bool processFailedStep();
-    virtual bool finish();
-    virtual bool handlePredictor();
+    virtual bool run() = 0;
+    virtual bool init() = 0;
+    virtual bool loopProcess() = 0;
+    virtual bool processSuccessfulStep() = 0;
+    virtual bool processFailedStep() = 0;
+    virtual bool finish() = 0;
+    virtual bool handlePredictor() = 0;
 
-    virtual void printStepHeader();
-    virtual void printProgress();
+    virtual void printStepHeader(std::ostream &os);
+    virtual void printProgress(std::ostream &os);
 
     // mixed-signal
-    virtual void preStepDetails (double maxTimeStepFromHabanero);
-    virtual bool mixedSignalStep();
-    virtual bool finalizeStep ();
+    virtual void preStepDetails(double maxTimeStepFromHabanero)
+    {}
+    
+    virtual bool mixedSignalStep() {
+      return true;
+    }
+
+    virtual bool finalizeStep () {
+      return true;
+    }
 
     // Two Level specific
-    virtual bool twoLevelStep();
+    virtual bool twoLevelStep() {
+      return true;
+    }
+
     virtual bool resetForStepAnalysis();
 
     // utility functions common to more than one analysis
-    int setupSweepLoop_( vector <N_ANP_SweepParam> & sweepParamVec );
-    bool updateSweepParams_ (int loopIter, vector <N_ANP_SweepParam> & sweepParamVec);
+    int setupSweepLoop_( std::vector<SweepParam> & sweepParamVec );
+    bool updateSweepParams_ (int loopIter, std::vector<SweepParam> & sweepParamVec);
 
     // Utility function for AnalysisManager to determine if a complex analysis type (like HB)
     // is performing another type of analysis under the hood.  This is necessary for populating
@@ -145,14 +156,12 @@ class N_ANP_AnalysisBase
     bool firstDoubleDCOPStep_ ();
 
   public:
-
-    RefCountPtr< N_ANP_AnalysisManager  > anaManagerRCPtr_;
+    RefCountPtr< AnalysisManager  > anaManagerRCPtr_;
     RefCountPtr< N_TIA_Assembler > assemblerRCPtr_;
-    RefCountPtr< N_TIA_DataStore > dsRCPtr_;
     RefCountPtr< N_LAS_System > lasSystemRCPtr_;
     RefCountPtr< N_LOA_Loader > loaderRCPtr_;
     RefCountPtr< N_NLS_Manager > nlsMgrRCPtr_;
-    RefCountPtr< N_ANP_OutputMgrAdapter > outputMgrAdapterRCPtr_;
+    RefCountPtr< OutputMgrAdapter > outputMgrAdapterRCPtr_;
     RefCountPtr< N_TIA_StepErrorControl > secRCPtr_;
     RefCountPtr< N_TIA_WorkingIntegrationMethod > wimRCPtr_;
 
@@ -200,49 +209,49 @@ class N_ANP_AnalysisBase
     bool inputOPFlag_;            // true if starting from an initial condition.
 
 
-    vector<vector<int> > saveTimeI;
-    vector<vector<double> > saveTimeD;
+    std::vector<std::vector<int> > saveTimeI;
+    std::vector<std::vector<double> > saveTimeD;
 
   protected:
     // command line object
-    N_IO_CmdParse & commandLine_;
+    const N_IO_CmdParse & commandLine_;
 
   private:
 
 };
 
 //-----------------------------------------------------------------------------
-inline double N_ANP_AnalysisBase::getTotalLinearSolutionTime() const
+inline double AnalysisBase::getTotalLinearSolutionTime() const
 {
   return totalLinearSolutionTime_;
 }
 
 //-----------------------------------------------------------------------------
-inline double N_ANP_AnalysisBase::getTotalResidualLoadTime() const
+inline double AnalysisBase::getTotalResidualLoadTime() const
 {
   return totalResidualLoadTime_;
 }
 
 //-----------------------------------------------------------------------------
-inline double N_ANP_AnalysisBase::getTotalJacobianLoadTime() const
+inline double AnalysisBase::getTotalJacobianLoadTime() const
 {
   return totalJacobianLoadTime_;
 }
 
 //-----------------------------------------------------------------------------
-inline bool N_ANP_AnalysisBase::getDoubleDCOPEnabled () 
+inline bool AnalysisBase::getDoubleDCOPEnabled () 
 {
   return doubleDCOPFlag_;
 }
 
 //-----------------------------------------------------------------------------
-inline int N_ANP_AnalysisBase::getDoubleDCOPStep () 
+inline int AnalysisBase::getDoubleDCOPStep () 
 {
   return doubleDCOPStep_ ;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::firstDoubleDCOPStep_
+// Function      : AnalysisBase::firstDoubleDCOPStep_
 // Purpose       : If the current step is the first step of
 //                  a "doubleDCOP", then return "true".
 //
@@ -259,10 +268,15 @@ inline int N_ANP_AnalysisBase::getDoubleDCOPStep ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 11/21/04
 //-----------------------------------------------------------------------------
-inline bool N_ANP_AnalysisBase::firstDoubleDCOPStep_ ()
+inline bool AnalysisBase::firstDoubleDCOPStep_ ()
 {
   return (getDoubleDCOPEnabled() && getDoubleDCOPStep() != tiaParams.lastDCOPStep);
 }
+
+} // namespace Analysis
+} // namespace Xyce
+
+typedef Xyce::Analysis::AnalysisBase N_ANP_AnalysisBase;
 
 #endif
 

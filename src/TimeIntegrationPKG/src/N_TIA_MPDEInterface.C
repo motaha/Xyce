@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -32,8 +32,8 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.25.6.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Number: $Revision: 1.31 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
@@ -47,7 +47,7 @@
 // ----------   Xyce Includes   ----------
 
 #include <N_TIA_MPDEInterface.h>
-#include <N_TIA_TimeIntInfo.h> 
+#include <N_TIA_TimeIntInfo.h>
 #include <N_TIA_TwoLevelError.h>
 
 //-----------------------------------------------------------------------------
@@ -176,7 +176,7 @@ bool N_TIA_MPDEInterface::setStateInitialCondition(N_LAS_Vector * stateInitialCo
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
-// Creation Date : 
+// Creation Date :
 //-----------------------------------------------------------------------------
 bool N_TIA_MPDEInterface::setStoreInitialCondition(N_LAS_Vector * storeInitialConditionPtr)
 {
@@ -208,11 +208,11 @@ bool N_TIA_MPDEInterface::setQVectorInitialCondition(N_LAS_Vector * qVectorIniti
 //-----------------------------------------------------------------------------
 bool N_TIA_MPDEInterface::runDCOP()
 {
-  if( !tiaParams_.NOOP )   
+  if( !tiaParams_.NOOP )
   {
     // as long as the user didn't request "noop"
     // try and do the operating point calculation
-    anaManagerPtr_->analysis = ANP_MODE_DC_SWEEP;
+    anaManagerPtr_->analysis = Xyce::Analysis::ANP_MODE_DC_SWEEP;
     return anaManagerPtr_->run();
   }
   return false;
@@ -228,7 +228,7 @@ bool N_TIA_MPDEInterface::runDCOP()
 //-----------------------------------------------------------------------------
 bool N_TIA_MPDEInterface::runTransient()
 {
-  anaManagerPtr_->analysis = ANP_MODE_TRANSIENT;
+  anaManagerPtr_->analysis = Xyce::Analysis::ANP_MODE_TRANSIENT;
   tiaParams_.NOOP = true;
   return anaManagerPtr_->run();
 }
@@ -244,7 +244,7 @@ bool N_TIA_MPDEInterface::runTransient()
 //-----------------------------------------------------------------------------
 bool N_TIA_MPDEInterface::runTransientWithDCOP()
 {
-  anaManagerPtr_->analysis = ANP_MODE_TRANSIENT;
+  anaManagerPtr_->analysis = Xyce::Analysis::ANP_MODE_TRANSIENT;
   return anaManagerPtr_->run();
 }
 
@@ -323,7 +323,7 @@ N_LAS_Vector* N_TIA_MPDEInterface::getStateFinalSolution()
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
-// Creation Date : 
+// Creation Date :
 //-----------------------------------------------------------------------------
 N_LAS_Vector* N_TIA_MPDEInterface::getStoreFinalSolution()
 {
@@ -372,11 +372,11 @@ bool N_TIA_MPDEInterface::reInitialize()
   // 10/04/05 tscofffe:  We need to reinitialize the variables in the
   // StepErrorControl object.
 #ifdef Xyce_DEBUG_TIME
-  cout << *(tiaSecPtr_) << endl;
+  Xyce::dout() << *(tiaSecPtr_) << std::endl;
 #endif
   tiaSecPtr_->resetAll();
 #ifdef Xyce_DEBUG_TIME
-  cout << *(tiaSecPtr_) << endl;
+  Xyce::dout() << *(tiaSecPtr_) << std::endl;
 #endif
 
   // 10/04/05 tscoffe:  BackwardDifferentiation15 needs to be re-initialized here.

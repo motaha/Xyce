@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.142.2.3 $
+// Revision Number: $Revision: 1.169.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -54,189 +54,156 @@
 #endif
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_ISRC.h>
-#include <N_DEV_SourceData.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_ExternData.h>
+#include <N_DEV_ISRC.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_SourceData.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
 
 #include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
 
 namespace Xyce {
 namespace Device {
-
-template<>
-ParametricData<ISRC::Instance>::ParametricData()
-{
-    // Set up configuration constants:
-    setNumNodes(2);
-    setNumOptionalNodes(0);
-    setNumFillNodes(0);
-    setModelRequired(0);
-    setPrimaryParameter("DCV0");
-
-    // Set up double precision variables:
-    // DC parameters
-    addPar ("DCV0",       0.0, true, NO_DEP,
-      &ISRC::Instance::DCV0,
-      NULL, U_VOLT, CAT_NONE, "DC Current");
-
-    // Pulse parameters
-    addPar ("V0",         0.0, false, NO_DEP,
-      &ISRC::Instance::par0,
-      NULL, U_AMP, CAT_NONE, "Offset Current");
-
-    addPar ("V1",         0.0, false, NO_DEP,
-      &ISRC::Instance::par0,
-      NULL, U_AMP, CAT_NONE, "Initial Current");
-
-    addPar ("V2",         0.0, false, NO_DEP,
-      &ISRC::Instance::par1,
-      NULL, U_AMP, CAT_NONE, "Pulsed Current");
-
-    addPar ("TD",         0.0, false, NO_DEP,
-      &ISRC::Instance::par2,
-      NULL, U_SECOND, CAT_NONE, "Delay");
-
-    addPar ("TR",         0.0, false, NO_DEP,
-      &ISRC::Instance::par3,
-      NULL, U_SECOND, CAT_NONE, "Rise Time");
-
-    addPar ("TF",         0.0, false, NO_DEP,
-      &ISRC::Instance::par4,
-      NULL, U_SECOND, CAT_NONE, "Fall Time");
-
-    addPar ("PW",         0.0, false, NO_DEP,
-      &ISRC::Instance::par5,
-      NULL, U_SECOND, CAT_NONE, "Pulse Width");
-
-    addPar ("PER",        0.0, false, NO_DEP,
-      &ISRC::Instance::par6,
-      NULL, U_SECOND, CAT_NONE, "Period");
-
-    addPar ("SF",        0.0, false, NO_DEP,
-      &ISRC::Instance::par7,
-      NULL, U_NONE, CAT_NONE, "Scale Factor -- smooth pulse only");
-
-    // Sin parameters
-    addPar ("VA",         0.0, false, NO_DEP,
-      &ISRC::Instance::par1,
-      NULL, U_AMP, CAT_NONE, "Amplitude");
-
-    addPar ("FREQ",       0.0, false, NO_DEP,
-      &ISRC::Instance::par3,
-      NULL, U_SECM1, CAT_NONE, "Frequency");
-
-    addPar ("THETA",      0.0, false, NO_DEP,
-      &ISRC::Instance::par4,
-      NULL, U_NONE, CAT_NONE, "Theta");
-
-    addPar ("PHASE",      0.0, false, NO_DEP,
-      &ISRC::Instance::par5,
-      NULL, U_NONE, CAT_NONE, "Phase");
-
-
-    // Exp parameters
-    addPar ("TD1",        0.0, false, NO_DEP,
-      &ISRC::Instance::par2,
-      NULL, U_SECOND, CAT_NONE, "Rise Delay Time");
-
-    addPar ("TAU1",       0.0, false, NO_DEP,
-      &ISRC::Instance::par3,
-      NULL, U_SECOND, CAT_NONE, "Rise Time Constant");
-
-    addPar ("TD2",        0.0, false, NO_DEP,
-      &ISRC::Instance::par4,
-      NULL, U_SECOND, CAT_NONE, "Fall Delay Time");
-
-    addPar ("TAU2",       0.0, false, NO_DEP,
-      &ISRC::Instance::par5,
-      NULL, U_SECOND, CAT_NONE, "Fall Time Constant");
-
-    // AC parameters
-    addPar ("ACMAG",         0.0, false, NO_DEP,
-      &ISRC::Instance::ACMAG,
-      NULL, U_VOLT, CAT_NONE, "Amplitude");
-
-    addPar ("ACPHASE",      0.0, false, NO_DEP,
-      &ISRC::Instance::ACPHASE,
-      NULL, U_NONE, CAT_NONE, "Phase");
-
-    // SFFM parameters
-    addPar ("FC",         0.0, false, NO_DEP,
-      &ISRC::Instance::par2,
-      NULL, U_SECM1, CAT_NONE, "Carrier Frequency");
-
-    addPar ("FS",         0.0, false, NO_DEP,
-      &ISRC::Instance::par4,
-      NULL, U_SECM1, CAT_NONE, "Signal Frequency");
-
-    addPar ("MDI",        0.0, false, NO_DEP,
-      &ISRC::Instance::par3,
-      NULL, U_NONE, CAT_NONE, "Modulation Index");
-
-
-    // PWL params
-    addPar ("R",          0.0, false, NO_DEP,
-      &ISRC::Instance::REPEATTIME,
-      NULL, U_SECOND, CAT_NONE, "Repeat Time");
-
-    addPar ("REPEATTIME", 0.0, false, NO_DEP,
-      &ISRC::Instance::REPEATTIME,
-      NULL, U_SECOND, CAT_NONE, "Repeat Time");
-
-    addPar ("T",          0.0, false, NO_DEP,
-      &ISRC::Instance::T,
-      NULL, U_SECOND, CAT_NONE, "Time");  // time-voltage pairs
-
-    addPar ("V",          0.0, false, NO_DEP,
-      &ISRC::Instance::V,
-      NULL, U_AMP, CAT_NONE, "Current"); // time-voltage pairs
-
-    // Set up non-double precision variables:
-    addPar ("TRANSIENTSOURCETYPE", (int)_DC_DATA, false, NO_DEP,
-      &ISRC::Instance::TRANSIENTSOURCETYPE,
-      &ISRC::Instance::TRANSIENTSOURCETYPEgiven,
-      U_NONE, CAT_NONE, "" );
-
-    addPar ("ACSOURCETYPE", (int) _AC_DATA, false, NO_DEP,
-      &ISRC::Instance::ACSOURCETYPE,
-      &ISRC::Instance::ACSOURCETYPEgiven,
-      U_NONE, CAT_NONE, "" );
-
-    addPar ("DCSOURCETYPE", (int) _DC_DATA, false, NO_DEP,
-      &ISRC::Instance::DCSOURCETYPE,
-      &ISRC::Instance::DCSOURCETYPEgiven,
-      U_NONE, CAT_NONE, "" );
-
-
-    addPar ("NUM", 0, false, NO_DEP, &ISRC::Instance::NUM,
-        NULL, U_NONE, CAT_NONE, "" );
-    addPar ("REPEAT", 0, false, NO_DEP, &ISRC::Instance::REPEAT,
-        NULL, U_NONE, CAT_NONE, "" );
-}
-
-template<>
-ParametricData<ISRC::Model>::ParametricData()
-{
-}
-
 namespace ISRC {
-vector< vector<int> > Instance::jacStamp;
 
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
+void Traits::loadInstanceParameters(ParametricData<ISRC::Instance> &p)
+{
+  // DC parameters
+  p.addPar ("DCV0", 0.0, &ISRC::Instance::DCV0)
+    .setOriginalValueStored(true)
+    .setUnit(U_VOLT)
+    .setDescription("DC Current");
 
-  return parMap;
+  // Pulse parameters
+  p.addPar ("V0", 0.0, &ISRC::Instance::par0)
+    .setUnit(U_AMP)
+    .setDescription("Offset Current");
+
+  p.addPar ("V1", 0.0, &ISRC::Instance::par0)
+    .setUnit(U_AMP)
+    .setDescription("Initial Current");
+
+  p.addPar ("V2", 0.0, &ISRC::Instance::par1)
+    .setUnit(U_AMP)
+    .setDescription("Pulsed Current");
+
+  p.addPar ("TD", 0.0, &ISRC::Instance::par2)
+    .setUnit(U_SECOND)
+    .setDescription("Delay");
+
+  p.addPar ("TR", 0.0, &ISRC::Instance::par3)
+    .setUnit(U_SECOND)
+    .setDescription("Rise Time");
+
+  p.addPar ("TF", 0.0, &ISRC::Instance::par4)
+    .setUnit(U_SECOND)
+    .setDescription("Fall Time");
+
+  p.addPar ("PW", 0.0, &ISRC::Instance::par5)
+    .setUnit(U_SECOND)
+    .setDescription("Pulse Width");
+
+  p.addPar ("PER", 0.0, &ISRC::Instance::par6)
+    .setUnit(U_SECOND)
+    .setDescription("Period");
+
+  p.addPar ("SF", 0.0, &ISRC::Instance::par7)
+    .setDescription("Scale Factor -- smooth pulse only");
+
+  // Sin parameters
+  p.addPar ("VA", 0.0, &ISRC::Instance::par1)
+    .setUnit(U_AMP)
+    .setDescription("Amplitude");
+
+  p.addPar ("FREQ", 0.0, &ISRC::Instance::par3)
+    .setUnit(U_SECM1)
+    .setDescription("Frequency");
+
+  p.addPar ("THETA", 0.0, &ISRC::Instance::par4)
+    .setDescription("Theta");
+
+  p.addPar ("PHASE", 0.0, &ISRC::Instance::par5)
+    .setDescription("Phase");
+
+  // Exp parameters
+  p.addPar ("TD1", 0.0, &ISRC::Instance::par2)
+    .setUnit(U_SECOND)
+    .setDescription("Rise Delay Time");
+
+  p.addPar ("TAU1", 0.0, &ISRC::Instance::par3)
+    .setUnit(U_SECOND)
+    .setDescription("Rise Time Constant");
+
+  p.addPar ("TD2", 0.0, &ISRC::Instance::par4)
+    .setUnit(U_SECOND)
+    .setDescription("Fall Delay Time");
+
+  p.addPar ("TAU2", 0.0, &ISRC::Instance::par5)
+    .setUnit(U_SECOND)
+    .setDescription("Fall Time Constant");
+
+  // AC parameters
+  p.addPar ("ACMAG", 0.0, &ISRC::Instance::ACMAG)
+    .setUnit(U_VOLT)
+    .setDescription("Amplitude");
+
+  p.addPar ("ACPHASE", 0.0, &ISRC::Instance::ACPHASE)
+    .setDescription("Phase");
+
+  // SFFM parameters
+  p.addPar ("FC", 0.0, &ISRC::Instance::par2)
+    .setUnit(U_SECM1)
+    .setDescription("Carrier Frequency");
+
+  p.addPar ("FS", 0.0, &ISRC::Instance::par4)
+    .setUnit(U_SECM1)
+    .setDescription("Signal Frequency");
+
+  p.addPar ("MDI", 0.0, &ISRC::Instance::par3)
+    .setDescription("Modulation Index");
+
+  // PWL params
+  p.addPar ("R", 0.0, &ISRC::Instance::REPEATTIME)
+    .setUnit(U_SECOND)
+    .setDescription("Repeat Time");
+
+  p.addPar ("REPEATTIME", 0.0, &ISRC::Instance::REPEATTIME)
+    .setUnit(U_SECOND)
+    .setDescription("Repeat Time");
+
+  p.addPar ("T", 0.0, &ISRC::Instance::T)
+    .setUnit(U_SECOND)
+    .setDescription("Time");  // time-voltage pairs
+
+  p.addPar ("V", 0.0, &ISRC::Instance::V)
+    .setUnit(U_AMP)
+    .setDescription("Current"); // time-voltage pairs
+
+  // Set up non-double precision variables:
+  p.addPar ("TRANSIENTSOURCETYPE", (int)_DC_DATA, &ISRC::Instance::TRANSIENTSOURCETYPE)
+    .setGivenMember(&ISRC::Instance::TRANSIENTSOURCETYPEgiven);
+
+  p.addPar ("ACSOURCETYPE", (int) _AC_DATA, &ISRC::Instance::ACSOURCETYPE)
+    .setGivenMember(&ISRC::Instance::ACSOURCETYPEgiven);
+
+  p.addPar ("DCSOURCETYPE", (int) _DC_DATA, &ISRC::Instance::DCSOURCETYPE)
+    .setGivenMember(&ISRC::Instance::DCSOURCETYPEgiven);
+
+  p.addPar ("NUM", 0, &ISRC::Instance::NUM);
+
+  p.addPar ("REPEAT", false, &ISRC::Instance::REPEAT);
 }
 
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
+void Traits::loadModelParameters(ParametricData<ISRC::Model> &p)
+{
 }
+
+
+std::vector< std::vector<int> > Instance::jacStamp;
 
 //-----------------------------------------------------------------------------
 // Function      : Instance::Instance
@@ -246,13 +213,12 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/06/00
 //-----------------------------------------------------------------------------
-Instance::Instance(InstanceBlock & IB,
-                   Model & model,
-                   MatrixLoadData & mlData1,
-                   SolverState &ss1,
-                   ExternData  &ed1,
-                   DeviceOptions & do1)
-  : SourceInstance(IB, mlData1, ss1, ed1, do1),
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock & instance_block,
+  Model &               model,
+  const FactoryBlock &  factory_block)
+  : SourceInstance(instance_block, configuration.getInstanceParameters(), factory_block),
     model_(model),
     li_Pos(-1),
     li_Neg(-1),
@@ -272,7 +238,7 @@ Instance::Instance(InstanceBlock & IB,
   ACMAG(1.0),
   ACPHASE(0.0),
   NUM(0),
-  REPEAT(0),
+  REPEAT(false),
   TRANSIENTSOURCETYPE(_DC_DATA),
   TRANSIENTSOURCETYPEgiven(false),
   ACSOURCETYPE(_AC_DATA),
@@ -293,68 +259,62 @@ Instance::Instance(InstanceBlock & IB,
   setDefaultParams ();
 
   // Set params according to instance line and constant defaults from metadata:
-  setParams (IB.params);
+  setParams (instance_block.params);
 
   // Set any non-constant parameter defaults:
 
-  if (solState.ACspecified && ACSOURCETYPEgiven)
+  if (getSolverState().ACspecified && ACSOURCETYPEgiven)
   {
-    acData_ptr = new ACData (IB.params,solState,devOptions);
+    acData_ptr = new ACData (instance_block.params,getSolverState(),getDeviceOptions());
   }
 
   if (DCSOURCETYPEgiven) // this will always be given, if the source spec was valid.
   {
-    dcData_ptr = new ConstData (IB.params,solState,devOptions);
+    dcData_ptr = new ConstData (instance_block.params,getSolverState(),getDeviceOptions());
   }
 
-  if (solState.HBspecified || TRANSIENTSOURCETYPEgiven)
+  if (getSolverState().HBspecified || TRANSIENTSOURCETYPEgiven)
   {
     switch (TRANSIENTSOURCETYPE)
     {
       case _SIN_DATA:
-        Data_ptr = new SinData (IB.params,solState,devOptions);
+        Data_ptr = new SinData (instance_block.params,getSolverState(),getDeviceOptions());
         break;
 
       case _EXP_DATA:
-        Data_ptr = new ExpData (IB.params,solState,devOptions);
+        Data_ptr = new ExpData (instance_block.params,getSolverState(),getDeviceOptions());
         break;
 
       case _PULSE_DATA:
-        Data_ptr = new PulseData (IB.params,solState,devOptions);
+        Data_ptr = new PulseData (instance_block.params,getSolverState(),getDeviceOptions());
         break;
 
       case _PWL_DATA:
-        Data_ptr = new PWLinData (IB.params,solState,devOptions);
+        Data_ptr = new PWLinData (instance_block.params,getSolverState(),getDeviceOptions());
         break;
 
       case _SFFM_DATA:
-        Data_ptr = new SFFMData (IB.params,solState,devOptions);
+        Data_ptr = new SFFMData (instance_block.params,getSolverState(),getDeviceOptions());
         break;
 
       case _DC_DATA:
-        Data_ptr = new ConstData (IB.params,solState,devOptions);
+        Data_ptr = new ConstData (instance_block.params,getSolverState(),getDeviceOptions());
         break;
 
       case _SMOOTH_PULSE_DATA:
-        Data_ptr = new SmoothPulseData (IB.params,solState,devOptions);
+        Data_ptr = new SmoothPulseData (instance_block.params,getSolverState(),getDeviceOptions());
         break;
 
 //	    case _AC_DATA:
-//	      Data_ptr = new ACData (IB.params,solState,devOptions);
+//	      Data_ptr = new ACData (instance_block.params,getSolverState(),getDeviceOptions());
 //	      break;
 
       default:
-        string msg = "Instance::Instance(IB)\n";
-        msg += "\tCannot identify source data type for " + getName() + ".";
-        std::ostringstream oss;
-        oss << "Error in " << netlistLocation() << "\n" << msg;
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+        UserError0(*this) << "Cannot identify source data type for " << getName();
         break;
     }
   }
 
-  //defaultParamName = Data_ptr->defaultParamName_;
-  defaultParamName = "DCV0";
   processParams();
 
   // Calculate any parameters specified as expressions:
@@ -375,7 +335,7 @@ Instance::Instance(InstanceBlock & IB,
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/06/00
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
   if (gotParams)
   {
@@ -445,40 +405,20 @@ Instance::~Instance ()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/20/02
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-	                               const vector<int> & extLIDVecRef)
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+	                               const std::vector<int> & extLIDVecRef)
 {
-  string msg;
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline(
-      "-----------------------------------------------------------------------------");
-  if (devOptions.debugLevel > 0 )
+  if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << endl << dashedline << endl;
-    cout << "  ISRCInstance::registerLIDs" << endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "  ISRCInstance::registerLIDs" << std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
 
   intLIDVec = intLIDVecRef;
   extLIDVec = extLIDVecRef;
@@ -491,11 +431,11 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
   li_Neg = extLIDVec[1];
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel > 0 )
+  if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << "  li_Pos = " << li_Pos << endl;
-    cout << "  li_Neg = " << li_Neg << endl;
-    cout << dashedline << endl;
+    Xyce::dout() << "  li_Pos = " << li_Pos << std::endl;
+    Xyce::dout() << "  li_Neg = " << li_Neg << std::endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -509,20 +449,9 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/20/02
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs(const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs(const std::vector<int> & staLIDVecRef )
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSTa != numStateVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 }
 
 //-----------------------------------------------------------------------------
@@ -533,20 +462,10 @@ void Instance::registerStateLIDs(const vector<int> & staLIDVecRef )
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 03/27/2013
 //-----------------------------------------------------------------------------
-void Instance::registerStoreLIDs(const vector<int> & stoLIDVecRef )
+void Instance::registerStoreLIDs(const std::vector<int> & stoLIDVecRef )
 {
-  string msg;
+  AssertLIDs(stoLIDVecRef.size() == getNumStoreVars());
 
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSto = stoLIDVecRef.size();
-
-  if (numSto != getNumStoreVars())
-  {
-    msg = "Instance::registerStoreLIDs:";
-    msg += "numSto != numStoreVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
   if( loadLeadCurrent )
   {
     li_store_dev_i = stoLIDVecRef[0];
@@ -562,16 +481,16 @@ void Instance::registerStoreLIDs(const vector<int> & stoLIDVecRef )
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 03/27/2013
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getStoreNameMap ()
+std::map<int,std::string> & Instance::getStoreNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if( loadLeadCurrent && storeNameMap.empty ())
   {
     // change subcircuitname:devicetype_deviceName to
     // devicetype:subcircuitName:deviceName
-    string modName(getName());
+    std::string modName(getName());
     spiceInternalName(modName);
-    string tmpstr;
+    std::string tmpstr;
     tmpstr = modName+":DEV_I";
     storeNameMap[ li_store_dev_i ] = tmpstr;
   }
@@ -588,7 +507,7 @@ map<int,string> & Instance::getStoreNameMap ()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 9/5/2
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -661,7 +580,7 @@ bool Instance::loadDAEFVector ()
 
   // get the source value:
   SourceData *dataPtr = dcData_ptr; // by default assume the DC value.
-  if ( (solState.HBspecified || solState.tranopFlag || solState.transientFlag) && Data_ptr != 0 )
+  if ( (getSolverState().HBspecified || getSolverState().tranopFlag || getSolverState().transientFlag) && Data_ptr != 0 )
   {
     dataPtr = Data_ptr;
   }
@@ -692,10 +611,11 @@ bool Instance::loadDAEFVector ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/06/00
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-                                        SolverState & ss1,
-                                        DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1)
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block)
 {
 
 }
@@ -710,9 +630,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -730,7 +650,7 @@ Model::~Model ()
 // Creator       : Lon Waters
 // Creation Date : 07/29/2002
 //----------------------------------------------------------------------------
-bool Model::processParams(string param)
+bool Model::processParams()
 {
   return true;
 }
@@ -743,12 +663,12 @@ bool Model::processParams(string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 03/23/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -770,18 +690,18 @@ std::ostream &Model::printOutInstances(std::ostream &os) const
 {
 #ifdef Xyce_DEBUG_DEVICE
 
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i;
-  os << endl;
-  os << "    name     modelName  Parameters" << endl;
+  os << std::endl;
+  os << "    name     modelName  Parameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "      ";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
     if ( (*iter)->Data_ptr != 0 )
     {
       (*iter)->Data_ptr->printOutParams ();
@@ -798,10 +718,31 @@ std::ostream &Model::printOutInstances(std::ostream &os) const
     }
   }
 
-  os << endl;
+  os << std::endl;
 #endif
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 
 
@@ -832,7 +773,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 //-----------------------------------------------------------------------------
 bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  double * storeLeadF, double * storeLeadQ)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & inst = *(*it);
 
@@ -869,6 +810,18 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
 bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 {
   return true;
+}
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("i", 1);
 }
 
 } // namespace Resistor

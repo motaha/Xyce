@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -35,9 +35,9 @@
 
 #include <Xyce_config.h>
 
-
 // ----------   Xyce Includes   ----------
 #include <N_DEV_fwd.h>
+#undef HAVE_LIBPARMETIS
 #include <N_ANP_ModelEvaluator_Stateless.h>
 #include <N_LAS_Vector.h>
 #include <N_LAS_BlockVector.h>
@@ -51,34 +51,37 @@
 
 using Teuchos::rcp;
 
-RCP<N_ANP_ModelEvaluator_Stateless> N_ANP_modelEvaluator_Stateless()
+namespace Xyce {
+namespace Analysis {
+
+RCP<ModelEvaluator_Stateless> N_ANP_modelEvaluator_Stateless()
 {
-    return rcp(new N_ANP_ModelEvaluator_Stateless());
+    return rcp(new ModelEvaluator_Stateless());
 }
 
 
-RCP<N_ANP_ModelEvaluator_Stateless> N_ANP_modelEvaluator_Stateless(
-    const RCP<N_ANP_ModelEvaluator>& xyceME)
+RCP<ModelEvaluator_Stateless> N_ANP_modelEvaluator_Stateless(
+    const RCP<ModelEvaluator>& xyceME)
 {
-    RCP<N_ANP_ModelEvaluator_Stateless>
+    RCP<ModelEvaluator_Stateless>
     xyceMES = N_ANP_modelEvaluator_Stateless();
     xyceMES->set_XyceModelEvaluator(xyceME);
     return xyceMES;
 }
 
 
-N_ANP_ModelEvaluator_Stateless::N_ANP_ModelEvaluator_Stateless()
+ModelEvaluator_Stateless::ModelEvaluator_Stateless()
   :isInitialized_(false)
 {
 }
 
 
-N_ANP_ModelEvaluator_Stateless::~N_ANP_ModelEvaluator_Stateless()
+ModelEvaluator_Stateless::~ModelEvaluator_Stateless()
 {
 }
 
-void N_ANP_ModelEvaluator_Stateless::set_XyceModelEvaluator(
-    const RCP<N_ANP_ModelEvaluator>& xyceME)
+void ModelEvaluator_Stateless::set_XyceModelEvaluator(
+  const RCP<Analysis::ModelEvaluator>& xyceME)
 {
     TEUCHOS_ASSERT(xyceME->isInitialized());
     xyceME_ = xyceME;
@@ -91,7 +94,7 @@ void N_ANP_ModelEvaluator_Stateless::set_XyceModelEvaluator(
     this->setupInOutArgs_();
 }
 
-void N_ANP_ModelEvaluator_Stateless::setupInOutArgs_()
+void ModelEvaluator_Stateless::setupInOutArgs_()
 {
   if (!isInitialized_) {
     Np_ = 0;
@@ -116,49 +119,49 @@ void N_ANP_ModelEvaluator_Stateless::setupInOutArgs_()
 }
 
 
-EpetraExt::ModelEvaluator::InArgs N_ANP_ModelEvaluator_Stateless::createInArgs() const
+EpetraExt::ModelEvaluator::InArgs ModelEvaluator_Stateless::createInArgs() const
 {
   TEUCHOS_ASSERT(isInitialized_);
   return inArgs_;
 }
 
 
-EpetraExt::ModelEvaluator::OutArgs N_ANP_ModelEvaluator_Stateless::createOutArgs() const
+EpetraExt::ModelEvaluator::OutArgs ModelEvaluator_Stateless::createOutArgs() const
 {
   TEUCHOS_ASSERT(isInitialized_);
   return outArgs_;
 }
 
 
-RCP<const Epetra_Map> N_ANP_ModelEvaluator_Stateless::get_x_map() const
+RCP<const Epetra_Map> ModelEvaluator_Stateless::get_x_map() const
 {
   TEUCHOS_ASSERT(isInitialized_);
   return xyceME_->get_x_map();
 }
 
 
-RCP<const Epetra_Map> N_ANP_ModelEvaluator_Stateless::get_f_map() const
+RCP<const Epetra_Map> ModelEvaluator_Stateless::get_f_map() const
 {
   TEUCHOS_ASSERT(isInitialized_);
   return xyceME_->get_f_map();
 }
 
 
-RCP<const Epetra_Map> N_ANP_ModelEvaluator_Stateless::get_p_map(int p) const
+RCP<const Epetra_Map> ModelEvaluator_Stateless::get_p_map(int p) const
 {
   TEUCHOS_ASSERT(isInitialized_);
   return Teuchos::null;
 }
 
 
-RCP<const Epetra_Map> N_ANP_ModelEvaluator_Stateless::get_g_map(int p) const
+RCP<const Epetra_Map> ModelEvaluator_Stateless::get_g_map(int p) const
 {
   TEUCHOS_ASSERT(isInitialized_);
   return Teuchos::null;
 }
 
 
-void N_ANP_ModelEvaluator_Stateless::evalModel( const InArgs& inArgs, const OutArgs& outArgs ) const
+void ModelEvaluator_Stateless::evalModel( const InArgs& inArgs, const OutArgs& outArgs ) const
 {
 
   TEUCHOS_ASSERT(isInitialized_);
@@ -178,11 +181,6 @@ void N_ANP_ModelEvaluator_Stateless::evalModel( const InArgs& inArgs, const OutA
     xyceInArgs.set_x_dot(x_dot);
     xyceOutArgs.set_g(0,tempStateVector_);
     xyceME_->evalModel(xyceInArgs,xyceOutArgs);
-    //std::cout << "-----------------------------------------------" << std::endl;
-    //RCP<Epetra_CrsMatrix> W_matrix = Teuchos::rcp_dynamic_cast<Epetra_CrsMatrix>(W,true);
-    //std::cout << "W_matrix in first step of Stateless = " << std::endl;
-    //W_matrix->Print(std::cout);
-    //std::cout << "-----------------------------------------------" << std::endl;
   }
 
   {
@@ -208,11 +206,6 @@ void N_ANP_ModelEvaluator_Stateless::evalModel( const InArgs& inArgs, const OutA
   {
     EpetraExt::ModelEvaluator::InArgs xyceInArgs = xyceME_->createInArgs();
     EpetraExt::ModelEvaluator::OutArgs xyceOutArgs = xyceME_->createOutArgs();
-    //std::cout << "-----------------------------------------------" << std::endl;
-    //std::cout << "t = " << t << std::endl;
-    //std::cout << "x = " << *x << std::endl;
-    //std::cout << "x_dot = " << *x_dot << std::endl;
-    //std::cout << "-----------------------------------------------" << std::endl;
     xyceInArgs.set_t(t);
     xyceInArgs.set_x(x);
     xyceInArgs.set_x_dot(x_dot);
@@ -225,19 +218,15 @@ void N_ANP_ModelEvaluator_Stateless::evalModel( const InArgs& inArgs, const OutA
     xyceOutArgs.set_f(f);
     xyceOutArgs.set_W(W);
     xyceME_->evalModel(xyceInArgs,xyceOutArgs);
-    //std::cout << "-----------------------------------------------" << std::endl;
-    //std::cout << "f in second step of Stateless= " << *f <<std::endl;
-    //RCP<Epetra_CrsMatrix> W_matrix = Teuchos::rcp_dynamic_cast<Epetra_CrsMatrix>(W,true);
-    //std::cout << "W_matrix in second step of Stateless= " << std::endl;
-    //W_matrix->Print(std::cout);
-    //std::cout << "-----------------------------------------------" << std::endl;
   }
 }
 
 
-RCP<Epetra_Operator> N_ANP_ModelEvaluator_Stateless::create_W() const
+RCP<Epetra_Operator> ModelEvaluator_Stateless::create_W() const
 {
   TEUCHOS_ASSERT(isInitialized_);
   return xyceME_->create_W();
 }
 
+} // namespace Analysis
+} // namespace Xyce

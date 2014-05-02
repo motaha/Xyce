@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,18 +31,14 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.13.2.3 $
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Number: $Revision: 1.28 $
+// Revision Date  : $Date: 2014/02/24 23:49:20 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-#include <Teuchos_RefCountPtr.hpp>
-using Teuchos::RCP;
-using Teuchos::rcp;
+#include <utility>
 
 // ----------   Xyce Includes   ----------
 #include <N_IO_MeasureManager.h>
@@ -65,50 +61,63 @@ using Teuchos::rcp;
 #include <N_ERH_ErrorMgr.h>
 #include <N_IO_OutputMgr.h>
 
+namespace Xyce {
+namespace IO {
+namespace Measure {
+
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureManager::N_IO_MeasureManager
+// Function      : Manager::Manager
 // Purpose       : constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-----------------------------------------------------------------------------
-N_IO_MeasureManager::N_IO_MeasureManager(N_IO_OutputMgr &outputManager)
+Manager::Manager(N_IO_OutputMgr &outputManager)
   : outputManager_(outputManager)
 {}
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureManager::N_IO_MeasureManager
+// Function      : Manager::Manager
 // Purpose       : destructor
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-----------------------------------------------------------------------------
-N_IO_MeasureManager::~N_IO_MeasureManager()
+Manager::~Manager()
 {
-
+  for (MeasurementVector::iterator it = allMeasuresList_.begin(); it != allMeasuresList_.end(); ++it)
+    delete (*it);
 }
 
+void
+Manager::fixupMeasureParameters() 
+{
+  for (MeasurementVector::iterator it = allMeasuresList_.begin(); it != allMeasuresList_.end(); ++it)
+    (*it)->fixupMeasureParameters();
+}
+
+
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureManager::addMeasure
+// Function      : Manager::addMeasure
 // Purpose       : Entery point when .measure lines are pased in the netlist
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-----------------------------------------------------------------------------
-bool N_IO_MeasureManager::addMeasure(const N_UTL_OptionBlock & measureBlock )
+bool Manager::addMeasure(const Util::OptionBlock & measureBlock )
 {
   // based on what's in the option block passed in, we
   // create the needed measure instance
 #ifdef Xyce_DEBUG_IO
-  std::cout << "In N_IO_MeasureManager::addMeasure" << std::endl;
-  std::cout << "measureLine passed it was: " << std::endl << measureBlock << std::endl;
+  Xyce::dout() << "In Manager::addMeasure" << std::endl;
+  Xyce::dout() << "measureLine passed it was: " << std::endl << measureBlock << std::endl;
 #endif
 
   // here's the base data we should pull from the option block while
-  string type;
+  std::string type;
 
   if( measureBlock.tagExists( "TYPE" ) )
   {
@@ -117,212 +126,209 @@ bool N_IO_MeasureManager::addMeasure(const N_UTL_OptionBlock & measureBlock )
   else
   {
     // this shouldn't happen, but catch it if does
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL, "Missing TYPE in N_IO_MeasureManager");
+    Report::UserError0() << "Missing TYPE in Manager";
   }
 
-  RCP< N_IO_MeasureBase > theMeasureObject;
+  N_IO_MeasureBase  * theMeasureObject = 0;
   // have enough info to make the correct measure class
   if( type=="TRIG" || type=="TARG" )
   {
-    theMeasureObject = rcp( new N_IO_MeasureRiseFallDelay( measureBlock, outputManager_ ));
+    theMeasureObject = new N_IO_MeasureRiseFallDelay( measureBlock, outputManager_ );
   }
   else if( type=="AVG" )
   {
-    theMeasureObject = rcp( new N_IO_MeasureAverage( measureBlock, outputManager_ ));
+    theMeasureObject = new N_IO_MeasureAverage( measureBlock, outputManager_ );
   }
   else if( type=="MAX" )
   {
-    theMeasureObject = rcp( new N_IO_MeasureMax( measureBlock, outputManager_ ));
+    theMeasureObject = new N_IO_MeasureMax( measureBlock, outputManager_ );
   }
   else if( type=="MIN" )
   {
-    theMeasureObject = rcp( new N_IO_MeasureMin( measureBlock, outputManager_ ));
+    theMeasureObject = new N_IO_MeasureMin( measureBlock, outputManager_ );
   }
   else if( type=="PP" )
   {
-    theMeasureObject = rcp( new N_IO_MeasurePeakToPeak( measureBlock, outputManager_ ));
+    theMeasureObject = new N_IO_MeasurePeakToPeak( measureBlock, outputManager_ );
   }
   else if( type=="RMS" )
   {
-    theMeasureObject = rcp( new N_IO_MeasureRMS( measureBlock, outputManager_ ));
+    theMeasureObject = new N_IO_MeasureRMS( measureBlock, outputManager_ );
   }
   else if( type=="FREQ" )
   {
-    theMeasureObject = rcp( new N_IO_MeasureFrequency( measureBlock, outputManager_ ));
+    theMeasureObject = new N_IO_MeasureFrequency( measureBlock, outputManager_ );
   }
   else if( type=="DUTY" )
   {
-    theMeasureObject = rcp( new N_IO_MeasureDuty( measureBlock, outputManager_ ));
+    theMeasureObject = new N_IO_MeasureDuty( measureBlock, outputManager_ );
   }
   else if( type=="ON_TIME" )
   {
-    theMeasureObject = rcp( new N_IO_MeasureOnTime( measureBlock, outputManager_ ));
+    theMeasureObject = new N_IO_MeasureOnTime( measureBlock, outputManager_ );
   }
   else if( type=="OFF_TIME" )
   {
-    theMeasureObject = rcp( new N_IO_MeasureOffTime( measureBlock, outputManager_ ));
+    theMeasureObject = new N_IO_MeasureOffTime( measureBlock, outputManager_ );
   }
   else if( type=="FIND" || type=="WHEN" )
   {
-    theMeasureObject = rcp( new N_IO_MeasureFindWhen( measureBlock, outputManager_ ));
+    theMeasureObject = new N_IO_MeasureFindWhen( measureBlock, outputManager_ );
   }
-  else if( type=="PARAM" )
+  else if( type=="PARAM" || type=="EQN"  )
   {
-    theMeasureObject = rcp( new N_IO_MeasureEquationEvaluation( measureBlock, outputManager_ ));
+    theMeasureObject = new N_IO_MeasureEquationEvaluation( measureBlock, outputManager_ );
   }
   else if( type=="DERIVATIVE" || type=="DERIV" )
   {
-    theMeasureObject = rcp( new N_IO_MeasureDerivativeEvaluation( measureBlock, outputManager_ ));
+    theMeasureObject = new N_IO_MeasureDerivativeEvaluation( measureBlock, outputManager_ );
   }
   else if( type=="INTEGRAL" || type=="INTEG" )
   {
-    theMeasureObject = rcp( new N_IO_MeasureIntegralEvaluation( measureBlock, outputManager_ ));
+    theMeasureObject = new N_IO_MeasureIntegralEvaluation( measureBlock, outputManager_ );
   }
   else if( type=="ERROR" )
   {
-    theMeasureObject = rcp( new N_IO_MeasureRelativeError( measureBlock, outputManager_ ));
+    theMeasureObject = new N_IO_MeasureRelativeError( measureBlock, outputManager_ );
   }
   else if( type=="FOUR" )
   {
-    theMeasureObject = rcp( new N_IO_MeasureFourier( measureBlock, outputManager_ ));
+    theMeasureObject = new N_IO_MeasureFourier( measureBlock, outputManager_ );
   }
   else
   {
     // unknown type issue warning.
-    string msg = "Unknown MEASURE type requested, \"" + type + "\" This measure will be ignored.";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_WARNING, msg);
+    Xyce::Report::UserWarning() << "Unknown MEASURE type requested, \"" << type << "\".  This measure will be ignored";
   }
 
   // if the measure object is supported, then add it to the active and all lists
-  // if it's not supported, then the ref count pointer will let it go on exiting
-  // this routine.
-  if( theMeasureObject->typeSupported_ )
+  if (theMeasureObject && theMeasureObject->typeSupported_ )
   {
     allMeasuresList_.push_back( theMeasureObject );
     activeMeasuresList_.push_back( theMeasureObject );
   }
+  else
+    delete theMeasureObject;
 
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureManager::updateDcMeasures
+// Function      : Manager::updateTranMeasures
 // Purpose       : Called during the simulation to update the measure objects
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-----------------------------------------------------------------------------
-void N_IO_MeasureManager::updateTranMeasures( const double circuitTime, RCP< N_LAS_Vector > solnVecRCP)
+void Manager::updateTranMeasures( const double circuitTime, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec)
 {
   // loop over active masure objects and get them to update themselves.
-  list<RCP<N_IO_MeasureBase> >::iterator currentMeasure = activeMeasuresList_.begin();
-  list<RCP<N_IO_MeasureBase> >::iterator endMeasure = activeMeasuresList_.end();
-  while( currentMeasure != endMeasure )
+  for (MeasurementVector::iterator it = activeMeasuresList_.begin(); it != activeMeasuresList_.end(); ++it) 
   {
-    (*currentMeasure)->updateTran(circuitTime, solnVecRCP);
-    if( (*currentMeasure)->finishedCalculation() )
-    {
-      // remove this one from the active list
-      list<RCP<N_IO_MeasureBase> >::iterator compleatedMeasure = currentMeasure;
-      currentMeasure++;
-      activeMeasuresList_.erase( compleatedMeasure );
-    }
-    else
-    {
-      currentMeasure++;
-    }
+    (*it)->updateTran(circuitTime, solnVec, stateVec, storeVec);
   }
+  activeMeasuresList_.erase(std::remove_if(activeMeasuresList_.begin(), activeMeasuresList_.end(), std::mem_fun(&Measure::Base::finishedCalculation)),
+                            activeMeasuresList_.end());
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureManager::updateDcMeasures
+// Function      : Manager::updateDcMeasures
 // Purpose       : Called during the simulation to update the measure objects
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-----------------------------------------------------------------------------
-void N_IO_MeasureManager::updateDcMeasures( const vector<N_ANP_SweepParam> & dcParamsVec, RCP< N_LAS_Vector > solnVecRCP)
+void Manager::updateDcMeasures( const std::vector<N_ANP_SweepParam> & dcParamsVec, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec)
 {
-  // loop over active measrue objects and get them to update themselves.
-  list<RCP<N_IO_MeasureBase> >::iterator currentMeasure = activeMeasuresList_.begin();
-  list<RCP<N_IO_MeasureBase> >::iterator endMeasure = activeMeasuresList_.end();
-  while( currentMeasure != endMeasure )
+  for (MeasurementVector::iterator it = activeMeasuresList_.begin(); it != activeMeasuresList_.end(); ++it) 
   {
-    (*currentMeasure)->updateDC(dcParamsVec, solnVecRCP);
-    if( (*currentMeasure)->finishedCalculation() )
-    {
-      // remove this one from the active list
-      list<RCP<N_IO_MeasureBase> >::iterator compleatedMeasure = currentMeasure;
-      currentMeasure++;
-      activeMeasuresList_.erase( compleatedMeasure );
-    }
-    else
-    {
-      currentMeasure++;
-    }
+    (*it)->updateDC(dcParamsVec, solnVec, stateVec, storeVec);
   }
+  activeMeasuresList_.erase(std::remove_if(activeMeasuresList_.begin(), activeMeasuresList_.end(), std::mem_fun(&Measure::Base::finishedCalculation)),
+                            activeMeasuresList_.end());
 }
 
+//-----------------------------------------------------------------------------
+// Function      : Manager::updateAcMeasures
+// Purpose       : Called during the simulation to update the measure objects
+// Special Notes :
+// Scope         : public
+// Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
+// Creation Date : 01/21/2014
+//-----------------------------------------------------------------------------
+void Manager::updateAcMeasures( const double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
+{
+  for (MeasurementVector::iterator it = activeMeasuresList_.begin(); it != activeMeasuresList_.end(); ++it) 
+  {
+    (*it)->updateAC(frequency, real_solution_vector, imaginary_solution_vector);
+  }
+  activeMeasuresList_.erase(std::remove_if(activeMeasuresList_.begin(), activeMeasuresList_.end(), std::mem_fun(&Measure::Base::finishedCalculation)),
+                            activeMeasuresList_.end()); }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureManager::outputResults
+// Function      : Manager::outputResults
 // Purpose       : Output measure results at end of simulation
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-----------------------------------------------------------------------------
-void N_IO_MeasureManager::outputResults( std::ostream& outputStream, bool printHeader )
+std::ostream &Manager::outputResults( std::ostream& outputStream, bool printHeader )
 {
-
   if (!allMeasuresList_.empty())
   {
     if (printHeader)
     {
       outputStream << std::endl
-        << " ***** Measure Functions ***** " << std::endl
-        << std::endl;
+                   << " ***** Measure Functions ***** " << std::endl
+                   << std::endl;
     }
 
     // loop over active measure objects and get the results
-    list<RCP<N_IO_MeasureBase> >::iterator currentMeasure = allMeasuresList_.begin();
-    list<RCP<N_IO_MeasureBase> >::iterator endMeasure = allMeasuresList_.end();
-    while( currentMeasure != endMeasure )
+    for (MeasurementVector::iterator it = allMeasuresList_.begin(); it != allMeasuresList_.end(); ++it)
     {
-      (*currentMeasure)->printMeasureResult( outputStream );
-      currentMeasure++;
+      (*it)->printMeasureResult( outputStream );
     }
   }
-
+  
+  return outputStream;
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureManager::getMeasureValue
+// Function      : Manager::getMeasureValue
 // Purpose       : Get the value of a .measure test
 // Special Notes :
 // Scope         : public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 04/29/2010
 //-----------------------------------------------------------------------------
-void N_IO_MeasureManager::getMeasureValue (const string &name, double &value, bool &found)
+void Manager::getMeasureValue(const std::string &name, double &value, bool &found) const
 {
   found = false;
-  if (allMeasuresList_.empty())
-    return;
-  list<RCP<N_IO_MeasureBase> >::iterator currentMeasure = allMeasuresList_.begin();
-  list<RCP<N_IO_MeasureBase> >::iterator endMeasure = allMeasuresList_.end();
-  while( currentMeasure != endMeasure )
+
+  for (MeasurementVector::const_iterator it = allMeasuresList_.begin(); it != allMeasuresList_.end(); ++it)
   {
-    if ((*currentMeasure)->name_ == name) {
+    if ((*it)->name_ == name) {
+      value = (*it)->getMeasureResult();
       found = true;
-      value = (*currentMeasure)->getMeasureResult();
       return;
     }
-    ++currentMeasure;
   }
-  return;
 }
+
+const Base *Manager::find(const std::string &name) const
+{
+  for (MeasurementVector::const_iterator it = allMeasuresList_.begin(); it != allMeasuresList_.end(); ++it)
+    if ((*it)->name_ == name)
+      return *it;
+
+  return 0;
+}
+
+} // namespace Measure
+} // namespace IO
+} // namespace Xyce

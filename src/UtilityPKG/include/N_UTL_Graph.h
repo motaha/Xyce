@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.18.2.2 $
+// Revision Number: $Revision: 1.23 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -181,7 +181,7 @@ class N_UTL_Graph
   std::vector<Key2Type> getAdjacent(const Key2Type& key);
 
   Index getIndex(const Key1Type & key) { return rvsKeys1_[ key ]; }
-  vector<Index> & getAdjacentRow(const Index idx) { return adjacencyGraph_[idx]; }
+  std::vector<Index> & getAdjacentRow(const Index idx) { return adjacencyGraph_[idx]; }
 
   void addToAdjacent(const Key1Type& oldkey, const Key1Type& key, std::vector<Key1Type> & newAdjVec);
   void addToAdjacent(const Key2Type& oldkey, const Key2Type& key, std::vector<Key2Type> & newAdjVec);
@@ -203,7 +203,7 @@ class N_UTL_Graph
   // to be traversed without an ordered list (BFT) being generated.  
   const std::map<Key1Type,DataType>& getData1Map() { return data1_; }
 
-  const vector<Key1Type>& getBFT();
+  const std::vector<Key1Type>& getBFT();
   int generateBFT();
   int generateBFT(const Key1Type& key);
   Key1Type getCenter(double threshold, int maxTries);
@@ -214,7 +214,7 @@ class N_UTL_Graph
 
   int generateBFT_(const Index& start);
 
-  vector< vector<Index> > adjacencyGraph_;
+  std::vector< std::vector<Index> > adjacencyGraph_;
 
   // if we remove any nodes from the adjacencyGraph_, then we'll have empty
   // rows.  We could erase these, but then we would have to reindx the keymaps.
@@ -528,8 +528,8 @@ inline void N_UTL_Graph<Key1Type,Key2Type,DataType>::addToAdjacent
     // and any new edges
     // need to do this by changing the edge's oldId to the id of the new key
     Index edgeIndex = rvsKeys1_[newAdjVec[i]];
-    vector< Index >::iterator endLoc = adjacencyGraph_[ edgeIndex ].end();
-    vector< Index >::iterator edgeLoc = find(adjacencyGraph_[ edgeIndex ].begin(), endLoc, oldId);
+    std::vector< Index >::iterator endLoc = adjacencyGraph_[ edgeIndex ].end();
+    std::vector< Index >::iterator edgeLoc = find(adjacencyGraph_[ edgeIndex ].begin(), endLoc, oldId);
     if(edgeLoc == endLoc)
     {
       adjacencyGraph_[edgeIndex].push_back(id);
@@ -570,8 +570,8 @@ inline void N_UTL_Graph<Key1Type,Key2Type,DataType>::addToAdjacent
     // and any new edges
     // need to do this by changing the edge's oldId to the id of the new key
     Index edgeIndex = rvsKeys1_[newAdjVec[i]];
-    vector< Index >::iterator endLoc = adjacencyGraph_[ edgeIndex ].end();
-    vector< Index >::iterator edgeLoc = find(adjacencyGraph_[ edgeIndex ].begin(), endLoc, oldId);
+    std::vector< Index >::iterator endLoc = adjacencyGraph_[ edgeIndex ].end();
+    std::vector< Index >::iterator edgeLoc = find(adjacencyGraph_[ edgeIndex ].begin(), endLoc, oldId);
     if(edgeLoc == endLoc)
     {
       adjacencyGraph_[edgeIndex].push_back(id);
@@ -604,10 +604,10 @@ inline void N_UTL_Graph<Key1Type,Key2Type,DataType>::replaceAdjacent
   int numAdjRows = adjacencyGraph_.size();
   for(int i=0; i<numAdjRows; ++i)
   {
-    vector< Index >::iterator beginLoc = adjacencyGraph_[i].begin();
-    vector< Index >::iterator endLoc = adjacencyGraph_[i].end();
+    std::vector< Index >::iterator beginLoc = adjacencyGraph_[i].begin();
+    std::vector< Index >::iterator endLoc = adjacencyGraph_[i].end();
     // look for the old key
-    vector< Index >::iterator oldKeyLoc = find(beginLoc, endLoc, oldId);
+    std::vector< Index >::iterator oldKeyLoc = find(beginLoc, endLoc, oldId);
     if(oldKeyLoc != endLoc)
     {
       // found old key, so overwrite it
@@ -618,7 +618,7 @@ inline void N_UTL_Graph<Key1Type,Key2Type,DataType>::replaceAdjacent
       // // found old key, so erase it
       // adjacencyGraph_[i].erase(oldKeyLoc);
       // // also check for new key before inserting it
-      // vector< Index >::iterator newKeyLoc = find(beginLoc, endLoc, newId);
+      // std::vector< Index >::iterator newKeyLoc = find(beginLoc, endLoc, newId);
       // if(newKeyLoc == endLoc)
       // {
       //   // new key isn't there so add it in
@@ -649,10 +649,10 @@ inline void N_UTL_Graph<Key1Type,Key2Type,DataType>::replaceAdjacent
   int numAdjRows = adjacencyGraph_.size();
   for(int i=0; i<numAdjRows; ++i)
   {
-    vector< Index >::iterator beginLoc = adjacencyGraph_[i].begin();
-    vector< Index >::iterator endLoc = adjacencyGraph_[i].end();
+    std::vector< Index >::iterator beginLoc = adjacencyGraph_[i].begin();
+    std::vector< Index >::iterator endLoc = adjacencyGraph_[i].end();
     // look for the old key
-    vector< Index >::iterator oldKeyLoc = find(beginLoc, endLoc, oldId);
+    std::vector< Index >::iterator oldKeyLoc = find(beginLoc, endLoc, oldId);
     if(oldKeyLoc != endLoc)
     {
       // found old key, so overwrite it
@@ -663,7 +663,7 @@ inline void N_UTL_Graph<Key1Type,Key2Type,DataType>::replaceAdjacent
       // // found old key, so erase it
       // adjacencyGraph_[i].erase(oldKeyLoc);
       // // also check for new key before inserting it
-      // vector< Index >::iterator newKeyLoc = find(beginLoc, endLoc, newId);
+      // std::vector< Index >::iterator newKeyLoc = find(beginLoc, endLoc, newId);
       // if(newKeyLoc == endLoc)
       // {
       //   // new key isn't there so add it in
@@ -694,7 +694,7 @@ inline void N_UTL_Graph<Key1Type,Key2Type,DataType>::removeKey
   adjacencyGraph_[id].clear();
   
   // erase row that this key points to in adjacency graph
-  // vector< vector< Index > >::iterator oldRowItr = adjacencyGraph_.begin() + id;
+  // std::vector< std::vector< Index > >::iterator oldRowItr = adjacencyGraph_.begin() + id;
   // adjacencyGraph_.erase(oldRowItr);
   // if I erase the row it throws off the key maps.  So I need to fix up those 
   
@@ -705,10 +705,10 @@ inline void N_UTL_Graph<Key1Type,Key2Type,DataType>::removeKey
   {
     if(!adjacencyGraph_[i].empty())
     {
-      vector< Index >::iterator beginLoc = adjacencyGraph_[i].begin();
-      vector< Index >::iterator endLoc = adjacencyGraph_[i].end();
+      std::vector< Index >::iterator beginLoc = adjacencyGraph_[i].begin();
+      std::vector< Index >::iterator endLoc = adjacencyGraph_[i].end();
       // look for the old key
-      vector< Index >::iterator oldKeyLoc = find(beginLoc, endLoc, id);
+      std::vector< Index >::iterator oldKeyLoc = find(beginLoc, endLoc, id);
       if(oldKeyLoc != endLoc)
       {
         // found old key, so erase it
@@ -754,10 +754,10 @@ inline void N_UTL_Graph<Key1Type,Key2Type,DataType>::removeKey
   {
     if(!adjacencyGraph_[i].empty())
     {
-      vector< Index >::iterator beginLoc = adjacencyGraph_[i].begin();
-      vector< Index >::iterator endLoc = adjacencyGraph_[i].end();
+      std::vector< Index >::iterator beginLoc = adjacencyGraph_[i].begin();
+      std::vector< Index >::iterator endLoc = adjacencyGraph_[i].end();
       // look for the old key
-      vector< Index >::iterator oldKeyLoc = find(beginLoc, endLoc, id);
+      std::vector< Index >::iterator oldKeyLoc = find(beginLoc, endLoc, id);
       if(oldKeyLoc != endLoc)
       {
         // found old key, so erase it
@@ -963,7 +963,7 @@ inline int N_UTL_Graph<Key1Type,Key2Type,DataType>::checkGraphState()
 // Creation Date : 
 //-----------------------------------------------------------------------------
 template <typename Key1Type, typename Key2Type, typename DataType>
-inline const vector<Key1Type>& N_UTL_Graph<Key1Type,Key2Type,DataType>::getBFT()
+inline const std::vector<Key1Type>& N_UTL_Graph<Key1Type,Key2Type,DataType>::getBFT()
 {
   if(bft_.empty()) generateBFT();
   return bftKeys_;
@@ -984,7 +984,7 @@ inline int N_UTL_Graph<Key1Type,Key2Type,DataType>::generateBFT()
   int state = checkGraphState();
   if(state != 0)
   {
-    std::cout << "Graph is in inconsistent state!  checkGraphState returned: " << state << std::endl;
+    Xyce::dout() << "Graph is in inconsistent state!  checkGraphState returned: " << state << std::endl;
   }
 #endif
 
@@ -1008,7 +1008,7 @@ inline int N_UTL_Graph<Key1Type,Key2Type,DataType>::generateBFT
   int state = checkGraphState();
   if(state != 0)
   {
-    std::cout << "Graph is in inconsistent state!  checkGraphState returned: " << state << std::endl;
+    Xyce::dout() << "Graph is in inconsistent state!  checkGraphState returned: " << state << std::endl;
   }
 #endif
 
@@ -1061,32 +1061,32 @@ inline void N_UTL_Graph<Key1Type,Key2Type,DataType>::print(std::ostream & ostr) 
     ostr << "Node " << i << " : ";
     for(size_t j = 0; j < adjacencyGraph_[i].size(); ++j)
       ostr << " " << adjacencyGraph_[i][j];
-    ostr << endl;
+    ostr << std::endl;
   }
   ostr << "---------------\n";
   ostr << "Key1Map\n";
   for(typename Key1Map::const_iterator it_k1m = keys1_.begin(); it_k1m != keys1_.end(); ++it_k1m)
-    ostr << it_k1m->first << ":" << it_k1m->second << endl;
+    ostr << it_k1m->first << ":" << it_k1m->second << std::endl;
   ostr << "-------\n";
   ostr << "Index1Map\n";
   for(typename Index1Map::const_iterator it_i1m = rvsKeys1_.begin(); it_i1m != rvsKeys1_.end(); ++it_i1m)
-    ostr << it_i1m->first << ":" << it_i1m->second << endl;
+    ostr << it_i1m->first << ":" << it_i1m->second << std::endl;
   ostr << "-------\n";
   ostr << "Data1Map\n";
   for(typename Data1Map::const_iterator it_d1m = data1_.begin(); it_d1m != data1_.end(); ++it_d1m)
-    ostr << it_d1m->first << ":" << it_d1m->second << endl;
+    ostr << it_d1m->first << ":" << it_d1m->second << std::endl;
   ostr << "-------\n";
   ostr << "Key12Map\n";
   for(typename Key12Map::const_iterator it_k12m = keys12_.begin(); it_k12m != keys12_.end(); ++it_k12m)
-    ostr << it_k12m->first << ":" << it_k12m->second << endl;
+    ostr << it_k12m->first << ":" << it_k12m->second << std::endl;
   ostr << "-------\n";
   ostr << "Key21Map\n";
   for(typename Key21Map::const_iterator it_k21m = keys21_.begin(); it_k21m != keys21_.end(); ++it_k21m)
-    ostr << it_k21m->first << ":" << it_k21m->second << endl;
+    ostr << it_k21m->first << ":" << it_k21m->second << std::endl;
   ostr << "-------\n";
   ostr << "BFT\n";
   for(size_t i = 0; i < bft_.size(); ++i)
-    ostr << bft_[i] << ":" << bftKeys_[i] << endl;
+    ostr << bft_[i] << ":" << bftKeys_[i] << std::endl;
   ostr << "-------\n";
   ostr << "-------------------- Basic Graph END ------------------------\n";
 }

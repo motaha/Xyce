@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.2.6.2 $
+// Revision Number: $Revision: 1.7 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:30 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -48,44 +48,72 @@
 #define Xyce_N_ANP_Dakota_h
 
 // ----------   Xyce Includes   ----------
+#include <N_ANP_fwd.h>
+
 #include <N_ANP_AnalysisBase.h>
 
-// ---------- Forward Declarations ----------
-class N_ANP_AnalysisManager;
-
+namespace Xyce {
+namespace Analysis {
 //-------------------------------------------------------------------------
-// Class         : N_ANP_Dakota
+// Class         : Dakota
 // Purpose       : Dakota analysis class
-// Special Notes : 
+// Special Notes :
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 01/24/08
 //-------------------------------------------------------------------------
-class N_ANP_Dakota : public N_ANP_AnalysisBase 
+class Dakota : public AnalysisBase
 {
-public:
-  N_ANP_Dakota( N_ANP_AnalysisManager * anaManagerPtr, N_ANP_AnalysisBase * anaType ) :
-  N_ANP_AnalysisBase(anaManagerPtr)
-  {
-     // this is the analysis that will be done for each step
-     mainAnalysisRCPtr_ = rcp( anaType, false);
-  };
+  public:
+    Dakota( AnalysisManager * anaManagerPtr, AnalysisBase * anaType ) :
+      AnalysisBase(anaManagerPtr)
+    {
+      // this is the analysis that will be done for each step
+      mainAnalysisRCPtr_ = rcp( anaType, false);
+    };
 
-  virtual ~N_ANP_Dakota( ) {};
+    virtual ~Dakota( ) {};
 
-  bool run();
+    virtual bool run();
+    virtual bool init() /* override */ {
+      return true;
+    }
 
-  
+    virtual bool loopProcess() /* override */ {
+      return true;
+    }
+
+    virtual bool processSuccessfulStep() /* override */ {
+      return true;
+    }
+
+    virtual bool processFailedStep() /* override */ {
+      return true;
+    }
+
+    virtual bool finish() /* override */ {
+      return true;
+    }
+
+    virtual bool handlePredictor() /* override */ {
+      return true;
+    }
+
 private:
-  RefCountPtr< N_ANP_AnalysisBase > mainAnalysisRCPtr_;
-  
+  RefCountPtr< AnalysisBase > mainAnalysisRCPtr_;
+
   // these should be part of this class, but are still too entangled in
-  // the N_ANP_AnalysisManager class to be moved
+  // the AnalysisManager class to be moved
   //vector <N_TIA_SweepParam> stepParamVec_;
   //
   //bool stepLoopInitialized_;    // true if the step loop has been set up.
   //int stepLoopSize_;
   //int stepLoopIter_;
-  
+
 };
 
-#endif
+} // namespace Analysis
+} // namespace Xyce
+
+typedef Xyce::Analysis::Dakota N_ANP_Dakota;
+
+#endif // Xyce_N_ANP_Dakota_h

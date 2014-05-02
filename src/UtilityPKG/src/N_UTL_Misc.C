@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,19 +36,14 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.30.2.2 $
+// Revision Number: $Revision: 1.39 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
-
-
-// ---------- Standard Includes ----------
-
-// ----------   Xyce Includes   ----------
 
 #include <N_UTL_Misc.h>
 #include <iostream>
@@ -62,8 +57,6 @@
 #ifdef Xyce_PARALLEL_MPI
  #include <mpi.h>
 #endif
-
-// ---------  Other Includes  -----------
 
 //-----------------------------------------------------------------------------
 // Function      : Xyce_exit
@@ -94,13 +87,9 @@ void Xyce_exit( int code )
 //-----------------------------------------------------------------------------
 
 string_param::string_param(const string_param &right)
-  :
-  tag(right.tag),
-  val(right.val)
-
-{
-
-}
+  : tag(right.tag),
+    val(right.val)
+{}
 
 //-----------------------------------------------------------------------------
 // Function      : ~string_param
@@ -112,9 +101,7 @@ string_param::string_param(const string_param &right)
 //-----------------------------------------------------------------------------
 
 string_param::~string_param()
-
-{
-}
+{}
 
 //-----------------------------------------------------------------------------
 // Function      : getString
@@ -124,7 +111,7 @@ string_param::~string_param()
 // Creator       : Lon Waters, SNL
 // Creation Date : 04/30/01
 //-----------------------------------------------------------------------------
-string string_param::getString()
+std::string string_param::getString()
 {
   return val;
 }
@@ -153,208 +140,6 @@ double string_param::getReal()
 int string_param::getInteger()
 {
   return atoi( val.c_str() );
-}
-
-//-----------------------------------------------------------------------------
-// Description   : Turn string into integer value
-// Special Notes :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 12/01/05
-//-----------------------------------------------------------------------------
-int ExtendedString::Ival()
-{
-  int value;
-
-  if (isInt())
-    value = atoi((*this).c_str());
-  else
-    return 0;
-
-  return value;
-}
-
-//-----------------------------------------------------------------------------
-// Description   : Adjustment of data values when recognizable scale factor is
-//                 present (e.g. 2.5n ==> 2.5E-9).
-// Special Notes :
-// Creator       : Alan Lundin
-// Creation Date :
-//-----------------------------------------------------------------------------
-double ExtendedString::Value()
-{
-   char tmp[3];
-   double value = atof((*this).c_str());
-   int j = (*this).find_first_not_of("0123456789.-+eE", 0);
-   if (j == (*this).npos) return value;
-   switch ((*this)[j])
-   {
-      case 'T' : case 't' :
-         return value*1.0e12;
-      case 'G' : case 'g' :
-         return value*1.0e9;
-      case 'K' : case 'k' :
-         return value*1.0e3;
-      case 'M' :
-      case 'm' :
-         tmp[0] = tolower ((*this)[j]);
-         if ((*this).size() > j+2)
-         {
-           tmp[1] = tolower ((*this)[j+1]);
-           tmp[2] = tolower ((*this)[j+2]);
-           if (tmp[1]  == 'i' && tmp[2] == 'l')
-             return value*25.4e-6;
-           else if (tmp[1] == 'e' && tmp[2] == 'g')
-             return value*1.0e6;
-         }
-         return value*1.0e-3;
-      case 'u' : case 'U' :
-         return value*1.0e-6;
-      case 'n' : case 'N' :
-         return value*1.0e-9;
-      case 'p' : case 'P' :
-         return value*1.0e-12;
-      case 'f' : case 'F' :
-         return value*1.0e-15;
-      default :
-         return value;
-   }
-   return 0;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : isValue
-// Purpose       : Test is string is a valid Value
-// Special Notes :
-// Scope         : public
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 10/28/05
-//-----------------------------------------------------------------------------
-bool ExtendedString::isValue()
-{ 
-  int stringPos ( 0 );
-  int i = ( 0 );
-  int stringSize ( (*this).size() );
-  static const char *units[] = {"V", "VOLT", "VDC", "A", "AMP", "AMPERE", "F", 
-                          "FARAD", "HENRY", "HY", "IL", "EG", "H", "HZ", 
-                          "HERTZ", "OHM", "SECOND", "S", "METER", "M",
-                          "MEG", "MIL", NULL};
-
-  // Check for leading + or - sign.
-  char ch ( (*this)[stringPos] );
-  if ( ch == '+' || ch == '-' )
-    ++stringPos;
-
-  if ( stringPos == stringSize )
-    return false; // string ended to soon to be a numeric value.
-
-  ch = (*this)[stringPos];
-  if ( (!isdigit(ch)) && ch != '.' )
-    return false;
-
-  while (isdigit(ch))
-  {
-    ++stringPos;
-    if ( stringPos == stringSize ) return true; // all is well.
-    ch = (*this)[stringPos];
-  }
-
-  if ( ch == '.' )
-  {
-    // Must have a digit before or after the decimal.
-    if ( stringPos + 1 >= stringSize )
-    {
-      // Decimal is at end of string, must have digit before decimal.
-      if ( stringPos == 0 ) 
-        return false;
-      else if ( !isdigit((*this)[stringPos-1]) )
-        return false;
-    }
-    else if ( stringPos == 0 )
-    {
-      // Decimal is at beginning of string, must have digit after decimal.
-      if ( stringPos + 1 >= stringSize )
-        return false;
-      else if ( !isdigit((*this)[stringPos+1]) )
-        return false;
-    }
-    else if ( !isdigit((*this)[stringPos-1]) &&
-              !isdigit((*this)[stringPos+1]) )
-      return false;
-
-    ++stringPos;
-    if ( stringPos == stringSize ) return true; // all is well.
-    ch = (*this)[stringPos];
-  }
-
-  while (isdigit(ch))
-  {
-    ++stringPos;
-    if ( stringPos == stringSize ) return true; // all is well.
-    ch = (*this)[stringPos];
-  }
-
-  // Check for exponent.
-  if ( ch == 'E' || ch == 'e' )
-  {
-    ++stringPos;
-    if ( stringPos == stringSize ) return true; // all is well.
-    ch = (*this)[stringPos];
-
-    // Look for exponent sign.
-    if ( ch == '+' || ch == '-' )
-    {
-      ++stringPos;
-      if ( stringPos == stringSize ) return true; // all is well.
-      ch = (*this)[stringPos];
-    }
-
-    while (isdigit(ch))
-    {
-      ++stringPos;
-      if ( stringPos == stringSize ) return true; // all is well.
-      ch = (*this)[stringPos];
-    }
-  }
-
-  if ((*this)[stringPos] == 'T' || (*this)[stringPos] == 't' ||
-      (*this)[stringPos] == 'G' || (*this)[stringPos] == 'g' ||
-      (*this)[stringPos] == 'K' || (*this)[stringPos] == 'k' ||
-      (*this)[stringPos] == 'U' || (*this)[stringPos] == 'u' ||
-      (*this)[stringPos] == 'N' || (*this)[stringPos] == 'n' ||
-      (*this)[stringPos] == 'P' || (*this)[stringPos] == 'p' ||
-      (*this)[stringPos] == 'F' || (*this)[stringPos] == 'f' )
-    ++stringPos; 
-
-  if ((*this)[stringPos] == 'M' || (*this)[stringPos] == 'm') 
-  {
-     char tmp[3];
-     tmp[0] = tolower ((*this)[stringPos]);
-     ++stringPos;
-
-    if (stringSize >= stringPos +2)
-    {
-           tmp[1] = tolower ((*this)[stringPos]);
-           tmp[2] = tolower ((*this)[stringPos + 1]);
-           if ((tmp[1]  == 'i' && tmp[2] == 'l') || (tmp[1] == 'e' && tmp[2] == 'g'))
-             stringPos = stringPos + 2;
-    }
-
-  }
-
-  if (stringPos == stringSize)
-    return true;
-
-  ExtendedString u((*this).substr(stringPos, stringSize-stringPos));
-  u = (*this).substr(stringPos, stringSize-stringPos);
-  u.toUpper();
-  i = 0;
-  while (units[i] != NULL)
-  {
-    if (u == units[i++])
-      return true;
-  }
-
-  return false;
 }
 
 //-----------------------------------------------------------------------------
@@ -399,68 +184,64 @@ double Xycepow10(int power)
   return (retval);
 }
 
-namespace N_UTL {
+namespace Xyce {
+namespace Util {
 
-  
-
-int Ival(const string & tmpStr)
+//-----------------------------------------------------------------------------
+// Description   : Adjustment of data values when recognizable scale factor is
+//                 present (e.g. 2.5n ==> 2.5E-9).
+// Special Notes :
+// Creator       : Alan Lundin
+// Creation Date :
+//-----------------------------------------------------------------------------
+double Value(const std::string &tmpStr)
 {
-  int value;
-
-  if (isInt(tmpStr))
-   value = atoi(tmpStr.c_str());
-  else
+   char tmp[3];
+   double value = atof(tmpStr.c_str());
+   int j = tmpStr.find_first_not_of("0123456789.-+eE", 0);
+   if (j == tmpStr.npos) return value;
+   switch (tmpStr[j])
+   {
+      case 'T' : case 't' :
+         return value*1.0e12;
+      case 'G' : case 'g' :
+         return value*1.0e9;
+      case 'K' : case 'k' :
+         return value*1.0e3;
+      case 'M' :
+      case 'm' :
+         tmp[0] = tolower (tmpStr[j]);
+         if (tmpStr.size() > j+2)
+         {
+           tmp[1] = tolower (tmpStr[j+1]);
+           tmp[2] = tolower (tmpStr[j+2]);
+           if (tmp[1]  == 'i' && tmp[2] == 'l')
+             return value*25.4e-6;
+           else if (tmp[1] == 'e' && tmp[2] == 'g')
+             return value*1.0e6;
+         }
+         return value*1.0e-3;
+      case 'u' : case 'U' :
+         return value*1.0e-6;
+      case 'n' : case 'N' :
+         return value*1.0e-9;
+      case 'p' : case 'P' :
+         return value*1.0e-12;
+      case 'f' : case 'F' :
+         return value*1.0e-15;
+      default :
+         return value;
+   }
    return 0;
-
-  return value;
 }
 
-double Value(const string & tmpStr)
-{
-  char tmp[3];
-  double value = atof(tmpStr.c_str());
-  int j = tmpStr.find_first_not_of("0123456789.-+eE", 0);
-  if (j == tmpStr.npos) return value;
-  switch (tmpStr[j])
-  {
-    case 'T' : case 't' :
-       return value*1.0e12;
-    case 'G' : case 'g' :
-       return value*1.0e9;
-    case 'K' : case 'k' :
-       return value*1.0e3;
-    case 'M' :
-    case 'm' :
-       tmp[0] = tolower (tmpStr[j]);
-       if (tmpStr.size() > j+2)
-       {
-	 tmp[1] = tolower (tmpStr[j+1]);
-	 tmp[2] = tolower (tmpStr[j+2]);
-	 if (tmp[1]  == 'i' && tmp[2] == 'l')
-	   return value*25.4e-6;
-	 else if (tmp[1] == 'e' && tmp[2] == 'g')
-	   return value*1.0e6;
-       }
-       return value*1.0e-3;
-    case 'u' : case 'U' :
-       return value*1.0e-6;
-    case 'n' : case 'N' :
-       return value*1.0e-9;
-    case 'p' : case 'P' :
-       return value*1.0e-12;
-    case 'f' : case 'F' :
-       return value*1.0e-15;
-    default :
-       return value;
-  }
-  return 0;
-}
 
-bool isValue(const string & tmpStr)
+bool isValue(const std::string & tmpStr)
 {
-  int stringPos ( 0 );
-  int i ( 0 );
-  int stringSize ( tmpStr.size() );
+  int stringPos = 0;
+  int i = 0;
+  int stringSize = tmpStr.size();
+  
   static const char *units[] = {"V", "VOLT", "VDC", "A", "AMP", "AMPERE", "F", 
                           "FARAD", "HENRY", "HY", "IL", "EG", "H", "HZ", 
                           "HERTZ", "OHM", "SECOND", "S", "METER", "M",
@@ -549,10 +330,10 @@ bool isValue(const string & tmpStr)
       tmpStr[stringPos] == 'U' || tmpStr[stringPos] == 'u' ||
       tmpStr[stringPos] == 'N' || tmpStr[stringPos] == 'n' ||
       tmpStr[stringPos] == 'P' || tmpStr[stringPos] == 'p' ||
-      tmpStr[stringPos] == 'F' || tmpStr[stringPos] == 'f')
-    ++stringPos;
+      tmpStr[stringPos] == 'F' || tmpStr[stringPos] == 'f' )
+    ++stringPos; 
 
-  if (tmpStr[stringPos] == 'M' || tmpStr[stringPos] == 'm')
+  if (tmpStr[stringPos] == 'M' || tmpStr[stringPos] == 'm') 
   {
      char tmp[3];
      tmp[0] = tolower (tmpStr[stringPos]);
@@ -584,5 +365,171 @@ bool isValue(const string & tmpStr)
   return false;
 }
 
+//-----------------------------------------------------------------------------
+// Function      : isInt
+// Purpose       :
+// Special Notes :
+// Creator       : Eric Keiter, SNL
+// Creation Date :
+//-----------------------------------------------------------------------------
+bool isInt(const std::string & tmpStr)
+{
+  int j;
+
+  if (tmpStr.empty())
+    return false;
+
+  if (tmpStr[0] == '-' || tmpStr[0] == '+')
+    j = tmpStr.find_first_not_of("0123456789", 1);
+  else
+    j = tmpStr.find_first_not_of("0123456789");
+
+  if (j == (int)std::string::npos)
+    return true;
+
+  // But there's one case where we *could* still be an int.  That would be
+  // if we've got .[0]* at the current point.
+
+  if (tmpStr[j] == '.')
+  {
+    std::string::size_type i = tmpStr.find_first_not_of("0",j+1);
+
+    // If we find nothing but 0 after the ., we are still an int.
+    if (i == std::string::npos)
+     return true;
+  }
+
+  return false;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : possibleParam
+// Purpose       : Test is string is a valid Value
+// Special Notes :
+// Scope         : public
+// Creator       : Dave Shirley, PSSI
+// Creation Date : 11/02/05
+//-----------------------------------------------------------------------------
+bool possibleParam(const std::string &tmpStr)
+{
+  std::string first("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$");
+  std::string legal("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_0123456789.");
+  std::string::iterator iterS, iterEnd;
+  int i;
+  bool ok = false;
+
+  for (i=0 ; i<(int)(tmpStr.size()) ; ++i)
+  {
+    if (i == 0)
+    {
+      iterS=first.begin();
+      iterEnd=first.end();
+    }
+    else
+    {
+      iterS=legal.begin();
+      iterEnd=legal.end();
+    }
+    ok = false;
+    while (iterS!=iterEnd)
+    {
+      if (*(iterS++) == tmpStr[i])
+      {
+        ok = true;
+        break;
+      }
+    }
+    if (!ok)
+      break;
+  }
+  if (ok && isBool(tmpStr))
+    ok = false;
+
+  return ok;
+}
+
+namespace {
+
+std::string::const_iterator
+find_next_char(
+  std::string::const_iterator	p,
+  std::string::const_iterator	end,
+  char				c)
+{
+  while (p != end && *p != c)
+    p++;
+  return p;
+}
+
+std::string::const_iterator
+find_next_not_char(
+  std::string::const_iterator	p,
+  std::string::const_iterator	end,
+  char				c)
+{
+  while (p != end && *p == c)
+    p++;
+  return p;
+}
+
+inline std::string::const_iterator find_next_space(std::string::const_iterator p, std::string::const_iterator end) {
+  return find_next_char(p, end, ' ');
+}
+
+inline std::string::const_iterator find_next_endl(std::string::const_iterator p, std::string::const_iterator end) {
+  return find_next_char(p, end, '\n');
+}
+
+inline std::string::const_iterator find_next_nonspace(std::string::const_iterator p, std::string::const_iterator end) {
+  return find_next_not_char(p, end, ' ');
+}
+
+} // namespace <null>
+
+std::ostream &
+word_wrap(
+  std::ostream &                os,
+  const std::string &	        s,
+  std::string::size_type        line_length,
+  const std::string &	        prefix,
+  const std::string &	        prefix_first_line)
+{
+  const std::string *u = &prefix_first_line;
+
+  std::string::const_iterator p0, p1, p2, p3;
+  p0 = p1 = p2 = s.begin();
+
+  while (p2 != s.end() ) {
+
+    // skip preceeding whitespace
+    p1 = find_next_nonspace(p0, s.end());
+    p3 = find_next_endl(p0, s.end());
+    p2 = p1 = find_next_space(p1, s.end());
+    do { // skip words
+      p1 = find_next_nonspace(p1, s.end());
+      p1 = find_next_space(p1, s.end());
+      if (p3 < p1) {
+	p2 = p3;
+	break;
+      }
+      if (p1 - p0 + u->size() > line_length) // hit word end past line_length
+	break;
+      p2 = p1;
+    } while (p2 != s.end());
+
+    os << *u << std::string(p0, p2) << "\n";
+
+    // if (p2 == p3) // If you want an embedded newline to mean
+    //   u = &prefix_first_line;
+    // else
+    u = &prefix;
+
+    p0 = p2 + 1;
+  }
+
+  return os;
+}
+
+} // namespace Util
+} // namespace Xyce
 

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.17.2.2 $
+// Revision Number: $Revision: 1.27 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/24 23:49:18 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -58,27 +58,32 @@ namespace Device {
 template<>
 ParametricData<DopeInfo>::ParametricData()
 {
-  addPar("NMAX", 1.0e+15, false, &DopeInfo::Nmax);
-  addPar("NMIN", 0.0, false, &DopeInfo::Nmin);
-  addPar("NMAXCHOP", 1.0e+20, false, &DopeInfo::Nmax_chop, &DopeInfo::Nmax_chopGiven);
-  addPar("XLOC", 0.0, false, &DopeInfo::xloc);
-  addPar("XMIN", 0.0, false, &DopeInfo::xmin, &DopeInfo::xminGiven);
-  addPar("XMAX", 0.0, false, &DopeInfo::xmax, &DopeInfo::xmaxGiven);
-  addPar("XWIDTH", 1.0e-3, false, &DopeInfo::xwidth);
-  addPar("YLOC", 0.0, false, &DopeInfo::yloc);
-  addPar("YMIN", 0.0, false, &DopeInfo::ymin, &DopeInfo::yminGiven);
-  addPar("YMAX", 0.0, false, &DopeInfo::ymax, &DopeInfo::ymaxGiven);
-  addPar("YWIDTH", 1.0e-3, false, &DopeInfo::ywidth);
+  addPar("NMAX", 1.0e+15, &DopeInfo::Nmax);
+  addPar("NMIN", 0.0, &DopeInfo::Nmin);
+  addPar("NMAXCHOP", 1.0e+20, &DopeInfo::Nmax_chop)
+    .setGivenMember(&DopeInfo::Nmax_chopGiven);
+  addPar("XLOC", 0.0, &DopeInfo::xloc);
+  addPar("XMIN", 0.0, &DopeInfo::xmin)
+    .setGivenMember(&DopeInfo::xminGiven);
+  addPar("XMAX", 0.0, &DopeInfo::xmax)
+    .setGivenMember(&DopeInfo::xmaxGiven);
+  addPar("XWIDTH", 1.0e-3, &DopeInfo::xwidth);
+  addPar("YLOC", 0.0, &DopeInfo::yloc);
+  addPar("YMIN", 0.0, &DopeInfo::ymin)
+    .setGivenMember(&DopeInfo::yminGiven);
+  addPar("YMAX", 0.0, &DopeInfo::ymax)
+    .setGivenMember(&DopeInfo::ymaxGiven);
+  addPar("YWIDTH", 1.0e-3, &DopeInfo::ywidth);
 
   // Set up map for non-double precision variables:
-  addPar("NAME", std::string("none"), false, &DopeInfo::name);
-  addPar("FUNCTION", std::string("uniform"), false, &DopeInfo::funcType);
-  addPar("TYPE", std::string("ntype"), false, &DopeInfo::type);
-  addPar("FLATX", 0, false, &DopeInfo::flatX);
-  addPar("FLATY", 0, false, &DopeInfo::flatY);
-  addPar("SPECIES", std::string("none"), false, &DopeInfo::speciesName);
-  addPar("FILE", std::string("none"), false, &DopeInfo::fileName);
-  addPar("EXPRESSION", std::string("none"), false, &DopeInfo::exprString);
+  addPar("NAME", std::string("none"), &DopeInfo::name);
+  addPar("FUNCTION", std::string("uniform"), &DopeInfo::funcType);
+  addPar("TYPE", std::string("ntype"), &DopeInfo::type);
+  addPar("FLATX", 0, &DopeInfo::flatX);
+  addPar("FLATY", 0, &DopeInfo::flatY);
+  addPar("SPECIES", std::string("none"), &DopeInfo::speciesName);
+  addPar("FILE", std::string("none"), &DopeInfo::fileName);
+  addPar("EXPRESSION", std::string("none"), &DopeInfo::exprString);
 }
 
 ParametricData<DopeInfo> &DopeInfo::getParametricData() {
@@ -96,7 +101,7 @@ ParametricData<DopeInfo> &DopeInfo::getParametricData() {
 // Creation Date : 05/07/05
 // ----------------------------------------------------------------------------
 DopeInfo::DopeInfo ()
-  : CompositeParam (),
+  : CompositeParam (getParametricData()),
     name("reg0"),
     type("ntype"),
     funcType("uniform"),
@@ -119,92 +124,7 @@ DopeInfo::DopeInfo ()
     Nmax_chopGiven(false),
     flatX(0),
     flatY(0)
-{
-
-  // // Set up mapping from param names to class variables:
-  // if (parMap.empty())
-  // {
-  //   // Set up map for double precision variables:
-  //   addPar ("NMAX", 1.0e+15, false,
-  //           static_cast <double CompositeParam:: *> (&DopeInfo::Nmax),
-  //           NULL);
-
-  //   addPar ("NMIN", 0.0, false,
-  //           static_cast <double CompositeParam:: *> (&DopeInfo::Nmin),
-  //           NULL);
-
-  //   addPar ("NMAXCHOP", 1.0e+20, false,
-  //           static_cast <double CompositeParam:: *> (&DopeInfo::Nmax_chop),
-  //           static_cast <bool CompositeParam:: *> (&DopeInfo::Nmax_chopGiven));
-
-  //   addPar ("XLOC", 0.0, false,
-  //           static_cast <double CompositeParam:: *> (&DopeInfo::xloc),
-  //           NULL);
-
-  //   addPar ("XMIN", 0.0, false,
-  //           static_cast <double CompositeParam:: *> (&DopeInfo::xmin),
-  //           static_cast <bool CompositeParam:: *> (&DopeInfo::xminGiven));
-
-  //   addPar ("XMAX", 0.0, false,
-  //           static_cast <double CompositeParam:: *> (&DopeInfo::xmax),
-  //           static_cast <bool CompositeParam:: *> (&DopeInfo::xmaxGiven));
-
-  //   addPar ("XWIDTH", 1.0e-3, false,
-  //           static_cast <double CompositeParam:: *> (&DopeInfo::xwidth),
-  //           NULL);
-
-  //   addPar ("YLOC", 0.0, false,
-  //           static_cast <double CompositeParam:: *> (&DopeInfo::yloc),
-  //           NULL);
-
-  //   addPar ("YMIN", 0.0, false,
-  //           static_cast <double CompositeParam:: *> (&DopeInfo::ymin),
-  //           static_cast <bool CompositeParam:: *> (&DopeInfo::yminGiven));
-
-  //   addPar ("YMAX", 0.0, false,
-  //           static_cast <double CompositeParam:: *> (&DopeInfo::ymax),
-  //           static_cast <bool CompositeParam:: *> (&DopeInfo::ymaxGiven));
-
-  //   addPar ("YWIDTH", 1.0e-3, false,
-  //           static_cast <double CompositeParam:: *> (&DopeInfo::ywidth),
-  //           NULL);
-
-  //   // Set up map for non-double precision variables:
-  //   addPar ("NAME", "none", false,
-  //           static_cast <string CompositeParam:: *> (&DopeInfo::name),
-  //           NULL);
-
-  //   addPar ("FUNCTION", "uniform", false,
-  //           static_cast <string CompositeParam:: *> (&DopeInfo::funcType),
-  //           NULL);
-
-  //   addPar ("TYPE", "ntype", false,
-  //           static_cast <string CompositeParam:: *> (&DopeInfo::type),
-  //           NULL);
-
-  //   addPar ("FLATX", 0, false,
-  //           static_cast <int CompositeParam:: *> (&DopeInfo::flatX),
-  //           NULL);
-
-  //   addPar ("FLATY", 0, false,
-  //           static_cast <int CompositeParam:: *> (&DopeInfo::flatY),
-  //           NULL);
-
-  //   addPar ("SPECIES", "none", false,
-  //           static_cast <string CompositeParam:: *> (&DopeInfo::speciesName),
-  //           NULL);
-
-  //   addPar ("FILE", "none", false,
-  //           static_cast <string CompositeParam:: *> (&DopeInfo::fileName),
-  //           NULL);
-
-  //   addPar ("EXPRESSION", "none", false,
-  //           static_cast <string CompositeParam:: *> (&DopeInfo::exprString),
-  //           NULL);
-
-
-  // }
-}
+{}
 
 // ----------------------------------------------------------------------------
 // Function      : DopeInfo::processParam
@@ -214,8 +134,7 @@ DopeInfo::DopeInfo ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 03/31/03
 // ----------------------------------------------------------------------------
-bool DopeInfo::processParam
-(Param & ndParam, string & param, DevicePDEInstance & di)
+bool DopeInfo::processParam(Param & ndParam, std::string & param, DevicePDEInstance & di)
 {
   bool bsuccess = true;
 
@@ -233,16 +152,16 @@ bool DopeInfo::processParam
 void DopeInfo::processParams()
 {
   {
-    ParameterMap::const_iterator p_i = (*getPMap()).find(string("FUNCTION"));
-    const Pars &p = static_cast<const Pars &>(*(*p_i).second);
+    ParameterMap::const_iterator p_i = getParameterMap().find(std::string("FUNCTION"));
+    const Descriptor &p = *(*p_i).second;
 
     ExtendedString tmp = getValue<std::string, DopeInfo>(*this, p);
     setValue<std::string, DopeInfo>(*this, p, static_cast<std::string>(tmp.toLower()));
   }
 
   {
-    ParameterMap::const_iterator p_i = (*getPMap()).find(string("TYPE"));
-    const Pars &p = static_cast<const Pars &>(*(*p_i).second);
+    ParameterMap::const_iterator p_i = getParameterMap().find(std::string("TYPE"));
+    const Descriptor &p = *(*p_i).second;
 
     ExtendedString tmp = getValue<std::string, DopeInfo>(*this, p);
     setValue<std::string, DopeInfo>(*this, p, static_cast<std::string>(tmp.toLower()));
@@ -257,12 +176,12 @@ void DopeInfo::processParams()
 // Creator       : Eric Keiter, SNL
 // Creation Date : 11/20/08
 // ----------------------------------------------------------------------------
-void DopeInfo:: setupInfo
-(vector<double> & CVec,
- vector<double> & CdonorVec,
- vector<double> & CacceptorVec,
- vector<double> & xVec,
- DeviceSupport & devSupport)
+void DopeInfo::setupInfo(
+  std::vector<double> & CVec,
+  std::vector<double> & CdonorVec,
+  std::vector<double> & CacceptorVec,
+  std::vector<double> & xVec,
+  DeviceSupport &       devSupport)
 {
   int i(0);
   int NX (CVec.size());
@@ -393,7 +312,7 @@ void DopeInfo:: setupInfo
   {
     if (exprString == "none")
     {
-      string msg = "Dope Region : ";
+      std::string msg = "Dope Region : ";
       msg += name;
       msg += " has specified the expression specification, but not provided an expression.";
       msg += "\n";
@@ -402,16 +321,16 @@ void DopeInfo:: setupInfo
     else
     {
 #ifdef Xyce_DEBUG_DEVICE
-      cout << "DopeInfo::setupInfo: exprString = " << exprString << endl;
+      Xyce::dout() << "DopeInfo::setupInfo: exprString = " << exprString << std::endl;
 #endif
-      N_UTL_Expression expr;
+      Util::Expression expr;
       expr.set(exprString);
 
       for (i=0;i<NX;++i)
       {
         double dopeValue(0.0);
 
-        expr.set_var(string("#X"), xVec[i]);
+        expr.set_var(std::string("#X"), xVec[i]);
         expr.evaluateFunction (dopeValue);
         CVec[i] += sign*dopeValue;
         splintDopeVec[i] = dopeValue;
@@ -430,7 +349,7 @@ void DopeInfo:: setupInfo
   {
     if (fileName == "none")
     {
-      string msg = "Dope Region : ";
+      std::string msg = "Dope Region : ";
       msg += name;
       msg += " has specified the file specification, but not specified a file name.";
       msg += "\n";
@@ -474,7 +393,7 @@ void DopeInfo:: setupInfo
   }
   else
   {
-    string msg = "Unrecognized Dope Region function type:  ";
+    std::string msg = "Unrecognized Dope Region function type:  ";
     msg += funcType;
     msg += "  for region: ";
     msg += name;
@@ -492,13 +411,13 @@ void DopeInfo:: setupInfo
 // Creator       : Eric Keiter, SNL
 // Creation Date : 11/20/08
 // ----------------------------------------------------------------------------
-void DopeInfo:: setupInfo2d
-(vector<double> & CVec,
- vector<double> & CdonorVec,
- vector<double> & CacceptorVec,
- vector<double> & xVec,
- vector<double> & yVec,
- DeviceSupport & devSupport)
+void DopeInfo::setupInfo2d(
+  std::vector<double> & CVec,
+  std::vector<double> & CdonorVec,
+  std::vector<double> & CacceptorVec,
+  std::vector<double> & xVec,
+  std::vector<double> & yVec,
+  DeviceSupport &       devSupport)
 {
   int i(0);
   int numMeshPoints (CVec.size());
@@ -688,7 +607,7 @@ void DopeInfo:: setupInfo2d
   }
   else
   {
-    string msg = "Unrecognized Dope Region function type:  ";
+    std::string msg = "Unrecognized Dope Region function type:  ";
     msg += funcType;
     msg += "  for region: ";
     msg += name;
@@ -712,7 +631,7 @@ void DopeInfo:: setupInfo2d
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 4/25/02
 // ----------------------------------------------------------------------------
-double DopeInfo::nsdep (double x, double W, double Dt)
+double DopeInfo::nsdep(double x, double W, double Dt)
 {
   double D  = 2.0 * sqrt(Dt);
   double Wh = W / 2.0;
@@ -762,8 +681,7 @@ double DopeInfo::nsdep (double x, double W, double Dt)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 4/25/02
 // ----------------------------------------------------------------------------
-double DopeInfo::ngdep
-(double x, double y, double W, double ax, double ay)
+double DopeInfo::ngdep(double x, double y, double W, double ax, double ay)
 {
   double xprime = fabs(x) - (0.5 * W);
   return ((xprime <= 0.0) ? 1.0 : exp(-ax*xprime*xprime))*
@@ -805,8 +723,7 @@ double DopeInfo::ngdep
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 03/28/03
 // ----------------------------------------------------------------------------
-double DopeInfo::ngdep2
-(double x, double y, double ax, double ay)
+double DopeInfo::ngdep2(double x, double y, double ax, double ay)
 {
   double retVal = exp(-ax*x*x)* exp(-ay*y*y);
   return retVal;
@@ -840,18 +757,21 @@ double DopeInfo::erf(double x)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 11/10/07
 //-----------------------------------------------------------------------------
-void DopeInfo::readDopingFile
-(string & filename, vector<double> & xloc, vector<double> & nvec,
- vector<double> & y2, DeviceSupport & devSupport)
+void DopeInfo::readDopingFile(
+  std::string &         filename,
+  std::vector<double> & xloc,
+  std::vector<double> & nvec,
+  std::vector<double> & y2,
+  DeviceSupport &       devSupport)
 {
-  ifstream input;
+  std::ifstream input;
   double x_loc(0.0);
   double value(0.0);
   xloc.clear();
   nvec.clear();
   y2.clear();
 
-  input.open( filename.c_str(), ios::in );
+  input.open( filename.c_str(), std::ios::in );
   if ( input.good() )
   {
     bool endOfFile = input.eof();
@@ -885,7 +805,7 @@ void DopeInfo::readDopingFile
   }
   else
   {
-    string msg = "Error:  Cannot open doping file: " + filename;
+    std::string msg = "Error:  Cannot open doping file: " + filename;
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
   }
 }
@@ -898,12 +818,16 @@ void DopeInfo::readDopingFile
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 11/10/07
 //-----------------------------------------------------------------------------
-void DopeInfo::readDopingFile (string & filename,
-                               vector<double> & xloc, vector<double> & nvec, vector<double> & y2_n,
-                               vector<double> & pvec, vector<double> & y2_p,
-                               DeviceSupport & devSupport)
+void DopeInfo::readDopingFile(
+  std::string &         filename,
+  std::vector<double> & xloc,
+  std::vector<double> & nvec,
+  std::vector<double> & y2_n,
+  std::vector<double> & pvec,
+  std::vector<double> & y2_p,
+  DeviceSupport &       devSupport)
 {
-  ifstream input;
+  std::ifstream input;
   double x_loc(0.0);
   double value1(0.0);
   double value2(0.0);
@@ -913,7 +837,7 @@ void DopeInfo::readDopingFile (string & filename,
   y2_n.clear();
   y2_p.clear();
 
-  input.open( filename.c_str(), ios::in );
+  input.open( filename.c_str(), std::ios::in );
   if ( input.good() )
   {
     bool endOfFile = input.eof();
@@ -952,7 +876,7 @@ void DopeInfo::readDopingFile (string & filename,
       nvec.push_back(value1);
       pvec.push_back(value2);
 
-      //cout << "x="<<x_loc<<"  value1="<<value1<<"  value2="<<value2<<endl;
+      //Xyce::dout() << "x="<<x_loc<<"  value1="<<value1<<"  value2="<<value2<<std::endl;
     }
     input.close();
     y2_n.resize(xloc.size(),0.0);
@@ -962,7 +886,7 @@ void DopeInfo::readDopingFile (string & filename,
   }
   else
   {
-    string msg = "Error:  Cannot open doping file: " + filename;
+    std::string msg = "Error:  Cannot open doping file: " + filename;
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
   }
 }

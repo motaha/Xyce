@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -43,9 +43,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.42.2.2 $
+// Revision Number: $Revision: 1.48.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -79,192 +79,169 @@ namespace Device {
 //-----------------------------------------------------------------------------
 class ExternData
 {
+public:
+  ExternData () :
+    lasSysPtr(0),
 
-  public:
-    ExternData () :
-      lasSysPtr(0),
-#ifdef Xyce_DEBUG_DEVICE
-      fVectorPtr(0),
-      JdxpVectorPtr(0),
-#endif
+    fVectorPtr(0),
+    JdxpVectorPtr(0),
+
 #ifdef Xyce_DEBUG_VOLTLIM
-      dxVoltlimVectorPtr(0),
+    dxVoltlimVectorPtr(0),
 
-      JTestMatrixPtr(0),
-      Jdx2VectorPtr(0),
+    JTestMatrixPtr(0),
+    Jdx2VectorPtr(0),
 
-      FTestMatrixPtr(0),
-      Fdx2VectorPtr(0),
-      QTestMatrixPtr(0),
-      Qdx2VectorPtr(0),
+    FTestMatrixPtr(0),
+    Fdx2VectorPtr(0),
+    QTestMatrixPtr(0),
+    Qdx2VectorPtr(0),
 #endif
-      tmpdIdXPtr(0),
-      tmpdQdXPtr(0),
-      daeQVectorPtr(0),
-      daeFVectorPtr(0),
+    tmpdIdXPtr(0),
+    tmpdQdXPtr(0),
+    daeQVectorPtr(0),
+    daeFVectorPtr(0),
 
-      bVecRealPtr(0),
-      bVecImagPtr(0),
+    bVecRealPtr(0),
+    bVecImagPtr(0),
 
-      dFdxdVpVectorPtr(0),
-      dQdxdVpVectorPtr(0),
-      dQdxMatrixPtr(0),
-      dFdxMatrixPtr(0),
+    dFdxdVpVectorPtr(0),
+    dQdxdVpVectorPtr(0),
+    dQdxMatrixPtr(0),
+    dFdxMatrixPtr(0),
 
-      currSolVectorPtr(0),
-      nextSolVectorPtr(0),
-      lastSolVectorPtr(0),
+    currSolVectorPtr(0),
+    nextSolVectorPtr(0),
+    lastSolVectorPtr(0),
 
-      currStaVectorPtr(0),
-      nextStaVectorPtr(0),
-      lastStaVectorPtr(0),
+    currStaVectorPtr(0),
+    nextStaVectorPtr(0),
+    lastStaVectorPtr(0),
 
-      currStoVectorPtr(0),
-      nextStoVectorPtr(0),
-      lastStoVectorPtr(0),
-      storeLeadCurrQCompPtr(0),
-      flagSolVectorPtr(0),
+    currStoVectorPtr(0),
+    nextStoVectorPtr(0),
+    lastStoVectorPtr(0),
+    storeLeadCurrQCompPtr(0),
+    flagSolVectorPtr(0),
 
-      perturbVectorPtr(0),
-      numJacRHSVectorPtr(0),
-      numJacFVectorPtr(0),
-      numJacQVectorPtr(0),
-      numJacLoadFlagPtr(0),
+    perturbVectorPtr(0),
+    numJacRHSVectorPtr(0),
+    numJacFVectorPtr(0),
+    numJacQVectorPtr(0),
+    numJacLoadFlagPtr(0),
+    nextStaDerivVectorPtr(0),
 
-#if 0
-      nextSolDerivVectorPtr(0),
-#endif
-      nextStaDerivVectorPtr(0),
+    deviceMaskVectorPtr(0),
 
-      deviceMaskVectorPtr(0),
+    daeQVectorRawPtr(0),
+    daeFVectorRawPtr(0),
+    dFdxdVpVectorRawPtr(0),
+    dQdxdVpVectorRawPtr(0),
+    nextSolVectorRawPtr(0),
+    currSolVectorRawPtr(0),
+    lastSolVectorRawPtr(0),
+    nextStaVectorRawPtr(0),
+    currStaVectorRawPtr(0),
+    lastStaVectorRawPtr(0),
+    nextStaDerivVectorRawPtr(0),
+    nextStoVectorRawPtr(0),
+    currStoVectorRawPtr(0),
+    lastStoVectorRawPtr(0),
+    storeLeadCurrQCompRawPtr(0),
+    bVecRealRawPtr(0),
+    bVecImagRawPtr(0),
+    initializeAllFlag(false)
+  {}
 
-      daeQVectorRawPtr(0),
-      daeFVectorRawPtr(0),
-      dFdxdVpVectorRawPtr(0),
-      dQdxdVpVectorRawPtr(0),
-      nextSolVectorRawPtr(0),
-      currSolVectorRawPtr(0),
-      lastSolVectorRawPtr(0),
-      nextStaVectorRawPtr(0),
-      currStaVectorRawPtr(0),
-      lastStaVectorRawPtr(0),
-      nextStaDerivVectorRawPtr(0),
-      nextStoVectorRawPtr(0),
-      currStoVectorRawPtr(0),
-      lastStoVectorRawPtr(0),
-      storeLeadCurrQCompRawPtr(0),
-      bVecRealRawPtr(0),
-      bVecImagRawPtr(0),
+public:
+  N_LAS_System * lasSysPtr;
 
-      devMgrPtr(0),
-      solDevInstMap(0),
-      initializeAllFlag(false)
-    { };
+  N_LAS_Vector * fVectorPtr;
+  N_LAS_Vector * JdxpVectorPtr;
 
-  protected:
-
-  private:
-
-  public:
-    N_LAS_System * lasSysPtr;
-
-#ifdef Xyce_DEBUG_DEVICE
-    N_LAS_Vector * fVectorPtr;
-    N_LAS_Vector * JdxpVectorPtr;
-#endif
 #ifdef Xyce_DEBUG_VOLTLIM
-    // voltlim DX vector:
-    N_LAS_Vector * dxVoltlimVectorPtr;
+  // voltlim DX vector:
+  N_LAS_Vector * dxVoltlimVectorPtr;
 
-    // old DAE matrix
-    N_LAS_Vector * Jdx2VectorPtr;
-    N_LAS_Matrix * JTestMatrixPtr;
+  // old DAE matrix
+  N_LAS_Vector * Jdx2VectorPtr;
+  N_LAS_Matrix * JTestMatrixPtr;
 
-    // new DAE matrices
-    N_LAS_Vector * Fdx2VectorPtr;
-    N_LAS_Matrix * FTestMatrixPtr;
-    N_LAS_Vector * Qdx2VectorPtr;
-    N_LAS_Matrix * QTestMatrixPtr;
+  // new DAE matrices
+  N_LAS_Vector * Fdx2VectorPtr;
+  N_LAS_Matrix * FTestMatrixPtr;
+  N_LAS_Vector * Qdx2VectorPtr;
+  N_LAS_Matrix * QTestMatrixPtr;
 #endif
-    N_LAS_Vector * tmpdIdXPtr;
-    N_LAS_Vector * tmpdQdXPtr;
+  N_LAS_Vector * tmpdIdXPtr;
+  N_LAS_Vector * tmpdQdXPtr;
 
-    // DAE formulation vectors
+  // DAE formulation vectors
 
 
-    N_LAS_Vector * bVecRealPtr;
-    N_LAS_Vector * bVecImagPtr;
+  N_LAS_Vector * bVecRealPtr;
+  N_LAS_Vector * bVecImagPtr;
 
-    N_LAS_Vector * daeQVectorPtr;
-    N_LAS_Vector * daeFVectorPtr;
+  N_LAS_Vector * daeQVectorPtr;
+  N_LAS_Vector * daeFVectorPtr;
 
-    N_LAS_Vector *  dFdxdVpVectorPtr;
-    N_LAS_Vector *  dQdxdVpVectorPtr;
+  N_LAS_Vector *  dFdxdVpVectorPtr;
+  N_LAS_Vector *  dQdxdVpVectorPtr;
 
-    // DAE formulation matrices
-    N_LAS_Matrix * dQdxMatrixPtr;
-    N_LAS_Matrix * dFdxMatrixPtr;
+  // DAE formulation matrices
+  N_LAS_Matrix * dQdxMatrixPtr;
+  N_LAS_Matrix * dFdxMatrixPtr;
 
-    N_LAS_Vector * currSolVectorPtr;
-    N_LAS_Vector * nextSolVectorPtr;
-    N_LAS_Vector * lastSolVectorPtr;
+  N_LAS_Vector * currSolVectorPtr;
+  N_LAS_Vector * nextSolVectorPtr;
+  N_LAS_Vector * lastSolVectorPtr;
 
-    N_LAS_Vector * currStaVectorPtr;
-    N_LAS_Vector * nextStaVectorPtr;
-    N_LAS_Vector * lastStaVectorPtr;
+  N_LAS_Vector * currStaVectorPtr;
+  N_LAS_Vector * nextStaVectorPtr;
+  N_LAS_Vector * lastStaVectorPtr;
 
-    N_LAS_Vector * currStoVectorPtr;
-    N_LAS_Vector * nextStoVectorPtr;
-    N_LAS_Vector * lastStoVectorPtr;
-    N_LAS_Vector * storeLeadCurrQCompPtr;
+  N_LAS_Vector * currStoVectorPtr;
+  N_LAS_Vector * nextStoVectorPtr;
+  N_LAS_Vector * lastStoVectorPtr;
+  N_LAS_Vector * storeLeadCurrQCompPtr;
 
-    N_LAS_Vector * flagSolVectorPtr;
+  N_LAS_Vector * flagSolVectorPtr;
 
-    N_LAS_Vector *  perturbVectorPtr;
-    N_LAS_Vector *  numJacRHSVectorPtr;
-    N_LAS_Vector *  numJacFVectorPtr;
-    N_LAS_Vector *  numJacQVectorPtr;
-    N_LAS_Vector *  numJacLoadFlagPtr;
+  N_LAS_Vector *  perturbVectorPtr;
+  N_LAS_Vector *  numJacRHSVectorPtr;
+  N_LAS_Vector *  numJacFVectorPtr;
+  N_LAS_Vector *  numJacQVectorPtr;
+  N_LAS_Vector *  numJacLoadFlagPtr;
 
-#if 0
-    N_LAS_Vector  * nextSolDerivVectorPtr;
-#endif
-    N_LAS_Vector  * nextStaDerivVectorPtr;
+  N_LAS_Vector  * nextStaDerivVectorPtr;
 
-    N_LAS_Vector  * deviceMaskVectorPtr;
+  N_LAS_Vector  * deviceMaskVectorPtr;
 
-    // raw pointers (to internal vector data):
-    double * daeQVectorRawPtr;
-    double * daeFVectorRawPtr;
-    double * dFdxdVpVectorRawPtr;
-    double * dQdxdVpVectorRawPtr;
+  // raw pointers (to internal vector data):
+  double * daeQVectorRawPtr;
+  double * daeFVectorRawPtr;
+  double * dFdxdVpVectorRawPtr;
+  double * dQdxdVpVectorRawPtr;
 
-    double * nextSolVectorRawPtr;
-    double * currSolVectorRawPtr;
-    double * lastSolVectorRawPtr;
+  double * nextSolVectorRawPtr;
+  double * currSolVectorRawPtr;
+  double * lastSolVectorRawPtr;
 
-    double * nextStaVectorRawPtr;
-    double * currStaVectorRawPtr;
-    double * lastStaVectorRawPtr;
+  double * nextStaVectorRawPtr;
+  double * currStaVectorRawPtr;
+  double * lastStaVectorRawPtr;
 
-    double * nextStoVectorRawPtr;
-    double * currStoVectorRawPtr;
-    double * lastStoVectorRawPtr;
-    double * storeLeadCurrQCompRawPtr;
+  double * nextStoVectorRawPtr;
+  double * currStoVectorRawPtr;
+  double * lastStoVectorRawPtr;
+  double * storeLeadCurrQCompRawPtr;
 
-    double * nextStaDerivVectorRawPtr;
+  double * nextStaDerivVectorRawPtr;
 
-    double * bVecRealRawPtr;
-    double * bVecImagRawPtr;
+  double * bVecRealRawPtr;
+  double * bVecImagRawPtr;
 
-    // This device class manager pointer should go somewhere
-    // else eventually.
-    N_DEV_DeviceMgr * devMgrPtr;
-
-    // This map should go elsewhere eventually also:
-    multimap <int, DeviceInstance*> * solDevInstMap;
-
-    bool initializeAllFlag;
+  bool initializeAllFlag;
 };
 
 } // namespace Device

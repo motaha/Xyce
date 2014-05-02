@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.27.4.2 $
+// Revision Number: $Revision: 1.32.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/03/11 15:46:13 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -71,7 +71,7 @@
 //-----------------------------------------------------------------------------
 N_PDS_ParMap::N_PDS_ParMap(int & numGlobalEntities,
                            const int & numLocalEntities,
-			   const vector<int> & lbMap,
+			   const std::vector<int> & lbMap,
                            const int index_base,
                            N_PDS_Comm * aComm)
   : petraMap_(0),
@@ -81,7 +81,7 @@ N_PDS_ParMap::N_PDS_ParMap(int & numGlobalEntities,
 {
 
 #ifdef Xyce_DEBUG_PARALLEL
-  static const string msg("N_PDS_ParMap::N_PDS_ParMap - ");
+  static const std::string msg("N_PDS_ParMap::N_PDS_ParMap - ");
 #endif
 
   if( comm_ == 0 )
@@ -103,10 +103,53 @@ N_PDS_ParMap::N_PDS_ParMap(int & numGlobalEntities,
                               *(comm_->petraComm()) );
 
 #ifdef Xyce_DEBUG_PARALLEL
-  cout << "New Petra Map: " << numGlobalEntities << " " <<
-	numLocalEntities << endl;
-  cout << "  " << petraMap_->NumMyElements() << " " <<
-	petraMap_->NumGlobalElements() << endl;
+  std::cout << "New Petra Map: " << numGlobalEntities << " " <<
+	numLocalEntities << std::endl;
+  std::cout << "  " << petraMap_->NumMyElements() << " " <<
+	petraMap_->NumGlobalElements() << std::endl;
+#endif
+
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_PDS_ParMap::N_PDS_ParMap
+// Purpose       : Constructor
+// Special Notes :
+// Scope         : Public
+// Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
+// Creation Date : 05/2/00
+//-----------------------------------------------------------------------------
+N_PDS_ParMap::N_PDS_ParMap(int & numGlobalEntities,
+                           const int & numLocalEntities,
+                           const int index_base,
+                           N_PDS_Comm * aComm)
+  : petraMap_(0),
+    mapOwned_(true),
+    comm_(aComm),
+    commOwned_(false)
+{
+
+#ifdef Xyce_DEBUG_PARALLEL
+  static const std::string msg("N_PDS_ParMap::N_PDS_ParMap - ");
+#endif
+
+  if( comm_ == 0 )
+  {
+    comm_ = N_PDS_CommFactory::create();
+    commOwned_ = true;
+  }
+
+  // Call the Petra constructor for the true Petra map.
+  petraMap_ = new Epetra_Map( numGlobalEntities,
+                              numLocalEntities,
+                              index_base,
+                              *(comm_->petraComm()) );
+
+#ifdef Xyce_DEBUG_PARALLEL
+  std::cout << "New Petra Map: " << numGlobalEntities << " " <<
+	numLocalEntities << std::endl;
+  std::cout << "  " << petraMap_->NumMyElements() << " " <<
+	petraMap_->NumGlobalElements() << std::endl;
 #endif
 
 }
@@ -127,8 +170,14 @@ N_PDS_ParMap::N_PDS_ParMap( Epetra_Map * map,
     commOwned_(false)
 {
 #ifdef Xyce_DEBUG_PARALLEL
-  static const string msg("N_PDS_ParMap::N_PDS_ParMap - ");
+  static const std::string msg("N_PDS_ParMap::N_PDS_ParMap - ");
 #endif
+
+  if( comm_ == 0 )
+  {
+    comm_ = N_PDS_CommFactory::create();
+    commOwned_ = true;
+  }
 }
 
 //-----------------------------------------------------------------------------

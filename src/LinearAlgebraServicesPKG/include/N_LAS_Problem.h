@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.4.6.4 $
+// Revision Number: $Revision: 1.10 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:44 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,30 +46,21 @@
 #ifndef Xyce_N_LAS_Problem_h
 #define Xyce_N_LAS_Problem_h
 
-// ---------- Epetra Includes ----------
 
-
-// ---------- Standard Includes ----------
-
-#include <Teuchos_RefCountPtr.hpp>
-
-// ----------   Xyce Includes   ----------
+#include <Teuchos_RCP.hpp>
 
 #include <N_UTL_Xyce.h>
+#include <N_PDS_fwd.h>
 #include <N_PDS_ParMap.h>
 #include <N_LAS_MultiVector.h>
-
-// ----------  Fwd Declares     ----------
 
 class N_LAS_Matrix;
 class N_LAS_Vector;
 
-class N_PDS_Comm;
-
 class Epetra_LinearProblem;
 class Epetra_Operator;
 
-using Teuchos::RefCountPtr;
+using Teuchos::RCP;
 using Teuchos::rcp;
 
 //-----------------------------------------------------------------------------
@@ -84,9 +75,9 @@ class N_LAS_Problem
 
 public:
   //Constructors
-  N_LAS_Problem( const RefCountPtr<N_LAS_Matrix> & A, const RefCountPtr<N_LAS_MultiVector> & x, const RefCountPtr<N_LAS_MultiVector> & b );
-  N_LAS_Problem( const RefCountPtr<Epetra_Operator> & Op, const RefCountPtr<N_LAS_MultiVector> & x, const RefCountPtr<N_LAS_MultiVector> & b );
-  N_LAS_Problem( const RefCountPtr<Epetra_LinearProblem> & epetraProblem );                                                                                        
+  N_LAS_Problem( const RCP<N_LAS_Matrix> & A, const RCP<N_LAS_MultiVector> & x, const RCP<N_LAS_MultiVector> & b );
+  N_LAS_Problem( const RCP<Epetra_Operator> & Op, const RCP<N_LAS_MultiVector> & x, const RCP<N_LAS_MultiVector> & b );
+  N_LAS_Problem( const RCP<Epetra_LinearProblem> & epetraProblem );                                                                                        
   Epetra_LinearProblem & epetraObj() { return *epetraProblem_; }
                                                                                           
   //Destructor
@@ -96,12 +87,12 @@ public:
 
 private:
                                                                                           
-  RefCountPtr<N_LAS_Matrix> A_;
-  RefCountPtr<Epetra_Operator> Op_;
-  RefCountPtr<N_LAS_MultiVector> x_;
-  RefCountPtr<N_LAS_MultiVector> b_;
+  RCP<N_LAS_Matrix> A_;
+  RCP<Epetra_Operator> Op_;
+  RCP<N_LAS_MultiVector> x_;
+  RCP<N_LAS_MultiVector> b_;
                                                                                           
-  RefCountPtr<Epetra_LinearProblem> epetraProblem_;
+  RCP<Epetra_LinearProblem> epetraProblem_;
                                                                                           
   bool matrixFreeFlag_;
 };

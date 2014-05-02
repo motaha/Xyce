@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.6.2.2 $
+// Revision Number: $Revision: 1.11.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/26 20:16:31 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -67,39 +67,39 @@ namespace Device {
 //-----------------------------------------------------------------------------
 class ScalingVars
 {
-  public:
-    ScalingVars () :
-      x0(1.0), a0(1.0), T0(1.0), V0(1.0),
-      rV0(1.0), C0(1.0), D0(1.0), u0(1.0),
-      R0(1.0), rR0(1.0), t0(1.0), E0(1.0),
-      F0(1.0), J0(1.0), L0(1.0), k0(1.0),
-      rt0(1.0), rk0(1.0)
-    {};
+public:
+  ScalingVars () :
+    x0(1.0), a0(1.0), T0(1.0), V0(1.0),
+    rV0(1.0), C0(1.0), D0(1.0), u0(1.0),
+    R0(1.0), rR0(1.0), t0(1.0), E0(1.0),
+    F0(1.0), J0(1.0), L0(1.0), k0(1.0),
+    rt0(1.0), rk0(1.0)
+  {};
 
-  public:
-    double x0;  // distance scaling (cm)
-    double a0;  // area scaling (cm^2)
-    double T0;  // temperature scaling (K)
-    double V0;  // electrostatic potential scaling (V)
-    double rV0; // reciprocal of V0
-    double C0;  // concentration scaling (cm^-3);
-    double D0;  // diffusion coefficient scaling (cm^2/s)
-    double u0;  // mobility coefficient scaling (cm^2/V/s)
-    double R0;  // recombination rate scaling (cm^-3/s)
-    double rR0; // reciprocal of R0
-    double t0;  // time scaling (s)
-    double E0;  // electric field scaling (V/s)
-    double F0;  // particle flux scaling (cm^-2/s)
-    double J0;  // current density scaling (A/cm^2)
-    double L0;  // Laplacian scaling constant
+public:
+  double x0;  // distance scaling (cm)
+  double a0;  // area scaling (cm^2)
+  double T0;  // temperature scaling (K)
+  double V0;  // electrostatic potential scaling (V)
+  double rV0; // reciprocal of V0
+  double C0;  // concentration scaling (cm^-3);
+  double D0;  // diffusion coefficient scaling (cm^2/s)
+  double u0;  // mobility coefficient scaling (cm^2/V/s)
+  double R0;  // recombination rate scaling (cm^-3/s)
+  double rR0; // reciprocal of R0
+  double t0;  // time scaling (s)
+  double E0;  // electric field scaling (V/s)
+  double F0;  // particle flux scaling (cm^-2/s)
+  double J0;  // current density scaling (A/cm^2)
+  double L0;  // Laplacian scaling constant
 
-    double k0;
-    double rt0;
-    double rk0;
+  double k0;
+  double rt0;
+  double rk0;
 
-  protected:
+protected:
 
-  private:
+private:
 
 };
 
@@ -112,9 +112,9 @@ class ScalingVars
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 11/15/09
 //-----------------------------------------------------------------------------
-inline ostream & operator<<(ostream & os, const ScalingVars & scaleVars)
+inline std::ostream & operator<<(std::ostream & os, const ScalingVars & scaleVars)
 {
-  os << "\n\n-----------------------------------------\n";
+  os << "\n\n-----------------------------------------" << std::endl;
   os << "\tPDE Scaling Vars:\n";
   //os << "\t\tdefad                 = " << scaleVars. <<"\n";
 
@@ -138,8 +138,8 @@ inline ostream & operator<<(ostream & os, const ScalingVars & scaleVars)
   os << "	rt0  = " << scaleVars.rt0 << "\n";
   os << "	rk0  = " << scaleVars.rk0 << "\n";
 
-  os << "-----------------------------------------\n";
-  os << endl;
+  os << Xyce::section_divider << std::endl;
+  os << std::endl;
 
   return os;
 }

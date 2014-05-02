@@ -1,9 +1,9 @@
-
 AM_CPPFLAGS = @Xyce_INCS@
 
 noinst_LTLIBRARIES = libTCADModels.la
 
 libTCADModels_la_SOURCES = \
+  $(srcdir)/src/N_DEV_RegisterTCADDevices.C \
   $(srcdir)/src/N_DEV_PDEMeshContainer.C \
   $(srcdir)/src/N_DEV_PDE_2DMesh.C \
   $(srcdir)/src/N_DEV_PDE_Electrode.C \
@@ -20,6 +20,7 @@ libTCADModels_la_SOURCES = \
   $(srcdir)/src/N_DEV_DopeInfo.C \
   $(srcdir)/src/N_DEV_MaterialSupport.C \
   $(srcdir)/src/N_DEV_BernouliSupport.C \
+  $(srcdir)/include/N_DEV_RegisterTCADDevices.h \
   $(srcdir)/include/N_DEV_bcData.h \
   $(srcdir)/include/N_DEV_2DPDE.h \
   $(srcdir)/include/N_DEV_DeviceInterfaceNode.h \

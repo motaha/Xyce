@@ -1,4 +1,4 @@
-//-----------------------------------------------------------------------------
+
 // Copyright Notice
 //
 //   Copyright 2002 Sandia Corporation. Under the terms
@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.68.2.2 $
+// Revision Number: $Revision: 1.85.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -47,6 +47,7 @@
 #define Xyce_N_DEV_MutIndNonLin_h
 
 // ----------   Xyce Includes   ----------
+#include <N_DEV_Configuration.h>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceInstance.h>
 #include <N_DEV_DeviceModel.h>
@@ -61,8 +62,21 @@ namespace Xyce {
 namespace Device {
 namespace MutIndNonLin {
 
-// ---------- Forward Declarations ----------
 class Model;
+class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance>
+{
+  static const char *name() {return "Nonlinear Mutual Inductor";}
+  static const char *deviceTypeName() {return "K level 1";}
+  static const int numNodes() {return 2;}
+  static const bool modelRequired() {return true;}
+  static const bool isLinearDevice() {return false;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : Instance
@@ -77,21 +91,15 @@ class Instance : public DeviceInstance
 {
   friend class ParametricData<Instance>;
   friend class Model;
-  friend class Master;
+  friend class Traits;friend class Master;
 
 public:
-  static ParametricData<Instance> &getParametricData();
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Instance(InstanceBlock & IB,
-                         Model & Iiter,
-                         MatrixLoadData & mlData1,
-                         SolverState &ss1,
-                         ExternData  &ed1,
-                         DeviceOptions & do1);
+  Instance(
+     const Configuration &       configuration,
+     const InstanceBlock &       IB,
+     Model &                     Iiter,
+     const FactoryBlock &        factory_block);
 
   ~Instance();
 
@@ -100,19 +108,19 @@ private:
   Instance &operator=(const Instance &);
 
 public:
-  void registerLIDs( const vector<int> & intLIDVecRef,
-                     const vector<int> & extLIDVecRef );
-  map<int,string> & getIntNameMap();
-  map<int,string> & getStateNameMap();
-  map<int,string> & getStoreNameMap();
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
+  std::map<int,std::string> & getIntNameMap();
+  std::map<int,std::string> & getStateNameMap();
+  std::map<int,std::string> & getStoreNameMap();
 
-  void registerStateLIDs( const vector<int> & staLIDVecRef );
-  void registerStoreLIDs( const vector<int> & staLIDVecRef );
+  void registerStateLIDs( const std::vector<int> & staLIDVecRef );
+  void registerStoreLIDs( const std::vector<int> & staLIDVecRef );
 
-  const vector< vector<int> > & jacobianStamp() const;
-  void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-  bool processParams (string param = "");
+  bool processParams ();
   bool updateTemperature(const double & temp_tmp);
   void updateInductanceMatrix();
   bool updateIntermediateVars ();
@@ -122,7 +130,7 @@ public:
 
   bool plotfileFlag () {return true;}
 
-  void varTypes( vector<char> & varTypeVec );
+  void varTypes( std::vector<char> & varTypeVec );
 
   // load functions, residual:
   bool loadDAEQVector ();
@@ -138,7 +146,8 @@ public:
 
   // iterator reference to the inductor model which owns this instance.
   // Getters and setters
-  Model &getModel() {
+  Model &getModel() 
+  {
     return model_;
   }
 
@@ -150,18 +159,18 @@ private:
   // involved in this mutual inductor
   int numInductors;
   double L;
-  vector< InductorInstanceData* > instanceData;
+  std::vector< InductorInstanceData* > instanceData;
 
   // These vectors let the new param options load and set inductor data
   // the parser passes all of these to us
-  vector< string > inductorNames;
-  vector< double > inductorInductances;
-  vector< string > inductorsNode1;
-  vector< string > inductorsNode2;
+  std::vector< std::string > inductorNames;
+  std::vector< double > inductorInductances;
+  std::vector< std::string > inductorsNode1;
+  std::vector< std::string > inductorsNode2;
   // and here's the list of ones we are coupling
-  vector< string > couplingInductor;
-  vector< double > couplingCoefficient;
-  //vector< vector< double > > mutualCouplingCoef;
+  std::vector< std::string > couplingInductor;
+  std::vector< double > couplingCoefficient;
+  //std::vector< std::vector< double > > mutualCouplingCoef;
 
   // local indices for extra equations
   int li_MagVar;
@@ -169,11 +178,11 @@ private:
 
   // offsets in the jacobian
   int mEquVPosOffset, mEquVNegOffset;
-  vector< int > mEquInductorOffsets;
+  std::vector< int > mEquInductorOffsets;
   int mEquMOffset, mEquROffset;
 
   int rEquROffset;
-  vector< int > rEquInductorOffsets;
+  std::vector< int > rEquInductorOffsets;
 
   // state variable for mag, h and r
   int li_MagVarState;
@@ -187,10 +196,10 @@ private:
   double mutualCup;    // mutaul coupling value
   bool mutualCupGiven;
 
-  vector< double > inductanceVals;      // the inductances of the inductors
-  vector< vector< double > > LO;        // L' * L (matrix)
-  vector< double > inductorCurrents;    // currents through inductors (col vec.)
-  vector< double > LOI;                 // LO * I (col vector).
+  std::vector< double > inductanceVals;      // the inductances of the inductors
+  std::vector< std::vector< double > > LO;        // L' * L (matrix)
+  std::vector< double > inductorCurrents;    // currents through inductors (col vec.)
+  std::vector< double > LOI;                 // LO * I (col vector).
 
   double temp;         // temperature of this instance
   bool tempGiven;      // flag if temp was given
@@ -216,19 +225,22 @@ private:
   // these vectors are used repeadily in loadDAEdFdx
   // so rather than create and destroy them on each call
   // we will allocate them in the constructor.
-  vector< double > dHe_dI;
-  vector< double > dManp_dI;
-  vector< double > ddelM_dI;
-  vector< double > dMirrp_dI;
-  vector< double > dP_dI;
+  std::vector< double > dHe_dI;
+  std::vector< double > dManp_dI;
+  std::vector< double > ddelM_dI;
+  std::vector< double > dMirrp_dI;
+  std::vector< double > dP_dI;
 
   // scaling crontrol for new equations
   double scalingRHS;   // scaling for loading DAE or RHS components
 
-  vector< vector<int> > jacStamp;
+  // used in scaling the tanh() approximation to sgn()
+  double maxVoltageDrop;
+
+  std::vector< std::vector<int> > jacStamp;
 
   // output stream for output of internal state if requested by user
-  Teuchos::RefCountPtr< ofstream > outputFileStreamPtr;
+  Teuchos::RefCountPtr< std::ofstream > outputFileStreamPtr;
   bool outputStateVarsFlag;
 };
 
@@ -245,18 +257,13 @@ class Model : public DeviceModel
 
   friend class ParametricData<Model>;
   friend class Instance;
-  friend class Master;
+  friend class Traits;friend class Master;
 
 public:
-  static ParametricData<Model> &getParametricData();
-
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Model(const ModelBlock & MB,
-                          SolverState & ss1,
-                          DeviceOptions & do1);
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &          MB,
+     const FactoryBlock &        factory_block);
   ~Model();
 
 private:
@@ -265,24 +272,33 @@ private:
   Model &operator=(const Model &);
 
 public:
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
+
   virtual std::ostream &printOutInstances(std::ostream &os) const;
 
-  bool processParams (string param = "");
-  bool processInstanceParams (string param = "");
+  bool processParams ();
+  bool processInstanceParams ();
 
   // Data Members for Associations
 
 public:
-  InstanceVector &getInstanceVector() {
+  void addInstance(Instance *instance) 
+  {
+    instanceContainer.push_back(instance);
+  }
+
+  InstanceVector &getInstanceVector() 
+  {
     return instanceContainer;
   }
 
-  const InstanceVector &getInstanceVector() const {
+  const InstanceVector &getInstanceVector() const 
+  {
     return instanceContainer;
   }
 
 private:
-  vector<Instance*> instanceContainer;
+  std::vector<Instance*> instanceContainer;
 
 private:
 
@@ -292,14 +308,13 @@ private:
   double BetaH;              // modeling constant (dimensionless)
   double BetaM;              // modeling constant (dimensionless)
   double C;                  // domain flesing parameter (dimensionless)
-  double DeltaV;             // smoothing coefficient for V_1 in tanh
+  double DeltaVScaling;      // smoothing coefficient for V_1 in tanh
   double Gap;                // effective air gap (m)
   double Kirr;               // domain anisotropy parameter (amp/m)
   double Ms;                 // saturation magnetization (amp/m)
   double LevelIgnored;       // for pspice compatibility -- ignored
   double PackIgnored;        // for pspice compatibility -- ignored
   double Path;               // total mean magnetic path (m)
-  double Vinf;               // smoothing coefficient for V+1 in tanh
   double tempCoeff1;         // first order temperature coeff.
   double tempCoeff2;         // second order temperature coeff.
   double tnom;               // reference temperature
@@ -319,6 +334,7 @@ private:
   bool tc1Given;
   bool tc2Given;
   bool tnomGiven;
+  bool UseConstantDeltaVScaling;
 };
 
 //-----------------------------------------------------------------------------
@@ -328,38 +344,31 @@ private:
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 11/26/08
 //-----------------------------------------------------------------------------
-class Master : public Xyce::Device::DeviceTemplate<Model, Instance>
+class Master : public DeviceMaster<Traits>
 {
-  public:
-    Master (
-      const std::string &dn,
-      const std::string &cn,
-      const std::string &dmName,
-           LinearDevice linearDev,
-           SolverState & ss1,
-           DeviceOptions & do1)
-      : Xyce::Device::DeviceTemplate<Model, Instance>(
-           dn, cn, dmName, linearDev, ss1, do1)
-    {
+  friend class Instance;
+  friend class Model;
 
-    }
+public:
+  Master(
+     const Configuration &       configuration,
+     const FactoryBlock &      factory_block,
+     const SolverState & ss1,
+     const DeviceOptions & do1)
+    : DeviceMaster<Traits>(configuration, factory_block, ss1, do1)
+  {}
 
-    virtual bool updateState (double * solVec, double * staVec, double * stoVec);
-    virtual bool updateSecondaryState (double * staDeriv, double * stoVec);
+  virtual bool updateState (double * solVec, double * staVec, double * stoVec);
+  virtual bool updateSecondaryState (double * staDeriv, double * stoVec);
 
-    // load functions, residual:
-    virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
-    //virtual bool loadDAEQVector (double * solVec, double * qVec);
-    //virtual bool loadDAEFVector (double * solVec, double * fVec);
+  // load functions, residual:
+  virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
 
-    // load functions, Jacobian:
-    virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
-    //virtual bool loadDAEdQdx (N_LAS_Matrix & dQdx);
-    //virtual bool loadDAEdFdx (N_LAS_Matrix & dFdx);
-
-    friend class Instance;
-    friend class Model;
+  // load functions, Jacobian:
+  virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
 };
+
+void registerDevice();
 
 } // namespace MutIndNonLin
 } // namespace Device

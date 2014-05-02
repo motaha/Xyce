@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.36.2.2 $
+// Revision Number: $Revision: 1.62.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -54,11 +54,14 @@
 
 // ----------   Xyce Includes   ----------
 #include <N_DEV_Const.h>
-#include <N_DEV_ROM.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_DeviceMaster.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_ROM.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
 
 #include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
@@ -71,55 +74,32 @@
 #include <Teuchos_Utils.hpp>
 #include <Teuchos_LAPACK.hpp>
 
+// Keep redundant (assuming Trilinos and Xyce are configured in the same environment) definitions from whining
+#undef HAVE_CMATH
+#undef HAVE_CSTDIO
+#undef HAVE_CSTDLIB
+#undef HAVE_INTTYPES_H
+#undef HAVE_IOSTREAM
+#undef HAVE_STDINT_H
 #include <Trilinos_Util.h>
 
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<ROM::Instance>::ParametricData()
-{
-  setNumNodes(2);
-  // Set an absurdly large number of optional nodes since we don't know apriori how many ports are in the ROM.
-  setNumOptionalNodes(1000);
-  setNumFillNodes(0);
-  setModelRequired(0);
-  //setPrimaryParameter("BASE_FILENAME");
-  addModelType("ROM");
-
-  // Set up double precision variables:
-
-  // Set up non-double precision variables:
-  addPar ("BASE_FILENAME", string("rom_input"), false, ParameterType::NO_DEP,
-          &ROM::Instance::baseFileName, NULL);
-
-  addPar ("MASK_VARS", false, false, ParameterType::NO_DEP,
-          &ROM::Instance::maskROMVars, NULL);
-
-  addPar ("USE_PORT_DESCRIPTION", 0, false, ParameterType::NO_DEP,
-          &ROM::Instance::usePortDesc, NULL);
-}
-
-template<>
-ParametricData<ROM::Model>::ParametricData()
-{}
 
 namespace ROM {
 
 
-
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
+void Traits::loadInstanceParameters(ParametricData<ROM::Instance> &p)
+{
+p.addPar("BASE_FILENAME", std::string("rom_input"), &ROM::Instance::baseFileName);
+  p.addPar("MASK_VARS", false, &ROM::Instance::maskROMVars);
+  p.addPar("USE_PORT_DESCRIPTION", 0, &ROM::Instance::usePortDesc);
 }
 
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
+void Traits::loadModelParameters(ParametricData<ROM::Model> &p)
+{}
 
-  return parMap;
-}
 
 // Class Instance
 //-----------------------------------------------------------------------------
@@ -130,7 +110,7 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Heidi Thornquist, SNL, Parallel Computational Sciences
 // Creation Date : 12/11/09
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
   return true;
 }
@@ -157,13 +137,11 @@ bool Instance::updateTemperature ( const double & temp_tmp)
 // Creation Date : 12/11/09
 //-----------------------------------------------------------------------------
 Instance::Instance(
-  InstanceBlock & IB,
+  const Configuration & configuration,
+  const InstanceBlock & IB,
   Model & ROMiter,
-  MatrixLoadData & mlData1,
-  SolverState &ss1,
-  ExternData  &ed1,
-  DeviceOptions & do1)
-  : DeviceInstance(IB, mlData1, ss1, ed1, do1),
+  const FactoryBlock &  factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(ROMiter),
     isCSparse(false),
     isGSparse(false),
@@ -180,11 +158,6 @@ Instance::Instance(
     usedOrder(0),
     lastTimeStepNumber(0)
 {
-  defaultParamName = "BASE_FILENAME";
-
-  setName(IB.getName());
-  setModelName(model_.getName());
-
   numExtVars   = IB.numExtVars;  // we have as many as were specified on the
                                  // instance line
 
@@ -198,27 +171,24 @@ Instance::Instance(
   if (given("BASE_FILENAME"))
   {
     FILE *c_file, *g_file, *b_file, *l_file;
-    N_IO_MMIO::MM_typecode mat_code;
+    Xyce::IO::MMIO::MM_typecode mat_code;
     int M=0, N=0, nz=0;
-    string cfile = Instance::baseFileName + ".Chat";
-    string gfile = Instance::baseFileName + ".Ghat";
-    string bfile = Instance::baseFileName + ".Bhat";
-    string lfile = Instance::baseFileName + ".Lhat";
+    std::string cfile = Instance::baseFileName + ".Chat";
+    std::string gfile = Instance::baseFileName + ".Ghat";
+    std::string bfile = Instance::baseFileName + ".Bhat";
+    std::string lfile = Instance::baseFileName + ".Lhat";
     c_file = fopen(cfile.c_str(), "r");
     g_file = fopen(gfile.c_str(), "r");
     b_file = fopen(bfile.c_str(), "r");
     l_file = fopen(lfile.c_str(), "r");
     if (c_file == NULL || g_file == NULL || b_file == NULL || l_file == NULL)
     {
-      string msg="Error: Cannot open one of the ROM files: " + cfile + "," + gfile + "," + bfile + "," + lfile;
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+      UserFatal0(*this) << "Cannot open one of the ROM files: " << cfile << "," << gfile << "," << bfile << "," << lfile;
     }
 
     // Get the input-output numbers from the projected B matrix
-    N_IO_MMIO::mm_read_banner( b_file, &mat_code );
-    N_IO_MMIO::mm_read_mtx_array_size( b_file, &M, &N );
+    Xyce::IO::MMIO::mm_read_banner( b_file, &mat_code );
+    Xyce::IO::MMIO::mm_read_mtx_array_size( b_file, &M, &N );
 
     // Set number of internal variables to dimension of reduced-order model
     if(Instance::usePortDesc)
@@ -244,8 +214,8 @@ Instance::Instance(
     // NOTE: The banners and array sizes need to be read in
     //       before the rest of the file can be read.
     int tmpM=0, tmpN=0;
-    N_IO_MMIO::mm_read_banner( l_file, &mat_code );   // Already read b_file banner
-    N_IO_MMIO::mm_read_mtx_array_size( l_file, &tmpM, &tmpN );  // Already read b_file array size
+    Xyce::IO::MMIO::mm_read_banner( l_file, &mat_code );   // Already read b_file banner
+    Xyce::IO::MMIO::mm_read_mtx_array_size( l_file, &tmpM, &tmpN );  // Already read b_file array size
 
     // Read in Bhat and Lhat multivectors
     for (int i=0; i<M*N; i++)
@@ -256,14 +226,14 @@ Instance::Instance(
 
     // Read in C matrix.
     // NOTE:  This matrix may have been sparsified or stored in a symmetric format
-    N_IO_MMIO::mm_read_banner( c_file, &mat_code );
+    Xyce::IO::MMIO::mm_read_banner( c_file, &mat_code );
     isCSparse = mm_is_sparse(mat_code);
 
     // If the input matrix C is dense, read in the dense data
     if (!isCSparse)
     {
       // Read in array size.
-      N_IO_MMIO::mm_read_mtx_array_size( c_file, &tmpM, &tmpN );
+      Xyce::IO::MMIO::mm_read_mtx_array_size( c_file, &tmpM, &tmpN );
       // TODO:  Add check of tmpM and tmpN
 
       Chat.resize( M*M );
@@ -303,19 +273,16 @@ Instance::Instance(
       }
       else
       {
-        string msg="Error: Do not recognize the Matrix Market format for Chat (matrix is not general or symmetric)";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+        UserFatal0(*this) << "Do not recognize the Matrix Market format for Chat (matrix is not general or symmetric)";
       }
     }
     else
     {
       int nnz=0;
-      N_IO_MMIO::mm_read_mtx_crd_size( c_file, &tmpM, &tmpN, &nnz );
+      Xyce::IO::MMIO::mm_read_mtx_crd_size( c_file, &tmpM, &tmpN, &nnz );
       if (nnz==0)
       {
-        string msg="Error: Chat has zero entries according to the Matrix Market file: ";
-        msg += cfile;
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+        UserFatal0(*this) << "Chat has zero entries according to the Matrix Market file " << cfile;
       }
 
       // Temporary storage for Chat, to read in coordinate format
@@ -323,7 +290,7 @@ Instance::Instance(
       std::vector<int> rowIdx( nnz ), colIdx( nnz );
 
       if (nnz > 0)
-        N_IO_MMIO::mm_read_mtx_crd_data( c_file, tmpM, tmpN, nnz, &rowIdx[0], &colIdx[0], &Chat_tmp[0], mat_code );
+        Xyce::IO::MMIO::mm_read_mtx_crd_data( c_file, tmpM, tmpN, nnz, &rowIdx[0], &colIdx[0], &Chat_tmp[0], mat_code );
 
       // Reduce the row and column indices to 0-based indexing and add entries if the matrix is (skew) symmetric.
       for (int i=0; i<nnz; ++i)
@@ -367,14 +334,14 @@ Instance::Instance(
 
     // Read in G matrix.
     // NOTE:  This matrix may have been sparsified or stored in a symmetric format
-    N_IO_MMIO::mm_read_banner( g_file, &mat_code );
+    Xyce::IO::MMIO::mm_read_banner( g_file, &mat_code );
     isGSparse = mm_is_sparse(mat_code);
 
     // If the input matrix G is dense, read in the dense data
     if (!isGSparse)
     {
       // Read in array size.
-      N_IO_MMIO::mm_read_mtx_array_size( g_file, &tmpM, &tmpN );
+      Xyce::IO::MMIO::mm_read_mtx_array_size( g_file, &tmpM, &tmpN );
       // TODO:  Add check of tmpM and tmpN
 
       Ghat.resize( M*M );
@@ -414,19 +381,16 @@ Instance::Instance(
       }
       else
       {
-        string msg="Error: Do not recognize the Matrix Market format for Ghat (matrix is not general or symmetric)";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+        UserFatal0(*this) << "Do not recognize the Matrix Market format for Ghat (matrix is not general or symmetric)";
       }
     }
     else
     {
       int nnz=0;
-      N_IO_MMIO::mm_read_mtx_crd_size( g_file, &tmpM, &tmpN, &nnz );
+      Xyce::IO::MMIO::mm_read_mtx_crd_size( g_file, &tmpM, &tmpN, &nnz );
       if (nnz==0)
       {
-        string msg="Error: Ghat has zero entries according to the Matrix Market file: ";
-        msg += gfile;
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+        UserFatal0(*this) << "Ghat has zero entries according to the Matrix Market file " << gfile;
       }
 
       // Temporary storage for Ghat, to read in coordinate format
@@ -434,7 +398,7 @@ Instance::Instance(
       std::vector<int> rowIdx( nnz ), colIdx( nnz );
 
       if (nnz > 0)
-        N_IO_MMIO::mm_read_mtx_crd_data( g_file, tmpM, tmpN, nnz, &rowIdx[0], &colIdx[0], &Ghat_tmp[0], mat_code );
+        Xyce::IO::MMIO::mm_read_mtx_crd_data( g_file, tmpM, tmpN, nnz, &rowIdx[0], &colIdx[0], &Ghat_tmp[0], mat_code );
 
       // Reduce the row and column indices to 0-based indexing
       for (int i=0; i<nnz; ++i)
@@ -690,28 +654,11 @@ Instance::~Instance()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/20/02
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                             const vector<int> & extLIDVecRef)
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                             const std::vector<int> & extLIDVecRef)
 {
-  string msg;
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
   // Copy over the local ID lists:
   intLIDVec = intLIDVecRef;
@@ -729,27 +676,25 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
       li_ROM[i] = intLIDVec[i+numExtVars];
   }
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "-----------------------------------------------------------------------------";
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
 
-    cout << "::registerLIDs:\n";
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << "::registerLIDs:\n";
+    Xyce::dout() << "  name = " << getName() << std::endl;
 
-    cout << "\nsolution indices:\n";
+    Xyce::dout() << "\nsolution indices:\n";
     for (int i=0; i<numExtVars; ++i)
-      cout << "  li_up[" << i << "] = " << extLIDVec[i] << endl;
+      Xyce::dout() << "  li_up[" << i << "] = " << extLIDVec[i] << std::endl;
     if (usePortDesc==0)
     {
       for (int i=0; i<numExtVars; ++i)
-        cout << "  li_ip[" << i << "] = " << intLIDVec[i] << endl;
+        Xyce::dout() << "  li_ip[" << i << "] = " << intLIDVec[i] << std::endl;
     }
     for (int i=0; i<numROMVars; i++)
-      cout << "  li_ROM[" << i << "] = " << li_ROM[i] << endl;
+      Xyce::dout() << "  li_ROM[" << i << "] = " << li_ROM[i] << std::endl;
 
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -763,26 +708,17 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/20/02
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef)
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef)
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables.
-  int numSta = staLIDVecRef.size();
-  li_state.resize(numSta,0);
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
   // Copy over the global ID lists:
   staLIDVec = staLIDVecRef;
 
-  for (int ix=0; ix<numSta; ix++) {  li_state[ix] = staLIDVec[ix]; }
+  li_state.resize(numStateVars, 0);
+  for (int ix=0; ix<numStateVars; ix++) {
+    li_state[ix] = staLIDVec[ix];
+  }
 }
 
 //-----------------------------------------------------------------------------
@@ -793,12 +729,12 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef)
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 05/13/05
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
-    string tmpstr;
+    std::string tmpstr;
     if (numIntVars > 0)  // Then add the current variables at the ports
     {
       for (int i=0; i<numExtVars; i++)
@@ -828,7 +764,7 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 08/27/02
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -841,7 +777,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 08/27/02
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
 
   DeviceInstance::registerJacLIDs( jacLIDVec );
@@ -938,35 +874,35 @@ void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "-----------------------------------------\n";
-      cout << "Instance::registerJacLIDs\n";
+      Xyce::dout() << Xyce::section_divider << std::endl;
+      Xyce::dout() << "Instance::registerJacLIDs\n";
       if (usePortDesc==0)
       {
-        cout << " AEqu_up_NodeOffset: ";
+        Xyce::dout() << " AEqu_up_NodeOffset: ";
         for (int i=0; i<numExtVars; i++)
-          cout << AEqu_up_NodeOffset[i] << "  ";
-        cout << endl;
-        cout << " AEqu_ip_NodeOffset: ";
+          Xyce::dout() << AEqu_up_NodeOffset[i] << "  ";
+        Xyce::dout() << std::endl;
+        Xyce::dout() << " AEqu_ip_NodeOffset: ";
         for (int i=0; i<numExtVars; i++)
-          cout << AEqu_ip_NodeOffset[i] << "  ";
-        cout << endl;
-        cout << " AROMEqu_Lt_NodeOffset: ";
+          Xyce::dout() << AEqu_ip_NodeOffset[i] << "  ";
+        Xyce::dout() << std::endl;
+        Xyce::dout() << " AROMEqu_Lt_NodeOffset: ";
         for (int i=0; i<numROMVars; i++)
-          cout << ROMEqu_Lt_NodeOffset[i] << "  ";
-        cout << endl;
-        cout << " AROMEqu_B_NodeOffset: " << endl;
+          Xyce::dout() << ROMEqu_Lt_NodeOffset[i] << "  ";
+        Xyce::dout() << std::endl;
+        Xyce::dout() << " AROMEqu_B_NodeOffset: " << std::endl;
         for (int i=0; i<numROMVars; i++)
         {
           for (int j=0; j<numExtVars; j++)
-            cout << ROMEqu_B_NodeOffset[i*numExtVars+j] << "  ";
-          cout << endl;
+            Xyce::dout() << ROMEqu_B_NodeOffset[i*numExtVars+j] << "  ";
+          Xyce::dout() << std::endl;
         }
-        cout << " AROMEqu_GpC_NodeOffset: ";
+        Xyce::dout() << " AROMEqu_GpC_NodeOffset: ";
         for (int i=0; i<numROMVars; i++)
-          cout << ROMEqu_GpC_NodeOffset[i] << "  ";
-        cout << endl;
+          Xyce::dout() << ROMEqu_GpC_NodeOffset[i] << "  ";
+        Xyce::dout() << std::endl;
       }
-      cout << "-----------------------------------------\n";
+      Xyce::dout() << Xyce::section_divider << std::endl;
     }
 #endif
   }
@@ -1074,7 +1010,7 @@ bool Instance::updatePrimaryState ()
 {
   double * solVec = extData.nextSolVectorRawPtr;
   double * staVec = extData.nextStaVectorRawPtr;
-  vector<double> v_up(numExtVars);
+  std::vector<double> v_up(numExtVars);
   for (int i=0; i<numExtVars; ++i)
   {
     v_up[i] = solVec[extLIDVec[i]];
@@ -1104,8 +1040,8 @@ bool Instance::updatePrimaryState ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << " ----------------------------------" << endl;
-    cout << "Instance::updatePrimaryState:" << endl;
+    Xyce::dout() << " ----------------------------------" << std::endl;
+    Xyce::dout() << "Instance::updatePrimaryState:" << std::endl;
   }
 #endif
 
@@ -1324,7 +1260,7 @@ bool Instance::setIC ()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 02/17/04
 //-----------------------------------------------------------------------------
-void Instance::varTypes( vector<char> & varTypeVec )
+void Instance::varTypes( std::vector<char> & varTypeVec )
 {
 }
 
@@ -1339,7 +1275,7 @@ void Instance::varTypes( vector<char> & varTypeVec )
 // Creator       : Heidi Thornquist, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   return true;
 }
@@ -1352,11 +1288,11 @@ bool Model::processParams (string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 03/23/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1375,10 +1311,11 @@ bool Model::processInstanceParams(string param)
 // Creation Date : 5/17/00
 //-----------------------------------------------------------------------------
 
-Model::Model(const ModelBlock & MB,
-             SolverState & ss1,
-             DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1)
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block)
 {
 
   // Set params to constant default values:
@@ -1405,9 +1342,9 @@ Model::Model(const ModelBlock & MB,
 
 Model::~Model()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1427,28 +1364,49 @@ Model::~Model()
 
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i,isize;
 
   isize = instanceContainer.size();
-  os << endl;
-  os << "Number of ROM instances: " << isize << endl;
-  os << "    name\t\tmodelName\tParameters" << endl;
+  os << std::endl;
+  os << "Number of ROM instances: " << isize << std::endl;
+  os << "    name\t\tmodelName\tParameters" << std::endl;
 
   for (i = 0, iter = first; iter != last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 // ROM Master functions:
 
@@ -1465,15 +1423,15 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << " ----------------------------------" << endl;
-    cout << " Master::updateState: " << endl;
+    Xyce::dout() << " ----------------------------------" << std::endl;
+    Xyce::dout() << " Master::updateState: " << std::endl;
   }
 #endif
 
 #ifdef _OMP
 #pragma omp parallel for
 #endif
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & ci = *(*it);
 
@@ -1508,7 +1466,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
         ci.coefLast = 0.5;
       }
       else
-        std::cout << "Bad 'USE_PORT_DESCRIPTION' flag" << std::endl;
+        Xyce::dout() << "Bad 'USE_PORT_DESCRIPTION' flag" << std::endl;
 
 
       // Get alph=1/dt for current and last time steps
@@ -1521,13 +1479,13 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
       //********************************************************************
       // Load port and internal state variables
       //********************************************************************
-      vector<double> lastStaVec, currStaVec, nextStaVec; // Internal states
+      std::vector<double> lastStaVec, currStaVec, nextStaVec; // Internal states
       lastStaVec.resize(M+N,0);
       currStaVec.resize(M+N,0);
       nextStaVec.resize(M+N,0);
       //for(int ix=0; ix<(M+N); ++ix) { lastStaVec[ix] = (*ci.extData.lastStaVectorPtr)[ix]; }  // WRONG
       for(int ix=0; ix<(M+N); ++ix) { lastStaVec[ix] = (*ci.extData.lastStaVectorPtr)[ ci.li_state[ix] ]; }
-      vector<double> lastPortVec, currPortVec, nextPortVec; // Port voltages
+      std::vector<double> lastPortVec, currPortVec, nextPortVec; // Port voltages
       lastPortVec.resize(N,0);
       currPortVec.resize(N,0);
       nextPortVec.resize(N,0);
@@ -1539,7 +1497,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
       }
 
       /*
-        vector<int> lidState = set this up in registerStateLIDs
+        std::vector<int> lidState = set this up in registerStateLIDs
         localState[ix] = ci.extradata.currState[ ci.lidState[ix] ];
         ci.extData.currState[ ci.lidState[ix] ] = localState[ix];
       */
@@ -1626,7 +1584,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
     if(ci.usePortDesc==0) // REGULAR DEVICE STAMPS
     {
       int N = ci.numExtVars;
-      vector<double> v_up(N);
+      std::vector<double> v_up(N);
       for (int i=0; i<N; ++i)
       {
         v_up[i] = solVec[ci.extLIDVec[i]];
@@ -1638,9 +1596,9 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
       // Compute Fhat[0:numExtVars-1] = i_ip - Lhat'*xhat
       blas.GEMV( Teuchos::TRANS, ci.numROMVars, ci.numExtVars, -1.0, &ci.Lhat[0], ci.numROMVars, xhat, 1, 1.0, &ci.Fhat[0], 1 );
 
-      //    std::cout << "Fhat (should just change first two elements): " << std::endl;
+      //    Xyce::dout() << "Fhat (should just change first two elements): " << std::endl;
       //    for (int i=0; i<ci.numIntVars; i++)
-      //      std::cout << "Fhat [" << i << "] = " << ci.Fhat[i] << std::endl;
+      //      Xyce::dout() << "Fhat [" << i << "] = " << ci.Fhat[i] << std::endl;
 
       // Compute Fhat[numExtVars:numIntVars] = Ghat*xhat - Bhat*v_up
       if (ci.isGSparse)
@@ -1649,9 +1607,9 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
         blas.GEMV( Teuchos::NO_TRANS, ci.numROMVars, ci.numROMVars, 1.0, &ci.Ghat[0], ci.numROMVars, xhat, 1, 0.0, &ci.Fhat[ci.numExtVars], 1 );
       blas.GEMV( Teuchos::NO_TRANS, ci.numROMVars, ci.numExtVars, -1.0, &ci.Bhat[0], ci.numROMVars, &v_up[0], 1, 1.0, &ci.Fhat[ci.numExtVars], 1 );
 
-      //    std::cout << "Fhat (should just change last elements representing ROM): " << std::endl;
+      //    Xyce::dout() << "Fhat (should just change last elements representing ROM): " << std::endl;
       //    for (int i=0; i<ci.numIntVars; i++)
-      //      std::cout << "Fhat [" << i << "] = " << ci.Fhat[i] << std::endl;
+      //      Xyce::dout() << "Fhat [" << i << "] = " << ci.Fhat[i] << std::endl;
 
       // Compute Qhat = Chat * xhat
       if (ci.isCSparse)
@@ -1659,9 +1617,9 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
       else
         blas.GEMV( Teuchos::NO_TRANS, ci.numROMVars, ci.numROMVars, 1.0, &ci.Chat[0], ci.numROMVars, xhat, 1, 0.0, &ci.Qhat[0], 1 );
 
-      //    std::cout << "Qhat (should change all elements): " << std::endl;
+      //    Xyce::dout() << "Qhat (should change all elements): " << std::endl;
       //    for (int i=0; i<ci.numROMVars; i++)
-      //      std::cout << "Qhat [" << i << "] = " << ci.Qhat[i] << std::endl;
+      //      Xyce::dout() << "Qhat [" << i << "] = " << ci.Qhat[i] << std::endl;
     }
   }
 
@@ -1680,14 +1638,14 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 //-----------------------------------------------------------------------------
 void Master::printMatrix ( std::string vname, double * Matrix, int Nrows, int Ncols )
 {
-  std::cout << std::endl << vname << ": " << std::endl;
+  Xyce::dout() << std::endl << vname << ": " << std::endl;
   for(int ix=0; ix < Nrows; ix++)
   {
     for(int iy=0; iy < Ncols; iy++)
     {
-      std::cout << Matrix[iy*Nrows+ix] << " ";
+      Xyce::dout() << Matrix[iy*Nrows+ix] << " ";
     }
-    std::cout << std::endl;
+    Xyce::dout() << std::endl;
   }
 }
 
@@ -1704,12 +1662,12 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << " ----------------------------------" << endl;
-    cout << " Master::loadDAEVectors: " << endl;
+    Xyce::dout() << " ----------------------------------" << std::endl;
+    Xyce::dout() << " Master::loadDAEVectors: " << std::endl;
   }
 #endif
 
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & ci = *(*it);
     if(ci.usePortDesc==0)
@@ -1761,12 +1719,12 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << " ----------------------------------" << endl;
-    cout << " Master::loadDAEMatrices: " << endl;
+    Xyce::dout() << " ----------------------------------" << std::endl;
+    Xyce::dout() << " Master::loadDAEMatrices: " << std::endl;
   }
 #endif
 
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & ci = *(*it);
 
@@ -1776,7 +1734,7 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
       {
-        cout << " loads for ROM " << ci.getName() << endl;
+        Xyce::dout() << " loads for ROM " << ci.getName() << std::endl;
       }
 #endif
 
@@ -1994,6 +1952,19 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
     }
   }
   return true;
+}
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("rom", 1)
+    .registerModelType("rom", 1);
 }
 
 } // namespace ROM

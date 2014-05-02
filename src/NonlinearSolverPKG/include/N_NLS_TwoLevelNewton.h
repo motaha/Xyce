@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.72.2.3 $
+// Revision Number: $Revision: 1.79 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:47 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -51,13 +51,10 @@
 
 // ----------   Xyce Includes   ----------
 #include <N_UTL_fwd.h>
+#include <N_ANP_fwd.h>
 #include <N_NLS_NLParams.h>
 #include <N_NLS_NonLinearSolver.h>
 #include <N_NLS_TwoLevelEnum.h>
-
-// ---------- Forward Declarations ----------
-// Time Integrator
-class N_ANP_AnalysisInterface;
 
 // Loader for RHS and Jacobian
 class N_LOA_Loader;
@@ -66,9 +63,6 @@ class N_LOA_Loader;
 class N_LAS_Matrix;
 class N_LAS_Vector;
 class N_LAS_System;
-
-// Options
-class N_UTL_Param;
 
 //-----------------------------------------------------------------------------
 // Class         : N_NLS_TwoLevelNewton
@@ -146,12 +140,8 @@ public:
 private:
   N_NLS_TwoLevelNewton();
 
-#ifdef Xyce_VERBOSE_NONLINEAR
-
-  void printHeader_();
   void printStepInfo_(int step, int success, TwoLevelNewtonMode solveType);
 
-#endif
   void zeroInnerLoopStatistics_ ();
   void calcInnerLoopStatistics_ ();
 
@@ -238,7 +228,7 @@ private:
 
   bool numInterfaceNodesSetup_;
 
-  vector<int> numInterfaceNodes_;
+  std::vector<int> numInterfaceNodes_;
 
   TwoLevelNewtonMode twoLevelCouplingMode_;
 
@@ -260,9 +250,9 @@ private:
 
   // continuation parameters used for algorithm 4.  (not the
   // continuationLoop_ function, that's different)
-  vector <string> paramNameList;
-  vector <double> paramFinalVal;
-  vector <double> paramCurrentVal;
+  std::vector<std::string> paramNameList;
+  std::vector<double> paramFinalVal;
+  std::vector<double> paramCurrentVal;
 
   // These options are saved in case they have to be modified
   // over the course of the solve.

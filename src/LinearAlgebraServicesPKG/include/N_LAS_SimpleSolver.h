@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.3.2.2 $
+// Revision Number: $Revision: 1.8 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:44 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,15 +46,7 @@
 #ifndef Xyce_N_LAS_SimpleSolver_h
 #define Xyce_N_LAS_SimpleSolver_h
 
-// ---------- Standard Includes ----------
-
 #include <string>
-
-class Epetra_LinearProblem;
-class Epetra_CrsMatrix;
-class Epetra_Export;
-
-// ----------   Xyce Includes   ----------
 
 #include <N_LAS_Solver.h>
 #include <N_UTL_fwd.h>
@@ -62,7 +54,10 @@ class Epetra_Export;
 
 class N_LAS_Problem;
 class N_LAS_Transform;
-class N_UTL_Timer;
+
+class Epetra_LinearProblem;
+class Epetra_CrsMatrix;
+class Epetra_Export;
 
 //-----------------------------------------------------------------------------
 // Class         : N_LAS_SimpleSolver
@@ -85,7 +80,7 @@ public:
   // Set the solver options
   bool setOptions(const N_UTL_OptionBlock & OB);
   bool setDefaultOptions();
-  bool setDefaultOption( const string & option );
+  bool setDefaultOption( const std::string & option );
 
   // Set individual options
   bool setParam( const N_UTL_Param & param );

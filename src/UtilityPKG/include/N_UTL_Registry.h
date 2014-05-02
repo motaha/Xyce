@@ -29,16 +29,16 @@
 //
 // Special Notes  : 
 //
-// Creator        : David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+// Creator        : David G. Baur  Raytheon  Sandia National Laboratories 1355 
 //
 // Creation Date  : 2013/04/18 18:01:27
 //
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.5.2.3 $
+// Revision Number: $Revision: 1.8.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/03/03 18:29:29 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -84,7 +84,8 @@ namespace Xyce {
 namespace Plugin {
 
 template<class T>
-inline const T &demangle(const T &t) {
+inline const T &demangle(const T &t) 
+{
   return t;
 }
 
@@ -108,7 +109,8 @@ public:
 
   struct Cmp_ : std::binary_function<Key_, Key_, bool>
   {
-    bool operator()(const Key_ &lhs, const Key_ &rhs ) const {
+    bool operator()(const Key_ &lhs, const Key_ &rhs ) const 
+    {
       if (*lhs.first == *rhs.first)
         return cmp(lhs.second, rhs.second);
       else
@@ -147,7 +149,8 @@ public:
    * @param key_pair           a <b>KeyPair</b> gives the key to the registry
    *                            entry.
    */
-  explicit Registry(const KeyPair &key_pair) {
+  explicit Registry(const KeyPair &key_pair) 
+  {
     registerIt(key_pair, this);
   }
 
@@ -159,7 +162,7 @@ public:
   virtual ~Registry()
   {}
 
-   /**
+  /**
    * @brief Member function <b>registerDL</b> opens a dynamic library and optionally executes a "C"
    * registration function.
    *
@@ -181,30 +184,37 @@ public:
    *                            which will be called immediately after loading the sharable object.
    *
    */
-  static void registerDL(const char *so_path, const char *function_key = 0) {
+  static void registerDL(const char *so_path, const char *function_key = 0) 
+  {
 #ifdef XYCE_DLOPEN_ENABLED
     slibout.m(Slib::LOG_PLUGIN) << "Loading dynamic library " << so_path << stk::diag::dendl;
     void *dl = dlopen(so_path, RTLD_NOW);
-    if (!dl){
+    if (!dl)
+    {
       throw std::runtime_error(dlerror());
     }
 
-    if (function_key) {
+    if (function_key) 
+    {
       std::string s = std::strlen(function_key) ? function_key : "dl_register";
 
       dl_register_t f = (dl_register_t) dlsym(dl, s.c_str());
-      if (!f) {
+      if (!f) 
+      {
         s = s + XYCE_FORTRAN_SUFFIX;
 
         f = (dl_register_t) dlsym(dl, s.c_str());
       }
 
-      if (f) {
+      if (f) 
+      {
         slibout.m(Slib::LOG_PLUGIN) << "Executing dynamic library " << so_path << " function " << s << "()" << stk::diag::dendl;
         (*f)();
       }
-      else {
-        if (std::strlen(function_key)) {
+      else 
+      {
+        if (std::strlen(function_key)) 
+        {
           std::ostringstream str;
           str << "Registration function " << function_key << " not found in " << so_path;
           throw std::runtime_error(str.str().c_str());
@@ -218,11 +228,13 @@ public:
   }
 
   template <typename T>
-  static T getsym(const char *sym) {
+  static T getsym(const char *sym) 
+  {
 #ifdef XYCE_DLOPEN_ENABLED
     void *s = NULL;
     void *dl = dlopen(NULL, RTLD_LAZY);
-    if (dl) {
+    if (dl) 
+    {
       s = dlsym(dl, sym);
       dlclose(dl);
     }
@@ -251,13 +263,15 @@ public:
    *                            registered for the derived class.
    *
    */
-  void registerIt(const KeyPair &key_pair, void *func_ptr) {
+  void registerIt(const KeyPair &key_pair, void *func_ptr) 
+  {
     // slibout.m(Slib::LOG_PLUGIN) << "Registering " << key_pair.second
     //                             << " of type " << demangle(key_pair.first->key())
     //                             << " at " << func_ptr << stk::diag::dendl;
 
     typename Map::const_iterator registry_entry = map.find(key_pair);
-    if (registry_entry != map.end() && (*registry_entry).second != func_ptr) {
+    if (registry_entry != map.end() && (*registry_entry).second != func_ptr) 
+    {
       std::ostringstream strout;
       strout << "Function with signature " << demangle((*registry_entry).first.first->name());
       strout << " and derived key '";
@@ -283,11 +297,13 @@ public:
    *                            if the function is not found.
    *
    */
-  void *getPluginPtr(const KeyPair &key_pair) const {
+  void *getPluginPtr(const KeyPair &key_pair) const 
+  {
     void *creator_function = getFuncPtr(key_pair);
     if (creator_function)
       return creator_function;
-    else {
+    else 
+    {
       std::ostringstream strout;
 
       strout << "User plugin creator function with base class '" << demangle(key_pair.first->name())
@@ -313,11 +329,13 @@ public:
    *                            if the function is not found.
    *
    */
-  void *getFunctionPtr(const KeyPair &key_pair) const {
+  void *getFunctionPtr(const KeyPair &key_pair) const 
+  {
     void *creator_function = getFuncPtr(key_pair);
     if (creator_function)
       return creator_function;
-    else {
+    else 
+    {
       std::ostringstream strout;
 
       strout << "User subroutine " << key_pair.second << "\n"
@@ -331,7 +349,7 @@ public:
 
   /**
    * @brief Member function <b>getFuncPtr</b> returns the function pointer with the
-   * specfied <it>key_pair</i>.
+   * specfied <i>key_pair</i>.
    *
    * @param key_pair           a <b>KeyPair</b> const reference to the registered
    *                            key pair.
@@ -339,11 +357,13 @@ public:
    * @returns                   a <b>void</b> function pointer with the specfied
    *                            <it>key_pair</i>.
    */
-  Registry *getFactoryPtr(const KeyPair &key_pair) const {
+  Registry *getFactoryPtr(const KeyPair &key_pair) const 
+  {
     Registry *creator_function = (Registry *) getFuncPtr(key_pair);
     if (creator_function)
       return creator_function;
-    else {
+    else 
+    {
       std::ostringstream strout;
       strout << "Registry does not contain function with signature " << demangle(key_pair.first->name())
              << " and derived name '" << key_pair.second << "'";
@@ -361,7 +381,8 @@ public:
    * @returns                   a <b>void</b> function pointer with the specfied
    *                            <em>key_pair</em>.
    */
-  void *getFuncPtr(const KeyPair &key_pair) const {
+  void *getFuncPtr(const KeyPair &key_pair) const 
+  {
     typename Map::const_iterator registry_entry = map.find(key_pair);
     return registry_entry == map.end() ? NULL : (*registry_entry).second;
   }
@@ -376,7 +397,8 @@ public:
    * @returns                   a <b>std::vector<str::string></b> value of the derived
    *                            names.
    */
-  KeyVector getDerivedKey(const std::type_info &type) const {
+  KeyVector getDerivedKey(const std::type_info &type) const 
+  {
     KeyVector derived_keys;
 
     for (typename Map::const_iterator it = map.begin(); it != map.end(); ++it)
@@ -402,7 +424,8 @@ public:
    * @return                    a <b>T</b> reference to the creation factory object.
    */
   template<class T>
-  static T &create(const Registry<Key> &registry, const Key &derived_key) {
+  static T &create(const Registry<Key> &registry, const Key &derived_key) 
+  {
     return static_cast<T &>(*registry.getFactoryPtr(KeyPair(&typeid(T), derived_key)));
   }
 
@@ -414,7 +437,8 @@ public:
    *
    * @return                    a <b>std::ostream</b> reference to <em>os</em>.
    */
-  std::ostream &verbose_print(std::ostream &os) const {
+  std::ostream &verbose_print(std::ostream &os) const 
+  {
     for (typename Map::const_iterator it = map.begin(); it != map.end(); ++it)
       os << (*it).first.second << " of type " << demangle((*it).first.first->name()) << " at " << (*it).second << std::endl;
     return os;
@@ -471,7 +495,8 @@ public:
    *                            function.
    *
    */
-  static void registerCreator(Registry &registry, const Key &derived_key, Signature function) {
+  static void registerCreator(Registry &registry, const Key &derived_key, Signature function) 
+  {
     registry.registerIt(KeyPair(&typeid(Signature), derived_key), (void *) function);
   }
 
@@ -489,7 +514,8 @@ public:
    * @return                    a <b>Signature</b> function pointer to the instance
    *                            create function.
    */
-  static Signature create(const Registry &registry, const Key &derived_key) {
+  static Signature create(const Registry &registry, const Key &derived_key) 
+  {
     Signature creator_function = (Signature) registry.getPluginPtr(KeyPair(&typeid(Signature), derived_key));
 
     return (*creator_function);
@@ -504,7 +530,8 @@ public:
    *
    * @return                    a <b>bool</b> of true if class of the type specified by derived_key exists in BaseClass.
    */
-  static bool exists(const Registry &registry, const Key &derived_key) {
+  static bool exists(const Registry &registry, const Key &derived_key) 
+  {
     return registry.getFuncPtr(KeyPair(&typeid(Signature), derived_key)) != NULL;
   }
 
@@ -593,6 +620,9 @@ public:
    * getCreatorName() static member function.  The signature is defined
    * UserSubroutineTraits template argument's Signature typedef.
    *
+   * @param registry           a <b>Registry</b> const reference to the 
+   *                            registry in which to search for the key.
+   *
    * @param function_key       a <b>Key</b> const reference to the user
    *                            function's name.
    *
@@ -600,7 +630,8 @@ public:
    *                            function.
    *
    */
-  inline static void registerFunction(Registry &registry, const Key &function_key, Signature *function) {
+  inline static void registerFunction(Registry &registry, const Key &function_key, Signature *function) 
+  {
     registry.registerIt(KeyPair(&typeid(Signature), function_key), (void *) function);
   }
 
@@ -617,7 +648,8 @@ public:
    *
    * @return                    a <b>Signature</b> user function.
    */
-  static Signature *execute(Registry &registry, const Key &function_key) {
+  static Signature *execute(Registry &registry, const Key &function_key) 
+  {
     Signature *user_function = (Signature *) registry.getFunctionPtr(KeyPair(&typeid(Signature), function_key));
 
     return (*user_function);
@@ -626,6 +658,9 @@ public:
   /**
    * @brief Member function <b>execute</b> returns the user function function
    * pointer associated with the specified signature and derived_key.
+   *
+   * @param registry           a <b>Registry</b> const reference to the 
+   *                            registry in which to search for the key.
    *
    * @param function_key       a <b>Key</b> const reference to the user
    *                            function's name.
@@ -636,7 +671,8 @@ public:
    *
    * @return                    a <b>Signature</b> user function pointer.
    */
-  static Signature *getFunction(const Registry &registry, const Key &function_key) {
+  static Signature *getFunction(const Registry &registry, const Key &function_key) 
+  {
     Signature *user_function = (Signature *) registry.getFunctionPtr(KeyPair(&typeid(Signature), function_key));
 
     return user_function;
@@ -646,13 +682,17 @@ public:
    * @brief Member function <b>exists</b> returns true if user function specified by
    * derived_key exists.
    *
-   * @param function_key       a <b>Key</b> const reference to the user
+   * @param registry          a <b>Registry</b> const reference to the 
+   *                            registry in which to search for the key.
+   *
+   * @param derived_key       a <b>Key</b> const reference to the user
    *                            function's name.
    *
    * @return                    a <b>bool</b> of true if user function specified
    *                            signature and <i>function_key</i> exists in BaseClass.
    */
-  static bool exists(const Registry &registry, const Key &derived_key) {
+  static bool exists(const Registry &registry, const Key &derived_key) 
+  {
     return registry.getFuncPtr(KeyPair(&typeid(Signature), derived_key)) != NULL;
   }
 
@@ -668,8 +708,13 @@ public:
      * @brief Creates a new <b>Register</b> instance.  Upon creation, the
      * <i>func_ptr()</i> function is registered with the <i>function_key</i>.
      *
+     * @param registry           a <b>Registry</b> const reference to the 
+     *                            registry in which to search for the key.
+     *
      * @param function_key     a <b>Key</b> const reference to the user
      *                          function's name.
+     * 
+     * @param function         a <b>Signature</b> pointer to the function.
      *
      */
     Register(Registry &registry, const Key &function_key, Signature *function)
@@ -687,7 +732,8 @@ public:
 // void *Registry<Key>::getsym<void *>(const char *sym);
 
 // template <typename Key, typename T>
-// inline T Registry<Key>::getsym(const char *sym) {
+// inline T Registry<Key>::getsym(const char *sym) 
+// {
 //   return static_cast<T>(getsym<void *>(sym));
 // }
 

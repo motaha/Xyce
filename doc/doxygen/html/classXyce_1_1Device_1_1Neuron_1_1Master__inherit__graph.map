@@ -1,0 +1,5 @@
+<map id="Xyce::Device::Neuron::Master" name="Xyce::Device::Neuron::Master">
+<area shape="rect" id="node2" href="$classXyce_1_1Device_1_1DeviceMaster.html" title="Xyce::Device::DeviceMaster\l\&lt; Traits \&gt;" alt="" coords="5,174,200,215"/>
+<area shape="rect" id="node3" href="$classXyce_1_1Device_1_1Device.html" title="The Device class is an interface for device implementations." alt="" coords="51,5,201,32"/>
+<area shape="rect" id="node4" href="$classXyce_1_1Device_1_1DeviceMaster.html" title="DeviceMaster instantiates a device as described by the device traits T." alt="" coords="119,83,347,109"/>
+</map>

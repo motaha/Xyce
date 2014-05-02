@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -38,9 +38,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.9.2.2 $
+// Revision Number: $Revision: 1.24.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -48,6 +48,7 @@
 #ifndef Xyce_N_DEV_ACC_h
 #define Xyce_N_DEV_ACC_h
 // ----------   Xyce Includes   ----------
+#include <N_DEV_Configuration.h>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceInstance.h>
 #include <N_DEV_DeviceModel.h>
@@ -56,8 +57,20 @@ namespace Xyce {
 namespace Device {
 namespace ACC {
 
-// ---------- Forward Declarations -------
 class Model;
+class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance>
+{
+  static const char *name() {return "Accelerated Object Device";}
+  static const char *deviceTypeName() {return "ACC level 1";}
+  static const int numNodes() {return 3;}
+  static const bool isLinearDevice() {return true;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : Instance
@@ -87,20 +100,15 @@ class Instance : public DeviceInstance
 {
   friend class ParametricData<Instance>;
   friend class Model;
-
+  friend class Traits;
+    
 public:
-  static ParametricData<Instance> &getParametricData();
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Instance(InstanceBlock & IB,
-           Model & Riter,
-           MatrixLoadData & mlData1,
-           SolverState &ss1,
-           ExternData  &ed1,
-           DeviceOptions & do1);
+  Instance(
+     const Configuration &       configuration,
+     const InstanceBlock &       IB,
+     Model &                     Riter,
+     const FactoryBlock &        factory_block);
 
   ~Instance();
 
@@ -109,18 +117,18 @@ private:
   Instance &operator=(const Instance &);
 
 public:
-  void registerLIDs( const vector<int> & intLIDVecRef,
-                     const vector<int> & extLIDVecRef );
-  void registerStateLIDs( const vector<int> & staLIDVecRef );
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
+  void registerStateLIDs( const std::vector<int> & staLIDVecRef );
 
-  map<int,string> & getIntNameMap ();
+  std::map<int,std::string> & getIntNameMap ();
 
   bool updateIntermediateVars ();
   bool updatePrimaryState ();
   bool updateSecondaryState ();
 
-  const vector< vector<int> > & jacobianStamp() const;
-  void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
   // load functions, residual:
   bool loadDAEQVector ();
@@ -133,12 +141,13 @@ public:
 public:
   // iterator reference to the ACC model which owns this instance.
   // Getters and setters
-  Model &getModel() {
+  Model &getModel() 
+  {
     return model_;
   }
 
 private:
-  static vector< vector<int> >  jacStamp;
+  static std::vector< std::vector<int> >  jacStamp;
 
   Model &       model_;         //< Owning model
 
@@ -190,17 +199,13 @@ class Model : public DeviceModel
 
   friend class ParametricData<Model>;
   friend class Instance;
-
+  friend class Traits;
+    
 public:
-  static ParametricData<Model> &getParametricData();
-
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Model(const ModelBlock & MB,
-        SolverState & ss1,
-        DeviceOptions & do1);
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &          MB,
+     const FactoryBlock &        factory_block);
   ~Model();
 
 private:
@@ -209,29 +214,43 @@ private:
   Model &operator=(const Model &);
 
 public:
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
+    
   virtual std::ostream &printOutInstances(std::ostream &os) const;
 
-    virtual bool processParams(std::string param = "")
-    {}
+  virtual bool processParams() 
+  {
+    return true;
+  }
 
-    virtual bool processInstanceParams(std::string param = "")
-    {}
-
+  virtual bool processInstanceParams() 
+  {
+    return true;
+  }
 
 public:
-  InstanceVector &getInstanceVector() {
+  void addInstance(Instance *instance) 
+  {
+    instanceContainer.push_back(instance);
+  }
+
+  InstanceVector &getInstanceVector() 
+  {
     return instanceContainer;
   }
 
-  const InstanceVector &getInstanceVector() const {
+  const InstanceVector &getInstanceVector() const 
+  {
     return instanceContainer;
   }
 
 private:
-  vector<Instance*> instanceContainer;
+  std::vector<Instance*> instanceContainer;
 
 private:
 };
+
+void registerDevice();
 
 } // namespace ACC
 } // namespace Device

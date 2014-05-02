@@ -29,16 +29,16 @@
 //
 // Special Notes  : 
 //
-// Creator        : David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+// Creator        : David G. Baur  Raytheon  Sandia National Laboratories 1355 
 //
 // Creation Date  : 2013/04/18 18:01:27
 //
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.2.2.2 $
+// Revision Number: $Revision: 1.13.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/03/03 18:29:29 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -46,13 +46,28 @@
 #ifndef Xyce_N_UTL_LogStream_h
 #define Xyce_N_UTL_LogStream_h
 
-#include <ostream>
+#include <iosfwd>
 
+#include <N_PDS_fwd.h>
+#include <N_UTL_fwd.h>
 #include <N_UTL_IndentStreamBuf.h>
 
 namespace Xyce {
 
 std::ostream &lout();
+std::ostream &dout();
+std::ostream &pout();
+
+void pout(Parallel::Machine comm);
+
+void initializeLogStream(int rank, int size);
+
+bool openLogFile(const std::string &path, bool per_processor);
+void closeLogFile();
+
+void initializeLogStreamByThread();
+void addThreadStream(std::ostream *os);
+void removeThreadStream(std::ostream *os);
 
 } // namespace Xyce
 

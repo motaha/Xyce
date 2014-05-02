@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.20.6.2 $
+// Revision Number: $Revision: 1.25.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Date  : $Date: 2014/02/26 20:42:38 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -56,46 +56,47 @@
 #include <vector>
 #include <iosfwd>
 
-// ----------   Xyce Includes   ----------
 #include <N_UTL_Packable.h>
 #include <N_UTL_Xyce.h>
 
-class N_IO_SpiceSeparatedFieldTool
-{
+namespace Xyce {
+namespace IO {
 
+class SpiceSeparatedFieldTool
+{
 public:
 
   struct StringToken : public Packable
   {
-     StringToken(): lineNumber_(0), string_(""){};
-     StringToken(string const& fileName, size_t lineNum, string const& str):
-        lineNumber_(lineNum), string_(str){};
-     ~StringToken(){};
+    StringToken(): lineNumber_(0), string_(""){};
+    StringToken(std::string const& fileName, size_t lineNum, std::string const& str):
+      lineNumber_(lineNum), string_(str){};
+    ~StringToken(){};
 
-     string string_;
-     size_t lineNumber_;
+    std::string string_;
+    size_t lineNumber_;
 
-     // Packing functionality.
-     Packable * instance() const;
+    // Packing functionality.
+    Packable * instance() const;
 
-     // Counts bytes needed to pack block.
-     int packedByteCount() const;
+    // Counts bytes needed to pack block.
+    int packedByteCount() const;
 
-     // Packs OptionBlock into char buffer using MPI_PACK.
-     void pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) const;
+    // Packs OptionBlock into char buffer using MPI_PACK.
+    void pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) const;
 
-     // Unpacks OptionBlock from char buffer using MPI_UNPACK.
-     void unpack(char * pB, int bsize, int & pos, N_PDS_Comm * comm);
+    // Unpacks OptionBlock from char buffer using MPI_UNPACK.
+    void unpack(char * pB, int bsize, int & pos, N_PDS_Comm * comm);
   };
 
-  N_IO_SpiceSeparatedFieldTool(ifstream & input, string const & fileName, 
-      const vector< pair< string, string > > & externalParams );
+  SpiceSeparatedFieldTool(std::ifstream & input, std::string const & fileName, 
+                          const std::vector< std::pair< std::string, std::string > > & externalParams );
   // Constructor
 
-  ~N_IO_SpiceSeparatedFieldTool() { }
+  ~SpiceSeparatedFieldTool() { }
   // Destructor
 
-  int getLine(vector<StringToken> & line);
+  int getLine(std::vector<StringToken> & line);
   // R int
   // R- Returns 1 if end-of-file has not been reached, 0 otherwise.
   // O str
@@ -106,7 +107,7 @@ public:
   // KRS, 10/11/07:  this is the original version of getLine, modified to 
   // handle ground synonym replacements.
 
-  int getLine(vector<StringToken> & line, bool replgndvar);
+  int getLine(std::vector<StringToken> & line, bool replgndvar);
   // R int
   // R- Returns 1 if end-of-file has not been reached, 0 otherwise.
   // O str
@@ -122,7 +123,7 @@ public:
   // Technically, doing so shouldn't cause errors, but this is more of a 
   // precaution for unforseen circumstances.
 
-  int getLineWithComments(vector<StringToken> & line);
+  int getLineWithComments(std::vector<StringToken> & line);
   // R int
   // R- Returns 1 if end-of-file has not been reached, 0 otherwise.
   // O str
@@ -133,7 +134,7 @@ public:
   // KRS, 12/05/07:  this is the original version of getLine, except that it
   // does NOT skip comments and blank lines (used for netlist copying).
   
-  int getLine2(vector<StringToken> & line);
+  int getLine2(std::vector<StringToken> & line);
   // R int
   // R- Returns 1 if end-of-file has not been reached, 0 otherwise.
   // O str
@@ -156,33 +157,32 @@ public:
   int getLineNumber() { return cursorLineNum_; }
 
   // Return the current character position in file.
-  streampos getFilePosition() const;
+  std::streampos getFilePosition() const;
 
   // Set the location in the ifstream at which the next input operation
   // will begin.
-  bool setLocation(streampos const& startLocation);
+  bool setLocation(std::streampos const& startLocation);
 
-  const string & getFileName() const {return fileName_;};
+  const std::string & getFileName() const {return fileName_;};
 
-protected:
+private:
+  std::ifstream & in_;
 
-private :
-
-  ifstream & in_;
-
-  string fileName_;
+  std::string fileName_;
   size_t cursorLineNum_; //The physical line number of the cursor
-  vector< pair< string, string > > externalParams_;
+  std::vector< std::pair< std::string, std::string > > externalParams_;
 
   // R bool
   // R-
   bool NextChar_(char & c);
-  void substituteExternalParams(vector<StringToken>& line);
+  void substituteExternalParams(std::vector<StringToken>& line);
   void skipToEndOfLine_();
   void skipCommentsAndBlankLines_();
-
-public:
-
 };
+
+} // namespace IO
+} // namespace Xyce
+
+typedef Xyce::IO::SpiceSeparatedFieldTool N_IO_SpiceSeparatedFieldTool;
 
 #endif // SpiceSeparatedFieldTool_H 

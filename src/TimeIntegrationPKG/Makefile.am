@@ -14,6 +14,8 @@ libTimeIntegration_la_SOURCES = \
   $(srcdir)/src/N_TIA_Gear12.C \
   $(srcdir)/src/N_TIA_OneStep.C \
   $(srcdir)/src/N_TIA_NoTimeIntegration.C \
+  $(srcdir)/src/N_TIA_TwoLevelError.C \
+  $(srcdir)/src/N_TIA_TimeIntInfo.C \
   $(srcdir)/include/N_TIA_Assembler.h \
   $(srcdir)/include/N_TIA_BackwardDifferentiation15.h \
   $(srcdir)/include/N_TIA_Gear12.h \
@@ -27,5 +29,4 @@ libTimeIntegration_la_SOURCES = \
   $(srcdir)/include/N_TIA_TimeIntegrationMethods.h \
   $(srcdir)/include/N_TIA_TimeIntegrationEnum.h \
   $(srcdir)/include/N_TIA_TimeIntInfo.h \
-  $(srcdir)/include/N_TIA_TwoLevelError.h \
-  $(srcdir)/include/N_TIA_MachDepParams.h
+  $(srcdir)/include/N_TIA_TwoLevelError.h

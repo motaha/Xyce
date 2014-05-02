@@ -1,0 +1,5 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classXyce_1_1Device_1_1DeviceTraits.html" title="Xyce::Device::DeviceTraits\l\&lt; Model, Instance, Resistor\l::Traits \&gt;" alt="" coords="6,31,199,87"/>
+<area shape="rect" id="node2" href="$structXyce_1_1Device_1_1Resistor3_1_1Traits.html" title="Xyce::Device::Resistor3\l::Traits" alt="" coords="271,5,439,46"/>
+<area shape="rect" id="node3" href="$structXyce_1_1Device_1_1ThermalResistor_1_1Traits.html" title="Xyce::Device::ThermalResistor\l::Traits" alt="" coords="249,70,461,111"/>
+</map>

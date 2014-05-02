@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,35 +36,29 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.22.2.2 $
+// Revision Number: $Revision: 1.31.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Date  : $Date: 2014/02/26 20:42:38 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
-#ifndef DeviceMetadata_H
-#define DeviceMetadata_H
+#ifndef Xyce_N_IO_CircuitMetadata_h
+#define Xyce_N_IO_CircuitMetadata_h
 
-// ---------- Standard Includes ----------
-
-#include <list>
 #include <map>
 #include <string>
 #include <vector>
 
-// ----------   Xyce Includes   ----------
-
 #include <N_DEV_fwd.h>
-#include <N_DEV_DeviceLevelKey.h>
 #include <N_DEV_Param.h>
-#include <N_UTL_Misc.h>
 #include <N_UTL_NoCase.h>
-
-// ---------- Forward Declarations ----------
 
 namespace Xyce {
 namespace IO {
+
+typedef std::map<std::string, std::vector<Device::Param>, LessNoCase> DeviceParamMap;
+typedef std::map<std::string, std::vector<Util::Param>, LessNoCase> UtilParamMap;
 
 //-----------------------------------------------------------------------------
 // Class         : DeviceMetadata
@@ -74,41 +68,47 @@ namespace IO {
 // Creation Date : 12/11/00
 //-----------------------------------------------------------------------------
 
-class DeviceMetadata
+struct DeviceMetadata
 {
-public:
-  typedef Device::DeviceParamMap DeviceParamMap;
-
   DeviceMetadata()
-    : deviceType(""),
+    : levelValid(false),
+      deviceType(),
       level(0),
       numNodes(0),
       numOptionalNodes(0),
       numFillNodes(0),
       modelRequired(0),
-      primaryParameter("") {};
+      primaryParameter(),
+      modelTypes(),
+      instanceParameters(),
+      modelParameters(),
+      instanceCompositeParameterMap(),
+      modelCompositeParameterMap()
+  {}
 
-  DeviceMetadata(const std::string & dtype, int lev)
-    : deviceType(dtype),
-      level(lev),
-      numNodes(0),
-      numOptionalNodes(0),
-      numFillNodes(0),
-      modelRequired(0),
-      primaryParameter("") {};
+  bool isModelTypeValid(const std::string & modelType) const 
+  {
+    return std::find_if(modelTypes.begin(), modelTypes.end(), EqualNoCasePred(modelType)) != modelTypes.end();
+  }
 
-  std::string deviceType;
-  int level;
-  int numNodes;
-  int numOptionalNodes;
-  int numFillNodes;
-  int modelRequired;
-  std::string primaryParameter;
-  std::vector<std::string> modelTypes;
-  std::vector<Device::Param> instanceParameters;
-  std::vector<Device::Param> modelParameters;
-  DeviceParamMap instanceCompositeParameterMap;
-  DeviceParamMap modelCompositeParameterMap;
+  bool isModelLevelValid() const 
+  {
+    return levelValid;
+  }
+
+  bool                        levelValid;
+  std::string                 deviceType;
+  int                         level;
+  int                         numNodes;
+  int                         numOptionalNodes;
+  int                         numFillNodes;
+  int                         modelRequired;
+  std::string                 primaryParameter;
+  std::vector<std::string>    modelTypes;
+  std::vector<Device::Param>  instanceParameters;
+  std::vector<Device::Param>  modelParameters;
+  DeviceParamMap              instanceCompositeParameterMap;
+  DeviceParamMap              modelCompositeParameterMap;
 };
 
 //-----------------------------------------------------------------------------
@@ -122,95 +122,118 @@ public:
 class CircuitMetadata
 {
 public:
-  typedef Device::DeviceParamMap DeviceParamMap;
-  typedef Device::DeviceLevelKey DeviceLevelKey;
-  typedef std::map<DeviceLevelKey, DeviceLevelKey, Device::DeviceLevelLess> DeviceMetadataIndexMap;
-  typedef std::map<DeviceLevelKey, DeviceMetadata, Device::DeviceLevelLess> DeviceMetadataMap;
+  typedef std::map<NameLevelKey, NameLevelKey, NameLevelLess> DeviceMetadataIndexMap;
+  typedef std::map<NameLevelKey, DeviceMetadata, NameLevelLess> DeviceMetadataMap;
 
   CircuitMetadata()
-    : metadataLocation("")
-  {};
+    : deviceMetadata_(),
+      deviceMetadataIndex(),
+      optionsMetadata_(),
+      sourceFcnMap()
+  {}
 
-  // Destructor
   ~CircuitMetadata()
-  {};
+  {}
 
   // Build device instance and model metadata.
-  void buildMetadata( );
+  void buildMetadata();
 
   // Find the metadata for a given device. If not found, return NULL.
-  DeviceMetadata* findDeviceMetadata(
-    const std::string & deviceType,
-    int level);
+  DeviceMetadata &getDeviceMetadata(const std::string & deviceType, int level) const;
 
   // Determine if the given model type is valid for the given device.
-  bool isModelTypeValid(
-    const std::string & deviceType,
-    const std::string & modelType,
-    int modelLevel);
+  bool isModelLevelValid(const std::string & deviceType, int modelLevel) const 
+  {
+    return getDeviceMetadata(deviceType, modelLevel).isModelLevelValid();
+  }
 
-  // Determine if the given parameter name is a valid parameter for
-  // the given device.
-  bool isDeviceParameter(const std::string & deviceType, int modelLevel, const std::string & parameterName);
+  // Determine if the given model type is valid for the given device.
+  bool isModelTypeValid(const std::string & deviceType, const std::string & modelType, int modelLevel) const 
+  {
+    return getDeviceMetadata(deviceType, modelLevel).isModelTypeValid(modelType);
+  }
 
-  std::string getPrimaryParameter(const std::string & deviceType, int modelLevel);
+  // Determine if the given parameter name is a valid parameter for the given device.
+  bool isDeviceParameter(const std::string & deviceType, int modelLevel, const std::string & parameterName) const 
+  {
+    DeviceMetadata &device_metadata = getDeviceMetadata(deviceType, modelLevel);
 
-  int getNumberOfNodes(const std::string & deviceType, int modelLevel);
+    std::vector<Device::Param>::const_iterator it = std::find(device_metadata.instanceParameters.begin(),
+                                                              device_metadata.instanceParameters.end(),
+                                                              Device::Param(parameterName, ""));
 
-  int getNumberOfOptionalNodes(const std::string & deviceType, int modelLevel);
+    return it != device_metadata.instanceParameters.end();
+  }
 
-  int getNumberOfFillNodes(const std::string & deviceType, int modelLevel);
 
-  bool isModelRequired(const std::string & deviceType, int modelLevel);
+  const std::string &getPrimaryParameter(const std::string & deviceType, int modelLevel) const 
+  {
+    return getDeviceMetadata(deviceType, modelLevel).primaryParameter;
+  }
 
-  int getSourceFunctionID(const std::string & sourceFcn);
+  int getNumberOfNodes(const std::string & deviceType, int modelLevel) const 
+  {
+    return getDeviceMetadata(deviceType, modelLevel).numNodes;
+  }
 
-  std::vector<Device::Param> * getPtrToInstanceParameters(
-    const std::string & deviceType,
-    int modelLevel);
+  int getNumberOfOptionalNodes(const std::string & deviceType, int modelLevel) const 
+  {
+    return getDeviceMetadata(deviceType, modelLevel).numOptionalNodes;
+  }
 
-  void getInstanceCompositeComponents(
-    const std::string & deviceType,
-    const std::string & parameterName, int modelLevel,
-    std::vector<Device::Param> & components);
+  int getNumberOfFillNodes(const std::string & deviceType, int modelLevel) const 
+  {
+    return getDeviceMetadata(deviceType, modelLevel).numFillNodes;
+  }
 
-  void getModelCompositeComponents(
-    const std::string & modelType,
-    const std::string & parameterName, int modelLevel,
-    std::vector<Device::Param> & components);
+  bool isModelRequired(const std::string & deviceType, int modelLevel) const 
+  {
+    return getDeviceMetadata(deviceType, modelLevel).modelRequired;
+  }
 
-  std::vector<Device::Param> * getPtrToModelParameters(
-    const std::string & modelType,
-    int modelLevel);
+  int getSourceFunctionID(const std::string & sourceFcn) const;
 
-  bool isOptionsPackage(const std::string & optionName);
+  std::vector<Device::Param> &getInstanceParameters(const std::string & deviceType, int modelLevel);
 
-  std::vector<N_UTL_Param> * getPtrToOptionsParameters(const std::string & optionName);
+  void getInstanceCompositeComponents(const std::string & deviceType, const std::string & parameterName, int modelLevel, std::vector<Device::Param> & components);
 
-  void getSourceFunctionParameters(const std::string & sourceFcn, std::vector<Device::Param> & sourceFunctionParameters);
+  void getModelCompositeComponents(const std::string & modelType, const std::string & parameterName, int modelLevel, std::vector<Device::Param> & components);
 
-  N_DEV_DeviceInterface* devIntPtr_;
+  std::vector<Device::Param> &getModelParameters(const std::string & modelType, int modelLevel);
+
+  bool isOptionsPackage(const std::string & optionName) 
+  {
+    return optionsMetadata_.find(optionName) != optionsMetadata_.end();
+  }
+
+  const std::vector<Util::Param> &getOptionsParameters(const std::string & optionName) const 
+  {
+    return optionsMetadata_[optionName];
+  }
+
+  const std::vector<Device::Param> &getSourceFunctionParameters(const std::string & sourceFcn) const 
+  {
+    return sourceFcnMap[sourceFcn];
+  }
 
 private:
-  DeviceMetadata * createMetadataEntry(const std::string & deviceType, int level);
   void optionsMetadata();
   void sourceFunctionMetadata();
 
-  std::string metadataLocation;
-
+private:
   // The device metadata container which contains information
   // about the recognizable devices in a netlist.
-  DeviceMetadataMap deviceMetadata_;
+  mutable DeviceMetadataMap deviceMetadata_;
 
   // An index to translate from model line indexes to deviceMetadata indexes
   // For example: NPN_1 to Q_1 for BJT
-  DeviceMetadataIndexMap deviceMetadataIndex;
+  mutable DeviceMetadataIndexMap deviceMetadataIndex;
 
   // The options metadata container.
-  std::map<std::string, std::vector<N_UTL_Param>, LessNoCase> optionsMetadata_;
+  mutable UtilParamMap optionsMetadata_;
 
   // Source function metadata.
-  DeviceParamMap sourceFcnMap;
+  mutable DeviceParamMap sourceFcnMap;
 };
 
 } // namespace IO
@@ -219,4 +242,4 @@ private:
 typedef Xyce::IO::CircuitMetadata N_IO_CircuitMetadata;
 typedef Xyce::IO::DeviceMetadata N_IO_DeviceMetadata;
 
-#endif
+#endif // Xyce_N_IO_CircuitMetadata_h

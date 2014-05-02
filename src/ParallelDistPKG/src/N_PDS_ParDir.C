@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,31 +36,16 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.18.6.2 $
+// Revision Number: $Revision: 1.24 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
-#include <N_UTL_Misc.h>
-
 #include <iostream>
-
-#ifdef HAVE_ALGORITHM
-#include <algorithm>
-#else
-#ifdef HAVE_ALGO_H
-#include <algo.h>
-#else
-#error Must have either <algorithm> or <algo.h>!
-#endif
-#endif
 
 #ifdef HAVE_CMATH
 #include <cmath>
@@ -68,7 +53,6 @@
 #include <math.h>
 #endif
 
-// ----------   Xyce Includes   ----------
 #include <N_PDS_ParDir.h>
 #include <N_PDS_Comm.h>
 #include <N_PDS_CommFactory.h>
@@ -146,25 +130,25 @@ N_PDS_ParDir::~N_PDS_ParDir()
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/01
 //-----------------------------------------------------------------------------
-void N_PDS_ParDir::addItems(const vector<N_TOP_ParNode *> & nodeVec)
+void N_PDS_ParDir::addItems(const std::vector<N_TOP_ParNode *> & nodeVec)
 {
   int size = nodeVec.size();
 
 #ifdef Xyce_PARALLEL_MPI
 
-  vector<int> assign(size);
+  std::vector<int> assign(size);
   for (int i = 0; i < size; ++i)
     assign[i] = parKey(nodeVec[i]->ID());
 
-  vector<Packable *> pNodeVec(size);
+  std::vector<Packable *> pNodeVec(size);
   for (int i = 0; i < size; ++i)
     pNodeVec[i] = nodeVec[i];
 
-  vector<Packable *> pNewNodeVec;
+  std::vector<Packable *> pNewNodeVec;
 
   pdsMigrator_->migratePackable(assign, pNodeVec, pNewNodeVec);
 
-  vector<N_TOP_ParNode *> newNodeVec(pNewNodeVec.size());
+  std::vector<N_TOP_ParNode *> newNodeVec(pNewNodeVec.size());
   int pSize = pNewNodeVec.size();
   for (int i = 0; i < pSize; ++i)
     newNodeVec[i] = reinterpret_cast<N_TOP_ParNode *> (pNewNodeVec[i]);
@@ -193,21 +177,21 @@ void N_PDS_ParDir::addItems(const vector<N_TOP_ParNode *> & nodeVec)
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/01
 //-----------------------------------------------------------------------------
-void N_PDS_ParDir::deleteItems(const vector<NodeID> & idVec)
+void N_PDS_ParDir::deleteItems(const std::vector<NodeID> & idVec)
 {
   int size = idVec.size();
 
 #ifdef Xyce_PARALLEL_MPI
 
-  vector<int> assign(size);
+  std::vector<int> assign(size);
   for (int i = 0; i < size; ++i)
     assign[i] = parKey(idVec[i].first);
 
-  vector<string> oldIDVec;
+  std::vector<std::string> oldIDVec;
   oldIDVec.reserve(size);
   transform(idVec.begin(), idVec.end(), oldIDVec.begin(),
-		FirstOfPair<NodeID,string>());
-  vector<string> newIDVec;
+		FirstOfPair<NodeID,std::string>());
+  std::vector<std::string> newIDVec;
   pdsMigrator_->migrateString(assign, oldIDVec, newIDVec);
 
   int newSize = newIDVec.size();
@@ -232,20 +216,20 @@ void N_PDS_ParDir::deleteItems(const vector<NodeID> & idVec)
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/01
 //-----------------------------------------------------------------------------
-void N_PDS_ParDir::addGhosts( const vector< pair<NodeID,int> > & ghostVec )
+void N_PDS_ParDir::addGhosts( const std::vector< std::pair<NodeID,int> > & ghostVec )
 {
   int size = ghostVec.size();
 
-  vector<int> assign(size);
+  std::vector<int> assign(size);
   for( int i = 0; i < size; ++i )
     assign[i] = parKey( ghostVec[i].first.first );
 
-  vector< pair<string,int> > oldGhostVec;
+  std::vector< std::pair<std::string,int> > oldGhostVec;
   oldGhostVec.reserve(size);
   for( int i = 0; i < size; ++i )
-    oldGhostVec[i] = pair<string,int>( ghostVec[i].first.first,
+    oldGhostVec[i] = std::pair<std::string,int>( ghostVec[i].first.first,
                                        ghostVec[i].second );
-  vector< pair<string,int> > newGhostVec;
+  std::vector< std::pair<std::string,int> > newGhostVec;
   pdsMigrator_->migrateInt( assign, oldGhostVec, newGhostVec );
 
   for( int i = 0; i < newGhostVec.size(); ++i )
@@ -260,20 +244,20 @@ void N_PDS_ParDir::addGhosts( const vector< pair<NodeID,int> > & ghostVec )
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/01
 //-----------------------------------------------------------------------------
-void N_PDS_ParDir::deleteGhosts( const vector< pair<NodeID,int> > & ghostVec )
+void N_PDS_ParDir::deleteGhosts( const std::vector< std::pair<NodeID,int> > & ghostVec )
 {
   int size = ghostVec.size();
 
-  vector<int> assign(size);
+  std::vector<int> assign(size);
   for( int i = 0; i < size; ++i )
     assign[i] = parKey( ghostVec[i].first.first );
 
-  vector< pair<string,int> > oldGhostVec;
+  std::vector< std::pair<std::string,int> > oldGhostVec;
   oldGhostVec.reserve(size);
   for( int i = 0; i < size; ++i )
-    oldGhostVec[i] = pair<string,int>( ghostVec[i].first.first,
+    oldGhostVec[i] = std::pair<std::string,int>( ghostVec[i].first.first,
                                        ghostVec[i].second );
-  vector< pair<string,int> > newGhostVec;
+  std::vector< std::pair<std::string,int> > newGhostVec;
   pdsMigrator_->migrateInt( assign, oldGhostVec, newGhostVec );
 
   for( int i = 0; i < newGhostVec.size(); ++i )
@@ -288,19 +272,19 @@ void N_PDS_ParDir::deleteGhosts( const vector< pair<NodeID,int> > & ghostVec )
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/01
 //-----------------------------------------------------------------------------
-void N_PDS_ParDir::clearGhosts( const vector<NodeID> & idVec )
+void N_PDS_ParDir::clearGhosts( const std::vector<NodeID> & idVec )
 {
   int size = idVec.size();
 
-  vector<int> assign(size);
+  std::vector<int> assign(size);
   for( int i = 0; i < size; ++i )
     assign[i] = parKey( idVec[i].first );
 
-  vector<string> oldIDVec;
+  std::vector<std::string> oldIDVec;
   oldIDVec.reserve(size);
   transform( idVec.begin(), idVec.end(), oldIDVec.begin(),
-		FirstOfPair<NodeID,string>() );
-  vector<string> newIDVec;
+		FirstOfPair<NodeID,std::string>() );
+  std::vector<std::string> newIDVec;
   pdsMigrator_->migrateString( assign, oldIDVec, newIDVec );
 
   for( int i = 0; i < newIDVec.size(); ++i )
@@ -317,7 +301,7 @@ void N_PDS_ParDir::clearGhosts( const vector<NodeID> & idVec )
 //-----------------------------------------------------------------------------
 void N_PDS_ParDir::clearGhosts()
 {
-  for( map<string,N_TOP_ParNode>::iterator it_M = nodeMap_.begin();
+  for( std::map<std::string,N_TOP_ParNode>::iterator it_M = nodeMap_.begin();
        it_M != nodeMap_.end(); ++it_M )
     it_M->second.ghosts().clear();
 }
@@ -332,25 +316,25 @@ void N_PDS_ParDir::clearGhosts()
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/01
 //-----------------------------------------------------------------------------
-void N_PDS_ParDir::getItems( const vector<NodeID> & idVec,
-                             vector<N_TOP_ParNode *> & nodeVec)
+void N_PDS_ParDir::getItems( const std::vector<NodeID> & idVec,
+                             std::vector<N_TOP_ParNode *> & nodeVec)
 {
   int size = idVec.size();
 
 #ifdef Xyce_PARALLEL_MPI
 
-  vector<int> assign(size);
+  std::vector<int> assign(size);
   for (int i = 0; i < size; ++i)
     assign[i] = parKey(idVec[i].first);
 
-  vector<string> oldIDVec;
+  std::vector<std::string> oldIDVec;
   oldIDVec.reserve(size);
-  transform(idVec.begin(), idVec.end(), oldIDVec.begin(), FirstOfPair<NodeID,string>());
-  vector<string> newIDVec;
+  transform(idVec.begin(), idVec.end(), oldIDVec.begin(), FirstOfPair<NodeID,std::string>());
+  std::vector<std::string> newIDVec;
   pdsMigrator_->migrateString(assign, oldIDVec, newIDVec);
 
   int newSize = newIDVec.size();
-  vector<Packable *> newNodeVec(newSize);
+  std::vector<Packable *> newNodeVec(newSize);
   for (int i = 0; i < newSize; ++i)
   {
     if( !nodeMap_.count( newIDVec[i] ) )
@@ -358,7 +342,7 @@ void N_PDS_ParDir::getItems( const vector<NodeID> & idVec,
     newNodeVec[i] = &(nodeMap_[newIDVec[i]]);
   }
 
-  vector<Packable *> pNodeVec;
+  std::vector<Packable *> pNodeVec;
   pdsMigrator_->reverseMigratePackable(assign, newNodeVec, pNodeVec);
 
   int pSize = pNodeVec.size();
@@ -388,26 +372,26 @@ void N_PDS_ParDir::getItems( const vector<NodeID> & idVec,
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/01
 //-----------------------------------------------------------------------------
-void N_PDS_ParDir::getGIDs( const vector<NodeID> & idVec,
-			    vector<int> & gidVec )
+void N_PDS_ParDir::getGIDs( const std::vector<NodeID> & idVec,
+			    std::vector<int> & gidVec )
 {
   int size = idVec.size();
 
 #ifdef Xyce_PARALLEL_MPI
 
-  vector<int> assign(size);
+  std::vector<int> assign(size);
   for (int i = 0; i < size; ++i)
     assign[i] = parKey(idVec[i].first);
 
-  vector<string> oldIDVec;
+  std::vector<std::string> oldIDVec;
   oldIDVec.reserve(size);
   transform(idVec.begin(), idVec.end(), oldIDVec.begin(),
-		FirstOfPair<NodeID,string>());
-  vector<string> newIDVec;
+		FirstOfPair<NodeID,std::string>());
+  std::vector<std::string> newIDVec;
   pdsMigrator_->migrateString(assign, oldIDVec, newIDVec);
 
   int newSize = newIDVec.size();
-  vector< pair<string,int> > newGIDVec(newSize);
+  std::vector< std::pair<std::string,int> > newGIDVec(newSize);
   for (int i = 0; i < newSize; ++i)
   {
     if( !nodeMap_.count( newIDVec[i] ) )
@@ -417,10 +401,10 @@ void N_PDS_ParDir::getGIDs( const vector<NodeID> & idVec,
     newGIDVec[i].second = nodeMap_[newIDVec[i]].GID();
   }
 
-  vector< pair<string,int> > tmpGIDVec;
+  std::vector< std::pair<std::string,int> > tmpGIDVec;
   pdsMigrator_->reverseMigrateInt(assign, newGIDVec, tmpGIDVec);
 
-  map< string, int > tmpMap;
+  std::map< std::string, int > tmpMap;
   int tmpSize = tmpGIDVec.size();
   for (int i = 0; i < tmpSize; ++i)
     tmpMap[tmpGIDVec[i].first] = tmpGIDVec[i].second;
@@ -451,27 +435,27 @@ void N_PDS_ParDir::getGIDs( const vector<NodeID> & idVec,
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/01
 //-----------------------------------------------------------------------------
-void N_PDS_ParDir::getProcs( const vector<NodeID> & idVec,
-			     vector<int> & procVec )
+void N_PDS_ParDir::getProcs( const std::vector<NodeID> & idVec,
+			     std::vector<int> & procVec )
 {
   int size = idVec.size();
 
 #ifdef Xyce_PARALLEL_MPI
 
-  vector<int> assign(size);
+  std::vector<int> assign(size);
   for (int i = 0; i < size; ++i)
     assign[i] = parKey(idVec[i].first);
 
-  vector<string> oldIDVec;
+  std::vector<std::string> oldIDVec;
   oldIDVec.resize(size);
   transform(idVec.begin(), idVec.end(), oldIDVec.begin(),
-		FirstOfPair<NodeID,string>());
+		FirstOfPair<NodeID,std::string>());
 
-  vector<string> newIDVec;
+  std::vector<std::string> newIDVec;
   pdsMigrator_->migrateString(assign, oldIDVec, newIDVec);
 
   int newSize = newIDVec.size();
-  vector< pair<string,int> > newProcVec(newSize);
+  std::vector< std::pair<std::string,int> > newProcVec(newSize);
   for (int i = 0; i < newSize; ++i )
   {
     if( !nodeMap_.count( newIDVec[i] ) )
@@ -481,10 +465,10 @@ void N_PDS_ParDir::getProcs( const vector<NodeID> & idVec,
     newProcVec[i].second = nodeMap_[newIDVec[i]].proc();
   }
 
-  vector< pair<string,int> > tmpProcVec;
+  std::vector< std::pair<std::string,int> > tmpProcVec;
   pdsMigrator_->reverseMigrateInt(assign, newProcVec, tmpProcVec);
 
-  map< string, int > tmpMap;
+  std::map< std::string, int > tmpMap;
   int tmpSize = tmpProcVec.size();
   for (int i = 0; i < tmpSize; ++i)
     tmpMap[tmpProcVec[i].first] = tmpProcVec[i].second;
@@ -518,23 +502,23 @@ void N_PDS_ParDir::getProcs( const vector<NodeID> & idVec,
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/01
 //-----------------------------------------------------------------------------
-void N_PDS_ParDir::getGhosts( const vector<NodeID> & idVec,
-			      vector< vector<int> > & ghostVec )
+void N_PDS_ParDir::getGhosts( const std::vector<NodeID> & idVec,
+			      std::vector< std::vector<int> > & ghostVec )
 {
   int size = idVec.size();
 
-  vector<int> assign(size);
+  std::vector<int> assign(size);
   for( int i = 0; i < size; ++i )
     assign[i] = parKey( idVec[i].first );
 
-  vector<string> oldIDVec;
+  std::vector<std::string> oldIDVec;
   oldIDVec.reserve(size);
   transform( idVec.begin(), idVec.end(), oldIDVec.begin(),
-		FirstOfPair<NodeID,string>() );
-  vector<string> newIDVec;
+		FirstOfPair<NodeID,std::string>() );
+  std::vector<std::string> newIDVec;
   pdsMigrator_->migrateString( assign, oldIDVec, newIDVec );
 
-  vector< pair< string,vector<int> > > newGhostVec( newIDVec.size() );
+  std::vector< std::pair< std::string,std::vector<int> > > newGhostVec( newIDVec.size() );
   for( int i = 0; i < newIDVec.size(); ++i )
   {
     if( !nodeMap_.count( newIDVec[i] ) )
@@ -542,15 +526,15 @@ void N_PDS_ParDir::getGhosts( const vector<NodeID> & idVec,
 
     newGhostVec[i].first = newIDVec[i];
     newGhostVec[i].second.resize( nodeMap_[ newIDVec[i] ].ghosts().size() );
-    set<int>::iterator it_M = nodeMap_[ newIDVec[i] ].ghosts().begin();
+    std::set<int>::iterator it_M = nodeMap_[ newIDVec[i] ].ghosts().begin();
     for( int j = 0; j < newGhostVec[i].second.size(); ++j, ++it_M )
       newGhostVec[i].second[j] = *it_M;
   }
 
-  vector< pair< string,vector<int> > > tmpGhostVec;
+  std::vector< std::pair< std::string,std::vector<int> > > tmpGhostVec;
   pdsMigrator_->reverseMigrateIntVec( assign, newGhostVec, tmpGhostVec );
 
-  map< string, vector<int> > tmpMap;
+  std::map< std::string, std::vector<int> > tmpMap;
   for( int i = 0; i < tmpGhostVec.size(); ++i )
     tmpMap[ tmpGhostVec[i].first ] = tmpGhostVec[i].second;
 
@@ -567,7 +551,7 @@ void N_PDS_ParDir::getGhosts( const vector<NodeID> & idVec,
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/01
 //-----------------------------------------------------------------------------
-int N_PDS_ParDir::parKey(const string & token)
+int N_PDS_ParDir::parKey(const std::string & token)
 {
   int sum = 0;
 
@@ -590,7 +574,7 @@ int N_PDS_ParDir::parKey(const string & token)
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/01
 //-----------------------------------------------------------------------------
-bool N_PDS_ParDir::debugDump( ostream & os ) const
+bool N_PDS_ParDir::debugDump( std::ostream & os ) const
 {
 #ifdef Xyce_PARALLEL_MPI
   pdsComm_->barrier();
@@ -603,12 +587,12 @@ bool N_PDS_ParDir::debugDump( ostream & os ) const
   {
     if( i == myProc )
     {
-      os << "Directory for Proc: " << myProc << endl;
-      os << "-------------------------------\n";
-      for( map<string,N_TOP_ParNode>::const_iterator iterSP =
+      os << "Directory for Proc: " << myProc << std::endl;
+      os << Xyce::section_divider << std::endl;
+      for( std::map<std::string,N_TOP_ParNode>::const_iterator iterSP =
 	    nodeMap_.begin(); iterSP != nodeMap_.end(); ++iterSP )
         os << iterSP->second;
-      os << "-------------------------------\n";
+      os << Xyce::section_divider << std::endl;
     }
 
 #ifdef Xyce_PARALLEL_MPI

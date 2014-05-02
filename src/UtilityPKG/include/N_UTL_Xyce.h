@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,31 +37,78 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.8.2.2 $
+// Revision Number: $Revision: 1.22 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
-#ifndef  _N_UTL_Xyce_H
-#define  _N_UTL_Xyce_H
+#ifndef Xyce_N_UTL_Xyce_H
+#define Xyce_N_UTL_Xyce_H
 
-//DO NOT REMOVE
-#include <string>
-// Why?
-// This is a terrible hack meant to tide the project over until misuse of
-// "using namespace std" is completely removed.
-// The reason?  On Windows, attempting to do a "using namespace std" before
-// any include file has actually *defined* anything in that namespace is an
-// error.  Because of that, it is a source of insanely cryptic windows build 
-// errors when a Xyce developer inadvertently includes this header file as the 
-// first line of any Xyce source file.
-//  The correct solution to this issue is to REMOVE the dependence on this
-//  using namespace thing, and to use "std::" where needed.  Then we can just
-//  do away with N_UTL_Xyce.h entirely, as it serves no purpose other than to
-//  obscure the using namespace.
-using namespace std;
+namespace Xyce {
 
+#ifdef Xyce_DEBUG_DEVICE
+static const int DEBUG_DEVICE = 1;
+#else
+static const int DEBUG_DEVICE = 0;
 #endif
 
+#ifdef Xyce_DEBUG_ANALYSIS
+static const int DEBUG_ANALYSIS = 1;
+#else
+static const int DEBUG_ANALYSIS = 0;
+#endif
+
+#ifdef Xyce_DEBUG_IO
+static const int DEBUG_IO = 1;
+#else
+static const int DEBUG_IO = 0;
+#endif
+
+#ifdef Xyce_DEBUG_EXPRESSION
+static const int DEBUG_EXPRESSION = 1;
+#else
+static const int DEBUG_EXPRESSION = 0;
+#endif
+
+#ifdef Xyce_DEBUG_RESTART
+static const int DEBUG_RESTART = 1;
+#else
+static const int DEBUG_RESTART = 0;
+#endif
+
+#ifdef Xyce_DEBUG_TIME
+static const int DEBUG_TIME = 1;
+#else
+static const int DEBUG_TIME = 0;
+#endif
+
+#ifdef Xyce_DEBUG_CIRCUIT
+static const int DEBUG_CIRCUIT = 1;
+#else
+static const int DEBUG_CIRCUIT = 0;
+#endif
+
+#ifdef Xyce_DEBUG_NONLINEAR
+static const int DEBUG_NONLINEAR = 1;
+#else
+static const int DEBUG_NONLINEAR = 0;
+#endif
+
+#ifdef Xyce_DEBUG_DISTRIBUTION
+static const int DEBUG_DISTRIBUTION = 1;
+#else
+static const int DEBUG_DISTRIBUTION = 0;
+#endif
+
+#ifdef Xyce_VERBOSE_TIME
+static const int VERBOSE_TIME = 1;
+#else
+static const int VERBOSE_TIME = 0;
+#endif
+
+} // namespace Xyce
+
+#endif // Xyce_N_UTL_Xyce_H

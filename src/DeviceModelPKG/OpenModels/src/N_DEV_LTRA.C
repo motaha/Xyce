@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,44 +36,25 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.35.2.5 $
+// Revision Number: $Revision: 1.61.2.3 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
 #include <N_UTL_Misc.h>
-
-#ifdef HAVE_CSTDIO
-#include <cstdio>
-#else
-#include <stdio.h>
-#endif
-
-#ifdef HAVE_ALGORITHM
-#include <algorithm>
-#else
-#ifdef HAVE_ALGO_H
-#include <algo.h>
-#else
-#error Must have either <algorithm> or <algo.h>!
-#endif
-#endif
-
-// ----------   Xyce Includes   ----------
-#include <N_DEV_LTRA.h>
-#include <N_DEV_LTRA_Faddeeva.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
 #include <N_DEV_DeviceState.h>
+#include <N_DEV_ExternData.h>
+#include <N_DEV_LTRA.h>
+#include <N_DEV_LTRA_Faddeeva.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_Message.h>
+#include <N_DEV_SolverState.h>
+#include <N_ERH_ErrorMgr.h>
 
 #include <N_LAS_Matrix.h>
 #include <N_LAS_Vector.h>
@@ -84,144 +65,119 @@
 
 namespace Xyce {
 namespace Device {
-
-template<>
-ParametricData<LTRA::Instance>::ParametricData()
-{
-    setNumNodes(4);
-    setNumOptionalNodes(0);
-    setNumFillNodes(0);
-    setModelRequired(1);
-    addModelType("LTRA");
-
-    // Set up double precision variables:
-    addPar ("V1", 0.0, false, ParameterType::NO_DEP,
-        &LTRA::Instance::initVolt1,
-        &LTRA::Instance::initVolt1Given,
-        U_VOLT,CAT_NONE, "Initial voltage at end 1");
-
-    addPar ("V2", 0.0, false, ParameterType::NO_DEP,
-        &LTRA::Instance::initVolt2,
-        &LTRA::Instance::initVolt2Given,
-        U_VOLT,CAT_NONE, "Initial voltage at end 2");
-
-    addPar ("I1", 0.0, false, ParameterType::NO_DEP,
-        &LTRA::Instance::initCur1,
-        &LTRA::Instance::initCur1Given,
-        U_AMP,CAT_NONE, "Initial current at end 1");
-
-    addPar ("I2", 0.0, false, ParameterType::NO_DEP,
-        &LTRA::Instance::initCur2,
-        &LTRA::Instance::initCur2Given,
-        U_AMP,CAT_NONE, "Initial current at end 2");
-}
-
-template<>
-ParametricData<LTRA::Model>::ParametricData()
-{
-    addPar ("R", 0.0, false, ParameterType::NO_DEP,
-            &LTRA::Model::resist,
-            &LTRA::Model::resistGiven, U_OHMMM1, CAT_NONE,
-            "Resistance per unit length");
-
-    addPar ("L", 0.0, false, ParameterType::NO_DEP,
-            &LTRA::Model::induct,
-            &LTRA::Model::inductGiven, U_HMM1, CAT_NONE,
-            "Inductance per unit length");
-
-    addPar ("G", 0.0, false, ParameterType::NO_DEP,
-            &LTRA::Model::conduct,
-            &LTRA::Model::conductGiven, U_OHMM1MM1, CAT_NONE,
-            "Conductance per unit length");
-
-    addPar ("C", 0.0, false, ParameterType::NO_DEP,
-            &LTRA::Model::capac,
-            &LTRA::Model::capacGiven, U_FARADMM1, CAT_NONE,
-            "Capacitance per unit length");
-
-    addPar ("LEN", 0.0, false, ParameterType::NO_DEP,
-            &LTRA::Model::length,
-            &LTRA::Model::lengthGiven, U_METER, CAT_NONE,
-            "length of line");
-
-    addPar ("REL", 1.0, false, ParameterType::NO_DEP,
-            &LTRA::Model::reltol,
-            &LTRA::Model::reltolGiven, U_NONE, CAT_NONE,
-            "Rel. rate of change of deriv. for bkpt");
-
-    addPar ("ABS", 1.0, false, ParameterType::NO_DEP,
-            &LTRA::Model::abstol,
-            &LTRA::Model::abstolGiven, U_NONE, CAT_NONE,
-            "Abs. rate of change of deriv. for bkpt");
-
-    addPar ("STEPLIMIT", true, false, ParameterType::NO_DEP,
-            &LTRA::Model::stepLimit,
-            &LTRA::Model::stepLimitGiven, U_LOGIC, CAT_NONE,
-            "limit timestep size based on the time constant of the line");
-
-    addPar ("NOSTEPLIMIT", false, false, ParameterType::NO_DEP,
-            &LTRA::Model::noStepLimit,
-            &LTRA::Model::noStepLimitGiven, U_LOGIC, CAT_NONE,
-            "don't limit timestep size based on the time constant of the line");
-
-    addPar ("COMPLEXSTEPCONTROL", false, false, ParameterType::NO_DEP,
-            &LTRA::Model::lteTimeStepControl,
-            &LTRA::Model::lteTimeStepControlGiven, U_LOGIC, CAT_NONE,
-            "do complex time step control using local truncation error estimation");
-
-    addPar ("LININTERP", false, false, ParameterType::NO_DEP,
-            &LTRA::Model::linInterp,
-            &LTRA::Model::linInterpGiven, U_LOGIC, CAT_NONE,
-            "use linear interpolation");
-
-    addPar ("QUADINTERP", true, false, ParameterType::NO_DEP,
-            &LTRA::Model::quadInterp,
-            &LTRA::Model::quadInterpGiven, U_LOGIC, CAT_NONE,
-            "use quadratic interpolation");
-
-    addPar ("MIXEDINTERP", false, false, ParameterType::NO_DEP,
-            &LTRA::Model::mixedInterp,
-            &LTRA::Model::mixedInterpGiven, U_LOGIC, CAT_NONE,
-            "use linear interpolation if quadratic results look unacceptable");
-
-    addPar ("COMPACTREL", 1.0e-3, false, ParameterType::NO_DEP,
-            &LTRA::Model::stLineReltol,
-            &LTRA::Model::stLineReltolGiven, U_NONE, CAT_NONE,
-            "special reltol for straight line checking");
-
-    addPar ("COMPACTABS", 1.0e-12, false, ParameterType::NO_DEP,
-            &LTRA::Model::stLineAbstol,
-            &LTRA::Model::stLineAbstolGiven, U_NONE, CAT_NONE,
-            "special abstol for straight line checking");
-
-    addPar ("TRUNCNR", false, false, ParameterType::NO_DEP,
-            &LTRA::Model::truncNR,
-            &LTRA::Model::truncNRGiven,
-            U_LOGIC, CAT_NONE, "use N-R iterations for step calculation in LTRAtrunc");
-
-    addPar ("TRUNCDONTCUT", false, false, ParameterType::NO_DEP,
-            &LTRA::Model::truncDontCut,
-            &LTRA::Model::truncDontCutGiven,
-            U_LOGIC, CAT_NONE, "don't limit timestep to keep impulse response calculation errors low");
-}
-
 namespace LTRA {
 
-vector< vector<int> > Instance::jacStamp;
 
+void Traits::loadInstanceParameters(ParametricData<LTRA::Instance> &p)
+{
+  p.addPar("V1", 0.0, &LTRA::Instance::initVolt1)
+    .setGivenMember(&LTRA::Instance::initVolt1Given)
+    .setUnit(U_VOLT)
+    .setDescription("Initial voltage at end 1");
 
+  p.addPar("V2", 0.0, &LTRA::Instance::initVolt2)
+    .setGivenMember(&LTRA::Instance::initVolt2Given)
+    .setUnit(U_VOLT)
+    .setDescription("Initial voltage at end 2");
 
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
+  p.addPar("I1", 0.0, &LTRA::Instance::initCur1)
+    .setGivenMember(&LTRA::Instance::initCur1Given)
+    .setUnit(U_AMP)
+    .setDescription("Initial current at end 1");
 
-  return parMap;
+  p.addPar("I2", 0.0, &LTRA::Instance::initCur2)
+    .setGivenMember(&LTRA::Instance::initCur2Given)
+    .setUnit(U_AMP)
+    .setDescription("Initial current at end 2");
 }
 
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
+void Traits::loadModelParameters(ParametricData<LTRA::Model> &p)
+{
+  p.addPar("R", 0.0, &LTRA::Model::resist)
+    .setGivenMember(&LTRA::Model::resistGiven)
+    .setUnit(U_OHMMM1)
+    .setDescription("Resistance per unit length");
 
-  return parMap;
+  p.addPar("L", 0.0, &LTRA::Model::induct)
+    .setGivenMember(&LTRA::Model::inductGiven)
+    .setUnit(U_HMM1)
+    .setDescription("Inductance per unit length");
+
+  p.addPar("G", 0.0, &LTRA::Model::conduct)
+    .setGivenMember(&LTRA::Model::conductGiven)
+    .setUnit(U_OHMM1MM1)
+    .setDescription("Conductance per unit length");
+
+  p.addPar("C", 0.0, &LTRA::Model::capac)
+    .setGivenMember(&LTRA::Model::capacGiven)
+    .setUnit(U_FARADMM1)
+    .setDescription("Capacitance per unit length");
+
+  p.addPar("LEN", 0.0, &LTRA::Model::length)
+    .setGivenMember(&LTRA::Model::lengthGiven)
+    .setUnit(U_METER)
+    .setDescription("length of line");
+
+  p.addPar("REL", 1.0, &LTRA::Model::reltol)
+    .setGivenMember(&LTRA::Model::reltolGiven)
+    .setDescription("Rel. rate of change of deriv. for bkpt");
+
+  p.addPar("ABS", 1.0, &LTRA::Model::abstol)
+    .setGivenMember(&LTRA::Model::abstolGiven)
+    .setDescription("Abs. rate of change of deriv. for bkpt");
+
+  p.addPar("STEPLIMIT", true, &LTRA::Model::stepLimit)
+    .setGivenMember(&LTRA::Model::stepLimitGiven)
+    .setUnit(U_LOGIC)
+    .setDescription("limit timestep size based on the time constant of the line");
+
+  p.addPar("NOSTEPLIMIT", false, &LTRA::Model::noStepLimit)
+    .setGivenMember(&LTRA::Model::noStepLimitGiven)
+    .setUnit(U_LOGIC)
+    .setDescription("don't limit timestep size based on the time constant of the line");
+
+  p.addPar("COMPLEXSTEPCONTROL", false, &LTRA::Model::lteTimeStepControl)
+    .setGivenMember(&LTRA::Model::lteTimeStepControlGiven)
+    .setUnit(U_LOGIC)
+    .setDescription("do complex time step control using local truncation error estimation");
+
+  p.addPar("LININTERP", false, &LTRA::Model::linInterp)
+    .setGivenMember(&LTRA::Model::linInterpGiven)
+    .setUnit(U_LOGIC)
+    .setDescription("use linear interpolation");
+
+  p.addPar("QUADINTERP", true, &LTRA::Model::quadInterp)
+    .setGivenMember(&LTRA::Model::quadInterpGiven)
+    .setUnit(U_LOGIC)
+    .setDescription("use quadratic interpolation");
+
+  p.addPar("MIXEDINTERP", false, &LTRA::Model::mixedInterp)
+    .setGivenMember(&LTRA::Model::mixedInterpGiven)
+    .setUnit(U_LOGIC)
+    .setDescription("use linear interpolation if quadratic results look unacceptable");
+
+  p.addPar("COMPACTREL", 1.0e-3, &LTRA::Model::stLineReltol)
+    .setGivenMember(&LTRA::Model::stLineReltolGiven)
+    .setDescription("special reltol for straight line checking");
+
+  p.addPar("COMPACTABS", 1.0e-12, &LTRA::Model::stLineAbstol)
+    .setGivenMember(&LTRA::Model::stLineAbstolGiven)
+    .setDescription("special abstol for straight line checking");
+
+  p.addPar("TRUNCNR", false, &LTRA::Model::truncNR)
+    .setGivenMember(&LTRA::Model::truncNRGiven)
+    .setUnit(U_LOGIC)
+    .setDescription("use N-R iterations for step calculation in LTRAtrunc");
+
+  p.addPar("TRUNCDONTCUT", false, &LTRA::Model::truncDontCut)
+    .setGivenMember(&LTRA::Model::truncDontCutGiven)
+    .setUnit(U_LOGIC)
+    .setDescription("don't limit timestep to keep impulse response calculation errors low");
 }
+
+
+
+std::vector< std::vector<int> > Instance::jacStamp;
 
 
 // Class Instance
@@ -234,16 +190,13 @@ ParametricData<Model> &Model::getParametricData() {
 // Creation Date : 06/16/10
 //-----------------------------------------------------------------------------
 
-Instance::Instance(InstanceBlock& IB,
-                                     Model & Miter,
-                                     MatrixLoadData& mlData1,
-                                     SolverState& ss1,
-                                     ExternData& ed1,
-                                     DeviceOptions& do1)
-
-  : DeviceInstance(IB,mlData1,ss1,ed1,do1),
-    model_(Miter),
-
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock&  instance_block,
+  Model &               model,
+  const FactoryBlock &  factory_block)
+  : DeviceInstance(instance_block, configuration.getInstanceParameters(), factory_block),
+    model_(model),
     input1(0.0),
     input2(0.0),
     listSize(0),
@@ -374,7 +327,7 @@ Instance::Instance(InstanceBlock& IB,
   setDefaultParams ();
 
   // Set params according to instance line and constant defaults from metadata:
-  setParams (IB.params);
+  setParams (instance_block.params);
 
   // Set any non-constant parameter defaults:
 
@@ -394,7 +347,7 @@ Instance::Instance(InstanceBlock& IB,
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 06/16/10
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
   bool bsuccess = true;
 
@@ -423,52 +376,22 @@ Instance::~Instance ()
 // Creator       : Eric Keiter, SNL
 // Creation Date : 06/16/10
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int>& intLIDVecRef,
-                                       const vector<int>& extLIDVecRef )
+void Instance::registerLIDs( const std::vector<int>& intLIDVecRef,
+                                       const std::vector<int>& extLIDVecRef )
 {
-  ostringstream msg;
-
-#if defined(Xyce_DEBUG_DEVICE)
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << endl << dashedline << endl;
-    cout << "[LTRA-DBG-DEV] In Instance::registerLIDs\n\n";
-    cout << "name             = " << getName() << endl;
-  }
-#endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #if defined(Xyce_DEBUG_DEVICE)
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "[LTRA-DBG-DEV] number of internal variables: " << numInt << endl;
-    cout << "[LTRA-DBG-DEV] number of external variables: " << numExt << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "[LTRA-DBG-DEV] In Instance::registerLIDs\n\n";
+    Xyce::dout() << "name             = " << getName() << std::endl;
+    Xyce::dout() << "[LTRA-DBG-DEV] number of internal variables: " << numIntVars << std::endl;
+    Xyce::dout() << "[LTRA-DBG-DEV] number of external variables: " << numExtVars << std::endl;
   }
 #endif
-
-  if (numInt != numIntVars)
-  {
-    msg.clear();
-    msg << "Instance::registerLIDs: ";
-    msg << "numInt != numIntVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg.str());
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg.clear();
-    msg << "Instance::registerLIDs: ";
-    msg << "numExt != numExtVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg.str());
-  }
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -490,18 +413,18 @@ void Instance::registerLIDs( const vector<int>& intLIDVecRef,
 #if defined(Xyce_DEBUG_DEVICE)
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "[LTRA-DBG-DEV]  VARIABLE Indicies " << endl;
-    cout << "li_Pos1 = " << li_Pos1 << endl;
-    cout << "li_Neg1 = " << li_Neg1 << endl;
-    cout << "li_Pos2 = " << li_Pos2 << endl;
-    cout << "li_Neg2 = " << li_Neg2 << endl;
-    cout << "li_Ibr1 = " << li_Ibr1 << endl;
-    cout << "li_Ibr1 = " << li_Ibr1 << endl;
-    cout << "li_Ibr2 = " << li_Ibr2 << endl;
-    cout << "li_Ibr2 = " << li_Ibr2 << endl;
+    Xyce::dout() << "[LTRA-DBG-DEV]  VARIABLE Indicies " << std::endl;
+    Xyce::dout() << "li_Pos1 = " << li_Pos1 << std::endl;
+    Xyce::dout() << "li_Neg1 = " << li_Neg1 << std::endl;
+    Xyce::dout() << "li_Pos2 = " << li_Pos2 << std::endl;
+    Xyce::dout() << "li_Neg2 = " << li_Neg2 << std::endl;
+    Xyce::dout() << "li_Ibr1 = " << li_Ibr1 << std::endl;
+    Xyce::dout() << "li_Ibr1 = " << li_Ibr1 << std::endl;
+    Xyce::dout() << "li_Ibr2 = " << li_Ibr2 << std::endl;
+    Xyce::dout() << "li_Ibr2 = " << li_Ibr2 << std::endl;
 
-    cout << "\nEnd of Instance::register LIDs\n";
-    cout << dashedline << endl;
+    Xyce::dout() << "\nEnd of Instance::register LIDs\n";
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 }
@@ -513,14 +436,14 @@ void Instance::registerLIDs( const vector<int>& intLIDVecRef,
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 06/16/10
 //-----------------------------------------------------------------------------
-map<int,string>& Instance::getIntNameMap ()
+std::map<int,std::string>& Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
 
     // set up internal name map
-    string tmpstr;
+    std::string tmpstr;
     tmpstr = getName()+"_branch1"; spiceInternalName (tmpstr);
     intNameMap[ li_Ibr1 ] = tmpstr;
 
@@ -540,21 +463,9 @@ map<int,string>& Instance::getIntNameMap ()
 // Creator       : Eric Keiter, SNL
 // Creation Date : 06/16/10
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int>& staLIDVecRef)
+void Instance::registerStateLIDs( const std::vector<int>& staLIDVecRef)
 {
-
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    ostringstream msg;
-    msg << "Instance::registerStateLIDs: ";
-    msg << "numSta != numStateVars";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL, msg.str());
-  }
-
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 }
 
 //-----------------------------------------------------------------------------
@@ -565,7 +476,7 @@ void Instance::registerStateLIDs( const vector<int>& staLIDVecRef)
 // Creator       : Eric Keiter, SNL
 // Creation Date : 06/16/10
 //-----------------------------------------------------------------------------
-const vector< vector<int> >& Instance::jacobianStamp() const
+const std::vector< std::vector<int> >& Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -578,7 +489,7 @@ const vector< vector<int> >& Instance::jacobianStamp() const
 // Creator       : Eric Keiter, SNL
 // Creation Date : 06/16/10
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> >& jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> >& jacLIDVec )
 {
 
   DeviceInstance::registerJacLIDs( jacLIDVec );
@@ -744,7 +655,7 @@ bool Instance::updateIntermediateVars ()
 // Creator       : Eric Keiter, SNL
 // Creation Date : 06/16/10
 //-----------------------------------------------------------------------------
-bool Instance::getInstanceBreakPoints ( vector<N_UTL_BreakPoint>& breakPointTimes )
+bool Instance::getInstanceBreakPoints ( std::vector<N_UTL_BreakPoint>& breakPointTimes )
 {
   bool bsuccess = true;
 
@@ -767,9 +678,9 @@ bool Instance::getInstanceBreakPoints ( vector<N_UTL_BreakPoint>& breakPointTime
 #if defined(Xyce_DEBUG_DEVICE)
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
       {
-        cout << "[LTRA-DBG-DEV]  In Instance::getBreakPoints "<<endl;
-        cout << " First time step, I don't get to set breakpoints.  Time is ";
-        cout << currentTime << endl;
+        Xyce::dout() << "[LTRA-DBG-DEV]  In Instance::getBreakPoints "<<std::endl;
+        Xyce::dout() << " First time step, I don't get to set breakpoints.  Time is ";
+        Xyce::dout() << currentTime << std::endl;
       }
 #endif
   }
@@ -931,7 +842,7 @@ void Instance::acceptStep()
       newBreakPointTime = getSolverState().ltraTimePoints[getSolverState().ltraTimeIndex-1] + model_.td;
 
 #ifdef Xyce_DEBUG_DEVICE
-      std::cout << "[LTRA-DBG-DEV]: At simulation time " << getSolverState().currTime
+      Xyce::dout() << "[LTRA-DBG-DEV]: At simulation time " << getSolverState().currTime
                 << " adding a breakpoint at time " << newBreakPointTime
                 << std::endl;
 #endif
@@ -945,13 +856,14 @@ void Instance::acceptStep()
     i1[getSolverState().ltraTimeIndex-1] = i1[getSolverState().ltraTimeIndex];
     i2[getSolverState().ltraTimeIndex-1] = i2[getSolverState().ltraTimeIndex];
 
+
     getSolverState().ltraDoCompact = true;
   }
 
   calculateMaxTimeStep_();
 
 #ifdef Xyce_DEBUG_DEVICE
-  std::cout << "[LTRA-DBG-DEV]: At time: " << getSolverState().currTime
+  Xyce::dout() << "[LTRA-DBG-DEV]: At time: " << getSolverState().currTime
             << " max time step set to: " << model_.maxTimeStep
             << std::endl;
 #endif
@@ -1029,7 +941,7 @@ void Instance::calculateMaxTimeStep_()
       break;
 
     default:
-        ostringstream msg;
+        std::ostringstream msg;
         msg << "**********" << std::endl;
         msg << ": Error. Case not handled in calculateMaxTimeStep_()";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg.str());
@@ -1037,22 +949,22 @@ void Instance::calculateMaxTimeStep_()
 
   }
 
-  /*
-   * the above was for the parts of the equations that resemble the
-   * lossless equations. Now we need to estimate the local truncation
-   * error in each of the three convolution equations, and if possible
-   * adjust the timestep so that all of them remain within some bound.
-   * Unfortunately, the expression for the LTE in a convolution
-   * operation is complicated and costly to evaluate; in addition, no
-   * explicit inverse exists.
-   *
-   * So what we do here (for the moment) is check to see the current
-   * error is acceptable. If so, the timestep is not changed. If not,
-   * then an estimate is made for the new timestep using a few
-   * iterations of the newton-raphson method.
-   *
-   * modification: we change the timestep to half its previous value
-   */
+  // 
+  // the above was for the parts of the equations that resemble the
+  // lossless equations. Now we need to estimate the local truncation
+  // error in each of the three convolution equations, and if possible
+  // adjust the timestep so that all of them remain within some bound.
+  // Unfortunately, the expression for the LTE in a convolution
+  // operation is complicated and costly to evaluate; in addition, no
+  // explicit inverse exists.
+  // 
+  // So what we do here (for the moment) is check to see the current
+  // error is acceptable. If so, the timestep is not changed. If not,
+  // then an estimate is made for the new timestep using a few
+  // iterations of the newton-raphson method.
+  // 
+  // modification: we change the timestep to half its previous value
+  // 
   if ((model.specialCase == LTRA_MOD_RLC) && !(model.truncDontCut))
   {
     model.maxTimeStep = Xycemin(model.maxTimeStep, model.maxSafeStep);
@@ -1087,7 +999,7 @@ void Instance::calculateMaxTimeStep_()
 
 #ifdef Xyce_DEBUG_DEVICE
               if (deriv_delta <= 0.0)
-                std::cout << "LTRAtrunc: error: timestep is now less than zero" << std::endl;
+                Xyce::dout() << "LTRAtrunc: error: timestep is now less than zero" << std::endl;
 #endif
               double deriv = model.lteCalculate_(*this, x + deriv_delta) - y;
 
@@ -1121,7 +1033,7 @@ void Instance::calculateMaxTimeStep_()
         break;
 
       default:
-        ostringstream msg;
+        std::ostringstream msg;
         msg << "**********" << std::endl;
         msg << ": Error. Case not handled in calculateMaxTimeStep_() [2]";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg.str());
@@ -1165,10 +1077,10 @@ DeviceState * Instance::getInternalState()
   myState->data[origSize+5]= initCur2 ;
 
 #ifdef Xyce_DEBUG_RESTART
-  cout.width(18); cout.precision(10); cout.setf(ios::scientific);
-  std::cout << "LTRA::getInternalState:  input1="<<input1<<" input2="<<input2<<std::endl;
-  std::cout << "LTRA::getInternalState:  initVolt11="<<initVolt1<<" initVolt2="<<initVolt2<<std::endl;
-  std::cout << "LTRA::getInternalState:  initCur11="<<initCur1<<" initCur2="<<initCur2<<std::endl;
+  Xyce::dout().width(18); Xyce::dout().precision(10); Xyce::dout().setf(std::ios::scientific);
+  Xyce::dout() << "LTRA::getInternalState:  input1="<<input1<<" input2="<<input2<<std::endl;
+  Xyce::dout() << "LTRA::getInternalState:  initVolt11="<<initVolt1<<" initVolt2="<<initVolt2<<std::endl;
+  Xyce::dout() << "LTRA::getInternalState:  initCur11="<<initCur1<<" initCur2="<<initCur2<<std::endl;
 #endif
 
   for (i=0;i<listSize;++i)
@@ -1179,8 +1091,8 @@ DeviceState * Instance::getInternalState()
     myState->data[j+2]=i1[i];
     myState->data[j+3]=i2[i];
 #ifdef Xyce_DEBUG_RESTART
-    cout.width(18); cout.precision(10); cout.setf(ios::scientific);
-    std::cout <<
+    Xyce::dout().width(18); Xyce::dout().precision(10); Xyce::dout().setf(std::ios::scientific);
+    Xyce::dout() <<
       "LTRA::getInternalState:  v1["<<i<<"]="<<v1[i]
       <<" v2["<<i<<"]="<<v2[i]
       <<" i1["<<i<<"]="<<i1[i]
@@ -1203,8 +1115,8 @@ DeviceState * Instance::getInternalState()
       myState->data[j+1]=model_.h2Coeffs[i];
       myState->data[j+2]=model_.h3dashCoeffs[i];
 #ifdef Xyce_DEBUG_RESTART
-    cout.width(18); cout.precision(10); cout.setf(ios::scientific);
-    std::cout <<
+    Xyce::dout().width(18); Xyce::dout().precision(10); Xyce::dout().setf(std::ios::scientific);
+    Xyce::dout() <<
       "LTRA::getInternalState:  h1dashCoeffs["<<i<<"] =" << model_.h1dashCoeffs[i]
           <<" h2Coeffs["<<i<<"] =" << model_.h2Coeffs[i]
           <<" h3dashCoeffs["<<i<<"] =" << model_.h3dashCoeffs[i]<<std::endl;
@@ -1232,7 +1144,7 @@ bool Instance::setInternalState(const DeviceState &state)
   int i,j;
   if ( state.ID != getName())
   {
-    string msg;
+    std::string msg;
     msg = "Instance::setInternalState:  ID ("+state.ID+")";
     msg += "from restart does not match my name ("+getName()+")!\n";
     N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL, msg);
@@ -1251,10 +1163,10 @@ bool Instance::setInternalState(const DeviceState &state)
   initCur2=state.data[5];
 
 #ifdef Xyce_DEBUG_RESTART
-  cout.width(18); cout.precision(10); cout.setf(ios::scientific);
-  std::cout << "LTRA::setInternalState:  input1="<<input1<<" input2="<<input2<<std::endl;
-  std::cout << "LTRA::setInternalState:  initVolt11="<<initVolt1<<" initVolt2="<<initVolt2<<std::endl;
-  std::cout << "LTRA::setInternalState:  initCur11="<<initCur1<<" initCur2="<<initCur2<<std::endl;
+  Xyce::dout().width(18); Xyce::dout().precision(10); Xyce::dout().setf(std::ios::scientific);
+  Xyce::dout() << "LTRA::setInternalState:  input1="<<input1<<" input2="<<input2<<std::endl;
+  Xyce::dout() << "LTRA::setInternalState:  initVolt11="<<initVolt1<<" initVolt2="<<initVolt2<<std::endl;
+  Xyce::dout() << "LTRA::setInternalState:  initCur11="<<initCur1<<" initCur2="<<initCur2<<std::endl;
 #endif
 
   for ( i=0; i<listSize; ++i)
@@ -1265,8 +1177,8 @@ bool Instance::setInternalState(const DeviceState &state)
     i1[i]= state.data[j+2];
     i2[i]= state.data[j+3];
 #ifdef Xyce_DEBUG_RESTART
-    cout.width(18); cout.precision(10); cout.setf(ios::scientific);
-    std::cout <<
+    Xyce::dout().width(18); Xyce::dout().precision(10); Xyce::dout().setf(std::ios::scientific);
+    Xyce::dout() <<
       "LTRA::setInternalState:  v1["<<i<<"]="<<v1[i]
       <<" v2["<<i<<"]="<<v2[i]
       <<" i1["<<i<<"]="<<i1[i]
@@ -1293,8 +1205,8 @@ bool Instance::setInternalState(const DeviceState &state)
     model_.h2Coeffs[i]= state.data[j+1];
     model_.h3dashCoeffs[i]= state.data[j+2];
 #ifdef Xyce_DEBUG_RESTART
-    cout.width(18); cout.precision(10); cout.setf(ios::scientific);
-    std::cout <<
+    Xyce::dout().width(18); Xyce::dout().precision(10); Xyce::dout().setf(std::ios::scientific);
+    Xyce::dout() <<
       "LTRA::setInternalState:  h1dashCoeffs["<<i<<"] =" << model_.h1dashCoeffs[i]
           <<" h2Coeffs["<<i<<"] =" << model_.h2Coeffs[i]
           <<" h3dashCoeffs["<<i<<"] =" << model_.h3dashCoeffs[i]<<std::endl;
@@ -1314,7 +1226,7 @@ bool Instance::setInternalState(const DeviceState &state)
 // Creator       : Eric Keiter, SNL
 // Creation Date : 06/16/10
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
 
   return true;
@@ -1328,12 +1240,12 @@ bool Model::processParams (string param)
 // Creator       : Eric Keiter, SNL
 // Creation Date : 06/16/10
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1351,10 +1263,11 @@ bool Model::processInstanceParams(string param)
 // Creator       : Eric Keiter, SNL
 // Creation Date : 06/16/10
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock& MB,
-                                      SolverState& ss1,
-                                      DeviceOptions& do1)
-  : DeviceModel(MB,ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock&     MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
 
     h1dashFirstVal(0.0),
     h2FirstVal(0.0),
@@ -1462,9 +1375,9 @@ bool Instance::setIC()
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1482,26 +1395,47 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i;
-  os << endl;
-  os << "    name     getModelName()  Parameters" << endl;
+  os << std::endl;
+  os << "    name     model name  Parameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "      ";
-    os << (*iter)->getModelName();
+    os << getName();
 
-    os << endl;
+    os << std::endl;
 
-    os << endl;
+    os << std::endl;
   }
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 //-----------------------------------------------------------------------------
 // Function      : Model::modelCalculations_
@@ -1558,7 +1492,7 @@ bool Model::modelCalculations_(int& isaved,
         break;
 
       default:
-        ostringstream msg;
+        std::ostringstream msg;
         msg << "**********" << std::endl;
         msg << ": Error. Case not handled in modelCalculations_()";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg.str());
@@ -1622,8 +1556,8 @@ bool Model::modelCalculations_(int& isaved,
 #ifdef Xyce_DEBUG_DEVICE
           if (i == getSolverState().ltraTimeIndex)
           {
-            std::cout << "[LTRA-DBG-DEV] LTRAload: Warning: timestep larger than delay of line" << std::endl;
-            std::cout << "\tTime now: " << getSolverState().currTime << std::endl << std::endl;
+            Xyce::dout() << "[LTRA-DBG-DEV] LTRAload: Warning: timestep larger than delay of line" << std::endl;
+            Xyce::dout() << "\tTime now: " << getSolverState().currTime << std::endl << std::endl;
           }
 #endif
 
@@ -1633,9 +1567,9 @@ bool Model::modelCalculations_(int& isaved,
           if (i == -1)
           {
 #ifdef Xyce_DEBUG_DEVICE
-            std::cout << "[LTRA-DBG-DEV] LTRAload: mistake: cannot find delayed timepoint" << std::endl;
+            Xyce::dout() << "[LTRA-DBG-DEV] LTRAload: mistake: cannot find delayed timepoint" << std::endl;
 #endif
-            ostringstream msg;
+            std::ostringstream msg;
             msg << "************" << std::endl;
             msg << ": Error. Delayed time point not found.";
             N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg.str());
@@ -1666,18 +1600,17 @@ bool Model::modelCalculations_(int& isaved,
 
       case LTRA_MOD_RC:
 
-        /*
-         * set up lists of values of the coefficients at the
-         * necessary timepoints.
-         */
+        // 
+        // set up lists of values of the coefficients at the
+        // necessary timepoints.
+        // 
 
-        /* set up coefficient lists LTRAh1dashCoeffs,
-           LTRAh2Coeffs, LTRAh3dashCoeffs for current
-           timepoint*/
+        //  set up coefficient lists LTRAh1dashCoeffs, LTRAh2Coeffs,
+        //    LTRAh3dashCoeffs for current timepoint
 
-        /* Note: many function evaluations are saved by doing the
-         * following all together in one procedure
-         */
+        // Note: many function evaluations are saved by doing the
+        // following all together in one procedure
+        // 
 
         (void)
           rcCoeffsSetup_(h1dashFirstCoeff, h2FirstCoeff, h3dashFirstCoeff,
@@ -1751,8 +1684,8 @@ int Model::quadInterp_ (double t, double t1, double t2, double t3, double& c1, d
   f2 = (t - t1) * (t - t3) ;
   f3 = (t - t1) * (t - t2) ;
   if((t2-t1)==0)
-  { /* should never happen, but don't want
-     * to divide by zero, EVER... */
+  { //  should never happen, but don't want
+    //  to divide by zero, EVER... 
     f1=0;
     f2=0;
   }
@@ -1762,8 +1695,8 @@ int Model::quadInterp_ (double t, double t1, double t2, double t3, double& c1, d
     f2 /= (t2-t1);
   }
   if((t3-t2)==0)
-  { /* should never happen, but don't want
-     * to divide by zero, EVER... */
+  { //  should never happen, but don't want
+    //  to divide by zero, EVER... 
     f2=0;
     f3=0;
   }
@@ -1773,8 +1706,8 @@ int Model::quadInterp_ (double t, double t1, double t2, double t3, double& c1, d
     f3 /= (t2-t3);
   }
   if((t3-t1)==0)
-  { /* should never happen, but don't want
-     * to divide by zero, EVER... */
+  {  // should never happen, but don't want
+     // to divide by zero, EVER... 
     f1=0;
     f2=0;
   }
@@ -2042,11 +1975,11 @@ double Model::bessI1xOverX_(double x)
 double Model::rlcH1dashFunc_(double time, double T, double alpha, double beta)
 {
   double besselarg, exparg, returnval;
-  /* T is not used in this function */
+  // T is not used in this function 
 
-  /* result = alpha * e^{- beta*time} * {I_1(alpha*time) -
-  * I_0(alpha*time)}
-  */
+  // result = alpha * e^{- beta*time} * {I_1(alpha*time) -
+  // I_0(alpha*time)}
+  // 
 
   if (alpha == 0.0) return(0.0);
 
@@ -2069,11 +2002,11 @@ double Model::rlcH2Func_(double time, double T, double alpha, double beta)
 {
   double besselarg, exparg, returnval;
 
-  /*
-  * result = 0, time < T
-  *      = (alpha*T*e^{-beta*time})/sqrt(t^2 - T^2) *
-  *        I_1(alpha*sqrt(t^2 - T^2)), time >= T
-  */
+  // 
+  // result = 0, time < T
+  //      = (alpha*T*e^{-beta*time})/sqrt(t^2 - T^2) *
+  //        I_1(alpha*sqrt(t^2 - T^2)), time >= T
+  // 
 
   if (alpha == 0.0) return(0.0);
   if (time < T) return(0.0);
@@ -2101,11 +2034,11 @@ double Model::rlcH3dashFunc_(double time, double T, double alpha, double beta)
 {
   double exparg,besselarg,returnval;
 
-  /*
-  * result = 0, time < T
-  *      = alpha*e^{-beta*time}*(t/sqrt(t^2-T^2)*
-  *      I_1(alpha*sqrt(t^2-T^2)) - I_0(alpha*sqrt(t^2-T^2)))
-  */
+  // 
+  // result = 0, time < T
+  //      = alpha*e^{-beta*time}*(t/sqrt(t^2-T^2)*
+  //      I_1(alpha*sqrt(t^2-T^2)) - I_0(alpha*sqrt(t^2-T^2)))
+  // 
 
   if (alpha == 0.0) return(0.0);
   if (time < T) return(0.0);
@@ -2137,9 +2070,9 @@ double Model::rlcH1dashTwiceIntFunc_(double time, double beta)
 {
   double arg, returnval;
 
-  /* result = time * e^{- beta*time} * {I_0(beta*time) +
-  * I_1(beta*time)} - time
-  */
+  //  result = time * e^{- beta*time} * {I_0(beta*time) +
+  // I_1(beta*time)} - time
+  // 
 
   if (beta == 0.0) return(time);
   arg = beta*time;
@@ -2262,11 +2195,11 @@ void Model::rcCoeffsSetup_(
     double& h1dashfirstcoeff,
     double& h2firstcoeff,
     double& h3dashfirstcoeff,
-    vector<double>& h1dashcoeffs,
-    vector<double>& h2coeffs,
-    vector<double>& h3dashcoeffs,
+    std::vector<double>& h1dashcoeffs,
+    std::vector<double>& h2coeffs,
+    std::vector<double>& h3dashcoeffs,
     size_t listsize, double cbyr, double rclsqr, double curtime,
-    vector<double>& timelist, int timeindex, double reltol)
+    const std::vector<double>& timelist, int timeindex, double reltol)
 {
   double delta1, delta2;
   double h1dummy1, h1dummy2;
@@ -2281,24 +2214,24 @@ void Model::rcCoeffsSetup_(
   int doh1=1, doh2=1, doh3=1;
   int i,auxindex;
 
-  /* coefflists should already have been allocated to the necessary size */
+  // coefflists should already have been allocated to the necessary size 
 
 #ifdef Xyce_DEBUG_DEVICE
   if (listsize < timeindex) {
-    std::cout << "[LTRA-DBG-DEV]: LTRAcoeffSetup: not enough space in coefflist" << std::endl;
+    Xyce::dout() << "[LTRA-DBG-DEV]: LTRAcoeffSetup: not enough space in coefflist" << std::endl;
   }
 #endif
 
   auxindex = timeindex;
 
-  /* the first coefficients */
+  // the first coefficients
 
   delta1 = curtime - timelist[auxindex];
   lolimit1 = 0.0;
   hilimit1 = delta1;
 
   h1lovalue1 = 0.0;
-  h1hivalue1 = /* LTRArcH1dashTwiceIntFunc(hilimit1,cbyr); */
+  h1hivalue1 = // LTRArcH1dashTwiceIntFunc(hilimit1,cbyr); 
         sqrt(4*cbyr*hilimit1/M_PI);
   h1dummy1 = h1hivalue1/delta1;
   h1dashfirstcoeff = h1dummy1;
@@ -2313,7 +2246,7 @@ void Model::rcCoeffsSetup_(
   temp5 = sqrt(cbyr);
 
   h2lovalue1 = 0.0;
-  h2hivalue1 = /* LTRArcH2TwiceIntFunc(hilimit1,rclsqr); */
+  h2hivalue1 = // LTRArcH2TwiceIntFunc(hilimit1,rclsqr); 
   (hilimit1 != 0.0?  (hilimit1 + rclsqr*0.5)*temp2 - sqrt(hilimit1*rclsqr/M_PI)*temp3 : 0.0);
 
 
@@ -2322,7 +2255,7 @@ void Model::rcCoeffsSetup_(
   h2relval = fabs(h2dummy1*reltol);
 
   h3lovalue1 = 0.0;
-  h3hivalue1 = /* LTRArcH3dashTwiceIntFunc(hilimit1,cbyr,rclsqr); */
+  h3hivalue1 = // LTRArcH3dashTwiceIntFunc(hilimit1,cbyr,rclsqr); 
   (hilimit1 != 0.0? temp = 2*sqrt(hilimit1/M_PI)*temp3 - temp4*temp2, (temp5*temp): 0.0);
 
 
@@ -2330,13 +2263,13 @@ void Model::rcCoeffsSetup_(
   h3dashfirstcoeff = h3dummy1;
   h3relval = fabs(h3dummy1*reltol);
 
-  /* the coefficients for the rest of the timepoints */
+  // the coefficients for the rest of the timepoints 
 
   for (i=auxindex; i>0; i--)
   {
-    delta2 = delta1; /* previous delta1 */
-    lolimit2 = lolimit1; /* previous lolimit1 */
-    hilimit2 = hilimit1; /*previous hilimit1 */
+    delta2 = delta1; // previous delta1 
+    lolimit2 = lolimit1; // previous lolimit1 
+    hilimit2 = hilimit1; //previous hilimit1 
 
     delta1 = timelist[i] - timelist[i - 1];
     lolimit1 = hilimit2;
@@ -2344,12 +2277,12 @@ void Model::rcCoeffsSetup_(
 
     if (doh1)
     {
-      h1lovalue2 = h1lovalue1; /* previous lovalue1 */
-      h1hivalue2 = h1hivalue1; /*previous hivalue1 */
-      h1dummy2 = h1dummy1; /* previous dummy1 */
+      h1lovalue2 = h1lovalue1; // previous lovalue1
+      h1hivalue2 = h1hivalue1; //previous hivalue1
+      h1dummy2 = h1dummy1; // previous dummy1
 
       h1lovalue1 = h1hivalue2;
-      h1hivalue1 = /* LTRArcH1dashTwiceIntFunc(hilimit1,cbyr); */
+      h1hivalue1 = // LTRArcH1dashTwiceIntFunc(hilimit1,cbyr);
             sqrt(4*cbyr*hilimit1/M_PI);
       h1dummy1 = (h1hivalue1 - h1lovalue1)/delta1;
       h1dashcoeffs[i] = h1dummy1 - h1dummy2;
@@ -2369,12 +2302,12 @@ void Model::rcCoeffsSetup_(
 
     if (doh2)
     {
-      h2lovalue2 = h2lovalue1; /* previous lovalue1 */
-      h2hivalue2 = h2hivalue1; /*previous hivalue1 */
-      h2dummy2 = h2dummy1; /* previous dummy1 */
+      h2lovalue2 = h2lovalue1; // previous lovalue1 
+      h2hivalue2 = h2hivalue1; // previous hivalue1
+      h2dummy2 = h2dummy1; // previous dummy1
 
       h2lovalue1 = h2hivalue2;
-      h2hivalue1 = /* LTRArcH2TwiceIntFunc(hilimit1,rclsqr); */
+      h2hivalue1 = // LTRArcH2TwiceIntFunc(hilimit1,rclsqr);
           (hilimit1 != 0.0?  (hilimit1 + rclsqr*0.5)*temp2 - sqrt(hilimit1*rclsqr/M_PI)*temp3 : 0.0);
       h2dummy1 = (h2hivalue1 - h2lovalue1)/delta1;
       h2coeffs[i] = h2dummy1 - h2dummy2;
@@ -2387,12 +2320,12 @@ void Model::rcCoeffsSetup_(
 
     if (doh3)
     {
-      h3lovalue2 = h3lovalue1; /* previous lovalue1 */
-      h3hivalue2 = h3hivalue1; /*previous hivalue1 */
-      h3dummy2 = h3dummy1; /* previous dummy1 */
+      h3lovalue2 = h3lovalue1; // previous lovalue1
+      h3hivalue2 = h3hivalue1; // previous hivalue1
+      h3dummy2 = h3dummy1; // previous dummy1
 
       h3lovalue1 = h3hivalue2;
-      h3hivalue1 = /*LTRArcH3dashTwiceIntFunc(hilimit1,cbyr,rclsqr);*/
+      h3hivalue1 = // LTRArcH3dashTwiceIntFunc(hilimit1,cbyr,rclsqr);
           (hilimit1 != 0.0? temp = 2*sqrt(hilimit1/M_PI)*temp3 - temp4*temp2, (temp5*temp): 0.0);
       h3dummy1 = (h3hivalue1 - h3lovalue1)/delta1;
       h3dashcoeffs[i] = h3dummy1 - h3dummy2;
@@ -2417,12 +2350,12 @@ void Model::rlcCoeffsSetup_(
     double& h1dashfirstcoeff,
     double& h2firstcoeff,
     double& h3dashfirstcoeff,
-    vector<double>& h1dashcoeffs,
-    vector<double>& h2coeffs,
-    vector<double>& h3dashcoeffs,
+    std::vector<double>& h1dashcoeffs,
+    std::vector<double>& h2coeffs,
+    std::vector<double>& h3dashcoeffs,
     size_t listsize,
     double T, double alpha, double beta, double curtime,
-    vector<double>& timelist, int timeindex, double reltol, int* auxindexptr)
+    const std::vector<double>& timelist, int timeindex, double reltol, int* auxindexptr)
 {
   unsigned exact;
   double lolimit1,lolimit2,hilimit1,hilimit2;
@@ -2444,20 +2377,20 @@ void Model::rlcCoeffsSetup_(
 
   int i,auxindex;
 
-  /* coefflists should already have been allocated to the necessary size */
+  // coefflists should already have been allocated to the necessary size
 
 #ifdef Xyce_DEBUG_DEVICE
   if (listsize < timeindex) {
-    std::cout << "[LTRA-DBG-DEV]: LTRArlcCoeffsSetup_: not enough space in coefflist" << std::endl;
+    Xyce::dout() << "[LTRA-DBG-DEV]: LTRArlcCoeffsSetup_: not enough space in coefflist" << std::endl;
   }
 #endif
 
 
-  /*
-  * we assume a piecewise linear function, and we calculate the
-  * coefficients using this assumption in the integration of the
-  * function
-  */
+  // 
+  // we assume a piecewise linear function, and we calculate the
+  // coefficients using this assumption in the integration of the
+  // function
+  
 
   if (T == 0.0) {
     auxindex = timeindex;
@@ -2477,7 +2410,7 @@ void Model::rlcCoeffsSetup_(
 
 #ifdef Xyce_DEBUG_DEVICE
       if ((i < 0) || ((i==0) && (exact==1)))
-        std::cout << "[LTRA-DBG-DEV]: LTRAcoeffSetup: i <= 0: some mistake!" << std::endl;
+        Xyce::dout() << "[LTRA-DBG-DEV]: LTRAcoeffSetup: i <= 0: some mistake!" << std::endl;
 #endif
 
       if (exact == 1) {
@@ -2487,7 +2420,7 @@ void Model::rlcCoeffsSetup_(
       }
     }
   }
-  /* the first coefficient */
+  // the first coefficient 
 
   if (auxindex != 0)
   {
@@ -2501,7 +2434,7 @@ void Model::rlcCoeffsSetup_(
     expterm = exp(exparg);
     bessi1overxterm = bessI1xOverX_(besselarg);
     alphasqTterm = alpha*alpha*T;
-    h2hivalue1 = /* LTRArlcH2Func(hilimit1,T,alpha,beta); */
+    h2hivalue1 = // LTRArlcH2Func(hilimit1,T,alpha,beta);
     ((alpha == 0.0) || (hilimit1 < T)) ? 0.0: alphasqTterm*expterm*bessi1overxterm;
 
     h2dummy1 = twiceintlinfunc_(lolimit1,hilimit1,lolimit1,h2lovalue1,
@@ -2509,10 +2442,10 @@ void Model::rlcCoeffsSetup_(
     h2firstcoeff = h2dummy1;
     h2relval = fabs(reltol*h2dummy1);
 
-    h3lovalue1 = 0.0; /* E3dash should be consistent with this */
+    h3lovalue1 = 0.0; // E3dash should be consistent with this
     bessi0term = bessI0_(besselarg);
     expbetaTterm = exp(-beta*T);
-    h3hivalue1 = /*LTRArlcH3dashIntFunc(hilimit1,T,beta);*/
+    h3hivalue1 = // LTRArlcH3dashIntFunc(hilimit1,T,beta);
     ((hilimit1 <= T) || (beta == 0.0)) ? 0.0: expterm* bessi0term-expbetaTterm;
     h3dummy1 = intlinfunc_(lolimit1,hilimit1,h3lovalue1,
       h3hivalue1,lolimit1,hilimit1)/delta1;
@@ -2531,7 +2464,7 @@ void Model::rlcCoeffsSetup_(
   expterm = exp(exparg);
 
   h1lovalue1 = 0.0;
-  h1hivalue1 = /*LTRArlcH1dashTwiceIntFunc(hilimit1,beta);*/
+  h1hivalue1 = //LTRArlcH1dashTwiceIntFunc(hilimit1,beta);
     (beta == 0.0) ? hilimit1 : ((hilimit1 == 0.0) ? 0.0 :
                                (bessI1_(-exparg)+bessI0_(-exparg))* hilimit1 * expterm - hilimit1);
   h1dummy1 = h1hivalue1/delta1;
@@ -2539,15 +2472,15 @@ void Model::rlcCoeffsSetup_(
   h1relval = fabs(h1dummy1*reltol);
 
 
-  /* the coefficients for the rest of the timepoints */
+  // the coefficients for the rest of the timepoints
 
   for (i=timeindex; i>0; i--)
   {
     if (doh1 || doh2 || doh3)
     {
-      lolimit2 = lolimit1; /* previous lolimit1 */
-      hilimit2 = hilimit1; /*previous hilimit1 */
-      delta2 = delta1; /* previous delta1 */
+      lolimit2 = lolimit1; // previous lolimit1
+      hilimit2 = hilimit1; // previous hilimit1
+      delta2 = delta1; // previous delta1
 
       lolimit1 = hilimit2;
       hilimit1 = curtime - timelist[i - 1];
@@ -2559,12 +2492,12 @@ void Model::rlcCoeffsSetup_(
 
     if (doh1)
     {
-      h1lovalue2 = h1lovalue1; /* previous lovalue1 */
-      h1hivalue2 = h1hivalue1; /*previous hivalue1 */
-      h1dummy2 = h1dummy1; /* previous dummy1 */
+      h1lovalue2 = h1lovalue1; // previous lovalue1
+      h1hivalue2 = h1hivalue1; // previous hivalue1
+      h1dummy2 = h1dummy1; // previous dummy1
 
       h1lovalue1 = h1hivalue2;
-      h1hivalue1 = /* LTRArlcH1dashTwiceIntFunc(hilimit1,beta);*/
+      h1hivalue1 = // LTRArlcH1dashTwiceIntFunc(hilimit1,beta);
         (beta == 0.0) ? hilimit1 : ((hilimit1 == 0.0) ? 0.0 :
                                     (bessI1_(-exparg)+bessI0_(-exparg))* hilimit1 * expterm - hilimit1);
       h1dummy1 = (h1hivalue1 - h1lovalue1)/delta1;
@@ -2579,12 +2512,10 @@ void Model::rlcCoeffsSetup_(
 
     if (i <= auxindex)
     {
-      /*
-      if (i == auxindex) {
-      lolimit2 = T;
-      delta2 = hilimit2 - lolimit2;
-      }
-      */
+      // if (i == auxindex) {
+      // lolimit2 = T;
+      // delta2 = hilimit2 - lolimit2;
+      // }
 
       if (doh2 || doh3)
       {
@@ -2593,13 +2524,13 @@ void Model::rlcCoeffsSetup_(
 
       if (doh2)
       {
-        h2lovalue2 = h2lovalue1; /* previous lovalue1 */
-        h2hivalue2 = h2hivalue1; /*previous hivalue1 */
-        h2dummy2 = h2dummy1; /* previous dummy1 */
+        h2lovalue2 = h2lovalue1; // previous lovalue1
+        h2hivalue2 = h2hivalue1; // previous hivalue1
+        h2dummy2 = h2dummy1; // previous dummy1
 
         h2lovalue1 = h2hivalue2;
         bessi1overxterm = bessI1xOverX_(besselarg);
-        h2hivalue1 = /*rlcH2Func(hilimit1,T,alpha,beta);*/
+        h2hivalue1 = // rlcH2Func(hilimit1,T,alpha,beta);
         ((alpha == 0.0) || (hilimit1 < T)) ? 0.0: alphasqTterm*expterm*bessi1overxterm;
         h2dummy1 = twiceintlinfunc_(lolimit1,hilimit1,lolimit1,
         h2lovalue1,h2hivalue1,lolimit1,hilimit1)/delta1;
@@ -2615,13 +2546,13 @@ void Model::rlcCoeffsSetup_(
 
       if (doh3)
       {
-        h3lovalue2 = h3lovalue1; /* previous lovalue1 */
-        h3hivalue2 = h3hivalue1; /*previous hivalue1 */
-        h3dummy2 = h3dummy1; /* previous dummy1 */
+        h3lovalue2 = h3lovalue1; // previous lovalue1
+        h3hivalue2 = h3hivalue1; //previous hivalue1
+        h3dummy2 = h3dummy1; // previous dummy1
 
         h3lovalue1 = h3hivalue2;
         bessi0term = bessI0_(besselarg);
-        h3hivalue1 = /*LTRArlcH3dashIntFunc(hilimit1,T,beta);*/
+        h3hivalue1 = //LTRArlcH3dashIntFunc(hilimit1,T,beta);
         ((hilimit1 <= T) || (beta == 0.0)) ? 0.0: expterm* bessi0term-expbetaTterm;
         h3dummy1 = intlinfunc_(lolimit1,hilimit1,h3lovalue1,h3hivalue1,lolimit1,hilimit1)/delta1;
 
@@ -2661,24 +2592,21 @@ bool Model::straightLineCheck_(double x1, double y1,
                                          double x3, double y3,
                                          double reltol, double abstol)
 {
-  /*
-  double asqr, bsqr, csqr, c, c1sqr;
-  double htsqr;
-  */
+  // double asqr, bsqr, csqr, c, c1sqr;
+  // double htsqr;
   double TRarea, QUADarea1,QUADarea2,QUADarea3, area;
 
-  /*
-  asqr = (x2-x1)*(x2-x1) + (y2-y1)*(y2-y1);
-  bsqr = (x3-x2)*(x3-x2) + (y3-y2)*(y3-y2);
-  csqr = (x3-x1)*(x3-x1) + (y3-y1)*(y3-y1);
-  c = sqrt(csqr);
-  c1sqr = (asqr - bsqr + csqr)/(2*c);
-  c1sqr *= c1sqr;
-  htsqr = asqr - c1sqr;
-  TRarea = c*sqrt(htsqr)*0.5;
-  */
-  /* this should work if y1,y2,y3 all have the same sign and x1,x2,x3
-  are in increasing order*/
+  // asqr = (x2-x1)*(x2-x1) + (y2-y1)*(y2-y1);
+  // bsqr = (x3-x2)*(x3-x2) + (y3-y2)*(y3-y2);
+  // csqr = (x3-x1)*(x3-x1) + (y3-y1)*(y3-y1);
+  // c = sqrt(csqr);
+  // c1sqr = (asqr - bsqr + csqr)/(2*c);
+  // c1sqr *= c1sqr;
+  // htsqr = asqr - c1sqr;
+  // TRarea = c*sqrt(htsqr)*0.5;
+
+  // this should work if y1,y2,y3 all have the same sign and x1,x2,x3
+  // are in increasing order
 
   QUADarea1 = (fabs(y2)+fabs(y1))*0.5*fabs(x2-x1);
   QUADarea2 = (fabs(y3)+fabs(y2))*0.5*fabs(x3-x2);
@@ -2773,7 +2701,7 @@ double Model::lteCalculate_ (
 
 #ifdef Xyce_DEBUG_DEVICE
         if ((i < 0) || ((i==0) && (exact==1)))
-          std::cout << "[LTRA-DBG-DEV]: lteCalculate_: i <= 0: some mistake!" << std::endl;
+          Xyce::dout() << "[LTRA-DBG-DEV]: lteCalculate_: i <= 0: some mistake!" << std::endl;
 #endif
 
         if (exact == 1)
@@ -2827,13 +2755,12 @@ double Model::lteCalculate_ (
       }
 
 
-      /* LTEs for convolution with v1 */
-      /* get divided differences for v1 (2nd derivative estimates) */
+      //  LTEs for convolution with v1 
+      //  get divided differences for v1 (2nd derivative estimates) 
 
-      /*
-        * no need to subtract operating point values because
-        * taking differences anyway
-        */
+      //   no need to subtract operating point values because
+      //   taking differences anyway
+      //   
 
 
       dashdash = SECONDDERIV_(getSolverState().ltraTimeIndex,
@@ -2853,10 +2780,10 @@ double Model::lteCalculate_ (
 
         eq2LTE += admit*fabs(dashdash * h3dashTfirstCoeff);
       }
-      /* end LTEs for convolution with v1 */
+      // end LTEs for convolution with v1
 
-      /* LTEs for convolution with v2 */
-      /* get divided differences for v2 (2nd derivative estimates) */
+      // LTEs for convolution with v2
+      // get divided differences for v2 (2nd derivative estimates)
 
       dashdash = SECONDDERIV_(getSolverState().ltraTimeIndex,
                               instance.v2[getSolverState().ltraTimeIndex-2],
@@ -2875,10 +2802,10 @@ double Model::lteCalculate_ (
         eq1LTE += admit*fabs(dashdash * h3dashTfirstCoeff);
       }
 
-      /* end LTEs for convolution with v2 */
+      // end LTEs for convolution with v2
 
-      /* LTE for convolution with i1 */
-      /* get divided differences for i1 (2nd derivative estimates) */
+      // LTE for convolution with i1
+      // get divided differences for i1 (2nd derivative estimates)
 
       if (tdover)
       {
@@ -2889,10 +2816,10 @@ double Model::lteCalculate_ (
 
         eq2LTE += fabs(dashdash * h2TfirstCoeff);
       }
-      /* end LTE for convolution with i1 */
+      // end LTE for convolution with i1
 
-      /* LTE for convolution with i2 */
-      /* get divided differences for i2 (2nd derivative estimates) */
+      // LTE for convolution with i2
+      // get divided differences for i2 (2nd derivative estimates)
 
       if (tdover)
       {
@@ -2904,7 +2831,7 @@ double Model::lteCalculate_ (
         eq1LTE += fabs(dashdash * h2TfirstCoeff);
       }
 
-      /* end LTE for convolution with i1 */
+      // end LTE for convolution with i1
 
       break;
 
@@ -2936,13 +2863,11 @@ double Model::lteCalculate_ (
                         hivalue1,lolimit1,hilimit1);
       h1dashTfirstCoeff = 0.5*f1i*(curtime-getSolverState().ltraTimePoints[getSolverState().ltraTimeIndex-1]) - g1i;
 
-      /* LTEs for convolution with v1 */
-      /* get divided differences for v1 (2nd derivative estimates) */
+      // LTEs for convolution with v1
+      // get divided differences for v1 (2nd derivative estimates)
 
-      /*
-        * no need to subtract operating point values because
-        * taking differences anyway
-        */
+      // no need to subtract operating point values because
+      // taking differences anyway
 
       dashdash = SECONDDERIV_( getSolverState().ltraTimeIndex,
                                instance.v1[getSolverState().ltraTimeIndex-2],
@@ -2952,10 +2877,10 @@ double Model::lteCalculate_ (
       eq1LTE += fabs(dashdash * h1dashTfirstCoeff);
       eq2LTE += fabs(dashdash * h3dashTfirstCoeff);
 
-      /* end LTEs for convolution with v1 */
+      // end LTEs for convolution with v1
 
-      /* LTEs for convolution with v2 */
-      /* get divided differences for v2 (2nd derivative estimates) */
+      // LTEs for convolution with v2
+      // get divided differences for v2 (2nd derivative estimates)
 
       dashdash = SECONDDERIV_( getSolverState().ltraTimeIndex,
                                instance.v2[getSolverState().ltraTimeIndex-2],
@@ -2965,10 +2890,10 @@ double Model::lteCalculate_ (
       eq2LTE += fabs(dashdash * h1dashTfirstCoeff);
       eq1LTE += fabs(dashdash * h3dashTfirstCoeff);
 
-      /* end LTEs for convolution with v2 */
+      // end LTEs for convolution with v2
 
-      /* LTE for convolution with i1 */
-      /* get divided differences for i1 (2nd derivative estimates) */
+      // LTE for convolution with i1
+      // get divided differences for i1 (2nd derivative estimates)
 
       dashdash = SECONDDERIV_( getSolverState().ltraTimeIndex,
                                instance.i1[getSolverState().ltraTimeIndex-2],
@@ -2977,10 +2902,10 @@ double Model::lteCalculate_ (
 
       eq2LTE += fabs(dashdash * h2TfirstCoeff);
 
-      /* end LTE for convolution with i1 */
+      // end LTE for convolution with i1
 
-      /* LTE for convolution with i2 */
-      /* get divided differences for i2 (2nd derivative estimates) */
+      // LTE for convolution with i2
+      // get divided differences for i2 (2nd derivative estimates)
 
       dashdash = SECONDDERIV_( getSolverState().ltraTimeIndex,
                                instance.i2[getSolverState().ltraTimeIndex-2],
@@ -2989,7 +2914,7 @@ double Model::lteCalculate_ (
 
       eq1LTE += fabs(dashdash * h2TfirstCoeff);
 
-      /* end LTE for convolution with i1 */
+      // end LTE for convolution with i1 
 
       break;
 
@@ -2998,10 +2923,10 @@ double Model::lteCalculate_ (
   }
 
 #ifdef Xyce_DEBUG_DEVICE
-  std::cout << "[LTRA-DBG-DEV] " << instance.getName() << ": LTE/input for Eq1 at time "
+  Xyce::dout() << "[LTRA-DBG-DEV] " << instance.getName() << ": LTE/input for Eq1 at time "
             << curtime << " is: " << eq1LTE/instance.input1 << std::endl;
 
-  std::cout << "[LTRA-DBG-DEV] " << instance.getName() << ": LTE/input for Eq2 at time "
+  Xyce::dout() << "[LTRA-DBG-DEV] " << instance.getName() << ": LTE/input for Eq2 at time "
             << curtime << " is: " << eq2LTE/instance.input1 << std::endl;
 #endif
 
@@ -3044,7 +2969,7 @@ bool Master::updateState (double* solVec, double* staVec, double* stoVec)
     vars_initialized = true;
   }
 
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance& di = *(*it);
 
@@ -3086,7 +3011,7 @@ bool Master::updateState (double* solVec, double* staVec, double* stoVec)
 //-----------------------------------------------------------------------------
 void Master::initialize_vars_(void)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
 
     Model& m = (*it)->getModel();
@@ -3117,32 +3042,26 @@ void Master::initialize_vars_(void)
 
     else if ((m.conduct != 0) && ((m.capac != 0) || (m.induct != 0)))
     {
-      ostringstream msg;
-      msg << "**********" << std::endl;
-      msg << "LTRA: Error. RL line not supported. "
-          << "Modes supported: RC, RG, LC, RLC";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg.str());
+      UserError0(m) << "RL line not supported. "
+                    << "Modes supported: RC, RG, LC, RLC";
+
       m.specialCase = LTRA_MOD_LTRA;
     }
     else if ((m.resist != 0) && (m.conduct == 0) && (m.capac == 0) && (m.induct != 0))
     {
-      ostringstream msg;
-      msg << "**********" << std::endl;
-      msg << "LTRA: Error. Nonzero G (except RG) transmission line not supported. "
-          << "Modes supported: RC, RG, LC, RLC";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg.str());
+      UserError0(m) << "Nonzero G (except RG) transmission line not supported. "
+                    << "Modes supported: RC, RG, LC, RLC";
+
       m.specialCase = LTRA_MOD_LTRA;
     }
 
     if ((m.resist == 0.0 ? 0 : 1) + (m.conduct == 0.0 ? 0 : 1) +
         (m.induct == 0.0 ? 0 : 1) + (m.capac == 0.0 ? 0 : 1) <= 1)
     {
-      ostringstream msg;
-      msg << "************" << std::endl;
-      msg << "LTRA: Error. Invalid specification. Specify at least "
-          << "two of R, L, G, or C with nonzero values. "
-          << "Modes supported: RC, RG, LC, RLC";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg.str());
+      UserError0(m) << "Invalid specification. Specify at least "
+                    << "two of R, L, G, or C with nonzero values. "
+                    << "Modes supported: RC, RG, LC, RLC";
+
       m.specialCase = LTRA_MOD_LTRA;
     }
 
@@ -3154,11 +3073,7 @@ void Master::initialize_vars_(void)
 
     if (m.stepLimit && m.noStepLimit)
     {
-      ostringstream msg;
-      msg << "************" << std::endl
-          << "LTRA: Warning. Conflicting options STEPLIMIT and NOSTEPLIMIT "
-          << "given. Using STEPLIMIT";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING, msg.str());
+      UserWarning(*this) << "Conflicting options STEPLIMIT and NOSTEPLIMIT given. Using STEPLIMIT";
       m.stepLimitType = LTRA_MOD_STEPLIMIT;
     }
     else if (m.stepLimit || !m.noStepLimit)
@@ -3206,11 +3121,7 @@ void Master::initialize_vars_(void)
 
         // Sanity check
         if (m.alpha < 0.0) {
-          ostringstream msg;
-          msg << "**********" << std::endl;
-          msg << ": Error. Resistance and inductance ";
-          msg << "must be greater than zero";
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_ERROR, msg.str());
+          UserError(m) << "Resistance and inductance must be greater than zero";
           return;
         }
 
@@ -3262,10 +3173,7 @@ void Master::initialize_vars_(void)
 
       default:
       {
-        ostringstream msg;
-        msg << "************" << std::endl;
-        msg << ": Error. Unhandled LTRA special case encountered.";
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_ERROR, msg.str());
+        Report::DevelFatal().in("Master::initialize_vars_(void)") << "Unhandled LTRA special case encountered.";
         return;
       }
     }
@@ -3287,13 +3195,11 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
   double max(0.0),min(0.0);
   double v1d(0.0), v2d(0.0), i1d(0.0), i2d(0.0);
   double dummy1(0.0), dummy2(0.0);
-  ostringstream msg;
+  std::ostringstream msg;
 
-  int sizeInstances = getInstanceVector().size();
-
-  for (int i=0; i<sizeInstances; ++i)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
-    Instance& di = *getInstanceVector()[i];
+    Instance& di = *(*it);
 
     if( getSolverState().dcopFlag || (di.getModel().specialCase == LTRA_MOD_RG))
     {
@@ -3361,14 +3267,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
           break;
 
         default:
-
-          msg.clear();
-          msg << "**********" << std::endl;
-          msg << ": Error. Unknown LTRA configuration, ";
-          msg << di.getModel().specialCase;
-          msg << ". Must be one of RG, LC, RC, or RLC.";
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_ERROR, msg.str());
-
+          UserError(di) << "Unknown LTRA configuration, " << di.getModel().specialCase << ". Must be one of RG, LC, RC, or RLC.";
           return false;
       }
 
@@ -3405,7 +3304,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
 
           if (di.getModel().tdover)
           {
-            /* have to interpolate values */
+            // have to interpolate values
             if ((isaved != 0) &&
                 ((di.getModel().howToInterp == LTRA_MOD_QUADINTERP) || (di.getModel().howToInterp == LTRA_MOD_MIXEDINTERP)))
             {
@@ -3426,14 +3325,14 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
               if ((isaved != 0) && (di.getModel().howToInterp == LTRA_MOD_QUADINTERP))
               {
 #ifdef Xyce_DEBUG_DEVICE
-                std::cout << "[LTRA-DBG-DEV] load: warning: interpolated v1 is out of range after timepoint "
+                Xyce::dout() << "[LTRA-DBG-DEV] load: warning: interpolated v1 is out of range after timepoint "
                           << getSolverState().ltraTimeIndex << std::endl;
-                std::cout << "         values: "
+                Xyce::dout() << "         values: "
                           << di.v1[isaved-1] << "  "
                           << di.v1[isaved] << "  "
                           << di.v1[isaved+1] << "; interpolated: "
                           << v1d << std::endl;
-                std::cout << "        timepoints are: "
+                Xyce::dout() << "        timepoints are: "
                           << getSolverState().currTime - di.getModel().td << std::endl;
 #endif
               }
@@ -3466,14 +3365,14 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
               if ((isaved != 0) && (di.getModel().howToInterp == LTRA_MOD_QUADINTERP))
               {
 #ifdef Xyce_DEBUG_DEVICE
-                std::cout << "[LTRA-DBG-DEV] load: warning: interpolated i1 is out of range after timepoint "
+                Xyce::dout() << "[LTRA-DBG-DEV] load: warning: interpolated i1 is out of range after timepoint "
                           << getSolverState().ltraTimeIndex << std::endl;
-                std::cout << "         values: "
+                Xyce::dout() << "         values: "
                           << di.i1[isaved-1] << "  "
                           << di.i1[isaved] << "  "
                           << di.i1[isaved+1] << "; interpolated: "
                           << i1d << std::endl;
-                std::cout << "        timepoints are: "
+                Xyce::dout() << "        timepoints are: "
                           << getSolverState().currTime - di.getModel().td << std::endl;
 #endif
               }
@@ -3509,14 +3408,14 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
                   (di.getModel().howToInterp == LTRA_MOD_QUADINTERP))
               {
 #ifdef Xyce_DEBUG_DEVICE
-                std::cout << "[LTRA-DBG-DEV] load: warning: interpolated v2 is out of range after timepoint "
+                Xyce::dout() << "[LTRA-DBG-DEV] load: warning: interpolated v2 is out of range after timepoint "
                           << getSolverState().ltraTimeIndex << std::endl;
-                std::cout << "         values: "
+                Xyce::dout() << "         values: "
                           << di.v2[isaved-1] << "  "
                           << di.v2[isaved] << "  "
                           << di.v2[isaved+1] << "; interpolated: "
                           << v2d << std::endl;
-                std::cout << "        timepoints are: "
+                Xyce::dout() << "        timepoints are: "
                           << getSolverState().currTime - di.getModel().td << std::endl;
 #endif
               }
@@ -3549,14 +3448,14 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
               if ((isaved != 0) && (di.getModel().howToInterp == LTRA_MOD_QUADINTERP))
               {
 #ifdef Xyce_DEBUG_DEVICE
-                std::cout << "[LTRA-DBG-DEV] load: warning: interpolated i2 is out of range after timepoint "
+                Xyce::dout() << "[LTRA-DBG-DEV] load: warning: interpolated i2 is out of range after timepoint "
                           << getSolverState().ltraTimeIndex << std::endl;
-                std::cout << "         values: "
+                Xyce::dout() << "         values: "
                           << di.i2[isaved-1] << "  "
                           << di.i2[isaved] << "  "
                           << di.i2[isaved+1] << "; interpolated: "
                           << i2d << std::endl;
-                std::cout << "        timepoints are: "
+                Xyce::dout() << "        timepoints are: "
                           << getSolverState().currTime - di.getModel().td << std::endl;
 #endif
               }
@@ -3567,7 +3466,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
             }
           }
 
-          /* interpolation done */
+          // interpolation done
           break;
 
       case LTRA_MOD_RC:
@@ -3582,10 +3481,10 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
       {
         case LTRA_MOD_RLC:
 
-          /* begin convolution parts */
+          // begin convolution parts
 
-          /* convolution of h1dash with v1 and v2 */
-          /* the matrix has already been loaded above */
+          // convolution of h1dash with v1 and v2
+          // the matrix has already been loaded above
 
           dummy1 = dummy2 = 0.0;
           for (int j = getSolverState().ltraTimeIndex; j > 0; j--)
@@ -3606,20 +3505,20 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
           di.input1 -= dummy1 * di.getModel().admit;
           di.input2 -= dummy2 * di.getModel().admit;
 
-          /* end convolution of h1dash with v1 and v2 */
+          // end convolution of h1dash with v1 and v2
 
-          /* convolution of h2 with i2 and i1 */
+          // convolution of h2 with i2 and i1
 
           dummy1 = dummy2 = 0.0;
           if (di.getModel().tdover)
           {
-            /* the term for ckt->CKTtime - di.getModel().td */
+            // the term for ckt->CKTtime - di.getModel().td
             dummy1 = (i2d - di.initCur2)* di.getModel().h2FirstCoeff;
             dummy2 = (i1d - di.initCur1)* di.getModel().h2FirstCoeff;
 
-            /* the rest of the convolution */
+            // the rest of the convolution
 
-            for (int j= /*di.getModel().h2Index*/di.getModel().auxIndex; j > 0; j--)
+            for (int j= di.getModel().auxIndex; j > 0; j--)
             {
 
               if (di.getModel().h2Coeffs[j] != 0.0)
@@ -3630,7 +3529,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
             }
           }
 
-          /* the initial-condition terms */
+          // the initial-condition terms
 
           dummy1 += di.initCur2 * di.getModel().intH2;
           dummy2 += di.initCur1 * di.getModel().intH2;
@@ -3638,9 +3537,9 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
           di.input1 += dummy1;
           di.input2 += dummy2;
 
-          /* end convolution of h2 with i2 and i1 */
-          /* convolution of h3dash with v2 and v1 */
-          /* the term for ckt->CKTtime - di.getModel().td */
+          // end convolution of h2 with i2 and i1
+          // convolution of h3dash with v2 and v1
+          // the term for ckt->CKTtime - di.getModel().td
 
           dummy1 = dummy2 = 0.0;
           if (di.getModel().tdover)
@@ -3648,9 +3547,9 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
             dummy1 = (v2d - di.initVolt2)* di.getModel().h3dashFirstCoeff;
             dummy2 = (v1d - di.initVolt1)* di.getModel().h3dashFirstCoeff;
 
-            /* the rest of the convolution */
+            // the rest of the convolution
 
-            for (int j= /*di.getModel().h3dashIndex*/di.getModel().auxIndex; j > 0; j--)
+            for (int j= di.getModel().auxIndex; j > 0; j--)
             {
               if (di.getModel().h3dashCoeffs[j] != 0.0)
               {
@@ -3660,7 +3559,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
             }
           }
 
-          /* the initial-condition terms */
+          // the initial-condition terms
 
           dummy1 += di.initVolt2 * di.getModel().intH3dash;
           dummy2 += di.initVolt1 * di.getModel().intH3dash;
@@ -3668,12 +3567,12 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
           di.input1 += di.getModel().admit*dummy1;
           di.input2 += di.getModel().admit*dummy2;
 
-          /* end convolution of h3dash with v2 and v1 */
+          // end convolution of h3dash with v2 and v1
 
-          /* NOTE: this switch passes through to following case */
+          // NOTE: this switch passes through to following case
 
         case LTRA_MOD_LC:
-          /* begin lossless-like parts */
+          // begin lossless-like parts
 
           if (!di.getModel().tdover)
           {
@@ -3694,15 +3593,15 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
           fVec[di.li_Ibr2] += ((di.getModel().admit * (di.getModel().h1dashFirstCoeff + 1.0)) *
                                (di.vpos2-di.vneg2) - di.currp2) - di.input2;
 
-          /* end lossless-like parts */
+          // end lossless-like parts
           break;
 
         case LTRA_MOD_RC:
 
-          /* begin convolution parts */
+          // begin convolution parts
 
-          /* convolution of h1dash with v1 and v2 */
-          /* the matrix has already been loaded above */
+          // convolution of h1dash with v1 and v2
+          // the matrix has already been loaded above
 
           dummy1 = 0.0;
           dummy2 = 0.0;
@@ -3715,12 +3614,12 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
             }
           }
 
-          /* the initial condition terms */
+          // the initial condition terms
 
           dummy1 += di.initVolt1 * di.getModel().intH1dash; dummy2 += di.initVolt2 * di.getModel().intH1dash;
 
-          /* the constant contributed by the init
-           * condition and the latest timepoint */
+          // the constant contributed by the init
+          // condition and the latest timepoint
 
           dummy1 -= di.initVolt1* di.getModel().h1dashFirstCoeff;
           dummy2 -= di.initVolt2* di.getModel().h1dashFirstCoeff;
@@ -3728,21 +3627,21 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
           di.input1 -= dummy1;
           di.input2 -= dummy2;
 
-          /* end convolution of h1dash with v1 and v2 */
-          /* convolution of h2 with i2 and i1 */
+          // end convolution of h1dash with v1 and v2
+          // convolution of h2 with i2 and i1
 
           dummy1=dummy2=0.0;
 
-          for (int j=getSolverState().ltraTimeIndex; j > 0; j--)
+          for (int j = getSolverState().ltraTimeIndex; j > 0; j--)
           {
-            if (di.getModel().h2Coeffs[i] != 0.0)
+            if (di.getModel().h2Coeffs[j] != 0.0)
             {
               dummy1 += di.getModel().h2Coeffs[j] * (di.i2[j] - di.initCur2);
               dummy2 += di.getModel().h2Coeffs[j] * (di.i1[j] - di.initCur1);
             }
           }
 
-          /* the initial-condition terms */
+          // the initial-condition terms
           dummy1 += di.initCur2 * di.getModel().intH2;
           dummy2 += di.initCur1 * di.getModel().intH2;
 
@@ -3752,8 +3651,8 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
           di.input1 += dummy1;
           di.input2 += dummy2;
 
-          /* end convolution of h2 with i2 and i1 */
-          /* convolution of h3dash with v2 and v1 */
+          // end convolution of h2 with i2 and i1
+          // convolution of h3dash with v2 and v1
 
           dummy1 = dummy2 = 0.0;
 
@@ -3766,7 +3665,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
             }
           }
 
-          /* the initial-condition terms */
+          // the initial-condition terms
 
           dummy1 += di.initVolt2 * di.getModel().intH3dash;
           dummy2 += di.initVolt1 * di.getModel().intH3dash;
@@ -3790,7 +3689,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
                                  di.currp2) -
                                di.input2);
 
-          /* end convolution of h3dash with v2 and v1 */
+          // end convolution of h3dash with v2 and v1
 
           break;
 
@@ -3823,14 +3722,14 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
 bool Master::loadDAEMatrices (N_LAS_Matrix& dFdx, N_LAS_Matrix& dQdx)
 {
   double dummy1(0.0), dummy2(0.0);
-  ostringstream msg;
+  std::ostringstream msg;
 
   // this is commented out for now because the loop contains return statements which
   // break the OMP threading on the loop -- RLS 8/20/2010
   // #ifdef _OMP
   // #pragma omp parallel for
   // #endif
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance& di = *(*it);
 
@@ -3877,12 +3776,7 @@ bool Master::loadDAEMatrices (N_LAS_Matrix& dFdx, N_LAS_Matrix& dQdx)
           break;
 
         default:
-          msg.clear();
-          msg << "***************" << std::endl;
-          msg << ": Error. Unknown LTRA configuration, ";
-          msg << di.getModel().specialCase;
-          msg << ". Must be one of RG, LC, RLC or RC.";
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_ERROR, msg.str());
+          UserError(di) << "Unknown LTRA configuration, " << di.getModel().specialCase << ". Must be one of RG, LC, RC, or RLC.";
 
           return false;
       }
@@ -3890,13 +3784,13 @@ bool Master::loadDAEMatrices (N_LAS_Matrix& dFdx, N_LAS_Matrix& dQdx)
     }
     else
     {
-      /* all cases other than DC or the RG case */
+      // all cases other than DC or the RG case
 
-      /* matrix loading - done every time load is called */
+      // matrix loading - done every time load is called
       switch (di.getModel().specialCase)
       {
         case LTRA_MOD_RLC:
-          /* loading for convolution parts' first terms */
+          // loading for convolution parts' first terms
 
           dummy1 = di.getModel().admit * di.getModel().h1dashFirstCoeff;
 
@@ -3905,13 +3799,13 @@ bool Master::loadDAEMatrices (N_LAS_Matrix& dFdx, N_LAS_Matrix& dQdx)
 
           *(di.ibr2Pos2Ptr) += dummy1;
           *(di.ibr2Neg2Ptr) -= dummy1;
-          /* end loading for convolution parts' first terms */
+          // end loading for convolution parts' first terms
 
-          /* NOTE: This case intentionally falls through to the next case */
+          // NOTE: This case intentionally falls through to the next case
 
         case LTRA_MOD_LC:
-          /* this section loads for the parts of the equations that
-             resemble the lossless equations */
+          // this section loads for the parts of the equations that
+          // resemble the lossless equations
 
           *(di.ibr1Pos1Ptr) += di.getModel().admit;
           *(di.ibr1Neg1Ptr) -= di.getModel().admit;
@@ -3929,13 +3823,13 @@ bool Master::loadDAEMatrices (N_LAS_Matrix& dFdx, N_LAS_Matrix& dQdx)
           *(di.pos2Ibr2Ptr) += 1.0;
           *(di.neg2Ibr2Ptr) -= 1.0;
 
-          /* loading for lossless-like parts over */
+          // loading for lossless-like parts over
           break;
 
         case LTRA_MOD_RC:
 
-          /* this section loads for the parts of the equations that
-             have no convolution */
+          // this section loads for the parts of the equations that
+          // have no convolution 
 
           *(di.ibr1Ibr1Ptr) -= 1.0;
 
@@ -3947,8 +3841,8 @@ bool Master::loadDAEMatrices (N_LAS_Matrix& dFdx, N_LAS_Matrix& dQdx)
           *(di.pos2Ibr2Ptr) += 1.0;
           *(di.neg2Ibr2Ptr) -= 1.0;
 
-          /* loading for non-convolution parts over */
-          /* loading for convolution parts' first terms */
+          // loading for non-convolution parts over
+          // loading for convolution parts' first terms
 
           dummy1 = di.getModel().h1dashFirstCoeff;
 
@@ -3971,7 +3865,7 @@ bool Master::loadDAEMatrices (N_LAS_Matrix& dFdx, N_LAS_Matrix& dQdx)
           *(di.ibr2Pos1Ptr) -= dummy1;
           *(di.ibr2Neg1Ptr) += dummy1;
 
-          /* end loading for convolution parts' first terms */
+          // end loading for convolution parts' first terms
 
           break;
 
@@ -3982,6 +3876,19 @@ bool Master::loadDAEMatrices (N_LAS_Matrix& dFdx, N_LAS_Matrix& dQdx)
   }
 
   return true;
+}
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("o", 1)
+    .registerModelType("ltra", 1);
 }
 
 } // namespace LTRA

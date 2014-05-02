@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.17.6.2 $
+// Revision Number: $Revision: 1.22.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/03/11 15:57:01 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -60,8 +60,6 @@
 #include <N_PDS_ParMap.h>
 
 #ifdef Xyce_PARALLEL_MPI
-//  #include <GSComm_Plan.h>
-//  #include <GSComm_Comm.h>
  #include <Epetra_MpiComm.h>
  #include <Epetra_MpiDistributor.h>
  #include <Epetra_SerialComm.h>
@@ -93,15 +91,8 @@ N_PDS_GlobalAccessor::N_PDS_GlobalAccessor( N_PDS_Comm * comm )
    recvBuf_(0),
    recvBufSize_(0),
    sendBuf_(0),
-   sendBufSize_(0)
-                   
-#ifdef Xyce_PARALLEL_MPI
-//                  ,
-//                  GSComm_(0),
-//                  GSPlan_(0)
-#endif
-                  ,
-                  distributor_(0)
+   sendBufSize_(0),
+  distributor_(0)
 {
 }
 
@@ -143,7 +134,7 @@ void N_PDS_GlobalAccessor::generateMigrationPlan()
 {
   numReceiveObjs_ = externGIDVector_.size();
 
-  map<int,int> sortMap;
+  std::map<int,int> sortMap;
 
   // sort externGIDVector_ numerically by processor
   for( int i = 0; i < numReceiveObjs_; ++i )
@@ -151,7 +142,7 @@ void N_PDS_GlobalAccessor::generateMigrationPlan()
 
   int count = 0;
   int tmp;
-  for( map<int,int>::iterator it_iiM = sortMap.begin();
+  for( std::map<int,int>::iterator it_iiM = sortMap.begin();
        it_iiM != sortMap.end(); ++it_iiM )
   {
     tmp = count;
@@ -188,13 +179,13 @@ void N_PDS_GlobalAccessor::generateMigrationPlan()
   }
 
 #ifdef Xyce_DEBUG_PARALLEL
-  cout << "N_PDS_GlobalAccessor::generateMigrationPlan:" << endl;
-  cout << " setup numRecvObjs: " << numReceiveObjs_ << endl;
-  cout << " setup numSendObjs: " << numSendObjs_ << endl;
+  std::cout << "N_PDS_GlobalAccessor::generateMigrationPlan:" << std::endl;
+  std::cout << " setup numRecvObjs: " << numReceiveObjs_ << std::endl;
+  std::cout << " setup numSendObjs: " << numSendObjs_ << std::endl;
 
   for( int i = 0; i < numReceiveObjs_; ++i )
-    cout << "  " << arrayReceiveGIDs_[i] << " " << arrayReceiveProcs_[i]
-	<< endl;
+    std::cout << "  " << arrayReceiveGIDs_[i] << " " << arrayReceiveProcs_[i]
+	<< std::endl;
 #endif
 
 #ifdef Xyce_PARALLEL_MPI
@@ -219,7 +210,7 @@ void N_PDS_GlobalAccessor::generateMigrationPlan()
   sendGIDVector_.resize( numSendObjs_ );
 
   for( int i = 0; i < numSendObjs_; ++i )
-    sendGIDVector_[i] = pair<int,int>( arraySendGIDs_[i],
+    sendGIDVector_[i] = std::pair<int,int>( arraySendGIDs_[i],
 			arraySendProcs_[i] );
 
   sendBufSize_ = numSendObjs_ * (sizeof(int)+sizeof(double));
@@ -228,15 +219,15 @@ void N_PDS_GlobalAccessor::generateMigrationPlan()
   recvBuf_ = new char[ recvBufSize_ ];
 
 #ifdef Xyce_DEBUG_PARALLEL
-  cout << "Created Migration Plan: " << endl;
-  cout << " numRecvObjs: " << numReceiveObjs_ << endl;
+  std::cout << "Created Migration Plan: " << std::endl;
+  std::cout << " numRecvObjs: " << numReceiveObjs_ << std::endl;
   for( int i = 0; i < numReceiveObjs_; ++i )
-    cout << "  " << arrayReceiveGIDs_[i] << " " << arrayReceiveProcs_[i]
-	<< endl;
-  cout << " numSendObjs: " << numSendObjs_ << endl;
+    std::cout << "  " << arrayReceiveGIDs_[i] << " " << arrayReceiveProcs_[i]
+	<< std::endl;
+  std::cout << " numSendObjs: " << numSendObjs_ << std::endl;
   for( int i = 0; i < numSendObjs_; ++i )
-    cout << "  " << arraySendGIDs_[i] << " " << arraySendProcs_[i]
-	<< endl;
+    std::cout << "  " << arraySendGIDs_[i] << " " << arraySendProcs_[i]
+	<< std::endl;
 #endif
 
 #endif /* Xyce_PARALLEL_MPI */
@@ -256,8 +247,8 @@ void N_PDS_GlobalAccessor::migrateMultiVector( N_LAS_MultiVector * mVector )
 {
 
 #ifdef Xyce_DEBUG_PARALLEL
-  cout << "migrating vector<<<<<<<<<<<<<<" << endl;
-  cout << " " << numSendObjs_ << " " << numReceiveObjs_ << endl;
+  std::cout << "migrating vector<<<<<<<<<<<<<<" << std::endl;
+  std::cout << " " << numSendObjs_ << " " << numReceiveObjs_ << std::endl;
 #endif
 
 #ifdef Xyce_PARALLEL_MPI
@@ -300,21 +291,21 @@ void N_PDS_GlobalAccessor::migrateMultiVector( N_LAS_MultiVector * mVector )
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 06/07/00
 //-----------------------------------------------------------------------------
-void N_PDS_GlobalAccessor::migrateIntArray( map<int,int> & sendMap,
-	map<int,int> & recvMap )
+void N_PDS_GlobalAccessor::migrateIntArray( std::map<int,int> & sendMap,
+	std::map<int,int> & recvMap )
 {
 
 #ifdef Xyce_PARALLEL_MPI
 
-  map<int,int>::iterator it_i2M, end_i2M;
+  std::map<int,int>::iterator it_i2M, end_i2M;
 
 #ifdef Xyce_DEBUG_PARALLEL
-  cout << "Send Map" << endl;
+  std::cout << "Send Map" << std::endl;
   it_i2M = sendMap.begin();
   end_i2M = sendMap.end();
   for( ; it_i2M != end_i2M; ++it_i2M )
-    cout << "  " << it_i2M->first << " " << it_i2M->second << endl;
-  cout << endl;
+    std::cout << "  " << it_i2M->first << " " << it_i2M->second << std::endl;
+  std::cout << std::endl;
 #endif
 
   int pos = 0;
@@ -326,8 +317,8 @@ void N_PDS_GlobalAccessor::migrateIntArray( map<int,int> & sendMap,
     val = sendMap[ sendGIDVector_[i].first ];
 
 #ifdef Xyce_DEBUG_PARALLEL
-    cout << "send values: " << sendGIDVector_[i].first <<
-	" " << val << endl;
+    std::cout << "send values: " << sendGIDVector_[i].first <<
+	" " << val << std::endl;
 #endif
 
     pdsComm_->pack( &idx, 1, sendBuf_, 2 * numSendObjs_ * sizeof( int ), pos );
@@ -348,12 +339,12 @@ void N_PDS_GlobalAccessor::migrateIntArray( map<int,int> & sendMap,
   }
 
 #ifdef Xyce_DEBUG_PARALLEL
-  cout << "Recv Map" << endl;
+  std::cout << "Recv Map" << std::endl;
   it_i2M = recvMap.begin();
   end_i2M = recvMap.end();
   for( ; it_i2M != end_i2M; ++it_i2M )
-    cout << "  " << it_i2M->first << " " << it_i2M->second << endl;
-  cout << endl;
+    std::cout << "  " << it_i2M->first << " " << it_i2M->second << std::endl;
+  std::cout << std::endl;
 #endif
 
 #endif /* Xyce_PARALLEL_MPI */
@@ -368,13 +359,13 @@ void N_PDS_GlobalAccessor::migrateIntArray( map<int,int> & sendMap,
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 02/26/01
 //-----------------------------------------------------------------------------
-void N_PDS_GlobalAccessor::migrateIntVecs( map< int,vector<int> > & sendMap,
-	map< int,vector<int> > & recvMap )
+void N_PDS_GlobalAccessor::migrateIntVecs( std::map< int,std::vector<int> > & sendMap,
+	std::map< int,std::vector<int> > & recvMap )
 {
 
 #ifdef Xyce_PARALLEL_MPI
 
-  map< int,vector<int> >::iterator it_i2M, end_i2M;
+  std::map< int,std::vector<int> >::iterator it_i2M, end_i2M;
 
   int maxSize = 0;
   int maxGlobalSize;
@@ -393,7 +384,7 @@ void N_PDS_GlobalAccessor::migrateIntVecs( map< int,vector<int> > & sendMap,
   int pos = 0;
   int idx, val;
 
-  map<int,int> recvSizeMap;
+  std::map<int,int> recvSizeMap;
 
   for( int i = 0; i < numSendObjs_; ++i )
   {
@@ -415,7 +406,7 @@ void N_PDS_GlobalAccessor::migrateIntVecs( map< int,vector<int> > & sendMap,
     pdsComm_->unpack( recvBuf_, 2 * numReceiveObjs_ * sizeof( int ), pos, &val, 1 );
 
     recvSizeMap[ idx ] = val;
-    recvMap[ idx ] = vector<int>(val,0);
+    recvMap[ idx ] = std::vector<int>(val,0);
   }
 
   for( int loc = 0; loc < maxGlobalSize; ++loc )

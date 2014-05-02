@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,19 +31,14 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.36.2.3 $
-// Revision Date  : $Date: 2013/10/03 17:23:31 $
+// Revision Number: $Revision: 1.46 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
 #include <iostream>
-
-// ----------   Xyce Includes   ----------
 
 #include <N_ANP_AnalysisInterface.h>
 #include <N_ANP_AnalysisManager.h>
@@ -71,7 +66,10 @@
 #include <N_DEV_DeviceInterface.h>
 #include <N_TOP_Topology.h>
 #include <N_LAS_Builder.h>
+#include <N_NLS_Manager.h>
 
+namespace Xyce {
+namespace Analysis {
 
 //-----------------------------------------------------------------------------
 // Function      : anpAnalysisModeToNLS
@@ -82,7 +80,7 @@
 // Creator       : Todd Coffey, 1414
 // Creation Date : 07/23/08
 //-----------------------------------------------------------------------------
-AnalysisMode anpAnalysisModeToNLS(ANP_Analysis_Mode mode)
+AnalysisMode anpAnalysisModeToNLS(Analysis_Mode mode)
 {
   AnalysisMode outMode;
   if (mode == ANP_MODE_TRANSIENT)
@@ -99,7 +97,7 @@ AnalysisMode anpAnalysisModeToNLS(ANP_Analysis_Mode mode)
   }
   else if (mode == ANP_MODE_HB)
   {
-    outMode = HB;
+    outMode = HB_MODE;
   }
   else
   {
@@ -109,55 +107,53 @@ AnalysisMode anpAnalysisModeToNLS(ANP_Analysis_Mode mode)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::N_ANP_AnalysisInterface
+// Function      : AnalysisInterface::AnalysisInterface
 // Purpose       : constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, 9233, Computational Sciences
 // Creation Date : 11/10/00
 //-----------------------------------------------------------------------------
-N_ANP_AnalysisInterface::N_ANP_AnalysisInterface(N_IO_CmdParse & cp)
+AnalysisInterface::AnalysisInterface(N_IO_CmdParse & cp)
     : commandLine_(cp)
 {
-  anaManagerPtr_ = rcp(new N_ANP_AnalysisManager(commandLine_,this));
+  anaManagerPtr_ = rcp(new AnalysisManager(commandLine_,this));
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::~N_ANP_AnalysisInterface
+// Function      : AnalysisInterface::~AnalysisInterface
 // Purpose       : destructor
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 11/10/00
 //-----------------------------------------------------------------------------
-N_ANP_AnalysisInterface::~N_ANP_AnalysisInterface ()
-{
-  pkgOptMgrPtr_ = Teuchos::null;
-}
+AnalysisInterface::~AnalysisInterface ()
+{}
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::resetAll
+// Function      : AnalysisInterface::resetAll
 // Purpose       : just like a destructor without the death
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, Rich Schiek, Ting Mei
 // Creation Date : 7/24/08
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisInterface::resetAll()
+void AnalysisInterface::resetAll()
 {
   anaManagerPtr_->resetAll();
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::registerTIAParams
+// Function      : AnalysisInterface::registerTIAParams
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/06/00
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::registerTIAParams(const N_TIA_TIAParams & tiaParams_tmp)
+bool AnalysisInterface::registerTIAParams(const N_TIA_TIAParams & tiaParams_tmp)
 
 {
   anaManagerPtr_->registerTIAParams(tiaParams_tmp);
@@ -165,261 +161,264 @@ bool N_ANP_AnalysisInterface::registerTIAParams(const N_TIA_TIAParams & tiaParam
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::registerNonlinearEquationLoader
+// Function      : AnalysisInterface::registerNonlinearEquationLoader
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd S. Coffey, 1414
 // Creation Date : 07/23/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::registerNonlinearEquationLoader( N_LOA_NonlinearEquationLoader * nonlinearEquationLoaderPtr )
+bool AnalysisInterface::registerNonlinearEquationLoader( N_LOA_NonlinearEquationLoader * nonlinearEquationLoaderPtr )
 {
   anaManagerPtr_->registerNonlinearEquationLoader(nonlinearEquationLoaderPtr);
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::registerDeviceInterface
+// Function      : AnalysisInterface::registerDeviceInterface
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd S. Coffey, 1414
 // Creation Date : 07/23/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::registerDeviceInterface( N_DEV_DeviceInterface * devInterfacePtr )
+bool AnalysisInterface::registerDeviceInterface( N_DEV_DeviceInterface * devInterfacePtr )
 {
   anaManagerPtr_->registerDeviceInterface(devInterfacePtr);
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::registerTopology
+// Function      : AnalysisInterface::registerTopology
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd S. Coffey, 1414
 // Creation Date : 07/23/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::registerTopology( N_TOP_Topology * topoMgrPtr )
+bool AnalysisInterface::registerTopology( N_TOP_Topology * topoMgrPtr )
 {
   anaManagerPtr_->registerTopology( topoMgrPtr );
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::registerApplicationBuilder
+// Function      : AnalysisInterface::registerApplicationBuilder
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd S. Coffey, 1414
 // Creation Date : 07/23/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::registerApplicationBuilder( N_LAS_Builder * appBuilderPtr )
+bool AnalysisInterface::registerApplicationBuilder( N_LAS_Builder * appBuilderPtr )
 {
   anaManagerPtr_->registerApplicationBuilder( appBuilderPtr );
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::registerPkgOptionsMgr
+// Function      : AnalysisInterface::registerPkgOptionsMgr
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, 1437
 // Creation Date : 10/21/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr )
+bool AnalysisInterface::registerPkgOptionsMgr( N_IO_PkgOptionsMgr *pkgOptPtr )
 {
   pkgOptMgrPtr_ = pkgOptPtr;
 
   // this work was in the constructor, but now we don't know the pkgOptMgrPtr_ until
   // it is registered.  So, do this work now.
-  string netListFile = "";
+  std::string netListFile = "";
   if (commandLine_.getArgumentValue("netlist") != "")
   {
     netListFile = commandLine_.getArgumentValue("netlist");
   }
 
   pkgOptMgrPtr_->submitRegistration(
-      "TIMEINT", netListFile, new N_ANP_AnalysisInterface_TranOptionsReg( this ) );
+      "TIMEINT", netListFile, new AnalysisInterface_TranOptionsReg( this ) );
 
   pkgOptMgrPtr_->submitRegistration(
-      "TRAN", netListFile, new N_ANP_AnalysisInterface_TransAnalysisReg( this ) );
+      "TRAN", netListFile, new AnalysisInterface_TransAnalysisReg( this ) );
 
   pkgOptMgrPtr_->submitRegistration(
-      "DC", netListFile, new N_ANP_AnalysisInterface_DCAnalysisReg( this ) );
+      "DC", netListFile, new AnalysisInterface_DCAnalysisReg( this ) );
 
   pkgOptMgrPtr_->submitRegistration(
-      "OP", netListFile, new N_ANP_AnalysisInterface_OPAnalysisReg( this ) );
+      "OP", netListFile, new AnalysisInterface_OPAnalysisReg( this ) );
 
   pkgOptMgrPtr_->submitRegistration(
-      "STEP", netListFile, new N_ANP_AnalysisInterface_STEPAnalysisReg( this ) );
+      "STEP", netListFile, new AnalysisInterface_STEPAnalysisReg( this ) );
 
   pkgOptMgrPtr_->submitRegistration(
-      "OP_IO", netListFile, new N_ANP_AnalysisInterface_DCOPOptionsReg( this ) );
+      "OP_IO", netListFile, new AnalysisInterface_DCOPOptionsReg( this ) );
 
   pkgOptMgrPtr_->submitRegistration(
-      "SAVE", netListFile, new N_ANP_AnalysisInterface_SaveOptionsReg( this ) );
+      "SAVE", netListFile, new AnalysisInterface_SaveOptionsReg( this ) );
 
   // MPDE specific netlist lines
   pkgOptMgrPtr_->submitRegistration(
-      "MPDE", netListFile, new N_ANP_AnalysisInterface_MPDE_AnalysisReg( this ) );
+      "MPDE", netListFile, new AnalysisInterface_MPDE_AnalysisReg( this ) );
 
   pkgOptMgrPtr_->submitRegistration(
-      "MPDEINT", netListFile, new N_ANP_AnalysisInterface_MPDE_OptionsReg( this ) );
+      "MPDEINT", netListFile, new AnalysisInterface_MPDE_OptionsReg( this ) );
 
   pkgOptMgrPtr_->submitRegistration(
-      "TIMEINT-MPDE", netListFile, new N_ANP_AnalysisInterface_MPDE_TranMPDEOptionsReg( this ) );
+      "TIMEINT-MPDE", netListFile, new AnalysisInterface_MPDE_TranMPDEOptionsReg( this ) );
 
   // HB Specific netlist lines
   pkgOptMgrPtr_->submitRegistration(
-      "HB", netListFile, new N_ANP_AnalysisInterface_HB_AnalysisReg( this ) );
+      "HB", netListFile, new AnalysisInterface_HB_AnalysisReg( this ) );
 
   pkgOptMgrPtr_->submitRegistration(
-      "HBINT", netListFile, new N_ANP_AnalysisInterface_HB_OptionsReg( this ) );
+      "HBINT", netListFile, new AnalysisInterface_HB_OptionsReg( this ) );
 
   pkgOptMgrPtr_->submitRegistration(
-      "LINSOL-HB", netListFile, new N_ANP_AnalysisInterface_HB_LinSolReg( this ) );
+      "LINSOL-HB", netListFile, new AnalysisInterface_HB_LinSolReg( this ) );
+
+  pkgOptMgrPtr_->submitRegistration(
+      "LINSOL", netListFile, new AnalysisInterface_LinSolReg( this ) );
 
   // AC Specific netlist lines
   pkgOptMgrPtr_->submitRegistration(
-      "AC", netListFile, new N_ANP_AnalysisInterface_AC_AnalysisReg( this ) );
+      "AC", netListFile, new AnalysisInterface_AC_AnalysisReg( this ) );
 
   // MOR Specific netlist lines
   pkgOptMgrPtr_->submitRegistration(
-      "MOR", netListFile, new N_ANP_AnalysisInterface_MOR_AnalysisReg( this ) );
+      "MOR", netListFile, new AnalysisInterface_MOR_AnalysisReg( this ) );
 
   // MOR Specific netlist lines
   pkgOptMgrPtr_->submitRegistration(
-      "MOR_OPTS", netListFile, new N_ANP_AnalysisInterface_MOR_OptionsReg( this ) );
+      "MOR_OPTS", netListFile, new AnalysisInterface_MOR_OptionsReg( this ) );
 
   pkgOptMgrPtr_->submitRegistration(
-      "SENS", netListFile, new N_ANP_AnalysisInterface_SensOptionsReg( this ) );
+      "SENS", netListFile, new AnalysisInterface_SensOptionsReg( this ) );
 
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setTranAnalysisParams
+// Function      : AnalysisInterface::setTranAnalysisParams
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 9/27/00
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setTranAnalysisParams(const N_UTL_OptionBlock &tiaParamsBlock)
+bool AnalysisInterface::setTranAnalysisParams(const N_UTL_OptionBlock &tiaParamsBlock)
 {
   return anaManagerPtr_->setTranAnalysisParams(tiaParamsBlock);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setDCAnalysisParams
+// Function      : AnalysisInterface::setDCAnalysisParams
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 10/6/00
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setDCAnalysisParams(const N_UTL_OptionBlock & tiaParamsBlock)
+bool AnalysisInterface::setDCAnalysisParams(const N_UTL_OptionBlock & tiaParamsBlock)
 {
   return anaManagerPtr_->setDCAnalysisParams(tiaParamsBlock);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setACAnalysisParams
+// Function      : AnalysisInterface::setACAnalysisParams
 // Purpose       : Method to handle AC statements
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 10/18/07
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setACAnalysisParams(const N_UTL_OptionBlock & ACParamBlock)
+bool AnalysisInterface::setACAnalysisParams(const N_UTL_OptionBlock & ACParamBlock)
 {
   return anaManagerPtr_->setACAnalysisParams(ACParamBlock);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setOPAnalysisParams
+// Function      : AnalysisInterface::setOPAnalysisParams
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 10/15/07
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setOPAnalysisParams(const N_UTL_OptionBlock & tiaParamsBlock)
+bool AnalysisInterface::setOPAnalysisParams(const N_UTL_OptionBlock & tiaParamsBlock)
 {
   return anaManagerPtr_->setOPAnalysisParams(tiaParamsBlock);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setSTEPAnalysisParams
+// Function      : AnalysisInterface::setSTEPAnalysisParams
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 10/30/03
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setSTEPAnalysisParams(const N_UTL_OptionBlock & tiaParamsBlock)
+bool AnalysisInterface::setSTEPAnalysisParams(const N_UTL_OptionBlock & tiaParamsBlock)
 {
   return anaManagerPtr_->setSTEPAnalysisParams(tiaParamsBlock);
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setSaveOptions
+// Function      : AnalysisInterface::setSaveOptions
 // Purpose       : Method to handle SAVE statements
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 10/18/07
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setSaveOptions(const N_UTL_OptionBlock & tiaParamBlock)
+bool AnalysisInterface::setSaveOptions(const N_UTL_OptionBlock & tiaParamBlock)
 {
   return anaManagerPtr_->setSaveOptions(tiaParamBlock);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setDCOPRestartParams
+// Function      : AnalysisInterface::setDCOPRestartParams
 // Purpose       : Method to handle DCOP restart statements
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 10/18/07
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setDCOPRestartParams(const N_UTL_OptionBlock & tiaParamBlock)
+bool AnalysisInterface::setDCOPRestartParams(const N_UTL_OptionBlock & tiaParamBlock)
 {
   return anaManagerPtr_->setDCOPRestartParams(tiaParamBlock);
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setPauseTime
+// Function      : AnalysisInterface::setPauseTime
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 04/29/04
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisInterface::setPauseTime(const double pauseTime)
+void AnalysisInterface::setPauseTime(const double pauseTime)
 {
   anaManagerPtr_->setPauseTime(pauseTime);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::getPauseTime
+// Function      : AnalysisInterface::getPauseTime
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 04/29/04
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisInterface::getPauseTime()
+double AnalysisInterface::getPauseTime()
 {
   return(anaManagerPtr_->getPauseTime());
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::isPaused
+// Function      : AnalysisInterface::isPaused
 //
 // Purpose       : return the true if the simulation is currently paused
 //
@@ -428,12 +427,12 @@ double N_ANP_AnalysisInterface::getPauseTime()
 // Creator       : Rich Schiek, SNL, Electrical and Microsystems Simulation
 // Creation Date : 02/18/2008
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::isPaused()
+bool AnalysisInterface::isPaused()
 {
   return(anaManagerPtr_->isPaused());
 }
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::resumeSimulation
+// Function      : AnalysisInterface::resumeSimulation
 // Purpose       : signal to control algorithm that simulation is continuing
 //                 from previously paused simulation
 // Special Notes :
@@ -441,196 +440,196 @@ bool N_ANP_AnalysisInterface::isPaused()
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 04/29/04
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisInterface::resumeSimulation()
+void AnalysisInterface::resumeSimulation()
 {
   anaManagerPtr_->resumeSimulation();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setTranOptions
+// Function      : AnalysisInterface::setTranOptions
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 9/29/00
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setTranOptions(const N_UTL_OptionBlock & OB)
+bool AnalysisInterface::setTranOptions(const N_UTL_OptionBlock & OB)
 {
   return anaManagerPtr_->setTranOptions(OB);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setMPDEAnalysisParams
+// Function      : AnalysisInterface::setMPDEAnalysisParams
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, 1414
 // Creation Date : 7/23/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setMPDEAnalysisParams(const N_UTL_OptionBlock & OB)
+bool AnalysisInterface::setMPDEAnalysisParams(const N_UTL_OptionBlock & OB)
 {
   return anaManagerPtr_->setMPDEAnalysisParams(OB);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setMPDEOptions
+// Function      : AnalysisInterface::setMPDEOptions
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, 1414
 // Creation Date : 7/23/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setMPDEOptions(const N_UTL_OptionBlock & OB)
+bool AnalysisInterface::setMPDEOptions(const N_UTL_OptionBlock & OB)
 {
   return anaManagerPtr_->setMPDEOptions(OB);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setHBAnalysisParams
+// Function      : AnalysisInterface::setHBAnalysisParams
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, Ting Mei
 // Creation Date : 7/30/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setHBAnalysisParams(const N_UTL_OptionBlock & OB)
+bool AnalysisInterface::setHBAnalysisParams(const N_UTL_OptionBlock & OB)
 {
   return anaManagerPtr_->setHBAnalysisParams(OB);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setHBOptions
+// Function      : AnalysisInterface::setHBOptions
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, Ting Mei
 // Creation Date : 7/30/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setHBOptions(const N_UTL_OptionBlock & OB)
+bool AnalysisInterface::setHBOptions(const N_UTL_OptionBlock & OB)
 {
   return anaManagerPtr_->setHBOptions(OB);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setLinSol
+// Function      : AnalysisInterface::setLinSol
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 07/12/2013
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setLinSol(const N_UTL_OptionBlock & OB)
+bool AnalysisInterface::setLinSol(const N_UTL_OptionBlock & OB)
 {
   return anaManagerPtr_->setLinSol(OB);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setHBLinSol
+// Function      : AnalysisInterface::setHBLinSol
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist
 // Creation Date : 11/11/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setHBLinSol(const N_UTL_OptionBlock & OB)
+bool AnalysisInterface::setHBLinSol(const N_UTL_OptionBlock & OB)
 {
   return anaManagerPtr_->setHBLinSol(OB);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setMORAnalysisParams
+// Function      : AnalysisInterface::setMORAnalysisParams
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist and Ting Mei
 // Creation Date : 5/31/12
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setMORAnalysisParams(const N_UTL_OptionBlock & OB)
+bool AnalysisInterface::setMORAnalysisParams(const N_UTL_OptionBlock & OB)
 {
   return anaManagerPtr_->setMORAnalysisParams(OB);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setMOROptions
+// Function      : AnalysisInterface::setMOROptions
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist and Ting Mei
 // Creation Date : 5/31/12
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setMOROptions(const N_UTL_OptionBlock & OB)
+bool AnalysisInterface::setMOROptions(const N_UTL_OptionBlock & OB)
 {
   return anaManagerPtr_->setMOROptions(OB);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setTRANMPDEOptions
+// Function      : AnalysisInterface::setTRANMPDEOptions
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, 1414
 // Creation Date : 7/23/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setTRANMPDEOptions(const N_UTL_OptionBlock & OB)
+bool AnalysisInterface::setTRANMPDEOptions(const N_UTL_OptionBlock & OB)
 {
   return anaManagerPtr_->setTRANMPDEOptions(OB);
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setSensOptions
+// Function      : AnalysisInterface::setSensOptions
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, Sandia
 // Creation Date : 6/5/13
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setSensOptions(const N_UTL_OptionBlock & OB)
+bool AnalysisInterface::setSensOptions(const N_UTL_OptionBlock & OB)
 {
   return anaManagerPtr_->setSensOptions(OB);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::registerElapsedTimer
+// Function      : AnalysisInterface::registerElapsedTimer
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 02/24/06
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::registerElapsedTimer (N_UTL_Timer * et)
+bool AnalysisInterface::registerElapsedTimer (N_UTL_Timer * et)
 {
   return anaManagerPtr_->registerElapsedTimer(et);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::getBlockAnalysisFlag
+// Function      : AnalysisInterface::getBlockAnalysisFlag
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/29/05
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::getBlockAnalysisFlag () const
+bool AnalysisInterface::getBlockAnalysisFlag () const
 {
   return anaManagerPtr_->getBlockAnalysisFlag();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::getTransientFlag
+// Function      : AnalysisInterface::getTransientFlag
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/29/05
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::getTransientFlag () const
+bool AnalysisInterface::getTransientFlag () const
 {
   return anaManagerPtr_->getTransientFlag();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::initializeAll
+// Function      : AnalysisInterface::initializeAll
 // Purpose       : This function performs the final initializations.  Mainly,
 //                 it initializes the two data container classes, DataStore and
 //                 StepErrorControl.  It also registers the neccessary vectors
@@ -644,20 +643,20 @@ bool N_ANP_AnalysisInterface::getTransientFlag () const
 // Creation Date : 11/10/00
 //-----------------------------------------------------------------------------
 
-bool N_ANP_AnalysisInterface::initializeAll()
+bool AnalysisInterface::initializeAll()
 {
   return anaManagerPtr_->initializeAll();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::registerLinearSystem
+// Function      : AnalysisInterface::registerLinearSystem
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/05/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::registerLinearSystem(N_LAS_System * lasSysPtr)
+bool AnalysisInterface::registerLinearSystem(N_LAS_System * lasSysPtr)
 {
   anaManagerPtr_->registerLinearSystem(lasSysPtr);
 
@@ -665,59 +664,59 @@ bool N_ANP_AnalysisInterface::registerLinearSystem(N_LAS_System * lasSysPtr)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::registerLoader
+// Function      : AnalysisInterface::registerLoader
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/05/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::registerLoader(N_LOA_Loader * loaderPtr)
+bool AnalysisInterface::registerLoader(N_LOA_Loader * loaderPtr)
 {
   return anaManagerPtr_->registerLoader(loaderPtr);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::registerOutputMgr
+// Function      : AnalysisInterface::registerOutputMgr
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/05/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::registerOutputMgr(N_IO_OutputMgr * outputPtr)
+bool AnalysisInterface::registerOutputMgr(N_IO_OutputMgr * outputPtr)
 {
   return anaManagerPtr_->registerOutputMgr(outputPtr);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::registerRestartMgr
+// Function      : AnalysisInterface::registerRestartMgr
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/05/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::registerRestartMgr(N_IO_RestartMgr * restartPtr)
+bool AnalysisInterface::registerRestartMgr(N_IO_RestartMgr * restartPtr)
 {
   return anaManagerPtr_->registerRestartMgr(restartPtr);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::registerNLSolver
+// Function      : AnalysisInterface::registerNLSolver
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/05/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::registerNLSManager(N_NLS_Manager * nlsMgrPtr)
+bool AnalysisInterface::registerNLSManager(N_NLS_Manager * nlsMgrPtr)
 {
   return anaManagerPtr_->registerNLSManager(nlsMgrPtr);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::run
+// Function      : AnalysisInterface::run
 // Purpose       : Execute the top level control loop.
 // Special Notes :
 // Scope         : public
@@ -725,13 +724,13 @@ bool N_ANP_AnalysisInterface::registerNLSManager(N_NLS_Manager * nlsMgrPtr)
 // Creation Date : 11/10/00
 //-----------------------------------------------------------------------------
 
-bool N_ANP_AnalysisInterface::run()
+bool AnalysisInterface::run()
 {
   return anaManagerPtr_->run();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::updateDerivs
+// Function      : AnalysisInterface::updateDerivs
 // Purpose       : calls the time  int. method to update the  corrector
 //                 derivatives.
 // Special Notes :
@@ -740,13 +739,13 @@ bool N_ANP_AnalysisInterface::run()
 // Creation Date : 11/10/00
 //-----------------------------------------------------------------------------
 
-bool N_ANP_AnalysisInterface::updateDerivs()
+bool AnalysisInterface::updateDerivs()
 {
   return anaManagerPtr_->updateDerivs ();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::updateDivDiffs
+// Function      : AnalysisInterface::updateDivDiffs
 // Purpose       :
 // Special Notes :
 // Scope         : public
@@ -754,79 +753,79 @@ bool N_ANP_AnalysisInterface::updateDerivs()
 // Creation Date : 11/10/00
 //-----------------------------------------------------------------------------
 
-bool N_ANP_AnalysisInterface::updateDivDiffs()
+bool AnalysisInterface::updateDivDiffs()
 {
   return anaManagerPtr_->updateDivDiffs();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::getTime
+// Function      : AnalysisInterface::getTime
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/27/00
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisInterface::getTime() const
+double AnalysisInterface::getTime() const
 {
   return anaManagerPtr_->getTime();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::getCurrentTime
+// Function      : AnalysisInterface::getCurrentTime
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, Electrical and Mems Modeling
 // Creation Date : 8/21/2009
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisInterface::getCurrentTime() const
+double AnalysisInterface::getCurrentTime() const
 {
   return anaManagerPtr_->getCurrentTime();
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::getFinalTime
+// Function      : AnalysisInterface::getFinalTime
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 9/04/01
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisInterface::getFinalTime() const
+double AnalysisInterface::getFinalTime() const
 {
   return anaManagerPtr_->getFinalTime();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::getInitialTime
+// Function      : AnalysisInterface::getInitialTime
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/04/02
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisInterface::getInitialTime() const
+double AnalysisInterface::getInitialTime() const
 {
   return anaManagerPtr_->getInitialTime();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::equateTmpVectors
+// Function      : AnalysisInterface::equateTmpVectors
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 01/24/02
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::equateTmpVectors()
+bool AnalysisInterface::equateTmpVectors()
 {
   return anaManagerPtr_->equateTmpVectors();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::updateDerivsBlock
+// Function      : AnalysisInterface::updateDerivsBlock
 // Purpose       : calls the time  int. method to update the  corrector
 //                 derivatives, but only does it a subset of the solution
 //                 and state vectors.
@@ -836,171 +835,171 @@ bool N_ANP_AnalysisInterface::equateTmpVectors()
 // Creation Date : 01/10/01
 //-----------------------------------------------------------------------------
 //inline
-bool N_ANP_AnalysisInterface::updateDerivsBlock(const list<index_pair> & solGIDList,
-                                      const list<index_pair> & staGIDList)
+bool AnalysisInterface::updateDerivsBlock(const std::list<index_pair> & solGIDList,
+                                      const std::list<index_pair> & staGIDList)
 {
   return anaManagerPtr_->updateDerivsBlock(solGIDList, staGIDList);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::restartDataSize
+// Function      : AnalysisInterface::restartDataSize
 // Purpose       : Gets the size of the restart data (bytes?).
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 07/31/01
 //-----------------------------------------------------------------------------
-int N_ANP_AnalysisInterface::restartDataSize( bool pack )
+int AnalysisInterface::restartDataSize( bool pack )
 {
   return anaManagerPtr_->restartDataSize( pack );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::dumpRestartData
+// Function      : AnalysisInterface::dumpRestartData
 // Purpose       : Dumps the restart data to a file.
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 07/31/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::dumpRestartData(char * buf, int bsize, int & pos,
+bool AnalysisInterface::dumpRestartData(char * buf, int bsize, int & pos,
                                     N_PDS_Comm * comm, bool pack )
 {
   return anaManagerPtr_->dumpRestartData(buf, bsize, pos, comm, pack);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::restoreRestartData
+// Function      : AnalysisInterface::restoreRestartData
 // Purpose       : Restores the restart data from a file.
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 07/31/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::restoreRestartData(char * buf, int bsize, int & pos,
+bool AnalysisInterface::restoreRestartData(char * buf, int bsize, int & pos,
                                        N_PDS_Comm * comm, bool pack )
 {
   return anaManagerPtr_->restoreRestartData(buf, bsize, pos, comm, pack);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::getSolnVarData
+// Function      : AnalysisInterface::getSolnVarData
 // Purpose       : Gets the solution variable data.
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 07/31/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::getSolnVarData(const int & gid, vector<double> & varData)
+bool AnalysisInterface::getSolnVarData(const int & gid, std::vector<double> & varData)
 {
   return anaManagerPtr_->getSolnVarData(gid, varData);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::getStateVarData
+// Function      : AnalysisInterface::getStateVarData
 // Purpose       : Gets the state variable data.
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 07/31/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::getStateVarData(const int & gid, vector<double> & varData)
+bool AnalysisInterface::getStateVarData(const int & gid, std::vector<double> & varData)
 {
   return anaManagerPtr_->getStateVarData(gid, varData);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::getStoreVarData
+// Function      : AnalysisInterface::getStoreVarData
 // Purpose       : Gets the store variable data.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::getStoreVarData(const int & gid, vector<double> & varData)
+bool AnalysisInterface::getStoreVarData(const int & gid, std::vector<double> & varData)
 {
   return anaManagerPtr_->getStoreVarData(gid, varData);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setSolnVarData
+// Function      : AnalysisInterface::setSolnVarData
 // Purpose       : Sets the solution variable data.
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 07/31/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setSolnVarData(const int & gid,
-                                   const vector<double> & varData)
+bool AnalysisInterface::setSolnVarData(const int & gid,
+                                   const std::vector<double> & varData)
 {
   return anaManagerPtr_->setSolnVarData(gid, varData);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setStateVarData
+// Function      : AnalysisInterface::setStateVarData
 // Purpose       : Sets the state variable data.
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 07/31/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setStateVarData(const int & gid,
-                                    const vector<double> & varData)
+bool AnalysisInterface::setStateVarData(const int & gid,
+                                    const std::vector<double> & varData)
 {
   return anaManagerPtr_->setStateVarData(gid, varData);
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setStoreVarData
+// Function      : AnalysisInterface::setStoreVarData
 // Purpose       : Sets the state variable data.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setStoreVarData(const int & gid,
-                                    const vector<double> & varData)
+bool AnalysisInterface::setStoreVarData(const int & gid,
+                                    const std::vector<double> & varData)
 {
   return anaManagerPtr_->setStoreVarData(gid, varData);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setBeginningIntegrationFlag
+// Function      : AnalysisInterface::setBeginningIntegrationFlag
 // Purpose       : set beginning integration flag to true
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, Electrical and Microsytems Modeling
 // Creation Date : 03/5/2010
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisInterface::setBeginningIntegrationFlag(bool bif)
+void AnalysisInterface::setBeginningIntegrationFlag(bool bif)
 {
   anaManagerPtr_->setBeginningIntegrationFlag (bif);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::registerParallelServices
+// Function      : AnalysisInterface::registerParallelServices
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 08/30/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::registerParallelServices(N_PDS_Manager * pds)
+bool AnalysisInterface::registerParallelServices(N_PDS_Manager * pds)
 {
   return anaManagerPtr_->registerParallelServices(pds);
 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::outputSummary
+// Function      : AnalysisInterface::outputSummary
 // Purpose       : Outputs summary information for time-integration function.
 // Special Notes :
 // Scope         : public
 // Creator       : Scott A. Hutchinson, SNL, Computational Sciences
 // Creation Date : 07/30/02
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::outputSummary()
+bool AnalysisInterface::outputSummary()
 {
   bool bsuccess = true;
 
@@ -1015,240 +1014,240 @@ bool N_ANP_AnalysisInterface::outputSummary()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setNextSolVectorPtr
+// Function      : AnalysisInterface::setNextSolVectorPtr
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 04/22/03
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::setNextSolVectorPtr (N_LAS_Vector * solVecPtr)
+bool AnalysisInterface::setNextSolVectorPtr (N_LAS_Vector * solVecPtr)
 {
   return anaManagerPtr_->setNextSolVectorPtr (solVecPtr);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::loadRHS
+// Function      : AnalysisInterface::loadRHS
 // Purpose       : manages the RHS load.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 03/03/04
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::loadRHS ()
+bool AnalysisInterface::loadRHS ()
 {
   return anaManagerPtr_->assemblerPtr->loadRHS();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::loadJacobian
+// Function      : AnalysisInterface::loadJacobian
 // Purpose       : Manages the jacobian load.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 03/03/04
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::loadJacobian ()
+bool AnalysisInterface::loadJacobian ()
 {
   return anaManagerPtr_->assemblerPtr->loadJacobian();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::applyJacobian
+// Function      : AnalysisInterface::applyJacobian
 // Purpose       : Manages the jacobian load.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 03/03/04
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::applyJacobian (const N_LAS_Vector& input, N_LAS_Vector& result)
+bool AnalysisInterface::applyJacobian (const N_LAS_Vector& input, N_LAS_Vector& result)
 {
   return anaManagerPtr_->assemblerPtr->applyJacobian(input,result);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::getResidualTime
+// Function      : AnalysisInterface::getResidualTime
 // Purpose       : This should give the time for the most recent Residual load.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 03/03/04
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisInterface::getResidualTime()
+double AnalysisInterface::getResidualTime()
 {
   return anaManagerPtr_->assemblerPtr->residualTime_;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::getJacobianTime
+// Function      : AnalysisInterface::getJacobianTime
 // Purpose       : This should give the time for the most recent Jacobian load.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 03/03/04
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisInterface::getJacobianTime()
+double AnalysisInterface::getJacobianTime()
 {
   return anaManagerPtr_->assemblerPtr->jacobianTime_;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::getTIAParams
+// Function      : AnalysisInterface::getTIAParams
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 11/05/04
 //-----------------------------------------------------------------------------
-N_TIA_TIAParams& N_ANP_AnalysisInterface::getTIAParams()
+N_TIA_TIAParams& AnalysisInterface::getTIAParams()
 {
   return anaManagerPtr_->tiaParams;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::simulationComplete
+// Function      : AnalysisInterface::simulationComplete
 // Purpose       : return boolean signifying whether simulation is complete
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 05/06/2004
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::simulationComplete()
+bool AnalysisInterface::simulationComplete()
 {
   return anaManagerPtr_->simulationComplete();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::completeOPStartStep
+// Function      : AnalysisInterface::completeOPStartStep
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/28/2006
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::completeOPStartStep()
+bool AnalysisInterface::completeOPStartStep()
 {
   return anaManagerPtr_->completeOPStartStep();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::completeHomotopyStep
+// Function      : AnalysisInterface::completeHomotopyStep
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, 9233
 // Creation Date : 03/20/2006
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::completeHomotopyStep
-    ( const vector<string> & paramNames,
-      const vector<double> & paramVals,
+bool AnalysisInterface::completeHomotopyStep
+    ( const std::vector<std::string> & paramNames,
+      const std::vector<double> & paramVals,
       N_LAS_Vector * solnVecPtr )
 {
   return anaManagerPtr_->completeHomotopyStep(paramNames, paramVals,solnVecPtr);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::failHomotopyStep
+// Function      : AnalysisInterface::failHomotopyStep
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, 9233
 // Creation Date : 03/30/2006
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::failHomotopyStep ( )
+bool AnalysisInterface::failHomotopyStep ( )
 {
   return anaManagerPtr_->failHomotopyStep ();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::startTimeStep
+// Function      : AnalysisInterface::startTimeStep
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/20/2006
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::startTimeStep (const N_TIA_TimeIntInfo & tiInfo)
+bool AnalysisInterface::startTimeStep (const N_TIA_TimeIntInfo & tiInfo)
 {
   return anaManagerPtr_->startTimeStep (tiInfo);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::runStep
+// Function      : AnalysisInterface::runStep
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/06/2006
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::runStep
+bool AnalysisInterface::runStep
     (const N_TIA_TimeIntInfo & tiInfo, N_TIA_TwoLevelError & tlError)
 {
   return anaManagerPtr_->runStep (tiInfo, tlError);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::startupSolvers
+// Function      : AnalysisInterface::startupSolvers
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/06/2006
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::startupSolvers ()
+bool AnalysisInterface::startupSolvers ()
 {
   return anaManagerPtr_->startupSolvers ();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::finishSolvers
+// Function      : AnalysisInterface::finishSolvers
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/06/2006
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::finishSolvers ()
+bool AnalysisInterface::finishSolvers ()
 {
   return anaManagerPtr_->finishSolvers ();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::provisionalStep
+// Function      : AnalysisInterface::provisionalStep
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/04/09
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::provisionalStep (double maxTimeStep,
+bool AnalysisInterface::provisionalStep (double maxTimeStep,
       double &currTimeStep)
 {
   return anaManagerPtr_->provisionalStep (maxTimeStep, currTimeStep);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::acceptProvisionalStep
+// Function      : AnalysisInterface::acceptProvisionalStep
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 04/10/09
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisInterface::acceptProvisionalStep ()
+void AnalysisInterface::acceptProvisionalStep ()
 {
   anaManagerPtr_->acceptProvisionalStep ();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::rejectProvisionalStep
+// Function      : AnalysisInterface::rejectProvisionalStep
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 04/10/09
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisInterface::rejectProvisionalStep ()
+void AnalysisInterface::rejectProvisionalStep ()
 {
   anaManagerPtr_->rejectProvisionalStep ();
 }
@@ -1256,56 +1255,56 @@ void N_ANP_AnalysisInterface::rejectProvisionalStep ()
 #ifdef Xyce_Dakota
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::getDakotaRunFlag
+// Function      : AnalysisInterface::getDakotaRunFlag
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::getDakotaRunFlag()
+bool AnalysisInterface::getDakotaRunFlag()
 {
   return anaManagerPtr_->getDakotaRunFlag();
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setDakotaRunFlag
+// Function      : AnalysisInterface::setDakotaRunFlag
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisInterface::setDakotaRunFlag( bool flag )
+void AnalysisInterface::setDakotaRunFlag( bool flag )
 {
   anaManagerPtr_->setDakotaRunFlag( flag );
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::getDakotaIteration
+// Function      : AnalysisInterface::getDakotaIteration
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-int N_ANP_AnalysisInterface::getDakotaIteration()
+int AnalysisInterface::getDakotaIteration()
 {
     return anaManagerPtr_->getDakotaIteration();
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::setDakotaIteration
+// Function      : AnalysisInterface::setDakotaIteration
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisInterface::setDakotaIteration( int iterNumber )
+void AnalysisInterface::setDakotaIteration( int iterNumber )
 {
   anaManagerPtr_->setDakotaIteration( iterNumber );
 }
@@ -1313,158 +1312,158 @@ void N_ANP_AnalysisInterface::setDakotaIteration( int iterNumber )
 #endif
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::condutanceTest
+// Function      : AnalysisInterface::condutanceTest
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisInterface::condutanceTest ()
+void AnalysisInterface::condutanceTest ()
 {
   anaManagerPtr_->conductanceTest ();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::homotopyStepSuccess
+// Function      : AnalysisInterface::homotopyStepSuccess
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisInterface::homotopyStepSuccess
-    ( const vector<string> & paramNames,
-      const vector<double> & paramVals)
+void AnalysisInterface::homotopyStepSuccess
+    ( const std::vector<std::string> & paramNames,
+      const std::vector<double> & paramVals)
 {
   anaManagerPtr_->homotopyStepSuccess ( paramNames, paramVals);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::homotopyStepFailure
+// Function      : AnalysisInterface::homotopyStepFailure
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/30/06
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisInterface::homotopyStepFailure ()
+void AnalysisInterface::homotopyStepFailure ()
 {
   anaManagerPtr_->homotopyStepFailure ();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::stepSuccess
+// Function      : AnalysisInterface::stepSuccess
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/12/06
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisInterface::stepSuccess (int analysis)
+void AnalysisInterface::stepSuccess (int analysis)
 {
   anaManagerPtr_->stepSuccess (analysis);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::stepFailure
+// Function      : AnalysisInterface::stepFailure
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/12/06
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisInterface::stepFailure (int analysis)
+void AnalysisInterface::stepFailure (int analysis)
 {
   anaManagerPtr_->stepFailure (analysis);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::getInitialQnorm
+// Function      : AnalysisInterface::getInitialQnorm
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/12/06
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::getInitialQnorm (N_TIA_TwoLevelError & tle)
+bool AnalysisInterface::getInitialQnorm (N_TIA_TwoLevelError & tle)
 {
   return anaManagerPtr_->getInitialQnorm (tle);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::getBreakPoints
+// Function      : AnalysisInterface::getBreakPoints
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/12/06
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::getBreakPoints (vector<N_UTL_BreakPoint> &breakPointTimes)
+bool AnalysisInterface::getBreakPoints (std::vector<N_UTL_BreakPoint> &breakPointTimes)
 {
   return anaManagerPtr_->getBreakPoints (breakPointTimes);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::getTimeIntInfo
+// Function      : AnalysisInterface::getTimeIntInfo
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 02/11/07
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisInterface::getTimeIntInfo(N_TIA_TimeIntInfo & tiInfo)
+void AnalysisInterface::getTimeIntInfo(N_TIA_TimeIntInfo & tiInfo)
 {
   anaManagerPtr_->getTimeIntInfo (tiInfo);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::silenceProgress
+// Function      : AnalysisInterface::silenceProgress
 // Purpose       : shut up "percent complete" noise
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo
 // Creation Date : 11 Feb 2009
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisInterface::silenceProgress()
+void AnalysisInterface::silenceProgress()
 {
   anaManagerPtr_->silenceProgress();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::enableProgress
+// Function      : AnalysisInterface::enableProgress
 // Purpose       : enable "percent complete" noise
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo
 // Creation Date : 11 Feb 2009
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisInterface::enableProgress()
+void AnalysisInterface::enableProgress()
 {
   anaManagerPtr_->enableProgress();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::initializeTransientModel
+// Function      : AnalysisInterface::initializeTransientModel
 // Purpose       : ModelEvaluator Interface
 // Special Notes :
 // Scope         : public
 // Creator       : Coffey, Schiek, Mei
 // Creation Date : 05/29/09
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisInterface::initializeTransientModel()
+void AnalysisInterface::initializeTransientModel()
 {
   anaManagerPtr_->initializeTransientModel();
 }
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::evalModel
+// Function      : AnalysisInterface::evalModel
 // Purpose       : ModelEvaluator Interface
 // Special Notes :
 // Scope         : public
 // Creator       : Coffey, Schiek, Mei
 // Creation Date : 05/27/09
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::evalTransientModel(
+bool AnalysisInterface::evalTransientModel(
       double t,
       N_LAS_Vector * SolVectorPtr,
       N_LAS_Vector * CurrSolVectorPtr,
@@ -1509,14 +1508,14 @@ bool N_ANP_AnalysisInterface::evalTransientModel(
       );
 }
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisInterface::evalTransientModelState
+// Function      : AnalysisInterface::evalTransientModelState
 // Purpose       : ModelEvaluator Interface
 // Special Notes :
 // Scope         : public
 // Creator       : Coffey, Schiek, Mei
 // Creation Date : 05/29/09
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisInterface::evalTransientModelState(
+bool AnalysisInterface::evalTransientModelState(
       double t,
       N_LAS_Vector * SolVectorPtr,
       N_LAS_Vector * StaVectorPtr,
@@ -1533,4 +1532,5 @@ bool N_ANP_AnalysisInterface::evalTransientModelState(
       );
 }
 
-
+} // namespace Analysis
+} // namespace Xyce

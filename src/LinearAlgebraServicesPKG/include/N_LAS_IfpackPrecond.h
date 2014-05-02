@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.12.2.2 $
+// Revision Number: $Revision: 1.16 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:44 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -81,7 +81,7 @@ public:
   // Set the preconditioner options
   bool setOptions(const N_UTL_OptionBlock & OB);
   bool setDefaultOptions();
-  bool setDefaultOption( const string & option );
+  bool setDefaultOption( const std::string & option );
 
   // Set individual preconditioner options
   bool setParam( const N_UTL_Param & param );
@@ -126,7 +126,7 @@ private:
 
   // Default preconditioner values
   static const bool useFactory_default_;
-  static const string ifpackType_default_;
+  static const std::string ifpackType_default_;
   static const double diagPerturb_default_;
   static const int overlap_default_;
   static const double dropTol_default_;

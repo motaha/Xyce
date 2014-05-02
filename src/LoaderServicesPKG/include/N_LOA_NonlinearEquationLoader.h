@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -39,9 +39,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.13.2.2 $
+// Revision Number: $Revision: 1.19 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:46 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -54,6 +54,8 @@
 // ----------   Xyce Includes   ----------
 
 #include <N_UTL_Misc.h>
+#include <N_ANP_fwd.h>
+
 #include <N_LOA_Loader.h>
 #include <N_UTL_BreakPoint.h>
 
@@ -61,7 +63,6 @@
 #include <N_ANP_AnalysisInterface.h>
 
 // ---------- Forward declarations --------
-class N_ANP_AnalysisInterface;
 class N_LAS_Vector;
 class N_LAS_Matrix;
 
@@ -119,13 +120,7 @@ public:
   // Function for setting the initial guess.
   bool setInitialGuess (N_LAS_Vector * solVectorPtr);
 
-  // Function for setting a single parameter value.
-  bool setParam (string & name, double val);
-
-  // Function for getting a single parameter value.
-  double getParam (const string & name);
-  bool getParam (const string & name, double & val);
-  bool getVsrcLIDs (string & srcName, int & li_Pos, int & li_Neg, int & li_Bra);
+  bool getVsrcLIDs (std::string & srcName, int & li_Pos, int & li_Neg, int & li_Bra);
 
   // Method which is called to update the sources.
   bool updateSources();
@@ -143,13 +138,13 @@ public:
   int  enablePDEContinuation ();
   bool disablePDEContinuation ();
 
-  void getNumInterfaceNodes (vector<int> & numINodes);
+    void getNumInterfaceNodes (std::vector<int> & numINodes);
   bool loadCouplingRHS   (int iSubProblem, int iCouple, N_LAS_Vector * dfdvPtr);
   bool calcCouplingTerms (int iSubProblem, int iCouple, const N_LAS_Vector * dxdvPtr);
   virtual bool raiseDebugLevel (int increment);
 
   // Gets the time integration required breakpoint times (in a vector).
-  bool getBreakPoints(vector < N_UTL_BreakPoint > & breakPointTimes);
+  bool getBreakPoints(std::vector < N_UTL_BreakPoint > & breakPointTimes);
 
   // Accessor which returns the maximum time step size (in seconds).
   double getMaxTimeStepSize();
@@ -177,7 +172,19 @@ public:
   // Get convergence info from inner-solves
   bool innerDevsConverged();
 
-protected:
+    virtual bool setParam (std::string & name, double val) {
+      return deviceIntPtr->setParam(name,val);
+    }
+    
+    virtual double getParamAndReduce (const std::string & name) {
+      return deviceIntPtr->getParamAndReduce(name);
+    }
+    
+    virtual bool getParamAndReduce (const std::string & name, double & val) {
+      return deviceIntPtr->getParamAndReduce(name,val);
+    }
+
+  protected:
 private :
 
 public :
@@ -292,45 +299,6 @@ inline bool N_LOA_NonlinearEquationLoader::setInitialGuess(N_LAS_Vector * solVec
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_LOA_NonlinearEquationLoader::setParam
-// Purpose       :
-// Special Notes : Used for continuation calculations.
-// Scope         : public
-// Creator       : Todd Coffey, SNL
-// Creation Date : 07/29/08
-//-----------------------------------------------------------------------------
-inline bool N_LOA_NonlinearEquationLoader::setParam(string & name, double val)
-{
-  return N_LOA_NonlinearEquationLoader::deviceIntPtr->setParam(name,val);
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_LOA_NonlinearEquationLoader::getParam
-// Purpose       :
-// Special Notes : Used for continuation calculations.
-// Scope         : public
-// Creator       : Todd Coffey, SNL
-// Creation Date : 07/29/08
-//-----------------------------------------------------------------------------
-inline double N_LOA_NonlinearEquationLoader::getParam (const string & name)
-{
-  return N_LOA_NonlinearEquationLoader::deviceIntPtr->getParam(name);
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_LOA_NonlinearEquationLoader::getParam
-// Purpose       :
-// Special Notes :
-// Scope         : public
-// Creator       : Todd Coffey, SNL
-// Creation Date : 07/29/08
-//-----------------------------------------------------------------------------
-inline bool N_LOA_NonlinearEquationLoader::getParam (const string & name, double & val)
-{
-  return N_LOA_NonlinearEquationLoader::deviceIntPtr->getParam(name,val);
-}
-
-//-----------------------------------------------------------------------------
 // Function      : N_LOA_NonlinearEquationLoader::getVsrcLIDs
 // Purpose       :
 // Special Notes :
@@ -338,8 +306,7 @@ inline bool N_LOA_NonlinearEquationLoader::getParam (const string & name, double
 // Creator       : Todd Coffey, SNL
 // Creation Date : 07/29/08
 //-----------------------------------------------------------------------------
-inline bool N_LOA_NonlinearEquationLoader::getVsrcLIDs
-  (string & srcName, int & li_Pos, int & li_Neg, int & li_Bra)
+inline bool N_LOA_NonlinearEquationLoader::getVsrcLIDs(std::string & srcName, int & li_Pos, int & li_Neg, int & li_Bra)
 {
   return N_LOA_NonlinearEquationLoader::deviceIntPtr->getVsrcLIDs
         (srcName, li_Pos, li_Neg, li_Bra);
@@ -460,7 +427,7 @@ inline double N_LOA_NonlinearEquationLoader::getJacobianTime()
 // Creator       : Todd Coffey, SNL
 // Creation Date : 07/29/08
 //-----------------------------------------------------------------------------
-inline bool N_LOA_NonlinearEquationLoader::getBreakPoints ( vector<N_UTL_BreakPoint> & breakPointTimes )
+inline bool N_LOA_NonlinearEquationLoader::getBreakPoints ( std::vector<N_UTL_BreakPoint> & breakPointTimes )
 {
   return N_LOA_NonlinearEquationLoader::deviceIntPtr->getBreakPoints(breakPointTimes);
 }
@@ -531,7 +498,7 @@ inline bool N_LOA_NonlinearEquationLoader::disablePDEContinuation ()
 // Creator       : Todd Coffey, SNL
 // Creation Date : 07/29/08
 //-----------------------------------------------------------------------------
-inline void N_LOA_NonlinearEquationLoader::getNumInterfaceNodes (vector<int> & numINodes)
+inline void N_LOA_NonlinearEquationLoader::getNumInterfaceNodes (std::vector<int> & numINodes)
 {
   deviceIntPtr->getNumInterfaceNodes (numINodes);
 }

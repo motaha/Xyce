@@ -90,15 +90,14 @@ am__aclocal_m4_deps = $(top_srcdir)/config/libtool.m4 \
 	$(top_srcdir)/config/lt~obsolete.m4 \
 	$(top_srcdir)/config/xyce_check_bison.m4 \
 	$(top_srcdir)/config/xyce_check_braindamaged_random_shuffle.m4 \
-	$(top_srcdir)/config/xyce_check_flexible_insert.m4 \
 	$(top_srcdir)/config/xyce_check_iota.m4 \
-	$(top_srcdir)/config/xyce_check_stl_member_templates.m4 \
 	$(top_srcdir)/config/xyce_debug_option.m4 \
 	$(top_srcdir)/config/xyce_finite_number_check.m4 \
 	$(top_srcdir)/config/xyce_library_include.m4 \
 	$(top_srcdir)/config/xyce_library_option.m4 \
 	$(top_srcdir)/config/xyce_test_using_dec_cxx.m4 \
 	$(top_srcdir)/config/xyce_test_using_icclt11_cxx.m4 \
+	$(top_srcdir)/config/xyce_trilinos_library_option.m4 \
 	$(top_srcdir)/acinclude.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -108,7 +107,8 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libParallelDist_la_LIBADD =
-am_libParallelDist_la_OBJECTS = N_PDS_Manager.lo N_PDS_ParMap.lo \
+am_libParallelDist_la_OBJECTS = N_PDS_Manager.lo \
+	N_PDS_ParallelMachine.lo N_PDS_MPI.lo N_PDS_ParMap.lo \
 	N_PDS_ParMapFactory.lo N_PDS_GlobalAccessor.lo \
 	N_PDS_Migrator.lo N_PDS_ParDir.lo N_PDS_MPIComm.lo \
 	N_PDS_ParComm.lo N_PDS_SerialComm.lo N_PDS_SerialParComm.lo \
@@ -262,6 +262,7 @@ MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MAYBE_NONFREE = @MAYBE_NONFREE@
+MAYBE_PLUGIN = @MAYBE_PLUGIN@
 MAYBE_RAD = @MAYBE_RAD@
 MKDIR_P = @MKDIR_P@
 NM = @NM@
@@ -356,6 +357,8 @@ AM_CPPFLAGS = @Xyce_INCS@
 noinst_LTLIBRARIES = libParallelDist.la
 libParallelDist_la_SOURCES = \
   $(srcdir)/src/N_PDS_Manager.C \
+  $(srcdir)/src/N_PDS_ParallelMachine.C \
+  $(srcdir)/src/N_PDS_MPI.C \
   $(srcdir)/src/N_PDS_ParMap.C \
   $(srcdir)/src/N_PDS_ParMapFactory.C \
   $(srcdir)/src/N_PDS_GlobalAccessor.C \
@@ -368,6 +371,9 @@ libParallelDist_la_SOURCES = \
   $(srcdir)/src/N_PDS_CommFactory.C \
   $(srcdir)/include/GSComm_Comm.h \
   $(srcdir)/include/GSComm_Plan.h \
+  $(srcdir)/include/N_PDS_fwd.h \
+  $(srcdir)/include/N_PDS_ParallelMachine.h \
+  $(srcdir)/include/N_PDS_MPI.h \
   $(srcdir)/include/N_PDS_Comm.h \
   $(srcdir)/include/N_PDS_CommFactory.h \
   $(srcdir)/include/N_PDS_Directory.h \
@@ -442,6 +448,7 @@ distclean-compile:
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_PDS_CommFactory.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_PDS_GlobalAccessor.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_PDS_MPI.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_PDS_MPIComm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_PDS_Manager.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_PDS_Migrator.Plo@am__quote@
@@ -449,6 +456,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_PDS_ParDir.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_PDS_ParMap.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_PDS_ParMapFactory.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_PDS_ParallelMachine.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_PDS_SerialComm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_PDS_SerialParComm.Plo@am__quote@
 
@@ -479,6 +487,20 @@ N_PDS_Manager.lo: $(srcdir)/src/N_PDS_Manager.C
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_PDS_Manager.C' object='N_PDS_Manager.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_PDS_Manager.lo `test -f '$(srcdir)/src/N_PDS_Manager.C' || echo '$(srcdir)/'`$(srcdir)/src/N_PDS_Manager.C
+
+N_PDS_ParallelMachine.lo: $(srcdir)/src/N_PDS_ParallelMachine.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_PDS_ParallelMachine.lo -MD -MP -MF $(DEPDIR)/N_PDS_ParallelMachine.Tpo -c -o N_PDS_ParallelMachine.lo `test -f '$(srcdir)/src/N_PDS_ParallelMachine.C' || echo '$(srcdir)/'`$(srcdir)/src/N_PDS_ParallelMachine.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_PDS_ParallelMachine.Tpo $(DEPDIR)/N_PDS_ParallelMachine.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_PDS_ParallelMachine.C' object='N_PDS_ParallelMachine.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_PDS_ParallelMachine.lo `test -f '$(srcdir)/src/N_PDS_ParallelMachine.C' || echo '$(srcdir)/'`$(srcdir)/src/N_PDS_ParallelMachine.C
+
+N_PDS_MPI.lo: $(srcdir)/src/N_PDS_MPI.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_PDS_MPI.lo -MD -MP -MF $(DEPDIR)/N_PDS_MPI.Tpo -c -o N_PDS_MPI.lo `test -f '$(srcdir)/src/N_PDS_MPI.C' || echo '$(srcdir)/'`$(srcdir)/src/N_PDS_MPI.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_PDS_MPI.Tpo $(DEPDIR)/N_PDS_MPI.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_PDS_MPI.C' object='N_PDS_MPI.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_PDS_MPI.lo `test -f '$(srcdir)/src/N_PDS_MPI.C' || echo '$(srcdir)/'`$(srcdir)/src/N_PDS_MPI.C
 
 N_PDS_ParMap.lo: $(srcdir)/src/N_PDS_ParMap.C
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_PDS_ParMap.lo -MD -MP -MF $(DEPDIR)/N_PDS_ParMap.Tpo -c -o N_PDS_ParMap.lo `test -f '$(srcdir)/src/N_PDS_ParMap.C' || echo '$(srcdir)/'`$(srcdir)/src/N_PDS_ParMap.C

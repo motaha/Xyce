@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -35,9 +35,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.14.2.3 $
+// Revision Number: $Revision: 1.19 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -65,10 +65,10 @@
 // Creator       : 
 // Creation Date : 
 //-----------------------------------------------------------------------------
-string N_UTL_Version::getFullVersionString() 
+std::string N_UTL_Version::getFullVersionString() 
 {
-  const string tmpVer( VERSION );
-  string version;
+  const std::string tmpVer( VERSION );
+  std::string version;
     
   // create developement version string
   if( tmpVer[ 0 ] == 'D' || tmpVer[ 0 ] == 'd' )
@@ -77,11 +77,11 @@ string N_UTL_Version::getFullVersionString()
     
     // add the timestamp
 
-    ostringstream ver("");
+    std::ostringstream ver("");
 
     ver << XYCEBUILDTIMESTAMP;
 
-    version += string( ver.str() );
+    version += std::string( ver.str() );
   }
 
   // create release version string
@@ -112,9 +112,9 @@ string N_UTL_Version::getFullVersionString()
 // Creator       : 
 // Creation Date : 
 //-----------------------------------------------------------------------------
-string N_UTL_Version::getShortVersionString()
+std::string N_UTL_Version::getShortVersionString()
 {
-  const string tmpVer( VERSION );
+  const std::string tmpVer( VERSION );
 
   // get position of the major-minor-rev number  
   int i = tmpVer.find_last_of( ":" );
@@ -134,9 +134,9 @@ string N_UTL_Version::getShortVersionString()
 // Creator       : Tom Russo
 // Creation Date : 6/10/2013
 //-----------------------------------------------------------------------------
-string N_UTL_Version::getBuildVariant()
+std::string N_UTL_Version::getBuildVariant()
 {
-  string variant;
+  std::string variant;
 #ifdef Xyce_RAD_MODELS
   variant="";
 #else
@@ -160,9 +160,9 @@ string N_UTL_Version::getBuildVariant()
 // Creator       : Tom Russo
 // Creation Date : 6/10/2013
 //-----------------------------------------------------------------------------
-string N_UTL_Version::getCapabilities()
+std::string N_UTL_Version::getCapabilities()
 {
-  string capabilities="";
+  std::string capabilities="";
 
 #ifdef Xyce_PARALLEL_MPI
   capabilities += "Parallel with MPI\n";
@@ -223,9 +223,9 @@ string N_UTL_Version::getCapabilities()
 // Creator       : Tom Russo
 // Creation Date : 6/10/2013
 //-----------------------------------------------------------------------------
-string N_UTL_Version::getLicense()
+std::string N_UTL_Version::getLicense()
 {
-  string License="";
+  std::string License="";
 
 #ifdef Xyce_RAD_MODELS
   License+= " \nEXPORT CONTROLLED SOFTWARE\n\n";
@@ -252,12 +252,11 @@ string N_UTL_Version::getLicense()
   License +="released under the GNU Public License:\n";
 #endif
 
-
   License +="\n    Xyce(TM) Parallel Electrical Simulator\n\n";
-  License += "Copyright 2002-2013 Sandia Corporation. Under the terms\n";
-  License += "of Contract DE-AC04-94AL85000 with Sandia Corporation, the U.S.\n";
-  License += "Government retains certain rights in this software.\n";
-  License += "\n";
+  License +="    Copyright 2002-2014 Sandia Corporation. Under the terms\n";
+  License +="    of Contract DE-AC04-94AL85000 with Sandia Corporation, the U.S.\n";
+  License +="    Government retains certain rights in this software.\n";
+  License +="\n";
   License +="    This program is free software: you can redistribute it and/or modify\n";
   License +="    it under the terms of the GNU General Public License as published by\n";
   License +="    the Free Software Foundation, either version 3 of the License, or\n";

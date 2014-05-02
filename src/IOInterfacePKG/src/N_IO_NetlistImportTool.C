@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,44 +37,29 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.66.2.4 $
+// Revision Number: $Revision: 1.92 $
 //
-// Revision Date  : $Date: 2014/01/29 18:42:10 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
-#include <N_UTL_Misc.h>
-
-#ifdef HAVE_ALGORITHM
-#include <algorithm>
-#else
-#ifdef HAVE_ALGO_H
-#include <algo.h>
-#else
-#error Must have either <algorithm> or <algo.h>!
-#endif
-#endif
-
 #include <iostream>
 #include <list>
 #include <string>
 #include <vector>
 
-// ----------   Xyce Includes   ----------
+#include <N_UTL_fwd.h>
 
 #include <N_IO_NetlistImportTool.h>
 
 #include <N_IO_DistributionTool.h>
 
-#ifdef Xyce_PARALLEL_MPI
-#include <N_PDS_Comm.h>
-#endif
+#include <N_PDS_ParallelMachine.h>
+#include <N_PDS_Serial.h>
+#include <N_PDS_MPI.h>
 
 #include <N_IO_DeviceBlock.h>
 #include <N_IO_ParameterBlock.h>
@@ -96,30 +81,8 @@
 
 #include <N_UTL_Expression.h>
 
-// ----------   Macro Definitions ---------
-
-#define RETURN_ON_FAILURE(result) \
-   if ( false == (result) )       \
-   {                              \
-      return false;               \
-   }
-
-// ---------- EXTERN DECLARATIONS ----------
-
-
-// this is defined in N_DEV_SourceData.h
-// device indices:
-//enum Src_index{
-//    _SIN_DATA,      // 0
-//    _EXP_DATA,      // 1
-//    _PULSE_DATA,    // 2
-//    _PWL_DATA,      // 3
-//    _SFFM_DATA,     // 4
-//    _DC_DATA,    // 5
-//    _SMOOTH_PULSE_DATA, // 6
-//    _AC_DATA,     //tmei: 05/02
-//    _NUM_DATA       // total number of data types
-//};
+namespace Xyce {
+namespace IO {
 
 //-------------------------------------------------------------------------
 // Function      : NetlistImportTool::factory
@@ -136,8 +99,8 @@
 //
 // Creation Date : 07/28/2000
 //-------------------------------------------------------------------------
-NetlistImportTool* NetlistImportTool::factory(N_IO_CmdParse & cp,
-    Xyce::Topology::Manager & tm)
+NetlistImportTool* NetlistImportTool::factory(IO::CmdParse & cp,
+    Xyce::Topo::Manager & tm)
 {
   NetlistImportTool * NIT_ptr = new NetlistImportTool(cp,tm);
   return NIT_ptr;
@@ -166,17 +129,17 @@ NetlistImportTool::~NetlistImportTool()
 // Creator       : Rich Schiek, 1437
 // Creation Date : 10/21/08
 //-----------------------------------------------------------------------------
-bool NetlistImportTool::registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr )
+bool NetlistImportTool::registerPkgOptionsMgr( PkgOptionsMgr *pkgOptPtr )
 {
   pkgOptMgrPtr_ = pkgOptPtr;
   return true;
 }
 
-typedef std::list<N_UTL_Param> ParameterList;
+typedef std::list<Util::Param> ParameterList;
 
 namespace { // <unnamed>
 
-void setLeadCurrentDevices(const ParameterList &variableList_, N_DEV_DeviceInterface * devPtr_)
+void setLeadCurrentDevices(const ParameterList &variableList_, Device::DeviceInterface * devPtr_)
 {
   std::set<std::string> devicesNeedingLeadCurrents;
 
@@ -184,11 +147,11 @@ void setLeadCurrentDevices(const ParameterList &variableList_, N_DEV_DeviceInter
   {
     std::string varType(iterParam->tag());
 
-    if (iterParam->hasExpressionTag())
+    if (Util::hasExpressionTag(*iterParam))
     {
       std::vector<std::string> leads;
 
-      N_UTL_Expression exp;
+      Util::Expression exp;
       exp.set(iterParam->tag());
       exp.get_names(XEXP_LEAD, leads);
 
@@ -203,15 +166,14 @@ void setLeadCurrentDevices(const ParameterList &variableList_, N_DEV_DeviceInter
     }
     else
     {
-      int numIndices = iterParam->iVal();
+      int numIndices = iterParam->getImmutableValue<int>();
       if (numIndices > 0 &&(varType == "I" ||(varType.size() == 2 && varType[0] == 'I')))
       {
         // any devices found in this I(xxx) structure need to be communicated to the device manager
         // so that the lead currents can be calculated
         if (numIndices != 1)
         {
-          std::string msg("Only one device argument allowed in I() in .print");
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
+          Report::DevelFatal0() << "Only one device argument allowed in I() in .print";
         }
         ++iterParam;
         if (varType.size() == 2)
@@ -226,20 +188,18 @@ void setLeadCurrentDevices(const ParameterList &variableList_, N_DEV_DeviceInter
     }
   }
 
-#ifdef Xyce_DEBUG_IO
   // for debugging output the list of devices that need lead currents.
-  if (! devicesNeedingLeadCurrents.empty())
+  if ( Xyce::DEBUG_IO && !devicesNeedingLeadCurrents.empty())
   {
     std::set<std::string>::iterator currentDeviceNameItr = devicesNeedingLeadCurrents.begin();
     std::set<std::string>::iterator endDeviceNameItr = devicesNeedingLeadCurrents.end();
-    std::cout << "OutputMgr::printLineDiagnostics Devices for which lead currents were requested: ";
+    Xyce::dout() << "OutputMgr::printLineDiagnostics Devices for which lead currents were requested: ";
     while ( currentDeviceNameItr != endDeviceNameItr)
     {
-      std::cout << *currentDeviceNameItr << "  ";
+      Xyce::dout() << *currentDeviceNameItr << "  ";
       currentDeviceNameItr++;
     }
   }
-#endif
 
 // This is the last call on the output manager before devices are constructed
   // So it's the last time I can isolate lead currents. However it won't be sufficient
@@ -258,17 +218,17 @@ void setLeadCurrentDevices(const ParameterList &variableList_, N_DEV_DeviceInter
 // Creator       : Lon Waters
 // Creation Date : 07/28/2000
 //-------------------------------------------------------------------------
-int NetlistImportTool::constructCircuitFromNetlist( string const & netlistFile,
-    const vector< pair< string, string> > & externalNetlistParams )
+int NetlistImportTool::constructCircuitFromNetlist(const std::string &netlistFile,
+    const std::vector< std::pair< std::string, std::string> > & externalNetlistParams )
 {
-    map<string,RefCountPtr<N_DEV_InstanceBlock> > dNames;
-    set<string> nNames;
+    std::map<std::string,RefCountPtr<Device::InstanceBlock> > dNames;
+    std::set<std::string> nNames;
 
     // build metadata
     metadata_.buildMetadata();
 
     // Create a circuitBlock instance to hold netlist circuit data.
-    circuitBlock_ = new N_IO_CircuitBlock(
+    circuitBlock_ = new IO::CircuitBlock(
         netlistFile,
         commandLine_,
         metadata_,
@@ -283,15 +243,10 @@ int NetlistImportTool::constructCircuitFromNetlist( string const & netlistFile,
         externalNetlistParams );
 
     // Parse the netlist file.
-#ifdef Xyce_DEBUG_IO
-    cout << "Starting netlist parsing." << endl;
-#endif
+    if (Xyce::DEBUG_IO)
+      Xyce::dout() << "Starting netlist parsing." << std::endl;
 
     bool result;
-
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::startSafeBarrier();  // All procs call (2)
-#endif
 
     // Get the device insertion tool. Note: the argument determines
     // the insertion tool returned, since only the device insertion
@@ -299,102 +254,47 @@ int NetlistImportTool::constructCircuitFromNetlist( string const & netlistFile,
     // and the argument is does nothing. This may need to be changed
     // later.
 
-    Xyce::Topology::InsertionTool* insertToolPtr = topMgr_.getInsertionTool("");
+    Xyce::Topo::InsertionTool* insertToolPtr = topMgr_.getInsertionTool("");
     circuitBlock_->registerInsertionTool(insertToolPtr);
 
     // Regsiter the device interface with the circuit block.
     circuitBlock_->registerDeviceInterface(devIntPtr_);
 
-#ifdef Xyce_PARALLEL_MPI
+    distToolPtr_ = new IO::DistributionTool(circuitBlock_, commandLine_, pdsCommPtr_);
 
-    // Create the distribution tool (parallel)
-    if (pdsCommPtr_ != NULL)
-    {
-      distToolPtr_ = new N_IO_DistributionTool(circuitBlock_, commandLine_, pdsCommPtr_);
-    }
-    else
-    {
-      string msg("Parallel Services not registered with NetlistImportTool\n");
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, msg);
-    }
-
-#else
-
-    // Create the distribution tool (serial)
-    distToolPtr_ = new N_IO_DistributionTool( circuitBlock_, commandLine_, NULL );
-
-#endif
     distToolPtr_->registerPkgOptionsMgr(pkgOptMgrPtr_);
 
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::safeBarrier(0);  // All procs call (2)
-#endif
+    N_ERH_ErrorMgr::safeBarrier(comm_);  // All procs call (2)
 
     // Issue the distribution tool start. Proc 0 will return right away, the
     // other procs will return when proc 0 issues the done signal.
     result = distToolPtr_->start();
 
-
     bool ok = true;
-#ifdef Xyce_PARALLEL_MPI
 
-    if( isSerial_ || pdsCommPtr_->procID() == 0 )
+    if (Parallel::rank(comm_) == 0)
     {
-
-#endif
-
       circuitBlock_->registerDistributionTool(distToolPtr_);
       ok = circuitBlock_->parseNetlistFilePass1();
 
       if (ok)
         ok = circuitBlock_->parseNetlistFilePass2();
 
-#ifdef Xyce_PARALLEL_MPI
-
-    }
-    N_ERH_ErrorMgr::safeBarrier(0);   // All procs call (END)
-    int stat;
-    if (!ok)
-    {
-      stat = -1;
-      pdsCommPtr_->bcast (&stat, 1, 0);
+      if (!ok)
+        N_ERH_ErrorMgr::safeBarrier(comm_);
     }
 
-    stat = ok?1:0;
-    pdsCommPtr_->bcast (&stat, 1, 0);
-    ok = (stat != 0);
-#endif
+    if (ok) {
+      distToolPtr_->done();
 
-    if (!ok)
-    {
-      string msg("Unrecoverable error(s) occurred in parsing");
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, msg);
+      if (Xyce::DEBUG_IO)
+        Xyce::dout() << "Completed netlist parsing. ";
+
+      circuitBlock_->fixupYDeviceNames();
+      if (outputMgrPtr_->getVariableList())
+        setLeadCurrentDevices(*outputMgrPtr_->getVariableList(), devIntPtr_);
+      outputMgrPtr_->printLineDiagnostics();
     }
-
-    distToolPtr_->done();
-
-#ifdef Xyce_DEBUG_IO
-    cout << "Completed netlist parsing. ";
-#endif
-
-  circuitBlock_->fixupYDeviceNames();
-
-  if (outputMgrPtr_->getVariableList())
-    setLeadCurrentDevices(*outputMgrPtr_->getVariableList(), devIntPtr_);
-
-  outputMgrPtr_->printLineDiagnostics();
-
-  if ( commandLine_.argExists("-syntax") )
-  {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         " ***** Netlist syntax OK\n");
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         " ***** Device Type Counts ...\n");
-    outputMgrPtr_->printDeviceCounts();
-
-    Xyce_exit( 0 );
-  }
 
   return 1;
 }
@@ -411,7 +311,7 @@ int NetlistImportTool::constructCircuitFromNetlist( string const & netlistFile,
 //
 // Creation Date : 07/28/2000
 //-------------------------------------------------------------------------
-bool NetlistImportTool::registerDevMgr(N_DEV_DeviceInterface * devPtr)
+bool NetlistImportTool::registerDevMgr(Device::DeviceInterface * devPtr)
 {
    return ( (devIntPtr_ = devPtr) != NULL );
 }
@@ -426,12 +326,11 @@ bool NetlistImportTool::registerDevMgr(N_DEV_DeviceInterface * devPtr)
 //
 // Creation Date : 08/15/06
 //-------------------------------------------------------------------------
-bool NetlistImportTool::registerOutputMgr(N_IO_OutputMgr * outputMgrPtr)
+bool NetlistImportTool::registerOutputMgr(IO::OutputMgr * outputMgrPtr)
 {
    return ( (outputMgrPtr_ = outputMgrPtr) != NULL );
 }
 
-#ifdef Xyce_PARALLEL_MPI
 //-----------------------------------------------------------------------------
 // Function      : NetlistImportTool::registerParallelServices
 // Purpose       : Registers N_PDS_Comm object for parallel communication.
@@ -442,29 +341,18 @@ bool NetlistImportTool::registerOutputMgr(N_IO_OutputMgr * outputMgrPtr)
 //-----------------------------------------------------------------------------
 bool NetlistImportTool::registerParallelServices(N_PDS_Comm * tmp_pds_ptr)
 {
+  if( !tmp_pds_ptr )
+    return false;
+
   pdsCommPtr_ = tmp_pds_ptr;
+  comm_ = pdsCommPtr_->comm();
 
-  if( !pdsCommPtr_ ) return false;
-
-  isSerial_ = ( pdsCommPtr_->numProc() == 1 );
-
-#ifdef Xyce_DEBUG_DISTRIBUTION
-  const string numProcsMsg("Number of Processors:\t");
-  const string procIDMsg("Processor ID:\t\t");
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG, numProcsMsg,
-			pdsCommPtr_->numProc(), "\n" );
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG, procIDMsg,
-			pdsCommPtr_->procID(), "\n" );
-#endif
+  if (Xyce::DEBUG_DISTRIBUTION)
+    Xyce::dout() << "Number of Processors:   " << Parallel::size(comm_) << std::endl
+                 << "Processor ID:           " << Parallel::rank(comm_) << std::endl;
 
   return true;
 }
-#endif
-
-// ********** END PUBLIC FUNCTIONS            **********
-
-// ********** BEGIN PROTECTED FUNCTIONS       **********
 
 //-------------------------------------------------------------------------
 // Name          : NetlistImportTool::NetlistImportTool
@@ -474,22 +362,19 @@ bool NetlistImportTool::registerParallelServices(N_PDS_Comm * tmp_pds_ptr)
 // Creation Date : 07/28/2000
 //-------------------------------------------------------------------------
 NetlistImportTool::NetlistImportTool(
-    N_IO_CmdParse & cp,
-    Xyce::Topology::Manager & tm)
+    IO::CmdParse & cp,
+    Xyce::Topo::Manager & tm)
   : circuitBlock_(NULL),
     commandLine_(cp),
     topMgr_(tm),
-    isSerial_(true),
     distToolPtr_(NULL),
     useCount_(0),
     globalParamsInserted_(false),
     currentContextPtr_(NULL),
-    circuitContext_( metadata_, contextList_, currentContextPtr_ )
-#ifdef Xyce_PARALLEL_MPI
-    ,
-    pdsCommPtr_(NULL)
-#endif
-{
-}
+    circuitContext_( metadata_, contextList_, currentContextPtr_ ),
+    comm_(0),
+    pdsCommPtr_(0)
+{}
 
-// ********** END PROTECTED FUNCTIONS         **********
+} // namespace IO
+} // namespace Xyce

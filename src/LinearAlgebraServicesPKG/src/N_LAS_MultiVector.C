@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.101.2.3 $
+// Revision Number: $Revision: 1.118 $
 //
-// Revision Date  : $Date: 2013/12/08 17:50:58 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -58,11 +58,13 @@
 // ----------   Xyce Includes   ----------
 
 #include <N_UTL_Misc.h>
+#include <N_UTL_fwd.h>
 
 #include <N_LAS_MultiVector.h>
 #include <N_LAS_Vector.h>
 #include <N_PDS_ParMap.h>
 #include <N_PDS_Comm.h>
+#include <N_PDS_CommFactory.h>
 
 #include <N_ERH_ErrorMgr.h>
 
@@ -74,6 +76,10 @@
 #include <Epetra_Export.h>
 #include <Epetra_Map.h>
 #include <Epetra_Comm.h>
+
+#ifdef Xyce_PARALLEL_MPI
+#include <Epetra_MpiComm.h>
+#endif
 
 #include <EpetraExt_View_MultiVector.h>
 #include <Teuchos_BLAS.hpp>
@@ -87,8 +93,8 @@
 // Creation Date : 05/20/00
 //-----------------------------------------------------------------------------
 N_LAS_MultiVector::N_LAS_MultiVector(N_PDS_ParMap & map, int numVectors)
-:  parallelMap_(&map),
-   overlapMap_(&map),
+:  parallelMap_(rcp(&map,false)),
+   overlapMap_(rcp(&map,false)),
    importer_(0),
    exporter_(0),
    viewTransform_(0),
@@ -115,8 +121,8 @@ N_LAS_MultiVector::N_LAS_MultiVector(N_PDS_ParMap & map, int numVectors)
 N_LAS_MultiVector::N_LAS_MultiVector( N_PDS_ParMap & map,
                                       N_PDS_ParMap & ol_map,
                                       int numVectors )
-: parallelMap_(&map),
-  overlapMap_(&ol_map),
+: parallelMap_(rcp(&map,false)),
+  overlapMap_(rcp(&ol_map,false)),
   importer_(0),
   exporter_(0),
   viewTransform_(0),
@@ -132,13 +138,11 @@ N_LAS_MultiVector::N_LAS_MultiVector( N_PDS_ParMap & map,
   viewTransform_ = new EpetraExt::MultiVector_View(
     *overlapMap_->petraBlockMap(), *parallelMap_->petraBlockMap());
   aMultiVector_ = &((*viewTransform_)(*oMultiVector_));
-#ifdef Xyce_PARALLEL_MPI
   if( map.pdsComm()->numProc() > 1 )
   {
     exporter_ = new Epetra_Export( *overlapMap_->petraBlockMap(),
                                    *parallelMap_->petraBlockMap() );
   }
-#endif
 
   importer_ = new Epetra_Import( *overlapMap_->petraBlockMap(), *parallelMap_->petraBlockMap() );
 }
@@ -167,12 +171,14 @@ N_LAS_MultiVector::N_LAS_MultiVector( const N_LAS_MultiVector & right )
     viewTransform_ = new EpetraExt::MultiVector_View( *overlapMap_->petraBlockMap(),
                                                       *parallelMap_->petraBlockMap() );
     aMultiVector_ = &((*viewTransform_)( *oMultiVector_ ));
-    if( right.parallelMap_->pdsComm()->numProc() > 1 )
-    {
-      if( right.exporter_ ) exporter_ = new Epetra_Export( *right.exporter_ );
-    }
   }
 
+  // Generate new exporter instead of using copy constructor, there is an issue with Epetra_MpiDistributor
+  if( right.exporter_ ) 
+  {
+    exporter_ = new Epetra_Export( *overlapMap_->petraBlockMap(),
+                                   *parallelMap_->petraBlockMap() );
+  }
   if( right.importer_ ) importer_ = new Epetra_Import( *right.importer_ );
 }
 
@@ -185,9 +191,7 @@ N_LAS_MultiVector::N_LAS_MultiVector( const N_LAS_MultiVector & right )
 // Creation Date : 04/09/03
 //-----------------------------------------------------------------------------
 N_LAS_MultiVector::N_LAS_MultiVector( Epetra_MultiVector * overlapMV, Epetra_Map& parMap, bool isOwned )
-: parallelMap_(0),
-  overlapMap_(0),
-  oMultiVector_( overlapMV ),
+: oMultiVector_( overlapMV ),
   importer_(0),
   exporter_(0),
   viewTransform_(0),
@@ -200,10 +204,8 @@ N_LAS_MultiVector::N_LAS_MultiVector( Epetra_MultiVector * overlapMV, Epetra_Map
   {
     viewTransform_ = new EpetraExt::MultiVector_View( overlapMV->Map(), parMap );
     aMultiVector_ = &((*viewTransform_)(*oMultiVector_));
-#ifdef Xyce_PARALLEL_MPI
     if( parMap.Comm().NumProc() > 1 )
       exporter_ = new Epetra_Export( overlapMV->Map(), parMap );
-#endif
 
     importer_ = new Epetra_Import( overlapMV->Map(), parMap );
   }
@@ -218,16 +220,30 @@ N_LAS_MultiVector::N_LAS_MultiVector( Epetra_MultiVector * overlapMV, Epetra_Map
 // Creation Date : 04/09/03
 //-----------------------------------------------------------------------------
 N_LAS_MultiVector::N_LAS_MultiVector( Epetra_MultiVector * origMV, bool isOwned )
-: parallelMap_(0),
-//  aMultiVector_( oMultiVector_ ),
-  overlapMap_(0),
+: aMultiVector_( origMV ),
   oMultiVector_( origMV ),
   importer_(0),
   exporter_(0),
   viewTransform_(0),
   isOwned_(isOwned)
 {
-  aMultiVector_ = oMultiVector_;
+#ifdef Xyce_PARALLEL_MPI
+  Epetra_Comm& ecomm = const_cast<Epetra_Comm &>( origMV->Comm() );
+  Epetra_MpiComm * empicomm = dynamic_cast<Epetra_MpiComm *>( &ecomm );
+
+  if (empicomm)
+  {
+    pdsComm_= Teuchos::rcp( N_PDS_CommFactory::create( 0, 0, empicomm->Comm() ) );
+  }
+  else
+  { 
+    // This is a parallel build executed using one processor.
+    pdsComm_ = Teuchos::rcp( N_PDS_CommFactory::create( 0, 0, MPI_COMM_WORLD ) );
+  }
+
+#else
+  pdsComm_ = Teuchos::rcp( N_PDS_CommFactory::create() );
+#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -550,34 +566,34 @@ void N_LAS_MultiVector::GEMM(const bool transA, const bool transB,
 
 #ifdef Xyce_DEBUG_LINEAR
 
-  const string methodMsg("N_LAS_MultiVector::GEMM - ");
+  static const char *methodMsg = "N_LAS_MultiVector::GEMM - ";
 
 
   int PetraError = aMultiVector_->Multiply(tA, tB, alpha,
                          *(A.aMultiVector_), *(B.aMultiVector_), beta);
 
-  cout << "sizes of this:  numvectors = ";
-  cout << aMultiVector_->NumVectors ();
-  cout << "  mylength = ";
-  cout << aMultiVector_->MyLength ();
-  cout << endl;
+  Xyce::dout() << "sizes of this:  numvectors = ";
+  Xyce::dout() << aMultiVector_->NumVectors ();
+  Xyce::dout() << "  mylength = ";
+  Xyce::dout() << aMultiVector_->MyLength ();
+  Xyce::dout() << std::endl;
 
 
-  cout << "sizes of A:  numvectors = ";
-  cout << A.aMultiVector_->NumVectors ();
+  Xyce::dout() << "sizes of A:  numvectors = ";
+  Xyce::dout() << A.aMultiVector_->NumVectors ();
 
-  cout << "  mylength = ";
-  cout << A.aMultiVector_->MyLength ();
-  cout << endl;
+  Xyce::dout() << "  mylength = ";
+  Xyce::dout() << A.aMultiVector_->MyLength ();
+  Xyce::dout() << std::endl;
 
-  cout << "sizes of B:  numvectors = ";
-  cout << B.aMultiVector_->NumVectors();
+  Xyce::dout() << "sizes of B:  numvectors = ";
+  Xyce::dout() << B.aMultiVector_->NumVectors();
 
-  cout << "  mylength = ";
-  cout << B.aMultiVector_->MyLength ();
-  cout << endl;
+  Xyce::dout() << "  mylength = ";
+  Xyce::dout() << B.aMultiVector_->MyLength ();
+  Xyce::dout() << std::endl;
 
-  cout << "PetraError = " << PetraError << endl;
+  Xyce::dout() << "PetraError = " << PetraError << std::endl;
   processError(methodMsg, PetraError);
 
 #else
@@ -601,15 +617,14 @@ void N_LAS_MultiVector::GEMM(const bool transA, const bool transB,
 int N_LAS_MultiVector::lpNorm(const int p, double * result) const
 {
   int PetraError = -1;
-  const string methodMsg("N_LAS_MultiVector::lpNorm - ");
+  static const char *methodMsg = "N_LAS_MultiVector::lpNorm - ";
 
   if (p == 1)
     PetraError = aMultiVector_->Norm1(result);
   else if (p == 2)
     PetraError = aMultiVector_->Norm2(result);
   else
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, methodMsg +
-                           "Requested norm is not supported");
+    Xyce::Report::DevelFatal0().in(methodMsg) << "Requested norm is not supported";
 
 #ifdef Xyce_DEBUG_LINEAR
   processError(methodMsg, PetraError);
@@ -631,7 +646,7 @@ int N_LAS_MultiVector::infNorm(double * result) const
   int PetraError = aMultiVector_->NormInf(result);
 
 #ifdef Xyce_DEBUG_LINEAR
-  const string methodMsg("N_LAS_MultiVector::infNorm - ");
+  static const char *methodMsg = "N_LAS_MultiVector::infNorm - ";
   processError(methodMsg, PetraError);
 #endif
 
@@ -811,29 +826,6 @@ void N_LAS_MultiVector::putScalar(const double scalar)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_LAS_MultiVector::putScalarIncExt
-// Purpose       : Fills N_LAS_MultiVector with the value "scalar".
-// Special Notes : includes external indices
-// Scope         : Public
-// Creator       : Robert J. Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 1/18/01
-//-----------------------------------------------------------------------------
-void N_LAS_MultiVector::putScalarIncExt(const double scalar)
-{
-  if( aMultiVector_ == oMultiVector_ )
-  {
-    map<int, double>::iterator it_idM = externVectorMap_.begin();
-    map<int, double>::iterator end_idM = externVectorMap_.end();
-    for (; it_idM != end_idM; ++it_idM)
-    {
-      it_idM->second = scalar;
-    }
-  }
-
-  putScalar(scalar);
-}
-
-//-----------------------------------------------------------------------------
 // Function      : N_LAS_MultiVector::addScalar
 // Purpose       : Adds to N_LAS_MultiVector with the value "scalar".
 // Special Notes :
@@ -852,29 +844,6 @@ void N_LAS_MultiVector::addScalar(const double scalar)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_LAS_MultiVector::addScalarIncExt
-// Purpose       : Adds to N_LAS_MultiVector with the value "scalar".
-// Special Notes : includes external indices
-// Scope         : Public
-// Creator       : Robert J. Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 1/18/01
-//-----------------------------------------------------------------------------
-void N_LAS_MultiVector::addScalarIncExt(const double scalar)
-{
-  if( aMultiVector_ == oMultiVector_ )
-  {
-    map<int, double>::iterator it_idM = externVectorMap_.begin();
-    map<int, double>::iterator end_idM = externVectorMap_.end ();
-    for ( ; it_idM != end_idM; ++it_idM)
-    {
-      it_idM->second += scalar;
-    }
-  }
-
-  addScalar(scalar);
-}
-
-//-----------------------------------------------------------------------------
 // Function      : N_LAS_MultiVector::absValue
 // Purpose       : Abs value of elements of N_LAS_MultiVector
 // Special Notes :
@@ -889,29 +858,6 @@ void N_LAS_MultiVector::absValue(const N_LAS_MultiVector & A)
 #ifdef Xyce_DEBUG_LINEAR
   processError( "N_LAS_MultiVector::absValue - ", PetraError);
 #endif
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_LAS_MultiVector::absValueIncExt
-// Purpose       : Abs value of elements
-// Special Notes : includes external indices
-// Scope         : Public
-// Creator       : Robert J. Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 1/18/01
-//-----------------------------------------------------------------------------
-void N_LAS_MultiVector::absValueIncExt(const N_LAS_MultiVector & A)
-{
-  if( aMultiVector_ == oMultiVector_ )
-  {
-    map<int, double>::iterator it_idM = externVectorMap_.begin();
-    map<int, double>::iterator last = externVectorMap_.end();
-    map<int, double>::const_iterator it_idM2 = A.externVectorMap_.begin();
-
-    for ( ; it_idM != last; ++it_idM, ++it_idM2 )
-      it_idM->second = fabs(it_idM2->second);
-  }
-
-  absValue(A);
 }
 
 //-----------------------------------------------------------------------------
@@ -939,9 +885,9 @@ void N_LAS_MultiVector::reciprocal(const N_LAS_MultiVector & A)
 // Creator       : Todd Coffey, 1414
 // Creation Date : 9/11/08
 //-----------------------------------------------------------------------------
-RefCountPtr<const N_LAS_Vector> N_LAS_MultiVector::getVectorView(int index) const
+RCP<const N_LAS_Vector> N_LAS_MultiVector::getVectorView(int index) const
 {
-  RefCountPtr<const N_LAS_Vector> vec = rcp(new N_LAS_Vector((*oMultiVector_)(index),false), true);
+  RCP<const N_LAS_Vector> vec = rcp(new N_LAS_Vector((*oMultiVector_)(index),false), true);
   return vec;
 }
 
@@ -953,9 +899,9 @@ RefCountPtr<const N_LAS_Vector> N_LAS_MultiVector::getVectorView(int index) cons
 // Creator       : Todd Coffey, 1414
 // Creation Date : 9/11/08
 //-----------------------------------------------------------------------------
-RefCountPtr<N_LAS_Vector> N_LAS_MultiVector::getNonConstVectorView(int index)
+RCP<N_LAS_Vector> N_LAS_MultiVector::getNonConstVectorView(int index)
 {
-  RefCountPtr<N_LAS_Vector> vec = rcp(new N_LAS_Vector((*oMultiVector_)(index),false), true);
+  RCP<N_LAS_Vector> vec = rcp(new N_LAS_Vector((*oMultiVector_)(index),false), true);
   return vec;
 }
 
@@ -995,14 +941,10 @@ const double *& N_LAS_MultiVector::operator[](int index) const
 //-----------------------------------------------------------------------------
 void N_LAS_MultiVector::fillComplete()
 {
-
-#ifdef Xyce_PARALLEL_MPI
-
-  if( exporter_ )
+  if ( exporter_ )
+  {
     aMultiVector_->Export( *oMultiVector_, *exporter_, Add );
-
-#endif
-
+  }
 }
 
 //-----------------------------------------------------------------------------
@@ -1137,8 +1079,6 @@ void N_LAS_MultiVector::readFromFile( char * filename )
 {
 }
 
-#ifdef Xyce_DEBUG_LINEAR
-
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_MultiVector::processError
 // Purpose       : Concrete implementation which processes Petra (in this case)
@@ -1150,28 +1090,24 @@ void N_LAS_MultiVector::readFromFile( char * filename )
 // Creator       : Scott A. Hutchinson, SNL, Parallel Computational Sciences
 // Creation Date : 05/22/00
 //-----------------------------------------------------------------------------
-void N_LAS_MultiVector::processError(string methodMsg, int error) const
+void N_LAS_MultiVector::processError(const char *methodMsg, int error) const
 {
 
-  const string PetraOK("Function returned without warnings or "
-                                   "errors.\n");
-  const string PetraError("Function returned with an error.\n");
+  const std::string PetraOK();
+  const std::string PetraError();
 
   // Process the error
   switch (error)
   {
   case 0:
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, methodMsg + PetraOK);
+    Xyce::dout() << methodMsg << ": Function returned without warnings or errors." << std::endl;
     break;
 
   default:
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, methodMsg +
-                           PetraError);
+    Xyce::Report::DevelFatal0().in(methodMsg) << "Function returned with an error.";
   }
 
 }
-
-#endif
 
 #if 0
 //-----------------------------------------------------------------------------
@@ -1187,7 +1123,7 @@ const double & N_LAS_MultiVector::getElementByGlobalIndex(
 {
   if( aMultiVector_ != oMultiVector_ )
     return (*oMultiVector_)[vec_index][overlapMap_->globalToLocalIndex(global_index)];
-  else if( !parallelMap_ )
+  else if( parallelMap_ == Teuchos::null )
     return (*aMultiVector_)[vec_index][ aMultiVector_->Map().LID(global_index) ];
   else
   {
@@ -1202,7 +1138,7 @@ const double & N_LAS_MultiVector::getElementByGlobalIndex(
       char message[128];
       sprintf(message, "getElementByGlobalIndex: failed to find MultiVector "
               "global index. global_index = %d", global_index);
-      string msg(message);
+      std::string msg(message);
 
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
       return externVectorMap_[-1];
@@ -1224,7 +1160,7 @@ const double & N_LAS_MultiVector::getElementByGlobalIndex(
 {
   if( aMultiVector_ != oMultiVector_ )
     return (*oMultiVector_)[vec_index][overlapMap_->globalToLocalIndex(global_index)];
-  else if( !parallelMap_ )
+  else if( parallelMap_ == Teuchos::null )
     return (*aMultiVector_)[vec_index][ aMultiVector_->Map().LID(global_index) ];
   else
   {
@@ -1233,7 +1169,7 @@ const double & N_LAS_MultiVector::getElementByGlobalIndex(
     if (i != -1)
       return ((*aMultiVector_)[vec_index])[i];
     else {
-      map<int,double>::const_iterator it = externVectorMap_.find(global_index);
+      std::map<int,double>::const_iterator it = externVectorMap_.find(global_index);
       if (it != externVectorMap_.end())
         return (*it).second;
       else
@@ -1241,7 +1177,7 @@ const double & N_LAS_MultiVector::getElementByGlobalIndex(
         char message[128];
         sprintf(message, "getElementByGlobalIndex: failed to find MultiVector "
                 "global index. global_index = %d", global_index);
-        string msg(message);
+        std::string msg(message);
 
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
         return (*externVectorMap_.find(-1)).second;
@@ -1264,7 +1200,7 @@ bool N_LAS_MultiVector::setElementByGlobalIndex(const int & global_index,
 {
   if( aMultiVector_ != oMultiVector_ )
     (*oMultiVector_)[vec_index][overlapMap_->globalToLocalIndex(global_index)] = val;
-  else if( !parallelMap_ )
+  else if( parallelMap_ == Teuchos::null )
     (*oMultiVector_)[vec_index][ oMultiVector_->Map().LID(global_index) ] = val;
   else
   {
@@ -1275,65 +1211,17 @@ bool N_LAS_MultiVector::setElementByGlobalIndex(const int & global_index,
       if (i != -1)
       {
         ( (*aMultiVector_)[vec_index] )[i] = val;
-        return STATUS_SUCCESS;
+        return true;
       }
       else
       {
-        string msg = " setElementByGlobalIndex: failed to find MultiVector "
-        "global index: ";
-
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg, global_index);
-        return STATUS_FAILURE;
+        Xyce::Report::DevelFatal().in("setElementByGlobalIndex") << "Failed to find MultiVector global index: " << global_index;
+        return false;
       }
     }
   }
 
-  return STATUS_SUCCESS;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_LAS_MultiVector::setElementByGlobalIndexIncExt
-// Purpose       : Set element from vector using global index.
-// Special Notes : Allows access to external indices block
-// Scope         : Public
-// Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 1/18/01
-//-----------------------------------------------------------------------------
-bool N_LAS_MultiVector::setElementByGlobalIndexIncExt(const int & global_index,
-                                                      const double & val,
-                                                      const int & vec_index)
-{
-  if( aMultiVector_ != oMultiVector_ )
-    (*oMultiVector_)[vec_index][overlapMap_->globalToLocalIndex(global_index)] = val;
-  else if( !parallelMap_ )
-    (*oMultiVector_)[vec_index][ oMultiVector_->Map().LID(global_index) ] = val;
-  else
-  {
-    if (global_index != -1)
-    {
-      int i = parallelMap_->globalToLocalIndex(global_index);
-
-      if (i != -1)
-      {
-        ( (*aMultiVector_)[vec_index] )[i] = val;
-        return STATUS_SUCCESS;
-      }
-      else if(externVectorMap_.count(global_index))
-      {
-        externVectorMap_[global_index] = val;
-        return STATUS_SUCCESS;
-      }
-      else
-      {
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL,
-           string(" setElementByGlobalIndexIncExt: failed to find MultiVector "
-                  "global index "));
-        return STATUS_FAILURE;
-      }
-    }
-  }
-
-  return STATUS_SUCCESS;
+  return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -1350,7 +1238,7 @@ bool N_LAS_MultiVector::sumElementByGlobalIndex(const int & global_index,
 {
   if( aMultiVector_ != oMultiVector_ )
     (*oMultiVector_)[vec_index][overlapMap_->globalToLocalIndex(global_index)] += val;
-  else if( !parallelMap_ )
+  else if( parallelMap_ == Teuchos::null )
     (*oMultiVector_)[vec_index][ oMultiVector_->Map().LID(global_index) ] += val;
   else
   {
@@ -1361,64 +1249,19 @@ bool N_LAS_MultiVector::sumElementByGlobalIndex(const int & global_index,
       if (i != -1)
       {
         ( (*aMultiVector_)[vec_index] )[i] += val;
-        return STATUS_SUCCESS;
+        return true;
       }
       else
       {
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL,
-                             string(" sumElementByGlobalIndex: failed to find "
+                             std::string(" sumElementByGlobalIndex: failed to find "
                                     "MultiVector global index "));
-        return STATUS_FAILURE;
+        return false;
       }
     }
   }
 
-  return STATUS_SUCCESS;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_LAS_MultiVector::sumElementByGlobalIndexIncExt
-// Purpose       : Set element from vector using global index.
-// Special Notes : Allow access to external indices.
-// Scope         : Public
-// Creator       : Robert J. Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 1/18/01
-//-----------------------------------------------------------------------------
-bool N_LAS_MultiVector::sumElementByGlobalIndexIncExt(const int & global_index,
-                                                      const double & val,
-                                                      const int & vec_index)
-{
-  if( aMultiVector_ != oMultiVector_ )
-    (*oMultiVector_)[vec_index][overlapMap_->globalToLocalIndex(global_index)] += val;
-  else if( !parallelMap_ )
-    (*oMultiVector_)[vec_index][ oMultiVector_->Map().LID(global_index) ] += val;
-  else
-  {
-    if (global_index != -1 )
-    {
-      int i = parallelMap_->globalToLocalIndex(global_index);
-
-      if (i != -1)
-      {
-        ( (*aMultiVector_)[vec_index] ) [i] += val;
-        return STATUS_SUCCESS;
-      }
-      else if( externVectorMap_.count(global_index) )
-      {
-        externVectorMap_[global_index] += val;
-        return STATUS_SUCCESS;
-      }
-      else
-      {
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL,
-                             string(" sumElementByGlobalIndexIncExt: failed to"
-                                    "find MultiVector global index "));
-        return STATUS_FAILURE;
-      }
-    }
-  }
-
-  return STATUS_SUCCESS;
+  return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -1442,20 +1285,23 @@ Epetra_Vector * N_LAS_MultiVector::epetraVector( int index ) const
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 07/14/00
 //-----------------------------------------------------------------------------
-void N_LAS_MultiVector::printPetraObject() const
+void N_LAS_MultiVector::printPetraObject(std::ostream &os) const
 {
-  cout << *aMultiVector_;
-  cout << *oMultiVector_;
+  if (aMultiVector_ != oMultiVector_)
+  {
+    os << *aMultiVector_;
+  }
+  os << *oMultiVector_;
 
 #ifdef Xyce_VERBOSE_LINEAR
-  map<int, double>::const_iterator it_idM = externVectorMap_.begin();
-  map<int, double>::const_iterator end_idM = externVectorMap_.end();
-  if (it_idM != end_idM) cout << "<Extern Vector Map>" << endl;
+  std::map<int, double>::const_iterator it_idM = externVectorMap_.begin();
+  std::map<int, double>::const_iterator end_idM = externVectorMap_.end();
+  if (it_idM != end_idM) os << "<Extern Vector Map>" << std::endl;
   for (; it_idM != end_idM; ++it_idM)
   {
-    cout << "  " << it_idM->first << "\t" << it_idM->second << endl;
+    os << "  " << it_idM->first << "\t" << it_idM->second << std::endl;
   }
-  cout << endl;
+  os << std::endl;
 #endif
 }
 
@@ -1507,8 +1353,8 @@ void N_LAS_MultiVector::pack( char * buf, int bsize, int & pos,
 
   int loc;
   double val;
-  map<int,double>::const_iterator iterXM = externVectorMap_.begin();
-  map<int,double>::const_iterator endXM = externVectorMap_.end ();
+  std::map<int,double>::const_iterator iterXM = externVectorMap_.begin();
+  std::map<int,double>::const_iterator endXM = externVectorMap_.end ();
   for(; iterXM != endXM; ++iterXM )
   {
     loc = iterXM->first;
@@ -1535,9 +1381,9 @@ void N_LAS_MultiVector::unpack( char * buf, int bsize, int & pos,
 
   if( (numV != numVectors()) || (locL != aMultiVector_->MyLength()) )
     N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL,
-	"ERROR:: UNPACKING VECTOR FAILED!\n" );
+	"UNPACKING VECTOR FAILED!\n" );
 
-  vector<double> tmpVec( numV * locL );
+  std::vector<double> tmpVec( numV * locL );
   comm->unpack( buf, bsize, pos, &(tmpVec[0]), locL * numV );
 
   int loc = 0;

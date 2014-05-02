@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.9.2.2 $
+// Revision Number: $Revision: 1.19 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:30 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -52,36 +52,38 @@ using Teuchos::RefCountPtr;
 using Teuchos::rcp;
 
 // ----------   Xyce Includes   ----------
+#include <N_ANP_fwd.h>
+
 #include <N_ANP_AnalysisBase.h>
 
-// ---------- Forward Declarations ----------
-class N_ANP_AnalysisManager;
+namespace Xyce {
+namespace Analysis {
 
 //-------------------------------------------------------------------------
-// Class         : N_ANP_DCSweep
+// Class         : DCSweep
 // Purpose       : Transient analysis class
 // Special Notes : 
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 01/24/08
 //-------------------------------------------------------------------------
-class N_ANP_DCSweep : public N_ANP_AnalysisBase 
+class DCSweep : public AnalysisBase 
 {
   public:
-    N_ANP_DCSweep( N_ANP_AnalysisManager * anaManagerPtr ) :
-    N_ANP_AnalysisBase(anaManagerPtr),
+    DCSweep( AnalysisManager * anaManagerPtr ) :
+    AnalysisBase(anaManagerPtr),
     dcLoopInitialized_( false ),
     dcLoopSize_(0)
     {
-      dcParamVec_ = rcp( new vector <N_ANP_SweepParam>() ); 
+      dcParamVec_ = rcp( new std::vector <SweepParam>() ); 
     };
 
-    virtual ~N_ANP_DCSweep( ) {};
+    virtual ~DCSweep( ) {};
 
     bool setAnalysisParams(const N_UTL_OptionBlock & paramsBlock);
-    bool outputFailureStats ();
+    bool outputFailureStats(std::ostream &os);
 
     void setParamsWithOutputMgrAdapter 
-    (RefCountPtr< N_ANP_OutputMgrAdapter > & outputMgrAdapterRCPtr) 
+    (RefCountPtr< OutputMgrAdapter > & outputMgrAdapterRCPtr) 
     {
       outputMgrAdapterRCPtr->setDCParamVec( dcParamVec_ );
     };
@@ -98,7 +100,7 @@ class N_ANP_DCSweep : public N_ANP_AnalysisBase
     bool twoLevelStep();
 
     void dcSweepOutput();
-    void printStepHeader();
+    void printStepHeader(std::ostream &os);
     bool printLoopInfo(int start, int finish);
 
   protected:
@@ -113,8 +115,19 @@ class N_ANP_DCSweep : public N_ANP_AnalysisBase
     bool dcLoopInitialized_;
     int dcLoopSize_;
 
-    list < int > dcSweepFailures_;
-    RefCountPtr< vector <N_ANP_SweepParam> > dcParamVec_;
+    std::list < int > dcSweepFailures_;
+    RefCountPtr< std::vector <SweepParam> > dcParamVec_;
+
+    std::vector<double> objectiveVec_; 
+    std::vector<double> dOdpVec_; 
+    std::vector<double> dOdpAdjVec_; 
+    std::vector<double> scaled_dOdpVec_;
+    std::vector<double> scaled_dOdpAdjVec_;
 };
+
+} // namespace Analysis
+} // namespace Xyce
+
+typedef Xyce::Analysis::DCSweep N_ANP_DCSweep;
 
 #endif

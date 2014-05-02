@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,73 +36,75 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.9.6.2 $
+// Revision Number: $Revision: 1.14 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ----------   Xyce Includes   ----------
 #include <N_TOP_CktGraphSupport.h>
 #include <N_TOP_CktGraphCreatorBasic.h>
 
+namespace Xyce {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktGraphSupport::N_TOP_CktGraphSupport
+// Function      : CktGraphSupport::CktGraphSupport
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-N_TOP_CktGraphSupport::N_TOP_CktGraphSupport()
+CktGraphSupport::CktGraphSupport()
 {
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktGraphSupport::N_TOP_CktGraphSupport
+// Function      : CktGraphSupport::CktGraphSupport
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-N_TOP_CktGraphSupport::N_TOP_CktGraphSupport(const N_TOP_CktGraphSupport &right)
+CktGraphSupport::CktGraphSupport(const CktGraphSupport &right)
 {
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktGraphSupport::~N_TOP_CktGraphSupport
+// Function      : CktGraphSupport::~CktGraphSupport
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-N_TOP_CktGraphSupport::~N_TOP_CktGraphSupport()
+CktGraphSupport::~CktGraphSupport()
 {
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktGraphSupport::factory
+// Function      : CktGraphSupport::factory
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
-N_TOP_CktGraphCreator* N_TOP_CktGraphSupport::factory (const string &typeID, const int maxTries)
+CktGraphCreator* CktGraphSupport::factory (const std::string &typeID, const int maxTries)
 {
-  if ( typeID == string("Basic") )
+  if ( typeID == std::string("Basic") )
   {
-    N_TOP_CktGraphCreatorBasic * cPtr = new N_TOP_CktGraphCreatorBasic( maxTries );
+    CktGraphCreatorBasic * cPtr = new CktGraphCreatorBasic( maxTries );
     return cPtr;
   }
   return 0;
 }
 
+} // namespace Topo
+} // namespace Xyce

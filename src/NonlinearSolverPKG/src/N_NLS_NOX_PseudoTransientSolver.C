@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.13.6.2 $
+// Revision Number: $Revision: 1.19 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -153,7 +153,7 @@ NOX::StatusTest::StatusType N_NLS_NOX::PseudoTransientBased::step()
     // Compute F of initital guess
     NOX::Abstract::Group::ReturnType rtype = solnPtr->computeF();
     if (rtype != NOX::Abstract::Group::Ok) {
-      cout << "NOX::Solver::PseudoTransientBased::step - Unable to compute F" << endl;
+      Xyce::dout() << "NOX::Solver::PseudoTransientBased::step - Unable to compute F" << std::endl;
       throw "NOX Error";
     }
     
@@ -165,7 +165,7 @@ NOX::StatusTest::StatusType N_NLS_NOX::PseudoTransientBased::step()
 		  << "into the solver (either through constructor or reset method) "
 		  << "is already converged!  The solver will not "
 		  << "attempt to solve this system since status is flagged as "
-		  << "converged." << endl;
+		  << "converged." << std::endl;
     }
     
     // Print out status tests
@@ -192,7 +192,7 @@ NOX::StatusTest::StatusType N_NLS_NOX::PseudoTransientBased::step()
     
     stepSize_ = scaleFactor_ * previousStepSize_ * f_nm1 / f_n;
 
-    //cout << "f_nm1/f_n = " << f_nm1 / f_n << endl;
+    //Xyce::dout() << "f_nm1/f_n = " << f_nm1 / f_n << std::endl;
 
     //if ((stepSize_ > previousStepSize_) && (f_n > 1.0e+10)) {
     //stepSize_ = previousStepSize_;
@@ -232,7 +232,7 @@ NOX::StatusTest::StatusType N_NLS_NOX::PseudoTransientBased::step()
   ok = direction->compute(dir, soln, *this);
   if (!ok) 
   {
-    cout << "N_NLS_NOX::PseudoTransientBased::iterate - unable to calculate direction" << endl;
+    Xyce::dout() << "N_NLS_NOX::PseudoTransientBased::iterate - unable to calculate direction" << std::endl;
     status = NOX::StatusTest::Failed;
     prePostOperator.runPostIterate(*this);
     return status;
@@ -250,20 +250,20 @@ NOX::StatusTest::StatusType N_NLS_NOX::PseudoTransientBased::step()
   {
     if (nIter == 0) 
     {
-      cout << "N_NLS_NOX::PseudoTransientBased::iterate - line search failed" << endl;
+      Xyce::dout() << "N_NLS_NOX::PseudoTransientBased::iterate - line search failed" << std::endl;
       status = NOX::StatusTest::Failed;
       prePostOperator.runPostIterate(*this);
       return status;
     }
     else if (utils.isPrintType(NOX::Utils::Warning))
-      utils.out() << "N_NLS_NOX::PseudoTransientBased::iterate - using recovery step for line search" << endl;
+      utils.out() << "N_NLS_NOX::PseudoTransientBased::iterate - using recovery step for line search" << std::endl;
   }
 
   // Compute F for new current solution.
   NOX::Abstract::Group::ReturnType rtype = soln.computeF();
   if (rtype != NOX::Abstract::Group::Ok) 
   {
-    utils.out() << "N_NLS_NOX::PseudoTransientBased::iterate - unable to compute F" << endl;
+    utils.out() << "N_NLS_NOX::PseudoTransientBased::iterate - unable to compute F" << std::endl;
     status = NOX::StatusTest::Failed;
     prePostOperator.runPostIterate(*this);
     return status;
@@ -310,7 +310,7 @@ NOX::StatusTest::StatusType N_NLS_NOX::PseudoTransientBased::solve()
   previousGroup_ = dynamic_cast<N_NLS_LOCA::Group*>(tmpPreviousGroup);
 
   if ((group_ == 0) || (previousGroup_ == 0)) {
-    string message = "ERROR: N_NLS_NOX::PrePostOperator\n Failed to dynamic_cast the old and new groups to N_NLS_LOCA::Groups! ";
+    std::string message = "N_NLS_NOX::PrePostOperator\n Failed to dynamic_cast the old and new groups to N_NLS_LOCA::Groups! ";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
   }
 
@@ -397,7 +397,7 @@ void N_NLS_NOX::PseudoTransientBased::printUpdate()
       utils.out() << " (Converged!)";
     if (status == NOX::StatusTest::Failed)
       utils.out() << " (Failed!)";
-    utils.out() << "\n" << NOX::Utils::fill(72) << "\n" << endl;
+    utils.out() << "\n" << NOX::Utils::fill(72) << "\n" << std::endl;
   }
 
   // Print the final parameter values of the status test

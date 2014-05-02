@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.5.6.2 $
+// Revision Number: $Revision: 1.11 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:30 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -47,56 +47,60 @@
 #ifndef Xyce_N_ANP_Step_h
 #define Xyce_N_ANP_Step_h
 
-// ----------   Xyce Includes   ----------
+#include <N_ANP_fwd.h>
+
 #include <N_ANP_AnalysisBase.h>
 
-// ---------- Forward Declarations ----------
-class N_ANP_AnalysisManager;
+namespace Xyce {
+namespace Analysis {
 
 //-------------------------------------------------------------------------
-// Class         : N_ANP_Step
+// Class         : Step
 // Purpose       : Step analysis class
 // Special Notes : 
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 01/24/08
 //-------------------------------------------------------------------------
-class N_ANP_Step : public N_ANP_AnalysisBase 
+class Step : public AnalysisBase 
 {
   public:
-    N_ANP_Step( N_ANP_AnalysisManager * anaManagerPtr, N_ANP_AnalysisBase * anaType ) :
-      N_ANP_AnalysisBase(anaManagerPtr),
+    Step( AnalysisManager * anaManagerPtr, AnalysisBase * anaType ) :
+      AnalysisBase(anaManagerPtr),
       stepLoopSize_(0),
       stepLoopIter_(0)
     {
       // this is the analysis that will be done for each step
       mainAnalysisRCPtr_ = rcp( anaType, false);
 
-      stepParamVec_ = rcp( new vector <N_ANP_SweepParam>() );
+      stepParamVec_ = rcp( new std::vector <SweepParam>() );
     };
 
-    virtual ~N_ANP_Step( ) {};
+    virtual ~Step( ) {};
 
     bool setAnalysisParams(const N_UTL_OptionBlock & paramsBlock);
 
     void setParamsWithOutputMgrAdapter 
-      (RefCountPtr< N_ANP_OutputMgrAdapter > & outputMgrAdapterRCPtr) 
+      (RefCountPtr< OutputMgrAdapter > & outputMgrAdapterRCPtr) 
     {
       outputMgrAdapterRCPtr_->setStepParamVec( stepParamVec_ );
     };
 
     int getStepIter () { return stepLoopIter_; }
 
-    bool run();
-    bool init();
-    bool loopProcess();
-    bool processSuccessfulStep();
-    bool processFailedStep();
-    bool finish();
+    virtual bool run(); /* override */
+    virtual bool init(); /* override */
+    virtual bool loopProcess(); /* override */
+    virtual bool processSuccessfulStep(); /* override */
+    virtual bool processFailedStep(); /* override */
+    virtual bool finish(); /* override */
+    virtual bool handlePredictor() /* override */ {
+      return true;
+    }
     
   private:
-    RefCountPtr< N_ANP_AnalysisBase > mainAnalysisRCPtr_;
+    RefCountPtr< AnalysisBase > mainAnalysisRCPtr_;
     
-    RefCountPtr< vector <N_ANP_SweepParam> > stepParamVec_;
+    RefCountPtr< std::vector <SweepParam> > stepParamVec_;
     //
     //bool stepLoopInitialized_;    // true if the step loop has been set up.
   
@@ -104,4 +108,9 @@ class N_ANP_Step : public N_ANP_AnalysisBase
     int stepLoopIter_;
 };
 
-#endif
+} // namespace Analysis
+} // namespace Xyce
+
+typedef Xyce::Analysis::Step N_ANP_Step;
+
+#endif // Xyce_N_ANP_Step_h

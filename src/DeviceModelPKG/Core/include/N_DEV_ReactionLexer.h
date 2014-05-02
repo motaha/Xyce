@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,27 +37,37 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.2.6.2 $
+// Revision Number: $Revision: 1.10.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #ifndef N_DEV_ReactionLexer_H
 #define N_DEV_ReactionLexer_H
+
 #include <iostream>
 #include <string>
 #include <map>
 
-class N_DEV_ReactionLexer: public yyFlexLexer 
+namespace Xyce {
+namespace Device {
+
+class ReactionLexer: public yyFlexLexer 
 {
-
 public:
-  N_DEV_ReactionLexer(istream *input = 0, ostream* output = 0): yyFlexLexer(input,output) {};
-
-  virtual ~N_DEV_ReactionLexer() {};
-
-  int getToken(N_DEV::N_DEV_ReactionParser::semantic_type *lvalp, N_DEV::location *llocp,map<string,int> &theSpecies);
+  ReactionLexer(std::istream *input = 0, std::ostream* output = 0)
+    : yyFlexLexer(input,output)
+  {}
+    
+  virtual ~ReactionLexer()
+  {}
+    
+  int getToken(XyceDevice::ReactionParser::semantic_type *lvalp, XyceDevice::location *llocp, std::map<std::string,int> &theSpecies);
 };
+
+}
+}
+
 #endif

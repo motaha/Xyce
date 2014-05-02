@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.8.6.2 $
+// Revision Number: $Revision: 1.12 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -123,8 +123,7 @@ Teuchos::RCP<N_LAS_Preconditioner> N_LAS_PrecondFactory::create( N_UTL_OptionBlo
   }
   else
   {
-    string msg = "N_LAS_PrecondFactory::create()";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_ERROR_0, msg + ", preconditioning type " + type + " unrecognized!\n");
+    Xyce::Report::DevelFatal0().in("N_LAS_PrecondFactory::create()") << "preconditioning type " << type << " unrecognized!";
   }                                                                                    
   return precond;
 }

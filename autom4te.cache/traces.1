@@ -2396,41 +2396,15 @@ ac_cv_xyce_braindamaged_random_shuffle,
 #else
 #include <algo.h>
 #endif
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
 ]],
 [[
 
-  vector<int> ipVec(5,0);
+  std::vector<int> ipVec(5,0);
 
-  random_shuffle(ipVec.begin(),ipVec.end());
+  std::random_shuffle(ipVec.begin(),ipVec.end());
 ]])], ac_cv_xyce_braindamaged_random_shuffle=no , ac_cv_xyce_braindamaged_random_shuffle=yes)
 AC_LANG_POP(C++)
 ])
-])
-m4trace:config/xyce_check_flexible_insert.m4:1: -1- AC_DEFUN([XYCE_CHECK_FLEXIBLE_INSERT], [AC_CACHE_CHECK(whether your STL supports flexible insertions,
-ac_cv_xyce_flexible_insert,
-[AC_LANG_PUSH(C++)
- AC_COMPILE_IFELSE(
-[AC_LANG_PROGRAM([[#include <vector>
-#include <list>
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
-]],
-[[
-  list<int> ipList(1,0);
-  vector<int> ipVec;
-  
-  ipVec.insert(ipVec.begin(),ipList.begin(),ipList.end());
-
-]])], ac_cv_xyce_flexible_insert=yes , ac_cv_xyce_flexible_insert=no)
-AC_LANG_POP(C++)
-])
-if test "$ac_cv_xyce_flexible_insert" = yes; then
-  AC_DEFINE(HAVE_FLEXIBLE_INSERT,1,[define if the Standard Template Library has flexible insert])
-fi
 ])
 m4trace:config/xyce_check_iota.m4:1: -1- AC_DEFUN([XYCE_CHECK_IOTA], [AC_CACHE_CHECK(whether your STL algorithm includes iota,
 ac_cv_xyce_have_iota,
@@ -2449,40 +2423,16 @@ ac_cv_xyce_have_iota,
 #else
 #include <algo.h>
 #endif
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
 ]],
 [[
-  vector<int> ipVec(5,0);
+  std::vector<int> ipVec(5,0);
 
-  iota(ipVec.begin(),ipVec.end(),1);
+  std::iota(ipVec.begin(),ipVec.end(),1);
 ]])], ac_cv_xyce_have_iota=yes , ac_cv_xyce_have_iota=no)
 AC_LANG_POP(C++)
 ])
 if test "$ac_cv_xyce_have_iota" = yes; then
   AC_DEFINE(HAVE_IOTA,1,[define if the Standard Template Library algorithms include iota])
-fi
-])
-m4trace:config/xyce_check_stl_member_templates.m4:1: -1- AC_DEFUN([XYCE_CHECK_STL_MEMBER_TEMPLATES], [AC_CACHE_CHECK(whether your STL supports member templates,
-ac_cv_xyce_stl_member_templates,
-[AC_LANG_PUSH(C++)
- AC_COMPILE_IFELSE(
-[AC_LANG_PROGRAM([[#include <vector>
-#include <list>
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
-]],
-[[
-	vector<int> v(2);
-	v[0] = v[1] = 0;
-	list<char> l( v.begin(), v.end() );
-]])], ac_cv_xyce_stl_member_templates=yes , ac_cv_xyce_stl_member_templates=no)
-AC_LANG_POP(C++)
-])
-if test "$ac_cv_xyce_stl_member_templates" = no; then
-  AC_DEFINE(BAD_STL,1,[define if the STL cannot support member templates])
 fi
 ])
 m4trace:config/xyce_debug_option.m4:4: -1- AC_DEFUN([XYCE_DEBUG_OPTION], [dnl
@@ -2531,10 +2481,10 @@ AC_LINK_IFELSE(
 #else
 #include <math.h>
 #endif
-]],[[using namespace std;
+]],[[
 
 double x = 1.0; 
-isnan(x); isinf(x);
+std::isnan(x); std::isinf(x);
 return 0;]])],
  ac_cv_xyce_have_finite_number=yes, ac_cv_xyce_have_finite_number=no)
  LIBS="$ac_save_LIBS"
@@ -2617,6 +2567,30 @@ if test "$ac_cv_cxx_xyce_using_icclt11_cxx" = yes; then
   USING_ICCLT11_CXX=yes
 fi
 ])
+m4trace:config/xyce_trilinos_library_option.m4:10: -1- AC_DEFUN([XYCE_TRILINOS_LIBRARY_OPTION], [
+# By default we check for the Makefile.export, then check for the library if it doesn't exist.
+dnl the library name, like "petra"
+m4_pushdef([tri_lib], m4_tolower([$1])) dnl
+m4_pushdef([func], [main]) dnl
+m4_pushdef([only_makefile], [$3]) dnl
+
+# If we can find the Makefile.export for this Trilinos package, then add all the libraries to LIBS.
+# Otherwise, we're doing this the old fashioned way with a static list of dependencies.
+if test -e "${ARCHDIR}/include/Makefile.export.$1"; then
+  m4_ifval($2, [$2=yes])
+  ALL_LIBS=`$GREP $1_LIBRARIES ${ARCHDIR}/include/Makefile.export.$1 | sed -e 's/$1_LIBRARIES//' -e 's/=//'`
+  AC_MSG_NOTICE([Found library and dependencies for $1 in Makefile.export.$1])
+  LIBS="${ALL_LIBS} ${LIBS}"
+else
+  m4_ifval($2, [$2=no])
+  AC_MSG_WARN([Unable to find export file: Makefile.export.$1.  Using predefined library dependencies.])
+  if test "only_makefile[]" != "yes"; then
+    AC_CHECK_LIB(tri_lib, func, [], [AC_MSG_ERROR([Unable to find required library, tri_lib.])]) 
+  fi
+fi
+
+m4_popdef([only_makefile],[func],[tri_lib]) dnl
+])
 m4trace:acinclude.m4:6: -1- AC_DEFUN([AC_CXX_NAMESPACES], [AC_CACHE_CHECK(whether the compiler implements namespaces,
 ac_cv_cxx_namespaces,
 [AC_LANG_PUSH(C++)
@@ -2636,10 +2610,7 @@ ac_cv_cxx_have_numeric_limits,
  AC_LANG_PUSH(C++)
  AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([[#include <limits>
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
-]],[[double e = numeric_limits<double>::epsilon(); return 0;]])],
+]],[[double e = std::numeric_limits<double>::epsilon(); return 0;]])],
  ac_cv_cxx_have_numeric_limits=yes, ac_cv_cxx_have_numeric_limits=no)
  AC_LANG_POP(C++)
 ])
@@ -2647,16 +2618,13 @@ if test "$ac_cv_cxx_have_numeric_limits" = yes; then
   AC_DEFINE(HAVE_NUMERIC_LIMITS,1,[define if the compiler has numeric_limits<T>])
 fi
 ])
-m4trace:acinclude.m4:45: -1- AC_DEFUN([AC_CXX_HAVE_CSTDIO], [AC_CACHE_CHECK(whether the compiler has cstdio,
+m4trace:acinclude.m4:42: -1- AC_DEFUN([AC_CXX_HAVE_CSTDIO], [AC_CACHE_CHECK(whether the compiler has cstdio,
 ac_cv_cxx_have_cstdio,
 [AC_REQUIRE([AC_CXX_NAMESPACES])
  AC_LANG_PUSH(C++)
  AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([[#include <cstdio>
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
-]],[[char foobie[128];sprintf(foobie,"%d\n",1); return 0;]])],
+]],[[char foobie[128];std::sprintf(foobie,"%d\n",1); return 0;]])],
  ac_cv_cxx_have_cstdio=yes, ac_cv_cxx_have_cstdio=no)
  AC_LANG_POP(C++)
 ])
@@ -2664,16 +2632,13 @@ if test "$ac_cv_cxx_have_cstdio" = yes; then
   AC_DEFINE(HAVE_CSTDIO,1,[define if the compiler has cstdio include])
 fi
 ])
-m4trace:acinclude.m4:70: -1- AC_DEFUN([AC_CXX_HAVE_FENV], [AC_CACHE_CHECK(whether the compiler has fenv.h,
+m4trace:acinclude.m4:64: -1- AC_DEFUN([AC_CXX_HAVE_FENV], [AC_CACHE_CHECK(whether the compiler has fenv.h,
 ac_cv_cxx_have_fenv_h,
 [AC_REQUIRE([AC_CXX_NAMESPACES])
  AC_LANG_PUSH(C++)
  AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([[#include <fenv.h>
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
-]],[[feenableexcept(FE_DIVBYZERO); return 0;]])],
+]],[[std::feenableexcept(FE_DIVBYZERO); return 0;]])],
  ac_cv_cxx_have_fenv_h=yes, ac_cv_cxx_have_fenv_h=no)
  AC_LANG_POP(C++)
 ])
@@ -2681,17 +2646,14 @@ if test "$ac_cv_cxx_have_fenv_h" = yes; then
   AC_DEFINE(HAVE_LINUX_EXCEPTIONS, 1,[define if the compiler has fenv include])
 fi
 ])
-m4trace:acinclude.m4:94: -1- AC_DEFUN([AC_CXX_HAVE_ALGORITHM], [AC_CACHE_CHECK(whether the compiler has algorithm,
+m4trace:acinclude.m4:85: -1- AC_DEFUN([AC_CXX_HAVE_ALGORITHM], [AC_CACHE_CHECK(whether the compiler has algorithm,
 ac_cv_cxx_have_algorithm,
 [AC_REQUIRE([AC_CXX_NAMESPACES])
  AC_REQUIRE([AC_CXX_HAVE_STL])
  AC_LANG_PUSH(C++)
  AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([[#include <algorithm>
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
-]],[[int baz; baz = min(1,2); return 0;]])],
+]],[[int baz; baz = std::min(1,2); return 0;]])],
  ac_cv_cxx_have_algorithm=yes, ac_cv_cxx_have_algorithm=no)
  AC_LANG_POP(C++)
 ])
@@ -2699,17 +2661,14 @@ if test "$ac_cv_cxx_have_algorithm" = yes; then
   AC_DEFINE(HAVE_ALGORITHM,1,[define if the compiler has algorithm])
 fi
 ])
-m4trace:acinclude.m4:114: -1- AC_DEFUN([AC_CXX_HAVE_ALGO_H], [AC_CACHE_CHECK(whether the compiler has algo.h,
+m4trace:acinclude.m4:102: -1- AC_DEFUN([AC_CXX_HAVE_ALGO_H], [AC_CACHE_CHECK(whether the compiler has algo.h,
 ac_cv_cxx_have_algo_h,
 [AC_REQUIRE([AC_CXX_NAMESPACES])
  AC_REQUIRE([AC_CXX_HAVE_STL])
  AC_LANG_PUSH(C++)
  AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([[#include <algo.h>
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
-]],[[int baz; baz = min(1,2); return 0;]])],
+]],[[int baz; baz = std::min(1,2); return 0;]])],
  ac_cv_cxx_have_algo_h=yes, ac_cv_cxx_have_algo_h=no)
  AC_LANG_POP(C++)
 ])
@@ -2717,17 +2676,14 @@ if test "$ac_cv_cxx_have_algo_h" = yes; then
   AC_DEFINE(HAVE_ALGO_H,1,[define if the compiler has algo.h])
 fi
 ])
-m4trace:acinclude.m4:141: -1- AC_DEFUN([AC_CXX_NEED_PAIR_H], [AC_CACHE_CHECK(whether use of stl strings and pairs requires including pair.h,
+m4trace:acinclude.m4:126: -1- AC_DEFUN([AC_CXX_NEED_PAIR_H], [AC_CACHE_CHECK(whether use of stl strings and pairs requires including pair.h,
 ac_cv_cxx_need_pair_h,
 [ AC_REQUIRE([AC_CXX_NAMESPACES])
  AC_REQUIRE([AC_CXX_HAVE_STL])
  AC_LANG_PUSH(C++)
  AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([[ #include <string>
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif 
-]],[[typedef pair<string,int> NodeID]])],
+]],[[typedef std::pair<std::string,int> NodeID]])],
  ac_cv_cxx_need_pair_h=no, ac_cv_cxx_need_pair_h=yes)
  AC_LANG_POP(C++)
 ] )
@@ -2735,7 +2691,7 @@ if test "$ac_cv_cxx_need_pair_h" = yes; then
   AC_DEFINE(NEED_PAIR_H,1,[define if stl string header does not cause pair.h to be included])
 fi
 ])
-m4trace:acinclude.m4:164: -1- AC_DEFUN([AC_HEADER_MATH_H_HAS_M_PI], [AC_CACHE_CHECK(whether math.h defines M_PI,
+m4trace:acinclude.m4:146: -1- AC_DEFUN([AC_HEADER_MATH_H_HAS_M_PI], [AC_CACHE_CHECK(whether math.h defines M_PI,
  ac_cv_header_math_h_has_m_pi,
 [AC_LANG_PUSH(C)
  AC_COMPILE_IFELSE(
@@ -2753,18 +2709,15 @@ if test "$ac_cv_header_math_h_has_m_pi" = yes; then
   AC_DEFINE(MATH_H_HAS_M_PI,1,[define if math.h defines M_PI])
 fi
 ])
-m4trace:acinclude.m4:184: -1- AC_DEFUN([AC_CXX_HAVE_STL], [AC_CACHE_CHECK(whether the compiler supports Standard Template Library,
+m4trace:acinclude.m4:166: -1- AC_DEFUN([AC_CXX_HAVE_STL], [AC_CACHE_CHECK(whether the compiler supports Standard Template Library,
 ac_cv_cxx_have_stl,
 [AC_REQUIRE([AC_CXX_NAMESPACES])
  AC_LANG_PUSH(C++)
  AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([[#include <list>
 #include <deque>
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
-]],[[list<int> x; x.push_back(5);
-list<int>::iterator iter = x.begin(); if (iter != x.end()) ++iter; return 0;]])],
+]],[[std::list<int> x; x.push_back(5);
+std::list<int>::iterator iter = x.begin(); if (iter != x.end()) ++iter; return 0;]])],
  ac_cv_cxx_have_stl=yes, ac_cv_cxx_have_stl=no)
  AC_LANG_POP(C++)
 ])
@@ -2824,82 +2777,92 @@ m4trace:configure.ac:9: -1- m4_pattern_allow([^build_alias$])
 m4trace:configure.ac:9: -1- m4_pattern_allow([^host_alias$])
 m4trace:configure.ac:9: -1- m4_pattern_allow([^target_alias$])
 m4trace:configure.ac:24: -1- AC_CONFIG_MACRO_DIR([config])
-m4trace:configure.ac:38: -1- AM_MAINTAINER_MODE
-m4trace:configure.ac:38: -1- AM_CONDITIONAL([MAINTAINER_MODE], [test $USE_MAINTAINER_MODE = yes])
-m4trace:configure.ac:38: -1- m4_pattern_allow([^MAINTAINER_MODE_TRUE$])
-m4trace:configure.ac:38: -1- m4_pattern_allow([^MAINTAINER_MODE_FALSE$])
-m4trace:configure.ac:38: -1- _AM_SUBST_NOTMAKE([MAINTAINER_MODE_TRUE])
-m4trace:configure.ac:38: -1- _AM_SUBST_NOTMAKE([MAINTAINER_MODE_FALSE])
-m4trace:configure.ac:38: -1- m4_pattern_allow([^MAINT$])
-m4trace:configure.ac:51: -1- m4_pattern_allow([^build$])
-m4trace:configure.ac:51: -1- m4_pattern_allow([^build_cpu$])
-m4trace:configure.ac:51: -1- m4_pattern_allow([^build_vendor$])
-m4trace:configure.ac:51: -1- m4_pattern_allow([^build_os$])
-m4trace:configure.ac:51: -1- m4_pattern_allow([^host$])
-m4trace:configure.ac:51: -1- m4_pattern_allow([^host_cpu$])
-m4trace:configure.ac:51: -1- m4_pattern_allow([^host_vendor$])
-m4trace:configure.ac:51: -1- m4_pattern_allow([^host_os$])
-m4trace:configure.ac:51: -1- m4_pattern_allow([^target$])
-m4trace:configure.ac:51: -1- m4_pattern_allow([^target_cpu$])
-m4trace:configure.ac:51: -1- m4_pattern_allow([^target_vendor$])
-m4trace:configure.ac:51: -1- m4_pattern_allow([^target_os$])
-m4trace:configure.ac:54: -1- AM_INIT_AUTOMAKE([1.10.1 foreign])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^AM_[A-Z]+FLAGS$])
-m4trace:configure.ac:54: -1- AM_SET_CURRENT_AUTOMAKE_VERSION
-m4trace:configure.ac:54: -1- AM_AUTOMAKE_VERSION([1.14])
-m4trace:configure.ac:54: -1- _AM_AUTOCONF_VERSION([2.69])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^INSTALL_PROGRAM$])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^INSTALL_SCRIPT$])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^INSTALL_DATA$])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^am__isrc$])
-m4trace:configure.ac:54: -1- _AM_SUBST_NOTMAKE([am__isrc])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^CYGPATH_W$])
-m4trace:configure.ac:54: -1- _AM_SET_OPTIONS([1.10.1 foreign])
-m4trace:configure.ac:54: -1- _AM_SET_OPTION([1.10.1])
-m4trace:configure.ac:54: -2- _AM_MANGLE_OPTION([1.10.1])
-m4trace:configure.ac:54: -1- _AM_SET_OPTION([foreign])
-m4trace:configure.ac:54: -2- _AM_MANGLE_OPTION([foreign])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^PACKAGE$])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^VERSION$])
-m4trace:configure.ac:54: -1- _AM_IF_OPTION([no-define], [], [AC_DEFINE_UNQUOTED([PACKAGE], ["$PACKAGE"], [Name of package])
+m4trace:configure.ac:29: -1- AM_SILENT_RULES([no])
+m4trace:configure.ac:29: -1- m4_pattern_allow([^AM_V$])
+m4trace:configure.ac:29: -1- AM_SUBST_NOTMAKE([AM_V])
+m4trace:configure.ac:29: -1- _AM_SUBST_NOTMAKE([AM_V])
+m4trace:configure.ac:29: -1- m4_pattern_allow([^AM_DEFAULT_V$])
+m4trace:configure.ac:29: -1- AM_SUBST_NOTMAKE([AM_DEFAULT_V])
+m4trace:configure.ac:29: -1- _AM_SUBST_NOTMAKE([AM_DEFAULT_V])
+m4trace:configure.ac:29: -1- m4_pattern_allow([^AM_DEFAULT_VERBOSITY$])
+m4trace:configure.ac:29: -1- m4_pattern_allow([^AM_BACKSLASH$])
+m4trace:configure.ac:29: -1- _AM_SUBST_NOTMAKE([AM_BACKSLASH])
+m4trace:configure.ac:40: -1- AM_MAINTAINER_MODE
+m4trace:configure.ac:40: -1- AM_CONDITIONAL([MAINTAINER_MODE], [test $USE_MAINTAINER_MODE = yes])
+m4trace:configure.ac:40: -1- m4_pattern_allow([^MAINTAINER_MODE_TRUE$])
+m4trace:configure.ac:40: -1- m4_pattern_allow([^MAINTAINER_MODE_FALSE$])
+m4trace:configure.ac:40: -1- _AM_SUBST_NOTMAKE([MAINTAINER_MODE_TRUE])
+m4trace:configure.ac:40: -1- _AM_SUBST_NOTMAKE([MAINTAINER_MODE_FALSE])
+m4trace:configure.ac:40: -1- m4_pattern_allow([^MAINT$])
+m4trace:configure.ac:53: -1- m4_pattern_allow([^build$])
+m4trace:configure.ac:53: -1- m4_pattern_allow([^build_cpu$])
+m4trace:configure.ac:53: -1- m4_pattern_allow([^build_vendor$])
+m4trace:configure.ac:53: -1- m4_pattern_allow([^build_os$])
+m4trace:configure.ac:53: -1- m4_pattern_allow([^host$])
+m4trace:configure.ac:53: -1- m4_pattern_allow([^host_cpu$])
+m4trace:configure.ac:53: -1- m4_pattern_allow([^host_vendor$])
+m4trace:configure.ac:53: -1- m4_pattern_allow([^host_os$])
+m4trace:configure.ac:53: -1- m4_pattern_allow([^target$])
+m4trace:configure.ac:53: -1- m4_pattern_allow([^target_cpu$])
+m4trace:configure.ac:53: -1- m4_pattern_allow([^target_vendor$])
+m4trace:configure.ac:53: -1- m4_pattern_allow([^target_os$])
+m4trace:configure.ac:56: -1- AM_INIT_AUTOMAKE([1.11 foreign])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^AM_[A-Z]+FLAGS$])
+m4trace:configure.ac:56: -1- AM_SET_CURRENT_AUTOMAKE_VERSION
+m4trace:configure.ac:56: -1- AM_AUTOMAKE_VERSION([1.14])
+m4trace:configure.ac:56: -1- _AM_AUTOCONF_VERSION([2.69])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^INSTALL_PROGRAM$])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^INSTALL_SCRIPT$])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^INSTALL_DATA$])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^am__isrc$])
+m4trace:configure.ac:56: -1- _AM_SUBST_NOTMAKE([am__isrc])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^CYGPATH_W$])
+m4trace:configure.ac:56: -1- _AM_SET_OPTIONS([1.11 foreign])
+m4trace:configure.ac:56: -1- _AM_SET_OPTION([1.11])
+m4trace:configure.ac:56: -2- _AM_MANGLE_OPTION([1.11])
+m4trace:configure.ac:56: -1- _AM_SET_OPTION([foreign])
+m4trace:configure.ac:56: -2- _AM_MANGLE_OPTION([foreign])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^PACKAGE$])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^VERSION$])
+m4trace:configure.ac:56: -1- _AM_IF_OPTION([no-define], [], [AC_DEFINE_UNQUOTED([PACKAGE], ["$PACKAGE"], [Name of package])
  AC_DEFINE_UNQUOTED([VERSION], ["$VERSION"], [Version number of package])])
-m4trace:configure.ac:54: -2- _AM_MANGLE_OPTION([no-define])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^PACKAGE$])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^VERSION$])
-m4trace:configure.ac:54: -1- AM_SANITY_CHECK
-m4trace:configure.ac:54: -1- AM_MISSING_PROG([ACLOCAL], [aclocal-${am__api_version}])
-m4trace:configure.ac:54: -1- AM_MISSING_HAS_RUN
-m4trace:configure.ac:54: -1- AM_AUX_DIR_EXPAND
-m4trace:configure.ac:54: -1- m4_pattern_allow([^ACLOCAL$])
-m4trace:configure.ac:54: -1- AM_MISSING_PROG([AUTOCONF], [autoconf])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^AUTOCONF$])
-m4trace:configure.ac:54: -1- AM_MISSING_PROG([AUTOMAKE], [automake-${am__api_version}])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^AUTOMAKE$])
-m4trace:configure.ac:54: -1- AM_MISSING_PROG([AUTOHEADER], [autoheader])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^AUTOHEADER$])
-m4trace:configure.ac:54: -1- AM_MISSING_PROG([MAKEINFO], [makeinfo])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^MAKEINFO$])
-m4trace:configure.ac:54: -1- AM_PROG_INSTALL_SH
-m4trace:configure.ac:54: -1- m4_pattern_allow([^install_sh$])
-m4trace:configure.ac:54: -1- AM_PROG_INSTALL_STRIP
-m4trace:configure.ac:54: -1- m4_pattern_allow([^STRIP$])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^INSTALL_STRIP_PROGRAM$])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^MKDIR_P$])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^mkdir_p$])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^AWK$])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^SET_MAKE$])
-m4trace:configure.ac:54: -1- AM_SET_LEADING_DOT
-m4trace:configure.ac:54: -1- m4_pattern_allow([^am__leading_dot$])
-m4trace:configure.ac:54: -1- _AM_IF_OPTION([tar-ustar], [_AM_PROG_TAR([ustar])], [_AM_IF_OPTION([tar-pax], [_AM_PROG_TAR([pax])],
+m4trace:configure.ac:56: -2- _AM_MANGLE_OPTION([no-define])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^PACKAGE$])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^VERSION$])
+m4trace:configure.ac:56: -1- AM_SANITY_CHECK
+m4trace:configure.ac:56: -1- AM_MISSING_PROG([ACLOCAL], [aclocal-${am__api_version}])
+m4trace:configure.ac:56: -1- AM_MISSING_HAS_RUN
+m4trace:configure.ac:56: -1- AM_AUX_DIR_EXPAND
+m4trace:configure.ac:56: -1- m4_pattern_allow([^ACLOCAL$])
+m4trace:configure.ac:56: -1- AM_MISSING_PROG([AUTOCONF], [autoconf])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^AUTOCONF$])
+m4trace:configure.ac:56: -1- AM_MISSING_PROG([AUTOMAKE], [automake-${am__api_version}])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^AUTOMAKE$])
+m4trace:configure.ac:56: -1- AM_MISSING_PROG([AUTOHEADER], [autoheader])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^AUTOHEADER$])
+m4trace:configure.ac:56: -1- AM_MISSING_PROG([MAKEINFO], [makeinfo])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^MAKEINFO$])
+m4trace:configure.ac:56: -1- AM_PROG_INSTALL_SH
+m4trace:configure.ac:56: -1- m4_pattern_allow([^install_sh$])
+m4trace:configure.ac:56: -1- AM_PROG_INSTALL_STRIP
+m4trace:configure.ac:56: -1- m4_pattern_allow([^STRIP$])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^INSTALL_STRIP_PROGRAM$])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^MKDIR_P$])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^mkdir_p$])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^AWK$])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^SET_MAKE$])
+m4trace:configure.ac:56: -1- AM_SET_LEADING_DOT
+m4trace:configure.ac:56: -1- m4_pattern_allow([^am__leading_dot$])
+m4trace:configure.ac:56: -1- _AM_IF_OPTION([tar-ustar], [_AM_PROG_TAR([ustar])], [_AM_IF_OPTION([tar-pax], [_AM_PROG_TAR([pax])],
 			     [_AM_PROG_TAR([v7])])])
-m4trace:configure.ac:54: -2- _AM_MANGLE_OPTION([tar-ustar])
-m4trace:configure.ac:54: -1- _AM_IF_OPTION([tar-pax], [_AM_PROG_TAR([pax])], [_AM_PROG_TAR([v7])])
-m4trace:configure.ac:54: -2- _AM_MANGLE_OPTION([tar-pax])
-m4trace:configure.ac:54: -1- _AM_PROG_TAR([v7])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^AMTAR$])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^am__tar$])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^am__untar$])
-m4trace:configure.ac:54: -1- _AM_IF_OPTION([no-dependencies], [], [AC_PROVIDE_IFELSE([AC_PROG_CC],
+m4trace:configure.ac:56: -2- _AM_MANGLE_OPTION([tar-ustar])
+m4trace:configure.ac:56: -1- _AM_IF_OPTION([tar-pax], [_AM_PROG_TAR([pax])], [_AM_PROG_TAR([v7])])
+m4trace:configure.ac:56: -2- _AM_MANGLE_OPTION([tar-pax])
+m4trace:configure.ac:56: -1- _AM_PROG_TAR([v7])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^AMTAR$])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^am__tar$])
+m4trace:configure.ac:56: -1- m4_pattern_allow([^am__untar$])
+m4trace:configure.ac:56: -1- _AM_IF_OPTION([no-dependencies], [], [AC_PROVIDE_IFELSE([AC_PROG_CC],
 		  [_AM_DEPENDENCIES([CC])],
 		  [m4_define([AC_PROG_CC],
 			     m4_defn([AC_PROG_CC])[_AM_DEPENDENCIES([CC])])])dnl
@@ -2916,565 +2879,551 @@ AC_PROVIDE_IFELSE([AC_PROG_OBJCXX],
 		  [m4_define([AC_PROG_OBJCXX],
 			     m4_defn([AC_PROG_OBJCXX])[_AM_DEPENDENCIES([OBJCXX])])])dnl
 ])
-m4trace:configure.ac:54: -2- _AM_MANGLE_OPTION([no-dependencies])
-m4trace:configure.ac:54: -1- AM_SILENT_RULES
-m4trace:configure.ac:54: -1- m4_pattern_allow([^AM_V$])
-m4trace:configure.ac:54: -1- AM_SUBST_NOTMAKE([AM_V])
-m4trace:configure.ac:54: -1- _AM_SUBST_NOTMAKE([AM_V])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^AM_DEFAULT_V$])
-m4trace:configure.ac:54: -1- AM_SUBST_NOTMAKE([AM_DEFAULT_V])
-m4trace:configure.ac:54: -1- _AM_SUBST_NOTMAKE([AM_DEFAULT_V])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^AM_DEFAULT_VERBOSITY$])
-m4trace:configure.ac:54: -1- m4_pattern_allow([^AM_BACKSLASH$])
-m4trace:configure.ac:54: -1- _AM_SUBST_NOTMAKE([AM_BACKSLASH])
-m4trace:configure.ac:66: -1- AM_CONDITIONAL([SGI], [test "$Xyce_TARGET" = "sgi10k" -o "$Xyce_TARGET" = "sgin32"])
-m4trace:configure.ac:66: -1- m4_pattern_allow([^SGI_TRUE$])
-m4trace:configure.ac:66: -1- m4_pattern_allow([^SGI_FALSE$])
-m4trace:configure.ac:66: -1- _AM_SUBST_NOTMAKE([SGI_TRUE])
-m4trace:configure.ac:66: -1- _AM_SUBST_NOTMAKE([SGI_FALSE])
-m4trace:configure.ac:69: -1- AM_CONDITIONAL([SUN], [test "$Xyce_TARGET" = "solaris"])
-m4trace:configure.ac:69: -1- m4_pattern_allow([^SUN_TRUE$])
-m4trace:configure.ac:69: -1- m4_pattern_allow([^SUN_FALSE$])
-m4trace:configure.ac:69: -1- _AM_SUBST_NOTMAKE([SUN_TRUE])
-m4trace:configure.ac:69: -1- _AM_SUBST_NOTMAKE([SUN_FALSE])
-m4trace:configure.ac:174: -1- AM_CONDITIONAL([BUILD_XYCE_BINARY], [test "X$ENABLE_XYCE_BINARY" != "Xno"])
-m4trace:configure.ac:174: -1- m4_pattern_allow([^BUILD_XYCE_BINARY_TRUE$])
-m4trace:configure.ac:174: -1- m4_pattern_allow([^BUILD_XYCE_BINARY_FALSE$])
-m4trace:configure.ac:174: -1- _AM_SUBST_NOTMAKE([BUILD_XYCE_BINARY_TRUE])
-m4trace:configure.ac:174: -1- _AM_SUBST_NOTMAKE([BUILD_XYCE_BINARY_FALSE])
-m4trace:configure.ac:180: -1- XYCE_DEBUG_OPTION([mpi], [no], [parallel build with MPI], [Xyce_PARALLEL_MPI], [USE_MPI])
-m4trace:configure.ac:217: -1- XYCE_DEBUG_OPTION([verbose_time], [no], [verbosity in time integrator])
-m4trace:configure.ac:218: -1- XYCE_DEBUG_OPTION([verbose_nonlinear], [no], [verbosity in nonlinear solver])
-m4trace:configure.ac:219: -1- XYCE_DEBUG_OPTION([verbose_nox], [no], [verbosity in NOX nonlinear solver library])
-m4trace:configure.ac:220: -1- XYCE_DEBUG_OPTION([verbose_linear], [no], [verbosity in linear solver])
-m4trace:configure.ac:221: -1- XYCE_DEBUG_OPTION([spice_norms], [yes], [using SPICE type norms])
-m4trace:configure.ac:222: -1- XYCE_DEBUG_OPTION([adaptive_solve], [no], [adaptive iterative linear solvers])
-m4trace:configure.ac:223: -1- XYCE_DEBUG_OPTION([bsim3_const], [no], [using constants from BSIM3], [Xyce_USE_BSIM3_CONST])
-m4trace:configure.ac:224: -1- XYCE_DEBUG_OPTION([nox_use_vector_copy], [yes], [using vector copies in NOX])
-m4trace:configure.ac:225: -1- XYCE_DEBUG_OPTION([sensitivity], [no], [sensitivity capability], [Xyce_SENSITIVITY_ENABLE], [SENSITIVITY_ENABLE])
-m4trace:configure.ac:228: -1- XYCE_DEBUG_OPTION([extdev], [yes], [extdev extensions], [Xyce_EXTDEV], [USE_EXTDEV])
-m4trace:configure.ac:229: -1- AM_CONDITIONAL([EXTDEV], [test $USE_EXTDEV = yes])
-m4trace:configure.ac:229: -1- m4_pattern_allow([^EXTDEV_TRUE$])
-m4trace:configure.ac:229: -1- m4_pattern_allow([^EXTDEV_FALSE$])
-m4trace:configure.ac:229: -1- _AM_SUBST_NOTMAKE([EXTDEV_TRUE])
-m4trace:configure.ac:229: -1- _AM_SUBST_NOTMAKE([EXTDEV_FALSE])
-m4trace:configure.ac:235: -1- XYCE_DEBUG_OPTION([radmodels], [yes], [Radiation Model Library], [Xyce_RAD_MODELS], [RAD_MODELS])
-m4trace:configure.ac:244: -1- AM_CONDITIONAL([RADMODELS], [test $RAD_MODELS = yes])
-m4trace:configure.ac:244: -1- m4_pattern_allow([^RADMODELS_TRUE$])
-m4trace:configure.ac:244: -1- m4_pattern_allow([^RADMODELS_FALSE$])
-m4trace:configure.ac:244: -1- _AM_SUBST_NOTMAKE([RADMODELS_TRUE])
-m4trace:configure.ac:244: -1- _AM_SUBST_NOTMAKE([RADMODELS_FALSE])
-m4trace:configure.ac:245: -1- m4_pattern_allow([^MAYBE_RAD$])
-m4trace:configure.ac:251: -1- XYCE_DEBUG_OPTION([nonfree], [yes], [Non-Free Models Library], [Xyce_NONFREE_MODELS], [NONFREE_MODELS])
-m4trace:configure.ac:259: -1- AM_CONDITIONAL([NONFREEMODELS], [test $NONFREE_MODELS = yes])
-m4trace:configure.ac:259: -1- m4_pattern_allow([^NONFREEMODELS_TRUE$])
-m4trace:configure.ac:259: -1- m4_pattern_allow([^NONFREEMODELS_FALSE$])
-m4trace:configure.ac:259: -1- _AM_SUBST_NOTMAKE([NONFREEMODELS_TRUE])
-m4trace:configure.ac:259: -1- _AM_SUBST_NOTMAKE([NONFREEMODELS_FALSE])
-m4trace:configure.ac:260: -1- m4_pattern_allow([^MAYBE_NONFREE$])
-m4trace:configure.ac:263: -1- XYCE_DEBUG_OPTION([dakota], [no], [Dakota direct linkage support], [Xyce_Dakota], [USE_DAKOTA])
-m4trace:configure.ac:264: -1- AM_CONDITIONAL([DAKOTA_LINK], [test $USE_DAKOTA = yes])
-m4trace:configure.ac:264: -1- m4_pattern_allow([^DAKOTA_LINK_TRUE$])
-m4trace:configure.ac:264: -1- m4_pattern_allow([^DAKOTA_LINK_FALSE$])
-m4trace:configure.ac:264: -1- _AM_SUBST_NOTMAKE([DAKOTA_LINK_TRUE])
-m4trace:configure.ac:264: -1- _AM_SUBST_NOTMAKE([DAKOTA_LINK_FALSE])
-m4trace:configure.ac:267: -1- AM_CONDITIONAL([DAKOTA_OBJ_NEEDED], [test $USE_DAKOTA = yes ])
-m4trace:configure.ac:267: -1- m4_pattern_allow([^DAKOTA_OBJ_NEEDED_TRUE$])
-m4trace:configure.ac:267: -1- m4_pattern_allow([^DAKOTA_OBJ_NEEDED_FALSE$])
-m4trace:configure.ac:267: -1- _AM_SUBST_NOTMAKE([DAKOTA_OBJ_NEEDED_TRUE])
-m4trace:configure.ac:267: -1- _AM_SUBST_NOTMAKE([DAKOTA_OBJ_NEEDED_FALSE])
-m4trace:configure.ac:270: -1- XYCE_DEBUG_OPTION([dakota50], [no], [Dakota 5.0 direct linkage support], [Xyce_Dakota50], [USE_DAKOTA50])
-m4trace:configure.ac:271: -1- AM_CONDITIONAL([DAKOTA_LINK], [test $USE_DAKOTA50 = yes -o $USE_DAKOTA = yes ])
-m4trace:configure.ac:271: -1- m4_pattern_allow([^DAKOTA_LINK_TRUE$])
-m4trace:configure.ac:271: -1- m4_pattern_allow([^DAKOTA_LINK_FALSE$])
-m4trace:configure.ac:271: -1- _AM_SUBST_NOTMAKE([DAKOTA_LINK_TRUE])
-m4trace:configure.ac:271: -1- _AM_SUBST_NOTMAKE([DAKOTA_LINK_FALSE])
-m4trace:configure.ac:274: -1- AM_CONDITIONAL([DAKOTA_OBJ_NEEDED], [test $USE_DAKOTA50 = yes ])
-m4trace:configure.ac:274: -1- m4_pattern_allow([^DAKOTA_OBJ_NEEDED_TRUE$])
-m4trace:configure.ac:274: -1- m4_pattern_allow([^DAKOTA_OBJ_NEEDED_FALSE$])
-m4trace:configure.ac:274: -1- _AM_SUBST_NOTMAKE([DAKOTA_OBJ_NEEDED_TRUE])
-m4trace:configure.ac:274: -1- _AM_SUBST_NOTMAKE([DAKOTA_OBJ_NEEDED_FALSE])
-m4trace:configure.ac:277: -1- XYCE_DEBUG_OPTION([charon], [no], [Charon device support], [Xyce_CHARON], [USE_CHARON])
-m4trace:configure.ac:278: -1- AM_CONDITIONAL([BUILD_CHARON_SUPPORT], [test $USE_CHARON = yes])
-m4trace:configure.ac:278: -1- m4_pattern_allow([^BUILD_CHARON_SUPPORT_TRUE$])
-m4trace:configure.ac:278: -1- m4_pattern_allow([^BUILD_CHARON_SUPPORT_FALSE$])
-m4trace:configure.ac:278: -1- _AM_SUBST_NOTMAKE([BUILD_CHARON_SUPPORT_TRUE])
-m4trace:configure.ac:278: -1- _AM_SUBST_NOTMAKE([BUILD_CHARON_SUPPORT_FALSE])
-m4trace:configure.ac:281: -1- XYCE_DEBUG_OPTION([trilinos_dev], [no], [Trilinos development support], [Xyce_TRILINOS_DEV], [USE_TRILINOS_DEV])
-m4trace:configure.ac:282: -1- AM_CONDITIONAL([TRILINOS_DEV], [test $USE_TRILINOS_DEV = yes])
-m4trace:configure.ac:282: -1- m4_pattern_allow([^TRILINOS_DEV_TRUE$])
-m4trace:configure.ac:282: -1- m4_pattern_allow([^TRILINOS_DEV_FALSE$])
-m4trace:configure.ac:282: -1- _AM_SUBST_NOTMAKE([TRILINOS_DEV_TRUE])
-m4trace:configure.ac:282: -1- _AM_SUBST_NOTMAKE([TRILINOS_DEV_FALSE])
-m4trace:configure.ac:285: -1- XYCE_DEBUG_OPTION([trilinos_dev_rythmos], [no], [Trilinos development support with Rythmos], [Xyce_TRILINOS_DEV_RYTHMOS], [USE_TRILINOS_DEV_RYTHMOS])
-m4trace:configure.ac:286: -1- AM_CONDITIONAL([TRILINOS_DEV_RYTHMOS], [test $USE_TRILINOS_DEV_RYTHMOS = yes])
-m4trace:configure.ac:286: -1- m4_pattern_allow([^TRILINOS_DEV_RYTHMOS_TRUE$])
-m4trace:configure.ac:286: -1- m4_pattern_allow([^TRILINOS_DEV_RYTHMOS_FALSE$])
-m4trace:configure.ac:286: -1- _AM_SUBST_NOTMAKE([TRILINOS_DEV_RYTHMOS_TRUE])
-m4trace:configure.ac:286: -1- _AM_SUBST_NOTMAKE([TRILINOS_DEV_RYTHMOS_FALSE])
-m4trace:configure.ac:289: -1- XYCE_DEBUG_OPTION([isorropia], [yes], [isorropia], [Xyce_USE_ISORROPIA], [USE_ISORROPIA])
-m4trace:configure.ac:290: -1- XYCE_DEBUG_OPTION([zoltan], [yes], [zoltan], [Xyce_USE_ZOLTAN], [USE_ZOLTAN])
-m4trace:configure.ac:306: -1- XYCE_DEBUG_OPTION([superlu], [no], [SuperLU direct solver], [Xyce_SUPERLU], [SUPERLU])
-m4trace:configure.ac:307: -1- XYCE_DEBUG_OPTION([umfpack], [yes], [UmfPack direct solver], [Xyce_UMFPACK], [UMFPACK])
-m4trace:configure.ac:308: -1- XYCE_DEBUG_OPTION([pardiso_mkl], [no], [Pardiso direct solver (through MKL)], [Xyce_PARDISO_MKL], [PARDISO_MKL])
-m4trace:configure.ac:311: -1- XYCE_DEBUG_OPTION([ksparse], [no], [Kundert's Sparse direct solver], [Xyce_KSPARSE], [USE_KSPARSE])
-m4trace:configure.ac:312: -1- AM_CONDITIONAL([BUILD_KSPARSE], [test "x$USE_KSPARSE" = "xyes"])
-m4trace:configure.ac:312: -1- m4_pattern_allow([^BUILD_KSPARSE_TRUE$])
-m4trace:configure.ac:312: -1- m4_pattern_allow([^BUILD_KSPARSE_FALSE$])
-m4trace:configure.ac:312: -1- _AM_SUBST_NOTMAKE([BUILD_KSPARSE_TRUE])
-m4trace:configure.ac:312: -1- _AM_SUBST_NOTMAKE([BUILD_KSPARSE_FALSE])
-m4trace:configure.ac:315: -1- XYCE_DEBUG_OPTION([belos], [yes], [Belos iterative solver support], [Xyce_BELOS], [USE_BELOS])
-m4trace:configure.ac:316: -1- AM_CONDITIONAL([BUILD_BELOS_SUPPORT], [test "x$USE_BELOS" = "xyes"])
-m4trace:configure.ac:316: -1- m4_pattern_allow([^BUILD_BELOS_SUPPORT_TRUE$])
-m4trace:configure.ac:316: -1- m4_pattern_allow([^BUILD_BELOS_SUPPORT_FALSE$])
-m4trace:configure.ac:316: -1- _AM_SUBST_NOTMAKE([BUILD_BELOS_SUPPORT_TRUE])
-m4trace:configure.ac:316: -1- _AM_SUBST_NOTMAKE([BUILD_BELOS_SUPPORT_FALSE])
-m4trace:configure.ac:319: -1- XYCE_DEBUG_OPTION([shylu], [no], [ShyLU hybrid solver support], [Xyce_SHYLU], [USE_SHYLU])
-m4trace:configure.ac:320: -1- AM_CONDITIONAL([BUILD_SHYLU_SUPPORT], [test "x$USE_SHYLU" = "xyes"])
-m4trace:configure.ac:320: -1- m4_pattern_allow([^BUILD_SHYLU_SUPPORT_TRUE$])
-m4trace:configure.ac:320: -1- m4_pattern_allow([^BUILD_SHYLU_SUPPORT_FALSE$])
-m4trace:configure.ac:320: -1- _AM_SUBST_NOTMAKE([BUILD_SHYLU_SUPPORT_TRUE])
-m4trace:configure.ac:320: -1- _AM_SUBST_NOTMAKE([BUILD_SHYLU_SUPPORT_FALSE])
-m4trace:configure.ac:323: -1- XYCE_DEBUG_OPTION([ml], [no], [ML preconditioner support], [Xyce_ML], [USE_ML])
-m4trace:configure.ac:324: -1- AM_CONDITIONAL([BUILD_ML_SUPPORT], [test "x$USE_ML" = "xyes"])
-m4trace:configure.ac:324: -1- m4_pattern_allow([^BUILD_ML_SUPPORT_TRUE$])
-m4trace:configure.ac:324: -1- m4_pattern_allow([^BUILD_ML_SUPPORT_FALSE$])
-m4trace:configure.ac:324: -1- _AM_SUBST_NOTMAKE([BUILD_ML_SUPPORT_TRUE])
-m4trace:configure.ac:324: -1- _AM_SUBST_NOTMAKE([BUILD_ML_SUPPORT_FALSE])
-m4trace:configure.ac:327: -1- XYCE_DEBUG_OPTION([amd], [yes], [AMD reordering], [Xyce_AMD], [AMD])
-m4trace:configure.ac:330: -1- XYCE_DEBUG_OPTION([superludist], [no], [SuperLU_Dist linear solver], [Xyce_SUPERLUDIST], [SUPERLUDIST])
-m4trace:configure.ac:335: -1- XYCE_DEBUG_OPTION([nox_unstable], [no], [NOX/LOCA experimental code - usually requires latest nox and loca development library], [Xyce_NOX_UNSTABLE], [NOX_UNSTABLE])
-m4trace:configure.ac:337: -1- XYCE_DEBUG_OPTION([test_soln_var_map], [no], [mapping of internal variables to external for debugging])
-m4trace:configure.ac:338: -1- XYCE_DEBUG_OPTION([debug_device], [no], [device package debugging output])
-m4trace:configure.ac:339: -1- XYCE_DEBUG_OPTION([debug_io], [no], [I/O package debugging])
-m4trace:configure.ac:340: -1- XYCE_DEBUG_OPTION([debug_expression], [no], [Expression package debugging output])
-m4trace:configure.ac:341: -1- XYCE_DEBUG_OPTION([debug_time], [no], [time integrator package debugging output])
-m4trace:configure.ac:342: -1- XYCE_DEBUG_OPTION([debug_analysis], [no], [analysis package debugging output])
-m4trace:configure.ac:343: -1- XYCE_DEBUG_OPTION([debug_parallel], [no], [parallel distribution package debugging output])
-m4trace:configure.ac:344: -1- XYCE_DEBUG_OPTION([debug_distribution], [no], [distribution package debugging output])
-m4trace:configure.ac:345: -1- XYCE_DEBUG_OPTION([debug_topology], [no], [topology package debugging output])
-m4trace:configure.ac:346: -1- XYCE_DEBUG_OPTION([debug_linear], [no], [linear solver package debugging output])
-m4trace:configure.ac:347: -1- XYCE_DEBUG_OPTION([debug_nonlinear], [no], [nonlinear solver package debugging output])
-m4trace:configure.ac:348: -1- XYCE_DEBUG_OPTION([debug_circuit], [no], [circuit package debugging output])
-m4trace:configure.ac:349: -1- XYCE_DEBUG_OPTION([debug_directsolve], [no], [direct solver package debugging output])
-m4trace:configure.ac:350: -1- XYCE_DEBUG_OPTION([debug_restart], [no], [restart debugging output])
-m4trace:configure.ac:352: -1- XYCE_DEBUG_OPTION([op_start], [yes], [allow startup from previous operating point])
-m4trace:configure.ac:355: -1- XYCE_DEBUG_OPTION([fortran_test], [yes], [test for fortran compiler], [Xyce_FORTRAN_TEST], [FORTRAN_TEST])
-m4trace:configure.ac:358: -1- XYCE_DEBUG_OPTION([reaction_parser], [yes], [reaction parser], [Xyce_REACTION_PARSER], [REACTION_PARSER])
-m4trace:configure.ac:361: -1- XYCE_DEBUG_OPTION([fft], [yes], [support for FFT libraries], [Xyce_FFT], [USE_FFT])
-m4trace:configure.ac:363: -1- XYCE_DEBUG_OPTION([intel_fft], [yes], [support for Intel MKL FFT library], [Xyce_IntelFFT], [USE_IntelFFT])
-m4trace:configure.ac:364: -1- XYCE_DEBUG_OPTION([fftw], [yes], [support for FFTW library], [Xyce_FFTW], [USE_FFTW])
-m4trace:configure.ac:370: -1- XYCE_DEBUG_OPTION([athena], [no], [building the ATHENA device])
-m4trace:configure.ac:379: -1- XYCE_DEBUG_OPTION([hdf5], [no], [support for HDF5 output library], [Xyce_HDF5], [USE_HDF5])
-m4trace:configure.ac:382: -1- AC_DISABLE_SHARED
-m4trace:configure.ac:386: -1- m4_pattern_allow([^CXX$])
-m4trace:configure.ac:386: -1- m4_pattern_allow([^CXXFLAGS$])
-m4trace:configure.ac:386: -1- m4_pattern_allow([^LDFLAGS$])
-m4trace:configure.ac:386: -1- m4_pattern_allow([^LIBS$])
-m4trace:configure.ac:386: -1- m4_pattern_allow([^CPPFLAGS$])
-m4trace:configure.ac:386: -1- m4_pattern_allow([^CXX$])
-m4trace:configure.ac:386: -1- m4_pattern_allow([^ac_ct_CXX$])
-m4trace:configure.ac:386: -1- m4_pattern_allow([^EXEEXT$])
-m4trace:configure.ac:386: -1- m4_pattern_allow([^OBJEXT$])
-m4trace:configure.ac:386: -1- _AM_DEPENDENCIES([CXX])
-m4trace:configure.ac:386: -1- AM_SET_DEPDIR
-m4trace:configure.ac:386: -1- m4_pattern_allow([^DEPDIR$])
-m4trace:configure.ac:386: -1- AM_OUTPUT_DEPENDENCY_COMMANDS
-m4trace:configure.ac:386: -1- AM_MAKE_INCLUDE
-m4trace:configure.ac:386: -1- m4_pattern_allow([^am__include$])
-m4trace:configure.ac:386: -1- m4_pattern_allow([^am__quote$])
-m4trace:configure.ac:386: -1- AM_DEP_TRACK
-m4trace:configure.ac:386: -1- AM_CONDITIONAL([AMDEP], [test "x$enable_dependency_tracking" != xno])
-m4trace:configure.ac:386: -1- m4_pattern_allow([^AMDEP_TRUE$])
-m4trace:configure.ac:386: -1- m4_pattern_allow([^AMDEP_FALSE$])
-m4trace:configure.ac:386: -1- _AM_SUBST_NOTMAKE([AMDEP_TRUE])
-m4trace:configure.ac:386: -1- _AM_SUBST_NOTMAKE([AMDEP_FALSE])
-m4trace:configure.ac:386: -1- m4_pattern_allow([^AMDEPBACKSLASH$])
-m4trace:configure.ac:386: -1- _AM_SUBST_NOTMAKE([AMDEPBACKSLASH])
-m4trace:configure.ac:386: -1- m4_pattern_allow([^am__nodep$])
-m4trace:configure.ac:386: -1- _AM_SUBST_NOTMAKE([am__nodep])
-m4trace:configure.ac:386: -1- m4_pattern_allow([^CXXDEPMODE$])
-m4trace:configure.ac:386: -1- AM_CONDITIONAL([am__fastdepCXX], [
+m4trace:configure.ac:56: -2- _AM_MANGLE_OPTION([no-dependencies])
+m4trace:configure.ac:68: -1- AM_CONDITIONAL([SGI], [test "$Xyce_TARGET" = "sgi10k" -o "$Xyce_TARGET" = "sgin32"])
+m4trace:configure.ac:68: -1- m4_pattern_allow([^SGI_TRUE$])
+m4trace:configure.ac:68: -1- m4_pattern_allow([^SGI_FALSE$])
+m4trace:configure.ac:68: -1- _AM_SUBST_NOTMAKE([SGI_TRUE])
+m4trace:configure.ac:68: -1- _AM_SUBST_NOTMAKE([SGI_FALSE])
+m4trace:configure.ac:71: -1- AM_CONDITIONAL([SUN], [test "$Xyce_TARGET" = "solaris"])
+m4trace:configure.ac:71: -1- m4_pattern_allow([^SUN_TRUE$])
+m4trace:configure.ac:71: -1- m4_pattern_allow([^SUN_FALSE$])
+m4trace:configure.ac:71: -1- _AM_SUBST_NOTMAKE([SUN_TRUE])
+m4trace:configure.ac:71: -1- _AM_SUBST_NOTMAKE([SUN_FALSE])
+m4trace:configure.ac:119: -1- AM_CONDITIONAL([BUILD_XYCE_SHAREABLE], [test "X$ENABLE_XYCE_SHAREABLE" != "Xno"])
+m4trace:configure.ac:119: -1- m4_pattern_allow([^BUILD_XYCE_SHAREABLE_TRUE$])
+m4trace:configure.ac:119: -1- m4_pattern_allow([^BUILD_XYCE_SHAREABLE_FALSE$])
+m4trace:configure.ac:119: -1- _AM_SUBST_NOTMAKE([BUILD_XYCE_SHAREABLE_TRUE])
+m4trace:configure.ac:119: -1- _AM_SUBST_NOTMAKE([BUILD_XYCE_SHAREABLE_FALSE])
+m4trace:configure.ac:131: -1- m4_pattern_allow([^MAYBE_PLUGIN$])
+m4trace:configure.ac:135: -1- AM_CONDITIONAL([BUILD_XYCE_BINARY], [test "X$ENABLE_XYCE_BINARY" != "Xno"])
+m4trace:configure.ac:135: -1- m4_pattern_allow([^BUILD_XYCE_BINARY_TRUE$])
+m4trace:configure.ac:135: -1- m4_pattern_allow([^BUILD_XYCE_BINARY_FALSE$])
+m4trace:configure.ac:135: -1- _AM_SUBST_NOTMAKE([BUILD_XYCE_BINARY_TRUE])
+m4trace:configure.ac:135: -1- _AM_SUBST_NOTMAKE([BUILD_XYCE_BINARY_FALSE])
+m4trace:configure.ac:140: -2- _m4_warn([obsolete], [The macro `AC_HELP_STRING' is obsolete.
+You should run autoupdate.], [../../lib/autoconf/general.m4:207: AC_HELP_STRING is expanded from...
+configure.ac:140: the top level])
+m4trace:configure.ac:145: -1- m4_pattern_allow([^USE_THREADS$])
+m4trace:configure.ac:148: -1- AM_CONDITIONAL([THREADS], [test $ac_enable_threads = yes])
+m4trace:configure.ac:148: -1- m4_pattern_allow([^THREADS_TRUE$])
+m4trace:configure.ac:148: -1- m4_pattern_allow([^THREADS_FALSE$])
+m4trace:configure.ac:148: -1- _AM_SUBST_NOTMAKE([THREADS_TRUE])
+m4trace:configure.ac:148: -1- _AM_SUBST_NOTMAKE([THREADS_FALSE])
+m4trace:configure.ac:153: -1- XYCE_DEBUG_OPTION([mpi], [no], [parallel build with MPI], [Xyce_PARALLEL_MPI], [USE_MPI])
+m4trace:configure.ac:182: -1- XYCE_DEBUG_OPTION([verbose_time], [no], [verbosity in time integrator])
+m4trace:configure.ac:183: -1- XYCE_DEBUG_OPTION([verbose_nonlinear], [no], [verbosity in nonlinear solver])
+m4trace:configure.ac:184: -1- XYCE_DEBUG_OPTION([verbose_nox], [no], [verbosity in NOX nonlinear solver library])
+m4trace:configure.ac:185: -1- XYCE_DEBUG_OPTION([verbose_linear], [no], [verbosity in linear solver])
+m4trace:configure.ac:186: -1- XYCE_DEBUG_OPTION([spice_norms], [yes], [using SPICE type norms])
+m4trace:configure.ac:187: -1- XYCE_DEBUG_OPTION([adaptive_solve], [no], [adaptive iterative linear solvers])
+m4trace:configure.ac:188: -1- XYCE_DEBUG_OPTION([bsim3_const], [no], [using constants from BSIM3 instead of more precise constants consistent with other devices], [Xyce_USE_BSIM3_CONST])
+m4trace:configure.ac:189: -1- XYCE_DEBUG_OPTION([nox_use_vector_copy], [yes], [using vector copies in NOX])
+m4trace:configure.ac:190: -1- XYCE_DEBUG_OPTION([sensitivity], [no], [device sensitivity capability], [Xyce_SENSITIVITY_ENABLE], [SENSITIVITY_ENABLE])
+m4trace:configure.ac:193: -1- XYCE_DEBUG_OPTION([extdev], [yes], ["external device" extensions], [Xyce_EXTDEV], [USE_EXTDEV])
+m4trace:configure.ac:194: -1- AM_CONDITIONAL([EXTDEV], [test $USE_EXTDEV = yes])
+m4trace:configure.ac:194: -1- m4_pattern_allow([^EXTDEV_TRUE$])
+m4trace:configure.ac:194: -1- m4_pattern_allow([^EXTDEV_FALSE$])
+m4trace:configure.ac:194: -1- _AM_SUBST_NOTMAKE([EXTDEV_TRUE])
+m4trace:configure.ac:194: -1- _AM_SUBST_NOTMAKE([EXTDEV_FALSE])
+m4trace:configure.ac:200: -1- XYCE_DEBUG_OPTION([radmodels], [yes], [Radiation Model Library], [Xyce_RAD_MODELS], [RAD_MODELS])
+m4trace:configure.ac:209: -1- AM_CONDITIONAL([RADMODELS], [test $RAD_MODELS = yes])
+m4trace:configure.ac:209: -1- m4_pattern_allow([^RADMODELS_TRUE$])
+m4trace:configure.ac:209: -1- m4_pattern_allow([^RADMODELS_FALSE$])
+m4trace:configure.ac:209: -1- _AM_SUBST_NOTMAKE([RADMODELS_TRUE])
+m4trace:configure.ac:209: -1- _AM_SUBST_NOTMAKE([RADMODELS_FALSE])
+m4trace:configure.ac:210: -1- m4_pattern_allow([^MAYBE_RAD$])
+m4trace:configure.ac:216: -1- XYCE_DEBUG_OPTION([nonfree], [yes], [Non-Free Models Library], [Xyce_NONFREE_MODELS], [NONFREE_MODELS])
+m4trace:configure.ac:224: -1- AM_CONDITIONAL([NONFREEMODELS], [test $NONFREE_MODELS = yes])
+m4trace:configure.ac:224: -1- m4_pattern_allow([^NONFREEMODELS_TRUE$])
+m4trace:configure.ac:224: -1- m4_pattern_allow([^NONFREEMODELS_FALSE$])
+m4trace:configure.ac:224: -1- _AM_SUBST_NOTMAKE([NONFREEMODELS_TRUE])
+m4trace:configure.ac:224: -1- _AM_SUBST_NOTMAKE([NONFREEMODELS_FALSE])
+m4trace:configure.ac:225: -1- m4_pattern_allow([^MAYBE_NONFREE$])
+m4trace:configure.ac:228: -1- XYCE_DEBUG_OPTION([dakota], [no], [Dakota direct linkage support], [Xyce_Dakota], [USE_DAKOTA])
+m4trace:configure.ac:229: -1- AM_CONDITIONAL([DAKOTA_LINK], [test $USE_DAKOTA = yes])
+m4trace:configure.ac:229: -1- m4_pattern_allow([^DAKOTA_LINK_TRUE$])
+m4trace:configure.ac:229: -1- m4_pattern_allow([^DAKOTA_LINK_FALSE$])
+m4trace:configure.ac:229: -1- _AM_SUBST_NOTMAKE([DAKOTA_LINK_TRUE])
+m4trace:configure.ac:229: -1- _AM_SUBST_NOTMAKE([DAKOTA_LINK_FALSE])
+m4trace:configure.ac:232: -1- AM_CONDITIONAL([DAKOTA_OBJ_NEEDED], [test $USE_DAKOTA = yes ])
+m4trace:configure.ac:232: -1- m4_pattern_allow([^DAKOTA_OBJ_NEEDED_TRUE$])
+m4trace:configure.ac:232: -1- m4_pattern_allow([^DAKOTA_OBJ_NEEDED_FALSE$])
+m4trace:configure.ac:232: -1- _AM_SUBST_NOTMAKE([DAKOTA_OBJ_NEEDED_TRUE])
+m4trace:configure.ac:232: -1- _AM_SUBST_NOTMAKE([DAKOTA_OBJ_NEEDED_FALSE])
+m4trace:configure.ac:235: -1- XYCE_DEBUG_OPTION([charon], [no], [Charon device support], [Xyce_CHARON], [USE_CHARON])
+m4trace:configure.ac:236: -1- AM_CONDITIONAL([BUILD_CHARON_SUPPORT], [test $USE_CHARON = yes])
+m4trace:configure.ac:236: -1- m4_pattern_allow([^BUILD_CHARON_SUPPORT_TRUE$])
+m4trace:configure.ac:236: -1- m4_pattern_allow([^BUILD_CHARON_SUPPORT_FALSE$])
+m4trace:configure.ac:236: -1- _AM_SUBST_NOTMAKE([BUILD_CHARON_SUPPORT_TRUE])
+m4trace:configure.ac:236: -1- _AM_SUBST_NOTMAKE([BUILD_CHARON_SUPPORT_FALSE])
+m4trace:configure.ac:239: -1- XYCE_DEBUG_OPTION([trilinos_dev], [no], [support for development (pre-release) versions of Trilinos], [Xyce_TRILINOS_DEV], [USE_TRILINOS_DEV])
+m4trace:configure.ac:240: -1- AM_CONDITIONAL([TRILINOS_DEV], [test $USE_TRILINOS_DEV = yes])
+m4trace:configure.ac:240: -1- m4_pattern_allow([^TRILINOS_DEV_TRUE$])
+m4trace:configure.ac:240: -1- m4_pattern_allow([^TRILINOS_DEV_FALSE$])
+m4trace:configure.ac:240: -1- _AM_SUBST_NOTMAKE([TRILINOS_DEV_TRUE])
+m4trace:configure.ac:240: -1- _AM_SUBST_NOTMAKE([TRILINOS_DEV_FALSE])
+m4trace:configure.ac:243: -1- XYCE_DEBUG_OPTION([trilinos_dev_rythmos], [no], [Trilinos development support with Rythmos], [Xyce_TRILINOS_DEV_RYTHMOS], [USE_TRILINOS_DEV_RYTHMOS])
+m4trace:configure.ac:244: -1- AM_CONDITIONAL([TRILINOS_DEV_RYTHMOS], [test $USE_TRILINOS_DEV_RYTHMOS = yes])
+m4trace:configure.ac:244: -1- m4_pattern_allow([^TRILINOS_DEV_RYTHMOS_TRUE$])
+m4trace:configure.ac:244: -1- m4_pattern_allow([^TRILINOS_DEV_RYTHMOS_FALSE$])
+m4trace:configure.ac:244: -1- _AM_SUBST_NOTMAKE([TRILINOS_DEV_RYTHMOS_TRUE])
+m4trace:configure.ac:244: -1- _AM_SUBST_NOTMAKE([TRILINOS_DEV_RYTHMOS_FALSE])
+m4trace:configure.ac:247: -1- XYCE_DEBUG_OPTION([isorropia], [yes], [isorropia partitioning option], [Xyce_USE_ISORROPIA], [USE_ISORROPIA])
+m4trace:configure.ac:248: -1- XYCE_DEBUG_OPTION([zoltan], [yes], [zoltan partitioning option], [Xyce_USE_ZOLTAN], [USE_ZOLTAN])
+m4trace:configure.ac:264: -1- XYCE_DEBUG_OPTION([superlu], [no], [SuperLU direct solver], [Xyce_SUPERLU], [SUPERLU])
+m4trace:configure.ac:265: -1- XYCE_DEBUG_OPTION([umfpack], [yes], [UmfPack direct solver], [Xyce_UMFPACK], [UMFPACK])
+m4trace:configure.ac:266: -1- XYCE_DEBUG_OPTION([pardiso_mkl], [no], [Pardiso direct solver (through MKL)], [Xyce_PARDISO_MKL], [PARDISO_MKL])
+m4trace:configure.ac:269: -1- XYCE_DEBUG_OPTION([ksparse], [no], [Kundert's Sparse direct solver], [Xyce_KSPARSE], [USE_KSPARSE])
+m4trace:configure.ac:270: -1- AM_CONDITIONAL([BUILD_KSPARSE], [test "x$USE_KSPARSE" = "xyes"])
+m4trace:configure.ac:270: -1- m4_pattern_allow([^BUILD_KSPARSE_TRUE$])
+m4trace:configure.ac:270: -1- m4_pattern_allow([^BUILD_KSPARSE_FALSE$])
+m4trace:configure.ac:270: -1- _AM_SUBST_NOTMAKE([BUILD_KSPARSE_TRUE])
+m4trace:configure.ac:270: -1- _AM_SUBST_NOTMAKE([BUILD_KSPARSE_FALSE])
+m4trace:configure.ac:273: -1- XYCE_DEBUG_OPTION([belos], [yes], [Belos iterative solver support], [Xyce_BELOS], [USE_BELOS])
+m4trace:configure.ac:274: -1- AM_CONDITIONAL([BUILD_BELOS_SUPPORT], [test "x$USE_BELOS" = "xyes"])
+m4trace:configure.ac:274: -1- m4_pattern_allow([^BUILD_BELOS_SUPPORT_TRUE$])
+m4trace:configure.ac:274: -1- m4_pattern_allow([^BUILD_BELOS_SUPPORT_FALSE$])
+m4trace:configure.ac:274: -1- _AM_SUBST_NOTMAKE([BUILD_BELOS_SUPPORT_TRUE])
+m4trace:configure.ac:274: -1- _AM_SUBST_NOTMAKE([BUILD_BELOS_SUPPORT_FALSE])
+m4trace:configure.ac:277: -1- XYCE_DEBUG_OPTION([shylu], [no], [ShyLU hybrid solver support], [Xyce_SHYLU], [USE_SHYLU])
+m4trace:configure.ac:278: -1- AM_CONDITIONAL([BUILD_SHYLU_SUPPORT], [test "x$USE_SHYLU" = "xyes"])
+m4trace:configure.ac:278: -1- m4_pattern_allow([^BUILD_SHYLU_SUPPORT_TRUE$])
+m4trace:configure.ac:278: -1- m4_pattern_allow([^BUILD_SHYLU_SUPPORT_FALSE$])
+m4trace:configure.ac:278: -1- _AM_SUBST_NOTMAKE([BUILD_SHYLU_SUPPORT_TRUE])
+m4trace:configure.ac:278: -1- _AM_SUBST_NOTMAKE([BUILD_SHYLU_SUPPORT_FALSE])
+m4trace:configure.ac:281: -1- XYCE_DEBUG_OPTION([ml], [no], [ML preconditioner support], [Xyce_ML], [USE_ML])
+m4trace:configure.ac:282: -1- AM_CONDITIONAL([BUILD_ML_SUPPORT], [test "x$USE_ML" = "xyes"])
+m4trace:configure.ac:282: -1- m4_pattern_allow([^BUILD_ML_SUPPORT_TRUE$])
+m4trace:configure.ac:282: -1- m4_pattern_allow([^BUILD_ML_SUPPORT_FALSE$])
+m4trace:configure.ac:282: -1- _AM_SUBST_NOTMAKE([BUILD_ML_SUPPORT_TRUE])
+m4trace:configure.ac:282: -1- _AM_SUBST_NOTMAKE([BUILD_ML_SUPPORT_FALSE])
+m4trace:configure.ac:285: -1- XYCE_DEBUG_OPTION([amd], [yes], [AMD reordering], [Xyce_AMD], [AMD])
+m4trace:configure.ac:288: -1- XYCE_DEBUG_OPTION([superludist], [no], [SuperLU_Dist linear solver], [Xyce_SUPERLUDIST], [SUPERLUDIST])
+m4trace:configure.ac:293: -1- XYCE_DEBUG_OPTION([nox_unstable], [no], [NOX/LOCA experimental code - usually requires latest nox and loca development library], [Xyce_NOX_UNSTABLE], [NOX_UNSTABLE])
+m4trace:configure.ac:295: -1- XYCE_DEBUG_OPTION([test_soln_var_map], [no], [mapping of internal variables to external for debugging])
+m4trace:configure.ac:296: -1- XYCE_DEBUG_OPTION([debug_device], [no], [device package debugging output])
+m4trace:configure.ac:297: -1- XYCE_DEBUG_OPTION([debug_io], [no], [I/O package debugging])
+m4trace:configure.ac:298: -1- XYCE_DEBUG_OPTION([debug_expression], [no], [Expression package debugging output])
+m4trace:configure.ac:299: -1- XYCE_DEBUG_OPTION([debug_time], [no], [time integrator package debugging output])
+m4trace:configure.ac:300: -1- XYCE_DEBUG_OPTION([debug_analysis], [no], [analysis package debugging output])
+m4trace:configure.ac:301: -1- XYCE_DEBUG_OPTION([debug_parallel], [no], [parallel distribution package debugging output])
+m4trace:configure.ac:302: -1- XYCE_DEBUG_OPTION([debug_distribution], [no], [distribution package debugging output])
+m4trace:configure.ac:303: -1- XYCE_DEBUG_OPTION([debug_topology], [no], [topology package debugging output])
+m4trace:configure.ac:304: -1- XYCE_DEBUG_OPTION([debug_linear], [no], [linear solver package debugging output])
+m4trace:configure.ac:305: -1- XYCE_DEBUG_OPTION([debug_nonlinear], [no], [nonlinear solver package debugging output])
+m4trace:configure.ac:306: -1- XYCE_DEBUG_OPTION([debug_circuit], [no], [circuit package debugging output])
+m4trace:configure.ac:307: -1- XYCE_DEBUG_OPTION([debug_directsolve], [no], [direct solver package debugging output])
+m4trace:configure.ac:308: -1- XYCE_DEBUG_OPTION([debug_restart], [no], [restart debugging output])
+m4trace:configure.ac:310: -1- XYCE_DEBUG_OPTION([op_start], [yes], [allow startup from previous operating point])
+m4trace:configure.ac:313: -1- XYCE_DEBUG_OPTION([fortran_test], [yes], [test for fortran compiler], [Xyce_FORTRAN_TEST], [FORTRAN_TEST])
+m4trace:configure.ac:316: -1- XYCE_DEBUG_OPTION([reaction_parser], [yes], [reaction parser], [Xyce_REACTION_PARSER], [REACTION_PARSER])
+m4trace:configure.ac:319: -1- XYCE_DEBUG_OPTION([fft], [yes], [support for FFT libraries], [Xyce_FFT], [USE_FFT])
+m4trace:configure.ac:321: -1- XYCE_DEBUG_OPTION([intel_fft], [yes], [support for Intel MKL FFT library], [Xyce_IntelFFT], [USE_IntelFFT])
+m4trace:configure.ac:322: -1- XYCE_DEBUG_OPTION([fftw], [yes], [support for FFTW library], [Xyce_FFTW], [USE_FFTW])
+m4trace:configure.ac:328: -1- XYCE_DEBUG_OPTION([athena], [no], [building the ATHENA device])
+m4trace:configure.ac:337: -1- XYCE_DEBUG_OPTION([hdf5], [no], [support for HDF5 output library], [Xyce_HDF5], [USE_HDF5])
+m4trace:configure.ac:340: -1- AC_DISABLE_SHARED
+m4trace:configure.ac:344: -1- m4_pattern_allow([^CXX$])
+m4trace:configure.ac:344: -1- m4_pattern_allow([^CXXFLAGS$])
+m4trace:configure.ac:344: -1- m4_pattern_allow([^LDFLAGS$])
+m4trace:configure.ac:344: -1- m4_pattern_allow([^LIBS$])
+m4trace:configure.ac:344: -1- m4_pattern_allow([^CPPFLAGS$])
+m4trace:configure.ac:344: -1- m4_pattern_allow([^CXX$])
+m4trace:configure.ac:344: -1- m4_pattern_allow([^ac_ct_CXX$])
+m4trace:configure.ac:344: -1- m4_pattern_allow([^EXEEXT$])
+m4trace:configure.ac:344: -1- m4_pattern_allow([^OBJEXT$])
+m4trace:configure.ac:344: -1- _AM_DEPENDENCIES([CXX])
+m4trace:configure.ac:344: -1- AM_SET_DEPDIR
+m4trace:configure.ac:344: -1- m4_pattern_allow([^DEPDIR$])
+m4trace:configure.ac:344: -1- AM_OUTPUT_DEPENDENCY_COMMANDS
+m4trace:configure.ac:344: -1- AM_MAKE_INCLUDE
+m4trace:configure.ac:344: -1- m4_pattern_allow([^am__include$])
+m4trace:configure.ac:344: -1- m4_pattern_allow([^am__quote$])
+m4trace:configure.ac:344: -1- AM_DEP_TRACK
+m4trace:configure.ac:344: -1- AM_CONDITIONAL([AMDEP], [test "x$enable_dependency_tracking" != xno])
+m4trace:configure.ac:344: -1- m4_pattern_allow([^AMDEP_TRUE$])
+m4trace:configure.ac:344: -1- m4_pattern_allow([^AMDEP_FALSE$])
+m4trace:configure.ac:344: -1- _AM_SUBST_NOTMAKE([AMDEP_TRUE])
+m4trace:configure.ac:344: -1- _AM_SUBST_NOTMAKE([AMDEP_FALSE])
+m4trace:configure.ac:344: -1- m4_pattern_allow([^AMDEPBACKSLASH$])
+m4trace:configure.ac:344: -1- _AM_SUBST_NOTMAKE([AMDEPBACKSLASH])
+m4trace:configure.ac:344: -1- m4_pattern_allow([^am__nodep$])
+m4trace:configure.ac:344: -1- _AM_SUBST_NOTMAKE([am__nodep])
+m4trace:configure.ac:344: -1- m4_pattern_allow([^CXXDEPMODE$])
+m4trace:configure.ac:344: -1- AM_CONDITIONAL([am__fastdepCXX], [
   test "x$enable_dependency_tracking" != xno \
   && test "$am_cv_CXX_dependencies_compiler_type" = gcc3])
-m4trace:configure.ac:386: -1- m4_pattern_allow([^am__fastdepCXX_TRUE$])
-m4trace:configure.ac:386: -1- m4_pattern_allow([^am__fastdepCXX_FALSE$])
-m4trace:configure.ac:386: -1- _AM_SUBST_NOTMAKE([am__fastdepCXX_TRUE])
-m4trace:configure.ac:386: -1- _AM_SUBST_NOTMAKE([am__fastdepCXX_FALSE])
-m4trace:configure.ac:387: -1- m4_pattern_allow([^CC$])
-m4trace:configure.ac:387: -1- m4_pattern_allow([^CFLAGS$])
-m4trace:configure.ac:387: -1- m4_pattern_allow([^LDFLAGS$])
-m4trace:configure.ac:387: -1- m4_pattern_allow([^LIBS$])
-m4trace:configure.ac:387: -1- m4_pattern_allow([^CPPFLAGS$])
-m4trace:configure.ac:387: -1- m4_pattern_allow([^CC$])
-m4trace:configure.ac:387: -1- m4_pattern_allow([^ac_ct_CC$])
-m4trace:configure.ac:387: -1- _AM_PROG_CC_C_O
-m4trace:configure.ac:387: -1- AM_RUN_LOG([$CC -c conftest.$ac_ext -o conftest2.$ac_objext])
-m4trace:configure.ac:387: -1- _AM_DEPENDENCIES([CC])
-m4trace:configure.ac:387: -1- m4_pattern_allow([^CCDEPMODE$])
-m4trace:configure.ac:387: -1- AM_CONDITIONAL([am__fastdepCC], [
+m4trace:configure.ac:344: -1- m4_pattern_allow([^am__fastdepCXX_TRUE$])
+m4trace:configure.ac:344: -1- m4_pattern_allow([^am__fastdepCXX_FALSE$])
+m4trace:configure.ac:344: -1- _AM_SUBST_NOTMAKE([am__fastdepCXX_TRUE])
+m4trace:configure.ac:344: -1- _AM_SUBST_NOTMAKE([am__fastdepCXX_FALSE])
+m4trace:configure.ac:345: -1- m4_pattern_allow([^CC$])
+m4trace:configure.ac:345: -1- m4_pattern_allow([^CFLAGS$])
+m4trace:configure.ac:345: -1- m4_pattern_allow([^LDFLAGS$])
+m4trace:configure.ac:345: -1- m4_pattern_allow([^LIBS$])
+m4trace:configure.ac:345: -1- m4_pattern_allow([^CPPFLAGS$])
+m4trace:configure.ac:345: -1- m4_pattern_allow([^CC$])
+m4trace:configure.ac:345: -1- m4_pattern_allow([^ac_ct_CC$])
+m4trace:configure.ac:345: -1- _AM_PROG_CC_C_O
+m4trace:configure.ac:345: -1- AM_RUN_LOG([$CC -c conftest.$ac_ext -o conftest2.$ac_objext])
+m4trace:configure.ac:345: -1- _AM_DEPENDENCIES([CC])
+m4trace:configure.ac:345: -1- m4_pattern_allow([^CCDEPMODE$])
+m4trace:configure.ac:345: -1- AM_CONDITIONAL([am__fastdepCC], [
   test "x$enable_dependency_tracking" != xno \
   && test "$am_cv_CC_dependencies_compiler_type" = gcc3])
-m4trace:configure.ac:387: -1- m4_pattern_allow([^am__fastdepCC_TRUE$])
-m4trace:configure.ac:387: -1- m4_pattern_allow([^am__fastdepCC_FALSE$])
-m4trace:configure.ac:387: -1- _AM_SUBST_NOTMAKE([am__fastdepCC_TRUE])
-m4trace:configure.ac:387: -1- _AM_SUBST_NOTMAKE([am__fastdepCC_FALSE])
-m4trace:configure.ac:389: -1- m4_pattern_allow([^F77$])
-m4trace:configure.ac:389: -1- m4_pattern_allow([^FFLAGS$])
-m4trace:configure.ac:389: -1- m4_pattern_allow([^LDFLAGS$])
-m4trace:configure.ac:389: -1- m4_pattern_allow([^LIBS$])
-m4trace:configure.ac:389: -1- m4_pattern_allow([^F77$])
-m4trace:configure.ac:389: -1- m4_pattern_allow([^ac_ct_F77$])
-m4trace:configure.ac:402: -1- m4_pattern_allow([^LEX$])
-m4trace:configure.ac:402: -1- m4_pattern_allow([^LEX_OUTPUT_ROOT$])
-m4trace:configure.ac:402: -1- m4_pattern_allow([^LEXLIB$])
-m4trace:configure.ac:402: -1- m4_pattern_allow([^YYTEXT_POINTER$])
-m4trace:configure.ac:403: -1- XYCE_CHECK_BISON([ 2.7, 2.6, 2.5, 2.4, 2.3], [], [BISON=no])
-m4trace:configure.ac:403: -1- m4_pattern_allow([^BISON$])
-m4trace:configure.ac:406: -1- m4_pattern_allow([^HAVE_FLEX$])
-m4trace:configure.ac:412: -1- m4_pattern_allow([^HAVE_BISON$])
-m4trace:configure.ac:421: -1- AM_CONDITIONAL([BUILD_REACTION_PARSER], [test `basename $LEX` = "flex" -a "$BISON" != "no"])
-m4trace:configure.ac:421: -1- m4_pattern_allow([^BUILD_REACTION_PARSER_TRUE$])
-m4trace:configure.ac:421: -1- m4_pattern_allow([^BUILD_REACTION_PARSER_FALSE$])
-m4trace:configure.ac:421: -1- _AM_SUBST_NOTMAKE([BUILD_REACTION_PARSER_TRUE])
-m4trace:configure.ac:421: -1- _AM_SUBST_NOTMAKE([BUILD_REACTION_PARSER_FALSE])
-m4trace:configure.ac:428: -1- m4_pattern_allow([^SET_MAKE$])
-m4trace:configure.ac:429: -1- AC_PROG_LIBTOOL
-m4trace:configure.ac:429: -1- _m4_warn([obsolete], [The macro `AC_PROG_LIBTOOL' is obsolete.
+m4trace:configure.ac:345: -1- m4_pattern_allow([^am__fastdepCC_TRUE$])
+m4trace:configure.ac:345: -1- m4_pattern_allow([^am__fastdepCC_FALSE$])
+m4trace:configure.ac:345: -1- _AM_SUBST_NOTMAKE([am__fastdepCC_TRUE])
+m4trace:configure.ac:345: -1- _AM_SUBST_NOTMAKE([am__fastdepCC_FALSE])
+m4trace:configure.ac:347: -1- m4_pattern_allow([^F77$])
+m4trace:configure.ac:347: -1- m4_pattern_allow([^FFLAGS$])
+m4trace:configure.ac:347: -1- m4_pattern_allow([^LDFLAGS$])
+m4trace:configure.ac:347: -1- m4_pattern_allow([^LIBS$])
+m4trace:configure.ac:347: -1- m4_pattern_allow([^F77$])
+m4trace:configure.ac:347: -1- m4_pattern_allow([^ac_ct_F77$])
+m4trace:configure.ac:360: -1- m4_pattern_allow([^LEX$])
+m4trace:configure.ac:360: -1- m4_pattern_allow([^LEX_OUTPUT_ROOT$])
+m4trace:configure.ac:360: -1- m4_pattern_allow([^LEXLIB$])
+m4trace:configure.ac:360: -1- m4_pattern_allow([^YYTEXT_POINTER$])
+m4trace:configure.ac:361: -1- XYCE_CHECK_BISON([ 2.7, 2.6, 2.5, 2.4, 2.3], [], [BISON=no])
+m4trace:configure.ac:361: -1- m4_pattern_allow([^BISON$])
+m4trace:configure.ac:364: -1- m4_pattern_allow([^HAVE_FLEX$])
+m4trace:configure.ac:370: -1- m4_pattern_allow([^HAVE_BISON$])
+m4trace:configure.ac:379: -1- AM_CONDITIONAL([BUILD_REACTION_PARSER], [test `basename $LEX` = "flex" -a "$BISON" != "no"])
+m4trace:configure.ac:379: -1- m4_pattern_allow([^BUILD_REACTION_PARSER_TRUE$])
+m4trace:configure.ac:379: -1- m4_pattern_allow([^BUILD_REACTION_PARSER_FALSE$])
+m4trace:configure.ac:379: -1- _AM_SUBST_NOTMAKE([BUILD_REACTION_PARSER_TRUE])
+m4trace:configure.ac:379: -1- _AM_SUBST_NOTMAKE([BUILD_REACTION_PARSER_FALSE])
+m4trace:configure.ac:386: -1- m4_pattern_allow([^SET_MAKE$])
+m4trace:configure.ac:387: -1- AC_PROG_LIBTOOL
+m4trace:configure.ac:387: -1- _m4_warn([obsolete], [The macro `AC_PROG_LIBTOOL' is obsolete.
 You should run autoupdate.], [config/libtool.m4:107: AC_PROG_LIBTOOL is expanded from...
-configure.ac:429: the top level])
-m4trace:configure.ac:429: -1- LT_INIT
-m4trace:configure.ac:429: -1- m4_pattern_forbid([^_?LT_[A-Z_]+$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^(_LT_EOF|LT_DLGLOBAL|LT_DLLAZY_OR_NOW|LT_MULTI_MODULE)$])
-m4trace:configure.ac:429: -1- LTOPTIONS_VERSION
-m4trace:configure.ac:429: -1- LTSUGAR_VERSION
-m4trace:configure.ac:429: -1- LTVERSION_VERSION
-m4trace:configure.ac:429: -1- LTOBSOLETE_VERSION
-m4trace:configure.ac:429: -1- _LT_PROG_LTMAIN
-m4trace:configure.ac:429: -1- m4_pattern_allow([^LIBTOOL$])
-m4trace:configure.ac:429: -1- _LT_PREPARE_SED_QUOTE_VARS
-m4trace:configure.ac:429: -1- _LT_PROG_ECHO_BACKSLASH
-m4trace:configure.ac:429: -1- LT_PATH_LD
-m4trace:configure.ac:429: -1- m4_pattern_allow([^SED$])
-m4trace:configure.ac:429: -1- AC_PROG_EGREP
-m4trace:configure.ac:429: -1- m4_pattern_allow([^GREP$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^EGREP$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^FGREP$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^GREP$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^LD$])
-m4trace:configure.ac:429: -1- LT_PATH_NM
-m4trace:configure.ac:429: -1- m4_pattern_allow([^DUMPBIN$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^ac_ct_DUMPBIN$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^DUMPBIN$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^NM$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^LN_S$])
-m4trace:configure.ac:429: -1- LT_CMD_MAX_LEN
-m4trace:configure.ac:429: -1- m4_pattern_allow([^OBJDUMP$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^OBJDUMP$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^DLLTOOL$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^DLLTOOL$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^AR$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^ac_ct_AR$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^STRIP$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^RANLIB$])
-m4trace:configure.ac:429: -1- _LT_WITH_SYSROOT
-m4trace:configure.ac:429: -1- m4_pattern_allow([LT_OBJDIR])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^LT_OBJDIR$])
-m4trace:configure.ac:429: -1- _LT_CC_BASENAME([$compiler])
-m4trace:configure.ac:429: -1- _LT_PATH_TOOL_PREFIX([${ac_tool_prefix}file], [/usr/bin$PATH_SEPARATOR$PATH])
-m4trace:configure.ac:429: -1- _LT_PATH_TOOL_PREFIX([file], [/usr/bin$PATH_SEPARATOR$PATH])
-m4trace:configure.ac:429: -1- LT_SUPPORTED_TAG([CC])
-m4trace:configure.ac:429: -1- _LT_COMPILER_BOILERPLATE
-m4trace:configure.ac:429: -1- _LT_LINKER_BOILERPLATE
-m4trace:configure.ac:429: -1- _LT_COMPILER_OPTION([if $compiler supports -fno-rtti -fno-exceptions], [lt_cv_prog_compiler_rtti_exceptions], [-fno-rtti -fno-exceptions], [], [_LT_TAGVAR(lt_prog_compiler_no_builtin_flag, )="$_LT_TAGVAR(lt_prog_compiler_no_builtin_flag, ) -fno-rtti -fno-exceptions"])
-m4trace:configure.ac:429: -1- _LT_COMPILER_OPTION([if $compiler PIC flag $_LT_TAGVAR(lt_prog_compiler_pic, ) works], [_LT_TAGVAR(lt_cv_prog_compiler_pic_works, )], [$_LT_TAGVAR(lt_prog_compiler_pic, )@&t@m4_if([],[],[ -DPIC],[m4_if([],[CXX],[ -DPIC],[])])], [], [case $_LT_TAGVAR(lt_prog_compiler_pic, ) in
+configure.ac:387: the top level])
+m4trace:configure.ac:387: -1- LT_INIT
+m4trace:configure.ac:387: -1- m4_pattern_forbid([^_?LT_[A-Z_]+$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^(_LT_EOF|LT_DLGLOBAL|LT_DLLAZY_OR_NOW|LT_MULTI_MODULE)$])
+m4trace:configure.ac:387: -1- LTOPTIONS_VERSION
+m4trace:configure.ac:387: -1- LTSUGAR_VERSION
+m4trace:configure.ac:387: -1- LTVERSION_VERSION
+m4trace:configure.ac:387: -1- LTOBSOLETE_VERSION
+m4trace:configure.ac:387: -1- _LT_PROG_LTMAIN
+m4trace:configure.ac:387: -1- m4_pattern_allow([^LIBTOOL$])
+m4trace:configure.ac:387: -1- _LT_PREPARE_SED_QUOTE_VARS
+m4trace:configure.ac:387: -1- _LT_PROG_ECHO_BACKSLASH
+m4trace:configure.ac:387: -1- LT_PATH_LD
+m4trace:configure.ac:387: -1- m4_pattern_allow([^SED$])
+m4trace:configure.ac:387: -1- AC_PROG_EGREP
+m4trace:configure.ac:387: -1- m4_pattern_allow([^GREP$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^EGREP$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^FGREP$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^GREP$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^LD$])
+m4trace:configure.ac:387: -1- LT_PATH_NM
+m4trace:configure.ac:387: -1- m4_pattern_allow([^DUMPBIN$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^ac_ct_DUMPBIN$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^DUMPBIN$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^NM$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^LN_S$])
+m4trace:configure.ac:387: -1- LT_CMD_MAX_LEN
+m4trace:configure.ac:387: -1- m4_pattern_allow([^OBJDUMP$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^OBJDUMP$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^DLLTOOL$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^DLLTOOL$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^AR$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^ac_ct_AR$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^STRIP$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^RANLIB$])
+m4trace:configure.ac:387: -1- _LT_WITH_SYSROOT
+m4trace:configure.ac:387: -1- m4_pattern_allow([LT_OBJDIR])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^LT_OBJDIR$])
+m4trace:configure.ac:387: -1- _LT_CC_BASENAME([$compiler])
+m4trace:configure.ac:387: -1- _LT_PATH_TOOL_PREFIX([${ac_tool_prefix}file], [/usr/bin$PATH_SEPARATOR$PATH])
+m4trace:configure.ac:387: -1- _LT_PATH_TOOL_PREFIX([file], [/usr/bin$PATH_SEPARATOR$PATH])
+m4trace:configure.ac:387: -1- LT_SUPPORTED_TAG([CC])
+m4trace:configure.ac:387: -1- _LT_COMPILER_BOILERPLATE
+m4trace:configure.ac:387: -1- _LT_LINKER_BOILERPLATE
+m4trace:configure.ac:387: -1- _LT_COMPILER_OPTION([if $compiler supports -fno-rtti -fno-exceptions], [lt_cv_prog_compiler_rtti_exceptions], [-fno-rtti -fno-exceptions], [], [_LT_TAGVAR(lt_prog_compiler_no_builtin_flag, )="$_LT_TAGVAR(lt_prog_compiler_no_builtin_flag, ) -fno-rtti -fno-exceptions"])
+m4trace:configure.ac:387: -1- _LT_COMPILER_OPTION([if $compiler PIC flag $_LT_TAGVAR(lt_prog_compiler_pic, ) works], [_LT_TAGVAR(lt_cv_prog_compiler_pic_works, )], [$_LT_TAGVAR(lt_prog_compiler_pic, )@&t@m4_if([],[],[ -DPIC],[m4_if([],[CXX],[ -DPIC],[])])], [], [case $_LT_TAGVAR(lt_prog_compiler_pic, ) in
      "" | " "*) ;;
      *) _LT_TAGVAR(lt_prog_compiler_pic, )=" $_LT_TAGVAR(lt_prog_compiler_pic, )" ;;
      esac], [_LT_TAGVAR(lt_prog_compiler_pic, )=
      _LT_TAGVAR(lt_prog_compiler_can_build_shared, )=no])
-m4trace:configure.ac:429: -1- _LT_LINKER_OPTION([if $compiler static flag $lt_tmp_static_flag works], [lt_cv_prog_compiler_static_works], [$lt_tmp_static_flag], [], [_LT_TAGVAR(lt_prog_compiler_static, )=])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^MANIFEST_TOOL$])
-m4trace:configure.ac:429: -1- _LT_REQUIRED_DARWIN_CHECKS
-m4trace:configure.ac:429: -1- m4_pattern_allow([^DSYMUTIL$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^NMEDIT$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^LIPO$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^OTOOL$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^OTOOL64$])
-m4trace:configure.ac:429: -1- _LT_LINKER_OPTION([if $CC understands -b], [lt_cv_prog_compiler__b], [-b], [_LT_TAGVAR(archive_cmds, )='$CC -b ${wl}+h ${wl}$soname ${wl}+b ${wl}$install_libdir -o $lib $libobjs $deplibs $compiler_flags'], [_LT_TAGVAR(archive_cmds, )='$LD -b +h $soname +b $install_libdir -o $lib $libobjs $deplibs $linker_flags'])
-m4trace:configure.ac:429: -1- LT_SYS_DLOPEN_SELF
-m4trace:configure.ac:429: -1- m4_pattern_allow([^CPP$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^CPPFLAGS$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^CPP$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^STDC_HEADERS$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^HAVE_DLFCN_H$])
-m4trace:configure.ac:429: -1- LT_LANG([CXX])
-m4trace:configure.ac:429: -1- LT_SUPPORTED_TAG([CXX])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^CXXCPP$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^CPPFLAGS$])
-m4trace:configure.ac:429: -1- m4_pattern_allow([^CXXCPP$])
-m4trace:configure.ac:429: -1- _LT_COMPILER_BOILERPLATE
-m4trace:configure.ac:429: -1- _LT_LINKER_BOILERPLATE
-m4trace:configure.ac:429: -1- _LT_CC_BASENAME([$compiler])
-m4trace:configure.ac:429: -1- LT_PATH_LD
-m4trace:configure.ac:429: -1- m4_pattern_allow([^LD$])
-m4trace:configure.ac:429: -1- _LT_COMPILER_OPTION([if $compiler PIC flag $_LT_TAGVAR(lt_prog_compiler_pic, CXX) works], [_LT_TAGVAR(lt_cv_prog_compiler_pic_works, CXX)], [$_LT_TAGVAR(lt_prog_compiler_pic, CXX)@&t@m4_if([CXX],[],[ -DPIC],[m4_if([CXX],[CXX],[ -DPIC],[])])], [], [case $_LT_TAGVAR(lt_prog_compiler_pic, CXX) in
+m4trace:configure.ac:387: -1- _LT_LINKER_OPTION([if $compiler static flag $lt_tmp_static_flag works], [lt_cv_prog_compiler_static_works], [$lt_tmp_static_flag], [], [_LT_TAGVAR(lt_prog_compiler_static, )=])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^MANIFEST_TOOL$])
+m4trace:configure.ac:387: -1- _LT_REQUIRED_DARWIN_CHECKS
+m4trace:configure.ac:387: -1- m4_pattern_allow([^DSYMUTIL$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^NMEDIT$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^LIPO$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^OTOOL$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^OTOOL64$])
+m4trace:configure.ac:387: -1- _LT_LINKER_OPTION([if $CC understands -b], [lt_cv_prog_compiler__b], [-b], [_LT_TAGVAR(archive_cmds, )='$CC -b ${wl}+h ${wl}$soname ${wl}+b ${wl}$install_libdir -o $lib $libobjs $deplibs $compiler_flags'], [_LT_TAGVAR(archive_cmds, )='$LD -b +h $soname +b $install_libdir -o $lib $libobjs $deplibs $linker_flags'])
+m4trace:configure.ac:387: -1- LT_SYS_DLOPEN_SELF
+m4trace:configure.ac:387: -1- m4_pattern_allow([^CPP$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^CPPFLAGS$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^CPP$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^STDC_HEADERS$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^HAVE_DLFCN_H$])
+m4trace:configure.ac:387: -1- LT_LANG([CXX])
+m4trace:configure.ac:387: -1- LT_SUPPORTED_TAG([CXX])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^CXXCPP$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^CPPFLAGS$])
+m4trace:configure.ac:387: -1- m4_pattern_allow([^CXXCPP$])
+m4trace:configure.ac:387: -1- _LT_COMPILER_BOILERPLATE
+m4trace:configure.ac:387: -1- _LT_LINKER_BOILERPLATE
+m4trace:configure.ac:387: -1- _LT_CC_BASENAME([$compiler])
+m4trace:configure.ac:387: -1- LT_PATH_LD
+m4trace:configure.ac:387: -1- m4_pattern_allow([^LD$])
+m4trace:configure.ac:387: -1- _LT_COMPILER_OPTION([if $compiler PIC flag $_LT_TAGVAR(lt_prog_compiler_pic, CXX) works], [_LT_TAGVAR(lt_cv_prog_compiler_pic_works, CXX)], [$_LT_TAGVAR(lt_prog_compiler_pic, CXX)@&t@m4_if([CXX],[],[ -DPIC],[m4_if([CXX],[CXX],[ -DPIC],[])])], [], [case $_LT_TAGVAR(lt_prog_compiler_pic, CXX) in
      "" | " "*) ;;
      *) _LT_TAGVAR(lt_prog_compiler_pic, CXX)=" $_LT_TAGVAR(lt_prog_compiler_pic, CXX)" ;;
      esac], [_LT_TAGVAR(lt_prog_compiler_pic, CXX)=
      _LT_TAGVAR(lt_prog_compiler_can_build_shared, CXX)=no])
-m4trace:configure.ac:429: -1- _LT_LINKER_OPTION([if $compiler static flag $lt_tmp_static_flag works], [lt_cv_prog_compiler_static_works_CXX], [$lt_tmp_static_flag], [], [_LT_TAGVAR(lt_prog_compiler_static, CXX)=])
-m4trace:configure.ac:429: -1- LT_LANG([F77])
-m4trace:configure.ac:429: -1- LT_SUPPORTED_TAG([F77])
-m4trace:configure.ac:429: -1- _LT_COMPILER_BOILERPLATE
-m4trace:configure.ac:429: -1- _LT_LINKER_BOILERPLATE
-m4trace:configure.ac:429: -1- _LT_CC_BASENAME([$compiler])
-m4trace:configure.ac:429: -1- _LT_COMPILER_OPTION([if $compiler PIC flag $_LT_TAGVAR(lt_prog_compiler_pic, F77) works], [_LT_TAGVAR(lt_cv_prog_compiler_pic_works, F77)], [$_LT_TAGVAR(lt_prog_compiler_pic, F77)@&t@m4_if([F77],[],[ -DPIC],[m4_if([F77],[CXX],[ -DPIC],[])])], [], [case $_LT_TAGVAR(lt_prog_compiler_pic, F77) in
+m4trace:configure.ac:387: -1- _LT_LINKER_OPTION([if $compiler static flag $lt_tmp_static_flag works], [lt_cv_prog_compiler_static_works_CXX], [$lt_tmp_static_flag], [], [_LT_TAGVAR(lt_prog_compiler_static, CXX)=])
+m4trace:configure.ac:387: -1- LT_LANG([F77])
+m4trace:configure.ac:387: -1- LT_SUPPORTED_TAG([F77])
+m4trace:configure.ac:387: -1- _LT_COMPILER_BOILERPLATE
+m4trace:configure.ac:387: -1- _LT_LINKER_BOILERPLATE
+m4trace:configure.ac:387: -1- _LT_CC_BASENAME([$compiler])
+m4trace:configure.ac:387: -1- _LT_COMPILER_OPTION([if $compiler PIC flag $_LT_TAGVAR(lt_prog_compiler_pic, F77) works], [_LT_TAGVAR(lt_cv_prog_compiler_pic_works, F77)], [$_LT_TAGVAR(lt_prog_compiler_pic, F77)@&t@m4_if([F77],[],[ -DPIC],[m4_if([F77],[CXX],[ -DPIC],[])])], [], [case $_LT_TAGVAR(lt_prog_compiler_pic, F77) in
      "" | " "*) ;;
      *) _LT_TAGVAR(lt_prog_compiler_pic, F77)=" $_LT_TAGVAR(lt_prog_compiler_pic, F77)" ;;
      esac], [_LT_TAGVAR(lt_prog_compiler_pic, F77)=
      _LT_TAGVAR(lt_prog_compiler_can_build_shared, F77)=no])
-m4trace:configure.ac:429: -1- _LT_LINKER_OPTION([if $compiler static flag $lt_tmp_static_flag works], [lt_cv_prog_compiler_static_works_F77], [$lt_tmp_static_flag], [], [_LT_TAGVAR(lt_prog_compiler_static, F77)=])
-m4trace:configure.ac:445: -1- XYCE_TEST_USING_DEC_CXX
-m4trace:configure.ac:454: -1- XYCE_TEST_USING_ICCLT11_CXX
-m4trace:configure.ac:463: -1- AM_CONDITIONAL([DEC], [test $USING_DEC_CXX = yes])
-m4trace:configure.ac:463: -1- m4_pattern_allow([^DEC_TRUE$])
-m4trace:configure.ac:463: -1- m4_pattern_allow([^DEC_FALSE$])
-m4trace:configure.ac:463: -1- _AM_SUBST_NOTMAKE([DEC_TRUE])
-m4trace:configure.ac:463: -1- _AM_SUBST_NOTMAKE([DEC_FALSE])
-m4trace:configure.ac:520: -1- m4_pattern_allow([^FLIBS$])
-m4trace:configure.ac:549: -1- XYCE_LIBRARY_INCLUDE([zoltan])
-m4trace:configure.ac:550: -1- m4_pattern_allow([^HAVE_LIBMETIS$])
-m4trace:configure.ac:551: -1- m4_pattern_allow([^HAVE_LIBPARMETIS$])
-m4trace:configure.ac:551: -1- m4_pattern_allow([^HAVE_LIBPARMETIS$])
-m4trace:configure.ac:554: -1- m4_pattern_allow([^HAVE_LIBZOLTAN$])
-m4trace:configure.ac:560: -1- m4_pattern_allow([^HAVE_LIBAMD$])
-m4trace:configure.ac:569: -1- XYCE_LIBRARY_OPTION([teuchos], [], [], [], [XYCE_TEUCHOS_NOT_FOUND=1])
-m4trace:configure.ac:569: -1- m4_pattern_allow([^HAVE_LIBTEUCHOS$])
-m4trace:configure.ac:574: -1- XYCE_LIBRARY_OPTION([teuchoscore])
-m4trace:configure.ac:574: -1- m4_pattern_allow([^HAVE_LIBTEUCHOSCORE$])
-m4trace:configure.ac:575: -1- XYCE_LIBRARY_OPTION([teuchosremainder])
-m4trace:configure.ac:575: -1- m4_pattern_allow([^HAVE_LIBTEUCHOSREMAINDER$])
-m4trace:configure.ac:576: -1- XYCE_LIBRARY_OPTION([teuchosnumerics])
-m4trace:configure.ac:576: -1- m4_pattern_allow([^HAVE_LIBTEUCHOSNUMERICS$])
-m4trace:configure.ac:577: -1- XYCE_LIBRARY_OPTION([teuchoscomm])
-m4trace:configure.ac:577: -1- m4_pattern_allow([^HAVE_LIBTEUCHOSCOMM$])
-m4trace:configure.ac:578: -1- XYCE_LIBRARY_OPTION([teuchosparameterlist])
-m4trace:configure.ac:578: -1- m4_pattern_allow([^HAVE_LIBTEUCHOSPARAMETERLIST$])
-m4trace:configure.ac:581: -1- XYCE_LIBRARY_OPTION([triutils])
-m4trace:configure.ac:581: -1- m4_pattern_allow([^HAVE_LIBTRIUTILS$])
-m4trace:configure.ac:582: -1- XYCE_LIBRARY_OPTION([epetra])
-m4trace:configure.ac:582: -1- m4_pattern_allow([^HAVE_LIBEPETRA$])
-m4trace:configure.ac:583: -1- XYCE_LIBRARY_OPTION([epetraext])
-m4trace:configure.ac:583: -1- m4_pattern_allow([^HAVE_LIBEPETRAEXT$])
-m4trace:configure.ac:587: -1- XYCE_LIBRARY_OPTION([isorropia])
-m4trace:configure.ac:587: -1- m4_pattern_allow([^HAVE_LIBISORROPIA$])
-m4trace:configure.ac:592: -1- XYCE_LIBRARY_OPTION([superludist])
-m4trace:configure.ac:592: -1- m4_pattern_allow([^HAVE_LIBSUPERLUDIST$])
-m4trace:configure.ac:598: -1- m4_pattern_allow([^HAVE_LIBCOLAMD$])
-m4trace:configure.ac:600: -1- m4_pattern_allow([^HAVE_LIBSUITESPARSECONFIG$])
-m4trace:configure.ac:602: -1- m4_pattern_allow([^HAVE_LIBCHOLMOD$])
-m4trace:configure.ac:603: -1- m4_pattern_allow([^HAVE_LIBUMFPACK$])
-m4trace:configure.ac:608: -1- m4_pattern_allow([^HAVE_LIBSUPERLU$])
-m4trace:configure.ac:611: -1- XYCE_LIBRARY_OPTION([amesos])
-m4trace:configure.ac:611: -1- m4_pattern_allow([^HAVE_LIBAMESOS$])
-m4trace:configure.ac:612: -1- XYCE_LIBRARY_OPTION([trilinoscouplings])
-m4trace:configure.ac:612: -1- m4_pattern_allow([^HAVE_LIBTRILINOSCOUPLINGS$])
-m4trace:configure.ac:616: -1- XYCE_LIBRARY_OPTION([ml])
-m4trace:configure.ac:616: -1- m4_pattern_allow([^HAVE_LIBML$])
-m4trace:configure.ac:618: -1- XYCE_LIBRARY_OPTION([ifpack])
-m4trace:configure.ac:618: -1- m4_pattern_allow([^HAVE_LIBIFPACK$])
-m4trace:configure.ac:619: -1- XYCE_LIBRARY_OPTION([aztecoo])
-m4trace:configure.ac:619: -1- m4_pattern_allow([^HAVE_LIBAZTECOO$])
-m4trace:configure.ac:623: -1- XYCE_LIBRARY_OPTION([belos])
-m4trace:configure.ac:623: -1- m4_pattern_allow([^HAVE_LIBBELOS$])
-m4trace:configure.ac:624: -1- XYCE_LIBRARY_OPTION([belosepetra])
-m4trace:configure.ac:624: -1- m4_pattern_allow([^HAVE_LIBBELOSEPETRA$])
-m4trace:configure.ac:629: -1- XYCE_LIBRARY_OPTION([shylu])
-m4trace:configure.ac:629: -1- m4_pattern_allow([^HAVE_LIBSHYLU$])
-m4trace:configure.ac:632: -1- XYCE_LIBRARY_OPTION([nox])
-m4trace:configure.ac:632: -1- m4_pattern_allow([^HAVE_LIBNOX$])
-m4trace:configure.ac:633: -1- XYCE_LIBRARY_OPTION([loca])
-m4trace:configure.ac:633: -1- m4_pattern_allow([^HAVE_LIBLOCA$])
-m4trace:configure.ac:638: -1- XYCE_LIBRARY_OPTION([amplsolver])
-m4trace:configure.ac:638: -1- m4_pattern_allow([^HAVE_LIBAMPLSOLVER$])
-m4trace:configure.ac:639: -1- XYCE_LIBRARY_OPTION([cdd])
-m4trace:configure.ac:639: -1- m4_pattern_allow([^HAVE_LIBCDD$])
-m4trace:configure.ac:640: -1- XYCE_LIBRARY_OPTION([shared])
-m4trace:configure.ac:640: -1- m4_pattern_allow([^HAVE_LIBSHARED$])
-m4trace:configure.ac:641: -1- XYCE_LIBRARY_OPTION([conveyor])
-m4trace:configure.ac:641: -1- m4_pattern_allow([^HAVE_LIBCONVEYOR$])
-m4trace:configure.ac:642: -1- XYCE_LIBRARY_OPTION([appspack])
-m4trace:configure.ac:642: -1- m4_pattern_allow([^HAVE_LIBAPPSPACK$])
-m4trace:configure.ac:643: -1- XYCE_LIBRARY_OPTION([nappspack])
-m4trace:configure.ac:643: -1- m4_pattern_allow([^HAVE_LIBNAPPSPACK$])
-m4trace:configure.ac:644: -1- XYCE_LIBRARY_OPTION([3po])
-m4trace:configure.ac:644: -1- m4_pattern_allow([^HAVE_LIB3PO$])
-m4trace:configure.ac:645: -1- XYCE_LIBRARY_OPTION([utilib])
-m4trace:configure.ac:645: -1- m4_pattern_allow([^HAVE_LIBUTILIB$])
-m4trace:configure.ac:646: -1- XYCE_LIBRARY_OPTION([pebbl])
-m4trace:configure.ac:646: -1- m4_pattern_allow([^HAVE_LIBPEBBL$])
-m4trace:configure.ac:647: -1- XYCE_LIBRARY_OPTION([colin])
-m4trace:configure.ac:647: -1- m4_pattern_allow([^HAVE_LIBCOLIN$])
-m4trace:configure.ac:648: -1- XYCE_LIBRARY_OPTION([coliny])
-m4trace:configure.ac:648: -1- m4_pattern_allow([^HAVE_LIBCOLINY$])
-m4trace:configure.ac:649: -1- XYCE_LIBRARY_OPTION([quadrature])
-m4trace:configure.ac:649: -1- m4_pattern_allow([^HAVE_LIBQUADRATURE$])
-m4trace:configure.ac:650: -1- XYCE_LIBRARY_OPTION([ncsuopt])
-m4trace:configure.ac:650: -1- m4_pattern_allow([^HAVE_LIBNCSUOPT$])
-m4trace:configure.ac:651: -1- XYCE_LIBRARY_OPTION([newmat])
-m4trace:configure.ac:651: -1- m4_pattern_allow([^HAVE_LIBNEWMAT$])
-m4trace:configure.ac:652: -1- XYCE_LIBRARY_OPTION([psuade])
-m4trace:configure.ac:652: -1- m4_pattern_allow([^HAVE_LIBPSUADE$])
-m4trace:configure.ac:653: -1- XYCE_LIBRARY_OPTION([opt])
-m4trace:configure.ac:653: -1- m4_pattern_allow([^HAVE_LIBOPT$])
-m4trace:configure.ac:654: -1- XYCE_LIBRARY_OPTION([npsol])
-m4trace:configure.ac:654: -1- m4_pattern_allow([^HAVE_LIBNPSOL$])
-m4trace:configure.ac:655: -1- XYCE_LIBRARY_OPTION([nlpql])
-m4trace:configure.ac:655: -1- m4_pattern_allow([^HAVE_LIBNLPQL$])
-m4trace:configure.ac:656: -1- XYCE_LIBRARY_OPTION([cport])
-m4trace:configure.ac:656: -1- m4_pattern_allow([^HAVE_LIBCPORT$])
-m4trace:configure.ac:657: -1- XYCE_LIBRARY_OPTION([jega])
-m4trace:configure.ac:657: -1- m4_pattern_allow([^HAVE_LIBJEGA$])
-m4trace:configure.ac:658: -1- XYCE_LIBRARY_OPTION([fsudace])
-m4trace:configure.ac:658: -1- m4_pattern_allow([^HAVE_LIBFSUDACE$])
-m4trace:configure.ac:659: -1- XYCE_LIBRARY_OPTION([ddace])
-m4trace:configure.ac:659: -1- m4_pattern_allow([^HAVE_LIBDDACE$])
-m4trace:configure.ac:660: -1- XYCE_LIBRARY_OPTION([conmin])
-m4trace:configure.ac:660: -1- m4_pattern_allow([^HAVE_LIBCONMIN$])
-m4trace:configure.ac:661: -1- XYCE_LIBRARY_OPTION([surfpack])
-m4trace:configure.ac:661: -1- m4_pattern_allow([^HAVE_LIBSURFPACK$])
-m4trace:configure.ac:662: -1- XYCE_LIBRARY_OPTION([lhs])
-m4trace:configure.ac:662: -1- m4_pattern_allow([^HAVE_LIBLHS$])
-m4trace:configure.ac:663: -1- XYCE_LIBRARY_OPTION([pecos])
-m4trace:configure.ac:663: -1- m4_pattern_allow([^HAVE_LIBPECOS$])
-m4trace:configure.ac:664: -1- XYCE_LIBRARY_OPTION([dakota])
-m4trace:configure.ac:664: -1- m4_pattern_allow([^HAVE_LIBDAKOTA$])
-m4trace:configure.ac:666: -1- XYCE_LIBRARY_OPTION([fl])
-m4trace:configure.ac:666: -1- m4_pattern_allow([^HAVE_LIBFL$])
-m4trace:configure.ac:667: -1- XYCE_LIBRARY_OPTION([amplsolver])
-m4trace:configure.ac:667: -1- m4_pattern_allow([^HAVE_LIBAMPLSOLVER$])
-m4trace:configure.ac:668: -1- XYCE_LIBRARY_OPTION([3po])
-m4trace:configure.ac:668: -1- m4_pattern_allow([^HAVE_LIB3PO$])
-m4trace:configure.ac:669: -1- XYCE_LIBRARY_OPTION([appspack])
-m4trace:configure.ac:669: -1- m4_pattern_allow([^HAVE_LIBAPPSPACK$])
-m4trace:configure.ac:670: -1- XYCE_LIBRARY_OPTION([utilib])
-m4trace:configure.ac:670: -1- m4_pattern_allow([^HAVE_LIBUTILIB$])
-m4trace:configure.ac:671: -1- XYCE_LIBRARY_OPTION([pebbl])
-m4trace:configure.ac:671: -1- m4_pattern_allow([^HAVE_LIBPEBBL$])
-m4trace:configure.ac:672: -1- XYCE_LIBRARY_OPTION([colin])
-m4trace:configure.ac:672: -1- m4_pattern_allow([^HAVE_LIBCOLIN$])
-m4trace:configure.ac:673: -1- XYCE_LIBRARY_OPTION([coliny])
-m4trace:configure.ac:673: -1- m4_pattern_allow([^HAVE_LIBCOLINY$])
-m4trace:configure.ac:674: -1- XYCE_LIBRARY_OPTION([cubature])
-m4trace:configure.ac:674: -1- m4_pattern_allow([^HAVE_LIBCUBATURE$])
-m4trace:configure.ac:675: -1- XYCE_LIBRARY_OPTION([gsl])
-m4trace:configure.ac:675: -1- m4_pattern_allow([^HAVE_LIBGSL$])
-m4trace:configure.ac:676: -1- XYCE_LIBRARY_OPTION([lhs])
-m4trace:configure.ac:676: -1- m4_pattern_allow([^HAVE_LIBLHS$])
-m4trace:configure.ac:677: -1- XYCE_LIBRARY_OPTION([ncsuopt])
-m4trace:configure.ac:677: -1- m4_pattern_allow([^HAVE_LIBNCSUOPT$])
-m4trace:configure.ac:678: -1- XYCE_LIBRARY_OPTION([newmat])
-m4trace:configure.ac:678: -1- m4_pattern_allow([^HAVE_LIBNEWMAT$])
-m4trace:configure.ac:679: -1- XYCE_LIBRARY_OPTION([opt])
-m4trace:configure.ac:679: -1- m4_pattern_allow([^HAVE_LIBOPT$])
-m4trace:configure.ac:680: -1- XYCE_LIBRARY_OPTION([npsol])
-m4trace:configure.ac:680: -1- m4_pattern_allow([^HAVE_LIBNPSOL$])
-m4trace:configure.ac:681: -1- XYCE_LIBRARY_OPTION([cport])
-m4trace:configure.ac:681: -1- m4_pattern_allow([^HAVE_LIBCPORT$])
-m4trace:configure.ac:682: -1- XYCE_LIBRARY_OPTION([jega])
-m4trace:configure.ac:682: -1- m4_pattern_allow([^HAVE_LIBJEGA$])
-m4trace:configure.ac:683: -1- XYCE_LIBRARY_OPTION([fsudace])
-m4trace:configure.ac:683: -1- m4_pattern_allow([^HAVE_LIBFSUDACE$])
-m4trace:configure.ac:684: -1- XYCE_LIBRARY_OPTION([ddace])
-m4trace:configure.ac:684: -1- m4_pattern_allow([^HAVE_LIBDDACE$])
-m4trace:configure.ac:685: -1- XYCE_LIBRARY_OPTION([conmin])
-m4trace:configure.ac:685: -1- m4_pattern_allow([^HAVE_LIBCONMIN$])
-m4trace:configure.ac:686: -1- XYCE_LIBRARY_OPTION([surfpack])
-m4trace:configure.ac:686: -1- m4_pattern_allow([^HAVE_LIBSURFPACK$])
-m4trace:configure.ac:687: -1- XYCE_LIBRARY_OPTION([evidence])
-m4trace:configure.ac:687: -1- m4_pattern_allow([^HAVE_LIBEVIDENCE$])
-m4trace:configure.ac:688: -1- XYCE_LIBRARY_OPTION([dakota])
-m4trace:configure.ac:688: -1- m4_pattern_allow([^HAVE_LIBDAKOTA$])
-m4trace:configure.ac:738: -1- m4_pattern_allow([^STDC_HEADERS$])
-m4trace:configure.ac:740: -1- AC_CXX_HAVE_STL
-m4trace:configure.ac:740: -1- AC_CXX_NAMESPACES
-m4trace:configure.ac:740: -1- m4_pattern_allow([^HAVE_NAMESPACES$])
-m4trace:configure.ac:740: -1- m4_pattern_allow([^HAVE_STL$])
-m4trace:configure.ac:748: -1- AC_FINITE_NUMBER_CHECK
-m4trace:configure.ac:748: -1- m4_pattern_allow([^HAVE_NAN_INF_SUPPORT$])
-m4trace:configure.ac:800: -1- AC_CXX_HAVE_NUMERIC_LIMITS
-m4trace:configure.ac:800: -1- m4_pattern_allow([^HAVE_NUMERIC_LIMITS$])
-m4trace:configure.ac:801: -1- AC_HEADER_MATH_H_HAS_M_PI
-m4trace:configure.ac:801: -1- m4_pattern_allow([^MATH_H_HAS_M_PI$])
-m4trace:configure.ac:802: -1- AC_CXX_NEED_PAIR_H
-m4trace:configure.ac:802: -1- m4_pattern_allow([^NEED_PAIR_H$])
-m4trace:configure.ac:808: -1- m4_pattern_allow([^HAVE_STRCASECMP$])
-m4trace:configure.ac:811: -1- m4_pattern_allow([^HAVE_GETOPT$])
-m4trace:configure.ac:816: -1- m4_pattern_allow([^Xyce_USE_FFT$])
-m4trace:configure.ac:824: -1- m4_pattern_allow([^HAVE_DFTICREATEDESCRIPTOR$])
-m4trace:configure.ac:824: -1- m4_pattern_allow([^Xyce_USE_INTEL_FFT$])
-m4trace:configure.ac:835: -1- m4_pattern_allow([^Xyce_USE_FFTW$])
-m4trace:configure.ac:853: -1- AM_CONDITIONAL([BUILD_INTEL_FFT_SUPPORT], [test "X$ac_cv_header_mkl_dfti_h" = "Xyes"])
-m4trace:configure.ac:853: -1- m4_pattern_allow([^BUILD_INTEL_FFT_SUPPORT_TRUE$])
-m4trace:configure.ac:853: -1- m4_pattern_allow([^BUILD_INTEL_FFT_SUPPORT_FALSE$])
-m4trace:configure.ac:853: -1- _AM_SUBST_NOTMAKE([BUILD_INTEL_FFT_SUPPORT_TRUE])
-m4trace:configure.ac:853: -1- _AM_SUBST_NOTMAKE([BUILD_INTEL_FFT_SUPPORT_FALSE])
-m4trace:configure.ac:854: -1- AM_CONDITIONAL([BUILD_FFTW_SUPPORT], [test "X$ac_cv_header_fftw3_h" = "Xyes"])
-m4trace:configure.ac:854: -1- m4_pattern_allow([^BUILD_FFTW_SUPPORT_TRUE$])
-m4trace:configure.ac:854: -1- m4_pattern_allow([^BUILD_FFTW_SUPPORT_FALSE$])
-m4trace:configure.ac:854: -1- _AM_SUBST_NOTMAKE([BUILD_FFTW_SUPPORT_TRUE])
-m4trace:configure.ac:854: -1- _AM_SUBST_NOTMAKE([BUILD_FFTW_SUPPORT_FALSE])
-m4trace:configure.ac:866: -1- m4_pattern_allow([^Xyce_USE_HDF5$])
-m4trace:configure.ac:876: -1- AM_CONDITIONAL([BUILD_HDF5_SUPPORT], [test "X$ac_cv_header_hdf5_h" = "Xyes"])
-m4trace:configure.ac:876: -1- m4_pattern_allow([^BUILD_HDF5_SUPPORT_TRUE$])
-m4trace:configure.ac:876: -1- m4_pattern_allow([^BUILD_HDF5_SUPPORT_FALSE$])
-m4trace:configure.ac:876: -1- _AM_SUBST_NOTMAKE([BUILD_HDF5_SUPPORT_TRUE])
-m4trace:configure.ac:876: -1- _AM_SUBST_NOTMAKE([BUILD_HDF5_SUPPORT_FALSE])
-m4trace:configure.ac:882: -1- XYCE_CHECK_BRAINDAMAGED_RANDOM_SHUFFLE
-m4trace:configure.ac:889: -1- XYCE_CHECK_IOTA
-m4trace:configure.ac:889: -1- m4_pattern_allow([^HAVE_IOTA$])
-m4trace:configure.ac:890: -1- XYCE_CHECK_FLEXIBLE_INSERT
-m4trace:configure.ac:890: -1- m4_pattern_allow([^HAVE_FLEXIBLE_INSERT$])
-m4trace:configure.ac:893: -1- XYCE_CHECK_STL_MEMBER_TEMPLATES
-m4trace:configure.ac:893: -1- m4_pattern_allow([^BAD_STL$])
-m4trace:configure.ac:917: -1- m4_pattern_allow([^Xyce_INCS$])
-m4trace:configure.ac:920: -1- XYCE_LIBRARY_OPTION([boost_filesystem ])
-m4trace:configure.ac:920: -1- m4_pattern_allow([^HAVE_LIBBOOST_FILESYSTEM_$])
-m4trace:configure.ac:920: -1- XYCE_LIBRARY_OPTION([boost_system ])
-m4trace:configure.ac:920: -1- m4_pattern_allow([^HAVE_LIBBOOST_SYSTEM_$])
-m4trace:configure.ac:920: -1- m4_pattern_allow([^Xyce_ATHENA$])
-m4trace:configure.ac:930: -1- AM_CONDITIONAL([BUILD_ATHENA], [test x$enable_athena = xyes])
-m4trace:configure.ac:930: -1- m4_pattern_allow([^BUILD_ATHENA_TRUE$])
-m4trace:configure.ac:930: -1- m4_pattern_allow([^BUILD_ATHENA_FALSE$])
-m4trace:configure.ac:930: -1- _AM_SUBST_NOTMAKE([BUILD_ATHENA_TRUE])
-m4trace:configure.ac:930: -1- _AM_SUBST_NOTMAKE([BUILD_ATHENA_FALSE])
-m4trace:configure.ac:938: -1- m4_pattern_allow([^XYCE_BUILDDIR$])
-m4trace:configure.ac:939: -1- m4_pattern_allow([^XYCE_SRCDIR$])
-m4trace:configure.ac:941: -1- m4_pattern_allow([^TS_LIBS$])
-m4trace:configure.ac:945: -1- m4_pattern_allow([^XYCELIBS$])
-m4trace:configure.ac:946: -1- m4_pattern_allow([^LIBTOOLFLAGS$])
-m4trace:configure.ac:949: -1- m4_pattern_allow([^DAKOTA_ARCH_DIR$])
-m4trace:configure.ac:953: -1- m4_pattern_allow([^ADMS_CXXFLAGS$])
-m4trace:configure.ac:971: -1- m4_pattern_allow([^CPACK_GENERATOR$])
-m4trace:configure.ac:1009: -1- m4_pattern_allow([^Xyce_VERSION$])
-m4trace:configure.ac:1010: -1- m4_pattern_allow([^Xyce_VERSION_MAJOR$])
-m4trace:configure.ac:1011: -1- m4_pattern_allow([^Xyce_VERSION_MINOR$])
-m4trace:configure.ac:1012: -1- m4_pattern_allow([^Xyce_VERSION_PATCH$])
-m4trace:configure.ac:1015: -1- m4_pattern_allow([^CPACK_PACKAGE_NAME$])
-m4trace:configure.ac:1020: -1- m4_pattern_allow([^CPACK_PACKAGE_FILE_NAME$])
-m4trace:configure.ac:1023: -1- m4_pattern_allow([^CPACK_RPM_PACKAGE_NAME$])
-m4trace:configure.ac:1047: -1- m4_pattern_allow([^CPACK_SYSTEM_NAME$])
-m4trace:configure.ac:1048: -1- m4_pattern_allow([^CPACK_PACKAGING_INSTALL_PREFIX$])
-m4trace:configure.ac:1058: -1- m4_pattern_allow([^CPACK_RPM_DEPENDS_SET_LINE$])
-m4trace:configure.ac:1075: -1- m4_pattern_allow([^XYCE_LICENSE$])
-m4trace:configure.ac:1076: -1- m4_pattern_allow([^CPACK_RPM_PACKAGE_LICENSE$])
-m4trace:configure.ac:1143: -1- m4_pattern_allow([^LIB@&t@OBJS$])
-m4trace:configure.ac:1143: -1- m4_pattern_allow([^LTLIBOBJS$])
-m4trace:configure.ac:1143: -1- AM_CONDITIONAL([am__EXEEXT], [test -n "$EXEEXT"])
-m4trace:configure.ac:1143: -1- m4_pattern_allow([^am__EXEEXT_TRUE$])
-m4trace:configure.ac:1143: -1- m4_pattern_allow([^am__EXEEXT_FALSE$])
-m4trace:configure.ac:1143: -1- _AM_SUBST_NOTMAKE([am__EXEEXT_TRUE])
-m4trace:configure.ac:1143: -1- _AM_SUBST_NOTMAKE([am__EXEEXT_FALSE])
-m4trace:configure.ac:1143: -1- _AC_AM_CONFIG_HEADER_HOOK(["$ac_file"])
-m4trace:configure.ac:1143: -1- _AM_OUTPUT_DEPENDENCY_COMMANDS
-m4trace:configure.ac:1143: -1- _LT_PROG_LTMAIN
+m4trace:configure.ac:387: -1- _LT_LINKER_OPTION([if $compiler static flag $lt_tmp_static_flag works], [lt_cv_prog_compiler_static_works_F77], [$lt_tmp_static_flag], [], [_LT_TAGVAR(lt_prog_compiler_static, F77)=])
+m4trace:configure.ac:388: -1- m4_pattern_allow([^GREP$])
+m4trace:configure.ac:404: -1- XYCE_TEST_USING_DEC_CXX
+m4trace:configure.ac:413: -1- XYCE_TEST_USING_ICCLT11_CXX
+m4trace:configure.ac:422: -1- AM_CONDITIONAL([DEC], [test $USING_DEC_CXX = yes])
+m4trace:configure.ac:422: -1- m4_pattern_allow([^DEC_TRUE$])
+m4trace:configure.ac:422: -1- m4_pattern_allow([^DEC_FALSE$])
+m4trace:configure.ac:422: -1- _AM_SUBST_NOTMAKE([DEC_TRUE])
+m4trace:configure.ac:422: -1- _AM_SUBST_NOTMAKE([DEC_FALSE])
+m4trace:configure.ac:467: -1- m4_pattern_allow([^FLIBS$])
+m4trace:configure.ac:496: -1- XYCE_LIBRARY_INCLUDE([zoltan])
+m4trace:configure.ac:497: -1- m4_pattern_allow([^HAVE_LIBMETIS$])
+m4trace:configure.ac:498: -1- m4_pattern_allow([^HAVE_LIBPARMETIS$])
+m4trace:configure.ac:498: -1- m4_pattern_allow([^HAVE_LIBPARMETIS$])
+m4trace:configure.ac:501: -1- m4_pattern_allow([^HAVE_LIBZOLTAN$])
+m4trace:configure.ac:507: -1- m4_pattern_allow([^HAVE_LIBAMD$])
+m4trace:configure.ac:516: -1- XYCE_LIBRARY_OPTION([teuchos], [], [], [], [XYCE_TEUCHOS_NOT_FOUND=1])
+m4trace:configure.ac:516: -1- m4_pattern_allow([^HAVE_LIBTEUCHOS$])
+m4trace:configure.ac:521: -1- XYCE_TRILINOS_LIBRARY_OPTION([Teuchos], [USE_TEUCHOS_MAKEFILE], [yes])
+m4trace:configure.ac:521: -1- m4_pattern_allow([^HAVE_LIBTEUCHOS$])
+m4trace:configure.ac:523: -1- XYCE_LIBRARY_OPTION([teuchoscore])
+m4trace:configure.ac:523: -1- m4_pattern_allow([^HAVE_LIBTEUCHOSCORE$])
+m4trace:configure.ac:524: -1- XYCE_LIBRARY_OPTION([teuchosremainder])
+m4trace:configure.ac:524: -1- m4_pattern_allow([^HAVE_LIBTEUCHOSREMAINDER$])
+m4trace:configure.ac:525: -1- XYCE_LIBRARY_OPTION([teuchosnumerics])
+m4trace:configure.ac:525: -1- m4_pattern_allow([^HAVE_LIBTEUCHOSNUMERICS$])
+m4trace:configure.ac:526: -1- XYCE_LIBRARY_OPTION([teuchoscomm])
+m4trace:configure.ac:526: -1- m4_pattern_allow([^HAVE_LIBTEUCHOSCOMM$])
+m4trace:configure.ac:527: -1- XYCE_LIBRARY_OPTION([teuchosparameterlist])
+m4trace:configure.ac:527: -1- m4_pattern_allow([^HAVE_LIBTEUCHOSPARAMETERLIST$])
+m4trace:configure.ac:530: -1- XYCE_TRILINOS_LIBRARY_OPTION([Triutils], [USE_TRIUTILS_MAKEFILE])
+m4trace:configure.ac:530: -1- m4_pattern_allow([^HAVE_LIBTRIUTILS$])
+m4trace:configure.ac:531: -1- XYCE_TRILINOS_LIBRARY_OPTION([Epetra], [USE_EPETRA_MAKEFILE])
+m4trace:configure.ac:531: -1- m4_pattern_allow([^HAVE_LIBEPETRA$])
+m4trace:configure.ac:532: -1- XYCE_TRILINOS_LIBRARY_OPTION([EpetraExt], [USE_EPETRAEXT_MAKEFILE])
+m4trace:configure.ac:532: -1- m4_pattern_allow([^HAVE_LIBEPETRAEXT$])
+m4trace:configure.ac:536: -1- XYCE_TRILINOS_LIBRARY_OPTION([Isorropia], [USE_ISORROPIA_MAKEFILE])
+m4trace:configure.ac:536: -1- m4_pattern_allow([^HAVE_LIBISORROPIA$])
+m4trace:configure.ac:541: -1- XYCE_LIBRARY_OPTION([superludist])
+m4trace:configure.ac:541: -1- m4_pattern_allow([^HAVE_LIBSUPERLUDIST$])
+m4trace:configure.ac:547: -1- m4_pattern_allow([^HAVE_LIBCOLAMD$])
+m4trace:configure.ac:549: -1- m4_pattern_allow([^HAVE_LIBSUITESPARSECONFIG$])
+m4trace:configure.ac:551: -1- m4_pattern_allow([^HAVE_LIBCHOLMOD$])
+m4trace:configure.ac:552: -1- m4_pattern_allow([^HAVE_LIBUMFPACK$])
+m4trace:configure.ac:557: -1- m4_pattern_allow([^HAVE_LIBSUPERLU$])
+m4trace:configure.ac:560: -1- XYCE_TRILINOS_LIBRARY_OPTION([Amesos], [USE_AMESOS_MAKEFILE])
+m4trace:configure.ac:560: -1- m4_pattern_allow([^HAVE_LIBAMESOS$])
+m4trace:configure.ac:561: -1- XYCE_TRILINOS_LIBRARY_OPTION([TrilinosCouplings], [USE_TRILINOSCOUPLINGS_MAKEFILE])
+m4trace:configure.ac:561: -1- m4_pattern_allow([^HAVE_LIBTRILINOSCOUPLINGS$])
+m4trace:configure.ac:565: -1- XYCE_TRILINOS_LIBRARY_OPTION([ML], [USE_ML_MAKEFILE])
+m4trace:configure.ac:565: -1- m4_pattern_allow([^HAVE_LIBML$])
+m4trace:configure.ac:567: -1- XYCE_TRILINOS_LIBRARY_OPTION([Ifpack], [USE_IFPACK_MAKEFILE])
+m4trace:configure.ac:567: -1- m4_pattern_allow([^HAVE_LIBIFPACK$])
+m4trace:configure.ac:568: -1- XYCE_TRILINOS_LIBRARY_OPTION([AztecOO], [USE_AZTECOO_MAKEFILE])
+m4trace:configure.ac:568: -1- m4_pattern_allow([^HAVE_LIBAZTECOO$])
+m4trace:configure.ac:572: -1- XYCE_TRILINOS_LIBRARY_OPTION([Belos], [USE_BELOS_MAKEFILE])
+m4trace:configure.ac:572: -1- m4_pattern_allow([^HAVE_LIBBELOS$])
+m4trace:configure.ac:574: -1- XYCE_LIBRARY_OPTION([belosepetra])
+m4trace:configure.ac:574: -1- m4_pattern_allow([^HAVE_LIBBELOSEPETRA$])
+m4trace:configure.ac:580: -1- XYCE_TRILINOS_LIBRARY_OPTION([ShyLU], [USE_SHYLU_MAKEFILE])
+m4trace:configure.ac:580: -1- m4_pattern_allow([^HAVE_LIBSHYLU$])
+m4trace:configure.ac:584: -1- XYCE_TRILINOS_LIBRARY_OPTION([NOX], [USE_NOX_MAKEFILE])
+m4trace:configure.ac:584: -1- m4_pattern_allow([^HAVE_LIBNOX$])
+m4trace:configure.ac:586: -1- XYCE_LIBRARY_OPTION([loca])
+m4trace:configure.ac:586: -1- m4_pattern_allow([^HAVE_LIBLOCA$])
+m4trace:configure.ac:604: -1- XYCE_LIBRARY_OPTION([boost_serialization])
+m4trace:configure.ac:604: -1- m4_pattern_allow([^HAVE_LIBBOOST_SERIALIZATION$])
+m4trace:configure.ac:605: -1- XYCE_LIBRARY_OPTION([boost_signals])
+m4trace:configure.ac:605: -1- m4_pattern_allow([^HAVE_LIBBOOST_SIGNALS$])
+m4trace:configure.ac:606: -1- XYCE_LIBRARY_OPTION([boost_system])
+m4trace:configure.ac:606: -1- m4_pattern_allow([^HAVE_LIBBOOST_SYSTEM$])
+m4trace:configure.ac:607: -1- XYCE_LIBRARY_OPTION([boost_filesystem])
+m4trace:configure.ac:607: -1- m4_pattern_allow([^HAVE_LIBBOOST_FILESYSTEM$])
+m4trace:configure.ac:608: -1- XYCE_LIBRARY_OPTION([boost_regex])
+m4trace:configure.ac:608: -1- m4_pattern_allow([^HAVE_LIBBOOST_REGEX$])
+m4trace:configure.ac:610: -1- XYCE_LIBRARY_OPTION([amplsolver])
+m4trace:configure.ac:610: -1- m4_pattern_allow([^HAVE_LIBAMPLSOLVER$])
+m4trace:configure.ac:612: -1- XYCE_LIBRARY_OPTION([dakota_src_fortran])
+m4trace:configure.ac:612: -1- m4_pattern_allow([^HAVE_LIBDAKOTA_SRC_FORTRAN$])
+m4trace:configure.ac:613: -1- XYCE_LIBRARY_OPTION([psuade])
+m4trace:configure.ac:613: -1- m4_pattern_allow([^HAVE_LIBPSUADE$])
+m4trace:configure.ac:614: -1- XYCE_LIBRARY_OPTION([optpp])
+m4trace:configure.ac:614: -1- m4_pattern_allow([^HAVE_LIBOPTPP$])
+m4trace:configure.ac:615: -1- XYCE_LIBRARY_OPTION([npsol])
+m4trace:configure.ac:615: -1- m4_pattern_allow([^HAVE_LIBNPSOL$])
+m4trace:configure.ac:616: -1- XYCE_LIBRARY_OPTION([nomad])
+m4trace:configure.ac:616: -1- m4_pattern_allow([^HAVE_LIBNOMAD$])
+m4trace:configure.ac:617: -1- XYCE_LIBRARY_OPTION([cport])
+m4trace:configure.ac:617: -1- m4_pattern_allow([^HAVE_LIBCPORT$])
+m4trace:configure.ac:618: -1- XYCE_LIBRARY_OPTION([nlpql])
+m4trace:configure.ac:618: -1- m4_pattern_allow([^HAVE_LIBNLPQL$])
+m4trace:configure.ac:619: -1- XYCE_LIBRARY_OPTION([ncsuopt])
+m4trace:configure.ac:619: -1- m4_pattern_allow([^HAVE_LIBNCSUOPT$])
+m4trace:configure.ac:620: -1- XYCE_LIBRARY_OPTION([utilities])
+m4trace:configure.ac:620: -1- m4_pattern_allow([^HAVE_LIBUTILITIES$])
+m4trace:configure.ac:621: -1- XYCE_LIBRARY_OPTION([eutils])
+m4trace:configure.ac:621: -1- m4_pattern_allow([^HAVE_LIBEUTILS$])
+m4trace:configure.ac:622: -1- XYCE_LIBRARY_OPTION([jega])
+m4trace:configure.ac:622: -1- m4_pattern_allow([^HAVE_LIBJEGA$])
+m4trace:configure.ac:623: -1- XYCE_LIBRARY_OPTION([soga])
+m4trace:configure.ac:623: -1- m4_pattern_allow([^HAVE_LIBSOGA$])
+m4trace:configure.ac:624: -1- XYCE_LIBRARY_OPTION([moga])
+m4trace:configure.ac:624: -1- m4_pattern_allow([^HAVE_LIBMOGA$])
+m4trace:configure.ac:625: -1- XYCE_LIBRARY_OPTION([jega_fe])
+m4trace:configure.ac:625: -1- m4_pattern_allow([^HAVE_LIBJEGA_FE$])
+m4trace:configure.ac:626: -1- XYCE_LIBRARY_OPTION([jega])
+m4trace:configure.ac:626: -1- m4_pattern_allow([^HAVE_LIBJEGA$])
+m4trace:configure.ac:627: -1- XYCE_LIBRARY_OPTION([hopspack])
+m4trace:configure.ac:627: -1- m4_pattern_allow([^HAVE_LIBHOPSPACK$])
+m4trace:configure.ac:628: -1- XYCE_LIBRARY_OPTION([fsudace])
+m4trace:configure.ac:628: -1- m4_pattern_allow([^HAVE_LIBFSUDACE$])
+m4trace:configure.ac:629: -1- XYCE_LIBRARY_OPTION([bose])
+m4trace:configure.ac:629: -1- m4_pattern_allow([^HAVE_LIBBOSE$])
+m4trace:configure.ac:630: -1- XYCE_LIBRARY_OPTION([sampling])
+m4trace:configure.ac:630: -1- m4_pattern_allow([^HAVE_LIBSAMPLING$])
+m4trace:configure.ac:631: -1- XYCE_LIBRARY_OPTION([random])
+m4trace:configure.ac:631: -1- m4_pattern_allow([^HAVE_LIBRANDOM$])
+m4trace:configure.ac:632: -1- XYCE_LIBRARY_OPTION([analyzer])
+m4trace:configure.ac:632: -1- m4_pattern_allow([^HAVE_LIBANALYZER$])
+m4trace:configure.ac:633: -1- XYCE_LIBRARY_OPTION([dace])
+m4trace:configure.ac:633: -1- m4_pattern_allow([^HAVE_LIBDACE$])
+m4trace:configure.ac:634: -1- XYCE_LIBRARY_OPTION([conmin])
+m4trace:configure.ac:634: -1- m4_pattern_allow([^HAVE_LIBCONMIN$])
+m4trace:configure.ac:635: -1- XYCE_LIBRARY_OPTION([utilib])
+m4trace:configure.ac:635: -1- m4_pattern_allow([^HAVE_LIBUTILIB$])
+m4trace:configure.ac:636: -1- XYCE_LIBRARY_OPTION([tinyxml])
+m4trace:configure.ac:636: -1- m4_pattern_allow([^HAVE_LIBTINYXML$])
+m4trace:configure.ac:637: -1- XYCE_LIBRARY_OPTION([pebbl])
+m4trace:configure.ac:637: -1- m4_pattern_allow([^HAVE_LIBPEBBL$])
+m4trace:configure.ac:638: -1- XYCE_LIBRARY_OPTION([3po])
+m4trace:configure.ac:638: -1- m4_pattern_allow([^HAVE_LIB3PO$])
+m4trace:configure.ac:639: -1- XYCE_LIBRARY_OPTION([scolib])
+m4trace:configure.ac:639: -1- m4_pattern_allow([^HAVE_LIBSCOLIB$])
+m4trace:configure.ac:640: -1- XYCE_LIBRARY_OPTION([interfaces])
+m4trace:configure.ac:640: -1- m4_pattern_allow([^HAVE_LIBINTERFACES$])
+m4trace:configure.ac:641: -1- XYCE_LIBRARY_OPTION([colin])
+m4trace:configure.ac:641: -1- m4_pattern_allow([^HAVE_LIBCOLIN$])
+m4trace:configure.ac:642: -1- XYCE_LIBRARY_OPTION([surfpack_fortran])
+m4trace:configure.ac:642: -1- m4_pattern_allow([^HAVE_LIBSURFPACK_FORTRAN$])
+m4trace:configure.ac:643: -1- XYCE_LIBRARY_OPTION([surfpack])
+m4trace:configure.ac:643: -1- m4_pattern_allow([^HAVE_LIBSURFPACK$])
+m4trace:configure.ac:644: -1- XYCE_LIBRARY_OPTION([sparsegrid])
+m4trace:configure.ac:644: -1- m4_pattern_allow([^HAVE_LIBSPARSEGRID$])
+m4trace:configure.ac:645: -1- XYCE_LIBRARY_OPTION([dfftpack])
+m4trace:configure.ac:645: -1- m4_pattern_allow([^HAVE_LIBDFFTPACK$])
+m4trace:configure.ac:646: -1- XYCE_LIBRARY_OPTION([mod])
+m4trace:configure.ac:646: -1- m4_pattern_allow([^HAVE_LIBMOD$])
+m4trace:configure.ac:647: -1- XYCE_LIBRARY_OPTION([mods])
+m4trace:configure.ac:647: -1- m4_pattern_allow([^HAVE_LIBMODS$])
+m4trace:configure.ac:648: -1- XYCE_LIBRARY_OPTION([lhs])
+m4trace:configure.ac:648: -1- m4_pattern_allow([^HAVE_LIBLHS$])
+m4trace:configure.ac:649: -1- XYCE_LIBRARY_OPTION([pecos_src])
+m4trace:configure.ac:649: -1- m4_pattern_allow([^HAVE_LIBPECOS_SRC$])
+m4trace:configure.ac:650: -1- XYCE_LIBRARY_OPTION([pecos])
+m4trace:configure.ac:650: -1- m4_pattern_allow([^HAVE_LIBPECOS$])
+m4trace:configure.ac:651: -1- XYCE_LIBRARY_OPTION([nidr])
+m4trace:configure.ac:651: -1- m4_pattern_allow([^HAVE_LIBNIDR$])
+m4trace:configure.ac:652: -1- XYCE_LIBRARY_OPTION([dakota_src])
+m4trace:configure.ac:652: -1- m4_pattern_allow([^HAVE_LIBDAKOTA_SRC$])
+m4trace:configure.ac:696: -1- m4_pattern_allow([^STDC_HEADERS$])
+m4trace:configure.ac:698: -1- AC_CXX_HAVE_STL
+m4trace:configure.ac:698: -1- AC_CXX_NAMESPACES
+m4trace:configure.ac:698: -1- m4_pattern_allow([^HAVE_NAMESPACES$])
+m4trace:configure.ac:698: -1- m4_pattern_allow([^HAVE_STL$])
+m4trace:configure.ac:711: -1- AC_FINITE_NUMBER_CHECK
+m4trace:configure.ac:711: -1- m4_pattern_allow([^HAVE_NAN_INF_SUPPORT$])
+m4trace:configure.ac:763: -1- AC_HEADER_MATH_H_HAS_M_PI
+m4trace:configure.ac:763: -1- m4_pattern_allow([^MATH_H_HAS_M_PI$])
+m4trace:configure.ac:764: -1- AC_CXX_NEED_PAIR_H
+m4trace:configure.ac:764: -1- m4_pattern_allow([^NEED_PAIR_H$])
+m4trace:configure.ac:770: -1- m4_pattern_allow([^HAVE_STRCASECMP$])
+m4trace:configure.ac:773: -1- m4_pattern_allow([^HAVE_GETOPT$])
+m4trace:configure.ac:778: -1- m4_pattern_allow([^Xyce_USE_FFT$])
+m4trace:configure.ac:786: -1- m4_pattern_allow([^HAVE_DFTICREATEDESCRIPTOR$])
+m4trace:configure.ac:786: -1- m4_pattern_allow([^Xyce_USE_INTEL_FFT$])
+m4trace:configure.ac:797: -1- m4_pattern_allow([^Xyce_USE_FFTW$])
+m4trace:configure.ac:815: -1- AM_CONDITIONAL([BUILD_INTEL_FFT_SUPPORT], [test "X$ac_cv_header_mkl_dfti_h" = "Xyes"])
+m4trace:configure.ac:815: -1- m4_pattern_allow([^BUILD_INTEL_FFT_SUPPORT_TRUE$])
+m4trace:configure.ac:815: -1- m4_pattern_allow([^BUILD_INTEL_FFT_SUPPORT_FALSE$])
+m4trace:configure.ac:815: -1- _AM_SUBST_NOTMAKE([BUILD_INTEL_FFT_SUPPORT_TRUE])
+m4trace:configure.ac:815: -1- _AM_SUBST_NOTMAKE([BUILD_INTEL_FFT_SUPPORT_FALSE])
+m4trace:configure.ac:816: -1- AM_CONDITIONAL([BUILD_FFTW_SUPPORT], [test "X$ac_cv_header_fftw3_h" = "Xyes"])
+m4trace:configure.ac:816: -1- m4_pattern_allow([^BUILD_FFTW_SUPPORT_TRUE$])
+m4trace:configure.ac:816: -1- m4_pattern_allow([^BUILD_FFTW_SUPPORT_FALSE$])
+m4trace:configure.ac:816: -1- _AM_SUBST_NOTMAKE([BUILD_FFTW_SUPPORT_TRUE])
+m4trace:configure.ac:816: -1- _AM_SUBST_NOTMAKE([BUILD_FFTW_SUPPORT_FALSE])
+m4trace:configure.ac:832: -1- m4_pattern_allow([^Xyce_USE_HDF5$])
+m4trace:configure.ac:842: -1- m4_pattern_allow([^Xyce_USE_HDF5$])
+m4trace:configure.ac:853: -1- AM_CONDITIONAL([BUILD_HDF5_SUPPORT], [test "X$ac_cv_header_hdf5_h" = "Xyes"])
+m4trace:configure.ac:853: -1- m4_pattern_allow([^BUILD_HDF5_SUPPORT_TRUE$])
+m4trace:configure.ac:853: -1- m4_pattern_allow([^BUILD_HDF5_SUPPORT_FALSE$])
+m4trace:configure.ac:853: -1- _AM_SUBST_NOTMAKE([BUILD_HDF5_SUPPORT_TRUE])
+m4trace:configure.ac:853: -1- _AM_SUBST_NOTMAKE([BUILD_HDF5_SUPPORT_FALSE])
+m4trace:configure.ac:859: -1- XYCE_CHECK_BRAINDAMAGED_RANDOM_SHUFFLE
+m4trace:configure.ac:866: -1- XYCE_CHECK_IOTA
+m4trace:configure.ac:866: -1- m4_pattern_allow([^HAVE_IOTA$])
+m4trace:configure.ac:889: -1- m4_pattern_allow([^Xyce_INCS$])
+m4trace:configure.ac:892: -1- XYCE_LIBRARY_OPTION([boost_filesystem ])
+m4trace:configure.ac:892: -1- m4_pattern_allow([^HAVE_LIBBOOST_FILESYSTEM_$])
+m4trace:configure.ac:892: -1- XYCE_LIBRARY_OPTION([boost_system ])
+m4trace:configure.ac:892: -1- m4_pattern_allow([^HAVE_LIBBOOST_SYSTEM_$])
+m4trace:configure.ac:892: -1- m4_pattern_allow([^Xyce_ATHENA$])
+m4trace:configure.ac:902: -1- AM_CONDITIONAL([BUILD_ATHENA], [test x$enable_athena = xyes])
+m4trace:configure.ac:902: -1- m4_pattern_allow([^BUILD_ATHENA_TRUE$])
+m4trace:configure.ac:902: -1- m4_pattern_allow([^BUILD_ATHENA_FALSE$])
+m4trace:configure.ac:902: -1- _AM_SUBST_NOTMAKE([BUILD_ATHENA_TRUE])
+m4trace:configure.ac:902: -1- _AM_SUBST_NOTMAKE([BUILD_ATHENA_FALSE])
+m4trace:configure.ac:910: -1- m4_pattern_allow([^XYCE_BUILDDIR$])
+m4trace:configure.ac:911: -1- m4_pattern_allow([^XYCE_SRCDIR$])
+m4trace:configure.ac:913: -1- m4_pattern_allow([^TS_LIBS$])
+m4trace:configure.ac:917: -1- m4_pattern_allow([^XYCELIBS$])
+m4trace:configure.ac:918: -1- m4_pattern_allow([^LIBTOOLFLAGS$])
+m4trace:configure.ac:921: -1- m4_pattern_allow([^DAKOTA_ARCH_DIR$])
+m4trace:configure.ac:925: -1- m4_pattern_allow([^ADMS_CXXFLAGS$])
+m4trace:configure.ac:943: -1- m4_pattern_allow([^CPACK_GENERATOR$])
+m4trace:configure.ac:981: -1- m4_pattern_allow([^Xyce_VERSION$])
+m4trace:configure.ac:982: -1- m4_pattern_allow([^Xyce_VERSION_MAJOR$])
+m4trace:configure.ac:983: -1- m4_pattern_allow([^Xyce_VERSION_MINOR$])
+m4trace:configure.ac:984: -1- m4_pattern_allow([^Xyce_VERSION_PATCH$])
+m4trace:configure.ac:987: -1- m4_pattern_allow([^CPACK_PACKAGE_NAME$])
+m4trace:configure.ac:992: -1- m4_pattern_allow([^CPACK_PACKAGE_FILE_NAME$])
+m4trace:configure.ac:995: -1- m4_pattern_allow([^CPACK_RPM_PACKAGE_NAME$])
+m4trace:configure.ac:1019: -1- m4_pattern_allow([^CPACK_SYSTEM_NAME$])
+m4trace:configure.ac:1020: -1- m4_pattern_allow([^CPACK_PACKAGING_INSTALL_PREFIX$])
+m4trace:configure.ac:1030: -1- m4_pattern_allow([^CPACK_RPM_DEPENDS_SET_LINE$])
+m4trace:configure.ac:1047: -1- m4_pattern_allow([^XYCE_LICENSE$])
+m4trace:configure.ac:1048: -1- m4_pattern_allow([^CPACK_RPM_PACKAGE_LICENSE$])
+m4trace:configure.ac:1115: -1- m4_pattern_allow([^LIB@&t@OBJS$])
+m4trace:configure.ac:1115: -1- m4_pattern_allow([^LTLIBOBJS$])
+m4trace:configure.ac:1115: -1- AM_CONDITIONAL([am__EXEEXT], [test -n "$EXEEXT"])
+m4trace:configure.ac:1115: -1- m4_pattern_allow([^am__EXEEXT_TRUE$])
+m4trace:configure.ac:1115: -1- m4_pattern_allow([^am__EXEEXT_FALSE$])
+m4trace:configure.ac:1115: -1- _AM_SUBST_NOTMAKE([am__EXEEXT_TRUE])
+m4trace:configure.ac:1115: -1- _AM_SUBST_NOTMAKE([am__EXEEXT_FALSE])
+m4trace:configure.ac:1115: -1- _AC_AM_CONFIG_HEADER_HOOK(["$ac_file"])
+m4trace:configure.ac:1115: -1- _AM_OUTPUT_DEPENDENCY_COMMANDS
+m4trace:configure.ac:1115: -1- _LT_PROG_LTMAIN

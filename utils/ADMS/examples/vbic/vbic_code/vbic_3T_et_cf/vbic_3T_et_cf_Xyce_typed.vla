@@ -60,7 +60,7 @@
 //	Start of VBIC model code
 //
 
-module vbic(c,b,e,dt);
+module vbic(c,b,e,dt) `attr(xyceModelGroup="BJT" xyceLevelNumber="10" xyceDeviceName="VBIC 3T et cf v1.2");
 
 // limiter for Rth
 // This is total cheese, but is what I did when I hacked RTH limiting
@@ -312,11 +312,11 @@ module vbic(c,b,e,dt);
 
 
            tVCrit = $vt($temperature)*ln($vt($temperature)/(`CONSTroot2*IS));
-           Vbei = $limit(V(bei),"typedpnjlim",$vt,tVCrit,dtype);
-           Vbci = $limit(V(bci),"typedpnjlim",$vt,tVCrit,dtype);
-           Vbex = $limit(V(bex),"typedpnjlim",$vt,tVCrit,dtype);
-           Vbcx = $limit(V(bcx),"typedpnjlim",$vt,tVCrit,dtype);
-           Vbep = $limit(V(bep),"typedpnjlim",$vt,tVCrit,dtype);
+           Vbei = $limit(V(bei),"typedpnjlim_new",$vt,tVCrit,dtype);
+           Vbci = $limit(V(bci),"typedpnjlim_new",$vt,tVCrit,dtype);
+           Vbex = $limit(V(bex),"typedpnjlim_new",$vt,tVCrit,dtype);
+           Vbcx = $limit(V(bcx),"typedpnjlim_new",$vt,tVCrit,dtype);
+           Vbep = $limit(V(bep),"typedpnjlim_new",$vt,tVCrit,dtype);
            Vrth = $limit(V(rth),"limRTH");
            Vbe  = $limit(V(be),"typeddummy",$vt,tVCrit,dtype);
            //Vbe = dtype*V(be);

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -32,8 +32,8 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.39.2.3 $
-// Revision Date  : $Date: 2013/10/03 17:23:31 $
+// Revision Number: $Revision: 1.49 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
@@ -86,19 +86,22 @@
 
 #include <N_IO_CmdParse.h>
 
+namespace Xyce {
+namespace Analysis {
+
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::provisionalStep
+// Function      : AnalysisManager::provisionalStep
 // Purpose       : Used by mixed-signal.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/04/2009
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::provisionalStep (double maxTimeStep,  double &timeStep)
+bool AnalysisManager::provisionalStep (double maxTimeStep,  double &timeStep)
 {
   bool bsuccess = true;
   bool b1 = true;
-  string msg;
+  std::string msg;
   bool dcopFlag = true;
 
   if (!initializeSolvers_mixedSignal_)
@@ -119,7 +122,7 @@ bool N_ANP_AnalysisManager::provisionalStep (double maxTimeStep,  double &timeSt
     }
     else
     {
-      msg = "N_ANP_AnalysisManager::provisionalStep - "
+      msg = "AnalysisManager::provisionalStep - "
         "unknown type of analysis\n";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
     }
@@ -127,7 +130,7 @@ bool N_ANP_AnalysisManager::provisionalStep (double maxTimeStep,  double &timeSt
 
     // This checks to make sure that all quantities in the .print are
     // valid before we continue.  This only needs to be done once.
-    outputMgrAdapterRCPtr_->check_output( analysis ); //, *dsPtr_->currSolutionPtr, *dsPtr_->currStatePtr, *dsPtr_->currStorePtr );
+    outputMgrAdapterRCPtr_->check_output( analysis ); //, *getDataStore()->currSolutionPtr, *getDataStore()->currStatePtr, *getDataStore()->currStorePtr );
 
     // Start the solvers timer.
     xyceTranTimerPtr_ = rcp(new N_UTL_Timer( *(pdsMgrPtr->getPDSComm()) ));
@@ -208,27 +211,27 @@ bool N_ANP_AnalysisManager::provisionalStep (double maxTimeStep,  double &timeSt
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::acceptProvisionalStep
+// Function      : AnalysisManager::acceptProvisionalStep
 // Purpose       : Used by mixed-signal.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 04/10/2009
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::acceptProvisionalStep ()
+void AnalysisManager::acceptProvisionalStep ()
 {
   mixedSignalAnalysisObject_->finalizeStep ();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::rejectProvisionalStep
+// Function      : AnalysisManager::rejectProvisionalStep
 // Purpose       : Used by mixed-signal.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 04/10/2009
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::rejectProvisionalStep ()
+void AnalysisManager::rejectProvisionalStep ()
 {
   secPtr_->stepAttemptStatus = false;
   secPtr_->updateBreakPoints();
@@ -270,7 +273,7 @@ void N_ANP_AnalysisManager::rejectProvisionalStep ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::runStep
+// Function      : AnalysisManager::runStep
 //
 // Purpose       : This function is similar to "run" except that only a single
 //                 integration (or DC sweep) step will be executed.
@@ -282,21 +285,21 @@ void N_ANP_AnalysisManager::rejectProvisionalStep ()
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/06/2006
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::runStep
+bool AnalysisManager::runStep
     (const N_TIA_TimeIntInfo & tiInfo, N_TIA_TwoLevelError & tlError)
 {
-  string msg;
+  std::string msg;
 
   if (initializeAllFlag_ == false)
   {
-    msg = "N_ANP_AnalysisManager::runStep - "
+    msg = "AnalysisManager::runStep - "
       "you need to call the initializeAll function first\n";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   }
 
   if (analysisParamsRegistered == false)
   {
-    msg = "N_ANP_AnalysisManager::runStep: "
+    msg = "AnalysisManager::runStep: "
       "no analysis statement in the netlist\n";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   }
@@ -304,14 +307,14 @@ bool N_ANP_AnalysisManager::runStep
   bool integration_status = false;
 
 #ifdef Xyce_VERBOSE_TIME
-  tiaParams.printParams(anpAnalysisModeToNLS(analysis));
+  tiaParams.printParams(Xyce::lout(), anpAnalysisModeToNLS(analysis));
 #endif
 
   solverStartTime_ = elapsedTimerPtr_->elapsedTime();
 
   if (stepLoopFlag_)
   {
-    msg = "N_ANP_AnalysisManager::runStep - "
+    msg = "AnalysisManager::runStep - "
       "Not valid to use .STEP statements in an inner solve.\n";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   }
@@ -320,9 +323,9 @@ bool N_ANP_AnalysisManager::runStep
     if (analysis == ANP_MODE_TRANSIENT)
     {
 #ifdef Xyce_VERBOSE_TIME
-      std::cout << "N_ANP_AnalysisManager::runStep:" << std::endl;
-      std::cout << "nextTime = " << tiInfo.nextTime << std::endl;
-      std::cout << "stepSize = " << tiInfo.nextTimeStep << std::endl;
+      Xyce::dout() << "AnalysisManager::runStep:" << std::endl;
+      Xyce::dout() << "nextTime = " << tiInfo.nextTime << std::endl;
+      Xyce::dout() << "stepSize = " << tiInfo.nextTimeStep << std::endl;
 #endif
     }
     else if (analysis == ANP_MODE_DC_SWEEP)
@@ -331,7 +334,7 @@ bool N_ANP_AnalysisManager::runStep
     }
     else
     {
-      msg = "N_ANP_AnalysisManager::runStep - "
+      msg = "AnalysisManager::runStep - "
         "unknown type of analysis\n";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
     }
@@ -344,7 +347,7 @@ bool N_ANP_AnalysisManager::runStep
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::startTimeStep_
+// Function      : AnalysisManager::startTimeStep_
 // Purpose       : used by 2-level solves.
 // Special Notes : One of the primary purposes for this function is to impose
 //                 a lot of upper level information from the top level time
@@ -369,7 +372,7 @@ bool N_ANP_AnalysisManager::runStep
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/06/2006
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::startTimeStep (const N_TIA_TimeIntInfo & tiInfo)
+bool AnalysisManager::startTimeStep (const N_TIA_TimeIntInfo & tiInfo)
 {
   // Beginning Integration flag is the only piece of data in tiInfo that is
   // currently owned by the control algorithm class.  Everything else
@@ -379,7 +382,7 @@ bool N_ANP_AnalysisManager::startTimeStep (const N_TIA_TimeIntInfo & tiInfo)
 #ifdef Xyce_DEBUG_ANALYSIS
   if (tiaParams.debugLevel > 0)
   {
-    std::cout << "N_ANP_AnalysisManager::startTimeStep:" << std::endl;
+    Xyce::dout() << "AnalysisManager::startTimeStep:" << std::endl;
   }
 #endif
 
@@ -387,7 +390,7 @@ bool N_ANP_AnalysisManager::startTimeStep (const N_TIA_TimeIntInfo & tiInfo)
   if( !is_null(twoLevelAnalysisObject_) )
   {
     // an MPDE run also traverses this area so catch case where this is null
-    twoLevelAnalysisObject_->printStepHeader();
+    twoLevelAnalysisObject_->printStepHeader(Xyce::lout());
   }
 #endif
   if (switchIntegrator_) wimPtr->createTimeIntegMethod( twoLevelAnalysisObject_->getIntegrationMethod() );
@@ -422,7 +425,7 @@ bool N_ANP_AnalysisManager::startTimeStep (const N_TIA_TimeIntInfo & tiInfo)
     dcopFlag = twoLevelTransientAnalysisObject->getDCOPFlag();
   }
 #ifdef Xyce_VERBOSE_TIME
-  if (!dcopFlag) secPtr_->outputTimeInfo();
+  if (!dcopFlag) secPtr_->outputTimeInfo(lout());
 #endif
 
   // ------------------------------------------------------------------------
@@ -441,18 +444,18 @@ bool N_ANP_AnalysisManager::startTimeStep (const N_TIA_TimeIntInfo & tiInfo)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::conductanceTest
+// Function      : AnalysisManager::conductanceTest
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/06/2006
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::conductanceTest ()
+void AnalysisManager::conductanceTest ()
 {
-  map<string,double> inputMap;
-  vector<double> outputVector;
-  vector< vector<double> > jacobian;
+  std::map<std::string,double> inputMap;
+  std::vector<double> outputVector;
+  std::vector< std::vector<double> > jacobian;
 
   // load inputMap from tiaParam.condTestDeviceNames option
   std::list< std::string >::iterator currentDeviceName = tiaParams.condTestDeviceNames.begin();
@@ -466,11 +469,11 @@ void N_ANP_AnalysisManager::conductanceTest ()
 #ifdef Xyce_DEBUG_ANALYSIS
   if (tiaParams.debugLevel > 0)
   {
-    std::cout << "N_ANP_AnalysisManager::conductanceTest()" << std::endl;
+    Xyce::dout() << "AnalysisManager::conductanceTest()" << std::endl;
     currentDeviceName = tiaParams.condTestDeviceNames.begin();
     while( currentDeviceName != endDeviceName )
     {
-      std::cout << "currentDeviceName = \"" << *currentDeviceName << "\" added to inputMap[ "
+      Xyce::dout() << "currentDeviceName = \"" << *currentDeviceName << "\" added to inputMap[ "
             << *currentDeviceName << " ] = " << inputMap[ *currentDeviceName ] << std::endl;
       ++currentDeviceName;
     }
@@ -501,11 +504,11 @@ void N_ANP_AnalysisManager::conductanceTest ()
   fprintf(fp1,"%s", "              ");
   if (b1)
   {
-    map<string,double>::iterator iterM = inputMap.begin();
-    map<string,double>::iterator  endM = inputMap.end  ();
+    std::map<std::string,double>::iterator iterM = inputMap.begin();
+    std::map<std::string,double>::iterator  endM = inputMap.end  ();
     for (iE2 = 0; iE2 < numElectrodes; ++iE2,++iterM)
     {
-      string srcname = iterM->first;
+      std::string srcname = iterM->first;
       fprintf(fp1,"\t%14s",srcname.c_str());
     }
     fprintf(fp1,"%s", "\n");
@@ -513,7 +516,7 @@ void N_ANP_AnalysisManager::conductanceTest ()
     iterM = inputMap.begin();
     for (iE1 = 0; iE1 < numElectrodes; ++iE1, ++iterM)
     {
-      string srcname = iterM->first;
+      std::string srcname = iterM->first;
       fprintf(fp1,"%14s",srcname.c_str());
       for (iE2 = 0; iE2 < numElectrodes; ++iE2)
       {
@@ -533,17 +536,17 @@ void N_ANP_AnalysisManager::conductanceTest ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::startupSolvers
+// Function      : AnalysisManager::startupSolvers
 // Purpose       :
 // Special Notes : Used only for 2-level solves.
 // Scope         : public
 // Creator       : Eric R. Keiter
 // Creation Date : 3/10/2006
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::startupSolvers ()
+bool AnalysisManager::startupSolvers ()
 {
   bool bsuccess = true;
-  string msg;
+  std::string msg;
 
   if (analysis == ANP_MODE_TRANSIENT)
   {
@@ -563,7 +566,7 @@ bool N_ANP_AnalysisManager::startupSolvers ()
   }
   else
   {
-    msg = "N_ANP_AnalysisManager::startupSolvers: Multi-Level Newton solves only supports DC and Transient analysis\n";
+    msg = "AnalysisManager::startupSolvers: Multi-Level Newton solves only supports DC and Transient analysis\n";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   }
   primaryAnalysisObject_ = twoLevelAnalysisObject_;
@@ -571,7 +574,7 @@ bool N_ANP_AnalysisManager::startupSolvers ()
 
   // This checks to make sure that all quantities in the .print are
   // valid before we continue.  This only needs to be done once.
-  outputMgrAdapterRCPtr_->check_output( analysis ); //, *dsPtr_->currSolutionPtr, *dsPtr_->currStatePtr, *dsPtr_->currStorePtr );
+  outputMgrAdapterRCPtr_->check_output( analysis ); //, *getDataStore()->currSolutionPtr, *getDataStore()->currStatePtr, *getDataStore()->currStorePtr );
 
 
   // Start the solvers timer.
@@ -592,17 +595,17 @@ bool N_ANP_AnalysisManager::startupSolvers ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::finishSolvers
+// Function      : AnalysisManager::finishSolvers
 // Purpose       :
 // Special Notes : Used only for 2-level solves.
 // Scope         : public
 // Creator       : Eric Keiter
 // Creation Date : 3/10/2006
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::finishSolvers ()
+bool AnalysisManager::finishSolvers ()
 {
   bool bsuccess = true;
-  string msg;
+  std::string msg;
 
   twoLevelAnalysisObject_->finish();
 
@@ -610,7 +613,7 @@ bool N_ANP_AnalysisManager::finishSolvers ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::homotopyStepSuccess
+// Function      : AnalysisManager::homotopyStepSuccess
 // Purpose       : Lower-level processing of a successful homotopy step,
 //                 which was controlled from the upper level of a 2-level solve.
 // Special Notes :
@@ -618,20 +621,20 @@ bool N_ANP_AnalysisManager::finishSolvers ()
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::homotopyStepSuccess
-    ( const vector<string> & paramNames,
-      const vector<double> & paramVals)
+void AnalysisManager::homotopyStepSuccess
+    ( const std::vector<std::string> & paramNames,
+      const std::vector<double> & paramVals)
 {
 #ifdef Xyce_DEBUG_ANALYSIS
-  string netListFile = commandLine_.getArgumentValue("netlist");
-  std::cout << "\n " << netListFile;
-  std::cout << " N_ANP_AnalysisManager::homotopyStepSuccess " << std::endl;
+  std::string netListFile = commandLine_.getArgumentValue("netlist");
+  Xyce::dout() << "\n " << netListFile;
+  Xyce::dout() << " AnalysisManager::homotopyStepSuccess " << std::endl;
 #endif
   // output:
-  outputMgrAdapterRCPtr_->outputHomotopy( paramNames, paramVals, *dsPtr_->nextSolutionPtr );
+  outputMgrAdapterRCPtr_->outputHomotopy( paramNames, paramVals, *getTIADataStore()->nextSolutionPtr );
 
   // update the data arrays:
-  dsPtr_->updateSolDataArrays();
+  getTIADataStore()->updateSolDataArrays();
 
   // pass info to the next level down, if it exists.
   loaderPtr->homotopyStepSuccess (paramNames,paramVals);
@@ -640,7 +643,7 @@ void N_ANP_AnalysisManager::homotopyStepSuccess
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::homotopyStepFailure
+// Function      : AnalysisManager::homotopyStepFailure
 //
 // Purpose       : Lower-level processing of a failed homotopy step,
 //                 which was controlled from the upper level of a
@@ -650,16 +653,16 @@ void N_ANP_AnalysisManager::homotopyStepSuccess
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 03/30/06
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::homotopyStepFailure ()
+void AnalysisManager::homotopyStepFailure ()
 {
 #ifdef Xyce_DEBUG_ANALYSIS
-  string netListFile = commandLine_.getArgumentValue("netlist");
-  std::cout << "\n " << netListFile;
-  std::cout << " N_ANP_AnalysisManager::homotopyStepFailure " << std::endl;
+  std::string netListFile = commandLine_.getArgumentValue("netlist");
+  Xyce::dout() << "\n " << netListFile;
+  Xyce::dout() << " AnalysisManager::homotopyStepFailure " << std::endl;
 #endif
 
   // The solutions currently in place represent failure.  Get rid of them.
-  dsPtr_->usePreviousSolAsPredictor ();
+  getTIADataStore()->usePreviousSolAsPredictor ();
 
   // pass info to the next level down, if it exists.
   loaderPtr->homotopyStepFailure ();
@@ -668,20 +671,20 @@ void N_ANP_AnalysisManager::homotopyStepFailure ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::stepSuccess
+// Function      : AnalysisManager::stepSuccess
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 03/12/06
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::stepSuccess (int analysisUpper)
+void AnalysisManager::stepSuccess (int analysisUpper)
 {
 
 #ifdef Xyce_DEBUG_ANALYSIS
-  string netListFile = commandLine_.getArgumentValue("netlist");
-  std::cout << "\n " << netListFile;
-  std::cout << " N_ANP_AnalysisManager::stepSuccess " << std::endl;
+  std::string netListFile = commandLine_.getArgumentValue("netlist");
+  Xyce::dout() << "\n " << netListFile;
+  Xyce::dout() << " AnalysisManager::stepSuccess " << std::endl;
 #endif
 
   currentMode_ = analysisUpper;
@@ -697,7 +700,7 @@ void N_ANP_AnalysisManager::stepSuccess (int analysisUpper)
         }
         else
         {
-          string msg = "N_ANP_AnalysisManager::stepSuccess - "
+          std::string msg = "AnalysisManager::stepSuccess - "
             "Failed dynamic_cast of twoLevelAnalysisObject to N_ANP_Transient.\n";
           N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
         }
@@ -710,21 +713,21 @@ void N_ANP_AnalysisManager::stepSuccess (int analysisUpper)
       twoLevelAnalysisObject_->processSuccessfulStep();
       break;
     default:
-      string msg = "N_ANP_AnalysisManager::stepSuccess - "
+      std::string msg = "AnalysisManager::stepSuccess - "
         "unknown type of analysis\n";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::stepFailure
+// Function      : AnalysisManager::stepFailure
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 03/12/06
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::stepFailure (int analysisUpper)
+void AnalysisManager::stepFailure (int analysisUpper)
 {
   currentMode_ = analysisUpper;
   secPtr_->stepAttemptStatus = false;
@@ -739,7 +742,7 @@ void N_ANP_AnalysisManager::stepFailure (int analysisUpper)
         }
         else
         {
-          string msg = "N_ANP_AnalysisManager::stepSuccess - "
+          std::string msg = "AnalysisManager::stepSuccess - "
             "Failed dynamic_cast of twoLevelAnalysisObject to N_ANP_Transient.\n";
           N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
         }
@@ -752,21 +755,21 @@ void N_ANP_AnalysisManager::stepFailure (int analysisUpper)
       twoLevelAnalysisObject_->processFailedStep();
       break;
     default:
-      string msg = "N_ANP_AnalysisManager::stepFailure - "
+      std::string msg = "AnalysisManager::stepFailure - "
         "unknown type of analysis\n";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getInitialQnorm
+// Function      : AnalysisManager::getInitialQnorm
 // Purpose       : Used for 2-level solves.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 03/12/06
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getInitialQnorm (N_TIA_TwoLevelError & tle)
+bool AnalysisManager::getInitialQnorm (N_TIA_TwoLevelError & tle)
 {
   bool bsuccess = true;
   wimPtr->getInitialQnorm (tle);
@@ -774,18 +777,19 @@ bool N_ANP_AnalysisManager::getInitialQnorm (N_TIA_TwoLevelError & tle)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getBreakPoints
+// Function      : AnalysisManager::getBreakPoints
 // Purpose       : Used for 2-level solves.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 03/12/06
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getBreakPoints
-     (vector<N_UTL_BreakPoint> &breakPointTimes)
+bool AnalysisManager::getBreakPoints(std::vector<N_UTL_BreakPoint> &breakPointTimes)
 {
   bool bsuccess = true;
   loaderPtr->getBreakPoints(breakPointTimes);
   return bsuccess;
 }
 
+} // namespace Analysis
+} // namespace Xyce

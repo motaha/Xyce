@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,29 +36,14 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.56.4.2 $
+// Revision Number: $Revision: 1.64 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
-
-
-// ---------- Standard Includes ----------
-
-#include <N_UTL_Misc.h>
-
-#ifdef HAVE_ALGORITHM
-#include <algorithm>
-#else
-#ifdef HAVE_ALGO_H
-#include <algo.h>
-#else
-#error Must have either <algorithm> or <algo.h>!
-#endif
-#endif
 
 #include <Epetra_CrsGraph.h>
 #include <Epetra_CrsMatrix.h>
@@ -68,10 +53,8 @@
 
 #include <EpetraExt_View_CrsGraph.h>
 
-// ----------   Xyce Includes   ----------
-
-#include <N_UTL_Misc.h>
 #include <N_UTL_Functors.h>
+#include <N_UTL_fwd.h>
 
 #include <N_PDS_ParMap.h>
 #include <N_PDS_Comm.h>
@@ -88,13 +71,15 @@
 
 #include <N_ERH_ErrorMgr.h>
 
+using std::max;
+
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_Builder::~
-// Purpose       : 
+// Purpose       :
 // Special Notes :
-// Scope         : 
-// Creator       : 
-// Creation Date : 
+// Scope         :
+// Creator       :
+// Creation Date :
 //-----------------------------------------------------------------------------
 N_LAS_Builder::~N_LAS_Builder()
 {
@@ -138,7 +123,7 @@ N_LAS_MultiVector * N_LAS_Builder::createStateMultiVector( const int numVectors,
 // Special Notes :
 // Scope         : Public
 // Creator       : Eric Keiter
-// Creation Date : 
+// Creation Date :
 //-----------------------------------------------------------------------------
 N_LAS_MultiVector * N_LAS_Builder::createStoreMultiVector( const int numVectors, const double value ) const
 {
@@ -184,7 +169,7 @@ N_LAS_Vector * N_LAS_Builder::createStateVector( const double value ) const
 // Special Notes :
 // Scope         : Public
 // Creator       : Eric Keiter, SNL
-// Creation Date : 
+// Creation Date :
 //-----------------------------------------------------------------------------
 N_LAS_Vector * N_LAS_Builder::createStoreVector( const double value ) const
 {
@@ -224,10 +209,10 @@ N_LAS_Matrix * N_LAS_Builder::createMatrix(const double initialValue) const
 //-----------------------------------------------------------------------------
 Epetra_MapColoring * N_LAS_Builder::createSolnColoring() const
 {
-  const vector<char> & charColors = lasQueryUtil_->rowList_VarType();
+  const std::vector<char> & charColors = lasQueryUtil_->rowList_VarType();
 
   int size = charColors.size();
-  vector<int> colors( size );
+  std::vector<int> colors( size );
   for( int i = 0; i < size; ++i )
   {
     switch( charColors[i] )
@@ -240,7 +225,7 @@ Epetra_MapColoring * N_LAS_Builder::createSolnColoring() const
                 break;
     }
   }
-  
+
   return new Epetra_MapColoring( *(pdsMgr_->getParallelMap("SOLUTION")->petraBlockMap()),
                                  &colors[0], 0 );
 }
@@ -248,7 +233,7 @@ Epetra_MapColoring * N_LAS_Builder::createSolnColoring() const
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_Builder::createInitialConditionColoring
-// Purpose       : 
+// Purpose       :
 // Special Notes : The .IC and .NODESET capabilities will use the variables
 //                 which are colored 0.  This will be all voltage nodes not
 //                 connected to independent sources.
@@ -258,12 +243,12 @@ Epetra_MapColoring * N_LAS_Builder::createSolnColoring() const
 //-----------------------------------------------------------------------------
 Epetra_MapColoring * N_LAS_Builder::createInitialConditionColoring() const
 {
-  const vector<char> & charColors = lasQueryUtil_->rowList_VarType();
-  const vector<int> & vsrcGIDColors = lasQueryUtil_->vsrcGIDVec();
+  const std::vector<char> & charColors = lasQueryUtil_->rowList_VarType();
+  const std::vector<int> & vsrcGIDColors = lasQueryUtil_->vsrcGIDVec();
 
   int size = charColors.size();
   int vsrcSize = vsrcGIDColors.size();
-  vector<int> colors( size );
+  std::vector<int> colors( size );
   for( int i = 0; i < size; ++i )
   {
     switch( charColors[i] )
@@ -282,12 +267,12 @@ Epetra_MapColoring * N_LAS_Builder::createInitialConditionColoring() const
   {
     int vsrcID = vsrcGIDColors[i];
     // Convert the ID from local to global if it is valid and the build is parallel.
-    if (vsrcID >= 0) 
+    if (vsrcID >= 0)
     {
 #ifdef Xyce_PARALLEL_MPI
       vsrcID = solnMap->globalToLocalIndex( vsrcGIDColors[i] );
 #endif
-      if (vsrcID < size && vsrcID >= 0)  
+      if (vsrcID < size && vsrcID >= 0)
         colors[vsrcID] = 1;
     }
   }
@@ -306,15 +291,15 @@ Epetra_MapColoring * N_LAS_Builder::createInitialConditionColoring() const
 bool N_LAS_Builder::generateParMaps()
 {
   int numLocalRows = lasQueryUtil_->numLocalRows();
-  vector<int> arrayGIDs(numLocalRows);
+  std::vector<int> arrayGIDs(numLocalRows);
   arrayGIDs = lasQueryUtil_->rowList_GID();
 
   int numLocalStateVars = lasQueryUtil_->numLocalStateVars();
-  vector<int> arrayStateGIDs(numLocalStateVars);
+  std::vector<int> arrayStateGIDs(numLocalStateVars);
   arrayStateGIDs = lasQueryUtil_->rowList_StateGID();
 
   int numLocalStoreVars = lasQueryUtil_->numLocalStoreVars();
-  vector<int> arrayStoreGIDs(numLocalStoreVars);
+  std::vector<int> arrayStoreGIDs(numLocalStoreVars);
   arrayStoreGIDs = lasQueryUtil_->rowList_StoreGID();
 
   int numGlobalRows = lasQueryUtil_->numGlobalRows();
@@ -417,11 +402,11 @@ bool N_LAS_Builder::generateParMaps()
 //-----------------------------------------------------------------------------
 bool N_LAS_Builder::generateGraphs()
 {
-  const vector< list<int> > & rcData = lasQueryUtil_->rowList_ColList();
+  const std::vector< std::list<int> > & rcData = lasQueryUtil_->rowList_ColList();
   int numLocalRows_Overlap = rcData.size();
 
   int maxNZs = 0;
-  vector<int> arrayNZs( numLocalRows_Overlap );
+  std::vector<int> arrayNZs( numLocalRows_Overlap );
   for( int i = 0; i < numLocalRows_Overlap; ++i )
   {
     arrayNZs[i] = rcData[i].size();
@@ -435,7 +420,7 @@ bool N_LAS_Builder::generateGraphs()
   Epetra_CrsGraph * overlapGndGraph = new Epetra_CrsGraph( Copy, overlapGndMap, &arrayNZs[0] );
   Epetra_CrsGraph * overlapGraph = new Epetra_CrsGraph( Copy, overlapMap, &arrayNZs[0] );
 
-  vector<int> indices( maxNZs );
+  std::vector<int> indices( maxNZs );
   for( int i = 0; i < numLocalRows_Overlap; ++i )
   {
     copy( rcData[i].begin(), rcData[i].end(), indices.begin() );
@@ -455,24 +440,17 @@ bool N_LAS_Builder::generateGraphs()
   pdsMgr_->addMatrixGraph( "JACOBIAN_OVERLAP_GND", overlapGndGraph );
   pdsMgr_->addMatrixGraph( "JACOBIAN_OVERLAP", overlapGraph );
 
-#ifdef Xyce_DEBUG_DIRECT_ACCESS_MATRIX
-  cout << overlapGndMap;
-  cout << *overlapGndGraph;
-  cout << overlapMap;
-  cout << *overlapGraph;
-#endif
-
 #ifndef Xyce_PARALLEL_MPI
   //determine what the column map should be for the local view of the graph
   //store a new one if it is different than the overlap map
   const Epetra_BlockMap & oColMap = overlapGraph->ColMap();
   int oColMapSize = oColMap.NumMyElements();
-  vector<int> nColMapElements;
+  std::vector<int> nColMapElements;
   for( int i = 0; i < oColMapSize; ++i )
     if( overlapMap.MyGID( oColMap.GID(i) ) ) nColMapElements.push_back( oColMap.GID(i) );
- 
+
   N_PDS_ParMap * localColMap = 0;
- 
+
   double lSize = static_cast<double>(nColMapElements.size());
   double tSize;
   pdsMgr_->getPDSComm()->sumAll( &lSize, &tSize, 1 );
@@ -485,26 +463,26 @@ bool N_LAS_Builder::generateGraphs()
         nColMapElements );
     pdsMgr_->addParallelMap( "SOLUTION_COLUMN", localColMap );
   }
- 
+
   Epetra_BlockMap * nColMap = &overlapMap;
   if( localColMap ) nColMap = localColMap->petraBlockMap();
- 
+
   EpetraExt::CrsGraph_View * viewTransform = new EpetraExt::CrsGraph_View( &localMap, nColMap );
   Epetra_CrsGraph * localGraph = &((*viewTransform)( *overlapGraph ));
   pdsMgr_->addMatrixGraph( "JACOBIAN", localGraph, viewTransform );
-#else  
+#else
   if( pdsMgr_->getPDSComm()->isSerial() )
   {
     //determine what the column map should be for the local view of the graph
     //store a new one if it is different than the overlap map
     const Epetra_BlockMap & oColMap = overlapGraph->ColMap();
     int oColMapSize = oColMap.NumMyElements();
-    vector<int> nColMapElements;
+    std::vector<int> nColMapElements;
     for( int i = 0; i < oColMapSize; ++i )
       if( overlapMap.MyGID( oColMap.GID(i) ) ) nColMapElements.push_back( oColMap.GID(i) );
-   
+
     N_PDS_ParMap * localColMap = 0;
-   
+
     double lSize = static_cast<double>(nColMapElements.size());
     double tSize;
     pdsMgr_->getPDSComm()->sumAll( &lSize, &tSize, 1 );
@@ -517,10 +495,10 @@ bool N_LAS_Builder::generateGraphs()
           nColMapElements );
       pdsMgr_->addParallelMap( "SOLUTION_COLUMN", localColMap );
     }
-   
+
     Epetra_BlockMap * nColMap = &overlapMap;
     if( localColMap ) nColMap = localColMap->petraBlockMap();
-   
+
     EpetraExt::CrsGraph_View * viewTransform = new EpetraExt::CrsGraph_View( &localMap, nColMap );
     Epetra_CrsGraph * localGraph = &((*viewTransform)( *overlapGraph ));
     pdsMgr_->addMatrixGraph( "JACOBIAN", localGraph, viewTransform );
@@ -531,27 +509,23 @@ bool N_LAS_Builder::generateGraphs()
     Epetra_CrsGraph * localGraph = new Epetra_CrsGraph( Copy, localMap, 0 );
     localGraph->Export( *overlapGraph, exporter, Add );
 #ifdef Xyce_VERBOSE_LINEAR
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_INFO_0, "Exported To Local Graph!\n" );
+    Xyce::lout() << "Exported To Local Graph!\n"  << std::endl;
 #endif
     localGraph->FillComplete();
 #ifdef Xyce_VERBOSE_LINEAR
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_INFO_0, "Local Graph Transformed!\n" );
+    Xyce::lout() << "Local Graph Transformed!\n"  << std::endl;
 #endif
     pdsMgr_->addMatrixGraph( "JACOBIAN", localGraph );
   }
 #endif
 
 
-#ifdef Xyce_DEBUG_DIRECT_ACCESS_MATRIX
-  cout << localMap;
-#endif
-
   return true;
 }
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_Builder::getSolutionMap
-// Purpose       : 
+// Purpose       :
 // Special Notes : This is specifically for blockAnalysis types (like MPDE & HB)
 // so we can get a valid map from the builder.
 // Scope         : Public
@@ -565,7 +539,7 @@ RCP<const Epetra_Map> N_LAS_Builder::getSolutionMap() const
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_Builder::getSolutionMaps
-// Purpose       : 
+// Purpose       :
 // Special Notes : This is specifically for ModelEvaluator Interface
 // Scope         : Public
 // Creator       : Todd Coffey, 1414
@@ -582,7 +556,7 @@ void N_LAS_Builder::getSolutionMaps(
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_Builder::getStateMap
-// Purpose       : 
+// Purpose       :
 // Special Notes : This is specifically for blockAnalysis types (like MPDE & HB)
 // so we can get a valid map from the builder.
 // Scope         : Public
@@ -596,12 +570,12 @@ RCP<const Epetra_Map> N_LAS_Builder::getStateMap() const
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_Builder::getStoreMap
-// Purpose       : 
+// Purpose       :
 // Special Notes : This is specifically for blockAnalysis types (like MPDE & HB)
 // so we can get a valid map from the builder.
 // Scope         : Public
-// Creator       : 
-// Creation Date : 
+// Creator       :
+// Creation Date :
 //-----------------------------------------------------------------------------
 RCP<const Epetra_Map> N_LAS_Builder::getStoreMap() const
 {
@@ -610,7 +584,7 @@ RCP<const Epetra_Map> N_LAS_Builder::getStoreMap() const
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_Builder::getStateMap
-// Purpose       : 
+// Purpose       :
 // Special Notes : This is specifically for ModelEvaluator Interface
 // Scope         : Public
 // Creator       : Todd Coffey, 1414
@@ -625,11 +599,11 @@ void N_LAS_Builder::getStateMap(
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_Builder::getStoreMap
-// Purpose       : 
+// Purpose       :
 // Special Notes : This is specifically for ModelEvaluator Interface
 // Scope         : Public
-// Creator       : 
-// Creation Date : 
+// Creator       :
+// Creation Date :
 //-----------------------------------------------------------------------------
 void N_LAS_Builder::getStoreMap(
     RCP<N_PDS_ParMap> & store_map
@@ -640,7 +614,7 @@ void N_LAS_Builder::getStoreMap(
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_Builder::getdFdxGraphs
-// Purpose       : 
+// Purpose       :
 // Special Notes : This is specifically for ModelEvaluator Interface
 // Scope         : Public
 // Creator       : Todd Coffey, 1414
@@ -657,7 +631,7 @@ void N_LAS_Builder::getdFdxGraphs(
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_Builder::getdQdxGraphs
-// Purpose       : 
+// Purpose       :
 // Special Notes : This is specifically for ModelEvaluator Interface
 // Scope         : Public
 // Creator       : Todd Coffey, 1414
@@ -674,12 +648,12 @@ void N_LAS_Builder::getdQdxGraphs(
 
 
 bool N_LAS_Builder::registerPDSManager(N_PDS_Manager * PDS_Manager)
-{ 
-  pdsMgr_ = rcp(PDS_Manager,false); return true; 
+{
+  pdsMgr_ = rcp(PDS_Manager,false); return true;
 }
 
 bool N_LAS_Builder::registerPDSManager(RCP<N_PDS_Manager> PDS_Manager)
-{ 
-  pdsMgr_ = PDS_Manager; return true; 
+{
+  pdsMgr_ = PDS_Manager; return true;
 }
 

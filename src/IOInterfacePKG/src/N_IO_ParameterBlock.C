@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -40,9 +40,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.72.2.2 $
+// Revision Number: $Revision: 1.87 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:43 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -60,23 +60,27 @@
 // ----------   Xyce Includes   ----------
 #include <N_IO_CircuitMetadata.h>
 #include <N_IO_ParameterBlock.h>
+#include <N_IO_Report.h>
 #include <N_DEV_Param.h>
 #include <N_ERH_ErrorMgr.h>
 #include <N_UTL_Misc.h>
 #include <N_UTL_Expression.h>
 #include <N_PDS_Comm.h>
 
+namespace Xyce {
+namespace IO {
+
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::N_IO_ParameterBlock
+// Function      : ParameterBlock::ParameterBlock
 // Purpose       : constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/10/2001
 //-----------------------------------------------------------------------------
-N_IO_ParameterBlock::N_IO_ParameterBlock(
-    string const& fileName,
-    vector<N_IO_SpiceSeparatedFieldTool::StringToken> const& parsedInputLine)
+ParameterBlock::ParameterBlock(
+    std::string const& fileName,
+    std::vector<N_IO_SpiceSeparatedFieldTool::StringToken> const& parsedInputLine)
 : netlistFileName_(fileName),
   defaultApplied_(false),
   parsedLine(parsedInputLine)
@@ -86,50 +90,47 @@ N_IO_ParameterBlock::N_IO_ParameterBlock(
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::print
+// Function      : ParameterBlock::print
 // Purpose       : Output the details of a device block to standard out.
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/10/2001
 //-----------------------------------------------------------------------------
-void N_IO_ParameterBlock::print()
+void ParameterBlock::print()
 {
-  cout << endl;
-  cout << "Parameter Block Information" << endl;
-  cout << "---------------------------" << endl;
+  Xyce::dout() << std::endl;
+  Xyce::dout() << "Parameter Block Information" << std::endl;
+  Xyce::dout() << "---------------------------" << std::endl;
 
-  cout << "netlist line:" << endl;
+  Xyce::dout() << "netlist line:" << std::endl;
   int lineSize = parsedLine.size();
   for ( int i = 0; i < lineSize; ++i )
   {
-    cout << "  " << parsedLine[i].string_;
+    Xyce::dout() << "  " << parsedLine[i].string_;
   }
-  cout << endl;
-  cout << "  name : " << getName() << endl;
-  cout << "  type : " << getType() << endl;
-  cout << "  level: " << getLevel() << endl;
+  Xyce::dout() << std::endl;
+  Xyce::dout() << "  name : " << getName() << std::endl;
+  Xyce::dout() << "  type : " << getType() << std::endl;
+  Xyce::dout() << "  level: " << getLevel() << std::endl;
 
-  cout << "  parameters: " << endl;
+  Xyce::dout() << "  parameters: " << std::endl;
   int numParameters = getNumberOfParameters();
   for (int i = 0; i < numParameters; ++i)
   {
-    cout << "  " << getParameter(i).uTag() << " : ";
-    cout << getParameter(i).sVal();
+    Xyce::dout() << "  " << getParameter(i).uTag() << " : ";
+    Xyce::dout() << getParameter(i).stringValue();
     if ( getParameter(i).isTimeDependent() )
     {
-      cout << "  time dependent";
+      Xyce::dout() << "  time dependent";
     }
-    cout << endl;
+    Xyce::dout() << std::endl;
   }
-  cout << endl;
-
-  cout << "------------------" << endl;
-  cout << endl;
+  Xyce::dout() << std::endl;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::extractModelData
+// Function      : ParameterBlock::extractModelData
 // Purpose       : Extract model data from parsedLine using model metadata.
 //
 // Special Notes : ERK - this function doesn't appear to actually use the
@@ -146,16 +147,14 @@ void N_IO_ParameterBlock::print()
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/10/2001
 //-----------------------------------------------------------------------------
-bool N_IO_ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
+bool ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
 {
   int numFields = parsedLine.size();
 
   // Check that the minimum required number of fields are on the line.
   if ( numFields < 3 )
   {
-    string msg(".model line has too few fields \n");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-        netlistFileName_, parsedLine[0].lineNumber_);
+    Report::UserFatal0().at(netlistFileName_, parsedLine[0].lineNumber_) << ".model line has too few fields";
   }
 
   // Extract the model name and type from parsedLine.
@@ -172,7 +171,7 @@ bool N_IO_ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
   int paramStartPos;
   int offsetEq;
   bool levelSet = false;
-  vector<N_DEV_Param> inputParameters;
+  std::vector<Device::Param> inputParameters;
   if ( numFields > 3 )
   {
     int paramEndPos;
@@ -191,9 +190,7 @@ bool N_IO_ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
     if ( (beginParenFound && parsedLine[numFields - 1].string_ != ")") ||
          (!beginParenFound && parsedLine[numFields - 1].string_ == ")") )
     {
-      string msg("Unmatched parentheses for .model " + getName() + "\n");
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-          netlistFileName_, parsedLine[0].lineNumber_);
+      Report::UserFatal0().at(netlistFileName_, parsedLine[0].lineNumber_) << "Unmatched parentheses for .model " << getName();
     }
     else if ( parsedLine[numFields - 1].string_ == ")" )
     {
@@ -216,7 +213,7 @@ bool N_IO_ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
     }
 
     // Extract the parameters from parsedLine.
-    N_DEV_Param parameter("", "");
+    Device::Param parameter("", "");
 
     // new way (ERK), which handles traditional name=value format params,
     // VECTOR params, and VECTOR-COMPOSITE params.
@@ -265,10 +262,8 @@ bool N_IO_ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
 
         if (unmatchedLeftBraces > 0)
         {
-          string msg("Unmatched curly braces \n");
-          msg += "in .model " + getName() + "\n";
-          N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-              netlistFileName_, parsedLine[i+1].lineNumber_);
+          Report::UserFatal0().at(netlistFileName_, parsedLine[i+1].lineNumber_)
+            << "Unmatched curly braces in .model " << getName();
         }
 
         bool composite(numEqualSigns > 0);
@@ -276,7 +271,7 @@ bool N_IO_ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
         if (composite)
         {
 #ifdef Xyce_DEBUG_IO
-          cout << " N_IO_ParameterBlock::extractModelData: YES! I found a VECTOR-COMPOSITE!!!!" << endl;
+          Xyce::dout() << " ParameterBlock::extractModelData: YES! I found a VECTOR-COMPOSITE!!!!" << std::endl;
 #endif
           int linePosition=i+3;
           int savedLinePosition=linePosition;
@@ -287,7 +282,7 @@ bool N_IO_ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
 /////
 
 // count the number of blocks, get stawman structure
-          vector<N_DEV_Param> tmpParamVec;
+          std::vector<Device::Param> tmpParamVec;
           while (parsedLine[linePosition].string_ != "}")
           {
             ExtendedString component ( parsedLine[linePosition].string_ );
@@ -297,7 +292,7 @@ bool N_IO_ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
             parameter.set(component, 0.0);
             tmpParamVec.push_back(parameter);
 #ifdef Xyce_DEBUG_IO
-            cout << "parameter = " << parameter << endl;
+            Xyce::dout() << "parameter = " << parameter << std::endl;
 #endif
 
             linePosition += 2;
@@ -316,7 +311,7 @@ bool N_IO_ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
             numBlocks = blockIndex;
           } // end of while loop.
 #ifdef Xyce_DEBUG_IO
-          cout << "numBlocks = " << numBlocks << endl;
+          Xyce::dout() << "numBlocks = " << numBlocks << std::endl;
 #endif
 
           inputCompositeParamVecMap[paramBase].resize(numBlocks);
@@ -325,11 +320,11 @@ bool N_IO_ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
           {
             inputCompositeParamVecMap[paramBase][iblock] = tmpParamVec;
 #ifdef Xyce_DEBUG_IO
-            cout << "paramBase = " << paramBase;
-            cout << "  iblock = " << iblock << endl;
+            Xyce::dout() << "paramBase = " << paramBase;
+            Xyce::dout() << "  iblock = " << iblock << std::endl;
             for (int ieric=0;ieric<tmpParamVec.size();++ieric)
             {
-              cout << "par["<<ieric<<"]="<<tmpParamVec[ieric]<<endl;
+              Xyce::dout() << "par["<<ieric<<"]="<<tmpParamVec[ieric]<<std::endl;
             }
 #endif
           }
@@ -365,7 +360,7 @@ bool N_IO_ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
 
               ExtendedString value ( parsedLine[linePosition].string_ );
 #ifdef Xyce_DEBUG_IO
-              cout << " N_IO_ParameterBlock::extractModelData: value = " << value << endl;
+              Xyce::dout() << " ParameterBlock::extractModelData: value = " << value << std::endl;
 #endif
               //
               // This line commented  out by TVR on 4 Feb 2009.  It is not
@@ -394,20 +389,20 @@ bool N_IO_ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
 
 #ifdef Xyce_DEBUG_IO
 
-          cout << "User-input .MODEL statement vector-composite for param = "<< paramBase << endl;
-          vector <vector<N_DEV_Param> > & tmpParamVecVec = inputCompositeParamVecMap[paramBase];
+          Xyce::dout() << "User-input .MODEL statement vector-composite for param = "<< paramBase << std::endl;
+          std::vector<std::vector<Device::Param> > & tmpParamVecVec = inputCompositeParamVecMap[paramBase];
           for (int ivec=0;ivec<tmpParamVecVec.size();++ivec)
           {
 
-            cout << "Composite for column (block) "<< ivec<< ":" <<endl;
-            vector<N_DEV_Param> & tmpVec = tmpParamVecVec[ivec];
+            Xyce::dout() << "Composite for column (block) "<< ivec<< ":" <<std::endl;
+            std::vector<Device::Param> & tmpVec = tmpParamVecVec[ivec];
             int vecSize = tmpVec.size();
 
             for (int ip=0; ip<vecSize; ++ip)
             {
-              cout << "param["<<ip<<"] = " << tmpVec[ip];
+              Xyce::dout() << "param["<<ip<<"] = " << tmpVec[ip];
             }
-            cout << "-----------" << endl;
+            Xyce::dout() << "-----------" << std::endl;
           }
 
 #endif
@@ -417,19 +412,19 @@ bool N_IO_ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
         else
         {
 #ifdef Xyce_DEBUG_IO
-          cout << " N_IO_ParameterBlock::extractModelData: YES! I found a VECTOR!!!!" << endl;
+          Xyce::dout() << " ParameterBlock::extractModelData: YES! I found a VECTOR!!!!" << std::endl;
           for (int k = i; k<=finalLeftBraceIndex; k++)
-            cout << "\"" << parsedLine[k].string_ << "\" ";
-          cout << std::endl;
+            Xyce::dout() << "\"" << parsedLine[k].string_ << "\" ";
+          Xyce::dout() << std::endl;
 #endif
           // Extract parameter name and value from parsedLine and add to
           // parameter list, check for LEVEL parameter treat as special case.
           field = parsedLine[i].string_;
           field.toUpper();
-          vector<string> values;
+          std::vector<std::string> values;
           for( int k=i+3; k<finalLeftBraceIndex; k+=2 )
           {
-            //std::cout << "adding \"" << parsedLine[k].string_ << "\"" << std::endl;
+            //Xyce::dout() << "adding \"" << parsedLine[k].string_ << "\"" << std::endl;
             values.push_back( parsedLine[k].string_ );
           }
           parameter.set( field, values );
@@ -457,7 +452,7 @@ bool N_IO_ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
         }
         else
         {
-          setLevel( parameter.sVal() );
+          setLevel( parameter.stringValue() );
           levelSet = true;
         }
         paramDone=true;
@@ -465,10 +460,8 @@ bool N_IO_ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
 
       if (!paramDone)
       {
-        string msg("Parameter not formatted correctly \n");
-        msg += "in .model " + getName() + "\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-            netlistFileName_, parsedLine[i+1].lineNumber_);
+        Report::UserFatal0().at(netlistFileName_, parsedLine[i+1].lineNumber_)
+          << "Parameter not formatted correctly in .model " << getName();
       }
     }
   }
@@ -479,13 +472,13 @@ bool N_IO_ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
   }
 
 #ifdef Xyce_DEBUG_IO
-  cout << " N_IO_ParameterBlock::extractModelData.  inputParameters: " << endl;
+  Xyce::dout() << " ParameterBlock::extractModelData.  inputParameters: " << std::endl;
 
-  //vector<N_DEV_Param> inputParameters;
+  //std::vector<Device::Param> inputParameters;
   int iIPSize = inputParameters.size();
   for (int ieric=0;ieric<iIPSize;++ieric)
   {
-    cout << inputParameters[ieric];
+    Xyce::dout() << inputParameters[ieric];
   }
 #endif
 
@@ -507,7 +500,7 @@ bool N_IO_ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::addDefaultModelParameters
+// Function      : ParameterBlock::addDefaultModelParameters
 // Purpose       : Add the default parameters for a model from metadata.
 // Special Notes : While not required, it is generally expected that
 //                 the parameters given in the input netlist will have
@@ -517,42 +510,42 @@ bool N_IO_ParameterBlock::extractModelData( N_IO_CircuitMetadata & metadata )
 // Creation Date : 09/17/2001
 // Last Modified : 05/28/2002
 //-----------------------------------------------------------------------------
-void N_IO_ParameterBlock::addDefaultModelParameters(N_IO_CircuitMetadata & metadata )
+void ParameterBlock::addDefaultModelParameters(N_IO_CircuitMetadata & metadata )
 {
-  vector<N_DEV_Param>::iterator paramIter, pparamIter;
+  std::vector<Device::Param>::iterator paramIter, pparamIter;
   int i(0);
-  map<string,bool> paramMetadataExistMap;
-  map<string,bool>::iterator pmap_i;
+  std::map<std::string,bool> paramMetadataExistMap;
+  std::map<std::string,bool>::iterator pmap_i;
 
   if (defaultApplied_)
     return;
 
   // get model metadata
-  vector<N_DEV_Param> * modelParameterPtr = metadata.getPtrToModelParameters(getType(), getLevel());
+  std::vector<Device::Param> &modelParameterPtr = metadata.getModelParameters(getType(), getLevel());
 
-  // check for null ptr (bad model name)
-  if( modelParameterPtr == NULL )
-  {
-    string msg("The model " /* + getName() + " of */"type " + getType() +
-     " is not supported in Xyce.\n");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg);
-  }
+  // // check for null ptr (bad model name)
+  // if( modelParameterPtr == NULL )
+  // {
+  //   std::string msg("The model " /* + getName() + " of */"type " + getType() +
+  //    " is not supported in Xyce.\n");
+  //   N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg);
+  // }
 
   // Process the metadata.
 #ifdef Xyce_DEBUG_IO
-  cout << "BEFORE adding final params:"<<endl;
+  Xyce::dout() << "BEFORE adding final params:"<<std::endl;
   int itmp3=0;
   for (itmp3=0;itmp3<modelData.params.size();++itmp3)
   {
-    cout << modelData.params[itmp3];
+    Xyce::dout() << modelData.params[itmp3];
   }
-  cout << "End of BEFORE parameter List"<<endl;
+  Xyce::dout() << "End of BEFORE parameter List"<<std::endl;
 #endif
 
-  for (i=0; i< modelParameterPtr->size(); ++i)
+  for (i=0; i< modelParameterPtr.size(); ++i)
   {
-    N_DEV_Param & param = (*modelParameterPtr)[i];
-    string paramSVal(param.sVal());
+    Device::Param & param = modelParameterPtr[i];
+    std::string paramSVal(param.stringValue());
 
     paramMetadataExistMap[param.tag()] = true;
 
@@ -568,31 +561,31 @@ void N_IO_ParameterBlock::addDefaultModelParameters(N_IO_CircuitMetadata & metad
 
     if (paramSVal == "VECTOR")
     {
-      std::cout << "N_IO_ParameterBlock::addDefaultModelParameters() Parameter type is VECTOR" << std::endl;
+      Xyce::dout() << "ParameterBlock::addDefaultModelParameters() Parameter type is VECTOR" << std::endl;
     }
   }
 
 #ifdef Xyce_DEBUG_IO
-  cout << " N_IO_ParameterBlock::addDefaultModelParameters: metadata modelParameterPtr[] (list of defaults):"<<endl;
-  for (i=0; i< modelParameterPtr->size(); ++i)
+  Xyce::dout() << " ParameterBlock::addDefaultModelParameters: metadata modelParameterPtr[] (list of defaults):"<<std::endl;
+  for (i=0; i< modelParameterPtr.size(); ++i)
   {
-      cout << (*modelParameterPtr)[i];
+      Xyce::dout() << modelParameterPtr[i];
   }
 #endif
 
   // loop over user-specified params.  At this point the vector composites (if they
   // exist), including defaults, have already been added the params vector.
   int pos = 0;
-  map<string,vector<N_DEV_Param>::iterator> paramDefaultProcessed;
-  vector<N_DEV_Param>::iterator paramEnd = modelData.params.end();
+  std::map<std::string,std::vector<Device::Param>::iterator> paramDefaultProcessed;
+  std::vector<Device::Param>::iterator paramEnd = modelData.params.end();
   for (paramIter=modelData.params.begin() ; paramIter!=paramEnd ; )
   {
-    N_DEV_Param & param = (*paramIter);
+    Device::Param & param = (*paramIter);
 
     if (param.tag() == "INDEPENDENT;PARAM")
     {
-      vector<N_DEV_Param> defaults;
-      for (pparamIter=modelParameterPtr->begin() ; pparamIter != modelParameterPtr->end() ; ++pparamIter)
+      std::vector<Device::Param> defaults;
+      for (pparamIter=modelParameterPtr.begin() ; pparamIter != modelParameterPtr.end() ; ++pparamIter)
       {
         if (paramDefaultProcessed.find((*pparamIter).tag()) == paramDefaultProcessed.end())
         {
@@ -608,13 +601,10 @@ void N_IO_ParameterBlock::addDefaultModelParameters(N_IO_CircuitMetadata & metad
     }
     else if (paramMetadataExistMap.find(param.tag()) == paramMetadataExistMap.end())
     {
-      string msg("No model parameter " + param.tag());
-      msg += " found for model " + getName();
-      msg += " of type " + getType() + ".\n";
-      msg += " This parameter ignored.\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING_0, msg,
-          netlistFileName_, parsedLine[0].lineNumber_);
-      paramIter=modelData.params.erase(paramIter);
+      Report::UserWarning0().at(netlistFileName_, parsedLine[0].lineNumber_)
+        << "No model parameter " << param.tag() << " found for model " << getName() << " of type " << getType() << ", parameter ignored.";
+
+      paramIter = modelData.params.erase(paramIter);
       paramEnd = modelData.params.end();
     }
     else
@@ -628,7 +618,7 @@ void N_IO_ParameterBlock::addDefaultModelParameters(N_IO_CircuitMetadata & metad
   // Any parameters, that have not been pushed back on the params vector, but
   // which do exist in metadata, should be pushed back at this point.  Vector-composite
   // defaults are already here, but other defaults may not be.
-  for (paramIter=modelParameterPtr->begin() ; paramIter != modelParameterPtr->end() ; ++paramIter)
+  for (paramIter=modelParameterPtr.begin() ; paramIter != modelParameterPtr.end() ; ++paramIter)
   {
     if (paramDefaultProcessed.find((*paramIter).tag()) == paramDefaultProcessed.end())
     {
@@ -643,7 +633,7 @@ void N_IO_ParameterBlock::addDefaultModelParameters(N_IO_CircuitMetadata & metad
   int numParameters = modelData.params.size();
   for ( int i = 0; i < numParameters; ++i )
   {
-    N_DEV_Param & parameter = modelData.params[i];
+    Device::Param & parameter = modelData.params[i];
     if (parameter.hasExpressionValue() || parameter.isQuoted())
     {
       expressionValuedParams_.push_back(parameter);
@@ -651,13 +641,13 @@ void N_IO_ParameterBlock::addDefaultModelParameters(N_IO_CircuitMetadata & metad
   }
 
 #ifdef Xyce_DEBUG_IO
-  cout << "AFTER adding final default params:"<<endl;
+  Xyce::dout() << "AFTER adding final default params:"<<std::endl;
   int itmp2=0;
   for (itmp2=0;itmp2<modelData.params.size();++itmp2)
   {
-    cout << modelData.params[itmp2];
+    Xyce::dout() << modelData.params[itmp2];
   }
-  cout << "End of AFTER parameter List"<<endl;
+  Xyce::dout() << "End of AFTER parameter List"<<std::endl;
 #endif
 
 
@@ -665,38 +655,38 @@ void N_IO_ParameterBlock::addDefaultModelParameters(N_IO_CircuitMetadata & metad
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::addDefaultCompositeModelParameters_
+// Function      : ParameterBlock::addDefaultCompositeModelParameters_
 // Purpose       :
 // Special Notes :
 // Scope         : private
 // Creator       : Eric Keiter, SNL
 // Creation Date : 05/15/2008
 //-----------------------------------------------------------------------------
-void N_IO_ParameterBlock::addDefaultCompositeModelParameters_
+void ParameterBlock::addDefaultCompositeModelParameters_
   ( N_IO_CircuitMetadata & metadata,
-    N_DEV_Param & baseParam ,
-    map<string,bool> & paramMetadataExistMap)
+    Device::Param & baseParam ,
+    std::map<std::string,bool> & paramMetadataExistMap)
 {
   int icomp(0), ic(0), iNumCols(0);
-  string typ(getType());
+  std::string typ(getType());
   int lev(getLevel());
 
   // Get the defaultComponents from metadata.
-  vector<N_DEV_Param> defaultComponents;
-  string baseTag(baseParam.uTag());
+  std::vector<Device::Param> defaultComponents;
+  std::string baseTag(baseParam.uTag());
   //metadata.getModelCompositeComponents(string(""),
   metadata.getModelCompositeComponents(getType(), baseTag, lev, defaultComponents);
 
   int iDefaultCompSize=defaultComponents.size();
 
 #ifdef Xyce_DEBUG_IO
-  cout << "FOUND A COMPOSITE! ";
-  cout << "N_IO_ParameterBlock::addDefaultCompositeModelParameters_: " << baseParam;
+  Xyce::dout() << "FOUND A COMPOSITE! ";
+  Xyce::dout() << "ParameterBlock::addDefaultCompositeModelParameters_: " << baseParam;
 
   for (icomp=0;icomp<iDefaultCompSize;++icomp)
   {
-    cout << "component["<<icomp<<"] : ";
-    cout << defaultComponents[icomp];
+    Xyce::dout() << "component["<<icomp<<"] : ";
+    Xyce::dout() << defaultComponents[icomp];
   }
 #endif
 
@@ -708,7 +698,7 @@ void N_IO_ParameterBlock::addDefaultCompositeModelParameters_
     inputCompositeParamVecMap[baseTag].resize(1);
     for (icomp=0;icomp<iDefaultCompSize;++icomp)
     {
-      N_DEV_Param & paramDefault = defaultComponents[icomp];
+      Device::Param & paramDefault = defaultComponents[icomp];
       inputCompositeParamVecMap[baseTag][0].push_back(paramDefault);
     }
 #else
@@ -740,15 +730,15 @@ void N_IO_ParameterBlock::addDefaultCompositeModelParameters_
     // push defaults into the inputCompositeParamVecMap, as needed.
     for (icomp=0;icomp<iDefaultCompSize;++icomp)
     {
-      N_DEV_Param & paramDefault = defaultComponents[icomp];
-      string utag1(defaultComponents[icomp].uTag());
+      Device::Param & paramDefault = defaultComponents[icomp];
+      std::string utag1(defaultComponents[icomp].uTag());
 
       bool found=false;
       int itmp=0;
       int iInputCompSize =  inputCompositeParamVecMap[baseTag][0].size();
       for (itmp=0;itmp<iInputCompSize;++itmp)
       {
-        string utag2(inputCompositeParamVecMap[baseTag][0][itmp].uTag());
+        std::string utag2(inputCompositeParamVecMap[baseTag][0][itmp].uTag());
         if (utag1 == utag2)
         {
           found=true;
@@ -771,44 +761,44 @@ void N_IO_ParameterBlock::addDefaultCompositeModelParameters_
 
     int iInputCompSize =  inputCompositeParamVecMap[baseTag][0].size();
 #ifdef Xyce_DEBUG_IO
-    cout << "N_IO_ParameterBlock::addDefaultCompositeModelParameters_: input composite for " << baseTag << ": " <<endl;
+    Xyce::dout() << "ParameterBlock::addDefaultCompositeModelParameters_: input composite for " << baseTag << ": " <<std::endl;
     iNumCols = inputCompositeParamVecMap[baseTag].size();
-    cout << "Column: " ;
+    Xyce::dout() << "Column: " ;
     for (ic=0;ic<iNumCols;++ic)
     {
-      cout << "\t\t" << ic;
+      Xyce::dout() << "\t\t" << ic;
     }
-    cout << endl;
+    Xyce::dout() << std::endl;
     for (icomp=0;icomp<iInputCompSize;++icomp)
     {
-      cout.width(14);
-      cout << inputCompositeParamVecMap[baseTag][0][icomp].tag();
+      Xyce::dout().width(14);
+      Xyce::dout() << inputCompositeParamVecMap[baseTag][0][icomp].tag();
       for (ic=0;ic<iNumCols;++ic)
       {
         if (icomp >= inputCompositeParamVecMap[baseTag][ic].size())
         {
-          string msg("N_IO_ParameterBlock::addDefaultCompositeModelParameters_: inputCompositeParamVecMap overrun!");
+          std::string msg("ParameterBlock::addDefaultCompositeModelParameters_: inputCompositeParamVecMap overrun!");
           N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
         }
 
-        N_DEV_Param & tmpPar = inputCompositeParamVecMap[baseTag][ic][icomp];
-        cout << "\t";
-        cout.width(20);
-        cout << tmpPar.sVal();
-        cout << "(given=";
-        if (tmpPar.given()) cout << "TRUE) ";
-        else                cout << "FALSE)";
+        Device::Param & tmpPar = inputCompositeParamVecMap[baseTag][ic][icomp];
+        Xyce::dout() << "\t";
+        Xyce::dout().width(20);
+        Xyce::dout() << tmpPar.stringValue();
+        Xyce::dout() << "(given=";
+        if (tmpPar.given()) Xyce::dout() << "TRUE) ";
+        else                Xyce::dout() << "FALSE)";
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
     }
-    cout << endl;
+    Xyce::dout() << std::endl;
 #endif
 
     // convert from composite components to conventional parameters.
-    ostringstream paramName;
+    std::ostringstream paramName;
     ExtendedString paramBase ( baseTag );
     paramBase.toUpper();
-    vector<N_DEV_Param> convertedCompositeParams;
+    std::vector<Device::Param> convertedCompositeParams;
 
     iInputCompSize =  inputCompositeParamVecMap[baseTag][0].size();
     iNumCols = inputCompositeParamVecMap[baseTag].size();
@@ -816,7 +806,7 @@ void N_IO_ParameterBlock::addDefaultCompositeModelParameters_
     {
       for (ic=0;ic<iNumCols;++ic)
       {
-        N_DEV_Param newParam = inputCompositeParamVecMap[baseTag][ic][icomp];
+        Device::Param newParam = inputCompositeParamVecMap[baseTag][ic][icomp];
         paramName.str("");
         paramName << paramBase << ic << "." << newParam.uTag();
         newParam.setTag(paramName.str());
@@ -832,11 +822,11 @@ void N_IO_ParameterBlock::addDefaultCompositeModelParameters_
     convertedCompositeParams.end());
 
 #ifdef Xyce_DEBUG_IO
-    cout << "After adding composite params:"<<endl;
+    Xyce::dout() << "After adding composite params:"<<std::endl;
     int itmp2=0;
     for (itmp2=0;itmp2<modelData.params.size();++itmp2)
     {
-      cout << modelData.params[itmp2];
+      Xyce::dout() << modelData.params[itmp2];
     }
 #endif
 
@@ -846,7 +836,7 @@ void N_IO_ParameterBlock::addDefaultCompositeModelParameters_
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::setParameterValues
+// Function      : ParameterBlock::setParameterValues
 // Purpose       : Look for expression valued parameters in the parameter
 //                 list, evaluate expressions found and reset the parameter
 //                 value accordingly.
@@ -855,9 +845,9 @@ void N_IO_ParameterBlock::addDefaultCompositeModelParameters_
 // Creator       : Lon Waters, SNL
 // Creation Date : 12/19/2001
 //-----------------------------------------------------------------------------
-void N_IO_ParameterBlock::setParameterValues(N_IO_CircuitContext* contextPtr)
+void ParameterBlock::setParameterValues(N_IO_CircuitContext* contextPtr)
 {
-  N_DEV_Param* parameterPtr;
+  Device::Param* parameterPtr;
   int numParameters = expressionValuedParams_.size();
   int i;
 
@@ -865,62 +855,61 @@ void N_IO_ParameterBlock::setParameterValues(N_IO_CircuitContext* contextPtr)
   {
     parameterPtr = findParameter(expressionValuedParams_[i]);
 #ifdef Xyce_DEBUG_IO
-    cout << " setParameterValues, processing expressionValuedParams[" << i << "]" << endl;
+    Xyce::dout() << " setParameterValues, processing expressionValuedParams[" << i << "]" << std::endl;
     if (parameterPtr == NULL)
     {
-      cout << "N_IO_ParameterBlock::setParmaeterValues.  expressionValuedParams_["<<i<<"].uTag = " <<
-      expressionValuedParams_[i].uTag() << " is NOT found in model data!" << endl;
+      Xyce::dout() << "ParameterBlock::setParmaeterValues.  expressionValuedParams_["<<i<<"].uTag = " <<
+      expressionValuedParams_[i].uTag() << " is NOT found in model data!" << std::endl;
       exit(0);
     }
 
-    cout << "   Tag is " << parameterPtr->uTag() << endl;
-    cout << "   value is " << parameterPtr->sVal() << endl;
+    Xyce::dout() << "   Tag is " << parameterPtr->uTag() << std::endl;
+    Xyce::dout() << "   value is " << parameterPtr->stringValue() << std::endl;
 #endif
     if (parameterPtr != NULL)
     {
       if (!contextPtr->resolveParameter(*parameterPtr))
       {
-        N_UTL_Expression & expr = *(parameterPtr->ePtr());
+        Util::Expression & expr = parameterPtr->getValue<Util::Expression>();
 
-        string msg("Parameter " + parameterPtr->uTag() + " for model ");
-        msg += getName();
+        Report::UserFatal message;
+        message.at(netlistFileName_, parsedLine[0].lineNumber_);
+        message << "Parameter " << parameterPtr->uTag() << " for model " << getName();
         if (expr.get_num(XEXP_LEAD) > 0)
         {
-          msg += " contains illegal use of lead current: ";
+          message << " contains illegal use of lead current: ";
         }
         else
         {
-          msg += " contains unrecognized symbols: \n";
+          message << " contains unrecognized symbols: ";
         }
-        msg += expr.get_expression();
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-            netlistFileName_, parsedLine[0].lineNumber_);
+        message << expr.get_expression();
       }
     }
 #ifdef Xyce_DEBUG_IO
-    cout << " after resolution, "  << endl;
-    cout << "   Tag is " << parameterPtr->uTag() << endl;
+    Xyce::dout() << " after resolution, "  << std::endl;
+    Xyce::dout() << "   Tag is " << parameterPtr->uTag() << std::endl;
     if (parameterPtr->hasExpressionValue())
     {
-      cout << " Expression did not fully resolve, still has value "
-           << parameterPtr->ePtr()->get_expression() << endl;
+      Xyce::dout() << " Expression did not fully resolve, still has value "
+           << parameterPtr->getValue<Util::Expression>().get_expression() << std::endl;
     }
     else
     {
-      cout << "   value is " << parameterPtr->dVal() << endl;
+      Xyce::dout() << "   value is " << parameterPtr->getImmutableValue<double>() << std::endl;
     }
 #endif
   }
 
-  vector<N_DEV_Param> & modelDataParams = modelData.params;
+  std::vector<Device::Param> & modelDataParams = modelData.params;
   int modelDataSize = modelDataParams.size();
   for (int iparam=0;iparam<modelDataSize;++iparam)
   {
-    N_DEV_Param & param = modelDataParams[iparam];
+    Device::Param & param = modelDataParams[iparam];
 
-    if (param.getType() == STR && !param.isNumeric())
+    if (param.getType() == Xyce::Util::STR && !param.isNumeric())
     {
-      ExtendedString paramNameOrig(param.sVal());
+      ExtendedString paramNameOrig(param.stringValue());
 
       // since we're going to upcase paramNameOrig to try resolving it as an
       // expression, save the original just in case we *can't* resolve it
@@ -932,7 +921,7 @@ void N_IO_ParameterBlock::setParameterValues(N_IO_CircuitContext* contextPtr)
       paramNameOrig.toUpper();
       if (paramNameOrig.possibleParam())
       {
-        param.setVal(string("{" + paramNameOrig + "}"));
+        param.setVal(std::string("{" + paramNameOrig + "}"));
 
         // try to resolve this string as a simple parameter.  If it can't
         // resolve, restore it to its original value (it's real original
@@ -945,16 +934,16 @@ void N_IO_ParameterBlock::setParameterValues(N_IO_CircuitContext* contextPtr)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::findParameter
+// Function      : ParameterBlock::findParameter
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-N_DEV_Param* N_IO_ParameterBlock::findParameter( N_DEV_Param const& parameter )
+Device::Param* ParameterBlock::findParameter( Device::Param const& parameter )
 {
-  vector<N_DEV_Param>::iterator paramIter;
+  std::vector<Device::Param>::iterator paramIter;
   paramIter = find( modelData.params.begin(),
                     modelData.params.end(),
                     parameter );
@@ -971,28 +960,28 @@ N_DEV_Param* N_IO_ParameterBlock::findParameter( N_DEV_Param const& parameter )
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::instance
+// Function      : ParameterBlock::instance
 // Purpose       : implement packable
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-Packable * N_IO_ParameterBlock::instance() const
+Packable * ParameterBlock::instance() const
 {
-  return new N_IO_ParameterBlock();
+  return new ParameterBlock();
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::packedByteCount
+// Function      : ParameterBlock::packedByteCount
 // Purpose       : Counts bytes needed to pack block.
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-int N_IO_ParameterBlock::packedByteCount() const
+int ParameterBlock::packedByteCount() const
 {
   int byteCount = 0;
   int size, length, j;
@@ -1032,24 +1021,24 @@ int N_IO_ParameterBlock::packedByteCount() const
   // count the internals of the composite, if not empty.
   if ( !(inputCompositeParamVecMap.empty()) )
   {
-    map < string, vector <vector<N_DEV_Param> > >::const_iterator  iter;
-    map < string, vector <vector<N_DEV_Param> > >::const_iterator  begin = inputCompositeParamVecMap.begin();
-    map < string, vector <vector<N_DEV_Param> > >::const_iterator  end = inputCompositeParamVecMap.end();
+    std::map< std::string, std::vector<std::vector<Device::Param> > >::const_iterator  iter;
+    std::map< std::string, std::vector<std::vector<Device::Param> > >::const_iterator  begin = inputCompositeParamVecMap.begin();
+    std::map< std::string, std::vector<std::vector<Device::Param> > >::const_iterator  end = inputCompositeParamVecMap.end();
     for (iter=begin;iter!=end;++iter)
     {
       // count paramBase
-      string paramBase = iter->first;
+      std::string paramBase = iter->first;
       byteCount += sizeof( int ); // size
       byteCount += paramBase.length();
 
       // count size of paramVecVec.
-      const vector <vector<N_DEV_Param> > & tmpParamVecVec = iter->second;
+      const std::vector<std::vector<Device::Param> > & tmpParamVecVec = iter->second;
       int sizeTmpParamVec = tmpParamVecVec.size();
       byteCount += sizeof( int ); // size
 
       for (int ivec=0;ivec< sizeTmpParamVec; ++ivec)
       {
-        const vector<N_DEV_Param> & tmpVec = tmpParamVecVec[ivec];
+        const std::vector<Device::Param> & tmpVec = tmpParamVecVec[ivec];
         int vecSize = tmpVec.size();
         byteCount += sizeof( int ); // size
 
@@ -1065,14 +1054,14 @@ int N_IO_ParameterBlock::packedByteCount() const
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::pack
+// Function      : ParameterBlock::pack
 // Purpose       : Packs parameter block into char buffer using MPI_PACK.
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_IO_ParameterBlock::pack( char * buf, int bsize, int & pos,
+void ParameterBlock::pack( char * buf, int bsize, int & pos,
  N_PDS_Comm * comm ) const
 {
   int size, length, j;
@@ -1120,26 +1109,26 @@ void N_IO_ParameterBlock::pack( char * buf, int bsize, int & pos,
 
   if ( !(inputCompositeParamVecMap.empty()) )
   {
-    map < string, vector <vector<N_DEV_Param> > >::const_iterator  iter;
-    map < string, vector <vector<N_DEV_Param> > >::const_iterator  begin = inputCompositeParamVecMap.begin();
-    map < string, vector <vector<N_DEV_Param> > >::const_iterator  end = inputCompositeParamVecMap.end();
+    std::map< std::string, std::vector<std::vector<Device::Param> > >::const_iterator  iter;
+    std::map< std::string, std::vector<std::vector<Device::Param> > >::const_iterator  begin = inputCompositeParamVecMap.begin();
+    std::map< std::string, std::vector<std::vector<Device::Param> > >::const_iterator  end = inputCompositeParamVecMap.end();
     for (iter=begin;iter!=end;++iter)
     {
       // pack paramBase name.
-      string paramBase = iter->first;
+      std::string paramBase = iter->first;
       int baseLength = paramBase.length();
       comm->pack( &baseLength, 1, buf, bsize, pos );
       comm->pack( paramBase.c_str(), baseLength, buf, bsize, pos );
 
       // pack size of tmpParamVecVec
-      const vector <vector<N_DEV_Param> > & tmpParamVecVec = iter->second;
+      const std::vector<std::vector<Device::Param> > & tmpParamVecVec = iter->second;
       int sizeTmpParamVec = tmpParamVecVec.size();
       comm->pack( &sizeTmpParamVec, 1, buf, bsize, pos );
 
       // pack contents of tmpParamVecVec
       for (int ivec=0;ivec< sizeTmpParamVec; ++ivec)
       {
-        const vector<N_DEV_Param> & tmpVec = tmpParamVecVec[ivec];
+        const std::vector<Device::Param> & tmpVec = tmpParamVecVec[ivec];
         int vecSize = tmpVec.size();
         comm->pack( &vecSize, 1, buf, bsize, pos );
 
@@ -1154,22 +1143,21 @@ void N_IO_ParameterBlock::pack( char * buf, int bsize, int & pos,
 #ifdef Xyce_COUNT_PACKED_BYTES
   if (pos != predictedPos)
   {
-    string msg("Predicted pos does not match actual pos in N_IO_ParameterBlock::pack");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING, msg );
+    DevelFatal(*this, "ParameterBlock::pack") << "Predicted pos does not match actual pos";
   }
 #endif
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::unpack
+// Function      : ParameterBlock::unpack
 // Purpose       : Unpacks parameter block from char buffer using MPI_UNPACK.
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_IO_ParameterBlock::unpack( char * pB, int bsize, int & pos,
+void ParameterBlock::unpack( char * pB, int bsize, int & pos,
  N_PDS_Comm * comm)
 {
   int size, length, j;
@@ -1189,7 +1177,7 @@ void N_IO_ParameterBlock::unpack( char * pB, int bsize, int & pos,
 
   // unpack netlistFileName_
   comm->unpack( pB, bsize, pos, &length, 1 );
-  netlistFileName_ = string( ( pB + pos ), length );
+  netlistFileName_ = std::string( ( pB + pos ), length );
   pos += length;
 
   comm->unpack( pB, bsize, pos, &lineNumber_, 1 );
@@ -1204,12 +1192,10 @@ void N_IO_ParameterBlock::unpack( char * pB, int bsize, int & pos,
   comm->unpack( pB, bsize, pos, &size, 1 );
   for( j = 0; j < size; ++j )
   {
-    expressionValuedParams_.push_back( N_DEV_Param() );
+    expressionValuedParams_.push_back( Device::Param() );
     expressionValuedParams_[ j ].unpack( pB, bsize, pos, comm );
   }
 
-
-//#ifdef Xyce_FIX_COMPOSITE_PACK
   // unpack inputCompositeParamVecMap
   int sizeComposite=0;
   comm->unpack( pB, bsize, pos, &size, 1 );
@@ -1221,13 +1207,13 @@ void N_IO_ParameterBlock::unpack( char * pB, int bsize, int & pos,
     {
       // unpack paramBase name.
       comm->unpack( pB, bsize, pos, &length, 1 );
-      string paramBase = string( ( pB + pos ), length );
+      std::string paramBase = std::string( ( pB + pos ), length );
       pos += length;
 
       // unpack size of paramVecVec
       int sizeTmpParamVec(0);
       comm->unpack( pB, bsize, pos, &sizeTmpParamVec, 1 );
-      vector <vector<N_DEV_Param> > tmpParamVecVec;
+      std::vector<std::vector<Device::Param> > tmpParamVecVec;
       tmpParamVecVec.resize(sizeTmpParamVec);
 
       for (int ivec=0;ivec< sizeTmpParamVec; ++ivec)
@@ -1245,7 +1231,11 @@ void N_IO_ParameterBlock::unpack( char * pB, int bsize, int & pos,
       inputCompositeParamVecMap[paramBase] = tmpParamVecVec;
     }
   }
-//#endif
-
 }
 
+NetlistLocation ParameterBlock::netlistLocation() const {
+  return NetlistLocation(modelData.netlistFileName_, modelData.lineNumber_);
+}
+
+} // namespace IO
+} // namespace Xyce

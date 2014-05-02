@@ -18,8 +18,6 @@ set ( SOURCE_DIRS
       TopoManagerPKG 
       UtilityPKG )
 
-
-
 # add optional top level source directories to list 
 if ( Xyce_Dakota )
   list ( APPEND SOURCE_DIRS DakotaLinkPKG )

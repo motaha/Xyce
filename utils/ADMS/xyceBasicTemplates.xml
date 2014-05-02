@@ -2,213 +2,213 @@
 <!DOCTYPE admst PUBLIC "-//adms//DTD admst 2.0//-" "http://mot-adms.sourceforge.net/xml-files/adms/admst.dtd">
 <admst version="2.3.0" xmlns:admst="http://mot-adms.sourceforge.net/xml-files/admst">
 
-  <!--                                                                      
-  Filename:   $RCSfile: xyceBasicTemplates.xml,v $                    
+  <!--
+  Filename:   $RCSfile: xyceBasicTemplates.xml,v $
   Purpose:  Provide a basic set of ADMST templates for working on Xyce
-            modules                                                   
-      Creator:   Tom Russo, SNL, Electrical and Microsystems Modeling 
-      Creation Date: 8 May 2008                                       
-                                                                      
-        Revision Information:                                         
-        ====================-                                         
-                                                                      
-        Revision Number: $Revision: 1.64.2.1 $                            
-        Revision Date:   $Date: 2013/10/07 21:16:16 $                 
-        Current Owner:   $Author: tvrusso $                           
-                                                                      
-   =================================================================- 
-   =================================================================- 
-    simple templates for producing commonly-used information          
-   =================================================================- 
-   =================================================================- 
+            modules
+      Creator:   Tom Russo, SNL, Electrical and Microsystems Modeling
+      Creation Date: 8 May 2008
+
+        Revision Information:
+        ====================-
+
+        Revision Number: $Revision: 1.94.2.1 $
+        Revision Date:   $Date: 2014/02/27 17:23:09 $
+        Current Owner:   $Author: tvrusso $
+
+   =================================================================-
+   =================================================================-
+    simple templates for producing commonly-used information
+   =================================================================-
+   =================================================================-
   -->
 
-  <!-- 
-   =================================================================- 
-   xyceNumberNodes                                                    
-    return the number of nodes (internal and external)in the given    
-    module                                                            
-   =================================================================- 
+  <!--
+   =================================================================-
+   xyceNumberNodes
+    return the number of nodes (internal and external)in the given
+    module
+   =================================================================-
   -->
   <admst:template match="xyceNumberNodes">
     <admst:text format="%(count(node[grounded='no']))"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceNumberProbes                                                   
-    return the number of nodes (internal and external)in the given    
-    module                                                            
-   =================================================================- 
+  <!--
+   =================================================================-
+   xyceNumberProbes
+    return the number of nodes (internal and external)in the given
+    module
+   =================================================================-
   -->
   <admst:template match="xyceNumberProbes">
     <admst:text format="%(count(probe)+count(@extraProbeBranches))"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceNumberInternalNodes                                            
-    return the number of nodes (internal)in the given                 
-    module                                                            
-   =================================================================- 
+  <!--
+   =================================================================-
+   xyceNumberInternalNodes
+    return the number of nodes (internal)in the given
+    module
+   =================================================================-
   -->
   <admst:template match="xyceNumberInternalNodes">
     <admst:text format="%(count(node[grounded='no' and location='internal']))"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceNumberExternalNodes                                            
-    return the number of nodes (External)in the given                 
-    module                                                            
-   =================================================================- 
+  <!--
+   =================================================================-
+   xyceNumberExternalNodes
+    return the number of nodes (External)in the given
+    module
+   =================================================================-
   -->
   <admst:template match="xyceNumberExternalNodes">
     <admst:text format="%(count(node[grounded='no' and location='external']))"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
+  <!--
+   =================================================================-
    xyceDeviceNamespace
-    Given a module, return what Xyce namespace we'd want it to be called 
-   =================================================================- 
+    Given a module, return what Xyce namespace we'd want it to be called
+   =================================================================-
   -->
   <admst:template match="xyceDeviceNamespace">
     <admst:return name="classname" value="ADMS%(name)"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
+  <!--
+   =================================================================-
    xyceClassBaseName
-    Given a module, return what Xyce class we'd want it to be called 
-   =================================================================- 
+    Given a module, return what Xyce class we'd want it to be called
+   =================================================================-
   -->
   <admst:template match="xyceClassBaseName">
     <admst:return name="classname" value="N_DEV_ADMS%(name)"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
+  <!--
+   =================================================================-
    xyceInstanceClassName
-    Given a module, return what Xyce class we'd want it to be called 
-   =================================================================- 
+    Given a module, return what Xyce class we'd want it to be called
+   =================================================================-
   -->
   <admst:template match="xyceInstanceClassName">
     <admst:return name="classname" value="N_DEV_ADMS%(name)Instance"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceModelClassName 
-    Given a module, return what Xyce class we'd want it to be called 
-   =================================================================- 
+  <!--
+   =================================================================-
+   xyceModelClassName
+    Given a module, return what Xyce class we'd want it to be called
+   =================================================================-
   -->
   <admst:template match="xyceModelClassName">
     <admst:return name="classname" value="N_DEV_ADMS%(name)Model"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
+  <!--
+   =================================================================-
    xyceGuardSymbol: make a symbol for the header file to use to prevent
-   multiple inclusion 
-   =================================================================- 
+   multiple inclusion
+   =================================================================-
   -->
   <admst:template match="xyceGuardSymbol">
     <admst:return name="symbolname" value="Xyce_N_DEV_ADMS%(name)_h"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceNodeConstantName                                               
-    given a node, generate the name of the integer symbol used to     
-    identify it in Xyce                                               
-   =================================================================- 
+  <!--
+   =================================================================-
+   xyceNodeConstantName
+    given a node, generate the name of the integer symbol used to
+    identify it in Xyce
+   =================================================================-
   -->
   <admst:template match="xyceNodeConstantName">
     <admst:return name="nodeConstant" value="admsNodeID_%(name)"/>
   </admst:template>
-  <!-- 
-   =================================================================- 
-   xyceBranchConstantName                                               
-    given a branch, generate the name of the integer symbol used to     
-    identify it in Xyce                                               
-   =================================================================- 
+  <!--
+   =================================================================-
+   xyceBranchConstantName
+    given a branch, generate the name of the integer symbol used to
+    identify it in Xyce
+   =================================================================-
   -->
   <admst:template match="xyceBranchConstantName">
     <admst:return name="branchConstant" value="admsBRA_ID_%(pnode)_%(nnode)"/>
   </admst:template>
 
 
-  <!-- 
-   =================================================================- 
-   xyceProbeConstantName                                              
-    given a probe, generate the name of the integer symbol used to    
-    identify it in Xyce                                               
-   =================================================================- 
+  <!--
+   =================================================================-
+   xyceProbeConstantName
+    given a probe, generate the name of the integer symbol used to
+    identify it in Xyce
+   =================================================================-
   -->
   <admst:template match="xyceProbeConstantName">
     <admst:return name="probeConstant" value="admsProbeID_%(nature)_%(branch/pnode)_%(branch/nnode)"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xycePotentialProbeConstantName                                              
-    given a branch, generate the name of the integer symbol used to    
-    identify its associated potetial probe constant in Xyce                                               
-   =================================================================- 
+  <!--
+   =================================================================-
+   xycePotentialProbeConstantName
+    given a branch, generate the name of the integer symbol used to
+    identify its associated potetial probe constant in Xyce
+   =================================================================-
   -->
   <admst:template match="xycePotentialProbeConstantName">
     <admst:return name="probeConstant" value="admsProbeID_V_%(pnode)_%(nnode)"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceFlowProbeConstantName                                              
-    given a branch, generate the name of the integer symbol used to    
-    identify it's associated flow probe in Xyce 
-   =================================================================- 
+  <!--
+   =================================================================-
+   xyceFlowProbeConstantName
+    given a branch, generate the name of the integer symbol used to
+    identify it's associated flow probe in Xyce
+   =================================================================-
   -->
   <admst:template match="xyceFlowProbeConstantName">
     <admst:return name="probeConstant" value="admsProbeID_I_%(pnode)_%(nnode)"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceJacobianOffsetName                                             
-    given a jacobian element, generate the name of the integer symbol 
-    used to identify its offset                                       
-   =================================================================- 
+  <!--
+   =================================================================-
+   xyceJacobianOffsetName
+    given a jacobian element, generate the name of the integer symbol
+    used to identify its offset
+   =================================================================-
   -->
   <admst:template match="xyceJacobianOffsetName">
     <admst:text format="A_%(row/name)_Equ_%(column/name)_NodeOffset"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xycedFdXPtrName                                             
-    given a jacobian element, generate the name of the pointer var 
-    used to identify its location                                       
-   =================================================================- 
+  <!--
+   =================================================================-
+   xycedFdXPtrName
+    given a jacobian element, generate the name of the pointer var
+    used to identify its location
+   =================================================================-
   -->
   <admst:template match="xycedFdXPtrName">
     <admst:text format="f_%(row/name)_Equ_%(column/name)_Node_Ptr"/>
   </admst:template>
-  <!-- 
-   =================================================================- 
-   xycedQdXPtrName                                             
-    given a jacobian element, generate the name of the pointer var 
-    used to identify its location                                       
-   =================================================================- 
+  <!--
+   =================================================================-
+   xycedQdXPtrName
+    given a jacobian element, generate the name of the pointer var
+    used to identify its location
+   =================================================================-
   -->
   <admst:template match="xycedQdXPtrName">
     <admst:text format="q_%(row/name)_Equ_%(column/name)_Node_Ptr"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-    xyceDeclareVariable                                               
-    Given a variable, emit a C++ declaration for that variable        
-   =================================================================- 
+  <!--
+   =================================================================-
+    xyceDeclareVariable
+    Given a variable, emit a C++ declaration for that variable
+   =================================================================-
   -->
   <admst:template match="xyceDeclareVariable">
     <admst:assert test="adms[datatypename='variable' or datatypename='variableprototype']" format="xyceDeclareVariable expecting datatypename=variable or variableprototype, got %(adms/datatypename)"/>
@@ -223,19 +223,325 @@
     <admst:text format=" %(name);\n"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   =================================================================- 
-    Specialized templates for declaring and initializing Instance and 
-    Model variables                                                   
-   =================================================================- 
+  <!--
+   =================================================================-
+   =================================================================-
+    Specialized templates for dealing with guessing device model cards
+    and/or header files to include
+   =================================================================-
+   -->
 
-   =================================================================- 
-   xyceDeclareInstanceVariables                                       
-   Extract all the variables that are either instance parameters or   
-   instance variables (with "global_instance" scope) and declare them 
-   Give the module for "select"                                       
-   =================================================================- 
+   <!--
+   =================================================================-
+   xyceIncludeModelBaseHeader
+   Given a module, this template generates an appropriate "#include"
+   for the base device IF the module has a "xyceModelGroup" attribute.
+   If the attribute doesn't exist, no include is generated.
+
+   Recognized groups:        Header included:
+      MOSFET                  N_DEV_MOSFET1.h
+      <anything else>         N_DEV_<that>.h
+   =================================================================-
+   -->
+   <admst:template match="xyceIncludeModelBaseHeader">
+     <admst:choose>
+       <admst:when test="[exists(attribute[name='xyceModelGroup'])]">
+         <admst:choose>
+           <admst:when test="[attribute[name='xyceModelGroup']/value='MOSFET']">
+             <admst:text format="#include &lt;N_DEV_MOSFET1.h&gt;\n"/>
+           </admst:when>
+           <admst:otherwise>
+             <admst:text format="#include &lt;N_DEV_%(attribute[name='xyceModelGroup']/value).h&gt;\n"/>
+           </admst:otherwise>
+         </admst:choose>
+       </admst:when>
+     </admst:choose>
+   </admst:template>
+
+   <!--
+   =================================================================-
+   xyceDeclareTraits
+   Given a module, this template generates an appropriate "typedef"
+   for the DeviceTraits.  IF the module has a "xyceModelGroup" attribute,
+   then this uses the base group instance as the group in the template.
+   If the attribute doesn't exist, no base group is used.
+
+   Recognized groups:        Base instance:
+      MOSFET                  MOSFET1
+      <anything else>         <verbatim>
+   =================================================================-
+   -->
+   <admst:template match="xyceDeclareTraits">
+struct Traits: public DeviceTraits&lt;Model, Instance
+     <admst:choose>
+       <admst:when test="[exists(attribute[name='xyceModelGroup'])]">
+         <admst:choose>
+           <admst:when test="[attribute[name='xyceModelGroup']/value='MOSFET']">
+             <admst:text format=", MOSFET1::Traits"/>
+           </admst:when>
+           <admst:otherwise>
+             <admst:text format=", %(attribute[name='xyceModelGroup']/value)::Traits"/>
+           </admst:otherwise>
+         </admst:choose>
+       </admst:when>
+     </admst:choose>&gt;
+{
+
+    <!-- Figure out a level number -->
+    <admst:choose>
+      <admst:when test="[exists(attribute[name='xyceLevelNumber'])]">
+        <admst:variable name="theLevelNumber" select="%(attribute[name='xyceLevelNumber']/value)"/>
+      </admst:when>
+      <admst:otherwise>
+        <admst:variable name="theLevelNumber" select="FIXME!"/>
+      </admst:otherwise>
+    </admst:choose>
+
+    <!-- Choose a device name -->
+    <admst:choose>
+      <admst:when test="[exists(attribute[name='xyceDeviceName'])]">
+        <admst:variable name="theDeviceName" select="%(attribute[name='xyceDeviceName']/value)"/>
+      </admst:when>
+      <admst:otherwise>
+        <admst:variable name="theDeviceName" select="ADMS %(name)"/>
+      </admst:otherwise>
+    </admst:choose>
+
+    <!-- Figure out what spice symbol we use -->
+    <admst:choose>
+      <admst:when test="[exists(attribute[name='xyceSpiceDeviceName'])]">
+        <admst:variable name="theSpiceDevice" select="%(attribute[name='xyceSpiceDeviceName']/value)"/>
+      </admst:when>
+      <admst:when test="[exists(attribute[name='xyceModelGroup'])]">
+        <admst:choose>
+          <admst:when test="[attribute[name='xyceModelGroup']/value='MOSFET']">
+            <admst:variable name="theSpiceDevice" select="m"/>
+          </admst:when>
+          <admst:when test="[attribute[name='xyceModelGroup']/value='BJT']">
+            <admst:variable name="theSpiceDevice" select="q"/>
+          </admst:when>
+          <admst:when test="[attribute[name='xyceModelGroup']/value='Diode']">
+            <admst:variable name="theSpiceDevice" select="d"/>
+          </admst:when>
+          <admst:when test="[attribute[name='xyceModelGroup']/value='Resistor']">
+            <admst:variable name="theSpiceDevice" select="r"/>
+          </admst:when>
+          <admst:when test="[attribute[name='xyceModelGroup']/value='Capacitor']">
+            <admst:variable name="theSpiceDevice" select="c"/>
+          </admst:when>
+        </admst:choose>
+      </admst:when>
+      <admst:otherwise>
+        <admst:variable name="theSpiceDevice" select="FIXME!"/>
+      </admst:otherwise>
+    </admst:choose>
+
+    <admst:text format="  static const char *name() {return &quot;%($theDeviceName)&quot;;}\n"/>
+    <admst:text format="  static const char *deviceTypeName() {return &quot;%($theSpiceDevice) level %($theLevelNumber)&quot;;}\n"/>
+  static const int numNodes() {return <admst:text format="%(xyceNumberExternalNodes(.))"/>;}
+  static const bool modelRequired() {return 
+     <admst:choose>
+       <admst:when test="variable[parametertype='model' and input='yes']">
+         <admst:text format="true"/>
+       </admst:when>
+       <admst:otherwise>
+         <admst:text format="false"/>
+       </admst:otherwise>
+     </admst:choose>
+     <admst:text format=";}"/>
+  static const bool isLinearDevice() {return false;}
+
+  static Device *factory(const Configuration &amp;configuration, const FactoryBlock &amp;factory_block);
+  static void loadModelParameters(ParametricData&lt;Model&gt; &amp;model_parameters);
+  static void loadInstanceParameters(ParametricData&lt;Instance&gt; &amp;instance_parameters);
+};
+   </admst:template>
+
+  <!--
+   =================================================================-
+   xyceAddModelTypes
+
+   Given a module, this template generates appropriate addModel lines
+   for the device.  IF the module has one or more "xyceModelCardType"
+   attributes, those are used to emit addModel statements.  If there
+   are no xyceModelCardType attributes, but there is a xyceModelGroup
+   attribute, the group is used to determine which model types to
+   use. If neither exists, a "fixme" line is added (just like the
+   behavior in older versions of the back-end).
+
+   Recognized groups:        Model Types
+      MOSFET                  PMOS, NMOS
+      BJT                     NPN, PNP
+      Diode                   D
+      Resistor                R
+      Capacitor               C
+   =================================================================-
+   -->
+  <admst:template match="xyceAddModelTypes">
+    <admst:choose>
+      <admst:when test="[exists(attribute[name='xyceModelCardType'])]">
+        <admst:for-each select="attribute[name='xyceModelCardType']">
+          <admst:text format="  addModelType(&quot;%(./value)&quot;);\n"/>
+        </admst:for-each>
+      </admst:when>
+      <admst:otherwise>
+        <admst:choose>
+          <admst:when test="[exists(attribute[name='xyceModelGroup'])]">
+            <admst:choose>
+              <admst:when test="[attribute[name='xyceModelGroup']/value='MOSFET']">
+                <admst:text format="  addModelType(&quot;NMOS&quot;);\n"/>
+                <admst:text format="  addModelType(&quot;PMOS&quot;);\n"/>
+              </admst:when>
+              <admst:when test="[attribute[name='xyceModelGroup']/value='BJT']">
+                <admst:text format="  addModelType(&quot;NPN&quot;);\n"/>
+                <admst:text format="  addModelType(&quot;PNP&quot;);\n"/>
+              </admst:when>
+              <admst:when test="[attribute[name='xyceModelGroup']/value='Diode']">
+                <admst:text format="  addModelType(&quot;D&quot;);\n"/>
+              </admst:when>
+              <admst:when test="[attribute[name='xyceModelGroup']/value='Resistor']">
+                <admst:text format="  addModelType(&quot;R&quot;);\n"/>
+              </admst:when>
+              <admst:when test="[attribute[name='xyceModelGroup']/value='Capacitor']">
+                <admst:text format="  addModelType(&quot;C&quot;);\n"/>
+              </admst:when>
+            </admst:choose>
+          </admst:when>
+          <admst:otherwise>
+            <admst:text format="//  FIXME!    addModelType(&quot;WTF;quot;);\n"/>
+          </admst:otherwise>
+        </admst:choose>
+      </admst:otherwise>
+    </admst:choose>
+  </admst:template>
+
+
+  <!--
+   =================================================================-
+   xyceDeviceFactoryandRegisterDevice
+
+   Given a module, this template generates appropriate code for a
+   device factory and registerDevice method.  If the attribute
+   xyceDeviceName exists, we use that as the name of the device.  If
+   not, we use "ADMS <module name>".  Other expected attributes are:
+
+      xyceSpiceDeviceName:   if not given, guess at one from xyceModelGroup.
+                             If that is not given, emit a "FIXME"
+      xyceLevelNumber:       If not given, "FIXME"
+
+   -->
+  <admst:template match="xyceDeviceFactoryandRegisterDevice">
+
+    <!-- Figure out what spice symbol we use -->
+    <admst:choose>
+      <admst:when test="[exists(attribute[name='xyceSpiceDeviceName'])]">
+        <admst:variable name="theSpiceDevice" select="%(attribute[name='xyceSpiceDeviceName']/value)"/>
+      </admst:when>
+      <admst:when test="[exists(attribute[name='xyceModelGroup'])]">
+        <admst:choose>
+          <admst:when test="[attribute[name='xyceModelGroup']/value='MOSFET']">
+            <admst:variable name="theSpiceDevice" select="m"/>
+          </admst:when>
+          <admst:when test="[attribute[name='xyceModelGroup']/value='BJT']">
+            <admst:variable name="theSpiceDevice" select="q"/>
+          </admst:when>
+          <admst:when test="[attribute[name='xyceModelGroup']/value='Diode']">
+            <admst:variable name="theSpiceDevice" select="d"/>
+          </admst:when>
+          <admst:when test="[attribute[name='xyceModelGroup']/value='Resistor']">
+            <admst:variable name="theSpiceDevice" select="r"/>
+          </admst:when>
+          <admst:when test="[attribute[name='xyceModelGroup']/value='Capacitor']">
+            <admst:variable name="theSpiceDevice" select="c"/>
+          </admst:when>
+        </admst:choose>
+      </admst:when>
+      <admst:otherwise>
+        <admst:variable name="theSpiceDevice" select="FIXME!"/>
+      </admst:otherwise>
+    </admst:choose>
+
+    <!-- Figure out a level number -->
+    <admst:choose>
+      <admst:when test="[exists(attribute[name='xyceLevelNumber'])]">
+        <admst:variable name="theLevelNumber" select="%(attribute[name='xyceLevelNumber']/value)"/>
+      </admst:when>
+      <admst:otherwise>
+        <admst:variable name="theLevelNumber" select="FIXME!"/>
+      </admst:otherwise>
+    </admst:choose>
+
+    <!-- Now emit the factory -->
+    <admst:text format="Device *Traits::factory(const Configuration &amp;configuration, const FactoryBlock &amp;factory_block)\n"/>
+    <admst:text format="{\n"/>
+    <admst:text format="  return new DeviceMaster&lt;Traits&gt;(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);\n"/>
+    <admst:text format="}\n\n"/>
+
+    <!-- and the registerDevice -->
+    <admst:text format="void registerDevice()\n"/>
+    <admst:text format="{\n"/>
+    <admst:text format="  Config&lt;Traits&gt;::addConfiguration()\n"/>
+    <admst:text format="    .registerDevice(&quot;%($theSpiceDevice)&quot;, %($theLevelNumber))"/>
+
+    <!-- and all the registerModelTypes... -->
+    <admst:choose>
+      <admst:when test="[exists(attribute[name='xyceModelCardType'])]">
+        <admst:for-each select="attribute[name='xyceModelCardType']">
+          <admst:text format="\n    .registerModelType(&quot;%(./value)&quot;, %($theLevelNumber))"/>
+        </admst:for-each>
+      </admst:when>
+      <admst:otherwise>
+        <admst:choose>
+          <admst:when test="[exists(attribute[name='xyceModelGroup'])]">
+            <admst:choose>
+              <admst:when  test="[attribute[name='xyceModelGroup']/value='MOSFET']">
+                <admst:text format="\n    .registerModelType(&quot;nmos&quot;, %($theLevelNumber))"/>
+                <admst:text format="\n    .registerModelType(&quot;pmos&quot;, %($theLevelNumber))"/>
+              </admst:when>
+              <admst:when test="[attribute[name='xyceModelGroup']/value='BJT']">
+                <admst:text format="\n    .registerModelType(&quot;npn&quot;, %($theLevelNumber))"/>
+                <admst:text format="\n    .registerModelType(&quot;pnp&quot;, %($theLevelNumber))"/>
+              </admst:when>
+              <admst:when test="[attribute[name='xyceModelGroup']/value='Diode']">
+                <admst:text format="\n    .registerModelType(&quot;d&quot;, %($theLevelNumber))"/>
+              </admst:when>
+              <admst:when test="[attribute[name='xyceModelGroup']/value='Resistor']">
+                <admst:text format="\n    .registerModelType(&quot;r&quot;, %($theLevelNumber))"/>
+              </admst:when>
+              <admst:when test="[attribute[name='xyceModelGroup']/value='Capacitor']">
+                <admst:text format="\n    .registerModelType(&quot;c&quot;, %($theLevelNumber))"/>
+              </admst:when>
+            </admst:choose>
+          </admst:when>
+          <admst:otherwise>
+            <!-- If the device requires a model (i.e. there are any 
+                  parameters of type "model"), and no modely type has
+                  been given in attributes, emit comments to fix the issue -->
+            <admst:if test="variable[parametertype='model' and input='yes']">
+
+                <admst:text format="\n//  FIXME!    .registerModelType(&quot;WTF;quot;, %($theLevelNumber))\n"/>
+            </admst:if>
+          </admst:otherwise>
+        </admst:choose>
+      </admst:otherwise>
+    </admst:choose>
+
+    <admst:text format=";\n}\n\n"/>
+
+  </admst:template>
+  <!--
+   =================================================================-
+   =================================================================-
+    Specialized templates for declaring and initializing Instance and
+    Model variables
+   =================================================================-
+
+   =================================================================-
+   xyceDeclareInstanceVariables
+   Extract all the variables that are either instance parameters or
+   instance variables (with "global_instance" scope) and declare them
+   Give the module for "select"
+   =================================================================-
   -->
   <admst:template match="xyceDeclareInstanceVariables">
     <admst:text format="    // Begin verilog Instance Variables\n"/>
@@ -254,11 +560,11 @@
   </admst:template>
 
 
-  <!-- 
-   =================================================================- 
-   xyceDeclareNodeConstants                                           
-    Declare const integers giving the node number of all named nodes  
-   =================================================================- 
+  <!--
+   =================================================================-
+   xyceDeclareNodeConstants
+    Declare const integers giving the node number of all named nodes
+   =================================================================-
   -->
   <admst:template match="xyceDeclareNodeConstants">
     <admst:text format="   // node numbers\n"/>
@@ -268,11 +574,11 @@
     <admst:text format="   // end node numbers\n"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceDeclareBranchConstants                                           
-    Declare const integers giving the node number of all named nodes  
-   =================================================================- 
+  <!--
+   =================================================================-
+   xyceDeclareBranchConstants
+    Declare const integers giving the node number of all named nodes
+   =================================================================-
   -->
   <admst:template match="xyceDeclareBranchConstants">
     <admst:text format="   // Additional IDs for branch equations\n"/>
@@ -282,11 +588,11 @@
     <admst:text format="   // end branch numbers\n"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceDeclareProbeConstants                                          
-    Declare const integers giving the probe number of all used probes 
-   =================================================================- 
+  <!--
+   =================================================================-
+   xyceDeclareProbeConstants
+    Declare const integers giving the probe number of all used probes
+   =================================================================-
   -->
   <admst:template match="xyceDeclareProbeConstants">
     <admst:text format="   // Probe numbers\n"/>
@@ -299,11 +605,11 @@
     <admst:text format="   // end probe numbers\n"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
+  <!--
+   =================================================================-
    xyceDeclareLimitedProbeStateLIDs
     Declare integers for state LIDs of limited probes, given a module
-   =================================================================- 
+   =================================================================-
   -->
   <admst:template match="xyceDeclareLimitedProbeStateLIDs">
     <admst:text format="   // State LIDs\n"/>
@@ -313,14 +619,14 @@
     <admst:text format="   // end state LIDs\n"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceInstanceInitializers 
+  <!--
+   =================================================================-
+   xyceInstanceInitializers
    Extract all the variables that are either instance parameters or
    instance variables (with "global_instance" scope) and generate
    an initializer list for the constructor.
    Give the module for "select"
-   =================================================================- 
+   =================================================================-
   -->
   <admst:template match="xyceInstanceInitializers">
     <admst:if test="[exists(variable[(parametertype='instance' and input='yes') or (scope='global_instance' and input='no')])]">
@@ -329,7 +635,7 @@
     <admst:join select="variable[(parametertype='instance' and input='yes') or (scope='global_instance' and input='no')]" separator=",\n    ">
       <admst:text format="%(name)("/>
       <admst:choose>
-        <admst:when test="[exists(default)]">
+        <admst:when test="[exists(default) and not exists(#dependent)]">
           <admst:text format="%(printTerm(default))"/>
         </admst:when>
         <admst:otherwise>
@@ -417,17 +723,17 @@
         <admst:text format="q_BRA_%($thePnodeName)_%($theNnodeName)_Equ_BRA_%(pnode/name)_%(nnode/name)_Var_Ptr(0)"/>
       </admst:join>
     </admst:for-each>
-    <admst:text format=",\n    admsTemperature(getDeviceOptions().temp.dVal())\n"/>
+    <admst:text format=",\n    admsTemperature(getDeviceOptions().temp.getImmutableValue&lt;double&gt;())\n"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceModelInitializers 
+  <!--
+   =================================================================-
+   xyceModelInitializers
    Extract all the variables that are either model parameters or
    model variables (with "global_model" scope) and generate
    an initializer list for the constructor.
    Give the module for "select"
-   =================================================================- 
+   =================================================================-
   -->
   <admst:template match="xyceModelInitializers">
     <admst:if test="[exists(variable[(parametertype='model' and input='yes') or (scope='global_model' and input='no')])]">
@@ -436,7 +742,7 @@
     <admst:join select="variable[(parametertype='model' and input='yes') or (scope='global_model' and input='no')]" separator=",\n    ">
       <admst:text format="%(name)("/>
       <admst:choose>
-        <admst:when test="[exists(default)]">
+        <admst:when test="[exists(default) and not exists(#dependent)]">
           <admst:text format="%(printTerm(default))"/>
         </admst:when>
         <admst:otherwise>
@@ -457,14 +763,14 @@
     </admst:join>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceInstanceCopyInitializers 
+  <!--
+   =================================================================-
+   xyceInstanceCopyInitializers
    Extract all the variables that are either instance parameters or
    instance variables (with "global_instance" scope) and generate
    an initializer list for the copy constructor.
    Give the module for "select"
-   =================================================================- 
+   =================================================================-
   -->
   <admst:template match="xyceInstanceCopyInitializers">
     <admst:if test="[exists(variable[(parametertype='instance' and input='yes') or (scope='global_instance' and input='no')])]">
@@ -545,14 +851,14 @@
     <admst:text format=",\n    admsTemperature(right.admsTemperature)\n"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
+  <!--
+   =================================================================-
    xyceModelCopyInitializers
    Extract all the variables that are either model parameters or
    model variables (with "global_model" scope) and generate
    an initializer list for the copy constructor.
    Give the module for "select"
-   =================================================================- 
+   =================================================================-
   -->
   <admst:template match="xyceModelCopyInitializers">
     <admst:if test="[exists(variable[(parametertype='model' and input='yes') or (scope='global_model' and input='no')])]">
@@ -563,18 +869,18 @@
     </admst:join>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceDeclareModelVariables 
+  <!--
+   =================================================================-
+   xyceDeclareModelVariables
    Extract all the variables that are either model parameters or
    model variables (with "global_model" scope) and declare them.
    Give the module for "select"
-   =================================================================- 
+   =================================================================-
   -->
   <admst:template match="xyceDeclareModelVariables">
     <admst:text format="// Begin verilog Model Variables\n"/>
     <admst:text format="//   Model Parameters\n"/>
-    <admst:for-each select="variable[parametertype='model' and input='yes']">
+    <admst:for-each select="variable[(parametertype='model' or (parametertype='instance' and exists(attribute[name='xyceAlsoModel']))) and input='yes']">
       <admst:text format="    "/>
       <admst:apply-templates select="." match="verilog2CXXtype"/>
       <admst:text format=" %(name);\n"/>
@@ -590,13 +896,13 @@
     <admst:text format="    // end verilog model variables====="/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceDeclareNodeLIDVariables 
+  <!--
+   =================================================================-
+   xyceDeclareNodeLIDVariables
    Generate a set of declarations for LID variables given module's
    nodes.
    Give the module for "select"
-   =================================================================- 
+   =================================================================-
   -->
   <admst:template match="xyceDeclareNodeLIDVariables">
     <admst:text format="    // Nodal LID Variables\n"/>
@@ -606,13 +912,13 @@
     <admst:text format="    // end Nodal LID Variables\n"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceDeclareBranchLIDVariables 
+  <!--
+   =================================================================-
+   xyceDeclareBranchLIDVariables
    Generate a set of declarations for LID variables given module's
    branch equations.
    Give the module for "select"
-   =================================================================- 
+   =================================================================-
   -->
   <admst:template match="xyceDeclareBranchLIDVariables">
     <admst:text format="    // Branch LID Variables\n"/>
@@ -622,12 +928,12 @@
     <admst:text format="    // end Branch LID Variables\n"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceDeclareJacobianOffsets                                         
-   given a module, declare the batch of Offset variables used when    
-   accessing jacobian elements                                        
-   =================================================================- 
+  <!--
+   =================================================================-
+   xyceDeclareJacobianOffsets
+   given a module, declare the batch of Offset variables used when
+   accessing jacobian elements
+   =================================================================-
   -->
   <admst:template match="xyceDeclareJacobianOffsets">
     <admst:text format="    // Jacobian  pointers\n"/>
@@ -653,7 +959,7 @@
         <admst:text format="    double * f_BRA_%($thePnodeName)_%($theNnodeName)_Equ_BRA_%(pnode/name)_%(nnode/name)_Var_Ptr;\n"/>
       </admst:for-each>
     </admst:for-each>
-    
+
     <!-- now the same thing for Q -->
     <admst:for-each select="jacobian">
       <admst:text format="    double * %(xycedQdXPtrName(.));\n"/>
@@ -676,28 +982,28 @@
     </admst:for-each>
     <admst:text format="    // end of Jacobian and pointers\n"/>
   </admst:template>
- 
-  <!-- 
-   =================================================================- 
-   xyceDeclareFadArrays 
-   Given a module, generate declaration of contribution arrays        
-   =================================================================- 
+
+  <!--
+   =================================================================-
+   xyceDeclareFadArrays
+   Given a module, generate declaration of contribution arrays
+   =================================================================-
   -->
   <admst:template match="xyceDeclareFadArrays">
     <admst:text format=" // Arrays to hold probes\n"/>
-    <admst:text format=" vector &lt; AdmsFadType &gt; probeVars;\n"/>
+    <admst:text format=" std::vector &lt; AdmsFadType &gt; probeVars;\n"/>
     <admst:text format=" // Arrays to hold contributions\n"/>
     <admst:text format=" // dynamic contributions are differentiated w.r.t time\n"/>
-    <admst:text format=" vector &lt; AdmsFadType &gt; staticContributions;\n"/>
-    <admst:text format=" vector &lt; AdmsFadType &gt; dynamicContributions;\n"/>
+    <admst:text format=" std::vector &lt; AdmsFadType &gt; staticContributions;\n"/>
+    <admst:text format=" std::vector &lt; AdmsFadType &gt; dynamicContributions;\n"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
+  <!--
+   =================================================================-
    xyceDeclareLimitingTemporaries
    Declare the various temporary variables that we need for limiting
    in updateIntermediateVarsBlock.  Pass in the module.
-   =================================================================- 
+   =================================================================-
   -->
   <admst:template match="xyceDeclareLimitingTemporaries">
     <admst:text format=" // temporary variables for limiting\n"/>
@@ -706,55 +1012,55 @@
     </admst:for-each>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceNodeLIDVariable 
-   Given a node, return its associated LID variable 
-   =================================================================- 
+  <!--
+   =================================================================-
+   xyceNodeLIDVariable
+   Given a node, return its associated LID variable
+   =================================================================-
   -->
   <admst:template match="xyceNodeLIDVariable">
     <admst:text format="li_%(name)"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceBranchLIDVariable 
-   Given a branch, return its associated LID variable  
-   =================================================================- 
+  <!--
+   =================================================================-
+   xyceBranchLIDVariable
+   Given a branch, return its associated LID variable
+   =================================================================-
   -->
   <admst:template match="xyceBranchLIDVariable">
     <admst:text format="li_BRA_%(pnode)_%(nnode)"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceLimitedProbeStateLIDVariable 
+  <!--
+   =================================================================-
+   xyceLimitedProbeStateLIDVariable
    Given a probe, return its associated state LID variable for limiting
-   =================================================================- 
+   =================================================================-
   -->
   <admst:template match="xyceLimitedProbeStateLIDVariable">
     <admst:text format="li_state_%(xyceProbeConstantName(.)/[name='probeConstant']/value)"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceAnalogFunctionDeclaration 
+  <!--
+   =================================================================-
+   xyceAnalogFunctionDeclaration
     Given an analog function, return a declaration for putting in
     the header file.
     Unlike the way "analogfunction.xml" from the ADMS source does,
     we do NOT prefix the function with the module name, because
     we're going to make it a member function of the class, and the
-    prefix will be redundant 
-   =================================================================- 
+    prefix will be redundant
+   =================================================================-
   -->
   <admst:template match="xyceAnalogFunctionDeclaration">
     <admst:value-of select="name"/>
     <admst:variable name="function" select="%s"/>
-    <admst:apply-templates 
+    <admst:apply-templates
        select="."
        match="verilog2CXXtype"/>
     <admst:text format=" $function("/>
-    <admst:join 
+    <admst:join
        select="variable[input='yes']"
        separator=", ">
       <admst:value-of select="name"/>
@@ -764,22 +1070,22 @@
     <admst:text format=");\n"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceTemplatedAnalogFunctionDeclaration 
+  <!--
+   =================================================================-
+   xyceTemplatedAnalogFunctionDeclaration
     Given an analog function, return a declaration for putting in
-    the header file. 
+    the header file.
    Unlike xyceAnalogFunctionDeclaration, we don't actually declare
    the function as it's declared in the verilog source, but rather
    as a templated function whose return type is assumed to be the
    type of all its arguments, which are assumed to be all of
    exactly the same type.  We'll simply puke with an error if this
-   condition isn't met. 
+   condition isn't met.
     Unlike the way "analogfunction.xml" from the ADMS source does,
     we do NOT prefix the function with the module name, because
     we're going to make it a member function of the class, and the
-    prefix will be redundant 
-   =================================================================- 
+    prefix will be redundant
+   =================================================================-
   -->
   <admst:template match="xyceTemplatedAnalogFunctionDeclaration">
     <admst:value-of select="name"/>
@@ -794,18 +1100,18 @@
       <admst:fatal format="Variable %(name) of type %(type) is not of same type as return
                       type of function $function, which is of type$returnType\n"/>
     </admst:for-each>
-      
+
     <!-- if we get here, all's good. Just churn out the declaration -->
     <!-- must output variables defined as input, output, or inout, but not
          the one that has the same name as the function -->
     <admst:text format="template&lt;typename ScalarT&gt; ScalarT $function("/>
-    <admst:join 
+    <admst:join
        select="variable[input='yes' or (input='no' and output='yes' and name!=$function)]"
        separator=", ">
       <admst:text format="ScalarT "/>
       <!-- only pass by reference if it's an output variable. -->
       <!-- this does cost us in copy constructions of Sacado type variables,
-           but is needed for correctness if analog functions modify their 
+           but is needed for correctness if analog functions modify their
            "input" variables, which they're allowed to do -->
       <admst:if test="[output='yes']">
         <admst:text format="&amp; "/>
@@ -827,11 +1133,27 @@
     <admst:text format="}\n"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   xyceRegisterJacLIDs                                                
-     given a module, generate code for initializing jacobian LIDs     
-   =================================================================- 
+  <!--
+   =================================================================-
+   xyceCopyModelVars
+     given a module, generate code for assuring that instance vars
+     that override model vars get appropriate defaults
+   =================================================================-
+  -->
+  <admst:template match="xyceCopyModelVars">
+    <admst:for-each select="variable[parametertype='instance' and exists(attribute[name='xyceAlsoModel']) and input='yes']">
+      <admst:text format="   if (!(given(&quot;%(name)&quot;)))\n"/>
+      <admst:text format="   {\n"/>
+      <admst:text format="      %(name) = model_.%(name);\n"/>
+      <admst:text format="   }\n"/>
+    </admst:for-each>
+  </admst:template>
+
+  <!--
+   =================================================================-
+   xyceRegisterJacLIDs
+     given a module, generate code for initializing jacobian LIDs
+   =================================================================-
   -->
   <admst:template match="xyceRegisterJacLIDs">
     <admst:variable name="theModule" select="%(.)"/>
@@ -854,19 +1176,19 @@
       <admst:variable name="theEquationName" select="%(name)"/>
       <admst:variable name="theEquationConstant" select="%(xyceNodeConstantName($theEquation)/[name='nodeConstant']/value)"/>
       <admst:for-each select="$theModule/jacobian[row/name='$theEquationName']">
-        <admst:text format="    cout &lt;&lt; &quot;%(xyceJacobianOffsetName(.)) = &quot; &lt;&lt; %(xyceJacobianOffsetName(.)) &lt;&lt; endl;\n"/>
+        <admst:text format="    std::cout &lt;&lt; &quot;%(xyceJacobianOffsetName(.)) = &quot; &lt;&lt; %(xyceJacobianOffsetName(.)) &lt;&lt; std::endl;\n"/>
       </admst:for-each>
     </admst:for-each>
     <admst:text format="  }\n"/>
     <admst:text format="#endif\n"/>
   </admst:template>
-      
 
-  <!-- 
-   =================================================================- 
+
+  <!--
+   =================================================================-
    xyceSetupPointers
-     given a module, generate code for initializing jacobian LIDs     
-   =================================================================- 
+     given a module, generate code for initializing jacobian LIDs
+   =================================================================-
   -->
   <admst:template match="xyceSetupPointers">
     <admst:variable name="theModule" select="%(.)"/>
@@ -907,11 +1229,11 @@
   </admst:template>
 
 
-  <!-- 
-   =================================================================- 
-   xyceGenerateJacStamp                                               
-     given a module, generate code for initializing  jacobian stamp   
-   =================================================================- 
+  <!--
+   =================================================================-
+   xyceGenerateJacStamp
+     given a module, generate code for initializing  jacobian stamp
+   =================================================================-
   -->
   <admst:template match="xyceGenerateJacStamp">
     <admst:variable name="theModule" select="%(.)"/>
@@ -932,18 +1254,18 @@
         </admst:for-each>
         <admst:text format="    }\n\n"/>
       </admst:if>
-          
+
     </admst:for-each>
     <admst:apply-templates select="." match="xyceAugmentJacStamp"/>
   </admst:template>
 
 
-  <!-- 
-   =================================================================- 
-   xyceAugmentJacStamp                                               
+  <!--
+   =================================================================-
+   xyceAugmentJacStamp
      given a module, generate code for adding branch equations/variables
-     to an existing  jacobian stamp   
-   =================================================================- 
+     to an existing  jacobian stamp
+   =================================================================-
   -->
   <admst:template match="xyceAugmentJacStamp">
 
@@ -951,7 +1273,7 @@
     <admst:for-each select="@extraJac1">
       <admst:variable name="theRow" select="%(xyceNodeConstantName(.)/[name='nodeConstant']/value)"/>
       <admst:variable name="theRowName" select="%(name)"/>
-      //Augment jacobian row for %($theRowName) 
+      //Augment jacobian row for %($theRowName)
     {
       int rowsize;
       int tempColOffset=0;
@@ -970,7 +1292,7 @@
     {
       int jacsize=jacStamp.size();
       jacStamp.resize(jacsize+1);
-      <admst:variable name="theRow" select="%(xyceBranchConstantName(.)/[name='branchConstant']/value)"/> 
+      <admst:variable name="theRow" select="%(xyceBranchConstantName(.)/[name='branchConstant']/value)"/>
       <admst:variable name="theBranchName" select="%(.)"/>
       jacStamp[$theRow].resize(%(count(@nodeDeps)+count(@branchDeps)));
       int tempCol = 0;
@@ -984,17 +1306,17 @@
     </admst:for-each>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
+  <!--
+   =================================================================-
    collectBranchDepends
-   Given a branch (which is assumed to have an associated 
+   Given a branch (which is assumed to have an associated
    branch variable due to use of flow probes and/or potential sources),
-   count up how many jacobian columns should be allocated for the 
+   count up how many jacobian columns should be allocated for the
    associated branch equation.  When returns, /module/@countNodes
    will list all the nodes this branch equation depends on (through
    potential probes) and /module/@countBranches will list the branch
    flows it depends on (through flow probes).
-   =================================================================- 
+   =================================================================-
    -->
   <admst:template match="collectBranchDepends">
     <admst:variable name="thePnode" select="%(pnode)"/>
@@ -1034,33 +1356,33 @@
           <admst:push into="/module/@countBranches" select="lhs/branch" onduplicate="ignore"/>
         </admst:otherwise>
       </admst:choose>
-          
+
     </admst:for-each>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   =================================================================- 
-   Basic templates for processing verilog                             
-                                                                      
-   =================================================================- 
-   =================================================================- 
+  <!--
+   =================================================================-
+   =================================================================-
+   Basic templates for processing verilog
 
-   =================================================================- 
-   collectAssignedVariables                                           
-   Given a node of the ADMS data tree, determine all variables that   
-   appear on the left-hand side of assignments in that node and all   
-   of its children.  This is done recursively.                        
-                                                                      
-   The list of all those variables is deposited in the @assignedVars  
-   array of the *PARENT* of the node passed in.  This is fishy, and   
-   I wish I could figure out a way to do it without pushing the data  
-   up above the node we start with.                                   
-                                                                      
-   Since we push data upward, it's probably best not to call this on  
-   the top level "analog/code" node of the tree, but rather loop over 
-   all of that node's children instead if one needs to process it.    
-   =================================================================- 
+   =================================================================-
+   =================================================================-
+
+   =================================================================-
+   collectAssignedVariables
+   Given a node of the ADMS data tree, determine all variables that
+   appear on the left-hand side of assignments in that node and all
+   of its children.  This is done recursively.
+
+   The list of all those variables is deposited in the @assignedVars
+   array of the *PARENT* of the node passed in.  This is fishy, and
+   I wish I could figure out a way to do it without pushing the data
+   up above the node we start with.
+
+   Since we push data upward, it's probably best not to call this on
+   the top level "analog/code" node of the tree, but rather loop over
+   all of that node's children instead if one needs to process it.
+   =================================================================-
   -->
 <admst:template match="collectAssignedVariables">
   <admst:choose>
@@ -1095,9 +1417,16 @@
     </admst:when>
     <!-- CASE -->
     <admst:when test="adms[datatypename='case']">
-      <admst:for-each select="caseitem">
-        <admst:apply-templates select="code/item" match="collectAssignedVariables"/>
-      </admst:for-each>
+      <admst:apply-templates select="caseitem" match="collectAssignedVariables"/>
+    </admst:when>
+    <!-- caseitem -->
+    <admst:when test="adms[datatypename='caseitem']">
+      <admst:apply-templates select="code" match="collectAssignedVariables"/>
+    </admst:when>
+    <!-- CODE -->
+    <admst:when test="adms[datatypename='code']">
+      <admst:apply-templates select="item" match="collectAssignedVariables">
+      </admst:apply-templates>
     </admst:when>
     <!-- none of the following types can do assignment -->
     <admst:when test="adms[datatypename='contribution']"/>
@@ -1109,33 +1438,124 @@
     </admst:otherwise>
   </admst:choose>
   <!-- At this point, we have processed our own and our children's variables,
-       and our @assignedVars array contains all the variables we or our 
+       and our @assignedVars array contains all the variables we or our
        children have assigned into.  Pass this information up to our parent
        if we haven't already done it (because we're an assignment). -->
   <admst:if test="adms[datatypename!='assignment']">
     <admst:variable name="parent" select="%(..)"/>
     <admst:for-each select="@assignedVars">
+<!--      <admst:warning format="Got something other than assignment (%(../datatypename
+)), pushing %(.) into $parent whcih is of type %($parent/datatypename)\n"/>-->
       <admst:push into="$parent/@assignedVars" select="." onduplicate="ignore"/>
     </admst:for-each>
   </admst:if>
 </admst:template>
 
+<!--
+ =================================================================-
+ collectInterdependentParams
+ Given a module, run through all the parameter variables it has and
+ mark as "#dependent='yes'" any that have default values that depend
+ on other variables in any way.
 
-<!-- 
- =================================================================- 
- collectLimiters                                                    
+ These variables cannot have their defaults determined by their addPar
+ calls, and must have their defaults set (if not given in the netlist)
+ at constructor time instead.
+
+ This template is intended to be called early in processing, like
+ collectLimters and collectCollapsibles
+ =================================================================-
+ -->
+ <admst:template match="collectInterdependentParams">
+   <admst:for-each select="variable[(parametertype='instance' or parametertype='model') and input='yes' and exists(default)]">
+     <admst:apply-templates select="default" match="recursiveDetectVariableDependence">
+       <admst:if test="[returned('isDependent')/value = 'yes']">
+         <admst:value-to select="../#dependent" string="yes"/>
+       </admst:if>
+     </admst:apply-templates>
+   </admst:for-each>
+ </admst:template>
+
+<!--
+ =================================================================-
+ recursiveDetectVariableDependence
+ Given a node, try to determine if the expression it represents has
+ dependence on parameter variables
+ =================================================================-
+ -->
+ <admst:template match="recursiveDetectVariableDependence">
+ <admst:choose>
+   <admst:when test="[datatypename='number']">
+     <admst:return name="isDependent" value="no"/>
+   </admst:when>
+   <admst:when test="[datatypename='variable']">
+     <admst:return name="isDependent" value="yes"/>
+   </admst:when>
+   <admst:when test="[datatypename='expression']">
+     <admst:apply-templates select="tree" match="recursiveDetectVariableDependence">
+       <admst:return name="isDependent" value="%(returned('isDependent')/value)"/>
+     </admst:apply-templates>
+   </admst:when>
+   <admst:when test="[datatypename='mapply_unary']">
+     <admst:apply-templates select="arg1" match="recursiveDetectVariableDependence">
+       <admst:return name="isDependent" value="%(returned('isDependent')/value)"/>
+     </admst:apply-templates>
+   </admst:when>
+   <admst:when test="[datatypename='mapply_binary']">
+     <admst:apply-templates select="arg1" match="recursiveDetectVariableDependence">
+       <admst:variable name="isDependent1" value="%(returned('isDependent')/value)"/>
+     </admst:apply-templates>
+     <admst:apply-templates select="arg2" match="recursiveDetectVariableDependence">
+       <admst:variable name="isDependent2" value="%(returned('isDependent')/value)"/>
+     </admst:apply-templates>
+     <admst:choose>
+       <admst:when test="[$isDependent1='yes' or $isDependent2='yes']">
+         <admst:return name="isDependent" value="yes"/>
+       </admst:when>
+       <admst:otherwise>
+         <admst:return name="isDependent" value="no"/>
+       </admst:otherwise>
+     </admst:choose>
+   </admst:when>
+   <admst:when test="[datatypename='mapply_ternary']">
+     <admst:apply-templates select="arg1" match="recursiveDetectVariableDependence">
+       <admst:variable name="isDependent1" value="%(returned('isDependent')/value)"/>
+     </admst:apply-templates>
+     <admst:apply-templates select="arg2" match="recursiveDetectVariableDependence">
+       <admst:variable name="isDependent2" value="%(returned('isDependent')/value)"/>
+     </admst:apply-templates>
+     <admst:apply-templates select="arg3" match="recursiveDetectVariableDependence">
+       <admst:variable name="isDependent3" value="%(returned('isDependent')/value)"/>
+     </admst:apply-templates>
+     <admst:choose>
+       <admst:when test="[$isDependent1='yes' or $isDependent2='yes' or $isDependent3='yes']">
+         <admst:return name="isDependent" value="yes"/>
+       </admst:when>
+       <admst:otherwise>
+         <admst:return name="isDependent" value="no"/>
+       </admst:otherwise>
+     </admst:choose>
+   </admst:when>
+   <admst:otherwise>
+     <admst:return name="isDependent" value="no"/>
+   </admst:otherwise>
+ </admst:choose>
+ </admst:template>
+<!--
+ =================================================================-
+ collectLimiters
  Given a module, create an "arobavar" (@limiters) containing all the
- assignments in which the verilog limiter function is called.       
- Also, create another arobavar (@limitedProbes) containing just     
- the probes that are limited by those assignments.                  
- This template is called early in processing, and the arrays it     
- produces will be used to produce the various bits of code needed   
- to implement voltage limiting in the device.                       
+ assignments in which the verilog limiter function is called.
+ Also, create another arobavar (@limitedProbes) containing just
+ the probes that are limited by those assignments.
+ This template is called early in processing, and the arrays it
+ produces will be used to produce the various bits of code needed
+ to implement voltage limiting in the device.
 
   Example:  <admst:apply-templates select="/module" match="collectLimiters"/>
 
   will result in there being a /module/@limiters and /module/@limitedProbes
- =================================================================- 
+ =================================================================-
 -->
 
 <admst:template match="collectLimiters">
@@ -1147,7 +1567,7 @@
     <admst:for-each select="rhs/probe">
       <admst:value-to select="#limited" string="yes"/>
       <admst:if test="[../function/[name='\$limit']/arguments[2]/datatypename='string']">
-        <admst:if test="[../function/[name='\$limit']/arguments[2]/value='typedpnjlim' or ../function/[name='\$limit']/arguments[2]/value='typeddummy' or ../function/[name='\$limit']/arguments[2]/value='typedfetlim']">
+        <admst:if test="[../function/[name='\$limit']/arguments[2]/value='typedpnjlim' or ../function/[name='\$limit']/arguments[2]/value='typedpnjlim_new' or ../function/[name='\$limit']/arguments[2]/value='typeddummy' or ../function/[name='\$limit']/arguments[2]/value='typedfetlim']">
           <admst:value-to select="#typed" string="yes"/>
         </admst:if>
       </admst:if>
@@ -1156,8 +1576,8 @@
   </admst:for-each>
 </admst:template>
 
-<!-- 
- =================================================================- 
+<!--
+ =================================================================-
  collectCollapsibles
  This template is intended to be called very early in verilog processing.
  It runs through all contributions and tries to identify those that
@@ -1167,9 +1587,9 @@
  to the node, and a "@collapsesTo" variable containing the node to which
  this one could collapse.
  In considering which node to collapse of a,b, if there's only one internal
- in the pair, that's the collapsible one.  If both are internal, it'll 
+ in the pair, that's the collapsible one.  If both are internal, it'll
  collapse the negative into the positive.
- =================================================================- 
+ =================================================================-
  -->
 <admst:template match="collectCollapsibles">
   <admst:variable name="thisModule" select="%(.)"/>
@@ -1179,20 +1599,23 @@
         <admst:when test="lhs/branch[grounded='no']">
           <admst:choose>
             <admst:when test="lhs/branch/nnode[location='internal']">
-<!--              <admst:warning format="collectCollapsibles found internal nnode %(lhs/branch/nnode/name) it wants to collapse into %(lhs/branch/pnode/name)\n"/> -->
+              <!-- <admst:warning format="collectCollapsibles found internal nnode %(lhs/branch/nnode/name) it wants to collapse into %(lhs/branch/pnode/name)\n"/> -->
               <!-- nnode is internal, collapse it into pnode -->
               <admst:if test="[exists(lhs/branch/nnode/#collapsible) and lhs/branch/nnode/#collapsible='yes']">
                 <!-- nnode is already collapsible to something, so don't just
-                     blindly collapse it to pnode... check that pnode is 
+                     blindly collapse it to pnode... check that pnode is
                      not collapsible, and collapse p into n if not -->
-<!--                <admst:warning format="    %(lhs/branch/nnode/name) is already collapsible...\n"/> -->
+                <!-- <admst:warning format="    %(lhs/branch/nnode/name) is already collapsible...\n"/> -->
                 <admst:choose>
                   <admst:when test="[not(exists(lhs/branch/pnode/#collapsible))]">
-<!--                    <admst:warning format="    but %(lhs/branch/pnode/name) is not collapsible...\n"/> -->
+                    <!-- <admst:warning format="    but %(lhs/branch/pnode/name) is not collapsible...\n"/> -->
                     <admst:choose>
+                      <admst:when test="[lhs/branch/pnode/name=lhs/branch/nnode/@collapsesTo/name]">
+                        <!-- <admst:warning format="But that is OK, because we were already going to do that collapsing!\n"/> -->
+                      </admst:when>
                       <admst:when test="lhs/branch/pnode[location='external']">
-<!--                        <admst:warning format="     unfortunately, that is external... rearranging\n"/> -->
-<!--                        <admst:warning format="     we will make %(lhs/branch/nnode/@collapsesTo/name) collapse to %(lhs/branch/nnode/name) instead, and make %(lhs/branch/nnode/name) collapse to %(lhs/branch/pnode/name) instead\n"/> -->
+                        <!-- <admst:warning format="     unfortunately, that is external... rearranging\n"/> -->
+                        <!-- <admst:warning format="     we will make %(lhs/branch/nnode/@collapsesTo/name) collapse to %(lhs/branch/nnode/name) instead, and make %(lhs/branch/nnode/name) collapse to %(lhs/branch/pnode/name) instead\n"/> -->
                         <admst:variable name="saveCollapse" select="%(lhs/branch/nnode/@collapsesTo)"/>
                         <admst:if test="[exists($saveCollapse/#collapsible)]">
                           <admst:error format="fatal error --- tried to rearrange collapsing of %(lhs/branch/nnode/name) and %($saveCollapse/name) but the latter is already collapsible.\n"/>
@@ -1213,7 +1636,7 @@
                   </admst:otherwise>
                 </admst:choose>
               </admst:if>
-              <admst:if test="[not(exists(lhs/branch/nnode/#collapsible))]"> 
+              <admst:if test="[not(exists(lhs/branch/nnode/#collapsible))]">
                 <!-- nnode is not already collapsible, collapse it into p -->
                 <admst:value-to select="lhs/branch/nnode/#collapsible" string="yes"/>
                 <admst:push into="lhs/branch/nnode/@collapsesTo" onduplicate="ignore" select="lhs/branch/pnode"/>
@@ -1227,20 +1650,36 @@
           </admst:choose>
         </admst:when>
         <admst:otherwise>
-          <admst:error format="Not yet supported: collapsing node to ground\n"/>
+          <admst:warning format="Not yet supported in collectCollapsibles: collapsing node to ground\n"/>
+          <!-- Even though nothing downstream of this will work, let's
+               at least push the machinery a little.  Find the node that's
+               not ground, and mark it as collapsing to ground -->
+          <admst:warning format="    Generated code will not be correct.  \n"/>
+
+          <admst:choose>
+            <admst:when test="lhs/branch/nnode/[grounded='yes']">
+              <admst:value-to select="lhs/branch/pnode/#collapsible" string="yes"/>
+              <admst:push into="lhs/branch/pnode/@collapsesTo" onduplicate="ignore" select="lhs/branch/nnode"/>
+            </admst:when>
+            <admst:when test="lhs/branch/pnode/[grounded='yes']">
+              <admst:value-to select="lhs/branch/nnode/#collapsible" string="yes"/>
+              <admst:push into="lhs/branch/nnode/@collapsesTo" onduplicate="ignore" select="lhs/branch/pnode"/>
+            </admst:when>
+          </admst:choose>
+
         </admst:otherwise>
       </admst:choose>
     </admst:if>
   </admst:for-each>
 </admst:template>
 
-<!-- 
- =================================================================- 
+<!--
+ =================================================================-
  declareCollapsibleBools
  For each node that may be collapsed, generate a declaration of a bool
  that will be used by Xyce to tell whether to collapse it or not.
  Pass the module in the select field of the apply-templates call.
- =================================================================- 
+ =================================================================-
  -->
 <admst:template match="declareCollapsibleBools">
   <admst:if test="[count(node[#collapsible='yes'])>0]">
@@ -1251,19 +1690,21 @@
   </admst:if>
 </admst:template>
 
-<!-- 
- =================================================================- 
+<!--
+ =================================================================-
  evaluateCollapse
  This runs through an element and outputs code only for assignments
  that depend only on constants, conditionals depending only on constants,
  and contributions into voltages (only to set a collapsible bool)
- =================================================================- 
- --> 
+ =================================================================-
+ -->
 
 <admst:template match="evaluateCollapse">
   <admst:choose>
+
+    <!--WHILE-->
     <admst:when test="[datatypename='whileloop']">
-      <admst:variable name="whileblockOutput" select="%s"/>
+      <admst:variable name="whileblockOutput" select=""/>
       <admst:variable name="whileOutput" select=""/>
       <admst:apply-templates select="whileblock" match="evaluateCollapse">
         <admst:value-of select="returned('outputSomething')/value"/>
@@ -1290,8 +1731,22 @@
           <admst:return name="output" string=""/>
         </admst:otherwise>
       </admst:choose>
-      
+
     </admst:when>
+
+    <!--FOR-->
+    <!-- KLUDGE:  The "evaluateCollapse" template is a mess, and invariably
+         outputs completely useless junk that has to be hand-edited out
+         anyway.  Odds are extremely good that any forloop encountered
+         will be among the stuff that really doesn't belong.  So just don't
+         do anything.  -->
+    <admst:when test="[datatypename='forloop']">
+      <admst:return name="outputSomething" string="no"/>
+      <admst:return name="output" string=""/>
+    </admst:when>
+
+
+    <!--IF/ELSE-->
     <admst:when test="[datatypename='conditional']">
       <admst:choose>
         <admst:when test="if[nilled(variable[OPdependent='yes'])]">
@@ -1315,7 +1770,7 @@
                   <admst:variable name="elseOutput" select="%s"/>
                 </admst:apply-templates>
               </admst:if>
-              
+
               <admst:if test="[$thenOutputSomething='yes']">
                 <admst:variable name="output" string="if (%(processTerm(if)/[name='returnedExpression']/value))"/>
                 <admst:variable name="output" string="$output\n{\n$thenOutput\n}\n"/>
@@ -1328,7 +1783,7 @@
                 <admst:variable name="output" string="if (!(%(processTerm(if)/[name='returnedExpression']/value)))"/>
                 <admst:variable name="output" string="$output\n{\n$elseOutput\n}\n"/>
               </admst:if>
-              
+
               <admst:choose>
                 <admst:when test="[$thenOutputSomething='yes' or $elseOutputSomething='yes']">
                   <admst:return name="outputSomething" string="yes"/>
@@ -1375,7 +1830,7 @@
                   <admst:return name="output" string=""/>
                 </admst:otherwise>
               </admst:choose>
-              
+
             </admst:otherwise>
           </admst:choose>
         </admst:when>
@@ -1385,6 +1840,8 @@
         </admst:otherwise>
       </admst:choose>
     </admst:when>
+
+    <!--CONTRIBUTION-->
     <admst:when test="[datatypename='contribution']">
       <admst:choose>
         <admst:when test="lhs[discipline/potential=nature]">
@@ -1401,7 +1858,9 @@
 
             </admst:when>
             <admst:otherwise>
-              <admst:error format="Unsupported feature, collapsing node to ground in contribution %(.)\n"/>
+              <admst:warning format="Unsupported feature, collapsing node to ground in contribution %(.)\n"/>
+              <admst:return name="output" string="//should collapse %(lhs/branch/nnode/name)  and %(lhs/branch/pnode/name) \n"/>
+              <admst:return name="outputSomething" string="yes"/>
             </admst:otherwise>
           </admst:choose>
         </admst:when>
@@ -1411,6 +1870,8 @@
         </admst:otherwise>
       </admst:choose>
     </admst:when>
+
+    <!--ASSIGNMENT-->
     <admst:when test="[datatypename='assignment']">
       <admst:choose>
         <admst:when test="[(lhs/insource='yes') and (lhs/OPdependent='no')]">
@@ -1423,6 +1884,8 @@
         </admst:otherwise>
       </admst:choose>
     </admst:when>
+
+    <!--BLOCK-->
     <admst:when test="[datatypename='block']">
       <admst:value-to select="./#tempOutput" value=""/>
       <admst:variable name="outputSomething" value="no"/>
@@ -1461,13 +1924,16 @@
       </admst:choose>
 <!--      <admst:warning  format="   returning %($output), outputSomething is %($outputSomething)\n"/> -->
     </admst:when>
-    <admst:when test="[datatypename='expression' or datatypename='probe' or datatypename='variable' or datatypename='mapply_unary' or datatypename='mapply_binary' or datatypename='mapply_ternary' or datatypename='function' or datatypename='number' or datatypename='string' or datatypename='nilled' or datatypename='blockvariable' or datatypename='callfunction']">
+
+
+    <!--other stuff to ignore-->
+    <admst:when test="[datatypename='expression' or datatypename='probe' or datatypename='variable' or datatypename='mapply_unary' or datatypename='mapply_binary' or datatypename='mapply_ternary' or datatypename='function' or datatypename='number' or datatypename='string' or datatypename='nilled' or datatypename='blockvariable' or datatypename='callfunction' or datatypename='case']">
       <admst:return name="output" string=""/>
       <admst:return name="outputSomething" string="no"/>
     </admst:when>
-      
+
     <admst:otherwise>
-      <admst:fatal format="%(datatypename): adms element not implemented\n"/> 
+      <admst:fatal format="%(datatypename): adms element not implemented\n"/>
     </admst:otherwise>
   </admst:choose>
 
@@ -1479,8 +1945,8 @@
   <admst:value-to select="./#tempOutput" value=""/>
 </admst:template>
 
-<!-- 
-   =================================================================- 
+<!--
+   =================================================================-
    collectExtraUnknowns
    Another "execute early in the processing" deal.
    Any use of "flow probes" requires an extra unknown (the flow through
@@ -1490,7 +1956,7 @@
    These two cases also, naturally, require an additional equation.  There
    are multiple possibilities:
 
-    A)  Flow probe used only in a flow source, without any associated 
+    A)  Flow probe used only in a flow source, without any associated
         contribution:
         I(b2) &lt;+ I(b1);
         In this case, the extra unknown is I(b1), and the extra equation is
@@ -1513,17 +1979,17 @@
         Extra unknown is I(B1), extra equation same as C
 
    Of course, each of these impacts the loads for the KCLs of the endpoints
-   of B1 and B2.  
+   of B1 and B2.
 
       A) add/subtract I(B1) to endpoint nodes of B1
       B) add/subtract I(B1) to endpoint nodes of B1
       C) add/subtract I(B1) to endpoints of B1
-      D) add/subtract I(B1) to endpoints of B1, use unknown I(B1) in 
+      D) add/subtract I(B1) to endpoints of B1, use unknown I(B1) in
          equations for endpoints of B2.
 
    There are other cases, too, but these are already handled elsewhere.
 
-   The purpose of this template is to figure out which new unknowns to 
+   The purpose of this template is to figure out which new unknowns to
    allocate for, which is pretty easy (look for flow probes in the module's
    list of probes, and look for potential sources that aren't already flagged
    as collapsible (zero RHS) in the module's list of sources: each one
@@ -1545,7 +2011,7 @@
   <!-- Now find the extra unknowns due to potential sources -->
   <admst:for-each select="$thisModule/source[not(exists(branch/nnode/#collapsible)) and not(exists(branch/pnode/#collapsible)) and nature=discipline/potential]">
     <admst:push into="$thisModule/@extraUnknowns" select="branch" onduplicate="ignore"/>
-  </admst:for-each>    
+  </admst:for-each>
 
   <!-- we now know the extra unknowns, which are all branches.  Unfortunately,
        ADMS does not store any information about this stuff in its "jacobian"
@@ -1554,7 +2020,7 @@
   <!-- we'll make three arrays to help us figure out jacobian stuff
 
        we need a list of nodes
-       that depend on branch variables.  We'll push the branch into the 
+       that depend on branch variables.  We'll push the branch into the
        node. We handle this by pushing the list of branch dependencies
        into the actual node structure.
 
@@ -1562,7 +2028,7 @@
        This will let us create the jacobian row for the branch and fill it
        with nodal dependencies.  These will simply be put in an array
        inside the @extraUnknowns array called @nodeDeps.
-       
+
        We need a list of branches that depend on branch vars.
        This will let us augment the branch equation rows.  This, too,
        will be stored in the @branchDeps array under the @extraUnknowns.
@@ -1584,11 +2050,11 @@
       </admst:for-each>
     </admst:for-each>
 
-    <!-- Finally, we have an issue:  if a voltage source is uses, but 
+    <!-- Finally, we have an issue:  if a voltage source is uses, but
          the corresponding current probe is never used (such is done if
          one has a pure voltage source), then our process so far will never
          allocate a place for the current branch probe that we need to use in
-         updateIntermediateVars.  So here, we'll go through our list of 
+         updateIntermediateVars.  So here, we'll go through our list of
          extra branch equations and make a list of branches for which there
          is no probe in the tree.  This will be used later to allocate what's
          missing. -->
@@ -1601,7 +2067,7 @@
       </admst:if>
     </admst:for-each>
 
-<!--   Debugging output commented out 
+<!--   Debugging output commented out
 
   <admst:for-each select="$thisModule/@extraUnknowns">
     // branch %(.) depends on nodes %(@nodeDeps)
@@ -1619,8 +2085,8 @@
 </admst:template>
 
 
-  <!-- 
-   =================================================================- 
+  <!--
+   =================================================================-
    finishUpBranchEquations
 
    Branch equations are of the form:
@@ -1630,7 +2096,7 @@
    the last bit.
 
     . must be a module
-   =================================================================- 
+   =================================================================-
    -->
   <admst:template match="finishUpBranchEquations">
 
@@ -1652,9 +2118,9 @@
         </admst:if>
       </admst:if>
     </admst:for-each>
-    
+
     <admst:for-each select="./@extraUnknowns">
-      <!-- There is one special case:  a branch where the 
+      <!-- There is one special case:  a branch where the
            flow probe is used AND there is a flow source for it.
             In this case the branch equation is
               (sum of contributions into I(branch)) - I(branch) =0
@@ -1671,9 +2137,9 @@
          </admst:when>
          <admst:otherwise>
            <!-- ICK.  In this case, we don't usually HAVE a probe variable,
-                and so we must calculate the drop V(branch) directly. 
+                and so we must calculate the drop V(branch) directly.
                 We can't rely on Sacado to do derivatives w.r.t. this,
-                and will have to have a manual +/- dependence in the 
+                and will have to have a manual +/- dependence in the
                 branch's static jacobian. -->
            <admst:text format="  staticContributions[%(xyceBranchConstantName(.)/[name='branchConstant']/value)] -= (*solVectorPtr)[%(xyceNodeLIDVariable(./pnode))]"/>
            <admst:if test="[nnode/grounded='no']">
@@ -1682,17 +2148,17 @@
          <admst:text format=";\n"/>
          </admst:otherwise>
        </admst:choose>
-           
+
     </admst:for-each>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   verilog2CXXtype                                                    
-     given an admst data tree node, return the C++ datatype           
-     corresponding to its type                                        
-    The node passed in is usually a variable                          
-   =================================================================- 
+  <!--
+   =================================================================-
+   verilog2CXXtype
+     given an admst data tree node, return the C++ datatype
+     corresponding to its type
+    The node passed in is usually a variable
+   =================================================================-
   -->
   <admst:template match="verilog2CXXtype">
     <admst:choose>
@@ -1711,11 +2177,11 @@
     </admst:choose>
   </admst:template>
 
-  <!-- 
+  <!--
    =================================================================-
-   processTerm                                                       
-   given any node, run the associated template over it               
-   =================================================================- 
+   processTerm
+   given any node, run the associated template over it
+   =================================================================-
   -->
   <admst:template match="processTerm" >
     <admst:apply-templates select="." match="%(adms/datatypename)">
@@ -1724,11 +2190,11 @@
     <admst:return name="returnedExpression" value="$expression"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   printTerm                                                          
-   given any node, run the associated template over it and print      
-   =================================================================- 
+  <!--
+   =================================================================-
+   printTerm
+   given any node, run the associated template over it and print
+   =================================================================-
   -->
   <admst:template match="printTerm" >
     <admst:apply-templates select="." match="%(adms/datatypename)">
@@ -1736,25 +2202,25 @@
     </admst:apply-templates>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   handling of expression                                             
-   expression                                                         
-   This template returns the expression passed to it in the select    
-   field                                                              
-   It processes each element of the tree using a template of the      
-   same name as the datatype name.                                    
-                                                                      
-   To understand what it's doing, be aware that the datatypenames     
-   that typically end up in the tree  are things like number,         
-   mapply_binary, mapply_unary, expression (implying recursion back   
-   into this template), ... (fill in, it would be good for this       
-   comment to document all the templates we can call)                
-                                                                      
-   Each of the templates called does little more than return the C++  
-   representation of that type of data, and when we return the entire 
-   expression will be printed in C++                                  
-   =================================================================- 
+  <!--
+   =================================================================-
+   handling of expression
+   expression
+   This template returns the expression passed to it in the select
+   field
+   It processes each element of the tree using a template of the
+   same name as the datatype name.
+
+   To understand what it's doing, be aware that the datatypenames
+   that typically end up in the tree  are things like number,
+   mapply_binary, mapply_unary, expression (implying recursion back
+   into this template), ... (fill in, it would be good for this
+   comment to document all the templates we can call)
+
+   Each of the templates called does little more than return the C++
+   representation of that type of data, and when we return the entire
+   expression will be printed in C++
+   =================================================================-
   -->
   <admst:template match="expression">
     <admst:apply-templates select="tree" match="%(adms/datatypename)" required="yes">
@@ -1764,11 +2230,11 @@
 
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   number                                                             
-   Print out a number, properly accounting for scaling unit suffixes  
-   =================================================================- 
+  <!--
+   =================================================================-
+   number
+   Print out a number, properly accounting for scaling unit suffixes
+   =================================================================-
   -->
   <admst:template match="number">
     <admst:value-of select="value"/>
@@ -1798,19 +2264,19 @@
     </admst:choose>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   mapply_unary                                                       
-   This template handles unary operators, printing out the result     
-   surrounded by parentheses                                          
-   =================================================================- 
+  <!--
+   =================================================================-
+   mapply_unary
+   This template handles unary operators, printing out the result
+   surrounded by parentheses
+   =================================================================-
   -->
   <admst:template match="mapply_unary">
     <admst:if test="[name='plus']"> <admst:variable name="op" select="+"/> </admst:if>
     <admst:if test="[name='minus']"> <admst:variable name="op" select="-"/> </admst:if>
     <admst:if test="[name='not']"> <admst:variable name="op" select="!"/> </admst:if>
     <admst:if test="[name='bw_not']"> <admst:variable name="op" select="~"/> </admst:if>
-    <admst:value-of select="arg1/adms/datatypename"/>	
+    <admst:value-of select="arg1/adms/datatypename"/>
     <admst:apply-templates select="arg1" match="%s" required="yes">
       <admst:value-of select="returned('returnedExpression')/value"/>
       <admst:variable name="expression" select="($op%s)"/>
@@ -1820,12 +2286,12 @@
 
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   mapply_binary                                                      
-   This template handles binary operators, printing out the C++       
-   version surrounded by parentheses                                  
-   =================================================================- 
+  <!--
+   =================================================================-
+   mapply_binary
+   This template handles binary operators, printing out the C++
+   version surrounded by parentheses
+   =================================================================-
   -->
   <admst:template match="mapply_binary">
     <admst:apply-templates select="arg1" match="processTerm">
@@ -1905,16 +2371,16 @@
     <admst:return name="returnedExpression" value="$expression"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   mapply_ternary                                                     
-   Given a ternary operator (cond)?yes:no                             
-   format for C++                                                     
-   Note: this will fail badly if any of the things involved are FAD   
-   types.  FIXME!                                                     
-   =================================================================- 
+  <!--
+   =================================================================-
+   mapply_ternary
+   Given a ternary operator (cond)?yes:no
+   format for C++
+   Note: this will fail badly if any of the things involved are FAD
+   types.  FIXME!
+   =================================================================-
   -->
-  <admst:template match="mapply_ternary"> 
+  <admst:template match="mapply_ternary">
     <admst:apply-templates select="arg1" match="processTerm">
       <admst:value-of select="returned('returnedExpression')/value"/>
       <admst:variable name="a1" select="%s"/>
@@ -1930,16 +2396,16 @@
     <admst:variable name="expression" select="($a1?$a2:$a3)"/>
     <admst:return name="returnedExpression" value="$expression"/>
   </admst:template>
-    
-  <!-- 
-   =================================================================- 
-   assignment                                                         
-   Given an assignment, format it for C++                             
 
-   Special Case:  If the assignment happens to be one that uses 
+  <!--
+   =================================================================-
+   assignment
+   Given an assignment, format it for C++
+
+   Special Case:  If the assignment happens to be one that uses
    $limit, we don't emit anything.  Those special things are handled
    differently.
-   =================================================================- 
+   =================================================================-
   -->
   <admst:template match="assignment">
     <admst:assert test="adms[datatypename='assignment']" format="assignment template called with something that is not an assignment\n"/>
@@ -1977,12 +2443,12 @@
     </admst:choose>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
+  <!--
+   =================================================================-
    limiterAssignment
    Handle special case output for assignments that involve limiters
    These require lots of extra output, and it's only part of the deal.
-   =================================================================- 
+   =================================================================-
   -->
   <admst:template match="limiterAssignment">
     <admst:text format="\n\n//%(printTerm(lhs)) = %(rhs);\n"/>
@@ -1996,6 +2462,10 @@
           <admst:when test="[rhs/function[name='\$limit']/arguments[2]/value='pnjlim' or rhs/function[name='\$limit']/arguments[2]/value='typedpnjlim']">
             <!-- handle "pnjlim" -->
             <admst:text format="  %(printTerm(lhs))_limited = devSupport.pnjlim(%(printTerm(lhs))_limited,%(printTerm(lhs))_old,%(printTerm((rhs/function[name='\$limit']/arguments[3]))),%(printTerm((rhs/function[name='\$limit']/arguments[4]))),&amp;icheck);\n"/>
+          </admst:when>
+          <admst:when test="[rhs/function[name='\$limit']/arguments[2]/value='pnjlim_new' or rhs/function[name='\$limit']/arguments[2]/value='typedpnjlim_new']">
+            <!-- handle "pnjlim_new" -->
+            <admst:text format="  %(printTerm(lhs))_limited = devSupport.pnjlim_new(%(printTerm(lhs))_limited,%(printTerm(lhs))_old,%(printTerm((rhs/function[name='\$limit']/arguments[3]))),%(printTerm((rhs/function[name='\$limit']/arguments[4]))),&amp;icheck);\n"/>
           </admst:when>
         <!-- if "fetlim" we would do something else, but for now nothing... -->
           <admst:when test="[rhs/function[name='\$limit']/arguments[2]/value='fetlim' or rhs/function[name='\$limit']/arguments[2]/value='typedfetlim']">
@@ -2027,7 +2497,7 @@
           </admst:otherwise>
 
         </admst:choose>
-      </admst:when>        
+      </admst:when>
       <admst:otherwise>
         <admst:text format="  %(printTerm(lhs))_limited = model_.analogFunctions.%(rhs/function[name='\$limit']/arguments[2])((%(printTerm(lhs))_limited,%(printTerm(lhs))_old"/>
         <admst:if test="[count(rhs/function[name='\$limit']/arguments)>2]">
@@ -2041,7 +2511,7 @@
     </admst:choose>
     <admst:text format="  if (icheck == 1)\n"/>
     <admst:text format="     origFlag = false;\n"/>
-    
+
     <admst:text format="  if (!origFlag)\n  {\n"/>
     <admst:text format="    probeDiffs[%(xyceProbeConstantName(rhs/function[name='\$limit']/arguments[1])/[name='probeConstant']/value)] = %(printTerm(lhs))_limited - %(printTerm(lhs))_orig;\n"/>
     <admst:text format="    probeVars[%(xyceProbeConstantName(rhs/function[name='\$limit']/arguments[1])/[name='probeConstant']/value)] += probeDiffs[%(xyceProbeConstantName(rhs/function[name='\$limit']/arguments[1])/[name='probeConstant']/value)];\n"/>
@@ -2049,17 +2519,17 @@
     <admst:text format="}\n"/>
     <admst:text format="%(printTerm(lhs)) = probeVars[%(xyceProbeConstantName(rhs/function[name='\$limit']/arguments[1])/[name='probeConstant']/value)];\n\n"/>
   </admst:template>
-<!-- 
-   =================================================================- 
-   contribution                                                       
-   Given a contribution, format it for xyce's updateIntermediateVars  
+<!--
+   =================================================================-
+   contribution
+   Given a contribution, format it for xyce's updateIntermediateVars
 
    This template is complicated by the need to compute Jdxp terms
    when we are working with any RHS that involves limited probes.
-   =================================================================- 
+   =================================================================-
   -->
   <admst:template match="contribution">
-    <!-- Do sanity check to make sure we're actually processing a contribution 
+    <!-- Do sanity check to make sure we're actually processing a contribution
     -->
     <admst:assert test="adms[datatypename='contribution']" format="contribution template called with something that is not a contribution\n"/>
 
@@ -2068,7 +2538,7 @@
     <admst:if test="[lhs/discipline/potential=lhs/nature and rhs/datatypename='expression' and not(rhs/tree/datatypename='number' and (rhs/tree/value='0' or rhs/tree/value='0.0'))]">
       <admst:error format="this version of the Xyce ADMS interface does not support contributions into voltages unless one is setting them to 0 or 0.0.  Attempt to do %(lhs) &lt; %(rhs) failed\n"/>
     </admst:if>
-    --> 
+    -->
 
     <!-- force template functions used on rhs to be explicitly instantiated -->
     <admst:variable name="saveTemplateUse" select="$globalMustUseTemplate"/>
@@ -2082,7 +2552,7 @@
       <admst:when test="[dynamic='yes']">
         <admst:variable name="mode" select="dynamic"/>
       </admst:when>
-      <admst:otherwise> 
+      <admst:otherwise>
         <admst:variable name="mode" select="static"/>
       </admst:otherwise>
     </admst:choose>
@@ -2095,19 +2565,19 @@
       <admst:when test="[lhs/discipline/potential=lhs/nature and (rhs/tree/datatypename='number' and (rhs/tree/value='0' or rhs/tree/value='0.0'))]">
         <admst:text format="// do nothing at all\n"/>
       </admst:when>
-      
+
       <!-- Contributions into potential sources that are nonzero are
-           really different.  In this case, we add/subtract the 
+           really different.  In this case, we add/subtract the
            associated branch current from the pos and negative nodes,
            and also add to the branch equation -->
       <admst:when test="[lhs/discipline/potential=lhs/nature]">
-        
+
         <!-- Positive and negative nodes get +/- the branch variable value -->
-        <!-- But this is not done once for every contribution to a source, 
+        <!-- But this is not done once for every contribution to a source,
              just once for each source!  So these terms will be done
              in the same finish-up operation mentioned below -->
         <admst:variable name="branchConstant" select="%(xyceBranchConstantName(lhs/branch)/[name='branchConstant']/value)"/>
-        
+
         <admst:choose>
           <admst:when test="[count(module/@limitedProbes)>0 and not(nilled(rhs/probe/[#limited='yes']))]">
             <!-- Special processing when RHS involves limited probes -->
@@ -2120,7 +2590,7 @@
               <admst:text format="contribTemp.dx(%(xyceProbeConstantName(.)/[name='probeConstant']/value))*probeDiffs[%(xyceProbeConstantName(.)/[name='probeConstant']/value)]*probeVars[%(xyceProbeConstantName(.)/[name='probeConstant']/value)].dx(%(xyceProbeConstantName(.)/[name='probeConstant']/value))"/>
             </admst:join>
             <admst:text format=";\n"/>
-            
+
           </admst:when>
 
           <admst:otherwise>
@@ -2138,10 +2608,10 @@
       </admst:when>
 
       <!-- Otherwise it's a contribution into flow source, which is
-           the most most straightforward case --> 
+           the most most straightforward case -->
       <admst:otherwise>
         <!-- do nothing if a noise term -->
-        <admst:if test="[whitenoise='no' and flickernoise='no']"> 
+        <admst:if test="[whitenoise='no' and flickernoise='no']">
           <admst:variable name="pnode" select="%(lhs/branch/pnode)"/>
           <admst:variable name="pnodeConstant" select="%(xyceNodeConstantName($pnode)/[name='nodeConstant']/value)"/>
           <admst:variable name="nnode" select="%(lhs/branch/nnode)"/>
@@ -2158,7 +2628,7 @@
                 <admst:variable name="nnodeConstant" select="%(xyceNodeConstantName($nnode)/[name='nodeConstant']/value)"/>
                 <admst:text format="%($mode)Contributions[$nnodeConstant] -= contribTemp;\n"/>
               </admst:if>
-              
+
               <admst:text format="\n"/>
 
               <!-- generate the Jdxp's:
@@ -2201,11 +2671,11 @@
     <admst:variable name="globalMustUseTemplate" select="$saveTemplateUse"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   probe                                                              
-   Given a probe, format it for xyce's updateIntermediateVars         
-   =================================================================- 
+  <!--
+   =================================================================-
+   probe
+   Given a probe, format it for xyce's updateIntermediateVars
+   =================================================================-
   -->
   <admst:template match="probe">
 <!--
@@ -2216,10 +2686,10 @@
   </admst:template>
 
   <!--
-   =================================================================- 
-   variable                                                           
-   given a variable, emit C++ reference thereto                       
-   =================================================================- 
+   =================================================================-
+   variable
+   given a variable, emit C++ reference thereto
+   =================================================================-
   -->
   <admst:template match="variable">
     <admst:assert test="adms[datatypename='variable']" format="variable template called on non-variable\n"/>
@@ -2229,7 +2699,7 @@
       </admst:when>
       <admst:when test="[scope='global_instance']">
         <admst:choose>
-          <admst:when test="[$globalCurrentScope='instance']">
+          <admst:when test="[$globalCurrentScope='instance' or exists(attribute[name='xyceAlsoModel'])]">
             <admst:variable name="expression" select="%(name)"/>
           </admst:when>
           <admst:otherwise>
@@ -2257,13 +2727,53 @@
     <admst:return name="returnedExpression" value="$expression"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   function                                                           
-   =================================================================- 
+  <!--
+   =================================================================-
+   function
+   =================================================================-
   -->
   <admst:template match="function">
     <admst:choose>
+      <admst:when test="[name='min']">
+        <admst:variable name="expression" select="std::min"/>
+        <admst:variable name="args" select=""/>
+        <admst:for-each select="arguments">
+          <!-- if *ANY* argument depends on probes, can't use std::min, must
+               use Sacado's overloaded min -->
+          <admst:if test="[exists(math/dependency)]">
+            <admst:if test="[math/dependency='linear' or math/dependency='nonlinear']">
+              <admst:variable name="expression" select="min"/>
+            </admst:if>
+          </admst:if>
+          <admst:if test="[$args!='']">
+            <admst:variable name="args" select="$args,"/>
+          </admst:if>
+          <admst:apply-templates select="." match="processTerm">
+            <admst:variable name="args" select="$args%(returned('returnedExpression')/value)"/>
+          </admst:apply-templates>
+        </admst:for-each>
+        <admst:variable name="expression" select="$expression($args)"/>
+      </admst:when>
+      <admst:when test="[name='max']">
+        <admst:variable name="expression" select="std::max"/>
+        <admst:variable name="args" select=""/>
+        <admst:for-each select="arguments">
+          <!-- if *ANY* argument depends on probes, can't use std::max, must
+               use Sacado's overloaded max -->
+          <admst:if test="[exists(math/dependency)]">
+            <admst:if test="[math/dependency='linear' or math/dependency='nonlinear']">
+              <admst:variable name="expression" select="max"/>
+            </admst:if>
+          </admst:if>
+          <admst:if test="[$args!='']">
+            <admst:variable name="args" select="$args,"/>
+          </admst:if>
+          <admst:apply-templates select="." match="processTerm">
+            <admst:variable name="args" select="$args%(returned('returnedExpression')/value)"/>
+          </admst:apply-templates>
+        </admst:for-each>
+        <admst:variable name="expression" select="$expression($args)"/>
+      </admst:when>
       <admst:when test="[name='absdelay']">
         <admst:apply-templates select="arguments[1]" match="processTerm">
           <admst:variable name="expression" select="FIXMEabsdelay(%(returned('returnedExpression')/value))"/>
@@ -2283,17 +2793,17 @@
           <admst:when test="$arg1/[parametertype='model']">
             <admst:choose>
               <admst:when test="[$globalCurrentScope = 'model']">
-                <admst:variable name="expression" select="given(&quot;($arg1/name)&quot;)"/>
+                <admst:variable name="expression" select="given(&quot;$arg1&quot;)"/>
               </admst:when>
               <admst:otherwise>
-                <admst:variable name="expression" select="(model_.given(&quot;($arg1/name)&quot;))"/>
+                <admst:variable name="expression" select="(model_.given(&quot;$arg1&quot;))"/>
               </admst:otherwise>
             </admst:choose>
           </admst:when>
           <admst:when test="$arg1/[parametertype='instance']">
             <admst:choose>
               <admst:when test="[$globalCurrentScope = 'instance']">
-                <admst:variable name="expression" select="given(&quot;($arg1/name)&quot;)"/>
+                <admst:variable name="expression" select="given(&quot;$arg1&quot;)"/>
               </admst:when>
               <admst:otherwise>
                 <admst:fatal format="Attempt to use \$given() on an instance variable outside of instance scope\n"/>
@@ -2314,7 +2824,7 @@
           <!-- KLUDGE!!!!!! -->
           <!-- Assumes that when at model scope, $temperature is taken as
                the default temperature of the simulator. -->
-          <!-- At instance scope, we use whatever Xyce passed in to 
+          <!-- At instance scope, we use whatever Xyce passed in to
                updateTemperature for that instance. -->
           <admst:when test="[$globalCurrentScope='model']">
             <admst:variable name="expression" select="admsModTemp"/>
@@ -2328,7 +2838,7 @@
       <admst:when test="[name='\$vt']">
         <admst:choose>
           <admst:when test="[nilled(arguments)]">
-            <admst:variable name="expression" select="adms_vt_nom"/>   
+            <admst:variable name="expression" select="adms_vt_nom"/>
           </admst:when>
           <admst:when test="arguments[count(.)=1]">
             <admst:apply-templates select="arguments[1]" match="processTerm">
@@ -2336,7 +2846,7 @@
             </admst:apply-templates>
           </admst:when>
         </admst:choose>
-      </admst:when>   
+      </admst:when>
       <admst:when test="[name='\$scale']">
         <admst:assert test="[nilled(arguments)]" format="%(name): should not have arguments\n"/>
         <admst:variable name="expression" select="FIXME_scale"/>
@@ -2392,21 +2902,21 @@
     <admst:return name="returnedExpression" value="$expression"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   string                                                             
-   format a string for output                                         
-   =================================================================- 
+  <!--
+   =================================================================-
+   string
+   format a string for output
+   =================================================================-
   -->
   <admst:template match="string">
     <admst:return name="returnedExpression" value="&quot;%(value)&quot;"/>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   conditional                                                        
-   output if/then/else                                                
-   =================================================================- 
+  <!--
+   =================================================================-
+   conditional
+   output if/then/else
+   =================================================================-
   -->
   <admst:template match="conditional">
     <admst:assert test="adms[datatypename='conditional']" format="conditional template called on something other than conditional\n"/>
@@ -2425,11 +2935,11 @@
     </admst:if>
   </admst:template>
 
-  <!-- 
-   =================================================================- 
-   block                                                              
-   output block                                                       
-   =================================================================- 
+  <!--
+   =================================================================-
+   block
+   output block
+   =================================================================-
   -->
   <admst:template match="block">
     <admst:assert test="adms[datatypename='block']" format="block template called on something other than block\n"/>
@@ -2441,11 +2951,11 @@
   </admst:template>
 
 
-  <!-- 
-   =================================================================- 
-   blockvariable                                                      
-     declare block-local variables                                    
-   =================================================================- 
+  <!--
+   =================================================================-
+   blockvariable
+     declare block-local variables
+   =================================================================-
   -->
   <admst:template match="blockvariable">
     <admst:text format="//Block-local variables for block %(block/name)\n"/>
@@ -2456,19 +2966,19 @@
   </admst:template>
 
   <!--
-   =================================================================- 
-   nilled                                                             
-   do nothing, when nothing is found                                  
-   =================================================================- 
+   =================================================================-
+   nilled
+   do nothing, when nothing is found
+   =================================================================-
   -->
   <admst:template match="nilled">
   </admst:template>
 
   <!--
-   =================================================================- 
-   whileloop                                                          
-   output while loop                                                  
-   =================================================================- 
+   =================================================================-
+   whileloop
+   output while loop
+   =================================================================-
   -->
   <admst:template match="whileloop">
     <admst:text format="while (%(printTerm(while)))\n"/>
@@ -2478,14 +2988,14 @@
   </admst:template>
 
   <!--
-   =================================================================- 
-   forloop                                                            
-   output for   loop                                                  
-   =================================================================- 
+   =================================================================-
+   forloop
+   output for   loop
+   =================================================================-
   -->
   <admst:template match="forloop">
     <admst:text format="for ("/>
-    <admst:text format="%(printTerm(initial/lhs))=%(printTerm(initial/rhs));"/> 
+    <admst:text format="%(printTerm(initial/lhs))=%(printTerm(initial/rhs));"/>
     <admst:text format="%(printTerm(condition));"/>
     <admst:text format="%(printTerm(update/lhs))=%(printTerm(update/rhs)) )"/>
     <admst:text select="forblock/adms[datatypename!='block']" format="{\n"/>
@@ -2493,10 +3003,10 @@
     <admst:text select="forblock/adms[datatypename!='block']" format="}\n"/>
   </admst:template>
   <!--
-   =================================================================- 
+   =================================================================-
    case
    output "case" statement
-   =================================================================- 
+   =================================================================-
   -->
   <admst:template match="case">
     <admst:variable name="casecondition" path="case/tree"/>
@@ -2509,7 +3019,7 @@
       <admst:text format="if ( "/>
       <admst:join select="condition" separator="||">
 	<admst:apply-templates select="." match="%(datatypename)">
-	  <admst:text format="($casecondition) == (%(returned('returnedExpression')/value))"/>
+	  <admst:text format="%(printTerm($casecondition)) == (%(returned('returnedExpression')/value))"/>
 	</admst:apply-templates>
       </admst:join>
       <admst:text format=")\n"/>
@@ -2524,12 +3034,12 @@
 
 
   <!--
-   =================================================================- 
-   formatted_range                                                    
-   Given a variable node, print out its range in a nicely formatted    
-   way, with open or closed bounds indicated.                         
-   This is for pretty printing such as for HTML, not code generation. 
-   =================================================================- 
+   =================================================================-
+   formatted_range
+   Given a variable node, print out its range in a nicely formatted
+   way, with open or closed bounds indicated.
+   This is for pretty printing such as for HTML, not code generation.
+   =================================================================-
   -->
   <admst:template match="formatted_range">
     <admst:choose>
@@ -2546,12 +3056,12 @@
   </admst:template>
 
   <!--
-   =================================================================- 
-   formatted_range2                                                   
-   the actual guts of formatted range, but this one takes a single    
-   range node of the tree, not a variable (which can have multiple    
-   ranges                                                             
-   =================================================================- 
+   =================================================================-
+   formatted_range2
+   the actual guts of formatted range, but this one takes a single
+   range node of the tree, not a variable (which can have multiple
+   ranges
+   =================================================================-
   -->
 <admst:template match="formatted_range2">
   <admst:choose>
@@ -2590,11 +3100,11 @@
 </admst:template>
 
   <!--
-   =================================================================- 
-   rangeCondition                                                     
-   Given a range, generate the C++ condition that checks if it's      
-   exceeded/violated                                                  
-   =================================================================- 
+   =================================================================-
+   rangeCondition
+   Given a range, generate the C++ condition that checks if it's
+   exceeded/violated
+   =================================================================-
   -->
 
 <admst:template match="rangeCondition">
@@ -2637,20 +3147,20 @@
 </admst:template>
 
   <!--
-   =================================================================- 
-   check_range                                                        
-   Given a variable node, generate code to check the variable against 
-   the range.                                                         
-                                                                      
-   The range of the variable is assumed non-nilled, so the caller     
-   must check first before calling this.                              
-   =================================================================- 
+   =================================================================-
+   check_range
+   Given a variable node, generate code to check the variable against
+   the range.
+
+   The range of the variable is assumed non-nilled, so the caller
+   must check first before calling this.
+   =================================================================-
   -->
 
 <admst:template match="check_range">
   <admst:choose>
     <!-- first special case: both upper and lower are special, meaning that
-         there really is no range to bother checking -->    
+         there really is no range to bother checking -->
     <admst:when test="[range/infexpr/hasspecialnumber='YES' and range/supexpr/hasspecialnumber='YES']">
       <!-- do nothing -->
     </admst:when>
@@ -2665,13 +3175,13 @@
           <admst:text format="%(returned('returnCondition')/value)"/>
         </admst:apply-templates>
       </admst:join>
-      <admst:text format=") )\n  {\n    string msg=&quot;$nameSpace: Parameter %(name) value "/>
+      <admst:text format=") )\n  {\n    UserError0(*this) &lt;&lt; &quot;$nameSpace: Parameter %(name) value &quot; &lt;&lt; %(name) &lt;&lt; &quot; "/>
       <admst:join select="range" separator=" or ">
         <admst:text select="[type='include']" format="out of range"/>
         <admst:text select="[type='exclude']" format="in excluded range"/>
         <admst:text format=" %(formatted_range2(.))"/>
       </admst:join>
-      <admst:text format="\\n&quot;;\n    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL,msg);\n  }\n"/>
+      <admst:text format="&quot;;\n  }\n"/>
     </admst:otherwise>
   </admst:choose>
 </admst:template>
@@ -2773,7 +3283,24 @@
     <admst:otherwise>
       <admst:choose>
         <admst:when test="[$globalMustUseTemplate='no' or class!='analog']">
-          <admst:variable name="expression" select="%(name)"/>
+          <admst:choose>
+            <admst:when test="[class='analog']">
+              <admst:choose>
+                <admst:when test="[$globalCurrentScope='model']">
+                  <admst:variable name="expression" select="analogFunctions.%(name)"/>
+                </admst:when>
+                <admst:when test="[$globalCurrentScope='instance']">
+                  <admst:variable name="expression" select="model_.analogFunctions.%(name)"/>
+                </admst:when>
+                <admst:when test="[$globalCurrentScope='AF']">
+                  <admst:variable name="expression" select="%(name)"/>
+                </admst:when>
+              </admst:choose>
+            </admst:when>
+            <admst:otherwise>
+              <admst:variable name="expression" select="%(name)"/>
+            </admst:otherwise>
+          </admst:choose>
         </admst:when>
         <admst:otherwise>
           <admst:choose>
@@ -2811,11 +3338,11 @@
 <admst:template match="callfunction">
   <admst:choose>
     <admst:when test="function[name='\$strobe']">
-      <admst:text format="cerr "/>
+      <admst:text format="std::cerr "/>
       <admst:for-each select="function/arguments">
       <admst:text format=" &lt;&lt; %(printTerm(.))"/>
       </admst:for-each>
-      <admst:text format=" &lt;&lt;  endl; \n"/>
+      <admst:text format=" &lt;&lt;  std::endl; \n"/>
     </admst:when>
     <admst:otherwise>
       <admst:value-of select="function/name"/>

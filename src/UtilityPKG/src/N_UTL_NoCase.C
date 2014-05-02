@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -24,14 +24,14 @@
 
 /**
  * @file   N_UTL_NoCase.h
- * @author David G. Baur  KTech Corp.  Sandia National Laboratories 9143 <dgbaur@sandia.gov>
+ * @author David G. Baur  KTech Corp.  Sandia National Laboratories 9143 
  * @date   Mon Apr 22 08:48:30 2013
  *
  * @brief Case insensitive functions and functors.
  *
- * Revision Number: $Revision: 1.1.2.2 $
+ * Revision Number: $Revision: 1.4.2.1 $
  *
- * Revision Date  : $Date: 2013/10/03 17:23:52 $
+ * Revision Date  : $Date: 2014/03/03 18:29:29 $
  */
 
 #include <N_UTL_NoCase.h>

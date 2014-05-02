@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.10.2.4 $
-// Revision Date  : $Date: 2013/12/19 01:07:14 $
-// Current Owner  : $Author: tmei $
+// Revision Number: $Revision: 1.23 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
+// Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #ifndef Xyce_N_ANP_HB_h
@@ -48,11 +48,12 @@
 #include <vector>
 
 // ----------   Xyce Includes   ----------
+#include <N_ANP_fwd.h>
+
 #include <N_ANP_AnalysisBase.h>
 #include <N_MPDE_State.h>
 
 // ---------- Forward Declarations ----------
-class N_ANP_AnalysisManager;
 class N_LAS_PrecondFactory;
 class N_LAS_System;
 
@@ -61,46 +62,51 @@ class N_MPDE_Discretization;
 class N_LOA_HBLoader;
 class N_LAS_HBBuilder;
 
+namespace Xyce {
+namespace Analysis {
+
 //-------------------------------------------------------------------------
-// Class         : N_ANP_HB
+// Class         : HB
 // Purpose       : HB analysis class
-// Special Notes : 
+// Special Notes :
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 01/24/08
 //-------------------------------------------------------------------------
-class N_ANP_HB : public N_ANP_AnalysisBase 
+class HB : public AnalysisBase
 {
 public:
-  N_ANP_HB( N_ANP_AnalysisManager * anaManagerPtr );
-  virtual ~N_ANP_HB() {};
+    HB( AnalysisManager * anaManagerPtr );
+    virtual ~HB() {};
 
-  // Method to set HB options
-  bool setHBOptions(const N_UTL_OptionBlock & OB);
+    // Method to set HB options
+    bool setHBOptions(const N_UTL_OptionBlock & OB);
 
-  // Method to set HB linear solver / preconditioning options
-  bool setHBLinSol(const N_UTL_OptionBlock & OB);
+    // Method to set HB linear solver / preconditioning options
+    bool setHBLinSol(const N_UTL_OptionBlock & OB);
 
-  // Method to set non-HB linear solver / preconditioning options (needed for .STEP)
-  bool setLinSol(const N_UTL_OptionBlock & OB);
+    // Method to set non-HB linear solver / preconditioning options (needed for .STEP)
+    bool setLinSol(const N_UTL_OptionBlock & OB);
 
-  // Override these methods using the current analysisObject_.
-  int getStepNumber ();
-  void setStepNumber (int step); 
-  void setBeginningIntegrationFlag(bool bif);
-  bool getBeginningIntegrationFlag();
-  void setIntegrationMethod (int im); 
-  unsigned int getIntegrationMethod (); 
+    // Override these methods using the current analysisObject_.
+    int getStepNumber ();
+    void setStepNumber (int step);
+    void setBeginningIntegrationFlag(bool bif);
+    bool getBeginningIntegrationFlag();
+    void setIntegrationMethod (int im);
+    unsigned int getIntegrationMethod ();
 
-  bool run();
-  bool init();
-  bool loopProcess();
-  bool processSuccessfulDCOP();
-  bool processFailedDCOP();
-  bool processSuccessfulStep();
-  bool processFailedStep();
-  bool finish();
-  bool resetForStepAnalysis();
-  
+    virtual bool run(); /* override */
+    virtual bool init(); /* override */
+    virtual bool loopProcess(); /* override */
+    virtual bool processSuccessfulDCOP(); /* override */
+    virtual bool processFailedDCOP(); /* override */
+    virtual bool processSuccessfulStep(); /* override */
+    virtual bool processFailedStep(); /* override */
+    virtual bool finish(); /* override */
+    virtual bool handlePredictor(); /* override */
+
+    virtual bool resetForStepAnalysis();
+
   bool finalVerboseOutput();
 
   // Utility function for AnalysisManager to determine if a complex analysis type (like HB)
@@ -110,30 +116,30 @@ public:
   bool isAnalysis( int analysis_type );
 
   // Transform the current solution vector for time domain and frequency domain output
-  void prepareHBOutput(N_LAS_Vector & solnVecPtr, 
+  void prepareHBOutput(N_LAS_Vector & solnVecPtr,
                        std::vector<double> & timePoints,
                        std::vector<double> & freqPoints,
-                       Teuchos::RCP<N_LAS_BlockVector> & timeDomainSolnVec, 
-                       Teuchos::RCP<N_LAS_BlockVector> & freqDomainSolnVecReal, 
-                       Teuchos::RCP<N_LAS_BlockVector> & freqDomainSolnVecImaginary) const;
-
-  void printStepHeader();
-  void printProgress();
+                       Teuchos::RCP<N_LAS_BlockVector> & timeDomainSolnVec,
+                       Teuchos::RCP<N_LAS_BlockVector> & freqDomainSolnVecReal,
+                       Teuchos::RCP<N_LAS_BlockVector> & freqDomainSolnVecImaginary,
+                       Teuchos::RCP<N_LAS_BlockVector> & timeDomainStoreVec,
+                       Teuchos::RCP<N_LAS_BlockVector> & freqDomainStoreVecReal,
+                       Teuchos::RCP<N_LAS_BlockVector> & freqDomainStoreVecImaginary) const;
 
   int debugLevel;
 
 private:
 
   // Add in solver info and timing info from current analysisObject_
-  void accumulateStatistics_(); 
+  void accumulateStatistics_();
 
   bool runTol_();
   bool runStartupPeriods_();
   bool runTransientIC_();
   bool interpolateIC_();
- 
+
   // Flag to indicate of the simulation is paused
-  bool isPaused; 
+  bool isPaused;
 
   // Timing/loop count info
   double startDCOPtime, endTRANtime; // startTRANtime
@@ -143,7 +149,7 @@ private:
   Teuchos::RCP<N_LOA_NonlinearEquationLoader> nonlinearEquationLoaderPtr_;
   Teuchos::RCP<N_LAS_Builder> appBuilderPtr_;
   Teuchos::RCP<N_PDS_Manager> pdsMgrPtr_;
-  Teuchos::RCP<N_ANP_AnalysisBase> analysisObject_;
+  Teuchos::RCP<AnalysisBase> analysisObject_;
 
   // Current analysis state flags.
   bool isTransient_, isDCSweep_;
@@ -171,6 +177,7 @@ private:
   // Transient assisted HB.
   int taHB_;
 
+  bool voltLimFlag_;
   // HB loader, builder, and system
   Teuchos::RCP<N_LOA_HBLoader> hbLoaderPtr_;
   Teuchos::RCP<N_LAS_HBBuilder> hbBuilderPtr_;
@@ -180,6 +187,7 @@ private:
   int fastTimeDisc_;
   int fastTimeDiscOrder_;
   std::vector<double> fastTimes_;
+  std::vector<double> timeSteps_;
   std::vector<double> freqPoints_;
   Teuchos::RCP<N_MPDE_Discretization> mpdeDiscPtr_;
   N_MPDE_State mpdeState_;
@@ -207,18 +215,17 @@ private:
   // HB initial condition
   Teuchos::RCP<N_LAS_BlockVector> HBICVectorPtr_;
   Teuchos::RCP<N_LAS_BlockVector> HBICVectorFreqPtr_;
-  
+
   // HB initial state condition
   Teuchos::RCP<N_LAS_BlockVector> HBICStateVectorPtr_;
-  Teuchos::RCP<N_LAS_BlockVector> HBICStateVectorFreqPtr_;
-  
+//  Teuchos::RCP<N_LAS_BlockVector> HBICStateVectorFreqPtr_;
+
   // HB initial Q condition
   Teuchos::RCP<N_LAS_BlockVector> HBICQVectorPtr_;
-  Teuchos::RCP<N_LAS_BlockVector> HBICQVectorFreqPtr_;
-  
+ //  Teuchos::RCP<N_LAS_BlockVector> HBICQVectorFreqPtr_;
+
   // HB initial store condition
   Teuchos::RCP<N_LAS_BlockVector> HBICStoreVectorPtr_;
-  Teuchos::RCP<N_LAS_BlockVector> HBICStoreVectorFreqPtr_;
 
   // HB statistics
   int hbTotalNumberSuccessfulStepsTaken_;
@@ -236,6 +243,11 @@ private:
 
   bool resetForStepCalledBefore_;
 };
+
+} // namespace Analysis
+} // namespace Xyce
+
+typedef Xyce::Analysis::Transient N_ANP_Transient;
 
 #endif // Xyce_N_ANP_HB_h
 

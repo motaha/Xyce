@@ -1,0 +1,46 @@
+*-------------------------------------------------------------------------
+* Copyright Notice
+*
+* Copyright (c) 2000, Sandia Corporation, Albuquerque, NM.
+*-------------------------------------------------------------------------
+*
+*-------------------------------------------------------------------------
+* Filename       : $RCSfile: dio_regulator.cir,v $
+*
+* Purpose        : This  circuit is a simple voltage regulator circuit.  
+*                  The output at node 2 should be a nice sinewave.  The 
+*                  output at node 3 should be a nearly flat line, around 
+*                  3 volts, with a very slight sinusoidal variation.
+*
+* Special Notes  : See page 68 of Fjeldly's book, "Introduction to 
+*                  Device Modeling and Circuit Simulation," for a more 
+*                  detailed description and explanation of this circuit.
+*
+* Creator        : Eric R. Keiter
+*
+* Creation Date  : 10/26/00
+*
+* Revision Information:
+* ---------------------
+*
+* Revision Number: $Revision: 1.1 $
+*
+* Revision Date  : $Date: 2000/10/26 23:21:19 $
+*
+* Current Owner  : $Author: erkeite $
+*-------------------------------------------------------------------------
+VP 1 0 PULSE(0 10 0.0 2.0e-2 0.0 1.0e+20 0.0)
+VF 1 2 SIN(0 1 50 2.0e-2)
+R1 2 3 1k
+D1 3 4 DIODE
+D2 4 5 DIODE
+D3 5 6 DIODE
+D4 6 0 DIODE
+.MODEL DIODE D (is=880.5e-18  rs=0.25 ikf=0 n=1 
++ xti=3 eg=1.11 cjo=175p m=0.5516 vj=0.75  fc=0.5
++ isr=1.859n nr=2 bv=4.7 ibv=20.245m)
+.TRAN 1.0e-3 0.7e-1
+.options NONLIN maxstep=100
+.options TIMEINT reltol=1.0e-3 abstol=1.0e-6
+.print tran v(1) v(2) v(3) v(4) v(5) v(6)
+.END

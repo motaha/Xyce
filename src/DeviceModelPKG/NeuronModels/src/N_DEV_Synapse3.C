@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.26.2.1 $
+// Revision Number: $Revision: 1.45.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:33 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -54,11 +54,16 @@
 // ----------   Xyce Includes   ----------
 //
 #include <N_DEV_Const.h>
-#include <N_DEV_Synapse3.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_DeviceMaster.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Synapse3.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
+
+#include <N_DEV_Synapse.h>
 
 #include <N_LAS_Matrix.h>
 #include <N_LAS_Vector.h>
@@ -66,111 +71,88 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<Synapse3::Instance>::ParametricData()
-{
-  setNumNodes(2);
-  setNumOptionalNodes(0);
-  setNumFillNodes(0);
-  setModelRequired(1);
-  addModelType("SYNAPSE");
 
-  // Set up map for double precision variables:
-  addPar ("GMAX", 0.01, false, ParameterType::NO_DEP,
+namespace Synapse3 {
+
+
+void Traits::loadInstanceParameters(ParametricData<Synapse3::Instance> &p)
+{
+// Set up map for double precision variables:
+  p.addPar ("GMAX", 0.01, false, ParameterType::NO_DEP,
           &Synapse3::Instance::gMax,
           &Synapse3::Instance::gMaxGiven,
           U_OHMM1, CAT_NONE, "Maximal Synaptic Conductance");
 
-  addPar ("P", 1.0, false, ParameterType::NO_DEP,
+  p.addPar ("P", 1.0, false, ParameterType::NO_DEP,
           &Synapse3::Instance::transmissionProbability,
           &Synapse3::Instance::transmissionProbabilityValueGiven,
           U_NONE, CAT_NONE, "Transmission Probability");
 
-  addPar ("WINIT", 0.01, false, ParameterType::NO_DEP,
+  p.addPar ("WINIT", 0.01, false, ParameterType::NO_DEP,
           &Synapse3::Instance::wInitialValue,
           &Synapse3::Instance::wInitialValueGiven,
           U_NONE, CAT_NONE, "Synaptic weight, initial value");
 }
 
-template<>
-ParametricData<Synapse3::Model>::ParametricData()
+void Traits::loadModelParameters(ParametricData<Synapse3::Model> &p)
 {
   // Set up map for double precision variables:
-  addPar ("VTHRESH", 0.01, false, ParameterType::NO_DEP,
-          &Synapse3::Model::vThresh, NULL,
-          U_VOLT, CAT_NONE, "Presynaptic voltage spike threhsold");
+  p.addPar ("VTHRESH", 0.01, &Synapse3::Model::vThresh)
+    .setUnit(U_VOLT)
+    .setDescription("Presynaptic voltage spike threhsold");
 
-  addPar ("DELAY", 0.001, false, ParameterType::NO_DEP,
-          &Synapse3::Model::delay, NULL,
-          U_SECOND, CAT_NONE, "Time delay between presynaptic signal and postsynaptic response");
+  p.addPar ("DELAY", 0.001, &Synapse3::Model::delay)
+    .setUnit(U_SECOND)
+    .setDescription("Time delay between presynaptic signal and postsynaptic response");
 
-  addPar ("GMAX", 0.01, false, ParameterType::NO_DEP,
-          &Synapse3::Model::gMax, NULL,
-          U_OHMM1, CAT_NONE, "Maximal Synaptic Conductance");
+  p.addPar ("GMAX", 0.01, &Synapse3::Model::gMax)
+    .setUnit(U_OHMM1)
+    .setDescription("Maximal Synaptic Conductance");
 
-  addPar ("EREV", 0.0, false, ParameterType::NO_DEP,
-          &Synapse3::Model::eRev, NULL,
-          U_VOLT, CAT_NONE, "Postsynaptic Reversal Potential");
+  p.addPar ("EREV", 0.0,&Synapse3::Model::eRev)
+    .setUnit(U_VOLT)
+    .setDescription("Postsynaptic Reversal Potential");
 
-  addPar ("TAU1", 0.0001, false, ParameterType::NO_DEP,
-          &Synapse3::Model::tau1, NULL,
-          U_SECM1, CAT_NONE, "Rise time constant");
+  p.addPar ("TAU1", 0.0001, &Synapse3::Model::tau1)
+    .setUnit(U_SECM1)
+    .setDescription("Rise time constant");
 
-  addPar ("TAU2", 0.01, false, ParameterType::NO_DEP,
-          &Synapse3::Model::tau2, NULL,
-          U_SECM1, CAT_NONE, "Decay time constant");
+  p.addPar ("TAU2", 0.01,&Synapse3::Model::tau2)
+    .setUnit(U_SECM1)
+    .setDescription("Decay time constant");
 
-  addPar ("S", 0.01, false, ParameterType::NO_DEP,
-          &Synapse3::Model::sParam, NULL,
-          U_VOLT, CAT_NONE, "Voltage threshold for a spike event");
-  addPar ("R", 0.01, false, ParameterType::NO_DEP,
-          &Synapse3::Model::rParam, NULL,
-          U_VOLT, CAT_NONE, "Resting voltage for resting event");
-  addPar ("WMIN", 0.01, false, ParameterType::NO_DEP,
-          &Synapse3::Model::wMin, NULL,
-          U_NONE, CAT_NONE, "Synaptic weight, minimum value");
-  addPar ("WMAX", 0.01, false, ParameterType::NO_DEP,
-          &Synapse3::Model::wMax, NULL,
-          U_NONE, CAT_NONE, "Synaptic weight, maximum value");
-  addPar ("WINIT", 0.01, false, ParameterType::NO_DEP,
-          &Synapse3::Model::wInitialValue, NULL,
-          U_NONE, CAT_NONE, "Synaptic weight, initial value");
-  addPar ("L1TAU", 0.01, false, ParameterType::NO_DEP,
-          &Synapse3::Model::vL1tau1, NULL,
-          U_SECOND, CAT_NONE, "Rate for Longterm potentiation factor (LPF) based on post-synaptic voltage (rate 1)");
-  addPar ("L2TAU", 0.01, false, ParameterType::NO_DEP,
-          &Synapse3::Model::vL2tau2, NULL,
-          U_SECOND, CAT_NONE, "Rate for Longterm potentiation factor (LPF) based on post-synaptic voltage (rate 2)");
-  addPar ("L3TAU", 0.01, false, ParameterType::NO_DEP,
-          &Synapse3::Model::vL3tau3, NULL,
-          U_SECOND, CAT_NONE, "Rate for Longterm potentiation factor (LPF) based on pre-synaptic voltage (rate 3)");
-  addPar ("ALTD", 0.01, false, ParameterType::NO_DEP,
-          &Synapse3::Model::aLTD, NULL,
-          U_NONE, CAT_NONE, "Long term depression coefficient");
-  addPar ("ALTP", 0.01, false, ParameterType::NO_DEP,
-          &Synapse3::Model::aLTP, NULL,
-          U_NONE, CAT_NONE, "Long term potentiation coefficient");
-  addPar ("P", 1.0, false, ParameterType::NO_DEP,
-          &Synapse3::Model::transmissionProbability,
-          NULL, U_NONE, CAT_NONE, "Transmission Probability");
+  p.addPar ("S", 0.01, &Synapse3::Model::sParam)
+    .setUnit(U_VOLT)
+    .setDescription("Voltage threshold for a spike event");
+  p.addPar ("R", 0.01, &Synapse3::Model::rParam)
+    .setUnit(U_VOLT)
+    .setDescription("Resting voltage for resting event");
+  p.addPar ("WMIN", 0.01, &Synapse3::Model::wMin)
+    .setDescription("Synaptic weight, minimum value");
+  p.addPar ("WMAX", 0.01, &Synapse3::Model::wMax)
+    .setDescription("Synaptic weight, maximum value");
+  p.addPar ("WINIT", 0.01, &Synapse3::Model::wInitialValue)
+    .setDescription("Synaptic weight, initial value");
+  p.addPar ("L1TAU", 0.01, &Synapse3::Model::vL1tau1)
+    .setUnit(U_SECOND)
+    .setDescription("Rate for Longterm potentiation factor (LPF) based on post-synaptic voltage (rate 1)");
+  p.addPar ("L2TAU", 0.01, &Synapse3::Model::vL2tau2)
+    .setUnit(U_SECOND)
+    .setDescription("Rate for Longterm potentiation factor (LPF) based on post-synaptic voltage (rate 2)");
+  p.addPar ("L3TAU", 0.01, &Synapse3::Model::vL3tau3)
+    .setUnit(U_SECOND)
+    .setDescription("Rate for Longterm potentiation factor (LPF) based on pre-synaptic voltage (rate 3)");
+  p.addPar ("ALTD", 0.01, &Synapse3::Model::aLTD)
+    .setDescription("Long term depression coefficient");
+  p.addPar ("ALTP", 0.01, &Synapse3::Model::aLTP)
+    .setDescription("Long term potentiation coefficient");
+  p.addPar ("P", 1.0, &Synapse3::Model::transmissionProbability)
+    .setDescription("Transmission Probability");
 }
 
-namespace Synapse3 {
-
-vector< vector<int> > Instance::jacStamp;
 
 
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
-}
-
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
+std::vector< std::vector<int> > Instance::jacStamp;
 
 // Class Instance
 //-----------------------------------------------------------------------------
@@ -181,10 +163,10 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Christina Warrender, SNL,
 // Creation Date : 10/12/11
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
   // initialization
-  respondTime = numeric_limits<double>::max( );
+  respondTime = std::numeric_limits<double>::max( );
   ready = true;
 
   return true;
@@ -199,14 +181,12 @@ bool Instance::processParams (string param)
 // Creation Date : 10/12/11
 //-----------------------------------------------------------------------------
 Instance::Instance(
-  InstanceBlock & IB,
+  const Configuration & configuration,
+  const InstanceBlock & IB,
   Model & Riter,
-  MatrixLoadData & mlData1,
-  SolverState &ss1,
-  ExternData  &ed1,
-  DeviceOptions & do1)
+  const FactoryBlock &  factory_block)
 
-  : DeviceInstance(IB, mlData1, ss1, ed1, do1),
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(Riter),
     li_Prev(-1),
     li_Post(-1),
@@ -232,9 +212,6 @@ Instance::Instance(
   numExtVars   = 2;   // presynaptic V and postsynaptic V
   setNumStoreVars(7);   // A0, B0, t0, weight, vl1, vl2, vl3
   numLeadCurrentStoreVars = 1;
-
-  setName(IB.getName());
-  setModelName(model_.getName());
 
   if( jacStamp.empty() )
   {
@@ -301,41 +278,20 @@ Instance::~Instance ()
 // Creator       : Christina Warrender, SNL,
 // Creation Date : 10/12/11
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                             const vector<int> & extLIDVecRef )
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                             const std::vector<int> & extLIDVecRef )
 {
-  string msg;
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "-------------------------------------------------------------------------"
-    "----";
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl << dashedline << endl;
-    cout << "  SynapseInstance::registerLIDs" << endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "  SynapseInstance::registerLIDs" << std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -347,15 +303,15 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << "  li_Prev = " << li_Prev << endl;
-    cout << "  li_Post = " << li_Post << endl;
+    Xyce::dout() << "  li_Prev = " << li_Prev << std::endl;
+    Xyce::dout() << "  li_Post = " << li_Post << std::endl;
   }
 #endif
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 }
@@ -368,7 +324,7 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Christina Warrender, SNL, Cognitive Modeling
 // Creation Date : 10/17/11
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   return intNameMap;
 }
@@ -381,21 +337,11 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Christina Warrender, SNL,
 // Creation Date : 10/12/11
 //-----------------------------------------------------------------------------
-void Instance::registerStoreLIDs(const vector<int> & stoLIDVecRef )
+void Instance::registerStoreLIDs(const std::vector<int> & stoLIDVecRef )
 {
-  string msg;
+  AssertLIDs(stoLIDVecRef.size() == getNumStoreVars());
 
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSto = stoLIDVecRef.size();
-
-  if (numSto != getNumStoreVars())
-  {
-    msg = "Instance::registerStoreLIDs:";
-    msg += "numSto != numStoreVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-  // copy over the global ID lists.
+// copy over the global ID lists.
   stoLIDVec = stoLIDVecRef;
 
   li_A0_store = stoLIDVec[0];
@@ -420,13 +366,13 @@ void Instance::registerStoreLIDs(const vector<int> & stoLIDVecRef )
 // Creator       : Rich Schiek, SNL, Electrical Systems Modeling
 // Creation Date : 08/01/2012
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getStoreNameMap()
+std::map<int,std::string> & Instance::getStoreNameMap()
 {
   // set up the internal name map, if it hasn't been already.
   if (storeNameMap.empty ())
   {
-    string baseString(getName() + "_");
-    string tempString;
+    std::string baseString(getName() + "_");
+    std::string tempString;
     tempString = baseString + "A0";
     storeNameMap[ li_A0_store ] = tempString;
     tempString = baseString + "B0";
@@ -459,7 +405,7 @@ map<int,string> & Instance::getStoreNameMap()
 // Creator       : Christina Warrender, SNL,
 // Creation Date : 10/12/11
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -472,7 +418,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Christina Warrender, SNL,
 // Creation Date : 10/12/11
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
 #ifdef Xyce_FullSynapseJac
@@ -640,15 +586,12 @@ bool Instance::updateIntermediateVars()
     }
 
 #ifdef Xyce_DEBUG_DEVICE
-    const string dashedline =
-      "-------------------------------------------------------------------------"
-      "----";
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << endl << dashedline << endl;
-      cout << "  SynapseInstance::updateIntermediateVars" << endl;
-      cout << "Anow:  " << Anow << endl;
-      cout << "Bnow:  " << Bnow << endl;
+      Xyce::dout() << std::endl << section_divider << std::endl;
+      Xyce::dout() << "  SynapseInstance::updateIntermediateVars" << std::endl;
+      Xyce::dout() << "Anow:  " << Anow << std::endl;
+      Xyce::dout() << "Bnow:  " << Bnow << std::endl;
     }
 #endif
 
@@ -668,13 +611,13 @@ bool Instance::updateIntermediateVars()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << endl << dashedline << endl;
-      cout << "vPost:  " << vPost << endl;
-      cout << "eRev:  " << eRev << endl;
-      cout << "weight: " << synapticWeight << endl;
-      cout << "weight update: " << synapticWeightUpdate << endl;
-      cout << "ipost:  " << ipost << endl;
-      cout << "didVpost:  " << didVpost << endl;
+      Xyce::dout() << std::endl << section_divider << std::endl;
+      Xyce::dout() << "vPost:  " << vPost << std::endl;
+      Xyce::dout() << "eRev:  " << eRev << std::endl;
+      Xyce::dout() << "weight: " << synapticWeight << std::endl;
+      Xyce::dout() << "weight update: " << synapticWeightUpdate << std::endl;
+      Xyce::dout() << "ipost:  " << ipost << std::endl;
+      Xyce::dout() << "didVpost:  " << didVpost << std::endl;
     }
 #endif
 
@@ -753,13 +696,13 @@ bool Instance::loadDAEFVector ()
   N_LAS_Vector *  fVecPtr = extData.daeFVectorPtr;
   (*fVecPtr)[li_Prev] += 0.0;
   (*fVecPtr)[li_Post] += ipost;
-  
+
   if( loadLeadCurrent )
   {
     double * stoVec = extData.nextStoVectorRawPtr;
     stoVec[li_store_dev_i] = ipost;
   }
-  
+
   return true;
 }
 
@@ -835,10 +778,10 @@ bool Instance::outputPlotFiles ()
 
   if (time >= respondTime)
   {
-    //std::cout << "Instance::outputPlotFiles() adjusting A0, B0 and t0 = " << getSolverState().currTime << ", " << respondTime << std::endl;
+    //Xyce::dout() << "Instance::outputPlotFiles() adjusting A0, B0 and t0 = " << getSolverState().currTime << ", " << respondTime << std::endl;
     // succesfully processed a step, so adjust the next
     // respondTime to distant future
-    respondTime = numeric_limits<double>::max( );
+    respondTime = std::numeric_limits<double>::max( );
 
     // now we also update the A0, B0 and t0 in the state vector
     double factor = model_.factor;
@@ -860,15 +803,12 @@ bool Instance::outputPlotFiles ()
   stoVec[li_VL3_store] += vl3Update;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "-------------------------------------------------------------------------"
-    "----";
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl << dashedline << endl;
-    cout << "  SynapseInstance::outputPlotFiles" << endl;
-    cout << "time:  " << getSolverState().currTime << endl;
-    cout << "weight in store:  " << stoVec[li_weight_store] << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "  SynapseInstance::outputPlotFiles" << std::endl;
+    Xyce::dout() << "time:  " << getSolverState().currTime << std::endl;
+    Xyce::dout() << "weight in store:  " << stoVec[li_weight_store] << std::endl;
   }
 #endif
 
@@ -898,7 +838,7 @@ bool Instance::updateTemperature ( const double & temp_tmp)
 // Creator       : Christina Warrender, SNL,
 // Creation Date : 10/12/11
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   // initialize variables needed to calculate synaptic dynamics
   if (tau1/tau2 > .9999) {
@@ -919,12 +859,12 @@ bool Model::processParams (string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 10/12/11
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -942,10 +882,11 @@ bool Model::processInstanceParams(string param)
 // Creator       : Christina Warrender, SNL,
 // Creation Date : 10/12/11
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-              SolverState & ss1,
-              DeviceOptions & do1)
-  : DeviceModel(MB, ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
     vThresh(0.0),
     delay(0.0),
     gMax(0.0),
@@ -979,9 +920,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -999,23 +940,58 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i,isize;
   isize = instanceContainer.size();
-  os << endl;
-  os << "Number of Synapse3 Instances: " << isize << endl;
-  os << "    name     getModelName()  Parameters" << endl;
+  os << std::endl;
+  os << "Number of Synapse3 Instances: " << isize << std::endl;
+  os << "    name     model name  Parameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
+  return os;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new DeviceMaster<Traits>(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("synapse", 3)
+    .registerModelType("synapse", 3);
 }
 
 } // namespace Synapse3

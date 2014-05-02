@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -38,11 +38,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.94.2.3 $
+// Revision Number: $Revision: 1.117.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/03/17 17:04:42 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: erkeite $
 //-------------------------------------------------------------------------
 #include <Xyce_config.h>
 
@@ -64,17 +64,16 @@
 #include <stdio.h>
 #endif
 
-// ----------   Xyce Includes   ----------
 #include <N_DEV_fwd.h>
 
-#include <N_DEV_DeviceTemplate.h>
-#include <N_DEV_Factory.h>
+#include <N_DEV_DeviceOptions.h>
+#include <N_DEV_DeviceMaster.h>
 #include <N_DEV_DiodePDE.h>
 #include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
-#include <N_DEV_DeviceOptions.h>
 #include <N_DEV_MatrixLoadData.h>
 #include <N_DEV_RegionData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
 
 #include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
@@ -83,113 +82,109 @@
 
 namespace Xyce {
 namespace Device {
+namespace DiodePDE {
 
-template<>
-ParametricData<DiodePDE::Instance>::ParametricData()
+// default number of mesh points:
+static const int NUM_MESH_POINTS = 11;
+
+// default maximum number of nonzero entries in a matrix row
+static const int MAX_COLS_PER_ROW = 40;
+
+
+void Traits::loadInstanceParameters(ParametricData<DiodePDE::Instance> &p)
 {
-  // Set up configuration constants:
-  setNumNodes(2);
-  setNumOptionalNodes(100);
-  setNumFillNodes(0); // these are nodes which will be there whether the user specifies or not.
-  setModelRequired(1);
-  addModelType("ZOD");
-
-  // Set up map for double precision variables:
-  addPar("ANODE.BC", 0.5, false, ParameterType::NO_DEP, &DiodePDE::Instance::anodebc, NULL, U_NONE, CAT_NONE, "");
-  addPar("CATHODE.BC", 0.0, false, ParameterType::NO_DEP, &DiodePDE::Instance::cathodebc, NULL, U_NONE, CAT_NONE, "");
-  addPar("EMITTER.BC", 0.5, false, ParameterType::NO_DEP, &DiodePDE::Instance::emitterbc, NULL, U_NONE, CAT_NONE, "");
-  addPar("COLLECTOR.BC", 0.0, false, ParameterType::NO_DEP, &DiodePDE::Instance::collectorbc, NULL, U_NONE, CAT_NONE, "");
-  addPar("BASE.BC", 0.0, false, ParameterType::NO_DEP, &DiodePDE::Instance::basebc, NULL, U_NONE, CAT_NONE, "");
-  addPar("BASE.LOC", 0.5e-3, false, ParameterType::NO_DEP, &DiodePDE::Instance::baseLocation, &DiodePDE::Instance::baseLocationGiven, U_NONE, CAT_NONE, "");
-  addPar("AREA", 1.0, false, ParameterType::NO_DEP, &DiodePDE::Instance::area, NULL, U_NONE, CAT_NONE, "");
+  p.addPar("ANODE.BC", 0.5, &DiodePDE::Instance::anodebc);
+  p.addPar("CATHODE.BC", 0.0, &DiodePDE::Instance::cathodebc);
+  p.addPar("EMITTER.BC", 0.5, &DiodePDE::Instance::emitterbc);
+  p.addPar("COLLECTOR.BC", 0.0, &DiodePDE::Instance::collectorbc);
+  p.addPar("BASE.BC", 0.0, &DiodePDE::Instance::basebc);
+  p.addPar("BASE.LOC", 0.5e-3, &DiodePDE::Instance::baseLocation)
+    .setGivenMember(&DiodePDE::Instance::baseLocationGiven);
+  p.addPar("AREA", 1.0, &DiodePDE::Instance::area);
 
   // user-specified scaling vars:
-  addPar("X0", 1.0e-7, false, ParameterType::TIME_DEP, &DiodePDE::Instance::x0_user, NULL, U_NONE, CAT_NONE, "");
-  addPar("C0", 1.0e+15, false, ParameterType::TIME_DEP, &DiodePDE::Instance::C0_user, NULL, U_NONE, CAT_NONE, "");
-  addPar("t0", 1.0e-6, false, ParameterType::TIME_DEP, &DiodePDE::Instance::t0_user, NULL, U_NONE, CAT_NONE, "");
-  addPar("SCALEDENSITYTOMAXDOPING", true, false, ParameterType::NO_DEP, &DiodePDE::Instance::scaleDensityToMaxDoping_, NULL, U_LOGIC, CAT_NONE,
-         "If set the density will be scaled by a fraction of the maximum doping.");
-  addPar("DENSITYSCALARFRACTION", 1.0e-1, false, ParameterType::NO_DEP, &DiodePDE::Instance::densityScalarFraction_, NULL, U_LOGIC, CAT_NONE,
-         "Fraction of the maximum doping by which density will be scaled.");
-  addPar("NA", 1.0e+15, false, ParameterType::NO_DEP, &DiodePDE::Instance::Na, NULL, U_NONE, CAT_NONE, "");
-  addPar("ND", 1.0e+15, false, ParameterType::NO_DEP, &DiodePDE::Instance::Nd, NULL, U_NONE, CAT_NONE, "");
-  addPar("WJ", 1.0e-4, false, ParameterType::NO_DEP, &DiodePDE::Instance::WJ, NULL, U_NONE, CAT_NONE, "");
-  addPar("TEMP", 300.15, false, ParameterType::NO_DEP, &DiodePDE::Instance::Temp, NULL, U_NONE, CAT_NONE, "");
-  addPar("ANODE.AREA", 0.0, false, ParameterType::NO_DEP, &DiodePDE::Instance::anodeArea, NULL, U_NONE, CAT_NONE, "");
-  addPar("EMITTER.AREA", 0.0, false, ParameterType::NO_DEP, &DiodePDE::Instance::emitterArea, NULL, U_NONE, CAT_NONE, "");
-  addPar("CATHODE.AREA", 0.0, false, ParameterType::NO_DEP, &DiodePDE::Instance::cathodeArea, NULL, U_NONE, CAT_NONE, "");
-  addPar("COLLECTOR.AREA", 0.0, false, ParameterType::NO_DEP, &DiodePDE::Instance::collectorArea, NULL, U_NONE, CAT_NONE, "");
-  addPar("BASE.AREA", 0.0, false, ParameterType::NO_DEP, &DiodePDE::Instance::baseArea, NULL, U_NONE, CAT_NONE, "");
-  addPar("L", 1.0e-3, false, ParameterType::NO_DEP, &DiodePDE::Instance::length, NULL, U_NONE, CAT_NONE, "");
-  addPar("W", 1.0e-3, false, ParameterType::NO_DEP, &DiodePDE::Instance::width, NULL, U_NONE, CAT_NONE, "");
-  addPar("MAXVOLTDELTA", 0.025, false, ParameterType::NO_DEP, &DiodePDE::Instance::maxVoltDelta, NULL, U_NONE, CAT_NONE, "");
-  addPar("OUTPUTINTERVAL", 0.0, false, ParameterType::NO_DEP, &DiodePDE::Instance::outputInterval, &DiodePDE::Instance::outputIntervalGiven, U_NONE, CAT_NONE,
-         "");
-  addPar("basex", 0.5e-3, false, ParameterType::NO_DEP, &DiodePDE::Instance::basex, NULL, U_NONE, CAT_NONE, "");
+  p.addPar("X0", 1.0e-7, &DiodePDE::Instance::x0_user)
+    .setExpressionAccess(ParameterType::TIME_DEP);
+  p.addPar("C0", 1.0e+15, &DiodePDE::Instance::C0_user)
+    .setExpressionAccess(ParameterType::TIME_DEP);
+  p.addPar("t0", 1.0e-6, &DiodePDE::Instance::t0_user)
+    .setExpressionAccess(ParameterType::TIME_DEP);
+  p.addPar("SCALEDENSITYTOMAXDOPING", true, &DiodePDE::Instance::scaleDensityToMaxDoping_)
+    .setUnit(U_LOGIC)
+    .setDescription("If set the density will be scaled by a fraction of the maximum doping.");
+  p.addPar("DENSITYSCALARFRACTION", 1.0e-1, &DiodePDE::Instance::densityScalarFraction_)
+    .setUnit(U_LOGIC)
+    .setDescription("Fraction of the maximum doping by which density will be scaled.");
+  p.addPar("NA", 1.0e+15, &DiodePDE::Instance::Na);
+  p.addPar("ND", 1.0e+15, &DiodePDE::Instance::Nd);
+  p.addPar("WJ", 1.0e-4, &DiodePDE::Instance::WJ);
+  p.addPar("TEMP", 300.15, &DiodePDE::Instance::Temp);
+  p.addPar("ANODE.AREA", 0.0, &DiodePDE::Instance::anodeArea);
+  p.addPar("EMITTER.AREA", 0.0, &DiodePDE::Instance::emitterArea);
+  p.addPar("CATHODE.AREA", 0.0, &DiodePDE::Instance::cathodeArea);
+  p.addPar("COLLECTOR.AREA", 0.0, &DiodePDE::Instance::collectorArea);
+  p.addPar("BASE.AREA", 0.0, &DiodePDE::Instance::baseArea);
+  p.addPar("L", 1.0e-3, &DiodePDE::Instance::length);
+  p.addPar("W", 1.0e-3, &DiodePDE::Instance::width);
+  p.addPar("MAXVOLTDELTA", 0.025, &DiodePDE::Instance::maxVoltDelta);
+  p.addPar("OUTPUTINTERVAL", 0.0, &DiodePDE::Instance::outputInterval)
+    .setGivenMember(&DiodePDE::Instance::outputIntervalGiven);
+  p.addPar("basex", 0.5e-3, &DiodePDE::Instance::basex);
 
 #ifdef Xyce_DEBUG_DEVICE
-  addPar("ANODEINDEX", 1, false, ParameterType::NO_DEP, &DiodePDE::Instance::anodeIndex_user, &DiodePDE::Instance::anodeIndex_userGiven, U_NONE, CAT_NONE,
-         "");
-  addPar("CATHODEINDEX", 0, false, ParameterType::NO_DEP, &DiodePDE::Instance::cathodeIndex_user, &DiodePDE::Instance::cathodeIndex_userGiven, U_NONE, CAT_NONE,"");
+  p.addPar("ANODEINDEX", 1, &DiodePDE::Instance::anodeIndex_user)
+    .setGivenMember(&DiodePDE::Instance::anodeIndex_userGiven);
+  p.addPar("CATHODEINDEX", 0, &DiodePDE::Instance::cathodeIndex_user)
+    .setGivenMember(&DiodePDE::Instance::cathodeIndex_userGiven);
 #endif
 
   // Neutron stuff:
-  addPar("JUNCTIONAREA", 1.0e-4, false, ParameterType::NO_DEP, &DiodePDE::Instance::junctionArea, NULL, U_NONE, CAT_NONE, "");
+  p.addPar("JUNCTIONAREA", 1.0e-4, &DiodePDE::Instance::junctionArea);
 
   // Set up map for non-double precision variables:
-  addPar("GRADED", false, false, ParameterType::NO_DEP, &DiodePDE::Instance::gradedJunctionFlag, NULL);
-  addPar("BJTENABLE", false, false, ParameterType::NO_DEP, &DiodePDE::Instance::bjtEnableFlag, NULL);
-  addPar("MOBMODEL", string("ARORA"), false, ParameterType::NO_DEP, &DiodePDE::Instance::mobModelName, NULL);
-  addPar("FIELDDEP", false, false, ParameterType::NO_DEP, &DiodePDE::Instance::fieldDependentMobility, &DiodePDE::Instance::fieldDependentMobilityGiven, U_LOGIC, CAT_NONE,
-         "If true, use field dependent mobility.");
-  addPar("BULKMATERIAL", string("SI"), false, ParameterType::NO_DEP, &DiodePDE::Instance::bulkMaterial, NULL);
-  addPar("OFFSETOUTPUTVOLTAGE", true, false, ParameterType::NO_DEP, &DiodePDE::Instance::useVoltageOutputOffset_, NULL);
-  addPar("FIRSTELECTRODEOFFSET", false, false, ParameterType::NO_DEP, &DiodePDE::Instance::offsetWithFirstElectrode_, NULL);
-  addPar("DISPLCUR", false, false, ParameterType::NO_DEP, &DiodePDE::Instance::displCurrentFlag, NULL);
-  addPar("OUTPUTNLPOISSON", false, false, ParameterType::NO_DEP, &DiodePDE::Instance::outputNLPoisson, NULL);
-  addPar("OUTPUTREGION", 1, false, ParameterType::NO_DEP, &DiodePDE::Instance::outputRegion, NULL);
-  addPar("MASKVARSTIA", false, false, ParameterType::NO_DEP, &DiodePDE::Instance::maskVarsTIAFlag_, NULL, U_LOGIC, CAT_NONE,
-         "If set to true, then some variables are excluded from the time integration error control calculation.");
-  addPar("AUGER", true, false, ParameterType::NO_DEP, &DiodePDE::Instance::includeAugerRecomb, NULL, U_LOGIC, CAT_NONE, "");
-  addPar("SRH", true, false, ParameterType::NO_DEP, &DiodePDE::Instance::includeSRHRecomb, NULL, U_LOGIC, CAT_NONE, "");
-  addPar("GNUPLOTLEVEL", 1, false, ParameterType::NO_DEP, &DiodePDE::Instance::gnuplotLevel, NULL);
-  addPar("TECPLOTLEVEL", 1, false, ParameterType::NO_DEP, &DiodePDE::Instance::tecplotLevel, NULL);
-  addPar("SGPLOTLEVEL", 0, false, ParameterType::NO_DEP, &DiodePDE::Instance::sgplotLevel, NULL);
-  addPar("VOLTLIM", false, false, ParameterType::NO_DEP, &DiodePDE::Instance::voltLimFlag, NULL);
-  addPar("MESHFILE", string("internal.msh"), false, ParameterType::NO_DEP, &DiodePDE::Instance::meshFileName, NULL);
+  p.addPar("GRADED", false, &DiodePDE::Instance::gradedJunctionFlag);
+  p.addPar("BJTENABLE", false, &DiodePDE::Instance::bjtEnableFlag);
+  p.addPar("MOBMODEL", std::string("ARORA"), &DiodePDE::Instance::mobModelName);
+  p.addPar("FIELDDEP", false, &DiodePDE::Instance::fieldDependentMobility)
+    .setGivenMember(&DiodePDE::Instance::fieldDependentMobilityGiven)
+    .setUnit(U_LOGIC)
+    .setDescription("If true, use field dependent mobility.");
+  p.addPar("BULKMATERIAL", std::string("SI"), &DiodePDE::Instance::bulkMaterial);
+  p.addPar("OFFSETOUTPUTVOLTAGE", true, &DiodePDE::Instance::useVoltageOutputOffset_);
+  p.addPar("FIRSTELECTRODEOFFSET", false, &DiodePDE::Instance::offsetWithFirstElectrode_);
+  p.addPar("DISPLCUR", false, &DiodePDE::Instance::displCurrentFlag);
+  p.addPar("OUTPUTNLPOISSON", false, &DiodePDE::Instance::outputNLPoisson);
+  p.addPar("OUTPUTREGION", 1, &DiodePDE::Instance::outputRegion);
+  p.addPar("MASKVARSTIA", false, &DiodePDE::Instance::maskVarsTIAFlag_)
+    .setUnit(U_LOGIC)
+    .setDescription("If set to true, then some variables are excluded from the time integration error control calculation.");
+  p.addPar("AUGER", true, &DiodePDE::Instance::includeAugerRecomb)
+    .setUnit(U_LOGIC);
+  p.addPar("SRH", true, &DiodePDE::Instance::includeSRHRecomb)
+    .setUnit(U_LOGIC);
+  p.addPar("GNUPLOTLEVEL", 1, &DiodePDE::Instance::gnuplotLevel);
+  p.addPar("TECPLOTLEVEL", 1, &DiodePDE::Instance::tecplotLevel);
+  p.addPar("SGPLOTLEVEL", 0, &DiodePDE::Instance::sgplotLevel);
+  p.addPar("VOLTLIM", false, &DiodePDE::Instance::voltLimFlag);
+  p.addPar("MESHFILE", std::string("internal.msh"), &DiodePDE::Instance::meshFileName);
 
-  // Doping file params:
-  addPar("DOPING_FILE", string("NOFILE"), false, ParameterType::NO_DEP, &DiodePDE::Instance::dopingFileName, NULL, U_NONE, CAT_NONE,
-         "");
-  addPar("PDOPE_FILE", string("NOFILE"), false, ParameterType::NO_DEP, &DiodePDE::Instance::pdopeFileName, NULL, U_NONE, CAT_NONE,
-         "");
-  addPar("NDOPE_FILE", string("NOFILE"), false, ParameterType::NO_DEP, &DiodePDE::Instance::ndopeFileName, NULL, U_NONE, CAT_NONE, "");
-  addPar("NX", 11, false, ParameterType::NO_DEP, &DiodePDE::Instance::NX, NULL);
-  addPar("DIRICHLETBC", false, false, ParameterType::NO_DEP, &DiodePDE::Instance::dirichletBCFlag, NULL, U_LOGIC, CAT_NONE,
-         "Flag for using Dirichlet boundary conditions for defects.");
-  addPar("USEOLDNI", false, false, ParameterType::NO_DEP, &DiodePDE::Instance::useOldNi, &DiodePDE::Instance::useOldNiGiven, U_LOGIC, CAT_NONE,
-         "Flag for using old(inaccurate) intrinsic carrier calculation.");
+// Doping file params:
+  p.addPar("DOPING_FILE", std::string("NOFILE"), &DiodePDE::Instance::dopingFileName);
+  p.addPar("PDOPE_FILE", std::string("NOFILE"), &DiodePDE::Instance::pdopeFileName);
+  p.addPar("NDOPE_FILE", std::string("NOFILE"), &DiodePDE::Instance::ndopeFileName);
+  p.addPar("NX", 11, &DiodePDE::Instance::NX);
+  p.addPar("DIRICHLETBC", false, &DiodePDE::Instance::dirichletBCFlag)
+    .setUnit(U_LOGIC)
+    .setDescription("Flag for using Dirichlet boundary conditions for defects.");
+  p.addPar("USEOLDNI", false, &DiodePDE::Instance::useOldNi)
+    .setGivenMember(&DiodePDE::Instance::useOldNiGiven)
+    .setDescription("Flag for using old(inaccurate) intrinsic carrier calculation.");
 
-  addComposite("NODE", PDE_1DElectrode::getParametricData(), &DiodePDE::Instance::nodeMap);
-  addComposite("DOPINGPROFILES", DopeInfo::getParametricData(), &DiodePDE::Instance::regionMap); // Yeah, really expects doping profile in regionMap, not dopeInfoMap
-  addComposite("REGION", DopeInfo::getParametricData(), &DiodePDE::Instance::regionMap); // Wow that was unexpected
+  p.addComposite("NODE", PDE_1DElectrode::getParametricData(), &DiodePDE::Instance::electrodeMap);
+  p.addComposite("DOPINGPROFILES", DopeInfo::getParametricData(), &DiodePDE::Instance::dopeInfoMap);
+  p.addComposite("REGION", DopeInfo::getParametricData(), &DiodePDE::Instance::dopeInfoMap);
 }
 
-
-namespace DiodePDE {
-
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
-}
-
-// default number of mesh points:
-#define NUM_MESH_POINTS 11
-
-// default maximum number of nonzero entries in a matrix row
-#define MAX_COLS_PER_ROW 40
 
 //-----------------------------------------------------------------------------
 // Function      : Instance::processParams
@@ -205,7 +200,7 @@ ParametricData<Instance> &Instance::getParametricData() {
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
   updateTemperature(Temp);
   return true;
@@ -220,14 +215,12 @@ bool Instance::processParams (string param)
 // Creation Date : 6/29/00
 //-----------------------------------------------------------------------------
 Instance::Instance(
-  InstanceBlock &                    IB,
-  Model & Miter,
-  MatrixLoadData &                   mlData1,
-  SolverState &                      ss1,
-  ExternData  &                      ed1,
-  DeviceOptions &                    do1)
-  : DevicePDEInstance(IB, mlData1, ss1, ed1, do1),
-    model_(Miter),
+  const Configuration & configuration,
+  const InstanceBlock &         IB,
+  Model &                       model,
+  const FactoryBlock &factory_block)
+  : DevicePDEInstance(IB, configuration.getInstanceParameters(), factory_block),
+    model_(model),
     numMeshPoints(NUM_MESH_POINTS),
     NX(numMeshPoints),
     LX(NX-1),
@@ -338,7 +331,7 @@ Instance::Instance(
   }
   else if (numExtVars > 3)
   {
-    string msg = "DiodePDEInstance:";
+    std::string msg = "DiodePDEInstance:";
     msg += "  name = " + getName();
     msg += " too many external nodes are set!  Set no more than 3.";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
@@ -354,23 +347,23 @@ Instance::Instance(
   // check doping files...
   if ( given("PDOPE_FILE") && !given("NDOPE_FILE") )
   {
-    string msg = "Ndope file specified with no Pdope file.  Exiting.";
+    std::string msg = "Ndope file specified with no Pdope file.  Exiting.";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
   }
 
   if ( !given("PDOPE_FILE") && given("NDOPE_FILE") )
   {
-    string msg = "Pdope file specified with no Ndope file.  Exiting.";
+    std::string msg = "Pdope file specified with no Ndope file.  Exiting.";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
   }
 
   // Set any non-constant parameter defaults:
   if (!given("TEMP"))
-    Temp = getDeviceOptions().temp.dVal();
+    Temp = getDeviceOptions().temp.getImmutableValue<double>();
 
   if (given("MESHFILE"))
   {
-    string msg = "Instance constructor."
+    std::string msg = "Instance constructor."
                  "mesh file was specified.  The 1D device doesn't need a mesh file."
                  "  Either add a model statement of level=2, or get rid of the mesh"
                  " file specification.";
@@ -419,34 +412,11 @@ Instance::Instance(
 //-----------------------------------------------------------------------------
 Instance::~Instance()
 {
-  // Loop over the dopeInfoMap (if it is not empty) and delete its contents.
-  if (!(dopeInfoMap.empty()))
-  {
-    map <string, DopeInfo *>::iterator iter;
-    map <string, DopeInfo *>::iterator begin = dopeInfoMap.begin();
-    map <string, DopeInfo *>::iterator end   = dopeInfoMap.end  ();
+  for (std::map<std::string, DopeInfo *>::iterator it = dopeInfoMap.begin(); it != dopeInfoMap.end(); ++it)
+    delete (*it).second;
 
-    for(iter=begin;iter!=end;++iter)
-    {
-      if (iter->second != 0) delete iter->second;
-    }
-  }
-
-  if (!(electrodeMap.empty()))
-  {
-    map<string, PDE_1DElectrode*>::iterator iter;
-    map<string, PDE_1DElectrode*>::iterator begin = electrodeMap.begin();
-    map<string, PDE_1DElectrode*>::iterator end   = electrodeMap.end  ();
-
-    for(iter=begin;iter!=end;++iter)
-    {
-      if (iter->second != 0) delete iter->second;
-    }
-  }
-
-  dopeInfoMap.clear();
-  electrodeMap.clear();
-  bcVec.clear();
+  for (std::map<std::string, PDE_1DElectrode *>::iterator it = electrodeMap.begin(); it != electrodeMap.end(); ++it)
+    delete (*it).second;
 }
 
 //-----------------------------------------------------------------------------
@@ -457,13 +427,14 @@ Instance::~Instance()
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 05/14/05
 //-----------------------------------------------------------------------------
-CompositeParam *Instance::constructComposite(string & compositeName, string & paramName)
+CompositeParam *
+Instance::constructComposite(const std::string & compositeName, const std::string & paramName)
 {
   if (compositeName == "DOPINGPROFILES" || compositeName == "REGION")
   {
     DopeInfo *n = new DopeInfo();
     dopeInfoMap[paramName] = n;
-    return (static_cast<CompositeParam *> (n));
+    return static_cast<CompositeParam *> (n);
   }
   else if (compositeName == "NODE" || compositeName == "ELECTRODE")
   {
@@ -492,11 +463,11 @@ CompositeParam *Instance::constructComposite(string & compositeName, string & pa
 
     PDE_1DElectrode *n = new PDE_1DElectrode();
     electrodeMap[paramName] = n;
-    return (static_cast<CompositeParam *> (n));
+    return static_cast<CompositeParam *> (n);
   }
   else
   {
-    string msg =
+    std::string msg =
       "Instance::constructComposite: unrecognized composite name: ";
     msg += compositeName;
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
@@ -698,7 +669,7 @@ bool Instance::setupNodes ()
   {
     useElectrodeSpec_ = true;
 
-    vector<int> tmpMeshSten(NX,0);
+    std::vector<int> tmpMeshSten(NX,0);
 
     for (int iBC=0;iBC<bcVec.size();++iBC)
     {
@@ -746,19 +717,19 @@ bool Instance::setupNodes ()
           // check to make sure that bIndex isn't already used.
           if (tmpMeshSten[bIndex] == 1)
           {
-            string msg = "Instance::setupNodes.  Failed to find mesh index for " + bcVec[iBC].eName;
+            std::string msg = "Instance::setupNodes.  Failed to find mesh index for " + bcVec[iBC].eName;
             N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
           }
         }
         else
         {
-          string msg = "Instance::setupNodes.  unrecognized side specified.";
+          std::string msg = "Instance::setupNodes.  unrecognized side specified.";
           N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
         }
       }
       else
       {
-        //string msg = "Instance::setupNodes.  side NOT specified.";
+        //std::string msg = "Instance::setupNodes.  side NOT specified.";
         //N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
       }
 
@@ -775,14 +746,14 @@ bool Instance::setupNodes ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << " area               = " << area << endl;
-    cout << " areaGiven          = " << given("AREA") << endl;
+    Xyce::dout() << " area               = " << area << std::endl;
+    Xyce::dout() << " areaGiven          = " << given("AREA") << std::endl;
     int isize=bcVec.size();
     for (int i=0;i<isize;++i)
     {
-      cout << " bcVec["<<i<<"].area      = " << bcVec[i].area << endl;
-      cout << " bcVec["<<i<<"].areaGiven = " << bcVec[i].areaGiven << endl;
-      cout << " bcVec["<<i<<"].meshIndex = " << bcVec[i].meshIndex << endl;
+      Xyce::dout() << " bcVec["<<i<<"].area      = " << bcVec[i].area << std::endl;
+      Xyce::dout() << " bcVec["<<i<<"].areaGiven = " << bcVec[i].areaGiven << std::endl;
+      Xyce::dout() << " bcVec["<<i<<"].meshIndex = " << bcVec[i].meshIndex << std::endl;
     }
   }
 #endif
@@ -859,7 +830,7 @@ bool Instance::setupNumVars ()
   }
   else
   {
-    string msg = "Instance constructor."
+    std::string msg = "Instance constructor."
                  "  NX parameter was not specified.";
     N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
   }
@@ -933,7 +904,7 @@ bool Instance::setupJacStamp ()
 
     if (edgeBoundarySten[iMeshNode]!=1 &&  internalBoundarySten[iMeshNode]!=1)
     {
-      string msg = "Instance::setupJacStamp:";
+      std::string msg = "Instance::setupJacStamp:";
       msg += "Boundary point not in the stencil.";
       N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL,msg);
     }
@@ -1112,7 +1083,7 @@ bool Instance::setupJacStamp ()
     }
     else// not a boundary.  oops!
     {
-      string msg = "Instance::setupJacStamp:";
+      std::string msg = "Instance::setupJacStamp:";
       msg += "Boundary point not in the stencil.";
       N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL,msg);
     }
@@ -1178,14 +1149,14 @@ bool Instance::setupJacStamp ()
   {
     // dump the jacStamp to stdout:
     int jacSize = jacStamp.size ();
-    cout << "jacStamp size = " << jacSize << endl;
+    Xyce::dout() << "jacStamp size = " << jacSize << std::endl;
 
     for(int i=0;i<jacSize;++i)
     {
       int colSize = jacStamp[i].size();
       for (int j=0;j<colSize;++j)
       {
-        cout << "  jacStamp["<<i<<"]["<<j<<"] = " << jacStamp[i][j] << endl;
+        Xyce::dout() << "  jacStamp["<<i<<"]["<<j<<"] = " << jacStamp[i][j] << std::endl;
       }
     }
   }
@@ -1233,8 +1204,8 @@ bool Instance::cleanupJacStamp ()
   // by default.
   if (columnReorderingFlag)
   {
-    vector< vector<int> > tempStamp_eric;
-    vector< vector<int> > tempMap2_eric;
+    std::vector< std::vector<int> > tempStamp_eric;
+    std::vector< std::vector<int> > tempMap2_eric;
     jacStampMap_fixOrder(jacStamp, jacMap2, tempStamp_eric, tempMap2_eric);
     jacStamp = tempStamp_eric;
     jacMap2 = tempMap2_eric;
@@ -1253,7 +1224,7 @@ bool Instance::cleanupJacStamp ()
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 05/13/05
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
@@ -1269,19 +1240,19 @@ map<int,string> & Instance::getIntNameMap ()
       if (li_Vrowarray[itmp] != -1)
       {
         sprintf(tmpchar,"%s_V_%d",getName().c_str(), itmp);
-        intNameMap[li_Vrowarray[itmp]] = string(tmpchar);
+        intNameMap[li_Vrowarray[itmp]] = std::string(tmpchar);
       }
 
       if (li_Nrowarray[itmp] != -1)
       {
         sprintf(tmpchar,"%s_N_%d",getName().c_str(), itmp);
-        intNameMap[li_Nrowarray[itmp]] = string(tmpchar);
+        intNameMap[li_Nrowarray[itmp]] = std::string(tmpchar);
       }
 
       if (li_Prowarray[itmp] != -1)
       {
         sprintf(tmpchar,"%s_P_%d",getName().c_str(), itmp);
-        intNameMap[li_Prowarray[itmp]] = string(tmpchar);
+        intNameMap[li_Prowarray[itmp]] = std::string(tmpchar);
       }
     }
   }
@@ -1297,36 +1268,23 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Eric R. Keiter,  SNL, Parallel Computational Sciences
 // Creation Date : 09/18/02
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                             const vector<int> & extLIDVecRef)
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                             const std::vector<int> & extLIDVecRef)
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "-----------------------------------------------------------------------------";
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << dashedline << endl;
-    cout << "Instance::registerLIDs:\n";
-    cout << "          name = " << getName() << endl;
-    cout << "        numInt = " << numInt <<endl;
-    cout << "        numEXt = " << numExt <<endl;
-    cout << "        NX     = " << NX << endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "Instance::registerLIDs:\n";
+    Xyce::dout() << "          name = " << getName() << std::endl;
+    Xyce::dout() << "        numInt = " << numIntVars << std::endl;
+    Xyce::dout() << "        numEXt = " << numExtVars << std::endl;
+    Xyce::dout() << "        NX     = " << NX << std::endl;
   }
 #endif
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
 
   // Copy over the local ID lists:
   intLIDVec = intLIDVecRef;
@@ -1374,15 +1332,15 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << "\n  solution indices:\n";
+    Xyce::dout() << "\n  solution indices:\n";
 
     for (int i=0;i<NX;++i)
     {
-      cout << "     li_Vrowarray["<<i<<"] = " << li_Vrowarray[i];
-      cout << "\tli_Nrowarray["<<i<<"] = " << li_Nrowarray[i];
-      cout << "\tli_Prowarray["<<i<<"] = " << li_Prowarray[i] << endl;
+      Xyce::dout() << "     li_Vrowarray["<<i<<"] = " << li_Vrowarray[i];
+      Xyce::dout() << "\tli_Nrowarray["<<i<<"] = " << li_Nrowarray[i];
+      Xyce::dout() << "\tli_Prowarray["<<i<<"] = " << li_Prowarray[i] << std::endl;
     }
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 
 #endif
@@ -1396,40 +1354,18 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 09/18/02
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef)
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef)
 {
-
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << endl;
-    cout << dashedline << endl;
-    cout << "  In Instance::registerStateLIDs\n\n";
-    cout << "  name             = " << getName() << endl;
-  }
-#endif
-
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "  Number of State LIDs: " << numSta << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "  In Instance::registerStateLIDs\n\n";
+    Xyce::dout() << "  name             = " << getName() << std::endl;
+    Xyce::dout() << "  Number of State LIDs: " << numStateVars << std::endl;
   }
 #endif
 
@@ -1451,20 +1387,20 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "  State indices:" << endl;
-    cout << endl;
+    Xyce::dout() << "  State indices:" << std::endl;
+    Xyce::dout() << std::endl;
     for (i=0;i<bcVec.size();++i)
     {
-      cout << "bcVec["<<i<<"].li_stateC = "<<bcVec[i].li_stateC<<endl;
+      Xyce::dout() << "bcVec["<<i<<"].li_stateC = "<<bcVec[i].li_stateC<< std::endl;
     }
-    cout << endl;
+    Xyce::dout() << std::endl;
 
-    cout << "  Displacement current state variable local indices:" << endl;
+    Xyce::dout() << "  Displacement current state variable local indices:" << std::endl;
     for (i=0;i<NX-1;++i)
     {
-      cout << "  li_stateDispl["<<i<<"] = " << li_stateDispl[i] << endl;
+      Xyce::dout() << "  li_stateDispl["<<i<<"] = " << li_stateDispl[i] << std::endl;
     }
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 }
@@ -1477,7 +1413,7 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef)
 // Creator       : Eric R. Keiter, Dept. 9233
 // Creation Date : 02/11/03
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -1491,7 +1427,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creation Date : 02/12/03
 //-----------------------------------------------------------------------------
 void Instance::registerJacLIDs
-( const vector< vector<int> > & jacLIDVec )
+( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs ( jacLIDVec );
 
@@ -1511,24 +1447,22 @@ void Instance::registerJacLIDs
   int extVarOffset = numExtVars;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "-----------------------------------------------------------------------------";
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << dashedline << endl;
-    cout << "Instance::registerJacLIDs" << endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "Instance::registerJacLIDs" << std::endl;
 
     int jacLIDSize = jacLIDVec.size();
-    cout << "jacLIDSize = " << jacLIDSize << endl;
+    Xyce::dout() << "jacLIDSize = " << jacLIDSize << std::endl;
     for (i=0;i<jacLIDSize;++i)
     {
       int jacLIDcolSize = jacLIDVec[i].size();
-      cout << endl;
-      cout << "jacLIDVec["<<i<<"].size = " << jacLIDcolSize << endl;
+      Xyce::dout() << std::endl;
+      Xyce::dout() << "jacLIDVec["<<i<<"].size = " << jacLIDcolSize << std::endl;
       for (j=0;j<jacLIDcolSize;++j)
       {
-        cout << "jacLIDVec["<<i<<"]["<<j<<"] = ";
-        cout << jacLIDVec[i][j] << endl;
+        Xyce::dout() << "jacLIDVec["<<i<<"]["<<j<<"] = ";
+        Xyce::dout() << jacLIDVec[i][j] << std::endl;
       }
     }
   }
@@ -1557,12 +1491,12 @@ void Instance::registerJacLIDs
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << endl;
+      Xyce::dout() << std::endl;
       for(i=0;i<bcVec[iBC].li_colArray.size();++i)
       {
-        cout << bcVec[iBC].eName << ": li_colArray["<<i<<"] = "<<bcVec[iBC].li_colArray[i]<<endl;
+        Xyce::dout() << bcVec[iBC].eName << ": li_colArray["<<i<<"] = "<<bcVec[iBC].li_colArray[i]<< std::endl;
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
     }
 #endif
   }
@@ -1618,30 +1552,30 @@ void Instance::registerJacLIDs
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << endl;
-      cout << "registerJacLIDs: iMeshNode = " << iMeshNode << endl;
-      cout << "jacLIDVec[Vindex].size = " << jacLIDVec[Vindex].size()<<endl;
-      cout << "jacLIDVec[Nindex].size = " << jacLIDVec[Nindex].size()<<endl;
-      cout << "jacLIDVec[Pindex].size = " << jacLIDVec[Pindex].size()<<endl;
+      Xyce::dout() << std::endl;
+      Xyce::dout() << "registerJacLIDs: iMeshNode = " << iMeshNode << std::endl;
+      Xyce::dout() << "jacLIDVec[Vindex].size = " << jacLIDVec[Vindex].size()<<std::endl;
+      Xyce::dout() << "jacLIDVec[Nindex].size = " << jacLIDVec[Nindex].size()<<std::endl;
+      Xyce::dout() << "jacLIDVec[Pindex].size = " << jacLIDVec[Pindex].size()<<std::endl;
 
       for (i=0;i<5;++i)
       {
-        cout << " li_Vcolarray["<<iMeshNode<<"]["<<i<<"] = ";
-        cout << li_Vcolarray[iMeshNode][i] << endl;
+        Xyce::dout() << " li_Vcolarray["<<iMeshNode<<"]["<<i<<"] = ";
+        Xyce::dout() << li_Vcolarray[iMeshNode][i] << std::endl;
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
       for (i=0;i<7;++i)
       {
-        cout << " li_Ncolarray["<<iMeshNode<<"]["<<i<<"] = ";
-        cout << li_Ncolarray[iMeshNode][i] << endl;
+        Xyce::dout() << " li_Ncolarray["<<iMeshNode<<"]["<<i<<"] = ";
+        Xyce::dout() << li_Ncolarray[iMeshNode][i] << std::endl;
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
       for (i=0;i<7;++i)
       {
-        cout << " li_Pcolarray["<<iMeshNode<<"]["<<i<<"] = ";
-        cout << li_Pcolarray[iMeshNode][i] << endl;
+        Xyce::dout() << " li_Pcolarray["<<iMeshNode<<"]["<<i<<"] = ";
+        Xyce::dout() << li_Pcolarray[iMeshNode][i] << std::endl;
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
     }
 #endif
   }
@@ -1719,7 +1653,6 @@ void Instance::registerJacLIDs
       li_Ncolarray[iMeshNode][i1++] = jacLIDVec[Nindex][j1++];
       li_Ncolarray[iMeshNode][i1++] = jacLIDVec[Nindex][j1++];
       li_Ncolarray[iMeshNode][i1++] = jacLIDVec[Nindex][j1++];
-      li_Ncolarray[iMeshNode][i1++] = jacLIDVec[Nindex][j1++];
 
       // hole col arrays:
       i1=0; j1=0;
@@ -1736,7 +1669,7 @@ void Instance::registerJacLIDs
     }
     else// not a boundary.  oops!
     {
-      string msg = "Instance::registerJacLIDs:";
+      std::string msg = "Instance::registerJacLIDs:";
       msg += "Boundary point not in the stencil.";
       N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL,msg);
     }
@@ -1744,27 +1677,27 @@ void Instance::registerJacLIDs
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << endl;
-      cout << "registerJacLIDs: ("<<bcVec[iBC].eName<<") iMeshNode = ";
-      cout << iMeshNode << endl;
+      Xyce::dout() << std::endl;
+      Xyce::dout() << "registerJacLIDs: ("<<bcVec[iBC].eName<<") iMeshNode = ";
+      Xyce::dout() << iMeshNode << std::endl;
       for (i=0;i<3;++i)
       {
-        cout << " li_Vcolarray["<<iMeshNode<<"]["<<i<<"] = ";
-        cout << li_Vcolarray[iMeshNode][i] << endl;
+        Xyce::dout() << " li_Vcolarray["<<iMeshNode<<"]["<<i<<"] = ";
+        Xyce::dout() << li_Vcolarray[iMeshNode][i] << std::endl;
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
       for (i=0;i<3;++i)
       {
-        cout << " li_Ncolarray["<<iMeshNode<<"]["<<i<<"] = ";
-        cout << li_Ncolarray[iMeshNode][i] << endl;
+        Xyce::dout() << " li_Ncolarray["<<iMeshNode<<"]["<<i<<"] = ";
+        Xyce::dout() << li_Ncolarray[iMeshNode][i] << std::endl;
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
       for (i=0;i<3;++i)
       {
-        cout << " li_Pcolarray["<<iMeshNode<<"]["<<i<<"] = ";
-        cout << li_Pcolarray[iMeshNode][i] << endl;
+        Xyce::dout() << " li_Pcolarray["<<iMeshNode<<"]["<<i<<"] = ";
+        Xyce::dout() << li_Pcolarray[iMeshNode][i] << std::endl;
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
     }
 #endif
   }
@@ -1845,12 +1778,10 @@ bool Instance::updateIntermediateVars ()
   bool bs1 = true;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
-    cout << "updateIntermediateVars.  name = " << getName() << endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "updateIntermediateVars.  name = " << getName() << std::endl;
   }
 #endif
 
@@ -1864,7 +1795,7 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -1912,7 +1843,7 @@ bool Instance::calcTerminalCurrents ()
     }
     else if (internalBoundarySten[index]==1)
     {
-      string & type = bcVec[iBC].type;
+      std::string & type = bcVec[iBC].type;
 
       // only majority carrier goes to the boundary
       if (type=="ntype")
@@ -1925,14 +1856,14 @@ bool Instance::calcTerminalCurrents ()
       }
       else // oops.
       {
-        string msg = "Instance::calcTerminalCurrents";
+        std::string msg = "Instance::calcTerminalCurrents";
         msg += "Unrecognized type on boundary.";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
       }
     }
     else
     {
-      string msg = "Instance::calcTerminalCurrents";
+      std::string msg = "Instance::calcTerminalCurrents";
       msg += "Unrecognized boundary.";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
     }
@@ -1949,16 +1880,16 @@ bool Instance::calcTerminalCurrents ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "-----------------------" << endl;
-    cout << "Calculated currents, etc., coming from the DD calculation:" << endl;
-    cout << "  scalingVars.J0 = " << J0<<endl;
-    cout << "  scalingVars.a0 = " << a0<<endl;
-    cout << "-----------------------" << endl;
+    Xyce::dout() << Xyce::subsection_divider << std::endl
+                 << "Calculated currents, etc., coming from the DD calculation:" << std::endl
+                 << "  scalingVars.J0 = " << J0<<std::endl
+                 << "  scalingVars.a0 = " << a0<<std::endl
+                 << Xyce::subsection_divider << std::endl;
     for (int iBC=0;iBC<bcVec.size();++iBC)
     {
-      cout << bcVec[iBC];
+      Xyce::dout() << bcVec[iBC];
     }
-    cout << "-----------------------" << endl;
+    Xyce::dout() << Xyce::subsection_divider << std::endl;
   }
 #endif
 
@@ -2005,7 +1936,7 @@ bool Instance::calcTerminalCurrents ()
 //-----------------------------------------------------------------------------
 bool Instance::pdTerminalCurrents ()
 {
-  string msg;
+  std::string msg;
 
   double & J0 = scalingVars.J0;
   double & a0 = scalingVars.a0;
@@ -2048,7 +1979,7 @@ bool Instance::pdTerminalCurrents ()
 
     if (edgeBoundarySten[i]!=1 &&  internalBoundarySten[i]!=1)
     {
-      string msg = "Instance::pdTerminalCurrents";
+      std::string msg = "Instance::pdTerminalCurrents";
       msg += "Unrecognized boundary.";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
     }
@@ -2056,7 +1987,7 @@ bool Instance::pdTerminalCurrents ()
     int iNN=bcVec[iBC].neighborNode;
     double & area = bcVec[iBC].area;
     double A0=J0*a0*area;
-    vector<int> & colA = bcVec[iBC].li_colArray;
+    std::vector<int> & colA = bcVec[iBC].li_colArray;
 
     double sign = ((iNN > i)?1.0:-1.0);
     double dJndV = 0.0;
@@ -2111,7 +2042,7 @@ bool Instance::pdTerminalCurrents ()
 
     if (internalBoundarySten[i]==1)
     {
-      string & type = bcVec[iBC].type;
+      std::string & type = bcVec[iBC].type;
 
       // only majority carrier goes to the boundary
       if (type=="ntype")
@@ -2126,7 +2057,7 @@ bool Instance::pdTerminalCurrents ()
       }
       else // oops.
       {
-        string msg = "Instance::pdTerminalCurrents";
+        std::string msg = "Instance::pdTerminalCurrents";
         msg += "Unrecognized type on boundary.";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
       }
@@ -2289,16 +2220,14 @@ bool Instance::calcConductance (int iElectrode, const N_LAS_Vector * dxdvPtr)
   for (int ich = 0; ich < 256; ++ich)
   { filename1[ich] = 0; }
 
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > -1 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "calcConductances  name = " << getName() << endl;
-    cout << "electrode = " << bcVec[iElectrode].eName;
-    cout << "  dIdVckt = " << bcVec[iElectrode].dIdVckt;
-    cout << endl;
-    cout << endl;
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "calcConductances  name = " << getName() << std::endl;
+    Xyce::dout() << "electrode = " << bcVec[iElectrode].eName;
+    Xyce::dout() << "  dIdVckt = " << bcVec[iElectrode].dIdVckt;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -2375,12 +2304,12 @@ bool Instance::calcConductance (int iElectrode, const N_LAS_Vector * dxdvPtr)
       sprintf(outstring,
               "(%2d,%2d): dotPr=%12.4e G=%12.4e",
               iEqu,iElectrode,dIidVj_chain,Gij);
-      cout << string(outstring) << endl;
+      Xyce::dout() << std::string(outstring) << std::endl;
 
       sprintf(outstring,
               "(%2d,%2d): G=%12.4e G*V=%12.4e I=%12.4e V=%12.4e",
               iEqu,iElectrode,Gij,GV,Itmp,Vtmp);
-      cout << string(outstring) << endl;
+      Xyce::dout() << std::string(outstring) << std::endl;
     }
 #endif
   }
@@ -2388,7 +2317,7 @@ bool Instance::calcConductance (int iElectrode, const N_LAS_Vector * dxdvPtr)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > -1 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -2632,7 +2561,7 @@ bool Instance::loadVecDDForm (double * rhs)
     }
     else if (internalBoundarySten[i])
     {
-      string & type = bcVec[iBC].type;
+      std::string & type = bcVec[iBC].type;
       double aveDx = 0.5*(dxVec[i-1] + dxVec[i]);
 
       if (type=="ntype")  // boundary condition on e-, let h+ flow
@@ -2647,14 +2576,14 @@ bool Instance::loadVecDDForm (double * rhs)
       }
       else
       {
-        string msg = "Instance::loadVecDDForm";
+        std::string msg = "Instance::loadVecDDForm";
         msg += "Unrecognized type on boundary.";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
       }
     }
     else
     {
-      string msg = "Instance::loadVecDDForm";
+      std::string msg = "Instance::loadVecDDForm";
       msg += "Unrecognized stencil on boundary.";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
     }
@@ -2710,7 +2639,7 @@ bool Instance::loadVecDDForm (double * rhs)
 // Creation Date : 02/09/08
 //-----------------------------------------------------------------------------
 bool Instance::getInstanceBreakPoints(
-  vector<N_UTL_BreakPoint> &breakPointTimes)
+  std::vector<N_UTL_BreakPoint> &breakPointTimes)
 {
 
   return true;
@@ -2848,7 +2777,7 @@ bool Instance::loadMatKCLDDForm (N_LAS_Matrix & mat)
 
     if (edgeBoundarySten[i]!=1 &&  internalBoundarySten[i]!=1)
     {
-      string msg = "Instance::loadMatKCLForm";
+      std::string msg = "Instance::loadMatKCLForm";
       msg += "Unrecognized boundary.";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
     }
@@ -2857,7 +2786,7 @@ bool Instance::loadMatKCLDDForm (N_LAS_Matrix & mat)
     li_row = bcVec[iBC].lid;
     double & area = bcVec[iBC].area;
     double A0=J0*a0*area;
-    vector<int> & colA = bcVec[iBC].li_colArray;
+    std::vector<int> & colA = bcVec[iBC].li_colArray;
 
     double sign = ((iNN > i)?1.0:-1.0);
     double dJndV = 0.0;
@@ -2924,7 +2853,7 @@ bool Instance::loadMatKCLDDForm (N_LAS_Matrix & mat)
 
     if (internalBoundarySten[i]==1)
     {
-      string & type = bcVec[iBC].type;
+      std::string & type = bcVec[iBC].type;
 
       // only majority carrier goes to the boundary
       if (type=="ntype")
@@ -2939,7 +2868,7 @@ bool Instance::loadMatKCLDDForm (N_LAS_Matrix & mat)
       }
       else // oops.
       {
-        string msg = "Instance::loadMatKCLForm";
+        std::string msg = "Instance::loadMatKCLForm";
         msg += "Unrecognized type on boundary.";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
       }
@@ -3022,7 +2951,7 @@ bool Instance::loadMatDDForm (N_LAS_Matrix & mat)
     for (int i=1;i<LX;++i)
     {
       double aveDx = 0.5*(dxVec[i-1]+dxVec[i]);
-      std::cout<<"\t" <<dJndp1Vec[i]/aveDx<<"\t"<<dJndp2Vec[i]/aveDx
+      Xyce::dout()<<"\t" <<dJndp1Vec[i]/aveDx<<"\t"<<dJndp2Vec[i]/aveDx
                <<"\t" <<dJpdn1Vec[i]/aveDx<<"\t"<<dJpdn2Vec[i]/aveDx<<std::endl;
     }
   }
@@ -3070,7 +2999,7 @@ bool Instance::loadMatDDForm (N_LAS_Matrix & mat)
       mat[Vrow][li_Vcolarray[i][0]] = -scalingVars.rV0;
       mat[Vrow][li_Vcolarray[i][2]] = 1.0;
 
-      string & type = bcVec[iBC].type;
+      std::string & type = bcVec[iBC].type;
 
       if (type=="ntype")  // boundary condition on e-, let h+ flow
       {
@@ -3150,7 +3079,7 @@ bool Instance::loadMatDDForm (N_LAS_Matrix & mat)
       }
       else
       {
-        string msg = "Instance::loadMatDDForm";
+        std::string msg = "Instance::loadMatDDForm";
         msg += "Unrecognized type on boundary.";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
       }
@@ -3435,25 +3364,25 @@ bool Instance::calcMobilities ()
 #if 0
     if( mi.fieldDependent )
     {
-      std::cout << "\tfieldDep=true";
+      Xyce::dout() << "\tfieldDep=true";
     }
     else
     {
-      std::cout << "\tfieldDep=false";
+      Xyce::dout() << "\tfieldDep=false";
     }
-    std::cout << "\tefield ="<<mi.epar;
-    std::cout << "\tn ="<<mi.n;
-    std::cout << "\tp ="<<mi.p;
-    std::cout << "\tNd ="<<mi.Nd;
-    std::cout << "\tNa ="<<mi.Na;
+    Xyce::dout() << "\tefield ="<<mi.epar;
+    Xyce::dout() << "\tn ="<<mi.n;
+    Xyce::dout() << "\tp ="<<mi.p;
+    Xyce::dout() << "\tNd ="<<mi.Nd;
+    Xyce::dout() << "\tNa ="<<mi.Na;
 #endif
 
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > -10 && getSolverState().debugTimeFlag)
     {
-      std::cout << "\tunE["<<i<<"]="<<unE_Vec[i];
-      std::cout << "\tupE["<<i<<"]="<<upE_Vec[i];
-      std::cout << std::endl;
+      Xyce::dout() << "\tunE["<<i<<"]="<<unE_Vec[i];
+      Xyce::dout() << "\tupE["<<i<<"]="<<upE_Vec[i];
+      Xyce::dout() << std::endl;
     }
 #endif
   }
@@ -3557,12 +3486,10 @@ bool Instance::setupDopingProfile ()
   int i;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << endl;
-    cout << "Instance::setupDopingProfile\n";
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "Instance::setupDopingProfile\n";
   }
 #endif
 
@@ -3638,15 +3565,15 @@ bool Instance::setupDopingProfile ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Na = " << Na << endl;
-    cout << "Nd = " << Nd << endl;
+    Xyce::dout() << "Na = " << Na << std::endl;
+    Xyce::dout() << "Nd = " << Nd << std::endl;
     for (i=0;i<NX;++i)
     {
-      cout << "x[" << i << "] = " << xVec[i] << "\t";
-      cout << "C[" << i << "] = " << CVec[i] << endl;
+      Xyce::dout() << "x[" << i << "] = " << xVec[i] << "\t";
+      Xyce::dout() << "C[" << i << "] = " << CVec[i] << std::endl;
     }
 
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -3713,9 +3640,9 @@ bool Instance::calcDopingProfile ()
   {
     // loop over the dope info map, and sum contributions from each
     // doping entity into the total doping array, CVec.
-    map<string, DopeInfo *>::iterator iter;
-    map<string, DopeInfo *>::iterator start = dopeInfoMap.begin();
-    map<string, DopeInfo *>::iterator end   = dopeInfoMap.end();
+    std::map<std::string, DopeInfo *>::iterator iter;
+    std::map<std::string, DopeInfo *>::iterator start = dopeInfoMap.begin();
+    std::map<std::string, DopeInfo *>::iterator end   = dopeInfoMap.end();
 
     for ( iter = start; iter != end; ++iter )
     {
@@ -3740,7 +3667,7 @@ bool Instance::calcDopingProfile ()
     // Error in given expression.
     char tmpChar[128];
     sprintf(tmpChar, "Mistake in doping. Na=%12.4e  Nd=%12.4e\n",Na,Nd);
-    string msg(tmpChar);
+    std::string msg(tmpChar);
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
   }
 
@@ -3777,9 +3704,9 @@ bool Instance::setupMesh ()
   {
     for (int i=0;i<NX;++i)
     {
-      cout << "x["<<i<<"] = " << xVec[i];
-      cout << "\tdx["<<i<<"] = " << dxVec[i];
-      cout << endl;
+      Xyce::dout() << "x["<<i<<"] = " << xVec[i];
+      Xyce::dout() << "\tdx["<<i<<"] = " << dxVec[i];
+      Xyce::dout() << std::endl;
     }
   }
 #endif
@@ -3901,19 +3828,19 @@ bool Instance::setupScalingVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > -2)
   {
-    cout << "scalingVars.x0 = " << scalingVars.x0 << endl;
-    cout << "scalingVars.a0 = " << scalingVars.a0 << endl;
-    cout << "scalingVars.T0 = " << scalingVars.T0 << endl;
-    cout << "scalingVars.V0 = " << scalingVars.V0 << endl;
-    cout << "scalingVars.C0 = " << scalingVars.C0 << endl;
-    cout << "scalingVars.D0 = " << scalingVars.D0 << endl;
-    cout << "scalingVars.u0 = " << scalingVars.u0 << endl;
-    cout << "scalingVars.R0 = " << scalingVars.R0 << endl;
-    cout << "scalingVars.t0 = " << scalingVars.t0 << endl;
-    cout << "scalingVars.E0 = " << scalingVars.E0 << endl;
-    cout << "scalingVars.F0 = " << scalingVars.F0 << endl;
-    cout << "scalingVars.J0 = " << scalingVars.J0 << endl;
-    cout << "scalingVars.L0 = " << scalingVars.L0 << endl;
+    Xyce::dout() << "scalingVars.x0 = " << scalingVars.x0 << std::endl;
+    Xyce::dout() << "scalingVars.a0 = " << scalingVars.a0 << std::endl;
+    Xyce::dout() << "scalingVars.T0 = " << scalingVars.T0 << std::endl;
+    Xyce::dout() << "scalingVars.V0 = " << scalingVars.V0 << std::endl;
+    Xyce::dout() << "scalingVars.C0 = " << scalingVars.C0 << std::endl;
+    Xyce::dout() << "scalingVars.D0 = " << scalingVars.D0 << std::endl;
+    Xyce::dout() << "scalingVars.u0 = " << scalingVars.u0 << std::endl;
+    Xyce::dout() << "scalingVars.R0 = " << scalingVars.R0 << std::endl;
+    Xyce::dout() << "scalingVars.t0 = " << scalingVars.t0 << std::endl;
+    Xyce::dout() << "scalingVars.E0 = " << scalingVars.E0 << std::endl;
+    Xyce::dout() << "scalingVars.F0 = " << scalingVars.F0 << std::endl;
+    Xyce::dout() << "scalingVars.J0 = " << scalingVars.J0 << std::endl;
+    Xyce::dout() << "scalingVars.L0 = " << scalingVars.L0 << std::endl;
   }
 #endif
 
@@ -4472,7 +4399,7 @@ bool Instance::outputPlotFiles ()
   lastOutputTime = getSolverState().currTime;
 
 #ifdef Xyce_DEBUG_DEVICE
-  cout << endl << "Doing an output at time = " << getSolverState().currTime << endl;
+  Xyce::dout() << std::endl << "Doing an output at time = " << getSolverState().currTime << std::endl;
 #endif
 
   if (tecplotLevel > 0) {bs1 = outputTecplot (); bsuccess = bsuccess && bs1;}
@@ -5117,10 +5044,8 @@ bool Instance::disablePDEContinuation ()
 void Instance::setPDEContinuationAlpha (double alpha)
 {
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-                          "---------------------------";
-  cout << dashedline << endl;
-  cout << "Instance::setPDEContinuationAlpha" << endl;
+  Xyce::dout() << section_divider << std::endl;
+  Xyce::dout() << "Instance::setPDEContinuationAlpha" << std::endl;
 #endif
 
 
@@ -5138,7 +5063,7 @@ void Instance::setPDEContinuationAlpha (double alpha)
     }
 
 #ifdef Xyce_DEBUG_DEVICE
-    cout << "  " << bcVec[iBC].eName << "  Vckt_ramp = " << bcVec[iBC].Vckt_ramp << endl;
+    Xyce::dout() << "  " << bcVec[iBC].eName << "  Vckt_ramp = " << bcVec[iBC].Vckt_ramp << std::endl;
 #endif
   }
 
@@ -5154,10 +5079,26 @@ void Instance::setPDEContinuationAlpha (double alpha)
   }
 
 #ifdef Xyce_DEBUG_DEVICE
-  cout << "  photoA1_ramp = " << photoA1_ramp << endl;
-  cout << dashedline << endl;
+  Xyce::dout() << "  photoA1_ramp = " << photoA1_ramp << std::endl;
+  Xyce::dout() << section_divider << std::endl;
 #endif
 #endif
+}
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  Device *device = new DeviceMaster<Traits>(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+
+  return device;
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("pde", 1)
+    .registerModelType("pde", 1)
+    .registerModelType("zod", 1);
 }
 
 } // namespace DiodePDE

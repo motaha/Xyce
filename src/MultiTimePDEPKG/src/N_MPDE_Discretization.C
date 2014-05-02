@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,8 +31,8 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.8.6.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:47 $
+// Revision Number: $Revision: 1.15 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
@@ -46,6 +46,7 @@
 // ----------   Xyce Includes   ----------
 #include <N_ERH_ErrorMgr.h>
 #include <N_MPDE_Discretization.h>
+#include <N_UTL_LogStream.h>
 
 //-----------------------------------------------------------------------------
 // Function      : N_MPDE_Discretization::N_MPDE_Discretization
@@ -190,19 +191,19 @@ N_MPDE_Discretization::N_MPDE_Discretization( Type type, int order )
   // GenerateCoeffs_( type, order, coeffs_ );
   
 #ifdef Xyce_DEBUG_MPDE
-  cout << "MPDE Fast Time Disc\n";
-  cout << "--------------------\n";
-  if( type == Backward ) cout << "Disc: Backward Difference\n";
-  else if ( type == Centered ) cout << "Disc: Centered Difference\n";
-  else if ( type == Forward ) cout << "Disc: Forward Difference\n";
+  Xyce::dout() << "MPDE Fast Time Disc\n";
+  Xyce::dout() << "-------------------\n";
+  if( type == Backward ) Xyce::dout() << "Disc: Backward Difference\n";
+  else if ( type == Centered ) Xyce::dout() << "Disc: Centered Difference\n";
+  else if ( type == Forward ) Xyce::dout() << "Disc: Forward Difference\n";
   
-  cout << "Order: " << order_ << endl;
-  cout << "Start: " << start_ << endl;
-  cout << "Width: " << width_ << endl;
-  cout << "Coefficients: ";
-  for( int i = 0; i < width_; ++i ) cout << coeffs_[i] << " ";
-  cout << endl;
-  cout << "--------------------\n";
+  Xyce::dout() << "Order: " << order_ << std::endl;
+  Xyce::dout() << "Start: " << start_ << std::endl;
+  Xyce::dout() << "Width: " << width_ << std::endl;
+  Xyce::dout() << "Coefficients: ";
+  for( int i = 0; i < width_; ++i ) Xyce::dout() << coeffs_[i] << " ";
+  Xyce::dout() << std::endl;
+  Xyce::dout() << "-------------------\n";
 #endif // Xyce_DEBUG_MPDE
 
 }
@@ -215,7 +216,7 @@ N_MPDE_Discretization::N_MPDE_Discretization( Type type, int order )
 // Creator       : Robert Hoekstra, 9233, Computational Sciences
 // Creation Date : 5/6/04
 //-----------------------------------------------------------------------------
-void N_MPDE_Discretization::GenerateCoeffs_( Type type, int order, vector<double> & coeffs )
+void N_MPDE_Discretization::GenerateCoeffs_( Type type, int order, std::vector<double> & coeffs )
 {
   /*
    * Function to calculate finite difference weights for derivatives of
@@ -251,7 +252,7 @@ void N_MPDE_Discretization::GenerateCoeffs_( Type type, int order, vector<double
     break;
   }
   
-  vector< vector<double> > c(2);
+  std::vector< std::vector<double> > c(2);
   c[0].resize(n+1);
   c[1].resize(n+1);
   for (k=0; k<=m; ++k)

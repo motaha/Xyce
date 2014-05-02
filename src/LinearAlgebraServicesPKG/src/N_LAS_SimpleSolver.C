@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.2.2.2 $
+// Revision Number: $Revision: 1.11 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -63,6 +63,7 @@
 
 #include <N_LAS_TransformTool.h>
 
+#include <N_UTL_fwd.h>
 #include <N_UTL_Timer.h>
 #include <N_UTL_OptionBlock.h>
 
@@ -119,16 +120,16 @@ N_LAS_SimpleSolver::~N_LAS_SimpleSolver()
 //-----------------------------------------------------------------------------
 bool N_LAS_SimpleSolver::setOptions( const N_UTL_OptionBlock & OB )
 {
-  for( list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
+  for( std::list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
          it_tpL != OB.getParams().end(); ++it_tpL )
   {
-    string tag = it_tpL->uTag();
+    std::string tag = it_tpL->uTag();
 
-    if( tag == "OUTPUT_LS" ) outputLS_ = it_tpL->iVal();
+    if( tag == "OUTPUT_LS" ) outputLS_ = it_tpL->getImmutableValue<int>();
 
-    if( tag == "OUTPUT_BASE_LS" ) outputBaseLS_ = it_tpL->iVal();
+    if( tag == "OUTPUT_BASE_LS" ) outputBaseLS_ = it_tpL->getImmutableValue<int>();
 
-    if( tag == "OUTPUT_FAILED_LS" ) outputFailedLS_ = it_tpL->iVal();
+    if( tag == "OUTPUT_FAILED_LS" ) outputFailedLS_ = it_tpL->getImmutableValue<int>();
   }
 
   if( options_ ) delete options_;
@@ -158,7 +159,7 @@ bool N_LAS_SimpleSolver::setDefaultOptions()
 // Creator       : Heidi Thornquist, SNL
 // Creation Date : 05/20/04
 //-----------------------------------------------------------------------------
-bool N_LAS_SimpleSolver::setDefaultOption( const string & option )
+bool N_LAS_SimpleSolver::setDefaultOption( const std::string & option )
 {
   return true;
 }
@@ -300,9 +301,7 @@ int N_LAS_SimpleSolver::solve( bool ReuseFactors )
 
 #ifdef Xyce_VERBOSE_LINEAR
     double endSolveTime = timer_->elapsedTime();
-    std::string msg1 = "  Simple (1x1 Matrix) Solve Time: "
-      + Teuchos::Utils::toString(endSolveTime-begSolveTime);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg1);
+    Xyce::lout() << "  Simple (1x1 Matrix) Solve Time: " << (endSolveTime-begSolveTime) << std::endl;
 #endif
 
   // Output computed solution vectors, if requested.
@@ -319,9 +318,7 @@ int N_LAS_SimpleSolver::solve( bool ReuseFactors )
   solutionTime_ = timer_->elapsedTime();
 
 #ifdef Xyce_VERBOSE_LINEAR
-  std::string msg2 = "Total Linear Solution Time (Simple): "
-    + Teuchos::Utils::toString(solutionTime_);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg2);
+  Xyce::lout() << "Total Linear Solution Time (Simple): " << solutionTime_ << std::endl;
 #endif
 
   return 0;

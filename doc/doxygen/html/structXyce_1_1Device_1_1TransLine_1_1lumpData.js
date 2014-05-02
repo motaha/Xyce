@@ -1,0 +1,28 @@
+var structXyce_1_1Device_1_1TransLine_1_1lumpData =
+[
+    [ "coef_ind", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#a1c58126bed7d8369dd75232488941b37", null ],
+    [ "f0_ind", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#aa03779356b566e32c163ecd0b24d5661", null ],
+    [ "i0_ind", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#a90705d91122b7d1c2b6e9d33c1a5d846", null ],
+    [ "i0_res", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#aee18aafb4d60ef79203cac43bbd8dfec", null ],
+    [ "indexI", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#addce434de433f1179ee11e81b113ca55", null ],
+    [ "indexV1", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#a9a9529eb33dd6891bd3b1175cfd6173e", null ],
+    [ "indexV2", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#a22719e770a7e42521ebad4430f90f189", null ],
+    [ "indexV3", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#a5f6cec2a2e899ded115fae6ab8ec4418", null ],
+    [ "li_I", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#ae52ea7e2647908d96b699c0e34ddd0f4", null ],
+    [ "li_V1", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#a77000af587475ccf21f16fa9656ce4f4", null ],
+    [ "li_V2", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#a38b16f68665cd12c08783a220c295bd7", null ],
+    [ "li_V3", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#ab2bce2bd7228dd7fe1b624dc09ebdbac", null ],
+    [ "offset_ii_ii", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#a88ed97344bd821b2edb2689ece172ea1", null ],
+    [ "offset_ii_v1", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#a5369a7fa873a7a5d7039a17b34d4af09", null ],
+    [ "offset_ii_v2", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#ad6c1b9707e493b082ac8e187ec196212", null ],
+    [ "offset_v1_ii", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#a43e5bec62a674625b352870a82273ec6", null ],
+    [ "offset_v1_iim1", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#aafc23b9af2a0fef9b9f0f560b1d77925", null ],
+    [ "offset_v1_v1", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#a11d0230ba0dda745be842b695cc4375f", null ],
+    [ "offset_v1_v2m1", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#a8ed143691c16a2c7d6836e0f3d30e7c2", null ],
+    [ "offset_v2_ii", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#a6ce413e5a8decf63b49356a95ec32388", null ],
+    [ "offset_v2_v2", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#a247146babc8cb8f7a10b954ec1cf8d93", null ],
+    [ "offset_v2_v3", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#a37caf95a714509a7310fd261d794c628", null ],
+    [ "offset_v3_v2", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#a05b6d100594cf5e7039de0a393f5c225", null ],
+    [ "offset_v3_v3", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#a769c2d879e1dcc4413dd97ac2ee555f7", null ],
+    [ "q0_cap", "structXyce_1_1Device_1_1TransLine_1_1lumpData.html#a88257bede230415dd7644ad859888b15", null ]
+];

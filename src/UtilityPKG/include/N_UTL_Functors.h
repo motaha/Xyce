@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.7.6.2 $
+// Revision Number: $Revision: 1.11 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -63,7 +63,7 @@
 // Creation Date : 7/16/01
 //-----------------------------------------------------------------------------
 template < typename T >
-struct DeletePtr : public unary_function < const T *, void >
+struct DeletePtr : public std::unary_function < const T *, void >
 {
   void operator() (const T * ptr) const { delete ptr; }
 };
@@ -76,7 +76,7 @@ struct DeletePtr : public unary_function < const T *, void >
 // Creation Date : 7/16/01
 //-----------------------------------------------------------------------------
 template < typename T, typename U >
-struct FirstOfPair : public unary_function < const T &, const U & >
+struct FirstOfPair : public std::unary_function < const T &, const U & >
 {
   const U & operator() (const T & ref) const { return ref.first; }
 };

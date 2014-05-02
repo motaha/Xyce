@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -38,9 +38,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.111.2.2 $
+// Revision Number: $Revision: 1.121 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -80,7 +80,7 @@
 
 N_TIA_TIAParams::N_TIA_TIAParams(N_IO_CmdParse & cp)
   :
-  commandLine(cp),
+  commandLine(&cp),
   tStart(0.0),
   tStartGiven(false),
   initialTime(0.0),
@@ -147,7 +147,9 @@ N_TIA_TIAParams::N_TIA_TIAParams(N_IO_CmdParse & cp)
   jacLimit(1.0e+17),
   maxOrder(5),
   minOrder(1),
-  freq(0.0),
+//  freq(0.0),
+//  freq2(0.0),
+//  freq2Given(false),
   freqGiven(false),
   type("DEC"),
   np(10.0),
@@ -179,11 +181,13 @@ N_TIA_TIAParams::N_TIA_TIAParams(N_IO_CmdParse & cp)
   historyTrackingDepth(25)
 {
   scalarTolerances = true;
+
+  freqs.clear();
 #ifdef Xyce_DEBUG_TIME
   // override default debug level based on command line options
-  if ( commandLine.argExists( "-tdl" ) )
+  if ( commandLine->argExists( "-tdl" ) )
   {
-    debugLevel = atoi( commandLine.getArgumentValue( "-tdl" ).c_str() );
+    debugLevel = atoi( commandLine->getArgumentValue( "-tdl" ).c_str() );
   }
 #endif 
 }
@@ -202,7 +206,6 @@ N_TIA_TIAParams::~N_TIA_TIAParams()
 
 }
 
-#ifdef Xyce_VERBOSE_TIME
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_TIAParams::printParams
 // Purpose       :
@@ -211,217 +214,95 @@ N_TIA_TIAParams::~N_TIA_TIAParams()
 // Creator       : Eric Keiter, 9233.
 // Creation Date : 7/12/01
 //-----------------------------------------------------------------------------
-void N_TIA_TIAParams::printParams (int analysis)
+void N_TIA_TIAParams::printParams(std::ostream &os, int analysis)
 {
-
-  static string dashedline =  "------------------------------------------------"
-    "-----------------------------";
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\n");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\n***** Time Integration solver options:\n");
+  os << "\n" << std::endl;
+  os << Xyce::section_divider << std::endl;
+  os << "\n***** Time Integration solver options:\n" << std::endl;
 
   if (analysis == TRANSIENT)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\tAnalysis:\t\t\tTRANSIENT");
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\tInitial Time (sec):\t\t", initialTime);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\tFinal Time (sec):\t\t", finalTime);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\tStarting Time Step(sec):\t", userSpecified_startingTimeStep);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\tRestart Time Step Scale:\t", restartTimeStepScale);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\tError Analysis option:  \t", errorAnalysisOption);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\ttStart (initial outputTime):\t", tStart);
+    os << "\tAnalysis:\t\t\tTRANSIENT" << std::endl
+                  << "\tInitial Time (sec):\t\t" <<  initialTime << std::endl
+                 << "\tFinal Time (sec):\t\t" <<  finalTime << std::endl
+                 << "\tStarting Time Step(sec):\t" <<  userSpecified_startingTimeStep << std::endl
+                 << "\tRestart Time Step Scale:\t" <<  restartTimeStepScale << std::endl
+                 << "\tError Analysis option:\t" <<  errorAnalysisOption << std::endl
+                 << "\ttStart (initial outputTime):\t" <<  tStart << std::endl;
 
     switch (integrationMethod)
     {
     case TIAMethod_BACKWARD_EULER:
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-               "\tTime Integration method:\tBACKWARD EULER");
+      os << "\tTime Integration method:\tBACKWARD EULER" << std::endl;
       break;
 
     case TIAMethod_BACKWARD_DIFFERENTIATION_2:
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-               "\tTime Integration method:\tBACKWARD DIFFERENTIATION ORDER 2");
+      os << "\tTime Integration method:\tBACKWARD DIFFERENTIATION ORDER 2" << std::endl;
       break;
 
     case TIAMethod_BACKWARD_DIFFERENTIATION_15:
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-               "\tTime Integration method:\tBACKWARD DIFFERENTIATION ORDER 15");
+      os << "\tTime Integration method:\tBACKWARD DIFFERENTIATION ORDER 15" << std::endl;
       break;
 
     case TIAMethod_GEAR_12:
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-               "\tTime Integration method:\tGEAR 12");      break;
+      os << "\tTime Integration method:\tGEAR 12" << std::endl;
+      break;
 
     case TIAMethod_ONESTEP:
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-               "\tTime Integration method:\tONESTEP");      break;
+      os << "\tTime Integration method:\tONESTEP" << std::endl;
+      break;
 
     case TIAMethod_TRAPEZOIDAL:
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-               "\tTime Integration method:\tTRAPEZOIDAL");
+      os << "\tTime Integration method:\tTRAPEZOIDAL" << std::endl;
       break;
 
     case TIAMethod_VARIABLE_THETA:
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-               "\tTime Integration method:\tVARIABLE THETA");
+      os << "\tTime Integration method:\tVARIABLE THETA" << std::endl;
       break;
 
     case TIAMethod_A_CONTRACTIVE_2:
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-               "\tTime Integration method:\tA-CONTRACTIVE order 2");
+      os << "\tTime Integration method:\tA-CONTRACTIVE order 2" << std::endl;
       break;
     }
 
-    if (constantStepSize)
-    {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-               "\tUsing Constant Step Size");
-    }
-    else
-    {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-               "\tUsing Variable Step Size");
-    }
-
-    if (useDeviceTimeStepMax)
-    {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-               "\tUsing Device specified maximum stepsize");
-    }
-    else
-    {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-               "\tNOT using Device specified maximum stepsize");
-    }
-
-    if( fastTests )
-    {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-               "\tTime integration FastTests is ON");
-    }
-    else
-    {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-               "\tTime integration FastTests is OFF");
-    }
-
-    if (nlNearConvFlag)
-    {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-               "\tNL Near Convergence Flag is ON");
-    }
-    else
-    {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-               "\tNL Near Convergence Flag is OFF");
-    }
-    
-    if( passNLStall )
-    {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-               "\tNL Pass Non-linear Stalls is ON");
-    }
-    else
-    {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-               "\tNL Pass Non-linear Stalls is OFF");
-    }
-    
-
+    os << (constantStepSize ? "\tUsing Constant Step Size" : "\tUsing Variable Step Size") << std::endl
+                 << (useDeviceTimeStepMax ? "\tUsing Device specified maximum stepsize" : "\tNOT using Device specified maximum stepsize") << std::endl
+                 << (fastTests ? "\tTime integration FastTests is ON" : "\tTime integration FastTests is OFF") << std::endl
+                 << (nlNearConvFlag ? "\tNL Near Convergence Flag is ON" : "\tNL Near Convergence Flag is OFF") << std::endl
+                 << (passNLStall ? "\tNL Pass Non-linear Stalls is ON" : "\tNL Pass Non-linear Stalls is OFF") << std::endl;
   }
   else
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\tAnalysis:\t\t\tDC SWEEP");
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\tTotal DC Sweep Steps:\t\t",sweepSteps);
+    os << "\tAnalysis:\t\t\tDC SWEEP" << std::endl
+                 <<"\tTotal DC Sweep Steps:\t\t" << sweepSteps << std::endl;
 
   }
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\tabsErrorTol:\t\t\t", absErrorTol );
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\trelErrorTol:\t\t\t", relErrorTol );
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\texitTime:\t\t\t", exitTime );
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\texitStep:\t\t\t", exitStep );
-
-#ifdef Xyce_DEBUG_TIME
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\tdebugLevel:\t\t\t", debugLevel);
-#endif
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                          "\tMaximum Order:\t\t\t", maxOrder);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                          "\tMinimum Order:\t\t\t", minOrder);
-
-  if (interpOutputFlag)
+  os << "\tabsErrorTol:\t\t\t" <<  absErrorTol  << std::endl
+               << "\trelErrorTol:\t\t\t" <<  relErrorTol  << std::endl
+               << "\texitTime:\t\t\t" <<  exitTime  << std::endl
+               << "\texitStep:\t\t\t" <<  exitStep  << std::endl
+               << "\tdebugLevel:\t\t\t" <<  debugLevel << std::endl
+               << "\tMaximum Order:\t\t\t" <<  maxOrder << std::endl
+               << "\tMinimum Order:\t\t\t" <<  minOrder << std::endl
+               << "\tInterpolated Output Flag:\t\t " << (interpOutputFlag ? "true": "false") << std::endl
+               << "\tConductance Test Flag:\t\t" << (condTestFlag  ? "true": "false") << std::endl;
+  
+  if (condTestDeviceNames.empty())
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-		       "\tInterpolated Output Flag:\t\tTRUE");
+    os <<
+		       "\tConductance Test Device Name List is:\t\tEMPTY" << std::endl;
   }
   else
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-		       "\tInterpolated Output Dae Flag:\t\tFALSE");
-  }
-
-  if (condTestFlag)
-  {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-		       "\tConductance Test Flag:\t\tTRUE");
-  }
-  else
-  {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-		       "\tConductance Test Flag:\t\tFALSE");
-  }
-
-  if( condTestDeviceNames.empty() )
-  {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-		       "\tConductance Test Device Name List is:\t\tEMPTY");
-  }
-  else
-  {
-    std::list< std::string >::iterator currentName = condTestDeviceNames.begin();
-    std::list< std::string >::iterator endName = condTestDeviceNames.end();
-    std::string namesMsg("\tConductance Test Device Name List contains:  ");
-    while( currentName != endName )
+    os << "\tConductance Test Device Name List contains:  " << std::endl;
+    for (std::list< std::string >::iterator it = condTestDeviceNames.begin(); it != condTestDeviceNames.end(); ++it)
     {
-      namesMsg.append(" \"");
-      namesMsg.append( *currentName );
-      namesMsg.append("\"");
-      ++currentName;
+      os << " \"" << *it << "\"";
     }
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, namesMsg );
   }
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-
+  os << Xyce::section_divider << std::endl;
 }
-
-#endif
 
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_TIAParams::operator=
@@ -474,7 +355,7 @@ N_TIA_TIAParams & N_TIA_TIAParams::operator=(const N_TIA_TIAParams & right)
   jacLimit = right.jacLimit;
   maxOrder = right.maxOrder;
   minOrder = right.minOrder;
-  freq = right.freq;
+  freqs = right.freqs;
   freqGiven = right.freqGiven;
   interpOutputFlag = right.interpOutputFlag;
   condTestFlag = right.condTestFlag;

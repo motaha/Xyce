@@ -13,8 +13,8 @@
       Revision Information:
       ---------------------
 
-      Revision Number: $Revision: 1.26 $
-      Revision Date:   $Date: 2012/11/29 20:57:44 $
+      Revision Number: $Revision: 1.27 $
+      Revision Date:   $Date: 2013/10/14 20:06:16 $
       Current Owner:   $Author: tvrusso $
     -->
 
@@ -23,6 +23,7 @@
   <!-- Get the module name, and form a Xyce class name out of it -->
   <admst:variable name="globalMustUseTemplate" select="no"/>
   <admst:variable name="globalMustForceScalar" select="no"/>
+  <admst:variable name="globalCurrentScope" select="instance"/>
   <admst:apply-templates select="/module" match="xyceClassBaseName">
     <admst:value-of select="returned('classname')/value"/>
     <admst:variable name="classname" select="%s"/>

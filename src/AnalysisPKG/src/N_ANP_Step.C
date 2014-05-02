@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,43 +31,43 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.13.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:31 $
+// Revision Number: $Revision: 1.26 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 #include <Xyce_config.h>
 
-// ---------- Standard Includes ----------
-
-// ----------   Xyce Includes   ----------
-#include<N_ANP_AnalysisManager.h>
+#include <N_ANP_AnalysisManager.h>
 #include <N_ANP_OutputMgrAdapter.h>
-#include<N_ANP_Step.h>
+#include <N_ANP_Step.h>
+
+namespace Xyce {
+namespace Analysis {
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Step::setAnalysisParams
+// Function      : Step::setAnalysisParams
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 6/22/10
 //-----------------------------------------------------------------------------
-bool N_ANP_Step::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
+bool Step::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
 {
 #ifdef Xyce_DEBUG_ANALYSIS
   if (anaManagerRCPtr_->tiaParams.debugLevel > 0)
   {
-    cout << "In N_ANP_Step::setAnalysisParams" << endl;
+    Xyce::dout() << "In Step::setAnalysisParams" << std::endl;
   }
 #endif
 
-  list<N_UTL_Param>::const_iterator it_tp;
-  list<N_UTL_Param>::const_iterator it_param;
-  list<N_UTL_Param>::const_iterator it_type;
-  list<N_UTL_Param>::const_iterator first = paramsBlock.getParams().begin();
-  list<N_UTL_Param>::const_iterator last = paramsBlock.getParams().end();
+  std::list<N_UTL_Param>::const_iterator it_tp;
+  std::list<N_UTL_Param>::const_iterator it_param;
+  std::list<N_UTL_Param>::const_iterator it_type;
+  std::list<N_UTL_Param>::const_iterator first = paramsBlock.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator last = paramsBlock.getParams().end();
 
-  string msg;
+  std::string msg;
 
   // first check to see that there is only 1 PARAM set.  They need to be in
   // separate lines for this to work.
@@ -81,29 +81,29 @@ bool N_ANP_Step::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
   }
   if (countPar > 1)
   {
-    msg =  "N_ANP_Step::setSTEPAnalysisParams\n";
+    msg =  "Step::setSTEPAnalysisParams\n";
     msg += "You have more than one step parameter on a single line.\n";
     msg += "Each parameter needs its own line.\n";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   }
 
-  N_ANP_SweepParam sp;
+  SweepParam sp;
 #ifdef Xyce_DEBUG_ANALYSIS
   if (anaManagerRCPtr_->tiaParams.debugLevel > 0)
   {
     for (it_tp = first; it_tp != last; ++it_tp)
     {
-      cout << it_tp->uTag() ;
-      cout << "\t";
+      Xyce::dout() << it_tp->uTag() ;
+      Xyce::dout() << "\t";
       if (it_tp->uTag() == "PARAM" || it_tp->uTag() == "TYPE")
       {
-	cout << it_tp->sVal ();
+        Xyce::dout() << it_tp->stringValue();
       }
       else
       {
-	cout << it_tp->dVal ();
+        Xyce::dout() << it_tp->getImmutableValue<double>();
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
     }
   }
 #endif
@@ -113,13 +113,13 @@ bool N_ANP_Step::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
     if (it_tp->uTag() == "TYPE")
     {
       it_type = it_tp;
-      sp.type = it_tp->sVal();
+      sp.type = it_tp->stringValue();
     }
 
     if (it_tp->uTag() == "PARAM")
     {
       it_param = it_tp;
-      sp.name = it_tp->sVal ();
+      sp.name = it_tp->stringValue();
     }
   }
 
@@ -127,26 +127,26 @@ bool N_ANP_Step::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
   ++it_tp;
   if (sp.type == "LIN") // default
   {
-    sp.startVal = it_tp->dVal (); ++it_tp;
-    sp.stopVal  = it_tp->dVal (); ++it_tp;
-    sp.stepVal  = it_tp->dVal (); ++it_tp;
+    sp.startVal = it_tp->getImmutableValue<double>(); ++it_tp;
+    sp.stopVal  = it_tp->getImmutableValue<double>(); ++it_tp;
+    sp.stepVal  = it_tp->getImmutableValue<double>(); ++it_tp;
   }
   else if (sp.type == "DEC" || sp.type == "OCT")
   {
-    sp.startVal = it_tp->dVal (); ++it_tp;
-    sp.stopVal  = it_tp->dVal (); ++it_tp;
-    sp.numSteps = it_tp->iVal (); ++it_tp;
+    sp.startVal = it_tp->getImmutableValue<double>(); ++it_tp;
+    sp.stopVal  = it_tp->getImmutableValue<double>(); ++it_tp;
+    sp.numSteps = it_tp->getImmutableValue<int>(); ++it_tp;
   }
   else if (sp.type == "LIST")
   {
     for (;it_tp!=last;++it_tp)
     {
-      sp.valList.push_back(it_tp->dVal());
+      sp.valList.push_back(it_tp->getImmutableValue<double>());
     }
   }
   else
   {
-    msg =  "N_ANP_Step::setSTEPAnalysisParams: ";
+    msg =  "Step::setSTEPAnalysisParams: ";
     msg += " unsupported STEP type\n";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   }
@@ -165,7 +165,7 @@ bool N_ANP_Step::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Step::run()
+// Function      : Step::run()
 // Purpose       : This is the main controlling loop for Step analysis.
 //
 // Special Notes :
@@ -173,7 +173,7 @@ bool N_ANP_Step::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
 // Creator       : Eric Keiter, SNL
 // Creation Date : 10/04/00
 //-----------------------------------------------------------------------------
-bool N_ANP_Step::run()
+bool Step::run()
 {
   bool bsuccess = true;
   bsuccess = init();
@@ -183,21 +183,21 @@ bool N_ANP_Step::run()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Step::init()
+// Function      : Step::init()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/10/06
 //-----------------------------------------------------------------------------
-bool N_ANP_Step::init()
+bool Step::init()
 {
 #ifdef Xyce_DEBUG_ANALYSIS
   if (anaManagerRCPtr_->tiaParams.debugLevel > 0)
   {
-    cout << endl << endl;
-    cout << "-----------------" << endl;
-    cout << "N_ANP_Step::init" << endl;
+    Xyce::dout() << std::endl << std::endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "Step::init" << std::endl;
   }
 #endif
 
@@ -212,16 +212,16 @@ bool N_ANP_Step::init()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Step::loopProcess()
+// Function      : Step::loopProcess()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/10/06
 //-----------------------------------------------------------------------------
-bool N_ANP_Step::loopProcess()
+bool Step::loopProcess()
 {
-  string msg;
+  std::string msg;
   bool integration_status = true;
 
   for (stepLoopIter_=0; stepLoopIter_< stepLoopSize_; ++stepLoopIter_)
@@ -232,26 +232,26 @@ bool N_ANP_Step::loopProcess()
     if (anaManagerRCPtr_->tiaParams.debugLevel > 0)
     {
       // output parameter(s)
-      vector <N_ANP_SweepParam>::iterator iterParam;
-      vector <N_ANP_SweepParam>::iterator firstParam = stepParamVec_->begin();
-      vector <N_ANP_SweepParam>::iterator lastParam = stepParamVec_->end ();
+      std::vector <SweepParam>::iterator iterParam;
+      std::vector <SweepParam>::iterator firstParam = stepParamVec_->begin();
+      std::vector <SweepParam>::iterator lastParam = stepParamVec_->end ();
       for (iterParam=firstParam; iterParam != lastParam;++iterParam)
       {
-        cout << "Step Analysis # " << stepLoopIter_<<"\t";
-        cout << (*iterParam);
+        Xyce::dout() << "Step Analysis # " << stepLoopIter_<<"\t";
+        Xyce::dout() << (*iterParam);
       }
     }
 #endif
 
     secRCPtr_->resetAll ();
-    dsRCPtr_->setZeroHistory();
+    anaManagerRCPtr_->getTIADataStore()->setZeroHistory();
 
     // solve the loop.
     outputMgrAdapterRCPtr_->setStepAnalysisStepNumber( stepLoopIter_);
     mainAnalysisRCPtr_->resetForStepAnalysis();
     integration_status &= mainAnalysisRCPtr_->run();
 
-    outputMgrAdapterRCPtr_->outputRESULT( *dsRCPtr_->currSolutionPtr, *dsRCPtr_->currStatePtr, *dsRCPtr_->currStorePtr );
+    outputMgrAdapterRCPtr_->outputRESULT( *(anaManagerRCPtr_->getTIADataStore()->currSolutionPtr), *(anaManagerRCPtr_->getTIADataStore()->currStatePtr), *(anaManagerRCPtr_->getTIADataStore()->currStorePtr) );
 
   } // end of for loop, and end of step analysis.
 
@@ -261,43 +261,45 @@ bool N_ANP_Step::loopProcess()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Step::processSuccessfulStep()
+// Function      : Step::processSuccessfulStep()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/10/06
 //-----------------------------------------------------------------------------
-bool N_ANP_Step::processSuccessfulStep()
+bool Step::processSuccessfulStep()
 {
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Step::processFailedStep()
+// Function      : Step::processFailedStep()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/10/06
 //-----------------------------------------------------------------------------
-bool N_ANP_Step::processFailedStep()
+bool Step::processFailedStep()
 {
   return true;
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Step::finish()
+// Function      : Step::finish()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/10/06
 //-----------------------------------------------------------------------------
-bool N_ANP_Step::finish()
+bool Step::finish()
 {
   return true;
 }
 
+} // namespace Analysis
+} // namespace Xyce
 

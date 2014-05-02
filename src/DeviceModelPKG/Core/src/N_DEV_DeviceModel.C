@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,33 +36,34 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.53.2.3 $
+// Revision Number: $Revision: 1.67 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/02/24 23:49:15 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
 #include <iostream>
 #include <set>
 
-// ----------   Xyce Includes   ----------
 #include <N_DEV_Const.h>
 #include <N_DEV_DeviceModel.h>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceOptions.h>
 #include <N_DEV_SolverState.h>
 #include <N_DEV_Param.h>
+#include <N_DEV_Message.h>
+#include <N_DEV_DeviceMgr.h>
+#include <N_DEV_Configuration.h>
 
 #include <N_ERH_ErrorMgr.h>
 
 namespace Xyce {
 namespace Device {
 
+const char *modelEntityType = "model";
 
 //-----------------------------------------------------------------------------
 // Function      : DeviceModel::DeviceModel
@@ -73,10 +74,10 @@ namespace Device {
 // Creation Date : 3/30/00
 //-----------------------------------------------------------------------------
 DeviceModel::DeviceModel(
-  const ModelBlock &    model_block,
-  SolverState &         solver_state,
-  DeviceOptions &       device_options)
-  : DeviceEntity(solver_state, device_options, model_block.name, model_block.netlistFileName_, model_block.lineNumber_),
+  const ModelBlock &            model_block,
+  ParametricData<void> &        parametric_data,
+  const FactoryBlock &          factory_block)
+  : DeviceEntity(modelEntityType, model_block.name, parametric_data, factory_block.solverState_, factory_block.deviceOptions_, model_block.netlistFileName_, model_block.lineNumber_),
     type_(model_block.type),
     level_(model_block.level),
     temperatureModel(""),
@@ -91,50 +92,32 @@ DeviceModel::DeviceModel(
 // Purpose       : Set up parameter fits from model line
 // Special Notes :
 //
-// ERK:  5/27/08.  The argument params cannot be a reference because the data
-//       passed to it (generally MB.params) is const.  I tried making
-//       it both const, and a reference, but the resize of params at the
-//       very end of this function violates const.
-//
-//       As a result, this function implicitly depends on the copying
-//       the params object into a temporary object, and doing that copy
-//       correctly.
-//
 // Scope         : public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 8/26/05
 //-----------------------------------------------------------------------------
-void DeviceModel::setModParams(vector<Param> params)
+void DeviceModel::setModParams(const std::vector<Param> &params)
 {
-  vector<Param>::const_iterator mp;
-  vector<Param>::const_iterator mp_begin = params.begin();
-  vector<Param>::const_iterator mp_end = params.end();
-  int i, j, k, k_lo, k_hi;
-  vector<int> m_start;
-  set<string> pname;
-  map<string,int> ptype;
+  std::vector<int> m_start;
+  std::set<std::string> pname;
+  std::map<std::string, int> ptype;
 
-  i = 0;
-  m_start.push_back(i);
-  for (mp = mp_begin ; mp != mp_end ; ++mp)
+  int param_index = 0;
+  m_start.push_back(param_index);
+  for (std::vector<Param>::const_iterator mp = params.begin(); mp != params.end(); ++mp)
   {
-    ++i;
+    ++param_index;
     if ((*mp).tag() == "INDEPENDENT;PARAM")
     {
-      m_start.push_back(i);
+      m_start.push_back(param_index);
       pname.clear();
     }
     else
     {
       if (pname.find((*mp).tag()) != pname.end())
       {
-        string msg = "Duplicate specification of parameter: ";
-        msg += (*mp).tag();
-        msg += " in model: ";
-        msg += getName();
-        std::ostringstream oss;
-        oss << "Error in " << netlistLocation() << "\n" << msg;
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, oss.str());
+        UserError0(*this) << "Duplicate specification of parameter " << (*mp).tag();
+        return;
       }
       pname.insert((*mp).tag());
       if (m_start.size() == 1)
@@ -146,473 +129,423 @@ void DeviceModel::setModParams(vector<Param> params)
   if (m_start.size() == 1)
   {
     setParams(params);
-    return;
-  }
-  m_start.push_back(i+1);
-
-			 // An interpolation method is present, first figure out what it
-			 // is and make sure that all models agree on the method.
-  string tmod("");
-  string dmod("");
-  string modName("");
-
-  for (i=0 ; i<m_start.size()-1 ; ++i)
-  {
-    for (j=m_start[i] ; j<m_start[i+1]-1 ; ++j)
-    {
-      if (params[j].tag() == "TEMPMODEL" && params[j].sVal() != "NONE")
-      {
-        if (i == 0)
-        {
-          tmod = params[j].sVal();
-        }
-        else
-        {
-          if (tmod != params[j].sVal())
-          {
-            string msg = "Inconsistent or missing TEMPMODEL for model: "+getName();
-            std::ostringstream oss;
-            oss << "Error in " << netlistLocation() << "\n" << msg;
-            N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, oss.str());
-          }
-        }
-      }
-      if (params[j].tag() == "DOSEMODEL" && params[j].sVal() != "NONE")
-      {
-        if (i == 0)
-        {
-          dmod = params[j].sVal();
-        }
-        else
-        {
-          if (dmod != params[j].sVal())
-          {
-            string msg = "Inconsistent or missing DOSEMODEL for model: "+getName();
-            std::ostringstream oss;
-            oss << "Error in " << netlistLocation() << "\n" << msg;
-            N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, oss.str());
-          }
-        }
-      }
-    }
-  }
-
-  if (tmod == "" && dmod == "")
-  {
-    string msg = "Neither TEMPMODEL or DOSEMODEL specified for model: "+getName();
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, oss.str());
-  }
-  else if (tmod != "" && dmod != "")
-  {
-    string msg = "Both TEMPMODEL and DOSEMODEL specified for model: "+getName();
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, oss.str());
-  }
-  else if (tmod != "")
-  {
-    modName = tmod;
-    iModel = TEMP;
-  }
-  else if (dmod != "")
-  {
-    modName = dmod;
-    iModel = DOSE;
-  }
-
-  if (modName == "QUADRATIC")
-  {
-    iMethod = QUAD;
-    if (m_start.size() > 4)
-    {
-      string msg =
-        "Mode than three model specifications given for model: "+getName();
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, oss.str());
-    }
-    fit.resize(3);
-  }
-  else if (modName == "PWL")
-  {
-    iMethod = PWL;
-    fit.resize(m_start.size()-1);
   }
   else
   {
-    string msg =
-      "Only QUADRATIC or PWL interpolation method is supported for model: "+getName();
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, oss.str());
-  }
+    m_start.push_back(param_index + 1);
 
-   // First find the params that vary between the specified models:
-  map<string,double> basePars;
-  vector<double> t;
-  string par;
+    // An interpolation method is present, first figure out what it
+    // is and make sure that all models agree on the method.
+    std::string tmod("");
+    std::string dmod("");
+    std::string modName("");
 
-  for (i=0 ; i<m_start.size()-1 ; ++i)
-  {
-    for (j=m_start[i] ; j<m_start[i+1]-1 ; ++j)
+    for (int i = 0; i < m_start.size()-1; ++i)
     {
-      par = params[j].tag();
-      ParameterMap::const_iterator parIt = (*getPMap()).find(par);
-      if (parIt == (*getPMap()).end())
-	throw std::runtime_error(string("Parameter ") + par + " not found");
-
+      for (int j = m_start[i]; j < m_start[i+1]-1; ++j)
       {
-	const DeviceEntity::Pars &nPar = static_cast<const DeviceEntity::Pars &>(*(*parIt).second);
-	if (params[j].given() && nPar.isType<double>())
-	{
-	  if (iModel == TEMP)
-	  {
-	    if (par == "TNOM")
-	    {
-	      t.push_back(params[j].dVal());
-	    }
-	  }
-	  else if (iModel == DOSE)
-	  {
-	    if (par == "DOSE")
-	    {
-	      t.push_back(params[j].dVal());
-	    }
-	  }
-	  if (i == 0)
-	  {
-	    if (params[j].getType() != EXPR)
-	    {
-	      basePars[par] = params[j].dVal();
-	    }
-	  }
-	  else
-	  {
-	    if (ptype[par] == EXPR)
-	    {
-	      string msg = "Non-constant expression for parameter: ";
-	      msg += par + " not interpolated in model: "+getName();
-	      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING, msg);
-	    }
-	    else
-	    {
-	      if (basePars.find(par) == basePars.end())
-	      {
-		string msg = "Unknown param: " + params[j].tag() + " in model: ";
-		msg += getName() + " temperature compensation .model statement";
-                std::ostringstream oss;
-                oss << "Error in " << netlistLocation() << "\n" << msg;
-                N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
-	      }
-	      if (basePars[par] != params[j].dVal() && params[j].given())
-	      {
-		if (fitMap.find(par) == fitMap.end())
-		{
-		  fitMap[par] = fit[0].size();
-		  fitParams.push_back(nPar.getMemberPtr<double>());
-		  fit[0].push_back(basePars[par]);
-		}
-	      }
-	    }
-	  }
-	}
-      }
-    }
-  }
-
-  if (t.size() != m_start.size()-1)
-  {
-    string msg;
-    if (iModel == TEMP)
-    {
-      msg = "TNOM";
-    }
-    else if (iModel == DOSE)
-    {
-      msg = "DOSE";
-    }
-    msg += " not specified in all .model statements for model: "+getName();
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, oss.str());
-  }
-
-  for (i=1 ; i<t.size() ; ++i)
-  {
-    for (j=0 ; j<i ; ++j)
-    {
-      if (t[i] == t[j])
-      {
-        string msg = "identical ";
-        if (iModel == TEMP)
+        if (params[j].tag() == "TEMPMODEL" && params[j].stringValue() != "NONE")
         {
-          msg += "TNOM";
-        }
-        else if (iModel == DOSE)
-        {
-          msg += "DOSE";
-        }
-        msg += " values in .model statements for model: "+getName();
-        std::ostringstream oss;
-        oss << "Error in " << netlistLocation() << "\n" << msg;
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, oss.str());
-      }
-    }
-  }
-
-   // Now, collect the values to use for the fits:
-  int nFit = fitMap.size();
-			   //int nSet = t.size();
-  vector<vector<double> > temp(nFit);
-  vector<vector<double> > val(nFit);
-  oldParams.resize(nFit);
-
-  for (i=1 ; i<fit.size() ; ++i)
-  {
-    fit[i].resize(nFit);
-  }
-  min_par.resize(nFit);
-  max_par.resize(nFit);
-  parType.resize(nFit);
-  map<string, int>::iterator fm = fitMap.begin();
-  map<string, int>::iterator fm_end = fitMap.end();
-
-  for ( ; fm != fm_end ; ++fm)
-  {
-    par = (*fm).first;
-    DeviceEntity::ParameterMap::const_iterator parIt = (*getPMap()).find(par);
-    if (parIt == (*getPMap()).end())
-      throw std::runtime_error(string("Parameter ") + par + " not found");
-    {
-      const DeviceEntity::Pars &nPar = static_cast<const DeviceEntity::Pars &>(*(*parIt).second);
-
-      if (nPar.getExpressionAccess() & ParameterType::LOG_T_DEP)
-      {
-	parType[fitMap[par]] = LOG_FIT;
-      }
-      else
-      {
-	parType[fitMap[par]] = LINEAR_FIT;
-      }
-    }
-  }
-
-  base_temp = t[0];
-  if (iModel == TEMP)
-  {
-    base_temp += CONSTCtoK;
-  }
-
-  for (i=0 ; i<nFit ; ++i)
-  {
-    temp[i].push_back(t[0]);
-    val[i].push_back(fit[0][i]);
-    if (parType[i] == LOG_FIT)
-    {
-      if (val[i][0] <= 0)
-      {
-        string msg = "Negative parameter value for log interpolation based parameter: ";
-        fm = fitMap.begin();
-        for ( ; fm != fm_end ; ++fm)
-        {
-          if ((*fm).second == i)
+          if (i == 0)
           {
-            par = (*fm).first;
-            break;
+            tmod = params[j].stringValue();
+          }
+          else
+          {
+            if (tmod != params[j].stringValue())
+            {
+              UserError0(*this) << "Inconsistent or missing TEMPMODEL parameter, " << params[j].stringValue() << " specified here, " << tmod << " specified perviously";
+              return;
+            }
           }
         }
-        msg += par;
-        std::ostringstream oss;
-        oss << "Error in " << netlistLocation() << "\n" << msg;
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, oss.str());
+        if (params[j].tag() == "DOSEMODEL" && params[j].stringValue() != "NONE")
+        {
+          if (i == 0)
+          {
+            dmod = params[j].stringValue();
+          }
+          else
+          {
+            if (dmod != params[j].stringValue())
+            {
+              UserError0(*this) << "Inconsistent or missing DOSEMODEL parameter, " << params[j].stringValue() << " specified here, " << dmod << " specified perviously";
+              return;
+            }
+          }
+        }
       }
-      val[i][0] = log(val[i][0]);
     }
-    min_par[i] = val[i][0];
-    max_par[i] = val[i][0];
-  }
 
-  double p;
-  for (i=1 ; i<m_start.size()-1 ; ++i)
-  {
-    for (j=m_start[i] ; j<m_start[i+1]-1 ; ++j)
+    if (tmod == "" && dmod == "")
     {
-      if (params[j].getType() == DBLE && params[j].given())
+      UserError0(*this) << "Duplicate model specification implies parameter interpolation, TEMPMODEL or DOSEMODEL parameters must specified";
+      return;
+    }
+    else if (tmod != "" && dmod != "")
+    {
+      UserError0(*this) << "Only one of TEMPMODEL or DOSEMODEL parameters may be specified";
+      return;
+    }
+    else if (tmod != "")
+    {
+      modName = tmod;
+      iModel = TEMP;
+    }
+    else if (dmod != "")
+    {
+      modName = dmod;
+      iModel = DOSE;
+    }
+
+    if (modName == "QUADRATIC")
+    {
+      iMethod = QUAD;
+      if (m_start.size() != 4)
+      {
+        UserError0(*this) << "Three model specifications required for QUADRATIC fit";
+        return;
+      }
+      fit.resize(3);
+    }
+    else if (modName == "PWL")
+    {
+      iMethod = PWL;
+      fit.resize(m_start.size() - 1);
+    }
+    else
+    {
+      UserError0(*this) << "Only QUADRATIC or PWL interpolation method is supported";
+      return;
+    }
+
+    // First find the params that vary between the specified models:
+    std::map<std::string,double> basePars;
+    std::vector<double> t;
+    std::string par;
+
+    for (int i = 0 ;i < m_start.size()-1; ++i)
+    {
+      for (int j = m_start[i]; j < m_start[i+1]-1; ++j)
       {
         par = params[j].tag();
-        map<string, int>::iterator fm1 = fitMap.find(par);
-        if (fm1 != fitMap.end())
+        ParameterMap::const_iterator parIt = getParameterMap().find(par);
+        if (parIt == getParameterMap().end())
+          DevelFatal0(*this).in("DeviceModel::setModParams") << "Parameter " << par << " not found";
+
+        const Descriptor &nPar = *(*parIt).second;
+        if (params[j].given() && nPar.isType<double>())
         {
-          k = fm1->second;
-          temp[k].push_back(t[i]);
-          p = params[j].dVal();
-          if (parType[k] == LOG_FIT)
+          if (iModel == TEMP)
           {
-            if (p <= 0)
+            if (par == "TNOM")
             {
-              string msg = "Negative parameter value for log interpolation based parameter: ";
-              fm = fitMap.begin();
-              for ( ; fm != fm_end ; ++fm)
-              {
-                if ((*fm).second == k)
-                {
-                  par = (*fm).first;
-                  break;
-                }
-              }
-              msg += par;
-              std::ostringstream oss;
-              oss << "Error in " << netlistLocation() << "\n" << msg;
-              N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, oss.str());
+              t.push_back(params[j].getImmutableValue<double>());
             }
-            p = log(p);
           }
-          val[k].push_back(p);
-          if (p > max_par[k])
-            max_par[k] = p;
-          if (p < min_par[k])
-            min_par[k] = p;
-        }
-      }
-    }
-  }
-
-   // Finally, do the actual fits:
-
-  if (fitMap.size() > 0)
-  {
-    if (iMethod == QUAD)
-    {
-      map<string, int>::iterator f;
-      for (f=fitMap.begin() ; f!=fitMap.end() ; ++f)
-      {
-        i = (*f).second;
-        if (temp[i].size() == 2)
-        {
-          fit[0][i] = val[i][0];
-          fit[1][i] = (val[i][1] - val[i][0])/(temp[i][1] - temp[i][0]);
-          fit[2][i] = 0;
-        }
-        else if (temp[i].size() == 3)
-        {
-          fit[0][i] = val[i][0];
-          double x1,x2,y1,y2;
-          x1 = temp[i][1] - temp[i][0];
-          y1 = val[i][1];
-          x2 = temp[i][2] - temp[i][0];
-          y2 = val[i][2];
-          fit[2][i] = (x2*y1-x1*y2-fit[0][i]*(x2-x1))/(x2*x1*x1-x1*x2*x2);
-          fit[1][i] = (y1-fit[2][i]*x1*x1-fit[0][i])/x1;
-        }
-        else
-        {
-          string msg =
-            "Internal error in DeviceModel, illegal number "
-	    "of fit points for parameter: ";
-          msg += (*f).first;
-          N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-        }
-        if ((*f).first == "TNOM")
-        {
-          fit[0][i] += CONSTCtoK;
-        }
-      }
-    }
-    else if (iMethod == PWL)
-    {
-      int nT = fit.size();
-      map<double,int> tOrd;
-      for (i=0 ; i<nT ; ++i)
-      {
-        tOrd[t[i]] = 0;
-      }
-      i = 0;
-      map<double,int>::iterator tOrd_i = tOrd.begin();
-      map<double,int>::iterator tOrd_end = tOrd.end();
-      for ( ; tOrd_i != tOrd_end; ++tOrd_i)
-      {
-        if (iModel == TEMP)
-        {
-          base.push_back((*tOrd_i).first+CONSTCtoK);
-        }
-        else
-        {
-          base.push_back((*tOrd_i).first);
-        }
-        (*tOrd_i).second = i++;
-      }
-      map<string, int>::iterator f;
-      map<string, int>::iterator f_end;
-      vector<bool> p(nT,false);
-      f=fitMap.begin();
-      f_end=fitMap.end();
-      for ( ; f!=f_end; ++f)
-      {
-        i = (*f).second;
-        for (j=0 ; j<nT ; ++j)
-        {
-          p[j] = false;
-        }
-        for (j=0 ; j<temp[i].size() ; ++j)
-        {
-          int ind = tOrd[temp[i][j]];
-          p[ind] = true;
-          fit[ind][i] = val[i][j];
-        }
-        for (j=0 ; j<nT ; ++j)
-        {
-          if (!p[j])
+          else if (iModel == DOSE)
           {
-            k_lo = j;
-            k_hi = j;
-            while (k_lo >= 0 && !p[k_lo])
+            if (par == "DOSE")
             {
-              k_lo--;
+              t.push_back(params[j].getImmutableValue<double>());
             }
-            while (k_hi <nT && !p[k_hi])
+          }
+          if (i == 0)
+          {
+            if (params[j].getType() != Util::EXPR)
             {
-              ++k_hi;
+              basePars[par] = params[j].getImmutableValue<double>();
             }
-            if (k_lo == -1)
+          }
+          else
+          {
+            if (ptype[par] == Util::EXPR)
             {
-              if (k_hi < nT)
-              {
-                fit[j][i] = fit[k_hi][i];
-              }
-              else
-              {
-                string msg =
-                  "DeviceModel::setModParams: Internal error "
-                  "forming PWL interpolation";
-                N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-              }
+              UserWarning0(*this) << "Non-constant expression for parameter " << par << ", it will not interpolated";
             }
             else
             {
-              if (k_hi < nT)
+              if (basePars.find(par) == basePars.end())
               {
-                double frac = (base[j]-base[k_lo])/(base[k_hi]-base[k_lo]);
-                fit[j][i] = fit[k_hi][i]*frac+fit[k_lo][i]*(1-frac);
+                UserError0(*this) << "Unknown parameter " << params[j].tag() <<  " in temperature compensation .MODEL statement";
+                return;
               }
-              else
+              if (basePars[par] != params[j].getImmutableValue<double>() && params[j].given())
               {
-                fit[j][i] = fit[k_lo][i];
+                if (fitMap.find(par) == fitMap.end())
+                {
+                  fitMap[par] = fit[0].size();
+                  fitParams.push_back(nPar.getMemberPtr<double>());
+                  fit[0].push_back(basePars[par]);
+                }
               }
             }
-          }
-          if ((*f).first == "TNOM")
-          {
-            fit[j][i] += CONSTCtoK;
           }
         }
       }
     }
-  }
 
-  params.resize(m_start[1]-1);
-  setParams(params);
+    if (t.size() != m_start.size()-1)
+    {
+      UserError0(*this) << (iModel == TEMP ? "TNOM" : "DOSE") << " not specified in all .MODEL statements";
+      return;
+    }
+
+    for (int i = 1; i < t.size(); ++i)
+    {
+      for (int j = 0; j < i; ++j)
+      {
+        if (t[i] == t[j])
+        {
+          UserError0(*this) << "Identical " << (iModel == TEMP ? "TNOM" : "DOSE") << " values in .MODEL statements";
+          return;
+        }
+      }
+    }
+
+    // Now, collect the values to use for the fits:
+    int nFit = fitMap.size();
+    //int nSet = t.size();
+    std::vector<std::vector<double> > temp(nFit);
+    std::vector<std::vector<double> > val(nFit);
+    oldParams.resize(nFit);
+
+    for (int i = 1; i < fit.size(); ++i)
+    {
+      fit[i].resize(nFit);
+    }
+    min_par.resize(nFit);
+    max_par.resize(nFit);
+    parType.resize(nFit);
+    std::map<std::string, int>::iterator fm = fitMap.begin();
+    std::map<std::string, int>::iterator fm_end = fitMap.end();
+
+    for ( ; fm != fm_end ; ++fm)
+    {
+      par = (*fm).first;
+      ParameterMap::const_iterator parIt = getParameterMap().find(par);
+      if (parIt == getParameterMap().end())
+        throw std::runtime_error(std::string("Parameter ") + par + " not found");
+      {
+        const Descriptor &nPar = *(*parIt).second;
+
+        if (nPar.getExpressionAccess() & ParameterType::LOG_T_DEP)
+        {
+          parType[fitMap[par]] = LOG_FIT;
+        }
+        else
+        {
+          parType[fitMap[par]] = LINEAR_FIT;
+        }
+      }
+    }
+
+    base_temp = t[0];
+    if (iModel == TEMP)
+    {
+      base_temp += CONSTCtoK;
+    }
+
+    for (int i = 0; i < nFit; ++i)
+    {
+      temp[i].push_back(t[0]);
+      val[i].push_back(fit[0][i]);
+      if (parType[i] == LOG_FIT)
+      {
+        if (val[i][0] <= 0)
+        {
+          UserError0 message(*this);
+          message << "Negative parameter value for log interpolation based parameter ";
+          fm = fitMap.begin();
+          for ( ; fm != fm_end ; ++fm)
+          {
+            if ((*fm).second == i)
+            {
+              par = (*fm).first;
+              break;
+            }
+          }
+          message << par;
+          return;
+        }
+        val[i][0] = log(val[i][0]);
+      }
+      min_par[i] = val[i][0];
+      max_par[i] = val[i][0];
+    }
+
+    for (int i = 1; i < m_start.size()-1; ++i)
+    {
+      for (int j = m_start[i]; j < m_start[i+1]-1; ++j)
+      {
+        if (params[j].getType() == Util::DBLE && params[j].given())
+        {
+          par = params[j].tag();
+          std::map<std::string, int>::iterator fm1 = fitMap.find(par);
+          if (fm1 != fitMap.end())
+          {
+            int k = fm1->second;
+            temp[k].push_back(t[i]);
+            double p = params[j].getImmutableValue<double>();
+            if (parType[k] == LOG_FIT)
+            {
+              if (p <= 0)
+              {
+                UserError0 message(*this);
+                message << "Negative parameter value for log interpolation based parameter ";
+                fm = fitMap.begin();
+                for ( ; fm != fm_end ; ++fm)
+                {
+                  if ((*fm).second == k)
+                  {
+                    par = (*fm).first;
+                    break;
+                  }
+                }
+                message << par;
+                return;
+              }
+              p = log(p);
+            }
+            val[k].push_back(p);
+            if (p > max_par[k])
+              max_par[k] = p;
+            if (p < min_par[k])
+              min_par[k] = p;
+          }
+        }
+      }
+    }
+
+    // Finally, do the actual fits:
+    if (fitMap.size() > 0)
+    {
+      if (iMethod == QUAD)
+      {
+        std::map<std::string, int>::iterator f;
+        for (f=fitMap.begin() ; f!=fitMap.end() ; ++f)
+        {
+          int i = (*f).second;
+          if (temp[i].size() == 2)
+          {
+            fit[0][i] = val[i][0];
+            fit[1][i] = (val[i][1] - val[i][0])/(temp[i][1] - temp[i][0]);
+            fit[2][i] = 0;
+          }
+          else if (temp[i].size() == 3)
+          {
+            fit[0][i] = val[i][0];
+            double x1,x2,y1,y2;
+            x1 = temp[i][1] - temp[i][0];
+            y1 = val[i][1];
+            x2 = temp[i][2] - temp[i][0];
+            y2 = val[i][2];
+            fit[2][i] = (x2*y1-x1*y2-fit[0][i]*(x2-x1))/(x2*x1*x1-x1*x2*x2);
+            fit[1][i] = (y1-fit[2][i]*x1*x1-fit[0][i])/x1;
+          }
+          else
+          {
+            DevelFatal0(*this).in("setModParams") << "Internal error in DeviceModel, illegal number of fit points for parameter " << (*f).first;
+          }
+          if ((*f).first == "TNOM")
+          {
+            fit[0][i] += CONSTCtoK;
+          }
+        }
+      }
+      else if (iMethod == PWL)
+      {
+        int nT = fit.size();
+        std::map<double,int> tOrd;
+        for (int i = 0; i < nT; ++i)
+        {
+          tOrd[t[i]] = 0;
+        }
+        int i = 0;
+        std::map<double,int>::iterator tOrd_i = tOrd.begin();
+        std::map<double,int>::iterator tOrd_end = tOrd.end();
+        for ( ; tOrd_i != tOrd_end; ++tOrd_i)
+        {
+          if (iModel == TEMP)
+          {
+            base.push_back((*tOrd_i).first+CONSTCtoK);
+          }
+          else
+          {
+            base.push_back((*tOrd_i).first);
+          }
+          (*tOrd_i).second = i++;
+        }
+        std::map<std::string, int>::iterator f;
+        std::map<std::string, int>::iterator f_end;
+        std::vector<bool> p(nT,false);
+        f=fitMap.begin();
+        f_end=fitMap.end();
+        for ( ; f!=f_end; ++f)
+        {
+          i = (*f).second;
+          for (int j = 0 ;j < nT; ++j)
+          {
+            p[j] = false;
+          }
+          for (int j = 0; j < temp[i].size() ; ++j)
+          {
+            int ind = tOrd[temp[i][j]];
+            p[ind] = true;
+            fit[ind][i] = val[i][j];
+          }
+          for (int j = 0; j < nT ; ++j)
+          {
+            if (!p[j])
+            {
+              int k_lo = j;
+              int k_hi = j;
+              while (k_lo >= 0 && !p[k_lo])
+              {
+                k_lo--;
+              }
+              while (k_hi <nT && !p[k_hi])
+              {
+                ++k_hi;
+              }
+              if (k_lo == -1)
+              {
+                if (k_hi < nT)
+                {
+                  fit[j][i] = fit[k_hi][i];
+                }
+                else
+                {
+                  DevelFatal0(*this).in("DeviceModel::setModParams") <<"DeviceModel::setModParams: Internal error forming PWL interpolation";
+                }
+              }
+              else
+              {
+                if (k_hi < nT)
+                {
+                  double frac = (base[j]-base[k_lo])/(base[k_hi]-base[k_lo]);
+                  fit[j][i] = fit[k_hi][i]*frac+fit[k_lo][i]*(1-frac);
+                }
+                else
+                {
+                  fit[j][i] = fit[k_lo][i];
+                }
+              }
+            }
+            if ((*f).first == "TNOM")
+            {
+              fit[j][i] += CONSTCtoK;
+            }
+          }
+        }
+      }
+    }
+
+    // params.resize(m_start[1]-1);
+    // setParams(params);
+    std::vector<Param> remaining_params(&params[0], &params[m_start[1] - 1]);
+    setParams(remaining_params);
+  }
 }
 
 //-----------------------------------------------------------------------------
@@ -724,9 +657,9 @@ bool DeviceModel::interpolate(double t)
   {
     del = t - base_temp;
     //    for (i=0 ; i<nFit ; ++i)
-    map<string,int>::iterator fp;
-    map<string,int>::iterator fm_begin=fitMap.begin();
-    map<string,int>::iterator fm_end=fitMap.end();
+    std::map<std::string,int>::iterator fp;
+    std::map<std::string,int>::iterator fm_begin=fitMap.begin();
+    std::map<std::string,int>::iterator fm_end=fitMap.end();
     for (fp=fm_begin; fp != fm_end; fp++)
     {
       i=fp->second;

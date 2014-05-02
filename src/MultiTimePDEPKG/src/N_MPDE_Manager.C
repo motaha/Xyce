@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,8 +31,8 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.177.2.4 $
-// Revision Date  : $Date: 2013/10/03 17:23:47 $
+// Revision Number: $Revision: 1.197 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
@@ -171,13 +171,6 @@ bool N_MPDE_Manager::run()
 {
   bool returnValue=true;
 
-#ifdef Xyce_PARALLEL_MPI
-#ifndef PMPDE
-  std::string msg = "The MPDE algorithm cannot yet be run in parallel.  Try a serial build of Xyce to run MPDE.\n";
-  N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0,msg);
-#endif
-#endif
-
   returnValue = initializeAll_();
 
   if( test_ )
@@ -217,23 +210,23 @@ bool N_MPDE_Manager::setMPDEAnalysisParams(
 
   N_TIA_TIAParams tiaParams = tiaMPDEIfacePtr_->getTIAParams();
 
-  list<N_UTL_Param>::const_iterator it_tp;
-  list<N_UTL_Param>::const_iterator first = tiaParamsBlock.getParams().begin();
-  list<N_UTL_Param>::const_iterator last = tiaParamsBlock.getParams().end();
+  std::list<N_UTL_Param>::const_iterator it_tp;
+  std::list<N_UTL_Param>::const_iterator first = tiaParamsBlock.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator last = tiaParamsBlock.getParams().end();
   for (it_tp = first; it_tp != last; ++it_tp)
   {
     if (it_tp->uTag()      == "TSTART")
     {
-      tiaParams.tStart = it_tp->dVal();
+      tiaParams.tStart = it_tp->getImmutableValue<double>();
       tiaParams.tStartGiven = true;
     }
     else if (it_tp->uTag() == "TSTOP")
     {
-      tiaParams.finalTime   = it_tp->dVal();
+      tiaParams.finalTime   = it_tp->getImmutableValue<double>();
     }
     else if (it_tp->uTag() == "TSTEP")
     {
-      tiaParams.userSpecified_startingTimeStep = it_tp->dVal();
+      tiaParams.userSpecified_startingTimeStep = it_tp->getImmutableValue<double>();
     }
     else if (it_tp->uTag() == "NOOP" ||
              it_tp->uTag() == "UIC")
@@ -242,12 +235,12 @@ bool N_MPDE_Manager::setMPDEAnalysisParams(
     }
     else if (it_tp->uTag() == "DTMAX")
     {
-      tiaParams.maxTimeStep = it_tp->dVal();
+      tiaParams.maxTimeStep = it_tp->getImmutableValue<double>();
       tiaParams.maxTimeStepGiven = true;
 #ifdef Xyce_DEBUG_ANALYSIS
       if (tiaParams.debugLevel > 0)
       {
-        std::cout << "setting maxTimeStep = " << tiaParams.maxTimeStep << std::endl;
+        Xyce::dout() << "setting maxTimeStep = " << tiaParams.maxTimeStep << std::endl;
       }
 #endif
     }
@@ -256,7 +249,7 @@ bool N_MPDE_Manager::setMPDEAnalysisParams(
 
   if (tiaParams.finalTime <= tiaParams.tStart || tiaParams.finalTime <= 0 || tiaParams.tStart < 0)
   {
-    ostringstream ost;
+    std::ostringstream ost;
     ost << " In N_MPDE_Manager::setMPDEAnalysisParams: " << std::endl;
     ost << "Final time of " << tiaParams.finalTime
         << " is earlier or same as start time of "
@@ -274,51 +267,17 @@ bool N_MPDE_Manager::setMPDEAnalysisParams(
   }
 
 #ifdef Xyce_DEBUG_ANALYSIS
-  std::string dashedline = "-------------------------------------------------"
-                       "----------------------------\n";
-
   if (tiaParams.debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       "  Transient simulation parameters");
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  initial time = ",
-            tiaParams.initialTime);
-            //N_ANP_AnalysisManager::tiaParams.initialTime);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  final time   = ",
-            tiaParams.finalTime);
-            //N_ANP_AnalysisManager::tiaParams.finalTime);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  starting time step = ",
-            tiaParams.userSpecified_startingTimeStep);
-            //N_ANP_AnalysisManager::tiaParams.userSpecified_startingTimeStep);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  tStart (time of first output) = ",
-            tiaParams.tStart);
-            //N_ANP_AnalysisManager::tiaParams.tStart);
-
-    //if (!(N_ANP_AnalysisManager::tiaParams.NOOP))
-    if (!(tiaParams.NOOP))
-    {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-         "  NOOP/UIC is NOT set");
-    }
-    else
-    {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  NOOP/UIC is set");
-    }
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       dashedline);
+    Xyce::dout() << std::endl
+                 << Xyce::section_divider << std::endl
+                 << "  Transient simulation parameters" << std::endl
+                 << "  initial time = " << tiaParams.initialTime << std::endl
+                 << "  final time   = " << tiaParams.finalTime << std::endl
+                 << "  starting time step = " << tiaParams.userSpecified_startingTimeStep << std::endl
+                 << "  tStart (time of first output << std::endl = " << tiaParams.tStart << std::endl
+                 << (!tiaParams.NOOP ? "  NOOP/UIC is NOT set" : "  NOOP/UIC is set") << std::endl
+                 << Xyce::section_divider << std::endl;
   }
 #endif
 
@@ -340,8 +299,8 @@ bool N_MPDE_Manager::setMPDEOptions(const N_UTL_OptionBlock & OB)
   std::string msg;
 
   //MOST OF THIS SHOULD BE PUSHED TO INITCOND AND PROBLEM CLASSES
-  list<N_UTL_Param>::const_iterator iterPL = OB.getParams().begin();
-  list<N_UTL_Param>::const_iterator  endPL = OB.getParams().end();
+  std::list<N_UTL_Param>::const_iterator iterPL = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator  endPL = OB.getParams().end();
 
   for( ; iterPL != endPL; ++iterPL )
   {
@@ -350,31 +309,31 @@ bool N_MPDE_Manager::setMPDEOptions(const N_UTL_OptionBlock & OB)
 
     if ( tag == "N2" )
     {
-      size_    = iterPL->iVal();
+      size_    = iterPL->getImmutableValue<int>();
     }
     else if ( tag == "AUTON2" )
     {
-      tranRunForSize_ = iterPL->bVal();
+      tranRunForSize_ = iterPL->getImmutableValue<bool>();
     }
     else if ( tag == "AUTON2MAX" )
     {
-      maxCalcSize_ = iterPL->iVal();
+      maxCalcSize_ = iterPL->getImmutableValue<int>();
       maxCalcSizeGiven_ = true;
     }
     else if (std::string(tag,0,6) == "OSCSRC" )
     {
-      fastSrc_  = iterPL->sVal();
+      fastSrc_  = iterPL->stringValue();
       srcVec_.push_back(fastSrc_);
       fastSrcGiven_ = true;
     }
     else if ( tag == "NONLTESTEPS" )
     {
-      nonLteSteps_ = iterPL->iVal();
+      nonLteSteps_ = iterPL->getImmutableValue<int>();
       nonLteStepsGiven_ = true;
     }
     else if ( tag == "STARTUPPERIODS" )
     {
-      startUpPeriods_ = iterPL->iVal();
+      startUpPeriods_ = iterPL->getImmutableValue<int>();
       startUpPeriodsGiven_ = true;
     }
     else if( tag == "SAVEICDATA" )
@@ -383,67 +342,67 @@ bool N_MPDE_Manager::setMPDEOptions(const N_UTL_OptionBlock & OB)
     }
     else if( tag == "OSCOUT" )
     {
-      oscOut_   = iterPL->sVal();
+      oscOut_   = iterPL->stringValue();
       oscOutGiven_ = true;
     }
     else if( tag == "PHASE" )
     {
-      warpPhase_ = iterPL->iVal();
+      warpPhase_ = iterPL->getImmutableValue<int>();
       warpPhaseGiven_ = true;
     }
     else if( tag == "PHASECOEFF" )
     {
-      warpPhaseCoeff_ = iterPL->dVal();
+      warpPhaseCoeff_ = iterPL->getImmutableValue<double>();
       warpPhaseCoeffGiven_ = true;
     }
     else if( tag == "TEST" )
     {
-      test_     = static_cast<bool> (iterPL->iVal());
+      test_     = static_cast<bool> (iterPL->getImmutableValue<int>());
     }
     else if( tag == "T2" )
     {
-      period_   = iterPL->dVal();
+      period_   = iterPL->getImmutableValue<double>();
       periodGiven_ = true;
     }
     else if( tag == "WAMPDE" )
     {
-      warpMPDE_ = static_cast<bool>( iterPL->iVal () );
+      warpMPDE_ = static_cast<bool>( iterPL->getImmutableValue<int>() );
     }
     else if( tag == "FREQDOMAIN" )
     {
-      fftFlag_  = static_cast<bool>( iterPL->iVal () );
+      fftFlag_  = static_cast<bool>( iterPL->getImmutableValue<int>() );
     }
     else if( tag == "ICPER" )
     {
-      icPer_    = iterPL->iVal ();
+      icPer_    = iterPL->getImmutableValue<int>();
     }
     else if( tag == "IC" )
     {
-      initialCondition_ = iterPL->iVal ();
+      initialCondition_ = iterPL->getImmutableValue<int>();
     }
     else if( tag == "DIFF" )
     {
-      fastTimeDisc_ = iterPL->iVal();
+      fastTimeDisc_ = iterPL->getImmutableValue<int>();
     }
     else if( tag == "DIFFORDER" )
     {
-      fastTimeDiscOrder_ = iterPL->iVal();
+      fastTimeDiscOrder_ = iterPL->getImmutableValue<int>();
     }
     else if (tag == "DCOPEXIT" )
     {
-      dcopExitFlag_ = static_cast<bool>( iterPL->iVal () );
+      dcopExitFlag_ = static_cast<bool>( iterPL->getImmutableValue<int>() );
     }
     else if (tag == "ICEXIT" )
     {
-      icExitFlag_ = static_cast<bool>( iterPL->iVal () );
+      icExitFlag_ = static_cast<bool>( iterPL->getImmutableValue<int>() );
     }
     else if (tag == "EXITSAWTOOTHSTEP" )
     {
-      exitSawtoothStep_ = iterPL->iVal ();
+      exitSawtoothStep_ = iterPL->getImmutableValue<int>();
     }
     else if (tag == "DEBUGLEVEL" )
     {
-      debugLevel = iterPL->iVal ();
+      debugLevel = iterPL->getImmutableValue<int>();
     }
     else
     {
@@ -492,16 +451,13 @@ bool N_MPDE_Manager::registerTranMPDEOptions(const N_UTL_OptionBlock & OB)
 //-----------------------------------------------------------------------------
 void N_MPDE_Manager::printParams_ ()
 {
-  static std::string dashedline =  "------------------------------------------------"
-    "-----------------------------";
+  Xyce::dout() << "\n" << std::endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
+  Xyce::dout() <<
+                         "\n***** MPDE options:\n" << std::endl;
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\n");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\n***** MPDE options:\n");
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       "\tN2:\t\t\t", size_);
+  Xyce::dout() <<
+       "\tN2:\t\t\t" <<  size_ << std::endl;
 
   std::string msg;
   if (fastSrcGiven_)
@@ -509,13 +465,13 @@ void N_MPDE_Manager::printParams_ ()
     for (unsigned int i1=0;i1<srcVec_.size();++i1)
     {
       msg = "\toscsrc:\t\t\t"+srcVec_[i1];
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,msg);
+      Xyce::dout() <<msg << std::endl;
     }
   }
   else
   {
     msg = "\toscsrc:\t\t\tNot Specified";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,msg);
+    Xyce::dout() <<msg << std::endl;
   }
 
   if (oscOutGiven_)
@@ -526,10 +482,10 @@ void N_MPDE_Manager::printParams_ ()
   {
     msg = "\toscout:\t\t\tNot Specified";
   }
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,msg);
+  Xyce::dout() <<msg << std::endl;
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       "\tT2:\t\t\t", period_);
+  Xyce::dout() <<
+       "\tT2:\t\t\t" <<  period_ << std::endl;
 
   if( fastTimeDisc_ == 0 )
     msg = "\tdiscretization:\tBackward";
@@ -537,61 +493,61 @@ void N_MPDE_Manager::printParams_ ()
     msg = "\tdiscretization:\tCentered";
   else
     msg = "\tdiscretization:\tUNKNOWN";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,msg);
+  Xyce::dout() <<msg << std::endl;
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       "\tDisc Order:\t\t\t", fastTimeDiscOrder_);
+  Xyce::dout() <<
+       "\tDisc Order:\t\t" <<  fastTimeDiscOrder_ << std::endl;
 
   if (test_)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-      "\tTest Mode:");
+    Xyce::dout() <<
+      "\tTest Mode:" << std::endl;
   }
   else
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-      "\tFull MPDE Mode(not test mode)");
+    Xyce::dout() <<
+      "\tFull MPDE Mode(not test mode)" << std::endl;
   }
 
   if (warpMPDE_)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-      "\tWarpedMPDE:\t\tON");
+    Xyce::dout() <<
+      "\tWarpedMPDE:\t\tON" << std::endl;
   }
   else
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-      "\tWarpedMPDE:\t\tOFF");
+    Xyce::dout() <<
+      "\tWarpedMPDE:\t\tOFF" << std::endl;
   }
 
   if (fftFlag_)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-      "\tFrequency domain:\tON");
+    Xyce::dout() <<
+      "\tFrequency domain:\tON" << std::endl;
   }
   else
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-      "\tFrequency domain:\tOFF");
+    Xyce::dout() <<
+      "\tFrequency domain:\tOFF" << std::endl;
   }
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       "\tICPER:\t\t\t", icPer_);
+  Xyce::dout() <<
+       "\tICPER:\t\t\t" <<  icPer_ << std::endl;
 
   if (initialCondition_ == MPDE_IC_DCOP)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       "\tInitial Condition:\tDCOP");
+    Xyce::dout() <<
+       "\tInitial Condition:\tDCOP" << std::endl;
   }
   else if (initialCondition_ == MPDE_IC_SAWTOOTH)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       "\tInitial Condition:\tSAWTOOTH");
+    Xyce::dout() <<
+       "\tInitial Condition:\tSAWTOOTH" << std::endl;
   }
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\n");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\n");
+  Xyce::dout() << "\n" << std::endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
+  Xyce::dout() << "\n" << std::endl;
 }
 
 //-----------------------------------------------------------------------------
@@ -606,19 +562,16 @@ bool N_MPDE_Manager::initializeAll_()
 {
   bool returnValue = true;
 
-  const std::string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
 #ifdef Xyce_DEBUG_MPDE
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                          "  N_MPDE_Manager::initializeAll_");
+  Xyce::dout() << std::endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
+  Xyce::dout() <<
+                          "  N_MPDE_Manager::initializeAll_" << std::endl;
 #endif // Xyce_DEBUG_MPDE
   //Need this for IC to get "MPDE size" vectors
   //-----------------------------------------
 #ifdef Xyce_DEBUG_MPDE
-  std::cout << "N_MPDE_Manager::initializeAll_[Construct Builder]\n";
+  Xyce::dout() << "N_MPDE_Manager::initializeAll_[Construct Builder]\n";
 #endif // Xyce_DEBUG_MPDE
 
   // Set up the gid index for the osc out variable:
@@ -636,8 +589,8 @@ bool N_MPDE_Manager::initializeAll_()
 
   //Set MPDE src
   //devInt_->setMPDESrc( fastSrc_ );
-
-  vector<double> srcPeriods;
+    
+  std::vector<double> srcPeriods;
   //srcPeriods = devInterfacePtr_->registerFastSources( srcVec_ );
   srcPeriods = mpdeDeviceInterfacePtr_->getFastSourcePeriod( srcVec_ );
 
@@ -649,7 +602,7 @@ bool N_MPDE_Manager::initializeAll_()
   if (periodGiven_ && fastSrcGiven_)
   {
     msg = "Note:  oscsrc is being ignored, as the user has set T2.\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg);
+    Xyce::dout() << msg << std::endl;
   }
 
   if (fastSrcGiven_  && !periodGiven_)
@@ -708,10 +661,10 @@ bool N_MPDE_Manager::initializeAll_()
 #ifdef Xyce_DEBUG_MPDE
     if( debugLevel > 0 )
     {
-      std::cout << "MPDE Fast Step: " << fastStep << std::endl;
+      Xyce::dout() << "MPDE Fast Step: " << fastStep << std::endl;
       for( i = 0; i < size_; ++i )
-        std::cout << "fastTimes_["<<i<<"] = " << fastTimes_[i] << std::endl;
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+        Xyce::dout() << "fastTimes_["<<i<<"] = " << fastTimes_[i] << std::endl;
+      Xyce::dout() << Xyce::section_divider << std::endl;
     }
 #endif // Xyce_DEBUG_MPDE
   }
@@ -734,22 +687,28 @@ bool N_MPDE_Manager::initializeAll_()
   mpdeBuilderPtr_ = rcp(new N_MPDE_Builder( rcp(this,false), size_, mpdeDiscPtr_, warpMPDE_ ));
 
 #ifdef Xyce_DEBUG_MPDE
-  std::cout << "N_MPDE_Manager::initializeAll_[Generate Maps]\n";
+  Xyce::dout() << "N_MPDE_Manager::initializeAll_[Generate Maps]\n";
 #endif // Xyce_DEBUG_MPDE
   mpdeBuilderPtr_->generateMaps( rcp( pdsMgrPtr_->getParallelMap( "SOLUTION" ), false) );
   mpdeBuilderPtr_->generateStateMaps( rcp( pdsMgrPtr_->getParallelMap( "STATE" ), false) );
   mpdeBuilderPtr_->generateStoreMaps( rcp( pdsMgrPtr_->getParallelMap( "STORE" ), false) );
 
-  // These three values are initialized during generateMaps in the MPDE Builder.
-  int offset = mpdeBuilderPtr_->getMPDEOffset();
-  int omegaGID = mpdeBuilderPtr_->getMPDEomegaGID();
-  int phiGID = mpdeBuilderPtr_->getMPDEphiGID();
-
   // Setup WaMPDE Phase Condition Object
   if (warpMPDE_)
   {
+    // These three values are initialized during generateMaps in the MPDE Builder.
+    int offset = mpdeBuilderPtr_->getMPDEOffset();
+    int omegaGID = mpdeBuilderPtr_->getMPDEomegaGID();
+    int phiGID = mpdeBuilderPtr_->getMPDEphiGID();
+    int augProcID = mpdeBuilderPtr_->getMPDEaugProcID();
+
+#ifdef Xyce_DEBUG_MPDE
+    std::cout << "N_MPDE_Manager::initializeAll_[ offset = " << offset << ", omegaGID = " << omegaGID 
+               << ", phiGID = " << phiGID << ", augProcID = " << augProcID << " ] " << std::endl;
+#endif
+
     warpMPDEPhasePtr_ = rcp(
-        new N_MPDE_WarpedPhaseCondition(warpPhase_, warpPhaseCoeff_, warpMPDEOSCOUT_, omegaGID, offset, size_, phiGID)
+        new N_MPDE_WarpedPhaseCondition(warpPhase_, warpPhaseCoeff_, warpMPDEOSCOUT_, omegaGID, offset, size_, phiGID, augProcID)
         );
     mpdeBuilderPtr_->setWarpedPhaseCondition(warpMPDEPhasePtr_);
   }
@@ -761,7 +720,7 @@ bool N_MPDE_Manager::initializeAll_()
   mpdeICStoreVectorPtr_ = rcp_dynamic_cast<N_LAS_BlockVector>(rcp(mpdeBuilderPtr_->createStoreVector()));
 
 #ifdef Xyce_DEBUG_MPDE
-  std::cout << "N_MPDE_Manager::initializeAll_[Finished]\n";
+  Xyce::dout() << "N_MPDE_Manager::initializeAll_[Finished]\n";
 #endif // Xyce_DEBUG_MPDE
 
   // set the fast source flag in the devices
@@ -788,33 +747,33 @@ bool N_MPDE_Manager::initializeOscOut_()
   if (oscOutGiven_)
   {
     bool oscOutError(false);
-    std::string varName(oscOut_);
-    list<int> oscoutList, dummyList;
+    ExtendedString varName(oscOut_);
+    varName.toUpper();
+    //std::string varName(oscOut_);
+    std::list<int> oscoutList, dummyList;
     char type1;
-
-    int pos1 = varName.find_first_of("I(");
-    int pos2 = varName.find_first_of("V(");
-    int pos3 = varName.find_first_of(")");
-
+    int pos1 = varName.find("I(");
+    int pos2 = varName.find("V(");
+    int pos3 = varName.find(")");
     if (pos1!=(int)std::string::npos && pos3!=(int)std::string::npos) // this is a current variable
     {
       pos1+=2;
       int len = pos3-pos1;
       std::string tmpVar (varName,pos1,len);
-#if 1
-      std::cout << "tmpVar (for I-oscout) = " << tmpVar << std::endl;
+#ifdef Xyce_DEBUG_MPDE
+      Xyce::dout() << "tmpVar (for I-oscout) = " << tmpVar << std::endl;
 #endif
-      topoMgrPtr_->getNodeSVarGIDs(NodeID(tmpVar,_DNODE), oscoutList, dummyList, type1);
+      topoMgrPtr_->getNodeSVarGIDs(NodeID(tmpVar, Xyce::_DNODE), oscoutList, dummyList, type1);
     }
     else if (pos2 !=(int)std::string::npos && pos3!=(int)std::string::npos) // this is a voltage variable
     {
-      pos1+=2;
-      int len = pos3-pos1;
+      pos2+=2;
+      int len = pos3-pos2;
       std::string tmpVar (varName,pos2,len);
-#if 1
-      std::cout << "tmpVar (for V-oscout) = " << tmpVar << std::endl;
+#ifdef Xyce_DEBUG_MPDE
+      Xyce::dout() << "tmpVar (for V-oscout) = " << tmpVar << std::endl;
 #endif
-      topoMgrPtr_->getNodeSVarGIDs(NodeID(tmpVar,_VNODE), oscoutList, dummyList, type1);
+      topoMgrPtr_->getNodeSVarGIDs(NodeID(tmpVar, Xyce::_VNODE), oscoutList, dummyList, type1);
     }
     else
     {
@@ -823,21 +782,27 @@ bool N_MPDE_Manager::initializeOscOut_()
       topoMgrPtr_->getNodeSVarGIDs(NodeID(varName,-1), oscoutList, dummyList, type1);
     }
 
-#if 1
-    std::cout << "size of oscoutList = " << oscoutList.size() <<std::endl;
-#endif // Xyce_DEBUG_MPDE
     if (oscoutList.size()==1)
     {
       warpMPDEOSCOUT_=oscoutList.front();
-      //oscOutGiven_ = true;
-#if 1
-      std::cout << "warpMPDEOSCOUT = " << warpMPDEOSCOUT_ << std::endl;
+#ifdef Xyce_DEBUG_MPDE
+      if (warpMPDEOSCOUT_>=0)
+        std::cout << "warpMPDEOSCOUT = " << warpMPDEOSCOUT_ << std::endl;
 #endif // Xyce_DEBUG_MPDE
     }
-    else
+#ifndef Xyce_PARALLEL_MPI
+    else  // This is not an error in parallel.
     {
       oscOutError = true;
     }
+#else
+    int tmpOscOut = warpMPDEOSCOUT_;
+    pdsMgrPtr_->getPDSComm()->maxAll( &tmpOscOut, &warpMPDEOSCOUT_, 1 );
+    if ( warpMPDEOSCOUT_ < 0 ) 
+    {
+      oscOutError = true;
+    }
+#endif
 
     if (oscOutError)
     {
@@ -845,7 +810,6 @@ bool N_MPDE_Manager::initializeOscOut_()
       msg += " Unrecognized value for MPDE option:  oscOut_=";
       msg += oscOut_ + "\n";
       N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_WARNING, msg);
-      //oscOutGiven_ = false;
     }
   }
 
@@ -864,21 +828,16 @@ bool N_MPDE_Manager::runInitialCondition_()
 {
   bool returnValue=true;
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, " ***** Running MPDE initial conditions....\n");
+  Xyce::lout() << " ***** Running MPDE initial conditions....\n" << std::endl;
 #ifdef Xyce_DEBUG_MPDE
-  const std::string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                          "  N_MPDE_Manager::runInitialCondition");
+  Xyce::dout() << std::endl
+               << Xyce::section_divider << std::endl
+               << "  N_MPDE_Manager::runInitialCondition" << std::endl;
 #endif // Xyce_DEBUG_MPDE
   int n2 = size_;
   std::string msg;
 
-  N_TIA_DataStore * dsPtr = anaIntPtr_->getAnalysisMgr()->getTIADataStore();
-
+  RCP<N_TIA_DataStore> dsPtr = anaIntPtr_->getAnalysisMgr()->getTIADataStore();
 
   if (!warpMPDE_)
   {
@@ -893,20 +852,28 @@ bool N_MPDE_Manager::runInitialCondition_()
     mpdeICStateVectorPtr_->block(0) = *dcOpStateVecPtr_;
     mpdeICQVectorPtr_->block(0) = *dcOpQVecPtr_;
     mpdeICStoreVectorPtr_->block(0) = *dcOpStoreVecPtr_;
-    dcOpSolVecPtr_.release();
-    dcOpStateVecPtr_.release();
-    dcOpQVecPtr_.release();
-    dcOpStoreVecPtr_.release();
   }
   else
   {
+    /* This initialization is wrong for WaMPDE.  
+       These vectors aren't available yet.
     mpdeICVectorPtr_->block(0) = *(dsPtr->fastTimeSolutionVec[0]);
     mpdeICStateVectorPtr_->block(0) = *(dsPtr->fastTimeStateVec[0]);
     mpdeICQVectorPtr_->block(0) = *(dsPtr->fastTimeQVec[0]);
     mpdeICStoreVectorPtr_->block(0) = *(dsPtr->fastTimeStoreVec[0]);
+       Initialize block 0 from the solution 
+    */
+
+    //std::cout << "Setting initial condition vectors for warped MPDE" << std::endl;
+    
+    mpdeICVectorPtr_->block(0) = *(dsPtr->currSolutionPtr);
+    mpdeICStateVectorPtr_->block(0) = *(dsPtr->currStatePtr);
+    mpdeICQVectorPtr_->block(0) = *(dsPtr->daeQVectorPtr);
+    mpdeICStoreVectorPtr_->block(0) = *(dsPtr->currStorePtr);
+
+    //std::cout << "Set initial condition vectors for warped MPDE" << std::endl;
   }
-
-
+    
 #ifdef Xyce_DEBUG_MPDE
   if (dcopExitFlag_) exit(0);
 #endif // Xyce_DEBUG_MPDE
@@ -918,6 +885,7 @@ bool N_MPDE_Manager::runInitialCondition_()
     // constant DCOP IC strategy:
     for (int i=1 ; i<n2 ; ++i)
     {
+      //std::cout << "Computing the initial condition for IC block " << i << std::endl;
       mpdeState_.fastTime = fastTimes_[i];
       tiaMPDEIfacePtr_->runDCOP();
       mpdeICVectorPtr_->block(i) = *(tiaMPDEIfacePtr_->getFinalSolution());
@@ -925,6 +893,9 @@ bool N_MPDE_Manager::runInitialCondition_()
       mpdeICQVectorPtr_->block(i) = *(tiaMPDEIfacePtr_->getQVectorFinalSolution());
       mpdeICStoreVectorPtr_->block(i) = *(tiaMPDEIfacePtr_->getStoreFinalSolution());
     }
+    
+    //std::cout << "Done computing the initial condition" << std::endl;
+    
     break;
 
   case MPDE_IC_SAWTOOTH:
@@ -959,7 +930,7 @@ bool N_MPDE_Manager::runInitialCondition_()
         tiaMPDEIfacePtr_->reInitialize();
 
 #ifdef Xyce_DEBUG_MPDE
-        std::cout << "Beginning SAWTOOTH IC: i = " << i
+        Xyce::dout() << "Beginning SAWTOOTH IC: i = " << i
           << " initialTime = " << tiaParams_.initialTime
           << " finalTime = " << tiaParams_.finalTime << std::endl;
 #endif // Xyce_DEBUG_MPDE
@@ -982,7 +953,7 @@ bool N_MPDE_Manager::runInitialCondition_()
         mpdeICStateVectorPtr_->block(i) = *(tiaMPDEIfacePtr_->getStateFinalSolution());
         mpdeICStoreVectorPtr_->block(i) = *(tiaMPDEIfacePtr_->getStoreFinalSolution());
 #ifdef Xyce_DEBUG_MPDE
-        std::cout << "End SAWTOOTH IC: i = " << i <<std::endl;
+        Xyce::dout() << "End SAWTOOTH IC: i = " << i <<std::endl;
         if (i==exitSawtoothStep_) exit(0);
 #endif // Xyce_DEBUG_MPDE
       }
@@ -998,8 +969,8 @@ bool N_MPDE_Manager::runInitialCondition_()
 #ifdef Xyce_DEBUG_MPDE
       if( debugLevel > 0 )
         {
-          for( int i=0; i<indicesUsed_.size(); i++ )
-            std::cout << "indicesUsed_[ " << i << " ] = " << indicesUsed_[i] << std::endl;
+          for( unsigned int i=0; i<indicesUsed_.size(); i++ )
+            Xyce::dout() << "indicesUsed_[ " << i << " ] = " << indicesUsed_[i] << std::endl;
         }
 #endif
 
@@ -1007,30 +978,26 @@ bool N_MPDE_Manager::runInitialCondition_()
 //      for (int i=1 ; i<n2 ; ++i)
       for (int i=0 ; i<n2 ; ++i)
       {
-        N_TIA_DataStore * dsPtr = anaIntPtr_->getAnalysisMgr()->getTIADataStore();
+        RCP<N_TIA_DataStore> dsPtr = anaIntPtr_->getAnalysisMgr()->getTIADataStore();
 #ifdef Xyce_DEBUG_MPDE
         if( debugLevel > 0 )
         {
-          std::cout << "Loading initial condition data from time: fastTimes_["
+          Xyce::dout() << "Loading initial condition data from time: fastTimes_["
             << i << "] = " << fastTimes_[i] << std::endl;
         }
         if ( debugLevel > 1 )
         {
-          std::cout << "mpdeICVectorPtr_->block(" << i << ") = dsPtr->fastTimeSolutionVec[" << indicesUsed_[i] << "] = " << std::endl;
-          (dsPtr->fastTimeSolutionVec[indicesUsed_[i]])->printPetraObject();
-          std::cout << "mpdeICStateVectorPtr_->block(" << i << ") = dsPtr->fastTimeStateVec[" << indicesUsed_[i] << "] = " << std::endl;
-          (dsPtr->fastTimeStateVec[indicesUsed_[i]])->printPetraObject();
-          std::cout << "mpdeICQVectorPtr_->block(" << i << ") = dsPtr->fastTimeQVec[" << indicesUsed_[i] << "] = " << std::endl;
-          (dsPtr->fastTimeQVec[indicesUsed_[i]])->printPetraObject();
-          std::cout << "mpdeICStoreVectorPtr_->block(" << i << ") = dsPtr->fastTimeStoreVec[" << indicesUsed_[i] << "] = " << std::endl;
-          (dsPtr->fastTimeStoreVec[indicesUsed_[i]])->printPetraObject();
+          Xyce::dout() << "mpdeICVectorPtr_->block(" << i << ") = dsPtr->fastTimeSolutionVec[" << indicesUsed_[i] << "] = " << std::endl;
+          (dsPtr->fastTimeSolutionVec[indicesUsed_[i]])->printPetraObject(Xyce::dout());
+          Xyce::dout() << "mpdeICStateVectorPtr_->block(" << i << ") = dsPtr->fastTimeStateVec[" << indicesUsed_[i] << "] = " << std::endl;
+          (dsPtr->fastTimeStateVec[indicesUsed_[i]])->printPetraObject(Xyce::dout());
+          Xyce::dout() << "mpdeICQVectorPtr_->block(" << i << ") = dsPtr->fastTimeQVec[" << indicesUsed_[i] << "] = " << std::endl;
+          (dsPtr->fastTimeQVec[indicesUsed_[i]])->printPetraObject(Xyce::dout());
+          Xyce::dout() << "mpdeICStoreVectorPtr_->block(" << i << ") = dsPtr->fastTimeStoreVec[" << indicesUsed_[i] << "] = " << std::endl;
+          (dsPtr->fastTimeStoreVec[indicesUsed_[i]])->printPetraObject(Xyce::dout());
         }
 #endif // Xyce_DEBUG_MPDE
 
-//        N_TIA_DataStore * dsPtr = anaIntPtr_->getAnalysisMgr()->getTIADataStore();
-//       mpdeICVectorPtr_->block(i) = *(dsPtr->fastTimeSolutionVec[indiciesUsed_[i]]);
-//        mpdeICStateVectorPtr_->block(i) = *(dsPtr->fastTimeStateVec[indiciesUsed_[i]]);
-//        mpdeICQVectorPtr_->block(i) = *(dsPtr->fastTimeQVec[indiciesUsed_[i]]);
         mpdeICVectorPtr_->block(i) = *(dsPtr->fastTimeSolutionVec[indicesUsed_[i]]);
         mpdeICStateVectorPtr_->block(i) = *(dsPtr->fastTimeStateVec[indicesUsed_[i]]);
         mpdeICQVectorPtr_->block(i) = *(dsPtr->fastTimeQVec[indicesUsed_[i]]);
@@ -1056,7 +1023,7 @@ bool N_MPDE_Manager::runInitialCondition_()
       }
 
       // use the last point for the endICvector
-      N_TIA_DataStore * dsPtr = anaIntPtr_->getAnalysisMgr()->getTIADataStore();
+      RCP<N_TIA_DataStore> dsPtr = anaIntPtr_->getAnalysisMgr()->getTIADataStore();
       endIcSolVecPtr_ = rcp((dsPtr->fastTimeSolutionVec[indicesUsed_[n2-1]]));
       endIcStateVecPtr_ = rcp((dsPtr->fastTimeStateVec[indicesUsed_[n2-1]]));
       endIcQVecPtr_ = rcp((dsPtr->fastTimeQVec[indicesUsed_[n2-1]]));
@@ -1112,7 +1079,7 @@ bool N_MPDE_Manager::runInitialCondition_()
         double fraction = fastTimes_[n2-i] / period_;
 
 #ifdef Xyce_DEBUG_MPDE
-        std::cout << "Beginning MPDE_IC_TRAN_MAP IC: i = " << i
+        Xyce::dout() << "Beginning MPDE_IC_TRAN_MAP IC: i = " << i
           << " fraction = " << fraction
           << " initialTime = " << tiaParams_.initialTime
           << " finalTime = " << tiaParams_.finalTime << std::endl;
@@ -1148,7 +1115,7 @@ bool N_MPDE_Manager::runInitialCondition_()
         mpdeICQVectorPtr_->block(i) = *(tiaMPDEIfacePtr_->getQVectorFinalSolution());
         mpdeICStoreVectorPtr_->block(i) = *(tiaMPDEIfacePtr_->getStoreFinalSolution());
 #ifdef Xyce_DEBUG_MPDE
-        std::cout << "End MPDE_IC_TRAN_MAP IC: i = " << i <<std::endl;
+        Xyce::dout() << "End MPDE_IC_TRAN_MAP IC: i = " << i <<std::endl;
 #endif // Xyce_DEBUG_MPDE
       }
 
@@ -1167,6 +1134,7 @@ bool N_MPDE_Manager::runInitialCondition_()
 
   case MPDE_IC_TWO_PERIOD:
     {
+ 
       // The runTransientIC_ function would have done two periods of
       // the fast time source.  Now we need to look at the points in
       // the second period and match them up with the ones in the first
@@ -1177,7 +1145,7 @@ bool N_MPDE_Manager::runInitialCondition_()
       // array still in the dataStore to find solutions in the first
       // cycle that lie close to those in the fastTimes_[] cycle.
 
-      N_TIA_DataStore * dsPtr = anaIntPtr_->getAnalysisMgr()->getTIADataStore();
+      RCP<N_TIA_DataStore> dsPtr = anaIntPtr_->getAnalysisMgr()->getTIADataStore();
       int numPoints = dsPtr->timeSteps.size();
       double startUpOffset = tiaMPDEParams_.initialTime;
       int lastJused = 0;
@@ -1192,7 +1160,7 @@ bool N_MPDE_Manager::runInitialCondition_()
 #ifdef Xyce_DEBUG_MPDE
             if( debugLevel > 0 )
             {
-              std::cout << "For fastTime_[" << i << "] = " << fastTimes_[i] <<
+              Xyce::dout() << "For fastTime_[" << i << "] = " << fastTimes_[i] <<
                 " Found bracketing times : " << (dsPtr->timeSteps[j] - startUpOffset) << ", "
                 << (dsPtr->timeSteps[j+1] - startUpOffset)
                 << " at j = " << j;
@@ -1210,7 +1178,7 @@ bool N_MPDE_Manager::runInitialCondition_()
 #ifdef Xyce_DEBUG_MPDE
             if( debugLevel > 0 )
             {
-              std::cout << " closest to point " << interpolationPoint;
+              Xyce::dout() << " closest to point " << interpolationPoint;
             }
 #endif
 
@@ -1234,7 +1202,7 @@ bool N_MPDE_Manager::runInitialCondition_()
 #ifdef Xyce_DEBUG_MPDE
             if( debugLevel > 0 )
             {
-              std::cout << " fraction = " << fraction << std::endl;
+              Xyce::dout() << " fraction = " << fraction << std::endl;
             }
 #endif
 
@@ -1264,7 +1232,7 @@ bool N_MPDE_Manager::runInitialCondition_()
 
       // stil under development RLS
       //double error = checkPeriodicity_();
-      //std::cout << "N_MPDE_Manager::runInitialConditon.  Based on two period anaysis, non-periodic error in this problem is " << error << std::endl;
+      //Xyce::dout() << "N_MPDE_Manager::runInitialConditon.  Based on two period anaysis, non-periodic error in this problem is " << error << std::endl;
     }
     break;
 
@@ -1275,29 +1243,37 @@ bool N_MPDE_Manager::runInitialCondition_()
     break;
   }
 
+  // Assemble global block vector
+  mpdeICVectorPtr_->assembleGlobalVector();
+  mpdeICStateVectorPtr_->assembleGlobalVector();
+  mpdeICQVectorPtr_->assembleGlobalVector();
+  mpdeICStoreVectorPtr_->assembleGlobalVector();
+
   if (warpMPDE_)
   {
+    //std::cout << "Setting omega = 1 into MPDE solution vector." << std::endl;
     // tscoffe/tmei 08/10/05:  put omega = 1 into MPDE solution vector
     // This is true for MPDE and WaMPDE because in WaMPDE we scale omega by T2.
     // tscoffe 12/14/06:  put phi(0) = omega(0) into MPDE solution vector.
     int omegaGID = warpMPDEPhasePtr_->getOmegaGID();
-    int omegaLID = mpdeICVectorPtr_->pmap()->globalToLocalIndex(omegaGID);
     int phiGID = warpMPDEPhasePtr_->getPhiGID();
+    int omegaLID = mpdeICVectorPtr_->pmap()->globalToLocalIndex(omegaGID);
     int phiLID = mpdeICVectorPtr_->pmap()->globalToLocalIndex(phiGID);
-//    mpdeICVectorPtr_->augmentstart()[0] = 1.0;
-    (*mpdeICVectorPtr_)[omegaLID] = 1.0;
-    (*mpdeICVectorPtr_)[phiLID] = 0.0;
+    if (omegaLID >= 0)
+      (*mpdeICVectorPtr_)[omegaLID] = 1.0;
+    if (phiLID >= 0)
+      (*mpdeICVectorPtr_)[phiLID] = 0.0;
   }
 
 #ifdef Xyce_DEBUG_MPDE
   if ( debugLevel > 1 )
   {
-    std::cout << "MPDE Initial Condition Solution!\n";
-    mpdeICVectorPtr_->printPetraObject();
-    std::cout << "MPDE Initial Condition State Vector!\n";
-    mpdeICStateVectorPtr_->printPetraObject();
-    std::cout << "MPDE Initial Condition Store Vector!\n";
-    mpdeICStoreVectorPtr_->printPetraObject();
+    Xyce::dout() << "MPDE Initial Condition Solution!\n";
+    mpdeICVectorPtr_->printPetraObject(std::cout);
+    Xyce::dout() << "MPDE Initial Condition State Vector!\n";
+    mpdeICStateVectorPtr_->printPetraObject(std::cout);
+    Xyce::dout() << "MPDE Initial Condition Store Vector!\n";
+    mpdeICStoreVectorPtr_->printPetraObject(std::cout);
   }
 #endif // Xyce_DEBUG_MPDE
 
@@ -1310,11 +1286,11 @@ bool N_MPDE_Manager::runInitialCondition_()
   //devInterfacePtr_->unsetVoltageLimiterFlag ();
 
 #ifdef Xyce_DEBUG_MPDE
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+  Xyce::dout() << Xyce::section_divider << std::endl;
   if (icExitFlag_) exit(0);
 #endif // Xyce_DEBUG_MPDE
 
-  return true;
+  return returnValue;
 }
 
 
@@ -1373,7 +1349,7 @@ bool N_MPDE_Manager::runStartupPeriods_()
   tiaMPDEIfacePtr_->registerTIAParams(tiaParams); // redundant?
 
 #ifdef Xyce_DEBUG_MPDE
-  std::cout << "Advancing time through " << startUpPeriods_ << " startup periods"
+  Xyce::dout() << "Advancing time through " << startUpPeriods_ << " startup periods"
      << " initialTime = " << tiaParams.initialTime
      << " finalTime = " << tiaParams.finalTime << std::endl;
 #endif // Xyce_DEBUG_MPDE
@@ -1390,8 +1366,6 @@ bool N_MPDE_Manager::runStartupPeriods_()
   }
   else
   {
-    //N_ANP_Transient analysisObject(tiaMPDEIfacePtr_->getAnalysisMgr());
-    //returnValue = analysisObject.run();
     returnValue = tiaMPDEIfacePtr_->runTransientWithDCOP();
   }
 
@@ -1429,7 +1403,7 @@ bool N_MPDE_Manager::runTransientIC_()
   bool returnValue = false;
 
 #ifdef Xyce_DEBUG_MPDE
-  std::cout << "N_MPDE_Manager::runTransientIC_() Doing initial transient run." << std::endl;
+  Xyce::dout() << "N_MPDE_Manager::runTransientIC_() Doing initial transient run." << std::endl;
 #endif
   // flag for N_TIA_ControlgAlgorithm that we're calculating an IC
   // this prevents extra DC op data from being printed.
@@ -1484,7 +1458,7 @@ bool N_MPDE_Manager::runTransientIC_()
     tiaMPDEIfacePtr_->setStoreInitialCondition(dcOpStoreVecPtr_.get());
   }
 
-  outMgrPtr_->prepareOutput( ANP_MODE_TRANSIENT, std::vector<N_ANP_SweepParam>(), std::vector<N_ANP_SweepParam>() ); //, *dsPtr_->currSolutionPtr, *dsPtr_->currStatePtr, *dsPtr_->currStorePtr );
+  outMgrPtr_->prepareOutput( Xyce::Analysis::ANP_MODE_TRANSIENT, std::vector<N_ANP_SweepParam>(), std::vector<N_ANP_SweepParam>() ); //, *dsPtr_->currSolutionPtr, *dsPtr_->currStatePtr, *dsPtr_->currStorePtr );
   
   {
     Xyce::IO::OutputMgr::ActiveOutput x(*outMgrPtr_);
@@ -1514,7 +1488,7 @@ bool N_MPDE_Manager::runTransientIC_()
       // will let us keep the initial condition data
       outMgrPtr_->setOutputFilenameSuffix( ".mpde_ic2" );
     }
-    N_TIA_DataStore * dsPtr = anaIntPtr_->getAnalysisMgr()->getTIADataStore();
+    RCP<N_TIA_DataStore> dsPtr = anaIntPtr_->getAnalysisMgr()->getTIADataStore();
     int numPoints = dsPtr->timeSteps.size();
 
     // try using the 2-level machinery to take prescribed time steps.
@@ -1534,12 +1508,12 @@ bool N_MPDE_Manager::runTransientIC_()
     }
 
     /*
-      std::cout << "From one period there were " << numPoints << " saved time steps." << std::endl;
+      Xyce::dout() << "From one period there were " << numPoints << " saved time steps." << std::endl;
       numPoints = dsPtr->timeSteps.size();
-      std::cout << "Now there are " << numPoints << " time steps saved." << std::endl;
+      Xyce::dout() << "Now there are " << numPoints << " time steps saved." << std::endl;
       for( int ts=0; ts<numPoints; ts++ )
       {
-      std::cout << "timeSteps[ " << ts << " ] = " << dsPtr->timeSteps[ts] << std::endl;
+      Xyce::dout() << "timeSteps[ " << ts << " ] = " << dsPtr->timeSteps[ts] << std::endl;
       }
     */
     // while runTransient() calls finishOutput(), runStep() does not.  So we
@@ -1568,7 +1542,7 @@ bool N_MPDE_Manager::runTransientIC_()
 //-----------------------------------------------------------------------------
 bool N_MPDE_Manager::filterFastTimePoints_()
 {
-  N_TIA_DataStore * dsPtr = anaIntPtr_->getAnalysisMgr()->getTIADataStore();
+  RCP<N_TIA_DataStore> dsPtr = anaIntPtr_->getAnalysisMgr()->getTIADataStore();
   int numPoints = dsPtr->timeSteps.size();
   int startIndex = 0;
   double extraPeriodShift = 0.0;
@@ -1589,7 +1563,7 @@ bool N_MPDE_Manager::filterFastTimePoints_()
   }
 
 #ifdef Xyce_DEBUG_MPDE
-  std::cout << "Initial transient run produced " << numPoints << " points." << std::endl;
+  Xyce::dout() << "Initial transient run produced " << numPoints << " points." << std::endl;
 #endif
 
   std::list<int> goodIndicies;
@@ -1607,7 +1581,7 @@ bool N_MPDE_Manager::filterFastTimePoints_()
     numGoodPoints = goodIndicies.size();
 
 #ifdef Xyce_DEBUG_MPDE
-    std::cout << " keeping all points for MPDE calculations." << std::endl;
+    Xyce::dout() << " keeping all points for MPDE calculations." << std::endl;
 #endif
   }
   else
@@ -1632,12 +1606,12 @@ bool N_MPDE_Manager::filterFastTimePoints_()
 #ifdef Xyce_DEBUG_MPDE
       if( debugLevel > 0 )
       {
-        std::cout << "\t\t timeStep[ " << i << " ] = " << dsPtr->timeSteps[i];
+        Xyce::dout() << "\t\t timeStep[ " << i << " ] = " << dsPtr->timeSteps[i];
         if( dsPtr->timeStepsBreakpointFlag[i] == true )
         {
-          std::cout << "  Breakpoint";
+          Xyce::dout() << "  Breakpoint";
         }
-        std::cout << std::endl;
+        Xyce::dout() << std::endl;
       }
 #endif
 
@@ -1652,7 +1626,7 @@ bool N_MPDE_Manager::filterFastTimePoints_()
     numGoodPoints = goodIndicies.size();
 
 #ifdef Xyce_DEBUG_MPDE
-    std::cout << " of which " << numGoodPoints << " fit tolerance requirements of abstol = "
+    Xyce::dout() << " of which " << numGoodPoints << " fit tolerance requirements of abstol = "
       << absTimeDiffTol << " and reltol*period = " << relTimeTol * period_ <<std::endl;
 #endif
   }
@@ -1691,7 +1665,7 @@ bool N_MPDE_Manager::filterFastTimePoints_()
 #ifdef Xyce_DEBUG_MPDE
         if( debugLevel > 0 )
         {
-          std::cout << " indicesUsed_[" << k << "] = " << indicesUsed_[k] << std::endl;
+          Xyce::dout() << " indicesUsed_[" << k << "] = " << indicesUsed_[k] << std::endl;
         }
 #endif
         fastTimes_[k] = dsPtr->timeSteps[*currentIndex] - tiaMPDEParams_.initialTime - extraPeriodShift;
@@ -1728,7 +1702,7 @@ bool N_MPDE_Manager::filterFastTimePoints_()
 #ifdef Xyce_DEBUG_MPDE
       if( debugLevel > 0 )
       {
-        std::cout << " indicesUsed_[" << k << "] = " << indicesUsed_[k] << std::endl;
+        Xyce::dout() << " indicesUsed_[" << k << "] = " << indicesUsed_[k] << std::endl;
       }
 #endif
       fastTimes_[k] = dsPtr->timeSteps[*currentIndex] - tiaMPDEParams_.initialTime - extraPeriodShift;
@@ -1739,16 +1713,16 @@ bool N_MPDE_Manager::filterFastTimePoints_()
   size_ = fastTimes_.size() - 1;
 
 //#ifdef Xyce_DEBUG_MPDE
-  std::cout << "MPDE: " << size_ << " fast time points added to the problem." << std::endl
+  Xyce::dout() << "MPDE: " << size_ << " fast time points added to the problem." << std::endl
     << "fast time point range: " << fastTimes_[0] << ", " << fastTimes_[size_] << std::endl;
   if( debugLevel > 0 )
   {
-    std::cout << "MPDE: new fast times are:" << std::endl;
+    Xyce::dout() << "MPDE: new fast times are:" << std::endl;
     int i=0;
     for( i = 0; i < size_; ++i )
-      std::cout << "fastTimes_["<<i<<"] = " << fastTimes_[i]
+      Xyce::dout() << "fastTimes_["<<i<<"] = " << fastTimes_[i]
         << " forward difference is " << (fastTimes_[i+1] - fastTimes_[i]) << std::endl;
-    std::cout << "period = " << period_
+    Xyce::dout() << "period = " << period_
       << " fastTimes_[numGoodPoints] = " << fastTimes_[numGoodPoints]
       << " extraPeriodShift = " << extraPeriodShift << std::endl;
   }
@@ -1767,17 +1741,14 @@ bool N_MPDE_Manager::filterFastTimePoints_()
 //-----------------------------------------------------------------------------
 bool N_MPDE_Manager::setupMPDEProblem_()
 {
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, " ***** Setting up full MPDE problem....\n");
-
 #ifdef Xyce_DEBUG_MPDE
-  const std::string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                          "  N_MPDE_Manager::setupMPDEProblem");
+  Xyce::dout() << std::endl
+               << Xyce::section_divider << std::endl
+               << "  N_MPDE_Manager::setupMPDEProblem" << std::endl;
 #endif // Xyce_DEBUG_MPDE
+
+  Xyce::lout() << " ***** Setting up full MPDE problem....\n" << std::endl;
+
   //Destroy Solvers, etc. from IC phase
   //-----------------------------------------
   anaIntPtr_->resetAll();
@@ -1791,7 +1762,6 @@ bool N_MPDE_Manager::setupMPDEProblem_()
       *(pdsMgrPtr_->getMatrixGraph( "JACOBIAN" )),
       *(pdsMgrPtr_->getMatrixGraph( "JACOBIAN" )) );
   //-----------------------------------------
-
 
   //Setup MPDE Loader
   //-----------------------------------------
@@ -1867,6 +1837,13 @@ bool N_MPDE_Manager::setupMPDEProblem_()
   nlsMgrPtr_->registerOutputMgr( &*outMgrPtr_ );
   nlsMgrPtr_->registerParallelMgr( &*pdsMgrPtr_ );
 
+#ifdef Xyce_PARALLEL_MPI
+  // Set reindexing for KLU
+  N_UTL_OptionBlock LSOB = N_UTL_OptionBlock();
+  LSOB.getParams().push_back( N_UTL_Param( "KLU_REINDEX", 1 ) );
+  nlsMgrPtr_->setLinSolOptions( LSOB );
+#endif
+
   //hack needed by TIA initialization currently
   mpdeBuilderPtr_->registerPDSManager( &*pdsMgrPtr_ );
 
@@ -1891,11 +1868,9 @@ bool N_MPDE_Manager::setupMPDEProblem_()
   //need to cut out unnecessary stuff from this call for new dae
   nlsMgrPtr_->initializeAll();
 
-  //Setup MPDE Output with Output Manager
-  //-----------------------------------------
-  //-----------------------------------------
+
 #ifdef Xyce_DEBUG_MPDE
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+  Xyce::dout() << Xyce::section_divider << std::endl;
 #endif // Xyce_DEBUG_MPDE
   return true;
 }
@@ -1914,25 +1889,22 @@ bool N_MPDE_Manager::runMPDEProblem_()
   bool returnValue = true;
 
 #ifdef Xyce_DEBUG_MPDE
-  const std::string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                          "  N_MPDE_Manager::runMPDEProblem_");
+  Xyce::dout() << std::endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
+  Xyce::dout() <<
+                          "  N_MPDE_Manager::runMPDEProblem_" << std::endl;
 #endif // Xyce_DEBUG_MPDE
   tiaMPDEIfacePtr_->setInitialCondition(&*mpdeICVectorPtr_);
   tiaMPDEIfacePtr_->setStateInitialCondition(&*mpdeICStateVectorPtr_);
   tiaMPDEIfacePtr_->setQVectorInitialCondition(&*mpdeICQVectorPtr_);
   tiaMPDEIfacePtr_->setStoreInitialCondition(&*mpdeICStoreVectorPtr_);
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, " ***** Beginning full MPDE simulation....\n");
+  Xyce::lout() << " ***** Beginning full MPDE simulation....\n" << std::endl;
 
   // try to run the transient problem
   returnValue = tiaMPDEIfacePtr_->runTransient();
 #ifdef Xyce_DEBUG_MPDE
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+  Xyce::dout() << Xyce::section_divider << std::endl;
 #endif // Xyce_DEBUG_MPDE
 
   return returnValue;
@@ -1949,22 +1921,22 @@ bool N_MPDE_Manager::runMPDEProblem_()
 //-----------------------------------------------------------------------------
 bool N_MPDE_Manager::runTests_()
 {
-  std::cout << "N_MPDE_Manager::runTests_\n";
+  Xyce::dout() << "N_MPDE_Manager::runTests_\n";
 
   //Finish setup of MPDE Builder
   //-----------------------------------------
-  std::cout << "N_MPDE_Manager::runTests_[Generate Graphs]\n";
+  Xyce::dout() << "N_MPDE_Manager::runTests_[Generate Graphs]\n";
   mpdeBuilderPtr_->generateGraphs
     ( *(pdsMgrPtr_->getMatrixGraph( "JACOBIAN" )),
       *(pdsMgrPtr_->getMatrixGraph( "JACOBIAN" )),
       *(pdsMgrPtr_->getMatrixGraph( "JACOBIAN" )) );
 
-  std::cout << "N_MPDE_Manager::runTests_[Finished Graphs]\n";
+  Xyce::dout() << "N_MPDE_Manager::runTests_[Finished Graphs]\n";
   //-----------------------------------------
 
   //Setup MPDE Loader
   //-----------------------------------------
-  std::cout << "N_MPDE_Manager::runTests_[Construct Loader]\n";
+  Xyce::dout() << "N_MPDE_Manager::runTests_[Construct Loader]\n";
   RCP<N_MPDE_Manager> mpdeMgrRCPtr = rcp(this,false);
   mpdeLoaderPtr_ = rcp(new N_MPDE_Loader( mpdeState_, mpdeDiscPtr_, mpdeMgrRCPtr, warpMPDEPhasePtr_ ));
   mpdeLoaderPtr_->registerAppLoader( appLoaderPtr_ );
@@ -1985,12 +1957,12 @@ bool N_MPDE_Manager::runTests_()
   mpdeLoaderPtr_->registerAppStoLeadCurrQCompVec( rcp(appBuilderPtr_->createStoreVector()) );
   mpdeLoaderPtr_->registerAppdQdx( rcp(appBuilderPtr_->createMatrix()) );
   mpdeLoaderPtr_->registerAppdFdx( rcp(appBuilderPtr_->createMatrix()) );
-  std::cout << "N_MPDE_Manager::runTests_[Finished Loader]\n";
+  Xyce::dout() << "N_MPDE_Manager::runTests_[Finished Loader]\n";
   //-----------------------------------------
 
   //Test Construction of "MPDE Size" Objects
   //-----------------------------------------
-  std::cout << "N_MPDE_Manager::runTests_[Create Vectors]\n";
+  Xyce::dout() << "N_MPDE_Manager::runTests_[Create Vectors]\n";
   RCP<N_LAS_Vector> Q = rcp(mpdeBuilderPtr_->createVector());
   RCP<N_LAS_Vector> F = rcp(mpdeBuilderPtr_->createVector());
   RCP<N_LAS_Vector> Res = rcp(mpdeBuilderPtr_->createVector());
@@ -2023,10 +1995,10 @@ bool N_MPDE_Manager::runTests_()
   RCP<N_LAS_BlockVector> bCurrStore = rcp_dynamic_cast<N_LAS_BlockVector>(currStore);
   RCP<N_LAS_BlockVector> bLastStore = rcp_dynamic_cast<N_LAS_BlockVector>(lastStore);
 
-  bNextX->printPetraObject();
-  std::cout << "N_MPDE_Manager::runTests_[Finished Vectors]\n";
+  bNextX->printPetraObject(Xyce::dout());
+  Xyce::dout() << "N_MPDE_Manager::runTests_[Finished Vectors]\n";
 
-  std::cout << "N_MPDE_Manager::runTests_[Construct Matrices]\n";
+  Xyce::dout() << "N_MPDE_Manager::runTests_[Construct Matrices]\n";
   RCP<N_LAS_Matrix> dQdx = rcp(mpdeBuilderPtr_->createMatrix());
   RCP<N_LAS_Matrix> dFdx = rcp(mpdeBuilderPtr_->createMatrix());
   RCP<N_LAS_Matrix> Jac  = rcp(mpdeBuilderPtr_->createMatrix());
@@ -2035,37 +2007,37 @@ bool N_MPDE_Manager::runTests_()
   RCP<N_LAS_BlockMatrix> bdFdx = rcp_dynamic_cast<N_LAS_BlockMatrix>(dFdx);
   RCP<N_LAS_BlockMatrix> bJac = rcp_dynamic_cast<N_LAS_BlockMatrix>(Jac);
 
-  bJac->printPetraObject();
-  std::cout << "N_MPDE_Manager::runTests_[Finished Matrices]\n";
+  bJac->printPetraObject(Xyce::dout());
+  Xyce::dout() << "N_MPDE_Manager::runTests_[Finished Matrices]\n";
 
   //-----------------------------------------
 
   //Test Load of MPDE Objects
   //-----------------------------------------
-  std::cout << "N_MPDE_Manager::runTests_[Load Vectors]\n";
+  Xyce::dout() << "N_MPDE_Manager::runTests_[Load Vectors]\n";
   mpdeLoaderPtr_->loadDAEVectors(
       &*nextX, &*currX, &*lastX,
       &*nextS, &*currS, &*lastS, &*dSdt,
       &*nextStore, &*currStore, &*lastStore, &*storeLeadCurrQComp, &*Q, &*F, 0, 0 );
-  std::cout << "N_MPDE_Manager::runTests_[Load Matrices]\n";
+  Xyce::dout() << "N_MPDE_Manager::runTests_[Load Matrices]\n";
 
   mpdeLoaderPtr_->loadDAEMatrices( &*nextX, &*nextS, &*dSdt, &*nextStore, &*dQdx, &*dFdx );
-  std::cout << "N_MPDE_Manager::runTests_[Finished Loads]\n";
+  Xyce::dout() << "N_MPDE_Manager::runTests_[Finished Loads]\n";
 
-  bQ->printPetraObject();
-  bF->printPetraObject();
+  bQ->printPetraObject(Xyce::dout());
+  bF->printPetraObject(Xyce::dout());
 
-  bdQdx->printPetraObject();
-  bdFdx->printPetraObject();
+  bdQdx->printPetraObject(Xyce::dout());
+  bdFdx->printPetraObject(Xyce::dout());
   //-----------------------------------------
 
   //Pretend to solve DCOP problems
   //-----------------------------------------
   Res->linearCombo( 1.0, *Res, +1.0, *F );
-  bRes->printPetraObject();
+  bRes->printPetraObject(Xyce::dout());
 
   Jac->add( *dFdx );
-  bJac->printPetraObject();
+  bJac->printPetraObject(Xyce::dout());
 
   return true;
 }
@@ -2086,7 +2058,7 @@ double  N_MPDE_Manager::checkPeriodicity_()
   double returnValue = 0.0;
 
   // get access to time history of simulation
-  N_TIA_DataStore * dsPtr = anaIntPtr_->getAnalysisMgr()->getTIADataStore();
+  RCP<N_TIA_DataStore> dsPtr = anaIntPtr_->getAnalysisMgr()->getTIADataStore();
   int numPoints = dsPtr->timeSteps.size();
 
   // Note, if we integrated more then one period in the runTransientIC_()
@@ -2106,7 +2078,7 @@ double  N_MPDE_Manager::checkPeriodicity_()
 #ifdef Xyce_DEBUG_MPDE
           if( debugLevel > 0 )
           {
-            std::cout << "For fastTime_[" << i << "] = " << fastTimes_[i] <<
+            Xyce::dout() << "For fastTime_[" << i << "] = " << fastTimes_[i] <<
               " Found bracketing times : " << (dsPtr->timeSteps[j] - startUpOffset) << ", "
               << (dsPtr->timeSteps[j+1] - startUpOffset)
               << " at j = " << j;
@@ -2124,7 +2096,7 @@ double  N_MPDE_Manager::checkPeriodicity_()
 #ifdef Xyce_DEBUG_MPDE
           if( debugLevel > 0 )
           {
-            std::cout << " closest to point " << interpolationPoint << " index used = " << indicesUsed_[i] << std::endl;
+            Xyce::dout() << " closest to point " << interpolationPoint << " index used = " << indicesUsed_[i] << std::endl;
           }
 #endif
           N_LAS_Vector *thisPeriod = dsPtr->fastTimeSolutionVec[indicesUsed_[i]];
@@ -2132,7 +2104,7 @@ double  N_MPDE_Manager::checkPeriodicity_()
           N_LAS_Vector scratchVec( *thisPeriod );
           scratchVec.linearCombo( 1.0, scratchVec, -1.0, *lastPeriod );
           scratchVec.infNorm(&returnValue);
-          std::cout << i << " returnValue = " << returnValue << std::endl;
+          Xyce::dout() << i << " returnValue = " << returnValue << std::endl;
         }
       }
     }

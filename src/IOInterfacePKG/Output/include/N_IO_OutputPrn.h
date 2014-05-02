@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.2.2.2 $
+// Revision Number: $Revision: 1.7 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Date  : $Date: 2014/02/24 23:49:20 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -56,16 +56,67 @@
 class N_IO_OutputPrn : public N_IO_OutputFileBase
 {
   public:
-  
-  N_IO_OutputPrn();
-  ~N_IO_OutputPrn();
 
-  // these functions are intended to let Xyce re-read a simulation output 
-  // file and then recalculate output metrics in .measure() statements 
-  // without re-running the original simulation. 
-  bool getOutputVarNames( vector< string > & varNames );
-  bool getOutputNextVarValues( N_LAS_Vector * varValues );
-  
+    N_IO_OutputPrn();
+    ~N_IO_OutputPrn();
+
+    // these functions are intended to let Xyce re-read a simulation output
+    // file and then recalculate output metrics in .measure() statements
+    // without re-running the original simulation.
+    bool getOutputVarNames( std::vector< std::string > & varNames );
+    bool getOutputNextVarValues( N_LAS_Vector * varValues );
+
+
+// These functions will depend on the output format.  Thus,
+// they emit errors if the base clase version is called.
+    virtual void outputHeader()
+    {}
+
+    virtual void outputDC(
+      const int dcNumber,
+      const int maxDC,
+      const std::vector<N_ANP_SweepParam> & dcParamVec1,
+      N_LAS_Vector * solnVecPtr,
+      N_LAS_Vector * stateVecPtr,
+      N_LAS_Vector * storeVecPtr )
+    {}
+
+    virtual void outputTran(
+      const double & time,
+      N_LAS_Vector * solnVecPtr,
+      N_LAS_Vector * stateVecPtr,
+      N_LAS_Vector * storeVecPtr )
+    {}
+
+    virtual void outputStep(
+      const int stepNumber,
+      const int maxStep,
+      const std::vector<N_ANP_SweepParam> & stepParamVec1,
+      N_LAS_Vector * solnVecPtr,
+      N_LAS_Vector * stateVecPtr,
+      N_LAS_Vector * storeVecPtr )
+    {}
+
+    virtual void outputAC(
+      const double & freq,
+      N_LAS_Vector * freqDomainSolnVecReal,
+      N_LAS_Vector * freqDomainSolnVecImaginary)
+    {}
+
+    virtual void outputMPDE(const double & time, N_LAS_Vector * solnVecPtr )
+    {}
+
+    virtual void outputHB(
+      const N_LAS_BlockVector & timeDomainSolnVec,
+      const N_LAS_BlockVector & freqDomainSolnVecReal,
+      const N_LAS_BlockVector & freqDomainSolnVecImaginary)
+    {}
+
+    virtual void outputMOR()
+    {}
+
+    virtual void finishOutput()
+    {}
 };
 
 #endif // Xyce_N_IO_OutputPrn_h

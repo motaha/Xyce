@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -42,9 +42,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.3.2.2 $
+// Revision Number: $Revision: 1.8.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -53,8 +53,6 @@
 #define N_DEV_REACTION_H
 #include <iosfwd>
 #include <vector>
-#include <string>
-using namespace std;
 
 #include <N_DEV_Specie.h>
 #include <N_DEV_RateConstantCalculators.h>
@@ -66,9 +64,9 @@ class Reaction
 {
 public:
   Reaction();
-  Reaction(vector< pair<int,double> > & ,
-             vector< pair<int,double> > &,
-             double);
+  Reaction(std::vector< std::pair<int,double> > & ,
+           std::vector< std::pair<int,double> > &,
+           double);
   Reaction(const Reaction &right);
   ~Reaction();
   void setRateConstant(double);
@@ -76,32 +74,32 @@ public:
   void scaleRateConstant(double);
   void scaleRateConstantFromCalculator();
   void unscaleRateConstantFromCalculator();
-  void setReactants(vector< pair<int,double> > &products );
+  void setReactants(std::vector< std::pair<int,double> > &products );
   void addReactant(int species,double stoich);
-  void setProducts(vector< pair<int,double> > &products );
+  void setProducts(std::vector< std::pair<int,double> > &products );
   void addProduct(int species,double stoich);
-  double getRate(vector<double> &concentrations,
-                 vector<double> &constants);
-  void getDdt(vector<double> &concentrations,
-                vector<double> &constants,
-                vector<double> &ddt);
-  void getDRateDC(vector<double> &concentrations,
-                  vector<double> &constants,
-                  vector<double> &dratedc);
+  double getRate(std::vector<double> &concentrations,
+                 std::vector<double> &constants);
+  void getDdt(std::vector<double> &concentrations,
+              std::vector<double> &constants,
+              std::vector<double> &ddt);
+  void getDRateDC(std::vector<double> &concentrations,
+                  std::vector<double> &constants,
+                  std::vector<double> &dratedc);
   void getDRateDConst(int constNum,
-                      vector<double> &concentrations,
-                      vector<double> &constants,
+                      std::vector<double> &concentrations,
+                      std::vector<double> &constants,
                       double &dratedc);
-  void getJac(vector<double> &concentrations,
-                vector<double> &constants,
-                vector<vector<double> > &jac);
+  void getJac(std::vector<double> &concentrations,
+              std::vector<double> &constants,
+              std::vector<std::vector<double> > &jac);
   void getDFdConst(int constantNumber,
-                   vector<double> &concentrations,
-                   vector<double> &constants,
-                   vector<double> &dFdConst);
+                   std::vector<double> &concentrations,
+                   std::vector<double> &constants,
+                   std::vector<double> &dFdConst);
 
-  void output ( const vector<N_DEV::Specie> & species,
-                ostream & os ) const;
+  void output ( const std::vector<Specie> & species,
+                std::ostream & os ) const;
 
   void setSimpleRateCalculator(double k, double C0, double t0, double x0);
   void setCaptureRateCalculator(double sigma, double v, double C0, double t0,
@@ -109,34 +107,34 @@ public:
   void setEmissionRateCalculator(double sigma, double v, double N,
                                  double Energy, double C0, double t0,
                                  double x0);
-  void setComplexRateCalculator(vector<N_DEV::Specie> &VariableSpecies,
-                                vector<N_DEV::Specie> &ConstantSpecies,
+  void setComplexRateCalculator(std::vector<Specie> &VariableSpecies,
+                                std::vector<Specie> &ConstantSpecies,
                                 double C0, double t0, double x0);
-  void setDecomplexRateCalculator(vector<N_DEV::Specie> &VariableSpecies,
-                                vector<N_DEV::Specie> &ConstantSpecies,
-                                double bindingEnergy,
-                                double gammaAB, double gammaA, double gammaB,
-                                double concSi,
-                                double C0, double t0, double x0);
+  void setDecomplexRateCalculator(std::vector<Specie> &VariableSpecies,
+                                  std::vector<Specie> &ConstantSpecies,
+                                  double bindingEnergy,
+                                  double gammaAB, double gammaA, double gammaB,
+                                  double concSi,
+                                  double C0, double t0, double x0);
 
   inline void setScaleFactors(double C0, double t0, double x0)
-    {
-      if (myRateCalc)
-        myRateCalc->setScaleFactors(C0,t0,x0);
-    };
+  {
+    if (myRateCalc)
+      myRateCalc->setScaleFactors(C0,t0,x0);
+  };
 
   Reaction & operator=(const Reaction & right);
 
 private:
   void setDependency(int cSize);
   void setConstDependency(int cSize);
-  vector< pair<int,double> > theReactants;
-  vector< pair<int,double> > theProducts;
+  std::vector< std::pair<int,double> > theReactants;
+  std::vector< std::pair<int,double> > theProducts;
   double theRateConstant;
   int numconcs; // size of vector of concentrations
   int numconsts; // size of vector of constants
-  vector<int> concDependency;
-  vector<int> constDependency;
+  std::vector<int> concDependency;
+  std::vector<int> constDependency;
   RateCalculator *myRateCalc;
 
 

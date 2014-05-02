@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.243.2.3 $
+// Revision Number: $Revision: 1.269.2.4 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -59,11 +59,13 @@
 #include <vector>
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_Inductor.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_ExternData.h>
+#include <N_DEV_Inductor.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
 
 #include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
@@ -71,98 +73,75 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<Inductor::Instance>::ParametricData()
+
+namespace Inductor {
+
+
+void Traits::loadInstanceParameters(ParametricData<Inductor::Instance> &p)
 {
-  setNumNodes(2);
-  setNumOptionalNodes(0);
-  setNumFillNodes(0);
-  setModelRequired(0);
-  setPrimaryParameter("L");
-  addModelType("L");
+  p.addPar("L",    0.0, &Inductor::Instance::baseL)
+    .setExpressionAccess(ParameterType::TIME_DEP)
+    .setUnit(U_HENRY)
+    .setDescription("Inductance");
 
-  // Set up double precision variables:
-  addPar ("L",    0.0, false, ParameterType::TIME_DEP,
-          &Inductor::Instance::baseL,
-          NULL,
-          U_HENRY, CAT_NONE, "Inductance");
+  p.addPar("IC",   0.0, &Inductor::Instance::IC)
+    .setGivenMember(&Inductor::Instance::ICGiven)
+    .setUnit(U_AMP)
+    .setDescription("Initial current through device");
 
-  addPar ("IC",   0.0, false,   ParameterType::NO_DEP,
-          &Inductor::Instance::IC,
-          &Inductor::Instance::ICGiven,
-          U_AMP, CAT_NONE, "Initial current through device");
+  p.addPar("TEMP", 0.0, &Inductor::Instance::temp)
+    .setExpressionAccess(ParameterType::TIME_DEP)
+    .setGivenMember(&Inductor::Instance::tempGiven)
+    .setUnit(U_DEGC)
+    .setCategory(CAT_MATERIAL)
+    .setDescription("Device temperature");
 
-  addPar ("TEMP", 0.0, false, ParameterType::TIME_DEP,
-          &Inductor::Instance::temp,
-          &Inductor::Instance::tempGiven,
-          U_DEGC, CAT_MATERIAL, "Temperature");
+  p.addPar("TC1", 0.0, &Inductor::Instance::tempCoeff1)
+    .setGivenMember(&Inductor::Instance::tempCoeff1Given)
+    .setUnit(U_DEGCM1)
+    .setDescription("Linear Temperature Coefficient");
 
-  //Genie 121412. Make Inductor support TC
-  addPar ("TC1",   0.0, false,   ParameterType::NO_DEP,
-          &Inductor::Instance::tempCoeff1,
-          &Inductor::Instance::tempCoeff1Given,
-          U_DEGCM1, CAT_NONE, "Linear Temperature Coefficient");
-
-  addPar ("TC2",   0.0, false,   ParameterType::NO_DEP,
-          &Inductor::Instance::tempCoeff2,
-          &Inductor::Instance::tempCoeff2Given,
-          U_DEGCM2, CAT_NONE, "Quadratic Temperature Coefficient");
+  p.addPar("TC2", 0.0, &Inductor::Instance::tempCoeff2)
+    .setGivenMember(&Inductor::Instance::tempCoeff2Given)
+    .setUnit(U_DEGCM2)
+    .setDescription("Quadratic Temperature Coefficient");
 
   // This call tells the parameter handling code that TC can be specified
   // as a vector with up to two elements as in TC=a,b.  It then translates
   // TC=a,b into TC1=a TC2=b.  Likewise, TC=a will translate into TC1=a
-  makeVector ("TC", 2);
+  p.makeVector ("TC", 2);
 }
 
-template<>
-ParametricData<Inductor::Model>::ParametricData()
+void Traits::loadModelParameters(ParametricData<Inductor::Model> &p)
 {
   // Set up double precision variables:
-  addPar ("L", 1.0, false, ParameterType::NO_DEP,
-          &Inductor::Model::L,
-          NULL,
-          U_NONE, CAT_NONE, "Inductance Multiplier");
+  p.addPar("L", 1.0, &Inductor::Model::L)
+    .setDescription("Inductance Multiplier");
 
-  addPar ("IC", 0.0, false, ParameterType::NO_DEP,
-          &Inductor::Model::IC,
-          NULL,
-          U_AMP, CAT_NONE, "Initial current through device");
+  p.addPar("IC", 0.0, &Inductor::Model::IC)
+    .setUnit(U_AMP)
+    .setDescription("Initial current through device");
 
-  addPar ("TNOM",  27.0,false, ParameterType::NO_DEP,
-          &Inductor::Model::tnom,
-          NULL,
-          U_DEGC, CAT_MATERIAL, "Reference temperature");
+  p.addPar("TNOM", 27.0, &Inductor::Model::tnom)
+    .setUnit(U_DEGC)
+    .setCategory(CAT_MATERIAL)
+    .setDescription("Reference temperature");
 
-  addPar ("TC1",0.0, false, ParameterType::NO_DEP,
-          &Inductor::Model::tempCoeff1,
-          NULL,
-          U_DEGCM1, CAT_MATERIAL, "First order temperature coeff.");
+  p.addPar("TC1",0.0, &Inductor::Model::tempCoeff1)
+    .setUnit(U_DEGCM1)
+    .setCategory(CAT_MATERIAL)
+    .setDescription("First order temperature coeff.");
 
-  addPar ("TC2",0.0, false, ParameterType::NO_DEP,
-          &Inductor::Model::tempCoeff2,
-          NULL,
-          U_DEGCM2, CAT_MATERIAL, "Second order temperature coeff.");
+  p.addPar("TC2", 0.0, &Inductor::Model::tempCoeff2)
+    .setUnit(U_DEGCM2)
+    .setCategory(CAT_MATERIAL)
+    .setDescription("Second order temperature coeff.");
 }
 
-namespace Inductor {
 //
 // static class member inits
 //
-vector< vector<int> > Instance::jacStamp_BASE;
-
-
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
-}
-
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
+std::vector< std::vector<int> > Instance::jacStamp_BASE;
 
 // Class Instance
 //-----------------------------------------------------------------------------
@@ -173,7 +152,7 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Instance::processParams(string param)
+bool Instance::processParams()
 {
   // If there are any time dependent parameters, set their values at for
   // the current time.
@@ -194,9 +173,6 @@ bool Instance::processParams(string param)
 bool Instance::updateTemperature ( const double & temp)
 {
   double difference = temp - model_.tnom;
-  //double factor = model_.L*(1.0 + (model_.tempCoeff1)*difference +
-  //                       (model_.tempCoeff2)*difference*difference);
-  //support specifying TC at the instance line
   double factor = model_.L*(1.0 + tempCoeff1*difference +
                          tempCoeff2*difference*difference);
   L = baseL*factor;
@@ -211,20 +187,18 @@ bool Instance::updateTemperature ( const double & temp)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
-Instance::Instance(InstanceBlock & IB,
-                                Model & Iiter,
-                                MatrixLoadData & mlData1,
-                                SolverState &ss1,
-                                ExternData  &ed1,
-                                DeviceOptions & do1)
-
-  : DeviceInstance (IB, mlData1, ss1, ed1, do1),
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock & instance_block,
+  Model &               model,
+  const FactoryBlock &  factory_block)
+  : DeviceInstance(instance_block, configuration.getInstanceParameters(), factory_block),
     L(0),
     IC(0),
     ICGiven(false),
-    model_(Iiter),
+    model_(model),
     baseL(0.0),
-    temp(getDeviceOptions().temp.dVal()),
+    temp(getDeviceOptions().temp.getImmutableValue<double>()),
     tempGiven(0),
     tempCoeff1(0.0),
     tempCoeff2(0.0),
@@ -273,19 +247,16 @@ Instance::Instance(InstanceBlock & IB,
   setDefaultParams ();
 
   // Set params according to instance line and constant defaults from metadata:
-  setParams (IB.params);
+  setParams (instance_block.params);
 
   // Set any non-constant parameter defaults:
   if (!given("L"))
   {
-    string msg("Could not find L parameter in instance.");
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Could not find L parameter in instance.";
   }
 
   if (!given("TEMP"))
-    temp = getDeviceOptions().temp.dVal();
+    temp = getDeviceOptions().temp.getImmutableValue<double>();
 
   if (!tempCoeff1Given)
     tempCoeff1=model_.tempCoeff1;
@@ -350,30 +321,11 @@ void Instance::setupPointers ()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/21/02
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs(const vector<int> & intLIDVecRef,
-                                          const vector<int> & extLIDVecRef)
+void Instance::registerLIDs(const std::vector<int> & intLIDVecRef,
+                                          const std::vector<int> & extLIDVecRef)
 {
-  string msg;
-  string tmpstr;
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -388,21 +340,19 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
   li_Bra = intLIDVec[0];
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline(
-"-----------------------------------------------------------------------------");
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
 
-    cout << "::registerLIDs:\n";
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << "::registerLIDs:\n";
+    Xyce::dout() << "  name = " << getName() << std::endl;
 
-    cout << "\nlocal solution indices:\n";
-    cout << "  li_Pos = "<< li_Pos << endl;
-    cout << "  li_Neg = "<< li_Neg << endl;
-    cout << "  li_Bra = "<< li_Bra << endl;
+    Xyce::dout() << "\nlocal solution indices:\n";
+    Xyce::dout() << "  li_Pos = "<< li_Pos << std::endl;
+    Xyce::dout() << "  li_Neg = "<< li_Neg << std::endl;
+    Xyce::dout() << "  li_Bra = "<< li_Bra << std::endl;
 
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -416,13 +366,13 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 05/13/05
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
     // set up internal name map
-    string tmpstr(getName()+"_branch");
+    std::string tmpstr(getName()+"_branch");
     spiceInternalName (tmpstr);
     intNameMap[ li_Bra ] = tmpstr;
   }
@@ -438,20 +388,9 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/22/02
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
   // copy over the global ID lists.
   staLIDVec = staLIDVecRef;
@@ -467,7 +406,7 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 // Creator       : Robert Hoekstra, SNL
 // Creation Date : 08/21/02
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp_BASE;
 }
@@ -480,7 +419,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Robert Hoekstra, SNL
 // Creation Date : 08/27/02
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
 
@@ -503,17 +442,11 @@ bool Instance::updatePrimaryState ()
 {
   double * solVec = extData.nextSolVectorRawPtr;
   double * staVec = extData.nextStaVectorRawPtr;
-
-  // obtain current accross the inductor
   double current = solVec[li_Bra];
-
   if( (getSolverState().dcopFlag) && ICGiven )
     current = IC;
 
-  // obtain the "current" value for the flux stored in the inductor
   f0 = L*current;
-
-  // place this value for the charge in the state vector.
   staVec[li_fstate] = f0;
 
   return true;
@@ -676,7 +609,6 @@ bool Instance::setIC ()
 
   if (ICGiven)
   {
-    // obtain the "current" value for the flux stored in the inductor
     f0 = L*IC;
     currStaVector[li_fstate] = f0;
     nextStaVector[li_fstate] = f0;
@@ -696,7 +628,7 @@ bool Instance::setIC ()
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 2/17/04
 //-----------------------------------------------------------------------------
-void Instance::varTypes( vector<char> & varTypeVec )
+void Instance::varTypes( std::vector<char> & varTypeVec )
 {
   varTypeVec.resize(1);
   varTypeVec[0] = 'I';
@@ -710,7 +642,7 @@ void Instance::varTypes( vector<char> & varTypeVec )
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   return true;
 }
@@ -723,11 +655,11 @@ bool Model::processParams (string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 03/23/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -745,10 +677,11 @@ bool Model::processInstanceParams(string param)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-                                                SolverState & ss1,
-                                                DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
     L(0.0),
     IC(0.0),
     tempCoeff1(0.0),
@@ -785,9 +718,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -806,29 +739,50 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i, isize;
   isize = instanceContainer.size();
 
-  os << endl;
-  os << "Number of Inductor instances: " << isize << endl;
-  os << "    name=\t\tmodelName\tParameters" << endl;
+  os << std::endl;
+  os << "Number of Inductor instances: " << isize << std::endl;
+  os << "    name=\t\tmodelName\tParameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
+    os << getName();
     os << "\t\tL = " << (*iter)->L;
     os << "\tIC = " << (*iter)->IC;
-    os << endl;
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 // Inductor Master functions:
 
@@ -842,20 +796,16 @@ std::ostream &Model::printOutInstances(std::ostream &os) const
 //-----------------------------------------------------------------------------
 bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & inst = *(*it);
 
-    // obtain current accross the inductor
     double current = solVec[inst.li_Bra];
 
     if( (getSolverState().dcopFlag) && inst.ICGiven )
       current = inst.IC;
 
-    // obtain the "current" value for the flux stored in the inductor
     inst.f0 = inst.L*current;
-
-    // place this value for the charge in the state vector.
     staVec[inst.li_fstate] = inst.f0;
   }
 
@@ -885,7 +835,7 @@ bool Master::updateSecondaryState ( double * staDerivVec, double * stoVec )
 //-----------------------------------------------------------------------------
 bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  double * storeLeadF, double * storeLeadQ)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
      Instance & inst = *(*it);
 
@@ -930,7 +880,7 @@ return true;
 //-----------------------------------------------------------------------------
 bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
      Instance & inst = *(*it);
 
@@ -967,6 +917,19 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 #endif
   }
   return true;
+}
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice() 
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("l", 1)
+    .registerModelType("l", 1);
 }
 
 } // namespace Inductor

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -39,24 +39,20 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.68.2.2 $
+// Revision Number: $Revision: 1.82 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/24 23:49:18 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ----------  Standard Includes ----------
-
 #include <iostream>
 
-// ----------   Xyce Includes   ----------
 #include <N_DEV_DeviceInstance.h>
 #include <N_DEV_DevicePDEInstance.h>
-#include <N_DEV_DeviceTemplate.h>
+#include <N_DEV_DeviceMaster.h>
 #include <N_DEV_DeviceOptions.h>
 #include <N_DEV_SolverState.h>
 #include <N_DEV_SourceData.h>
@@ -78,13 +74,11 @@ namespace Device {
 // Creation Date : 04/01/03
 //-----------------------------------------------------------------------------
 DevicePDEInstance::DevicePDEInstance(
-  InstanceBlock &  IB,
-  MatrixLoadData & mlData1,
-  SolverState &    ss1,
-  ExternData &     ed1,
-  DeviceOptions &  do1)
-  : DeviceInstance(IB, mlData1, ss1, ed1, do1),
-    Temp(getDeviceOptions().temp.dVal()),
+  const InstanceBlock &               IB,
+  ParametricData<void> &        parametric_data,
+  const FactoryBlock &          factory_block)
+  : DeviceInstance(IB, parametric_data, factory_block),
+    Temp(getDeviceOptions().temp.getImmutableValue<double>()),
     charge(1.602176565e-19),
     kb (1.3806488e-23), // boltzmann's constant
     Vt(kb*Temp/charge),
@@ -329,20 +323,20 @@ double DevicePDEInstance::Jn
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout.width(24);
-    cout.precision(16);
-    cout.setf(ios::scientific);
+    Xyce::dout().width(24);
+    Xyce::dout().precision(16);
+    Xyce::dout().setf(std::ios::scientific);
 
-    cout << endl;
-    cout << "  MU = "<< MU << endl;
-    cout << "  n  = "<< n  << " dndx = "<< dndx <<" E = "<< E << endl;
-    cout << "  dV = "<< dV << " Ut = "<< Ut <<" Jn = "<< J <<endl;
-    cout << "  n1 = "<< n1 << " n2 = "<< n2 <<" (n2-n1) = "<<(n2-n1)<<endl;
-    cout << "  h  = "<< h  <<endl;
-    cout << "  aux1(-dV) = " << aux1(-dV) << endl;
-    cout << "  aux2( dV) = " << aux2( dV) << endl;
-    cout << "  aux2(-dV) = " << aux2( dV) << endl;
-    cout << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "  MU = "<< MU << std::endl;
+    Xyce::dout() << "  n  = "<< n  << " dndx = "<< dndx <<" E = "<< E << std::endl;
+    Xyce::dout() << "  dV = "<< dV << " Ut = "<< Ut <<" Jn = "<< J << std::endl;
+    Xyce::dout() << "  n1 = "<< n1 << " n2 = "<< n2 <<" (n2-n1) = "<<(n2-n1)<< std::endl;
+    Xyce::dout() << "  h  = "<< h  << std::endl;
+    Xyce::dout() << "  aux1(-dV) = " << aux1(-dV) << std::endl;
+    Xyce::dout() << "  aux2( dV) = " << aux2( dV) << std::endl;
+    Xyce::dout() << "  aux2(-dV) = " << aux2( dV) << std::endl;
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -467,20 +461,20 @@ double DevicePDEInstance::Jp
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout.width(16);
-    cout.precision(8);
-    cout.setf(ios::scientific);
+    Xyce::dout().width(16);
+    Xyce::dout().precision(8);
+    Xyce::dout().setf(std::ios::scientific);
 
-    cout << endl;
-    cout << "  MU = "<< MU << endl;
-    cout << "  p  = "<< p  << " dpdx = "<<dpdx<<" E = "<<E <<endl;
-    cout << "  dV = "<< dV << " Ut = "<<Ut<<" Jpx = "<<J<<endl;
-    cout << "  p1 = "<< p1 << " p2 = "<<p2<<" (p2-p1) = "<<(p2-p1)<<endl;
-    cout << "  h  = "<< h  <<  endl;
-    cout << "  aux1(-dV) = " << aux1(-dV) << endl;
-    cout << "  aux2( dV) = " << aux2( dV) << endl;
-    cout << "  aux2(-dV) = " << aux2( dV) << endl;
-    cout << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "  MU = "<< MU << std::endl;
+    Xyce::dout() << "  p  = "<< p  << " dpdx = "<<dpdx<<" E = "<<E <<std::endl;
+    Xyce::dout() << "  dV = "<< dV << " Ut = "<<Ut<<" Jpx = "<<J<<std::endl;
+    Xyce::dout() << "  p1 = "<< p1 << " p2 = "<<p2<<" (p2-p1) = "<<(p2-p1)<<std::endl;
+    Xyce::dout() << "  h  = "<< h  <<  std::endl;
+    Xyce::dout() << "  aux1(-dV) = " << aux1(-dV) << std::endl;
+    Xyce::dout() << "  aux2( dV) = " << aux2( dV) << std::endl;
+    Xyce::dout() << "  aux2(-dV) = " << aux2( dV) << std::endl;
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -936,6 +930,137 @@ double DevicePDEInstance::dJdp2_qdep
 
   return dJdp2;
 }
+
+
+
+
+//-----------------------------------------------------------------------------
+// Function      : DevicePDEInstance::dJdbm1_qdep
+// Purpose       : This function returns the derivative of current
+//                 density between two points in space, with
+//                 respect to the dopants at node 1.
+// Special Notes : This version is used when mu is dopant-dependent and dopants are variable
+// Scope         : public
+// Creator       : Lawrence C Musson, SNL
+// Creation Date : 10/24/13
+//-----------------------------------------------------------------------------
+double DevicePDEInstance::dJdbm1_qdep
+(double n1, double n2, double E, const pdeFadType & u, double h, int z)
+{
+  double dJdbm1 = 0.0;
+  double dudbm1=u.dx(6);
+
+  // add in chain rule from mobility derivative.
+  if (dudbm1 != 0.0)
+  {
+    double charge_number = static_cast<double>(z);
+    double dV     = -E*h/(2.0*Ut);
+    double n      = charge_number*(n1*aux2(charge_number*dV)+n2*aux2(-charge_number*dV));
+    double dndx   = aux1(-charge_number*dV)*(n2-n1)/h;
+    double dJ      =  dudbm1*((n*E)-Ut*(dndx));
+    dJdbm1 += dJ;
+  }
+
+  return dJdbm1;
+}
+
+
+//-----------------------------------------------------------------------------
+// Function      : DevicePDEInstance::dJdbm2_qdep
+// Purpose       : This function returns the derivative of current
+//                 density between two points in space, with
+//                 respect to the dopants at node 1.
+// Special Notes : This version is used when mu is dopant-dependent and dopants are variable
+// Scope         : public
+// Creator       : Lawrence C Musson, SNL
+// Creation Date : 10/24/13
+//-----------------------------------------------------------------------------
+double DevicePDEInstance::dJdbm2_qdep
+(double n1, double n2, double E, const pdeFadType & u, double h, int z)
+{
+  double dJdbm2=0.0;
+  double dudbm2=u.dx(8);
+
+  // add in chain rule from mobility derivative.
+  if (dudbm2 != 0.0)
+  {
+    double charge_number = static_cast<double>(z);
+    double dV     = -E*h/(2.0*Ut);
+    double n      = charge_number*(n1*aux2(charge_number*dV)+n2*aux2(-charge_number*dV));
+    double dndx   = aux1(-charge_number*dV)*(n2-n1)/h;
+    double dJ      =  dudbm2*((n*E)-Ut*(dndx));
+    dJdbm2 += dJ;
+  }
+
+  return dJdbm2;
+}
+
+
+//-----------------------------------------------------------------------------
+// Function      : DevicePDEInstance::dJdpp1_qdep
+// Purpose       : This function returns the derivative of current
+//                 density between two points in space, with
+//                 respect to the dopants at node 1.
+// Special Notes : This version is used when mu is dopant-dependent and dopants are variable
+// Scope         : public
+// Creator       : Lawrence C Musson, SNL
+// Creation Date : 10/24/13
+//-----------------------------------------------------------------------------
+double DevicePDEInstance::dJdpp1_qdep
+(double n1, double n2, double E, const pdeFadType & u, double h, int z)
+{
+  double dJdpp1=0.0;
+  double dudpp1=u.dx(7);
+
+  // add in chain rule from mobility derivative.
+  if (dudpp1 != 0.0)
+  {
+    double charge_number = static_cast<double>(z);
+    double dV     = -E*h/(2.0*Ut);
+    double n      = charge_number*(n1*aux2(charge_number*dV)+n2*aux2(-charge_number*dV));
+    double dndx   = aux1(-charge_number*dV)*(n2-n1)/h;
+    double dJ      =  dudpp1*((n*E)-Ut*(dndx));
+    dJdpp1 += dJ;
+  }
+
+  return dJdpp1;
+}
+
+
+//-----------------------------------------------------------------------------
+// Function      : DevicePDEInstance::dJdpp2_qdep
+// Purpose       : This function returns the derivative of current
+//                 density between two points in space, with
+//                 respect to the dopants at node 1.
+// Special Notes : This version is used when mu is dopant-dependent and dopants are variable
+// Scope         : public
+// Creator       : Lawrence C Musson, SNL
+// Creation Date : 10/24/13
+//-----------------------------------------------------------------------------
+double DevicePDEInstance::dJdpp2_qdep
+(double n1, double n2, double E, const pdeFadType & u, double h, int z)
+{
+  double dJdpp2=0.0;
+  double dudpp2=u.dx(9);
+
+  // add in chain rule from mobility derivative.
+  if (dudpp2 != 0.0)
+  {
+    double charge_number = static_cast<double>(z);
+    double dV     = -E*h/(2.0*Ut);
+    double n      = charge_number*(n1*aux2(charge_number*dV)+n2*aux2(-charge_number*dV));
+    double dndx   = aux1(-charge_number*dV)*(n2-n1)/h;
+    double dJ      =  dudpp2*((n*E)-Ut*(dndx));
+    dJdpp2 += dJ;
+  }
+
+  return dJdpp2;
+}
+
+
+
+
+
 //
 //
 #if 0
@@ -1110,23 +1235,23 @@ double DevicePDEInstance::pd1erf(double x)
 void DevicePDEInstance::setupOutputName ()
 {
 
-  string pdeString("Y%PDE%");
-  string neutString("Y%NEUTRON%");
+  std::string pdeString("Y%PDE%");
+  std::string neutString("Y%NEUTRON%");
   std::string::size_type pos1 = getName().find(pdeString);
   std::string::size_type pos2 = getName().find(neutString);
 
   if (pos1 != std::string::npos)
   {
-    string tmp1 = "";
+    std::string tmp1 = "";
     if (pos1 > 0) tmp1 = getName().substr(0,pos1);
-    string tmp2 = getName().substr(pos1+6, getName().length()-1);
+    std::string tmp2 = getName().substr(pos1+6, getName().length()-1);
     outputName = tmp1 + tmp2;
   }
   else if (pos2 != std::string::npos)
   {
-    string tmp1 = "";
+    std::string tmp1 = "";
     if (pos2 > 0) tmp1 = getName().substr(0,pos2);
-    string tmp2 = getName().substr(pos2+10, getName().length()-1);
+    std::string tmp2 = getName().substr(pos2+10, getName().length()-1);
     outputName = tmp1 + tmp2;
   }
   else
@@ -1146,7 +1271,7 @@ void DevicePDEInstance::setupOutputName ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "outputName = "<< outputName << endl;
+    Xyce::dout() << "outputName = "<< outputName << std::endl;
   }
 #endif
 

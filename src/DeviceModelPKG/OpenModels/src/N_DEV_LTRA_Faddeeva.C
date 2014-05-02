@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,139 +36,138 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.4.2.2 $
+// Revision Number: $Revision: 1.7.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/04 23:50:54 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
-/* Copyright (c) 2012, 2013 Massachusetts Institute of Technology
- *
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:
- *
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
+// Copyright (c) 2012, 2013 Massachusetts Institute of Technology
+// 
+// Permission is hereby granted, free of charge, to any person obtaining
+// a copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to
+// permit persons to whom the Software is furnished to do so, subject to
+// the following conditions:
+// 
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+// 
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+// LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+// WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+// 
 
-/* XYCE-NOTE: This file is, at present, only exists because of the Intel
- * compilers on Windows not putting erfc() in the standard math library.
- * Note also that this is a VERY stripped down version of what's
- * available at the referenced website below.
- */
+// XYCE-NOTE: This file is, at present, only exists because of the Intel
+// compilers on Windows not putting erfc() in the standard math library.
+// Note also that this is a VERY stripped down version of what's
+// available at the referenced website below.
+// 
 
 #include "N_DEV_LTRA_Faddeeva.h"
 
-/* Available at: http://ab-initio.mit.edu/Faddeeva
+// Available at: http://ab-initio.mit.edu/Faddeeva
 
-   Computes various error functions (erf, erfc, erfi, erfcx),
-   including the Dawson integral, in the complex plane, based
-   on algorithms for the computation of the Faddeeva function
-              w(z) = exp(-z^2) * erfc(-i*z).
-   Given w(z), the error functions are mostly straightforward
-   to compute, except for certain regions where we have to
-   switch to Taylor expansions to avoid cancellation errors
-   [e.g. near the origin for erf(z)].
+//    Computes various error functions (erf, erfc, erfi, erfcx),
+//    including the Dawson integral, in the complex plane, based
+//    on algorithms for the computation of the Faddeeva function
+//               w(z) = exp(-z^2) * erfc(-i*z).
+//    Given w(z), the error functions are mostly straightforward
+//    to compute, except for certain regions where we have to
+//    switch to Taylor expansions to avoid cancellation errors
+//    [e.g. near the origin for erf(z)].
 
-   To compute the Faddeeva function, we use a combination of two
-   algorithms:
+//    To compute the Faddeeva function, we use a combination of two
+//    algorithms:
 
-   For sufficiently large |z|, we use a continued-fraction expansion
-   for w(z) similar to those described in:
+//    For sufficiently large |z|, we use a continued-fraction expansion
+//    for w(z) similar to those described in:
 
-      Walter Gautschi, "Efficient computation of the complex error
-      function," SIAM J. Numer. Anal. 7(1), pp. 187-198 (1970)
+//       Walter Gautschi, "Efficient computation of the complex error
+//       function," SIAM J. Numer. Anal. 7(1), pp. 187-198 (1970)
 
-      G. P. M. Poppe and C. M. J. Wijers, "More efficient computation
-      of the complex error function," ACM Trans. Math. Soft. 16(1),
-      pp. 38-46 (1990).
+//       G. P. M. Poppe and C. M. J. Wijers, "More efficient computation
+//       of the complex error function," ACM Trans. Math. Soft. 16(1),
+//       pp. 38-46 (1990).
 
-   Unlike those papers, however, we switch to a completely different
-   algorithm for smaller |z|:
+//    Unlike those papers, however, we switch to a completely different
+//    algorithm for smaller |z|:
 
-      Mofreh R. Zaghloul and Ahmed N. Ali, "Algorithm 916: Computing the
-      Faddeyeva and Voigt Functions," ACM Trans. Math. Soft. 38(2), 15
-      (2011).
+//       Mofreh R. Zaghloul and Ahmed N. Ali, "Algorithm 916: Computing the
+//       Faddeyeva and Voigt Functions," ACM Trans. Math. Soft. 38(2), 15
+//       (2011).
 
-   (I initially used this algorithm for all z, but it turned out to be
-    significantly slower than the continued-fraction expansion for
-    larger |z|.  On the other hand, it is competitive for smaller |z|,
-    and is significantly more accurate than the Poppe & Wijers code
-    in some regions, e.g. in the vicinity of z=1+1i.)
+//    (I initially used this algorithm for all z, but it turned out to be
+//     significantly slower than the continued-fraction expansion for
+//     larger |z|.  On the other hand, it is competitive for smaller |z|,
+//     and is significantly more accurate than the Poppe & Wijers code
+//     in some regions, e.g. in the vicinity of z=1+1i.)
 
-   Note that this is an INDEPENDENT RE-IMPLEMENTATION of these algorithms,
-   based on the description in the papers ONLY.  In particular, I did
-   not refer to the authors' Fortran or Matlab implementations, respectively,
-   (which are under restrictive ACM copyright terms and therefore unusable
-    in free/open-source software).
+//    Note that this is an INDEPENDENT RE-IMPLEMENTATION of these algorithms,
+//    based on the description in the papers ONLY.  In particular, I did
+//    not refer to the authors' Fortran or Matlab implementations, respectively,
+//    (which are under restrictive ACM copyright terms and therefore unusable
+//     in free/open-source software).
 
-   Steven G. Johnson, Massachusetts Institute of Technology
-   http://math.mit.edu/~stevenj
-   October 2012.
+//    Steven G. Johnson, Massachusetts Institute of Technology
+//    http://math.mit.edu/~stevenj
+//    October 2012.
 
-    -- Note that Algorithm 916 assumes that the erfc(x) function,
-       or rather the scaled function erfcx(x) = exp(x*x)*erfc(x),
-       is supplied for REAL arguments x.   I originally used an
-       erfcx routine derived from DERFC in SLATEC, but I have
-       since replaced it with a much faster routine written by
-       me which uses a combination of continued-fraction expansions
-       and a lookup table of Chebyshev polynomials.  For speed,
-       I implemented a similar algorithm for Im[w(x)] of real x,
-       since this comes up frequently in the other error functions.
+//     -- Note that Algorithm 916 assumes that the erfc(x) function,
+//        or rather the scaled function erfcx(x) = exp(x*x)*erfc(x),
+//        is supplied for REAL arguments x.   I originally used an
+//        erfcx routine derived from DERFC in SLATEC, but I have
+//        since replaced it with a much faster routine written by
+//        me which uses a combination of continued-fraction expansions
+//        and a lookup table of Chebyshev polynomials.  For speed,
+//        I implemented a similar algorithm for Im[w(x)] of real x,
+//        since this comes up frequently in the other error functions.
 
-   A small test program is included the end, which checks
-   the w(z) etc. results against several known values.  To compile
-   the test function, compile with -DTEST_FADDEEVA (that is,
-   #define TEST_FADDEEVA).
+//    A small test program is included the end, which checks
+//    the w(z) etc. results against several known values.  To compile
+//    the test function, compile with -DTEST_FADDEEVA (that is,
+//    #define TEST_FADDEEVA).
 
-   REVISION HISTORY:
-       4 October 2012: Initial public release (SGJ)
-       5 October 2012: Revised (SGJ) to fix spelling error,
-                       start summation for large x at round(x/a) (> 1)
-		       rather than ceil(x/a) as in the original
-		       paper, which should slightly improve performance
-     		       (and, apparently, slightly improves accuracy)
-      19 October 2012: Revised (SGJ) to fix bugs for large x, large -y,
-                       and 15<x<26. Performance improvements. Prototype
-		       now supplies default value for relerr.
-      24 October 2012: Switch to continued-fraction expansion for
-                       sufficiently large z, for performance reasons.
-		       Also, avoid spurious overflow for |z| > 1e154.
-		       Set relerr argument to min(relerr,0.1).
-      27 October 2012: Enhance accuracy in Re[w(z)] taken by itself,
-                       by switching to Alg. 916 in a region near
-		       the real-z axis where continued fractions
-		       have poor relative accuracy in Re[w(z)].  Thanks
-		       to M. Zaghloul for the tip.
-      29 October 2012: Replace SLATEC-derived erfcx routine with
-                       completely rewritten code by me, using a very
-		       different algorithm which is much faster.
-      30 October 2012: Implemented special-case code for real z
-                       (where real part is exp(-x^2) and imag part is
-		        Dawson integral), using algorithm similar to erfx.
-		       Export ImFaddeeva_w function to make Dawson's
-		       integral directly accessible.
-      3 November 2012: Provide implementations of erf, erfc, erfcx,
-                       and Dawson functions in N_DEV_LTRA_Faddeeva:: namespace,
-		       in addition to N_DEV_LTRA_Faddeeva::w.  Provide header
-		       file Faddeeva.hh.
-      4 November 2012: Slightly faster erf for real arguments.
-                       Updated MATLAB and Octave plugins.
-*/
+//    REVISION HISTORY:
+//        4 October 2012: Initial public release (SGJ)
+//        5 October 2012: Revised (SGJ) to fix spelling error,
+//                        start summation for large x at round(x/a) (> 1)
+// 		       rather than ceil(x/a) as in the original
+// 		       paper, which should slightly improve performance
+//      		       (and, apparently, slightly improves accuracy)
+//       19 October 2012: Revised (SGJ) to fix bugs for large x, large -y,
+//                        and 15<x<26. Performance improvements. Prototype
+// 		       now supplies default value for relerr.
+//       24 October 2012: Switch to continued-fraction expansion for
+//                        sufficiently large z, for performance reasons.
+// 		       Also, avoid spurious overflow for |z| > 1e154.
+// 		       Set relerr argument to min(relerr,0.1).
+//       27 October 2012: Enhance accuracy in Re[w(z)] taken by itself,
+//                        by switching to Alg. 916 in a region near
+// 		       the real-z axis where continued fractions
+// 		       have poor relative accuracy in Re[w(z)].  Thanks
+// 		       to M. Zaghloul for the tip.
+//       29 October 2012: Replace SLATEC-derived erfcx routine with
+//                        completely rewritten code by me, using a very
+// 		       different algorithm which is much faster.
+//       30 October 2012: Implemented special-case code for real z
+//                        (where real part is exp(-x^2) and imag part is
+// 		        Dawson integral), using algorithm similar to erfx.
+// 		       Export ImFaddeeva_w function to make Dawson's
+// 		       integral directly accessible.
+//       3 November 2012: Provide implementations of erf, erfc, erfcx,
+//                        and Dawson functions in N_DEV_LTRA_Faddeeva:: namespace,
+// 		       in addition to N_DEV_LTRA_Faddeeva::w.  Provide header
+// 		       file Faddeeva.hh.
+//       4 November 2012: Slightly faster erf for real arguments.
+//                        Updated MATLAB and Octave plugins.
 
 #include <cfloat>
 #include <cmath>
@@ -219,43 +218,43 @@ double erfc(double x)
 
 /////////////////////////////////////////////////////////////////////////
 
-/* erfcx(x) = exp(x^2) erfc(x) function, for real x, written by
-   Steven G. Johnson, October 2012.
+//  erfcx(x) = exp(x^2) erfc(x) function, for real x, written by
+//  Steven G. Johnson, October 2012.
 
-   This function combines a few different ideas.
+//  This function combines a few different ideas.
 
-   First, for x > 50, it uses a continued-fraction expansion (same as
-   for the Faddeeva function, but with algebraic simplifications for z=i*x).
+//  First, for x > 50, it uses a continued-fraction expansion (same as
+//  for the Faddeeva function, but with algebraic simplifications for z=i*x).
 
-   Second, for 0 <= x <= 50, it uses Chebyshev polynomial approximations,
-   but with two twists:
+//  Second, for 0 <= x <= 50, it uses Chebyshev polynomial approximations,
+//  but with two twists:
 
-      a) It maps x to y = 4 / (4+x) in [0,1].  This simple transformation,
-         inspired by a similar transformation in the octave-forge/specfun
-	 erfcx by Soren Hauberg, results in much faster Chebyshev convergence
-	 than other simple transformations I have examined.
+//     a) It maps x to y = 4 / (4+x) in [0,1].  This simple transformation,
+//        inspired by a similar transformation in the octave-forge/specfun
+//     erfcx by Soren Hauberg, results in much faster Chebyshev convergence
+//     than other simple transformations I have examined.
 
-      b) Instead of using a single Chebyshev polynomial for the entire
-         [0,1] y interval, we break the interval up into 100 equal
-	 subintervals, with a switch/lookup table, and use much lower
-	 degree Chebyshev polynomials in each subinterval. This greatly
-	 improves performance in my tests.
+//     b) Instead of using a single Chebyshev polynomial for the entire
+//        [0,1] y interval, we break the interval up into 100 equal
+//     subintervals, with a switch/lookup table, and use much lower
+//     degree Chebyshev polynomials in each subinterval. This greatly
+//     improves performance in my tests.
 
-   For x < 0, we use the relationship erfcx(-x) = 2 exp(x^2) - erfc(x),
-   with the usual checks for overflow etcetera.
+//  For x < 0, we use the relationship erfcx(-x) = 2 exp(x^2) - erfc(x),
+//  with the usual checks for overflow etcetera.
 
-   Performance-wise, it seems to be substantially faster than either
-   the SLATEC DERFC function [or an erfcx function derived therefrom]
-   or Cody's CALERF function (from netlib.org/specfun), while
-   retaining near machine precision in accuracy.  */
+//  Performance-wise, it seems to be substantially faster than either
+//  the SLATEC DERFC function [or an erfcx function derived therefrom]
+//  or Cody's CALERF function (from netlib.org/specfun), while
+//  retaining near machine precision in accuracy.
 
-/* Given y100=100*y, where y = 4/(4+x) for x >= 0, compute erfc(x).
+//  Given y100=100*y, where y = 4/(4+x) for x >= 0, compute erfc(x).
 
-   Uses a look-up table of 100 different Chebyshev polynomials
-   for y intervals [0,0.01], [0.01,0.02], ...., [0.99,1], generated
-   with the help of Maple and a little shell script.   This allows
-   the Chebyshev polynomials to be of significantly lower degree (about 1/4)
-   compared to fitting the whole [0,1] interval with a single polynomial. */
+//  Uses a look-up table of 100 different Chebyshev polynomials
+//  for y intervals [0,0.01], [0.01,0.02], ...., [0.99,1], generated
+//  with the help of Maple and a little shell script.   This allows
+//  the Chebyshev polynomials to be of significantly lower degree (about 1/4)
+//  compared to fitting the whole [0,1] interval with a single polynomial.
 static double erfcx_y100(double y100)
 {
   switch ((int) y100) {
@@ -672,8 +671,8 @@ double erfcx(double x)
       const double ispi = 0.56418958354775628694807945156; // 1 / sqrt(pi)
       if (x > 5e7) // 1-term expansion, important to avoid overflow
 	return ispi / x;
-      /* 5-term expansion (rely on compiler for CSE), simplified from:
-	        ispi / (x+0.5/(x+1/(x+1.5/(x+2/x))))  */
+      //  5-term expansion (rely on compiler for CSE), simplified from:
+      //         ispi / (x+0.5/(x+1/(x+1.5/(x+2/x)))) 
       return ispi*((x*x) * (x*x+4.5) + 2) / (x * ((x*x) * (x*x+5) + 3.75));
     }
     return erfcx_y100(400/(4+x));

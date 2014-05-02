@@ -27,24 +27,24 @@
 //
 // Purpose        : Stream buffer that performs indentationx
 //
-// Special Notes  : 
+// Special Notes  :
 //
-// Creator        : David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+// Creator        : David G. Baur  Raytheon  Sandia National Laboratories 1355 
 //
 // Creation Date  : 2013/04/18 18:01:27
 //
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.2.2.2 $
+// Revision Number: $Revision: 1.6.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/03/03 18:29:29 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
-#ifndef N_UTL_INDENTSTREAMBUF_HPP
-#define N_UTL_INDENTSTREAMBUF_HPP
+#ifndef Xyce_N_UTL_IndentStreambuf_h
+#define Xyce_N_UTL_IndentStreambuf_h
 
 #include <streambuf>
 // #include <utility>
@@ -97,13 +97,13 @@ public:
    * Creates a new <b>basic_indent_streambuf</b> instance.
    *
    * @param indent_size		a <b>size_t</b> value of the number of spaces for each indentation
-   *                            level. 
+   *                            level.
    *
    * @param flags		an <b>unsigned int</b> value of Flags to enable or disable
    *                            BLANK_LINES and BRACES.
    *
    */
-  explicit basic_indent_streambuf(std::basic_streambuf<Ch, Tr> *stream_buffer, size_t indent_size = 2, unsigned flags = BRACES)
+  explicit basic_indent_streambuf(std::basic_streambuf<Ch, Tr> *stream_buffer, size_t indent_size = 2, unsigned flags = BRACES|BLANK_LINES)
     : m_streamBuffer(stream_buffer),
       m_atLineBegin(true),
       m_leftJustify(false),
@@ -120,7 +120,8 @@ public:
    * Destroys a <b>basic_indent_streambuf</b> instance.
    *
    */
-  virtual ~basic_indent_streambuf() {
+  virtual ~basic_indent_streambuf() 
+  {
     delete[] m_indentString;
   }
 
@@ -128,30 +129,33 @@ public:
    * @brief Member function <b>redirect</b> sets the destination output stream buffer.
    *
    */
-  void redirect(std::basic_streambuf<Ch, Tr> *stream_buffer) {
+  void redirect(std::basic_streambuf<Ch, Tr> *stream_buffer) 
+  {
     m_streamBuffer = stream_buffer;
   }
 
   /**
    * @brief Member function <b>get_stream_buffer</b> returns the current destination output stream
-   * buffer. 
+   * buffer.
    *
    * @return			a <b>std::streambuf</b> pointer to the current destination output
    *                            stream buffer.
    */
-  std::streambuf *get_stream_buffer() {
+  std::streambuf *get_stream_buffer() 
+  {
     return m_streamBuffer;
   }
-  
+
   /**
    * @brief Member function <b>set_indent_size</b> set the number of spaces to write for each
    * indentation level.
    *
    * @param indent_size		a <b>size_t</b> value of the number of spaces for each indentation
-   *                            level. 
+   *                            level.
    *
    */
-  void set_indent_size(size_t indent_size) {
+  void set_indent_size(size_t indent_size) 
+  {
     m_indentSize = indent_size;
 
     delete[] m_indentString;
@@ -166,7 +170,8 @@ public:
    * @param flags		an <b>unsigned int</b> value of the Flags to enable/disable.
    *
    */
-  void set_flags(unsigned flags) {
+  void set_flags(unsigned flags) 
+  {
     m_flags = (Flags) flags;
   }
 
@@ -177,7 +182,8 @@ private:
    *
    * @return			a <b>size_t</b> value of the current indentation level.
    */
-  size_t indent_level() {
+  size_t indent_level() 
+  {
     return std::min(m_indentLevel*m_indentSize, (size_t) MAX_INDENT_LEVEL*m_indentSize);
   }
 
@@ -186,8 +192,10 @@ private:
    * line and no left justification.
    *
    */
-  void prefix() {
-    if (m_atLineBegin) {
+  void prefix() 
+  {
+    if (m_atLineBegin) 
+    {
       if (!m_leftJustify)
         m_streamBuffer->sputn(m_indentString, indent_level());
       m_leftJustify = false;
@@ -199,13 +207,16 @@ private:
    * @brief Member function <b>next_line</b> prints the braces for indentation.
    *
    */
-  void next_line() {
-    if (m_nextIndentLevel > m_indentLevel) {
-      if (m_flags & BRACES) 
+  void next_line() 
+  {
+    if (m_nextIndentLevel > m_indentLevel) 
+    {
+      if (m_flags & BRACES)
 	m_streamBuffer->sputn(" {", 2);
       m_streamBuffer->sputc(Tr::to_int_type('\n'));
     }
-    else if (m_nextIndentLevel < m_indentLevel) {
+    else if (m_nextIndentLevel < m_indentLevel) 
+    {
       m_indentLevel = m_nextIndentLevel;
       if (!m_atLineBegin)
         m_streamBuffer->sputc(Tr::to_int_type('\n'));
@@ -232,24 +243,29 @@ public:
    *
    * @return			an <b>int</b> value of the character written.
    */
-  virtual typename std::basic_streambuf<Ch, Tr>::int_type overflow(typename std::basic_streambuf<Ch, Tr>::int_type c) {
+  virtual typename std::basic_streambuf<Ch, Tr>::int_type overflow(typename std::basic_streambuf<Ch, Tr>::int_type c) 
+  {
     if (c == Tr::to_int_type('\n'))
       next_line();
-    else if (c == Tr::to_int_type(POP)) {
+    else if (c == Tr::to_int_type(POP)) 
+    {
       if (m_nextIndentLevel != m_indentLevel)
 	next_line();
       if (m_indentLevel > 0)
 	m_nextIndentLevel = m_indentLevel - 1;
     }
-    else if (c == Tr::to_int_type(PUSH)) {
+    else if (c == Tr::to_int_type(PUSH)) 
+    {
       if (m_nextIndentLevel != m_indentLevel)
 	next_line();
       m_nextIndentLevel = m_indentLevel + 1;
     }
-    else if (c == Tr::to_int_type(LEFT)) {
+    else if (c == Tr::to_int_type(LEFT)) 
+    {
       m_leftJustify = true;
     }
-    else {
+    else 
+    {
       prefix();
       m_streamBuffer->sputc(c);
     }
@@ -265,49 +281,59 @@ public:
    * @param p			a <b>Ch</b> const pointer to the character string to write.
    *
    * @param n			a <b>std::streamsize</b> value of the number of characters in the
-   *                            string. 
+   *                            string.
    *
    * @return			a <b>std::streamsize</b> value of the number of characters os the
    *                            string which were interpreted or written.
    */
-  virtual std::streamsize xsputn(const Ch *p,  std::streamsize n) {
+  virtual std::streamsize xsputn(const Ch *p,  std::streamsize n) 
+  {
     const Ch *p_end = p + n;
-    for (const Ch *q = p; q != p_end; ++q) {
+    for (const Ch *q = p; q != p_end; ++q) 
+    {
 
 // If at start of line, PUSH and POP have immediate effect
-      if (p == q && m_atLineBegin) {
-	if (Tr::to_int_type(*p) == Tr::to_int_type('\n')) {
+      if (p == q && m_atLineBegin) 
+      {
+	if (Tr::to_int_type(*p) == Tr::to_int_type('\n')) 
+        {
 	  next_line();
 	  ++p;
 	}
-	else if (Tr::to_int_type(*p) == Tr::to_int_type(POP)) {
+	else if (Tr::to_int_type(*p) == Tr::to_int_type(POP)) 
+        {
 	  ++p;
 	  if (m_nextIndentLevel != m_indentLevel)
 	    next_line();
 	  if (m_indentLevel > 0)
 	    m_nextIndentLevel = m_indentLevel - 1;
 	}
-	else if (Tr::to_int_type(*p) == Tr::to_int_type(PUSH)) {
+	else if (Tr::to_int_type(*p) == Tr::to_int_type(PUSH)) 
+        {
 	  ++p;
 	  if (m_nextIndentLevel != m_indentLevel)
 	    next_line();
 	  m_nextIndentLevel = m_indentLevel + 1;
 	}
-        else if (Tr::to_int_type(*p) == Tr::to_int_type(LEFT)) {
+        else if (Tr::to_int_type(*p) == Tr::to_int_type(LEFT)) 
+        {
           ++p;
           m_leftJustify = true;
         }
       }
 
 // If not at start, PUSH and POP are for the next line.
-      else {
-	if (Tr::to_int_type(*q) == Tr::to_int_type('\n')) {
+      else 
+      {
+	if (Tr::to_int_type(*q) == Tr::to_int_type('\n')) 
+        {
 	  prefix();
 	  m_streamBuffer->sputn(p, q - p);
 	  next_line();
 	  p = q + 1;
 	}
-	else if (Tr::to_int_type(*q) == Tr::to_int_type(POP)) {
+	else if (Tr::to_int_type(*q) == Tr::to_int_type(POP)) 
+        {
 	  prefix();
 	  m_streamBuffer->sputn(p, q - p);
 	  p = q + 1;
@@ -316,7 +342,8 @@ public:
 	  if (m_indentLevel > 0)
 	    m_nextIndentLevel = m_indentLevel - 1;
 	}
-	else if (Tr::to_int_type(*q) == Tr::to_int_type(PUSH)) {
+	else if (Tr::to_int_type(*q) == Tr::to_int_type(PUSH)) 
+        {
 	  prefix();
 	  m_streamBuffer->sputn(p, q - p);
 	  p = q + 1;
@@ -324,13 +351,15 @@ public:
 	    next_line();
 	  m_nextIndentLevel = m_indentLevel + 1;
 	}
-        else if (Tr::to_int_type(*q) == Tr::to_int_type(LEFT)) {
+        else if (Tr::to_int_type(*q) == Tr::to_int_type(LEFT)) 
+        {
           m_leftJustify = true;
 	  p = q + 1;
         }
       }
     }
-    if (p != p_end) {
+    if (p != p_end) 
+    {
       prefix();
       m_streamBuffer->sputn(p, p_end - p);
       m_atLineBegin = false;
@@ -340,18 +369,19 @@ public:
   }
 
   /**
-   * @brief Member function <b>sync</b> syncs the destination output stream buffer. 
+   * @brief Member function <b>sync</b> syncs the destination output stream buffer.
    *
    * @return			an <b>int</b> value result of the pub sync operation.
    */
-  virtual int sync() {
+  virtual int sync() 
+  {
     return m_streamBuffer->pubsync();
   }
 
 private:
   basic_indent_streambuf(const basic_indent_streambuf &);
   basic_indent_streambuf &operator=(const basic_indent_streambuf &);
-  
+
 private:
   std::streambuf *	m_streamBuffer;         ///< Pointer to destination output stream buffer
   bool			m_atLineBegin;          ///< Flag indicating at beginning of line
@@ -364,17 +394,17 @@ private:
 };
 
 template<class Ch, class Tr>
-std::basic_ostream<Ch, Tr> &push(std::basic_ostream<Ch, Tr> &os) {
+std::basic_ostream<Ch, Tr> &push(std::basic_ostream<Ch, Tr> &os) 
+{
   os.put(PUSH);
-//  os.put('\n');
   os.flush();
   return os;
 }
 
 template<class Ch, class Tr>
-std::basic_ostream<Ch, Tr> &pop(std::basic_ostream<Ch, Tr> &os) {
+std::basic_ostream<Ch, Tr> &pop(std::basic_ostream<Ch, Tr> &os) 
+{
   os.put(POP);
-//  os.put('\n');
   os.flush();
   return os;
 }
@@ -388,7 +418,8 @@ class indent_streambuf_throwsafe
       m_indentLevel(sb.indent_level())
   {}
 
-  ~indent_streambuf_throwsafe() {
+  ~indent_streambuf_throwsafe() 
+  {
     while (m_indentStreambuf.indent_level() > m_indentLevel)
       m_indentStreambuf.pop();
   }
@@ -399,11 +430,13 @@ private:
 };
 
 
-struct IndentFlags {
+struct IndentFlags 
+{
   int           m_flags;
 };
 
-inline IndentFlags indent_flags(int flags) {
+inline IndentFlags indent_flags(int flags) 
+{
   IndentFlags f;
   f.m_flags = flags;
   return f;
@@ -411,11 +444,12 @@ inline IndentFlags indent_flags(int flags) {
 
 template<class Ch, class Tr>
 std::basic_ostream<Ch, Tr> &
-operator<<(std::basic_ostream<Ch, Tr> &os, IndentFlags indent_flags) {
+operator<<(std::basic_ostream<Ch, Tr> &os, IndentFlags indent_flags) 
+{
   basic_indent_streambuf<Ch, Tr> *osb = dynamic_cast<basic_indent_streambuf<Ch, Tr> *>(os.rdbuf());
   if (osb)
     osb->set_flags(indent_flags.m_flags);
-      
+
   return os;
 }
 
@@ -424,4 +458,4 @@ typedef basic_indent_streambuf<char> indent_streambuf;
 } // namespace Util
 } // namespace Xyce
 
-#endif //  N_UTL_INDENTSTREAMBUF_HPP
+#endif // Xyce_N_UTL_IndentStreambuf_h

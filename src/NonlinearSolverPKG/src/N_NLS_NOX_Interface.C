@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.149.2.2 $
+// Revision Number: $Revision: 1.158 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -103,7 +103,7 @@ Interface::Interface(N_IO_CmdParse & cp) :
   N_NLS_NonLinearSolver(cp),
   dcParams_(DC_OP),
   transientParams_(TRANSIENT),
-  hbParams_(HB),
+  hbParams_(HB_MODE),
   sharedSystemPtr_(0),
   mode_(DC_OP),
   lastParametersMode_(DC_OP),
@@ -287,7 +287,7 @@ bool Interface::initializeAll()
   transientParams_.setOutputOptions(myPID, 0);
 
   // get var type list
-  vector<char> varTypeVec;
+  std::vector<char> varTypeVec;
 #if 0
   topologyRcp_->returnVarTypeVec( varTypeVec );
 #endif
@@ -320,19 +320,19 @@ bool Interface::initializeAll()
 	  .get("Forcing Term Method","Constant") == std::string("Constant")))
   {
     setAZ_Tol_DC = true;
-    //cout << "NOX is overriding DC LS tol." << endl;
+    //Xyce::dout() << "NOX is overriding DC LS tol." << std::endl;
   }
   if (!(transientParams_.getNoxParams()->sublist("Direction").sublist("Newton")
 	  .get("Forcing Term Method", "Constant") == std::string("Constant")))
   {
     setAZ_Tol_Transient = true;
-    //cout << "NOX is overriding Transient LS tol." << endl;
+    //Xyce::dout() << "NOX is overriding Transient LS tol." << std::endl;
   }
   if (!(hbParams_.getNoxParams()->sublist("Direction").sublist("Newton")
 	  .get("Forcing Term Method", "Constant") == std::string("Constant")))
   {
     setAZ_Tol_Transient = true;
-    //cout << "NOX is overriding Transient LS tol." << endl;
+    //Xyce::dout() << "NOX is overriding Transient LS tol." << std::endl;
   }
 
   return true;
@@ -389,12 +389,12 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
     lastParametersMode_ = parametersMode_;
     parametersMode_ = TRANSIENT;
   }
-  else if ((usemode_) && (mode_ == HB))
+  else if ((usemode_) && (mode_ == HB_MODE))
   {
     paramsPtr = &hbParams_;
     locaStatusTestPtr_ = locaHBStatusTestPtr_;
     lastParametersMode_ = parametersMode_;
-    parametersMode_ = HB;
+    parametersMode_ = HB_MODE;
   }
   else
   {
@@ -473,7 +473,7 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
   }
 
 #ifdef Xyce_DEBUG_NONLINEAR
-  cout << "solverType is " << solverType << endl;
+  Xyce::dout() << "solverType is " << solverType << std::endl;
 #endif
 
   // (0) Standard Newton Method Solve (includes line search and
@@ -496,7 +496,7 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
     if (Teuchos::is_null(solverPtr_))
     {
 #ifdef Xyce_DEBUG_NONLINEAR
-      std::cout << "Creating new NLS solver b/c it is 0." <<std::endl;
+      Xyce::dout() << "Creating new NLS solver b/c it is 0." <<std::endl;
 #endif
       solverPtr_ = NOX::Solver::buildSolver(groupPtr_,
                                             paramsPtr->getStatusTests(),
@@ -523,7 +523,7 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
     else if ((usemode_) && (lastParametersMode_ != parametersMode_))
     {
 #ifdef Xyce_DEBUG_NONLINEAR
-      std::cout << "Creating new NLS solver b/c starting next phase, post-DC." <<std::endl;
+      Xyce::dout() << "Creating new NLS solver b/c starting next phase, post-DC." <<std::endl;
 #endif
       // Create a new solver for the next phase of the simulation.
       solverPtr_ = NOX::Solver::buildSolver(groupPtr_,
@@ -533,7 +533,7 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
     else  // solverPtr is not null, and the mode didn't change since last call.
     {
 #ifdef Xyce_DEBUG_NONLINEAR
-      std::cout << "NOT Creating new NLS solver, just resetting." <<std::endl;
+      Xyce::dout() << "NOT Creating new NLS solver, just resetting." <<std::endl;
 #endif
       solverPtr_->reset(groupPtr_->getX());
     }
@@ -548,17 +548,17 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
     }
     // Send back the correct return code
 #ifdef Xyce_DEBUG_NONLINEAR
-    std::cout << "return code for transient params: " << transientParams_.getStatusTestReturnCode() <<std::endl;;
-    std::cout << "return code for hb params: " << hbParams_.getStatusTestReturnCode() << std::endl;
-    std::cout << "return code for dc params: " << dcParams_.getStatusTestReturnCode () <<std::endl;
+    Xyce::dout() << "return code for transient params: " << transientParams_.getStatusTestReturnCode() <<std::endl;;
+    Xyce::dout() << "return code for hb params: " << hbParams_.getStatusTestReturnCode() << std::endl;
+    Xyce::dout() << "return code for dc params: " << dcParams_.getStatusTestReturnCode () <<std::endl;
 #endif
     return (paramsPtr->getStatusTestReturnCode());
   }
   // (1) Natural Parameter Continuation
   else if (solverType == 1)
   {
-    vector<string> pars;
-    string con;
+    std::vector<std::string> pars;
+    std::string con;
     int j, numParam = 0;
     double value;
     bool usedOP=false;
@@ -597,20 +597,20 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
 
     // Fail out if no parameters have been specified.
     if ( numParam == 0 ) {
-      string message = "ERROR: Using \"continuation=1\" requires a parameter to be set with the conparam keyword in the loca option block!";
+      std::string message = "Using \"continuation=1\" requires a parameter to be set with the conparam keyword in the loca option block!";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, message);
     }
 
     Teuchos::RefCountPtr<N_NLS_NOX::AugmentLinSys> als;
     Teuchos::RefCountPtr<N_NLS_NOX::AugmentLinSys> alsNull; // 0
 
-    vector<double> minValue(numParam, 0.);
-    vector<double> maxValue(numParam, 0.);
-    vector<double> initialValue(numParam, 0.);
-    vector<double> initialStepSize(numParam, 0.);
-    vector<double> minStepSize(numParam, 0.);
-    vector<double> maxStepSize(numParam, 0.);
-    vector<double> aggressiveness(numParam, 0.);
+    std::vector<double> minValue(numParam, 0.);
+    std::vector<double> maxValue(numParam, 0.);
+    std::vector<double> initialValue(numParam, 0.);
+    std::vector<double> initialStepSize(numParam, 0.);
+    std::vector<double> minStepSize(numParam, 0.);
+    std::vector<double> maxStepSize(numParam, 0.);
+    std::vector<double> aggressiveness(numParam, 0.);
 
     // Check the size of params to make sure users provided all required data
     std::vector<std::string> paramNames(0);
@@ -723,7 +723,7 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
       {
         if (iParam_ == 0 && DCOPused_)
         {
-          string message = "'.dcop input=' and gstepping are incompatible";
+          std::string message = "'.dcop input=' and gstepping are incompatible";
           N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, message);
         }
         Teuchos::RefCountPtr<N_NLS_NOX::AugmentLinSys> als =
@@ -772,8 +772,8 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
     }
 
     // check if use specified vector params.  If so, flag a warning.
-    vector<string> pars;
-    string con;
+    std::vector<std::string> pars;
+    std::string con;
     int numParam;
     while (paramsPtr->getVectorParam("CONPARAM", numParam, con))
     {
@@ -782,15 +782,15 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
     }
 
     if ( numParam > 1 ) {
-      string message = "WARNING: Using \"continuation=2\" currently does not support vectorized loca parameters.  Only the first values in each list will be used.";
+      std::string message = "WARNING: Using \"continuation=2\" currently does not support vectorized loca parameters.  Only the first values in each list will be used.";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING, message);
     }
 
     Teuchos::RefCountPtr<Teuchos::ParameterList> locaList = paramsPtr->getLocaParams();
 
     // Create the continuation parameter names
-    string gain = "mosfet:gainscale";
-    string nonlinear = "mosfet:nltermscale";
+    std::string gain = "mosfet:gainscale";
+    std::string nonlinear = "mosfet:nltermscale";
 
     // Create Parameter Vector and get the stepper parameter list.
     LOCA::ParameterVector locaPVec;
@@ -883,7 +883,7 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
     Teuchos::RefCountPtr<Teuchos::ParameterList> locaList = paramsPtr->getLocaParams();
 
     // Create the continuation parameter names
-    string gmin = "GSTEPPING";
+    std::string gmin = "GSTEPPING";
 
     // Create Parameter Vector and get the stepper parameter list.
     LOCA::ParameterVector locaPVec;
@@ -948,7 +948,7 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
     iParam_ = 0;
     if (iParam_ == 0 && DCOPused_)
     {
-      string message = "'.dcop input=' and gstepping are incompatible";
+      std::string message = "'.dcop input=' and gstepping are incompatible";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, message);
     }
     if (!usedIC)
@@ -977,9 +977,9 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
     Teuchos::RefCountPtr<Teuchos::ParameterList> locaList = paramsPtr->getLocaParams();
 
     // Create the continuation parameter names
-    string gain = "mosfet:gainscale";
-    string nonlinear = "mosfet:nltermscale";
-    string size = "mosfet:sizescale";
+    std::string gain = "mosfet:gainscale";
+    std::string nonlinear = "mosfet:nltermscale";
+    std::string size = "mosfet:sizescale";
 
     // Create Parameter Vector and get the stepper parameter list.
     LOCA::ParameterVector locaPVec;
@@ -1065,9 +1065,9 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
     Teuchos::RefCountPtr<Teuchos::ParameterList> locaList = paramsPtr->getLocaParams();
 
     // Create the continuation parameter names
-    //string gain = "mosfet:gainscale";
-    string nonlinear = "mosfet:nltermscale";
-    string size = "mosfet:sizescale";
+    //std::string gain = "mosfet:gainscale";
+    std::string nonlinear = "mosfet:nltermscale";
+    std::string size = "mosfet:sizescale";
 
     // Create Parameter Vector and get the stepper parameter list.
     LOCA::ParameterVector locaPVec;
@@ -1131,9 +1131,9 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
     Teuchos::RefCountPtr<Teuchos::ParameterList> locaList = paramsPtr->getLocaParams();
 
     // Create the continuation parameter names
-    string gain = "mosfet:gainscale";
-    string nonlinear = "mosfet:nltermscale";
-    string size = "mosfet:sizescale";
+    std::string gain = "mosfet:gainscale";
+    std::string nonlinear = "mosfet:nltermscale";
+    std::string size = "mosfet:sizescale";
 
     // Create Parameter Vector and get the stepper parameter list.
     LOCA::ParameterVector locaPVec;
@@ -1176,18 +1176,18 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
     // Create storage for continuation objects
     int numGainBlocks = loaderPtr_->getHomotopyBlockSize();
     int numHomotopyContinuationRuns = 1 + numGainBlocks;
-    vector<string> names(numHomotopyContinuationRuns);
-    vector<double> initialVal(numHomotopyContinuationRuns);
-    vector<double> finalVal(numHomotopyContinuationRuns);
-    vector<double> minVal(numHomotopyContinuationRuns);
-    vector<double> maxVal(numHomotopyContinuationRuns);
+    std::vector<std::string> names(numHomotopyContinuationRuns);
+    std::vector<double> initialVal(numHomotopyContinuationRuns);
+    std::vector<double> finalVal(numHomotopyContinuationRuns);
+    std::vector<double> minVal(numHomotopyContinuationRuns);
+    std::vector<double> maxVal(numHomotopyContinuationRuns);
 
     // Set up continuation steps
     // ***************************************************
     // Changes vals below for continuation
     // ***************************************************
     for (int i = 0; i < numGainBlocks; ++i) {
-      stringstream s;
+      std::stringstream s;
       s << i;
       names[i] = "mosfet:gainscale_block_" + s.str();
       initialVal[i] = 0.0;
@@ -1264,11 +1264,11 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
 
     // Create storage for continuation objects
     int numHomotopyContinuationRuns = 1;
-    vector<string> names(numHomotopyContinuationRuns);
-    vector<double> initialVal(numHomotopyContinuationRuns);
-    vector<double> finalVal(numHomotopyContinuationRuns);
-    vector<double> minVal(numHomotopyContinuationRuns);
-    vector<double> maxVal(numHomotopyContinuationRuns);
+    std::vector<std::string> names(numHomotopyContinuationRuns);
+    std::vector<double> initialVal(numHomotopyContinuationRuns);
+    std::vector<double> finalVal(numHomotopyContinuationRuns);
+    std::vector<double> minVal(numHomotopyContinuationRuns);
+    std::vector<double> maxVal(numHomotopyContinuationRuns);
 
     // Set up continuation steps
     // ***************************************************
@@ -1285,9 +1285,9 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
     //finalVal[1] = 1.0;
     //finalVal[2] = 1.0;
     // ***************************************************
-    string n1 = "mosfet:nltermscale";
+    std::string n1 = "mosfet:nltermscale";
     locaPVec.addParameter(n1, 0.0);
-    //string n2 = "mosfet:sizescale";
+    //std::string n2 = "mosfet:sizescale";
     //locaPVec.addParameter(n2, 0.0);
     // ***************************************************
     // ***************************************************
@@ -1424,11 +1424,11 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
 
     // Create storage for continuation objects
     int numHomotopyContinuationRuns = 4;
-    vector<string> names(numHomotopyContinuationRuns);
-    vector<double> initialVal(numHomotopyContinuationRuns);
-    vector<double> finalVal(numHomotopyContinuationRuns);
-    vector<double> minVal(numHomotopyContinuationRuns);
-    vector<double> maxVal(numHomotopyContinuationRuns);
+    std::vector<std::string> names(numHomotopyContinuationRuns);
+    std::vector<double> initialVal(numHomotopyContinuationRuns);
+    std::vector<double> finalVal(numHomotopyContinuationRuns);
+    std::vector<double> minVal(numHomotopyContinuationRuns);
+    std::vector<double> maxVal(numHomotopyContinuationRuns);
 
     // Set up continuation steps
     // ***************************************************
@@ -1447,9 +1447,9 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
     finalVal[2] = 1.0;
     finalVal[3] = 1.0;
     // ***************************************************
-    //string n1 = "mosfet:nltermscale";
+    //std::string n1 = "mosfet:nltermscale";
     //locaPVec.addParameter(n1, 0.0);
-    //string n2 = "mosfet:sizescale";
+    //std::string n2 = "mosfet:sizescale";
     //locaPVec.addParameter(n2, 0.0);
     // ***************************************************
     // ***************************************************
@@ -1548,8 +1548,10 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
       return (paramsPtr->getStatusTestReturnCode());
 
 #else
-    string message = "ERROR: Nonlinear Solver (NOX::Interface)\n Artificial parameter continuation requires building xyce with the define:\n-DXyce_NOX_LOCA_ARTIFICIAL_HOMOTOPY_SUPPORT\nto allow LOCA to augment the diagonal of Jacobian!\nEither rebuild Xyce or do not run Xyce with \"continuation=33\"";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
+    Xyce::Report::UserFatal0() << "Nonlinear Solver (NOX::Interface) Artificial parameter continuation requires "
+                               << "building xyce with the define: -DXyce_NOX_LOCA_ARTIFICIAL_HOMOTOPY_SUPPORT to "
+                               << "allow LOCA to augment the diagonal of Jacobian! Either rebuild Xyce or do not "
+                               << "run Xyce with \"continuation=33\"";
 #endif
   } // End of if (solverType == )
 
@@ -1558,7 +1560,7 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
    std::string nox_error = "NOX Error";
    std::string err_msg = std::string(error_msg);
    if (err_msg == nox_error) {
-     const string message =
+     const std::string message =
        "Caught a NOX Exception in N_NLS_NOX::Interface::solve()!";
      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
    }
@@ -1567,13 +1569,13 @@ int Interface::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
  }
 #ifndef Xyce_CHARON
  catch (const std::exception& e) {
-   cout << e.what() << endl;
-   const string message =
+   Xyce::dout() << e.what() << std::endl;
+   const std::string message =
      "Caught std::exception in N_NLS_NOX::Interface::solve()!";
    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
  }
  catch (...) {
-   const string message =
+   const std::string message =
      "Caught Unknown Exception in N_NLS_NOX::Interface::solve()!";
    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
  }
@@ -1602,12 +1604,12 @@ bool Interface::opStartCont0 (ParameterSet* paramsPtr)
   bool usedOP(false);
 
 #ifdef Xyce_DEBUG_OP_START
-  cout << "NOX_Interface:  Inside continuation=0 OP_START code (case 1)" << endl;
+  Xyce::dout() << "NOX_Interface:  Inside continuation=0 OP_START code (case 1)" << std::endl;
 #endif
   if (!DCOPused_)
   {
     int found = 0;
-    string icType;
+    std::string icType;
     Xyce::NodeNamePairMap & op = outMgrPtr_->getICData(found, icType);
     Xyce::NodeNamePairMap & allNodes = outMgrPtr_->getAllNodes( );
 #ifdef Xyce_PARALLEL_MPI
@@ -1666,12 +1668,12 @@ bool Interface::opStartCont1 (ParameterSet* paramsPtr)
   bool usedOP(false);
 
 #ifdef Xyce_DEBUG_OP_START
-  cout << "NOX_Interface:  Inside continuation=1 OP_START code (case 2)" << endl;
+  Xyce::dout() << "NOX_Interface:  Inside continuation=1 OP_START code (case 2)" << std::endl;
 #endif
   if (!DCOPused_)
   {
     int found = 0;
-    string icType;
+    std::string icType;
     Xyce::NodeNamePairMap & op = outMgrPtr_->getICData(found, icType);
     Xyce::NodeNamePairMap & allNodes = outMgrPtr_->getAllNodes( );
 #ifdef Xyce_PARALLEL_MPI
@@ -1735,10 +1737,10 @@ bool Interface::icCont (ParameterSet* paramsPtr)
   bool usedIC(false);
 
 #ifdef Xyce_DEBUG_IC
-  cout << "NOX_Interface:  Inside continuation=0 .IC code." << endl;
+  Xyce::dout() << "NOX_Interface:  Inside continuation=0 .IC code." << std::endl;
 #endif
   int found = 0;
-  string icType;
+  std::string icType;
   Xyce::NodeNamePairMap & op = outMgrPtr_->getICData(found, icType);
 
   usedIC = (icType=="IC" && found > 0);
@@ -1770,10 +1772,10 @@ bool Interface::icCont3 (ParameterSet* paramsPtr)
   bool usedIC(false);
 
 #ifdef Xyce_DEBUG_IC
-  cout << "NOX_Interface:  Inside continuation=3 .IC code." << endl;
+  Xyce::dout() << "NOX_Interface:  Inside continuation=3 .IC code." << std::endl;
 #endif
   int found = 0;
-  string icType = "";
+  std::string icType = "";
   Xyce::NodeNamePairMap & op = outMgrPtr_->getICData(found, icType);
 
   usedIC = (icType=="IC" && found > 0);
@@ -1800,10 +1802,10 @@ bool Interface::nodesetCont0 (ParameterSet* paramsPtr)
   bool usedNODESET(false);
 
 #ifdef Xyce_DEBUG_IC
-  cout << "NOX_Interface:  Inside continuation=0 .NODESET code (case 1)" << endl;
+  Xyce::dout() << "NOX_Interface:  Inside continuation=0 .NODESET code (case 1)" << std::endl;
 #endif
   int found = 0;
-  string icType;
+  std::string icType;
   Xyce::NodeNamePairMap & op = outMgrPtr_->getICData(found, icType);
 #ifdef Xyce_PARALLEL_MPI
   N_PDS_Comm * pdsCommPtr = pdsMgrPtr_->getPDSComm();
@@ -1843,11 +1845,11 @@ bool Interface::nodesetCont1 (ParameterSet* paramsPtr)
   bool usedNODESET(false);
 
 #ifdef Xyce_DEBUG_IC
-  cout << "NOX_Interface:  Inside continuation=1 .NODESET code (case 2)" << endl;
+  Xyce::dout() << "NOX_Interface:  Inside continuation=1 .NODESET code (case 2)" << std::endl;
 #endif
 
   int found = 0;
-  string icType;
+  std::string icType;
   Xyce::NodeNamePairMap & op = outMgrPtr_->getICData(found, icType);
 #ifdef Xyce_PARALLEL_MPI
   N_PDS_Comm * pdsCommPtr = pdsMgrPtr_->getPDSComm();
@@ -1895,7 +1897,7 @@ int Interface::takeFirstSolveStep (N_NLS_NonLinearSolver * nlsTmpPtr)
   ParameterSet* paramsPtr;
   if ((usemode_) && (mode_ == TRANSIENT))
     paramsPtr = &transientParams_;
-  else if ((usemode_) && (mode_ == HB))
+  else if ((usemode_) && (mode_ == HB_MODE))
     paramsPtr = &hbParams_;
   else
     paramsPtr = &dcParams_;
@@ -1923,7 +1925,7 @@ int Interface::takeFirstSolveStep (N_NLS_NonLinearSolver * nlsTmpPtr)
   {
     if (Teuchos::is_null(groupPtr_))
     {
-       cout << "takeFirstSolveStep: allocating a new group!" << endl;
+       Xyce::dout() << "takeFirstSolveStep: allocating a new group!" << std::endl;
        groupPtr_ = Teuchos::rcp(new N_NLS_LOCA::Group(globalDataPtr_,
 						      *sharedSystemPtr_,
 						      getLoader(),
@@ -1932,14 +1934,14 @@ int Interface::takeFirstSolveStep (N_NLS_NonLinearSolver * nlsTmpPtr)
     }
     else
     {
-       cout << "takeFirstSolveStep: using the old group!" << endl;
+       Xyce::dout() << "takeFirstSolveStep: using the old group!" << std::endl;
       N_NLS_NOX::Vector tmpVec(**nextSolVectorPtrPtr_, *lasSysPtr_);
       groupPtr_->setX(tmpVec);
     }
   }
   else
   {
-    cout << "takeFirstSolveStep: copying over the passed group!" << endl;
+    Xyce::dout() << "takeFirstSolveStep: copying over the passed group!" << std::endl;
     copiedGroupFlag_ = true;
     Interface * nlsOtherPtr = dynamic_cast<Interface*>(nlsTmpPtr);
     groupPtr_ = nlsOtherPtr->getSolutionGroup();
@@ -1993,7 +1995,7 @@ int Interface::getNumIterations() const
   const ParameterSet* paramsPtr;
   if ((usemode_) && (mode_ == TRANSIENT))
     paramsPtr = &transientParams_;
-  else if ((usemode_) && (mode_ == HB))
+  else if ((usemode_) && (mode_ == HB_MODE))
     paramsPtr = &hbParams_;
   else
     paramsPtr = &dcParams_;
@@ -2033,7 +2035,7 @@ double Interface::getMaxNormF() const
   {
     paramsPtr = &transientParams_;
   }
-  else if ((usemode_) && (mode_ == HB))
+  else if ((usemode_) && (mode_ == HB_MODE))
   {
     paramsPtr = &hbParams_;
   }
@@ -2064,7 +2066,7 @@ int Interface::getMaxNormFindex() const
   {
     paramsPtr = &transientParams_;
   }
-  else if ((usemode_) && (mode_ == HB))
+  else if ((usemode_) && (mode_ == HB_MODE))
   {
     paramsPtr = &hbParams_;
   }
@@ -2077,7 +2079,6 @@ int Interface::getMaxNormFindex() const
   return maxNormFindex;
 }
 
-#ifdef Xyce_DEBUG_NONLINEAR
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_NOX::Interface::getDebugLevel
 // Purpose       :
@@ -2093,7 +2094,7 @@ int Interface::getDebugLevel() const
   {
     paramsPtr = &transientParams_;
   }
-  else if ((usemode_) && (mode_ == HB ))
+  else if ((usemode_) && (mode_ == HB_MODE))
   {
     paramsPtr = &hbParams_;
   }
@@ -2120,7 +2121,7 @@ bool Interface::getScreenOutputFlag () const
   {
     paramsPtr = &transientParams_;
   }
-  else if ((usemode_) && (mode_ == HB))
+  else if ((usemode_) && (mode_ == HB_MODE))
   {
     paramsPtr = &hbParams_;
   }
@@ -2147,7 +2148,7 @@ double Interface::getDebugMinTime() const
   {
     paramsPtr = &transientParams_;
   }
-  else if ((usemode_) && (mode_ == HB))
+  else if ((usemode_) && (mode_ == HB_MODE))
   {
     paramsPtr = &hbParams_;
   }
@@ -2174,7 +2175,7 @@ double Interface::getDebugMaxTime() const
   {
     paramsPtr = &transientParams_;
   }
-  else if ((usemode_) && (mode_ == HB))
+  else if ((usemode_) && (mode_ == HB_MODE))
   {
     paramsPtr = &hbParams_;
   }
@@ -2201,7 +2202,7 @@ int Interface::getDebugMinTimeStep() const
   {
     paramsPtr = &transientParams_;
   }
-  else if ((usemode_) && (mode_ == HB))
+  else if ((usemode_) && (mode_ == HB_MODE))
   {
     paramsPtr = &hbParams_;
   }
@@ -2228,7 +2229,7 @@ int Interface::getDebugMaxTimeStep() const
   {
     paramsPtr = &transientParams_;
   }
-  else if ((usemode_) && (mode_ == HB))
+  else if ((usemode_) && (mode_ == HB_MODE))
   {
     paramsPtr = &hbParams_;
   }
@@ -2252,7 +2253,6 @@ bool Interface::getMMFormat () const
 {
   return false;
 }
-#endif
 
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_NOX::Interface::isFirstContinuationParam
@@ -2527,7 +2527,7 @@ bool Interface::getLocaFlag ()
   }
   else
   {
-    if ((usemode_) && (mode_ ==HB))
+    if ((usemode_) && (mode_ ==HB_MODE))
     {
       paramsPtr = &hbParams_;
     }

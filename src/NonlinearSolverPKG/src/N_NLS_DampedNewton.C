@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.207.2.3 $
+// Revision Number: $Revision: 1.222 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -215,10 +215,10 @@ bool N_NLS_DampedNewton::setTranOptions(const N_UTL_OptionBlock & OB)
 //-----------------------------------------------------------------------------
 bool N_NLS_DampedNewton::setHBOptions(const N_UTL_OptionBlock & OB)
 {
-  N_NLS_NLParams nlHBParams(HB, commandLine_);
+  N_NLS_NLParams nlHBParams(HB_MODE, commandLine_);
   bool bsuccess = nlHBParams.setOptions(OB);
 
-  nlpMgrPtr_->addParameterSet(HB, nlHBParams);
+  nlpMgrPtr_->addParameterSet(HB_MODE, nlHBParams);
   return bsuccess;
 }
 
@@ -266,8 +266,6 @@ bool N_NLS_DampedNewton::initializeAll()
   return bsuccess;
 }
 
-#ifdef Xyce_VERBOSE_NONLINEAR
-
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_DampedNewton::printHeader_
 // Purpose       : Print out header for step information.
@@ -276,35 +274,25 @@ bool N_NLS_DampedNewton::initializeAll()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/03/00
 //-----------------------------------------------------------------------------
-void N_NLS_DampedNewton::printHeader_()
+void N_NLS_DampedNewton::printHeader_(std::ostream &os)
 {
-  static const string crStr = "\n";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, crStr);
-
-  static const string tmpStr4 =
-    "  Iter           Step         Wt DX        Inf-Norm      2-Norm (rel)\n"
-    "------------------------------------------------------------------";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, tmpStr4);
+  os << std::endl
+     << "  Iter           Step         Wt DX        Inf-Norm      2-Norm (rel)\n"
+     << "  -------------------------------------------------------------------";
 }
 
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_DampedNewton::printFooter_
-// Purpose       : 
+// Purpose       :
 // Special Notes :
 // Scope         : private
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/03/11
 //-----------------------------------------------------------------------------
-void N_NLS_DampedNewton::printFooter_()
+void N_NLS_DampedNewton::printFooter_(std::ostream &os)
 {
-  static const string tmpStr4 =
-    "------------------------------------------------------------------";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, tmpStr4);
+  os << Xyce::section_divider << std::endl;
 }
-
-#endif
-
-#ifdef Xyce_VERBOSE_NONLINEAR
 
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_DampedNewton::printStepInfo_
@@ -314,19 +302,10 @@ void N_NLS_DampedNewton::printFooter_()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/03/00
 //-----------------------------------------------------------------------------
-void N_NLS_DampedNewton::printStepInfo_(int step)
+void N_NLS_DampedNewton::printStepInfo_(std::ostream &os, int step)
 {
-  char tmpChar[128];
-  sprintf(tmpChar,"Niter:%4d  %12.4e  %12.4e  %12.4e  %12.4e",
-          step,
-          stepLength_,
-          wtNormDX_,
-          maxNormRHS_,
-          normRHS_rel_);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, tmpChar);
+  os << "Niter: " << step << " " << stepLength_ << " " << wtNormDX_ << " " << maxNormRHS_ << " " << normRHS_rel_ << std::endl;
 }
-
-#endif
 
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_DampedNewton::updateWeights_
@@ -394,14 +373,12 @@ void N_NLS_DampedNewton::updateWeights_()
 //-----------------------------------------------------------------------------
 int N_NLS_DampedNewton::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
 {
-#ifdef Xyce_VERBOSE_NONLINEAR
-  static string msg = "N_NLS_DampedNewton::solve: ";
-#endif
+  static const char *trace = "N_NLS_DampedNewton::solve: ";
 
 #ifdef Xyce_DEBUG_NONLINEAR
   setDebugFlags ();
 
-  if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 ) cout << retCodes_;
+  if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 ) Xyce::dout() << retCodes_;
 #endif
 
   resetCountersAndTimers_();
@@ -432,16 +409,13 @@ int N_NLS_DampedNewton::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
 
 #ifdef Xyce_VERBOSE_NONLINEAR
   // Output the nonlinear solver information header:
-  printHeader_();
+  printHeader_(Xyce::lout());
 #endif
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-
   // Print warning about using the gradient-only strategy
   if (nlParams.getNLStrategy() == GRADIENT)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg +
-                           "WARNING: Use of the gradient strategy (1) is "
-                           "discouraged\n");
+    Xyce::Report::UserWarning0() << "Use of the gradient strategy (1) is discouraged";
 #endif
 
   // For the initial RHS load, the step number needs to be zero.  The Xyce
@@ -470,7 +444,7 @@ int N_NLS_DampedNewton::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
   maxNormRHSindex_ = index[0];
 
   // Print out the starting point information.
-  printStepInfo_(nlStep_);
+  printStepInfo_(Xyce::lout(), nlStep_);
 #endif
 
   // Check to ensure that we haven't been passed a converged solution already
@@ -584,7 +558,7 @@ int N_NLS_DampedNewton::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
     normRHS_old = normRHS_;
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-    printStepInfo_(nlStep_);
+    printStepInfo_(Xyce::lout(), nlStep_);
 #endif
 
     // Increment diagnostic step counters.  These need to be updated after
@@ -598,9 +572,7 @@ int N_NLS_DampedNewton::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
       descentStep_++;
 
 // #ifdef Xyce_VERBOSE_NONLINEAR
-//     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-//                            "Residual Convergence Rate: ",
-//                             resConvRate_, "\n");
+//     Xyce::lout() << "Residual Convergence Rate: " << resConvRate_ <<  "\n" << std::endl;
 // #endif
 
     // Evaluate the need for a fresh Jacobian and/or preconditioner...
@@ -634,7 +606,7 @@ int N_NLS_DampedNewton::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
   iNumCalls_++;
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-  printFooter_();
+  printFooter_(Xyce::lout());
 #endif
 
   // A positive value of convergedStatus indicates a successful nonlinear
@@ -657,9 +629,7 @@ int N_NLS_DampedNewton::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
 //-----------------------------------------------------------------------------
 int N_NLS_DampedNewton::takeFirstSolveStep (N_NLS_NonLinearSolver * nlsTmpPtr)
 {
-#ifdef Xyce_VERBOSE_NONLINEAR
-  static string msg = "N_NLS_DampedNewton::takeFirstSolveStep: ";
-#endif
+  static const char *trace = "N_NLS_DampedNewton::takeFirstSolveStep: ";
 
 #ifdef Xyce_DEBUG_NONLINEAR
   setDebugFlags ();
@@ -695,19 +665,15 @@ int N_NLS_DampedNewton::takeFirstSolveStep (N_NLS_NonLinearSolver * nlsTmpPtr)
 #endif
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-
   // Output the nonlinear solver information header:
-  printHeader_();
+  printHeader_(Xyce::lout());
 
 #endif
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-
   // Print warning about using the gradient-only strategy
   if (nlParams.getNLStrategy() == GRADIENT)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg +
-                           "WARNING: Use of the gradient strategy (1) is "
-                           "discouraged\n");
+    Xyce::Report::UserWarning0() << "Use of the gradient strategy (1) is discouraged";
 #endif
 
   // For the initial RHS load, the step number needs to be zero.  The Xyce
@@ -733,7 +699,7 @@ int N_NLS_DampedNewton::takeFirstSolveStep (N_NLS_NonLinearSolver * nlsTmpPtr)
   rhsVectorPtr_->infNorm(&maxNormRHS_);
 
   // Print out the starting point information.
-  printStepInfo_(nlStep_);
+  printStepInfo_(Xyce::lout(), nlStep_);
 #endif
 
   // Check to ensure that we haven't been passed a converged solution already
@@ -827,7 +793,7 @@ int N_NLS_DampedNewton::takeFirstSolveStep (N_NLS_NonLinearSolver * nlsTmpPtr)
   normRHS_old = normRHS_;
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-  printStepInfo_(nlStep_);
+  printStepInfo_(Xyce::lout(), nlStep_);
 #endif
 
   // Increment diagnostic step counters.  These need to be updated after
@@ -902,9 +868,7 @@ int N_NLS_DampedNewton::takeFirstSolveStep (N_NLS_NonLinearSolver * nlsTmpPtr)
 //-----------------------------------------------------------------------------
 int N_NLS_DampedNewton::takeOneSolveStep()
 {
-#ifdef Xyce_VERBOSE_NONLINEAR
-  static string msg = "N_NLS_DampedNewton::takeOneSolveStep: ";
-#endif
+  static const char *trace = "N_NLS_DampedNewton::takeOneSolveStep";
 
 #ifdef Xyce_DEBUG_NONLINEAR
   setDebugFlags ();
@@ -999,7 +963,7 @@ int N_NLS_DampedNewton::takeOneSolveStep()
   normRHS_old = normRHS_;
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-  printStepInfo_(nlStep_);
+  printStepInfo_(Xyce::lout(), nlStep_);
 #endif
 
   // Increment diagnostic step counters.  These need to be updated after
@@ -1135,47 +1099,35 @@ bool N_NLS_DampedNewton::newton_()
 //-----------------------------------------------------------------------------
 void N_NLS_DampedNewton::direction_()
 {
-#ifdef Xyce_DEBUG_NONLINEAR
-  char tmpStr[128];
-  static string msg = "N_NLS_DampedNewton::direction_: ";
+  static const char *trace = "N_NLS_DampedNewton::direction_: ";
 
+#ifdef Xyce_DEBUG_NONLINEAR
 #if 0
   if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
   {
-    sprintf(tmpStr, "\nSearch Method: %d     Strategy: %d\n\n",
-    nlParams.getSearchMethod(), nlParams.getNLStrategy());
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + tmpStr);
+    Xyce::dout() << "Search Method: " << nlParams.getSearchMethod() << "     Strategy: " << nlParams.getNLStrategy() << std::endl;
     // Print status messages
-    switch (nlParams.getNLStrategy()) 
+    switch (nlParams.getNLStrategy())
     {
       case NEWTON:
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
-        "\nnonlinear strategy is Newton\n");
+        Xyce::dout() << "nonlinear strategy is Newton" << std::endl;
         break;
       case MOD_NEWTON:
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
-        "\nnonlinear strategy is Modified-Newton\n");
+        Xyce::dout() << "nonlinear strategy is Modified-Newton" << std::endl;
         break;
       case NEWTON_GRADIENT:
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
-        "\n\tnonlinear strategy is Inexact Newton\n"
-        "\t\tconvergence rate: ", resConvRate_);
+        Xyce::dout() << "\tnonlinear strategy is Inexact Newton" << std::endl
+                     << "\t\tconvergence rate: " << resConvRate_ << std::endl;
         break;
       case MOD_NEWTON_GRADIENT:
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
-        "\n\tnonlinear strategy is Inexact "
-        "Modified-Newton\n\t\tconvergence rate: ",
-        resConvRate_);
+        Xyce::dout() << "\tnonlinear strategy is Inexact Modified-Newton\n\t\tconvergence rate: " << resConvRate_ << std::endl;
         break;
       case GRADIENT:
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
-        "nonlinear strategy is Gradient\n");
+        Xyce::dout() << "nonlinear strategy is Gradient" << std::endl;
         break;
 
       default:
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg +
-        "invalid nonlinear solver strategy: ",
-        static_cast<int> (nlParams.getNLStrategy()));
+        Xyce::Report::DevelFatal0().in(trace) << "Invalid nonlinear solver strategy: " << static_cast<int> (nlParams.getNLStrategy());
         break;
     } // end switch on nlParams.getNLStrategy() - status messages
   }
@@ -1264,9 +1216,7 @@ void N_NLS_DampedNewton::direction_()
     default:
 
 #ifdef Xyce_DEBUG_NONLINEAR
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg +
-                            "invalid search direction: ",
-                            static_cast<int> (nlParams.getDirection()));
+      Xyce::Report::DevelFatal0().in("N_NLS_DampedNewton::direction_") << "Invalid search direction: " << static_cast<int>(nlParams.getDirection());
 #endif
 
       break;
@@ -1292,9 +1242,7 @@ void N_NLS_DampedNewton::direction_()
 bool N_NLS_DampedNewton::computeStepLength_()
 
 {
-#if defined(Xyce_VERBOSE_NONLINEAR) || defined(Xyce_DEBUG_NONLINEAR)
-  static string msg = "N_NLS_DampedNewton::computeStepLength_: ";
-#endif
+  static const char *trace = "N_NLS_DampedNewton::computeStepLength_";
 
   searchStep_ = 0;  // number of search steps
 
@@ -1351,10 +1299,8 @@ bool N_NLS_DampedNewton::computeStepLength_()
 //-----------------------------------------------------------------------------
 bool N_NLS_DampedNewton::divide_()
 {
+  static const char *trace = "N_NLS_DampedNewton::divide__";
 
-#if defined(Xyce_VERBOSE_NONLINEAR) || defined(Xyce_DEBUG_NONLINEAR)
-  static string msg = "N_NLS_DampedNewton::computeStepLength_: ";
-#endif
 #if defined(Xyce_DEBUG_NONLINEAR)
   char tmpStr[128];
 #endif
@@ -1376,15 +1322,11 @@ bool N_NLS_DampedNewton::divide_()
   // Evaluate the new residual and take its norm:
   rhs_();
 
-#ifdef Xyce_DEBUG_NONLINEAR
-  if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
+  if (Xyce::DEBUG_NONLINEAR && debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
     {
-      sprintf(tmpStr, "\n\tSearch Step: %d Step Size: %e\n"
-	      "\toldNormRHS: %e normRHS: %e\n", searchStep_,
-	      stepLength_, oldNormRHS, normRHS_);
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + tmpStr);
+      Xyce::dout() << "\n\tSearch Step: " << searchStep_ << ", Step Size: " << stepLength_ << std::endl
+                   << "\toldNormRHS: " << oldNormRHS << ", normRHS: " << normRHS_ << std::endl;
     }
-#endif
 
   // Linesearch...
   bool searchDone = (normRHS_ < oldNormRHS);
@@ -1399,10 +1341,7 @@ bool N_NLS_DampedNewton::divide_()
 #ifdef Xyce_DEBUG_NONLINEAR
   if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg +
-                             "\n\tStep size too small: ",
-                             stepLength_,
-                             "\n\tTaking a full step.\n");
+      Xyce::Report::UserWarning0() << "\tStep size too small: " << stepLength_ << "\n\tTaking a full step.\n";
     }
 #endif
 
@@ -1421,15 +1360,11 @@ bool N_NLS_DampedNewton::divide_()
     searchDone = ((normRHS_ < oldNormRHS) || (searchDone) ||
                   (searchStep_ >= nlParams.getMaxSearchStep()));
 
-#ifdef Xyce_DEBUG_NONLINEAR
-  if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
+    if (Xyce::DEBUG_NONLINEAR && debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
     {
-      sprintf(tmpStr, "\n\tSearch Step: %d Step Size: %e\n"
-	      "\toldNormRHS: %e normRHS: %e\n", searchStep_,
-	      stepLength_, oldNormRHS, normRHS_);
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + tmpStr);
+      Xyce::dout() << "\n\tSearch Step: " << searchStep_ << ", Step Size: " << stepLength_ << std::endl
+                   << "\toldNormRHS: " << oldNormRHS << ", normRHS: " << normRHS_ << std::endl;
     }
-#endif
   }
 
   return (normRHS_ < oldNormRHS);
@@ -1475,7 +1410,7 @@ bool N_NLS_DampedNewton::simpleBacktrack_()
   if (((sdotg >= 0) || (!issuffdec)) &&
       (nlParams.getDirection() != GRADIENT_DIR))
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "Switching to Cauchy!");
+    Xyce::lout() << "Switching to Cauchy!" << std::endl;
     s = g;
     s.scale(-1.0 / normrhs);
     sdotg = s.dotProduct(g);
@@ -1491,7 +1426,7 @@ bool N_NLS_DampedNewton::simpleBacktrack_()
     updateX_();
     rhs_();
 
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "Linesearch failed!");
+    Xyce::lout() << "Linesearch failed!" << std::endl;
   }
 
   return issuffdec;
@@ -1518,15 +1453,15 @@ bool N_NLS_DampedNewton::simpleBt_(double gsinit, double finit)
   double f = 0.5 * normrhs * normrhs; // Function value
   const double alpha = 1.0e-6;        // Suff dec cond parameter
 
-  cout.setf(ios::scientific);
-  cout.precision(10);
+  Xyce::dout().setf(std::ios::scientific);
+  Xyce::dout().precision(10);
 
-  cout << "\nIteration: " << 0
+  Xyce::dout() << "\nIteration: " << 0
        << " Step: " << 0
        << " F(X): " << finit
        << " gsinit: " << gsinit
        << " alpha * gsinit: " << alpha * gsinit
-       << endl;
+       << std::endl;
 
   // Initialize search
   const int nstepmax = 20;            // Max number of backtracking steps
@@ -1567,14 +1502,14 @@ bool N_NLS_DampedNewton::simpleBt_(double gsinit, double finit)
     // Increment the step counter
     nstep ++;
 
-    cout << "Iteration: " << nstep
+    Xyce::dout() << "Iteration: " << nstep
          << " Step: " << step
          << " F(X): " << f
          << " Test: " << (finit + (alpha * step * gsinit))
-         << endl;
+         << std::endl;
   }
 
-  cout.unsetf(ios::scientific);
+  Xyce::dout().unsetf(std::ios::scientific);
 
   return issuffdec;
 }
@@ -1589,10 +1524,8 @@ bool N_NLS_DampedNewton::simpleBt_(double gsinit, double finit)
 //-----------------------------------------------------------------------------
 bool N_NLS_DampedNewton::backtrack_()
 {
+  static const char *trace = "N_NLS_DampedNewton::computeStepLength_";
 
-#if defined(Xyce_VERBOSE_NONLINEAR) || defined(Xyce_DEBUG_NONLINEAR)
-  static string msg = "N_NLS_DampedNewton::computeStepLength_: ";
-#endif
 #if defined(Xyce_DEBUG_NONLINEAR)
   char tmpStr[128];
 #endif
@@ -1661,15 +1594,11 @@ bool N_NLS_DampedNewton::backtrack_()
     rho = normRHS_ / oldNormRHS;
     searchStep_++;
 
-#ifdef Xyce_DEBUG_NONLINEAR
-  if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
+    if (Xyce::DEBUG_NONLINEAR && debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
     {
-      sprintf(tmpStr, "\n\tSearch Step: %d Step Size: %e\n"
-	      "\toldNormRHS: %e normRHS_: %e\n", searchStep_,
-	      stepLength_, oldNormRHS, normRHS_);
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + tmpStr);
+      Xyce::dout() << "\n\tSearch Step: " << searchStep_ << ", Step Size: " << stepLength_ << std::endl
+                   << "\toldNormRHS: " << oldNormRHS << ", normRHS: " << normRHS_ << std::endl;
     }
-#endif
   }
 
   // If the linesearch fails, take a full step...
@@ -1761,9 +1690,7 @@ bool N_NLS_DampedNewton::spiceNewton_()
 void N_NLS_DampedNewton::evalModNewton_()
 
 {
-#ifdef Xyce_DEBUG_NONLINEAR
-  static string msg = "N_NLS_DampedNewton::evalModNewton_: ";
-#endif
+  static const char * trace = "N_NLS_DampedNewton::evalModNewton_";
 
   const double minConvFactor = 0.01;
 
@@ -1786,15 +1713,12 @@ void N_NLS_DampedNewton::evalModNewton_()
   }
 
 #ifdef Xyce_DEBUG_NONLINEAR
-   char tmpStr[128];
   if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
   {
     N_UTL_Param linRes( "RESIDUAL", 0.0 );
     lasSolverPtr_->getInfo( linRes );
-    sprintf(tmpStr, "\tnlResNorm: %e linRes: %e nlResNormOld: %e "
-	      "calculated eta: %e\n\n", nlResNorm,
-	      linRes.dVal(), nlResNormOld, eta);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmpStr);
+    Xyce::dout() << "\tnlResNorm: " << nlResNorm << " linRes: " << linRes.getImmutableValue<double>()
+                 << "nlResNormOld: " << nlResNormOld << "calculated eta: " << eta << std::endl;
   }
 #endif
 
@@ -1804,7 +1728,7 @@ void N_NLS_DampedNewton::evalModNewton_()
 #ifdef Xyce_DEBUG_NONLINEAR
   if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\t\teta:\t", eta, "\n");
+      Xyce::dout() << "\t\teta:\t" << eta <<  "\n" << std::endl;
     }
 #endif
 
@@ -1822,11 +1746,9 @@ void N_NLS_DampedNewton::evalModNewton_()
 
 #ifdef Xyce_VERBOSE_NONLINEAR
   if (loadJacobianFlag_)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, " ***** Calculating "
-                           "new Jacobian and preconditioner\n");
-   else
-     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, " ***** Using old "
-                            "Jacobian and preconditioner\n");
+    Xyce::lout() << " ***** Calculating new Jacobian and preconditioner\n" << std::endl;
+  else
+    Xyce::lout() << " ***** Using old Jacobian and preconditioner\n" << std::endl;
 #endif
 
 }
@@ -1865,9 +1787,7 @@ void N_NLS_DampedNewton::evalModNewton_()
 int N_NLS_DampedNewton::converged_()
 
 {
-#ifdef Xyce_DEBUG_NONLINEAR
-  static string msg = "N_NLS_DampedNewton::converged_: ";
-#endif
+  static const char *trace = "N_NLS_DampedNewton::converged_";
 
   const double rhsTol       = N_UTL_MachineDependentParams::MachineEpsilon();
   const double convRateMax  = 0.5 * N_UTL_MachineDependentParams::DoubleMax();
@@ -1885,8 +1805,8 @@ int N_NLS_DampedNewton::converged_()
   // Devices need to satisfy their own convergence criteria
   if (nlParams.getEnforceDeviceConvFlag ()) {
     bool allDevicesConverged_ = loaderPtr_->allDevsConverged();
-    if (!allDevicesConverged_ && 
-             (nlStep_ < nlParams.getMaxNewtonStep() )) 
+    if (!allDevicesConverged_ &&
+             (nlStep_ < nlParams.getMaxNewtonStep() ))
     {
       return 0;
     }
@@ -1940,10 +1860,8 @@ int N_NLS_DampedNewton::converged_()
 #ifdef Xyce_DEBUG_NONLINEAR
   if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-			     "\tcount:\t", count);
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-			     "\tresConvRate_:\t", resConvRate_, "\n");
+      Xyce::dout() << "\tcount:\t" <<  count << std::endl
+                   << "\tresConvRate_:\t" <<  resConvRate_ <<  "\n" << std::endl;
     }
 #endif
   }
@@ -1958,11 +1876,9 @@ int N_NLS_DampedNewton::converged_()
 #ifdef Xyce_DEBUG_NONLINEAR
       if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
 	{
-	  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-				 "\ttmpConvRate: ", tmpConvRate);
-	  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-				 "\tnormRHS_rel_:\t", normRHS_rel_);
-	  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\tReturning 3\n");
+	  Xyce::dout() << "\ttmpConvRate: " <<  tmpConvRate << std::endl
+                       << "\tnormRHS_rel_:\t" <<  normRHS_rel_ << std::endl
+                       << "\tReturning 3\n" << std::endl;
 	}
 #endif
       return retCodes_.nearConvergence; // 3;
@@ -1972,12 +1888,9 @@ int N_NLS_DampedNewton::converged_()
 #ifdef Xyce_DEBUG_NONLINEAR
       if (debugTimeFlag_ && nlParams.getDebugLevel() > 0 )
       {
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "\ttmpConvRate: ", tmpConvRate);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "\tnormRHS_rel_:\t", normRHS_rel_);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "\tReturning -3\n");
+        Xyce::dout() << "\ttmpConvRate: " <<  tmpConvRate << std::endl
+                     << "\tnormRHS_rel_:\t" <<  normRHS_rel_ << std::endl
+                     << "\tReturning -3\n" << std::endl;
       }
 #endif
           return retCodes_.stalled;  // -3;
@@ -2023,15 +1936,12 @@ double N_NLS_DampedNewton::constrain_()
   minValue = Xycemin(minValue, nlConstraintPtr_->getThetaBoundPos());
   minValue = Xycemin(minValue, nlConstraintPtr_->getThetaChange());
 
-#ifdef Xyce_DEBUG_NONLINEAR
-  static std::string msg = "N_NLS_DampedNewton::constrain_: ";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg + "minValue: ",
-                         minValue);
-#endif
+  if (Xyce::DEBUG_NONLINEAR)
+    Xyce::dout() << "N_NLS_DampedNewton::constrain_: minValue: " << minValue << std::endl;
+
 #ifdef Xyce_VERBOSE_NONLINEAR
   if (minValue < 1.0)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           " ***** Constraining:\t", minValue, "\n");
+    Xyce::lout() << " ***** Constraining:\t" <<  minValue << std::endl;
 #endif
 
   return minValue;
@@ -2066,7 +1976,7 @@ void N_NLS_DampedNewton::setForcing_(const double nlResNorm)
   {
     N_UTL_Param linRes( "RESIDUAL", 0.0 );
     lasSolverPtr_->getInfo( linRes );
-    eta = fabs(nlResNorm - linRes.dVal()) / nlResNormOld;
+    eta = fabs(nlResNorm - linRes.getImmutableValue<double>()) / nlResNormOld;
     eta *= eta;
 
     // First safeguard...
@@ -2081,15 +1991,11 @@ void N_NLS_DampedNewton::setForcing_(const double nlResNorm)
     eta = Xycemax(etaMin, eta);
 
 #ifdef Xyce_DEBUG_NONLINEAR
-    char tmpStr[128];
-    sprintf(tmpStr, "\tnlResNorm: %e linRes: %e nlResNormOld: %e "
-            "calculated eta: %e\n\n", nlResNorm,
-            linRes.dVal(), nlResNormOld,
-            fabs(nlResNorm - linRes.dVal()) /
-            nlResNormOld);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmpStr);
+    Xyce::dout() << "\tnlResNorm: " << nlResNorm
+                 << " linRes: " << linRes.getImmutableValue<double>()
+                 << " nlResNormOld: " << nlResNormOld
+                 << " calculated eta: " << fabs(nlResNorm - linRes.getImmutableValue<double>())/nlResNormOld << std::endl;
 #endif
-
   }
 
   else
@@ -2099,7 +2005,7 @@ void N_NLS_DampedNewton::setForcing_(const double nlResNorm)
   nlResNormOld = nlResNorm;
 
 #ifdef Xyce_VERBOSE_NONLINEAR
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\t\teta:\t", eta, "\n");
+  Xyce::lout() << "\t\teta:\t" <<  eta <<  "\n" << std::endl;
 #endif
 
   // Set the tolerance
@@ -2128,8 +2034,7 @@ void N_NLS_DampedNewton::setForcing_(const double nlResNorm)
 //-----------------------------------------------------------------------------
 bool N_NLS_DampedNewton::bankRose_()
 {
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-          "THIS IS BROKEN. DO NOT USE THIS METHOD");
+  Xyce::lout() << "THIS IS BROKEN. DO NOT USE THIS METHOD" << std::endl;
   return false;
 }
 
@@ -2144,8 +2049,7 @@ bool N_NLS_DampedNewton::bankRose_()
 //-----------------------------------------------------------------------------
 bool N_NLS_DampedNewton::descent_()
 {
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-          "THIS IS BROKEN. DO NOT USE THIS METHOD");
+  Xyce::lout() << "THIS IS BROKEN. DO NOT USE THIS METHOD" << std::endl;
   return false;
 }
 

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,10 +36,10 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.14.2.3 $
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Number: $Revision: 1.40.2.1 $
+// Revision Date  : $Date: 2014/02/25 22:30:29 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: dgbaur $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
@@ -67,12 +67,14 @@
 
 // ----------    Xyce Includes  ----------
 #include <N_DEV_Const.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_DeviceMaster.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_Message.h>
 #include <N_DEV_Region.h>
 #include <N_DEV_RegionData.h>
+#include <N_DEV_SolverState.h>
 #include <N_DEV_SpecieSource.h>
 
 #include <N_LAS_Matrix.h>
@@ -87,76 +89,57 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<RxnSet::Instance>::ParametricData()
-{
-  setNumNodes(2);
-  setNumOptionalNodes(0);
-  setNumFillNodes(0);
-  setModelRequired(1);
-  addModelType("PN");
-  addModelType("NP");
-  addModelType("RXN");
-
-  addPar ("TEMP", 0.0, false, ParameterType::TIME_DEP, &RxnSet::Instance::TEMP, NULL, STANDARD, CAT_NONE, "");
-
-  // user-specified scaling vars:
-  addPar ("X0", 1.0e-7, false, ParameterType::NO_DEP, &RxnSet::Instance::x0_user, NULL, U_NONE, CAT_NONE, "Length Scalar.");
-  addPar ("C0", 1.0e+12, false, ParameterType::NO_DEP, &RxnSet::Instance::C0_user, NULL, U_NONE, CAT_NONE, "Concentration Scalar.");
-  addPar ("t0", 1.0e-6, false, ParameterType::NO_DEP, &RxnSet::Instance::t0_user, NULL, U_NONE, CAT_NONE, "Time Scalar.");
-  addPar ("outputXscalar", 1.0, false, ParameterType::NO_DEP, &RxnSet::Instance::outputXscalar, NULL, U_NONE, CAT_NONE, "Scalar for X axis in tecplot file (default unit is cm)");
-  addPar ("OUTPUTINTERVAL", 0.0, false, ParameterType::NO_DEP, &RxnSet::Instance::outputInterval, NULL, U_NONE, CAT_NONE, "Output Interval(sec)");
-
-  // Set up map for non-double precision variables:
-
-  addPar ("COPYRXN", false, false, ParameterType::NO_DEP, &RxnSet::Instance::reactionFileCopyFlag, NULL, U_LOGIC, CAT_NONE, "Flag for processing chemistry file only once, then copied to other mesh points.");
-  addPar ("SCALERXN", true, false, ParameterType::NO_DEP, &RxnSet::Instance::useScaledVariablesFlag, NULL, U_LOGIC, CAT_NONE, "Flag for applying scaling to the reaction equations.");
-  addPar ("DIFFUSION", false, false, ParameterType::NO_DEP, &RxnSet::Instance::diffusionFlag, &RxnSet::Instance::diffusionFlagGiven, U_LOGIC, CAT_NONE, "Flag for enabling lattice defect diffusion.");
-  addPar ("TRANSPORT", false, false, ParameterType::NO_DEP, &RxnSet::Instance::transportFlag, &RxnSet::Instance::transportFlagGiven, U_LOGIC, CAT_NONE, "Flag for enabling lattice defect diffusion.  Identical to DIFFUSION flag, above.  Do not set both!");
-  addPar ("EXCLUDENOSOURCE", true, false, ParameterType::NO_DEP, &RxnSet::Instance::excludeNoSourceRegionsFlag, &RxnSet::Instance::excludeNoSourceRegionsFlagGiven, U_LOGIC, CAT_NONE, "Flag for excluding regions that are outside of source region from computing defect reaction equations.  This is a speed optimization.  Turning it on will NOT change the answer");
-  addPar ("COLUMNREORDER", false, false, ParameterType::NO_DEP, &RxnSet::Instance::columnReorderingFlag, NULL, U_LOGIC, CAT_NONE, "Debug Flag for turning on/off column reordering.");
-  addPar ("OUTPUTREGION", 1, false, ParameterType::NO_DEP, &RxnSet::Instance::outputRegion, NULL); addPar ("TECPLOTLEVEL", 0, false, ParameterType::NO_DEP, &RxnSet::Instance::tecplotLevel, NULL, U_NONE, CAT_NONE, "Integer number to determine type of tecplot output.  0=no output.  1=single time-dependent file, with each time step in a different zone.");
-  addPar ("DIRICHLETBC", false, false, ParameterType::NO_DEP, &RxnSet::Instance::dirichletBCFlag, NULL, U_LOGIC, CAT_NONE, "Flag for using Dirichlet boundary conditions.");
-}
-
-template<>
-ParametricData<RxnSet::Model>::ParametricData()
-{
-  addPar ("TNOM", 0.0, false, ParameterType::NO_DEP, &RxnSet::Model::TNOM, NULL, U_DEGC, CAT_UNKNOWN,
-          "Parameter measurement temperature");
-
-  // rxn stuff:
-
-  addPar ("XLO", 1.0e-5, false, ParameterType::NO_DEP, &RxnSet::Model::xlo, NULL, U_CM, CAT_UNKNOWN, "Left edge of integration volume.");
-  addPar ("XHI", 3.0e-4, false, ParameterType::NO_DEP, &RxnSet::Model::xhi, NULL, U_CM, CAT_UNKNOWN, "Right edge of integration volume");
-  addPar ("XLO_SOURCE",1.0e-5, false, ParameterType::NO_DEP, &RxnSet::Model::xlo_source, &RxnSet::Model::xlo_sourceGiven, U_CM, CAT_UNKNOWN, "Left edge of source region");
-  addPar ("XHI_SOURCE",3.0e-4, false, ParameterType::NO_DEP, &RxnSet::Model::xhi_source, &RxnSet::Model::xhi_sourceGiven, U_CM, CAT_UNKNOWN, "Right edge of source region");
-  addPar ("MASTERSOURCE", 0.0, false, ParameterType::TIME_DEP, &RxnSet::Model::masterSource, NULL, STANDARD, CAT_NONE, "");
-  addPar ("REACTION_FILE",string("NOFILE"),false,ParameterType::NO_DEP, &RxnSet::Model::rxnFileName, NULL, U_NONE, CAT_NONE, "");
-  addPar ("NUMBER_REGIONS", 0, false, ParameterType::NO_DEP, &RxnSet::Model::userNumRegions, NULL, U_NONE, CAT_NONE, "Number of mesh points.");
-
-  DeviceModel::initThermalModel(*this);
-
-  addComposite("DOPINGPROFILES", DopeInfo::getParametricData(), &RxnSet::Model::regionMap);
-  addComposite("REGION", DopeInfo::getParametricData(), &RxnSet::Model::regionMap);
-  addComposite("SOURCELIST", SpecieSource::getParametricData(), &RxnSet::Model::defectSourceMap);
-}
 
 namespace RxnSet {
 
 
+void Traits::loadInstanceParameters(ParametricData<RxnSet::Instance> &p)
+{
+p.addPar ("TEMP", 0.0, false, ParameterType::TIME_DEP, &RxnSet::Instance::TEMP, NULL, STANDARD, CAT_NONE, "");
 
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
+  // user-specified scaling vars:
+  p.addPar ("X0", 1.0e-7, false, ParameterType::NO_DEP, &RxnSet::Instance::x0_user, NULL, U_NONE, CAT_NONE, "Length Scalar.");
+  p.addPar ("C0", 1.0e+12, false, ParameterType::NO_DEP, &RxnSet::Instance::C0_user, NULL, U_NONE, CAT_NONE, "Concentration Scalar.");
+  p.addPar ("t0", 1.0e-6, false, ParameterType::NO_DEP, &RxnSet::Instance::t0_user, NULL, U_NONE, CAT_NONE, "Time Scalar.");
+  p.addPar ("outputXscalar", 1.0, false, ParameterType::NO_DEP, &RxnSet::Instance::outputXscalar, NULL, U_NONE, CAT_NONE, "Scalar for X axis in tecplot file (default unit is cm)");
+  p.addPar ("OUTPUTINTERVAL", 0.0, false, ParameterType::NO_DEP, &RxnSet::Instance::outputInterval, NULL, U_NONE, CAT_NONE, "Output Interval(sec)");
 
-  return parMap;
+  // Set up map for non-double precision variables:
+
+  p.addPar ("COPYRXN", false, false, ParameterType::NO_DEP, &RxnSet::Instance::reactionFileCopyFlag, NULL, U_LOGIC, CAT_NONE, "Flag for processing chemistry file only once, then copied to other mesh points.");
+  p.addPar ("SCALERXN", true, false, ParameterType::NO_DEP, &RxnSet::Instance::useScaledVariablesFlag, NULL, U_LOGIC, CAT_NONE, "Flag for applying scaling to the reaction equations.");
+  p.addPar ("DIFFUSION", false, false, ParameterType::NO_DEP, &RxnSet::Instance::diffusionFlag, &RxnSet::Instance::diffusionFlagGiven, U_LOGIC, CAT_NONE, "Flag for enabling lattice defect diffusion.");
+  p.addPar ("TRANSPORT", false, false, ParameterType::NO_DEP, &RxnSet::Instance::transportFlag, &RxnSet::Instance::transportFlagGiven, U_LOGIC, CAT_NONE, "Flag for enabling lattice defect diffusion.  Identical to DIFFUSION flag, above.  Do not set both!");
+  p.addPar ("EXCLUDENOSOURCE", true, false, ParameterType::NO_DEP, &RxnSet::Instance::excludeNoSourceRegionsFlag, &RxnSet::Instance::excludeNoSourceRegionsFlagGiven, U_LOGIC, CAT_NONE, "Flag for excluding regions that are outside of source region from computing defect reaction equations.  This is a speed optimization.  Turning it on will NOT change the answer");
+  p.addPar ("COLUMNREORDER", false, false, ParameterType::NO_DEP, &RxnSet::Instance::columnReorderingFlag, NULL, U_LOGIC, CAT_NONE, "Debug Flag for turning on/off column reordering.");
+  p.addPar ("OUTPUTREGION", 1, &RxnSet::Instance::outputRegion);
+  p.addPar ("TECPLOTLEVEL", 0, &RxnSet::Instance::tecplotLevel)
+    .setDescription("Integer number to determine type of tecplot output.  0=no output.  1=single time-dependent file, with each time step in a different zone.");
+  p.addPar ("DIRICHLETBC", false, false, ParameterType::NO_DEP, &RxnSet::Instance::dirichletBCFlag, NULL, U_LOGIC, CAT_NONE, "Flag for using Dirichlet boundary conditions.");
 }
 
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
+void Traits::loadModelParameters(ParametricData<RxnSet::Model> &p)
+{
+  p.addPar ("TNOM", 0.0, false, ParameterType::NO_DEP, &RxnSet::Model::TNOM, NULL, U_DEGC, CAT_UNKNOWN,
+          "Parameter measurement temperature");
 
-  return parMap;
+  // rxn stuff:
+
+  p.addPar ("XLO", 1.0e-5, false, ParameterType::NO_DEP, &RxnSet::Model::xlo, NULL, U_CM, CAT_UNKNOWN, "Left edge of integration volume.");
+  p.addPar ("XHI", 3.0e-4, false, ParameterType::NO_DEP, &RxnSet::Model::xhi, NULL, U_CM, CAT_UNKNOWN, "Right edge of integration volume");
+  p.addPar ("XLO_SOURCE",1.0e-5, false, ParameterType::NO_DEP, &RxnSet::Model::xlo_source, &RxnSet::Model::xlo_sourceGiven, U_CM, CAT_UNKNOWN, "Left edge of source region");
+  p.addPar ("XHI_SOURCE",3.0e-4, false, ParameterType::NO_DEP, &RxnSet::Model::xhi_source, &RxnSet::Model::xhi_sourceGiven, U_CM, CAT_UNKNOWN, "Right edge of source region");
+  p.addPar ("MASTERSOURCE", 0.0, false, ParameterType::TIME_DEP, &RxnSet::Model::masterSource, NULL, STANDARD, CAT_NONE, "");
+  p.addPar ("REACTION_FILE",std::string("NOFILE"),false,ParameterType::NO_DEP, &RxnSet::Model::rxnFileName, NULL, U_NONE, CAT_NONE, "");
+  p.addPar ("NUMBER_REGIONS", 0, false, ParameterType::NO_DEP, &RxnSet::Model::userNumRegions, NULL, U_NONE, CAT_NONE, "Number of mesh points.");
+
+  DeviceModel::initThermalModel(p);
+
+  p.addComposite("DOPINGPROFILES", DopeInfo::getParametricData(), &RxnSet::Model::dopeInfoMap);
+  p.addComposite("REGION", DopeInfo::getParametricData(), &RxnSet::Model::dopeInfoMap);
+  p.addComposite("SOURCELIST", SpecieSource::getParametricData(), &RxnSet::Model::defectSourceMap);
 }
+
 
 //-----------------------------------------------------------------------------
 // Function      : Instance::processParams
@@ -166,7 +149,7 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 02/09/08
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
   updateTemperature(TEMP);
   return true;
@@ -181,13 +164,12 @@ bool Instance::processParams (string param)
 // Creation Date : 02/09/08
 //----------------------------------------------------------------------------
 
-Instance::Instance(InstanceBlock & IB,
-                   Model & it_MB,
-                   MatrixLoadData & mlData1,
-                   SolverState &ss1,
-                   ExternData  &ed1,
-                   DeviceOptions & do1)
-  : DevicePDEInstance(IB,mlData1, ss1, ed1, do1),
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock &         IB,
+  Model &                       it_MB,
+  const FactoryBlock &          factory_block)
+  : DevicePDEInstance(IB,configuration.getInstanceParameters(), factory_block),
     model_(it_MB),
     reactionFileCopyFlag(false),
     haveAnyReactions(false),
@@ -226,85 +208,6 @@ Instance::Instance(InstanceBlock & IB,
   devConMap[0] = 1;
   devConMap[1] = 1;
 
-
-  // Set up mapping from param names to class variables:
-
-  // if (parMap.empty())
-  // {
-  //   setNumNodes(2);
-  //   setNumOptionalNodes(0);
-  //   setNumFillNodes(0);
-  //   setModelRequired(1);
-  //   addModelType("PN");
-  //   addModelType("NP");
-  //   addModelType("RXN");
-
-  //   addPar ("TEMP", 0.0, false, ParameterType::TIME_DEP,
-  //           static_cast <double DeviceEntity:: *> (&Instance::TEMP),
-  //           NULL, STANDARD, CAT_NONE, "");
-
-  //   // user-specified scaling vars:
-  //   addPar ("X0", 1.0e-7, false, ParameterType::NO_DEP,
-  //           static_cast <double DeviceEntity:: *> (&Instance::x0_user),
-  //           NULL, U_NONE, CAT_NONE, "Length Scalar.");
-
-  //   addPar ("C0", 1.0e+12, false, ParameterType::NO_DEP,
-  //           static_cast <double DeviceEntity:: *> (&Instance::C0_user),
-  //           NULL, U_NONE, CAT_NONE, "Concentration Scalar.");
-
-  //   addPar ("t0", 1.0e-6, false, ParameterType::NO_DEP,
-  //           static_cast <double DeviceEntity:: *> (&Instance::t0_user),
-  //           NULL, U_NONE, CAT_NONE, "Time Scalar.");
-
-  //   addPar ("outputXscalar", 1.0, false, ParameterType::NO_DEP,
-  //           static_cast <double DeviceEntity:: *> (&Instance::outputXscalar),
-  //           NULL, U_NONE, CAT_NONE, "Scalar for X axis in tecplot file (default unit is cm)");
-
-  //   addPar ("OUTPUTINTERVAL", 0.0, false, ParameterType::NO_DEP,
-  //           static_cast <double DeviceEntity:: *> (&Instance::outputInterval),
-  //           NULL, U_NONE, CAT_NONE, "Output Interval(sec)");
-
-  //   // Set up map for non-double precision variables:
-
-  //   addPar ("COPYRXN", false, false, ParameterType::NO_DEP,
-  //           static_cast <bool DeviceEntity:: *> (&Instance::reactionFileCopyFlag), NULL,
-  //           U_LOGIC, CAT_NONE, "Flag for processing chemistry file only once, then copied to other mesh points.");
-
-  //   addPar ("SCALERXN", true, false, ParameterType::NO_DEP,
-  //           static_cast <bool DeviceEntity:: *> (&Instance::useScaledVariablesFlag), NULL,
-  //           U_LOGIC, CAT_NONE, "Flag for applying scaling to the reaction equations.");
-
-  //   addPar ("DIFFUSION", false, false, ParameterType::NO_DEP,
-  //           static_cast <bool DeviceEntity:: *> (&Instance::diffusionFlag),
-  //           static_cast <bool DeviceEntity:: *> (&Instance::diffusionFlagGiven),
-  //           U_LOGIC, CAT_NONE, "Flag for enabling lattice defect diffusion.");
-
-  //   addPar ("TRANSPORT", false, false, ParameterType::NO_DEP,
-  //           static_cast <bool DeviceEntity:: *> (&Instance::transportFlag),
-  //           static_cast <bool DeviceEntity:: *> (&Instance::transportFlagGiven),
-  //           U_LOGIC, CAT_NONE, "Flag for enabling lattice defect diffusion.  Identical to DIFFUSION flag, above.  Do not set both!");
-
-  //   addPar ("EXCLUDENOSOURCE", true, false, ParameterType::NO_DEP,
-  //           static_cast <bool DeviceEntity:: *> (&Instance::excludeNoSourceRegionsFlag),
-  //           static_cast <bool DeviceEntity:: *> (&Instance::excludeNoSourceRegionsFlagGiven),
-  //           U_LOGIC, CAT_NONE, "Flag for excluding regions that are outside of source region from computing defect reaction equations.  This is a speed optimization.  Turning it on will NOT change the answer");
-
-  //   addPar ("COLUMNREORDER", false, false, ParameterType::NO_DEP,
-  //           static_cast <bool DeviceEntity:: *> (&Instance::columnReorderingFlag), NULL,
-  //           U_LOGIC, CAT_NONE, "Debug Flag for turning on/off column reordering.");
-
-  //   addPar ("OUTPUTREGION", 1, false, ParameterType::NO_DEP,
-  //           static_cast <int DeviceEntity:: *> (&Instance::outputRegion), NULL);
-
-  //   addPar ("TECPLOTLEVEL", 0, false, ParameterType::NO_DEP,
-  //           static_cast <int DeviceEntity:: *> (&Instance::tecplotLevel), NULL,
-  //           U_NONE, CAT_NONE, "Integer number to determine type of tecplot output.  0=no output.  1=single time-dependent file, with each time step in a different zone.");
-
-  //   addPar ("DIRICHLETBC", false, false, ParameterType::NO_DEP,
-  //           static_cast <bool DeviceEntity:: *> (&Instance::dirichletBCFlag), NULL,
-  //           U_LOGIC, CAT_NONE, "Flag for using Dirichlet boundary conditions.");
-  // }
-
   // Set params to constant default values:
   setDefaultParams ();
 
@@ -313,7 +216,7 @@ Instance::Instance(InstanceBlock & IB,
 
   // Set any non-constant parameter defaults:
   if (!given("TEMP"))
-    TEMP = getDeviceOptions().temp.dVal();
+    TEMP = getDeviceOptions().temp.getImmutableValue<double>();
 
 
   if (diffusionFlagGiven && !transportFlagGiven)
@@ -323,7 +226,7 @@ Instance::Instance(InstanceBlock & IB,
 
   if (diffusionFlagGiven && transportFlagGiven) // both given
   {
-    string msg = "Both transportFlag and diffusionFlag set in " + getName() + ".  Using transportFlag";
+    std::string msg = "Both transportFlag and diffusionFlag set in " + getName() + ".  Using transportFlag";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
   }
 
@@ -346,14 +249,14 @@ Instance::Instance(InstanceBlock & IB,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    vector<RegionData*> & rdVec1 = model_.regionDataVec;
+    std::vector<RegionData*> & rdVec1 = model_.regionDataVec;
     if (!(rdVec1.empty()))
     {
-      cout << "Model Region Data vector:" << endl;
+      Xyce::dout() << "Model Region Data vector:" << std::endl;
       for (int ireg=0;ireg<numRegions;++ireg)
       {
         RegionData & rd = *(rdVec1[ireg]);
-        cout << ireg << ":  "<< rd;
+        Xyce::dout() << ireg << ":  "<< rd;
       }
     }
   }
@@ -428,7 +331,7 @@ void Instance::setupMeshUniform ()
 //-----------------------------------------------------------------------------
 void Instance::allocateRegions ()
 {
-  map <string, DopeInfo *> diMap = model_.dopeInfoMap;
+  std::map<std::string, DopeInfo *> diMap = model_.dopeInfoMap;
 
   if ( model_.userNumRegions > 0 && model_.rxnFileName != "NOFILE" )
   {
@@ -439,7 +342,7 @@ void Instance::allocateRegions ()
     // mesh stuff will be fixed later also:
     int numReg = model_.userNumRegions;
 
-    vector<RegionData*> * rdVecPtr(0);
+    std::vector<RegionData*> * rdVecPtr(0);
     rdVecPtr = &(model_.regionDataVec);
     // if (*rdVecPtr) is not empty, then the contents came from the input file and
     // should be deleted, as this specification overrides.
@@ -450,15 +353,15 @@ void Instance::allocateRegions ()
       RegionData * regDataPtr = new RegionData ();
       double xtmp = xVec[iReg];
 
-      vector<char> tmpname;
+      std::vector<char> tmpname;
       tmpname.resize( getName().size()+10 );
       sprintf( &(tmpname[0]), "%s_%03d",getName().c_str(),iReg);
-      string regName(&(tmpname[0]));
+      std::string regName(&(tmpname[0]));
 
-      vector<char> tmpname2;
+      std::vector<char> tmpname2;
       tmpname2.resize( outputName.size()+10 );
       sprintf( &(tmpname2[0]), "%s_%03d",outputName.c_str(),iReg);
-      string outRegName(&(tmpname2[0]));
+      std::string outRegName(&(tmpname2[0]));
 
       regDataPtr->xloc = xtmp;
       regDataPtr->name = regName;
@@ -473,8 +376,8 @@ void Instance::allocateRegions ()
       // Allocate a single reaction network class, and use it to parse the reactions
       // file.  This reaction network will then be copied into each reaction region
       // as it is constructed.
-      N_DEV_ReactionNetwork tmpReactions1;
-      N_DEV_ReactionNetwork tmpReactions2;
+      ReactionNetwork tmpReactions1;
+      ReactionNetwork tmpReactions2;
 
       tmpReactions1.setApplySources(true);
       tmpReactions1.setReactionNetworkFromFile(model_.rxnFileName);
@@ -494,8 +397,8 @@ void Instance::allocateRegions ()
         {
           regPtr = new Region
                    ( *((*rdVecPtr)[iReg]),
-                     devOptions,
-                     solState,
+                     getDeviceOptions(),
+                     getSolverState(),
                      tmpReactions1);
         }
         else
@@ -506,8 +409,8 @@ void Instance::allocateRegions ()
           {
             regPtr = new Region
                      ( *((*rdVecPtr)[iReg]),
-                       devOptions,
-                       solState,
+                       getDeviceOptions(),
+                       getSolverState(),
                        tmpReactions2);
           }
           else
@@ -516,8 +419,8 @@ void Instance::allocateRegions ()
 
             regPtr = new Region
                      ( *((*rdVecPtr)[iReg]),
-                       devOptions,
-                       solState,
+                       getDeviceOptions(),
+                       getSolverState(),
                        tmpReactions2);
           }
         }
@@ -543,8 +446,8 @@ void Instance::allocateRegions ()
 
         Region * regPtr = new Region
                           ( *((*rdVecPtr)[iReg]),
-                            devOptions,
-                            solState, sourceOn);
+                            getDeviceOptions(),
+                            getSolverState(), sourceOn);
 
         regVec.push_back(regPtr);
       }
@@ -625,21 +528,21 @@ void Instance::initializeChemistry ()
   if (getDeviceOptions().debugLevel > 0)
   {
     // debug outputs.  Check what is in the defect map.
-    map <string,CompositeParam *>::iterator itSource = model_.defectSourceMap.begin();
-    map <string,CompositeParam *>::iterator itSourceEnd = model_.defectSourceMap.end ();
+    std::map<std::string, SpecieSource *>::iterator itSource = model_.defectSourceMap.begin();
+    std::map<std::string, SpecieSource *>::iterator itSourceEnd = model_.defectSourceMap.end ();
 
-    cout << "----------------------------------------------" << endl;
-    cout << "Instance::initializeChemistry ():" << endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() << "Instance::initializeChemistry ():" << std::endl;
     for (; itSource!=itSourceEnd; ++itSource)
     {
-      string speciesName (itSource->first);
-      cout << "speciesName = " << speciesName << endl;
+      std::string speciesName (itSource->first);
+      Xyce::dout() << "speciesName = " << speciesName << std::endl;
     }
-    cout << "----------------------------------------------" << endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
   }
 #endif
 
-  vector<RegionData*> * rdVecPtr(0);
+  std::vector<RegionData*> * rdVecPtr(0);
   rdVecPtr = &(model_.regionDataVec);
 
   int numRegions=regVec.size();
@@ -649,14 +552,14 @@ void Instance::initializeChemistry ()
 
     if (useDopingArrayData)
     {
-      map <string, DopeInfo *> diMap = model_.dopeInfoMap;
+      std::map<std::string, DopeInfo *> diMap = model_.dopeInfoMap;
       if (!(diMap.empty()))
       {
         // Push in some initial values for various species.
         // This includes doping species like boron- (BM) as well as E and H.
-        map<string, DopeInfo *>::iterator iter;
-        map<string, DopeInfo *>::iterator start = diMap.begin();
-        map<string, DopeInfo *>::iterator end   = diMap.end();
+        std::map<std::string, DopeInfo *>::iterator iter;
+        std::map<std::string, DopeInfo *>::iterator start = diMap.begin();
+        std::map<std::string, DopeInfo *>::iterator end   = diMap.end();
 
         for ( iter = start; iter != end; ++iter )
         {
@@ -701,12 +604,12 @@ void Instance::initializeChemistry ()
 
         if (sourceOn)
         {
-          map <string,CompositeParam *>::iterator itSource = model_.defectSourceMap.begin();
-          map <string,CompositeParam *>::iterator itSourceEnd = model_.defectSourceMap.end ();
+          std::map<std::string,SpecieSource *>::iterator itSource = model_.defectSourceMap.begin();
+          std::map<std::string,SpecieSource *>::iterator itSourceEnd = model_.defectSourceMap.end ();
 
           for (; itSource!=itSourceEnd; ++itSource)
           {
-            string speciesName (itSource->first);
+            std::string speciesName (itSource->first);
             regVec[ireg]->addMasterSource(speciesName);
           }
         }
@@ -763,7 +666,7 @@ void Instance::setupJacStamp ()
     if (concentrationSize != 0)
     {
       // communicate down to the region the voltage inputs indices.
-      vector<int> voltageNodeColDep(2,-1);
+      std::vector<int> voltageNodeColDep(2,-1);
       voltageNodeColDep[0]=localPosIndex; // pos (previously base) voltage
       voltageNodeColDep[1]=localNegIndex; // neg (perviously emitter) voltage
 
@@ -794,8 +697,8 @@ void Instance::setupJacStamp ()
     }
 #ifdef Xyce_DEBUG_DEVICE
 
-    cout << regVec[ireg]->getName ()
-         << "   numSpecies = " << regNumSpecieVec[ireg] << endl;
+    Xyce::dout() << regVec[ireg]->getName ()
+         << "   numSpecies = " << regNumSpecieVec[ireg] << std::endl;
 #endif
   }
 
@@ -909,8 +812,8 @@ void Instance::setupJacStamp ()
   // "true" in the orginal device from which this was copied.
   if (columnReorderingFlag)
   {
-    vector< vector<int> > tempStamp_eric;
-    vector< vector<int> > tempMap2_eric;
+    std::vector< std::vector<int> > tempStamp_eric;
+    std::vector< std::vector<int> > tempMap2_eric;
     jacStampMap_fixOrder(jacStamp, jacMap2, tempStamp_eric, tempMap2_eric);
     jacStamp = tempStamp_eric;
     jacMap2 = tempMap2_eric;
@@ -921,9 +824,9 @@ void Instance::setupJacStamp ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > -50 && getSolverState().debugTimeFlag)
   {
-    cout << "jacStamp Before removing terminal nodes:"<<endl;
+    Xyce::dout() << "jacStamp Before removing terminal nodes:"<<std::endl;
     outputJacStamp(jacStamp);
-    cout << "jacMap2  Before removing terminal nodes:"<<endl;
+    Xyce::dout() << "jacMap2  Before removing terminal nodes:"<<std::endl;
     outputJacStamp(jacMap2 );
   }
 #endif
@@ -941,7 +844,7 @@ void Instance::setupJacStamp ()
 //-----------------------------------------------------------------------------
 void Instance::scaleMesh ()
 {
-  vector<RegionData*> * rdVecPtr(0);
+  std::vector<RegionData*> * rdVecPtr(0);
   rdVecPtr = &(model_.regionDataVec);
   int i=0;
   int size = (*rdVecPtr).size();
@@ -968,14 +871,14 @@ void Instance::scaleMesh ()
   {
     for (i=0;i<size;++i)
     {
-      cout << "Scaled Mesh:  xVec["<<i<<"] = " << xVec[i] << endl;
+      Xyce::dout() << "Scaled Mesh:  xVec["<<i<<"] = " << xVec[i] << std::endl;
     }
-    cout << endl;
+    Xyce::dout() << std::endl;
     for (i=0;i<size-1;++i)
     {
-      cout << "Scaled Mesh:  dxVec["<<i<<"] = " << dxVec[i] << endl;
+      Xyce::dout() << "Scaled Mesh:  dxVec["<<i<<"] = " << dxVec[i] << std::endl;
     }
-    cout << endl;
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -991,7 +894,7 @@ void Instance::scaleMesh ()
 //-----------------------------------------------------------------------------
 void Instance::setupFluxVec ()
 {
-  vector<RegionData*> * rdVecPtr(0);
+  std::vector<RegionData*> * rdVecPtr(0);
   rdVecPtr = &(model_.regionDataVec);
   if ( !((*rdVecPtr).empty()) )
   {
@@ -1113,7 +1016,7 @@ bool Instance::outputTecplot ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "  Instance::outputTecplot.  filename = " << string(filename) <<endl;
+    Xyce::dout() << "  Instance::outputTecplot.  filename = " << std::string(filename) <<std::endl;
   }
 #endif
 
@@ -1160,7 +1063,7 @@ bool Instance::outputTecplot ()
     fprintf(fp1,"  T = \"time step = %d, time=%20.12e\" AUXDATA time = \"%20.12e seconds\" \n", callsOTEC , time, time);
   }
 
-  vector<RegionData*> * rdVecPtr(0);
+  std::vector<RegionData*> * rdVecPtr(0);
   rdVecPtr = &(model_.regionDataVec);
 
   if (NX <= 1)
@@ -1278,7 +1181,7 @@ bool Instance::output2DTecplot ()
 
   fprintf(fp1,"%s"," \n");
 
-  vector<RegionData*> * rdVecPtr(0);
+  std::vector<RegionData*> * rdVecPtr(0);
   rdVecPtr = &(model_.regionDataVec);
 
   if (NX <= 1)
@@ -1357,7 +1260,7 @@ bool Instance::outputCarrierDensities ()
   fp1 = fopen(filename,"w");
   int cSize=(regVec[0])->getNumConstants();
 
-  vector<RegionData*> * rdVecPtr(0);
+  std::vector<RegionData*> * rdVecPtr(0);
   rdVecPtr = &(model_.regionDataVec);
 
   for (i=0;i<NX;++i)
@@ -1409,9 +1312,9 @@ Instance::~Instance()
   // Loop over the dopeInfoMap (if it is not empty) and delete its contents.
   if (!(dopeInfoMap.empty()))
   {
-    map <string,DopeInfo *>::iterator iter;
-    map <string,DopeInfo *>::iterator begin = dopeInfoMap.begin();
-    map <string,DopeInfo *>::iterator end   = dopeInfoMap.end  ();
+    std::map<std::string,DopeInfo *>::iterator iter;
+    std::map<std::string,DopeInfo *>::iterator begin = dopeInfoMap.begin();
+    std::map<std::string,DopeInfo *>::iterator end   = dopeInfoMap.end  ();
 
     for(iter=begin;iter!=end;++iter)
     {
@@ -1431,45 +1334,24 @@ Instance::~Instance()
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 02/09/08
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                             const vector<int> & extLIDVecRef )
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                             const std::vector<int> & extLIDVecRef )
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "----------------------------------------------------------------------------";
-
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << dashedline << endl;
-    cout << "  Instance::registerLIDs" <<endl;
-    cout << "  name = " << getName() << endl;
-    cout << "  number of internal variables: " << numInt << endl;
-    cout << "  number of external variables: " << numExt << endl;
-    cout << "  numIntVars = " << numIntVars << endl;
-    cout << "  numExtVars = " << numExtVars << endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "  Instance::registerLIDs" <<std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
+    Xyce::dout() << "  number of internal variables: " << numIntVars << std::endl;
+    Xyce::dout() << "  number of external variables: " << numExtVars << std::endl;
+    Xyce::dout() << "  numIntVars = " << numIntVars << std::endl;
+    Xyce::dout() << "  numExtVars = " << numExtVars << std::endl;
   }
 #endif
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
 
   // Copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -1478,12 +1360,12 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "  Internal LID List" << endl;
+    Xyce::dout() << "  Internal LID List" << std::endl;
     for( int i = 0; i < intLIDVec.size(); ++i )
-      cout << "  " << intLIDVec[i] << endl;
-    cout << "  External LID List" << endl;
+      Xyce::dout() << "  " << intLIDVec[i] << std::endl;
+    Xyce::dout() << "  External LID List" << std::endl;
     for( int i = 0; i < extLIDVec.size(); ++i )
-      cout << "  " << extLIDVec[i] << endl;
+      Xyce::dout() << "  " << extLIDVec[i] << std::endl;
   }
 #endif
 
@@ -1498,8 +1380,8 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "  li_Pos = " << li_Pos << endl;
-    cout << "  li_Neg = " << li_Neg << endl;
+    Xyce::dout() << "  li_Pos = " << li_Pos << std::endl;
+    Xyce::dout() << "  li_Neg = " << li_Neg << std::endl;
   }
 #endif
 
@@ -1520,7 +1402,7 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
   {
     for (ispec=0;ispec<numSpecies;++ispec)
     {
-      string speciesName = regVec[0]->getSpeciesName(ispec);
+      std::string speciesName = regVec[0]->getSpeciesName(ispec);
       thVec[ispec].specie_id.resize(size,-1);
       for (i=0;i<size;++i)
       {
@@ -1532,7 +1414,7 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -1546,7 +1428,7 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 02/09/08
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
@@ -1571,20 +1453,9 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 02/09/08
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-  string msg;
-
-  // Check if the size of the ID list corresponds to the proper number of state
-  // variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
   // Copy over the global ID lists:
   staLIDVec = staLIDVecRef;
@@ -1606,7 +1477,7 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 06/06/01
 //-----------------------------------------------------------------------------
-const vector<string> & Instance::getDepSolnVars()
+const std::vector<std::string> & Instance::getDepSolnVars()
 {
   return DeviceInstance::getDepSolnVars();
 }
@@ -1619,7 +1490,7 @@ const vector<string> & Instance::getDepSolnVars()
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 02/09/08
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -1632,12 +1503,12 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 02/09/08
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
 
-  vector<int> &map=jacMap;
-  vector< vector<int> > &map2=jacMap2;
+  std::vector<int> &map=jacMap;
+  std::vector< std::vector<int> > &map2=jacMap2;
   int posI = 0;
   int negI = 1;
 
@@ -1752,8 +1623,8 @@ bool Instance::updateTemperature( const double & temp )
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Start Instance::updateTemperature" << endl;
-    cout << "temp = "<<temp << endl;
+    Xyce::dout() << "Start Instance::updateTemperature" << std::endl;
+    Xyce::dout() << "temp = "<<temp << std::endl;
   }
 #endif
   if( temp != -999.0 ) TEMP = temp;
@@ -1781,7 +1652,7 @@ bool Instance::updateTemperature( const double & temp )
     thVec.reserve(numSpecies);
     for (int ispec=0;ispec<numSpecies;++ispec)
     {
-      string speciesName = regVec[0]->getSpeciesName(ispec);
+      std::string speciesName = regVec[0]->getSpeciesName(ispec);
 
       double Dtmp = (regVec[0])->getDiffusionCoefficient (ispec,TEMP);
 
@@ -1792,13 +1663,13 @@ bool Instance::updateTemperature( const double & temp )
       {
         if (useScaledVariablesFlag)
         {
-          cout << "Vacancy Diffusion: scaling=TRUE ";
-          cout << "D_"<<speciesName<<" = " << Dtmp << endl;
+          Xyce::dout() << "Vacancy Diffusion: scaling=TRUE ";
+          Xyce::dout() << "D_"<<speciesName<<" = " << Dtmp << std::endl;
         }
         else
         {
-          cout << "Vacancy Diffusion: scaling=FALSE ";
-          cout << "D_"<<speciesName<<" = " << Dtmp << endl;
+          Xyce::dout() << "Vacancy Diffusion: scaling=FALSE ";
+          Xyce::dout() << "D_"<<speciesName<<" = " << Dtmp << std::endl;
         }
       }
 #endif
@@ -1809,10 +1680,10 @@ bool Instance::updateTemperature( const double & temp )
     {
       for (int ispec=0;ispec<numSpecies;++ispec)
       {
-        cout << "Vacancy Diffusion: D_" << thVec[ispec].name << "  transportFlag = ";
-        if (thVec[ispec].transportFlag) cout << "TRUE";
-        else cout << "FALSE";
-        cout << endl;
+        Xyce::dout() << "Vacancy Diffusion: D_" << thVec[ispec].name << "  transportFlag = ";
+        if (thVec[ispec].transportFlag) Xyce::dout() << "TRUE";
+        else Xyce::dout() << "FALSE";
+        Xyce::dout() << std::endl;
       }
     }
 #endif
@@ -1929,7 +1800,7 @@ bool Instance::loadDAEFVector ()
         int i=0;
         int size = regVec.size();
 
-        vector<int> & specie_id = thVec[isp].specie_id;
+        std::vector<int> & specie_id = thVec[isp].specie_id;
 
         double dx1 = dxVec[0];
         double xloVal = (thVec[isp].fluxVec[0]-thVec[isp].flux_bc1)/dx1;
@@ -1975,13 +1846,12 @@ bool Instance::loadDAEdQdx ()
 
 #ifdef Xyce_DEBUG_DEVICE
   char tmpstr[256];
-  const string dashedline2 = "---------------------";
 
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "Rxn dQdx load:" << endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "Rxn dQdx load:" << std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
 
@@ -1990,7 +1860,7 @@ bool Instance::loadDAEdQdx ()
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
-    cout << dashedline2 << endl;
+    Xyce::dout() << subsection_divider << std::endl;
 #endif
 
   return bsuccess;
@@ -2043,13 +1913,12 @@ bool Instance::loadDAEdFdx ()
 
 #ifdef Xyce_DEBUG_DEVICE
   char tmpstr[256];
-  const string dashedline2 = "---------------------";
 
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "Rxn dFdx load:" << endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "Rxn dFdx load:" << std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
 
@@ -2059,7 +1928,7 @@ bool Instance::loadDAEdFdx ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
+    Xyce::dout() << subsection_divider << std::endl;
   }
 #endif
 
@@ -2114,7 +1983,7 @@ bool Instance::loadFMatrix (N_LAS_Matrix & dFdxMat)
         int size = regVec.size();
 
         double DiffC = thVec[isp].D_specie;
-        vector<int> & specie_id = thVec[isp].specie_id;
+        std::vector<int> & specie_id = thVec[isp].specie_id;
 
         for (i=0;i<size;++i)
         {
@@ -2175,13 +2044,12 @@ bool Instance::updatePrimaryState()
   bool bsuccess = true;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
 
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "  Start Instance::updatePrimaryState\n";
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "  Start Instance::updatePrimaryState\n";
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
 
@@ -2245,13 +2113,12 @@ bool Instance::updateSecondaryState()
   double * staDeriv = extData.nextStaDerivVectorRawPtr;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
 
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "  Start Instance::updateSecondaryState\n";
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "  Start Instance::updateSecondaryState\n";
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
 
@@ -2282,12 +2149,11 @@ bool Instance::updateIntermediateVars()
   double * currStaVec = extData.currStaVectorRawPtr;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "  In Instance::updateIntermediateVars" << endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "  In Instance::updateIntermediateVars" << std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
 
@@ -2375,7 +2241,7 @@ bool Instance::updateIntermediateVars()
 // Creation Date : 02/09/08
 //-----------------------------------------------------------------------------
 bool Instance::getInstanceBreakPoints(
-  vector<N_UTL_BreakPoint> &breakPointTimes)
+  std::vector<N_UTL_BreakPoint> &breakPointTimes)
 {
   int numRegions = regVec.size();
   double junk;
@@ -2396,11 +2262,10 @@ bool Instance::getInstanceBreakPoints(
 // Creator       : Eric Keiter, SNL
 // Creation Date : 02/09/08
 //-----------------------------------------------------------------------------
-CompositeParam *Model::constructComposite
-(string & cName, string & pName)
+CompositeParam *Model::constructComposite(const std::string & cName, const std::string & pName)
 {
 #ifdef Xyce_DEBUG_DEVICE
-  //cout << "Model::constructComposite  name = " << name << "   cName = " << cName <<endl;
+  //cout << "Model::constructComposite  name = " << name << "   cName = " << cName <<std::endl;
 #endif
 
   if (cName == "DOPINGPROFILES" || cName == "REGION")
@@ -2417,7 +2282,7 @@ CompositeParam *Model::constructComposite
   }
   else
   {
-    string msg =
+    std::string msg =
       "Model::constructComposite: unrecognized composite name: ";
     msg += cName;
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
@@ -2434,7 +2299,7 @@ CompositeParam *Model::constructComposite
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 02/09/08
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   return true;
 }
@@ -2447,12 +2312,12 @@ bool Model::processParams (string param)
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 02/09/08
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -2470,10 +2335,11 @@ bool Model::processInstanceParams(string param)
 // Creator       :
 // Creation Date : 02/09/08
 //-----------------------------------------------------------------------------
-Model::Model(const ModelBlock & MB,
-             SolverState & ss1,
-             DeviceOptions & do1)
-  : DevicePDEModel(MB,ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DevicePDEModel(MB,configuration.getModelParameters(), factory_block),
     TNOM(300.0),
 
     userNumRegions(0),
@@ -2504,8 +2370,7 @@ Model::Model(const ModelBlock & MB,
   {
     xlo_sourceGiven = false;
     xhi_sourceGiven = false;
-    string msg = "XLO_SOURCE >= XHI_SOURCE.  Ignoring, and using a spatially uniform source";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING, msg);
+    UserWarning(*this) << "XLO_SOURCE >= XHI_SOURCE.  Ignoring, and using a spatially uniform source";
   }
 
   // If the source region was not specified(or turned off), make sure it
@@ -2539,9 +2404,9 @@ Model::Model(const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -2565,9 +2430,9 @@ Model::~Model()
   // Loop over the dopeInfoMap (if it is not empty) and delete its contents.
   if (!(dopeInfoMap.empty()))
   {
-    map <string,DopeInfo *>::iterator iter;
-    map <string,DopeInfo *>::iterator begin = dopeInfoMap.begin();
-    map <string,DopeInfo *>::iterator end   = dopeInfoMap.end  ();
+    std::map<std::string,DopeInfo *>::iterator iter;
+    std::map<std::string,DopeInfo *>::iterator begin = dopeInfoMap.begin();
+    std::map<std::string,DopeInfo *>::iterator end   = dopeInfoMap.end  ();
 
     for(iter=begin;iter!=end;++iter)
     {
@@ -2578,9 +2443,9 @@ Model::~Model()
   // Do the same for the defect source map.
   if (!(defectSourceMap.empty()))
   {
-    map <string,CompositeParam *>::iterator iter;
-    map <string,CompositeParam *>::iterator begin = defectSourceMap.begin();
-    map <string,CompositeParam *>::iterator end   = defectSourceMap.end  ();
+    std::map<std::string,SpecieSource *>::iterator iter;
+    std::map<std::string,SpecieSource *>::iterator begin = defectSourceMap.begin();
+    std::map<std::string,SpecieSource *>::iterator end   = defectSourceMap.end  ();
 
     for(iter=begin;iter!=end;++iter)
     {
@@ -2605,26 +2470,45 @@ Model::~Model()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i;
-  os << "     name     getModelName()  Parameters" << endl;
+  os << "     name     model name  Parameters" << std::endl;
   for (i = 0, iter = first; iter != last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "        ";
-    os << (*iter)->getModelName();
+    os << getName();
 
-    os << endl;
-    os << "  TEMP  = " << (*iter)->TEMP  << endl;
+    os << std::endl;
+    os << "  TEMP  = " << (*iter)->TEMP  << std::endl;
 
-    os << endl;
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
+}
+
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ {
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new DeviceMaster<Traits>(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("rxn", 1)
+    .registerModelType("rxn", 1);
 }
 
 } // namespace RxnSet

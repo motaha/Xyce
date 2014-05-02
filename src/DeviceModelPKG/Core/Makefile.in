@@ -92,15 +92,14 @@ am__aclocal_m4_deps = $(top_srcdir)/config/libtool.m4 \
 	$(top_srcdir)/config/lt~obsolete.m4 \
 	$(top_srcdir)/config/xyce_check_bison.m4 \
 	$(top_srcdir)/config/xyce_check_braindamaged_random_shuffle.m4 \
-	$(top_srcdir)/config/xyce_check_flexible_insert.m4 \
 	$(top_srcdir)/config/xyce_check_iota.m4 \
-	$(top_srcdir)/config/xyce_check_stl_member_templates.m4 \
 	$(top_srcdir)/config/xyce_debug_option.m4 \
 	$(top_srcdir)/config/xyce_finite_number_check.m4 \
 	$(top_srcdir)/config/xyce_library_include.m4 \
 	$(top_srcdir)/config/xyce_library_option.m4 \
 	$(top_srcdir)/config/xyce_test_using_dec_cxx.m4 \
 	$(top_srcdir)/config/xyce_test_using_icclt11_cxx.m4 \
+	$(top_srcdir)/config/xyce_trilinos_library_option.m4 \
 	$(top_srcdir)/acinclude.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -111,6 +110,8 @@ CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libDeviceCore_la_LIBADD =
 am__libDeviceCore_la_SOURCES_DIST =  \
+	$(srcdir)/src/N_DEV_RegisterDevices.C \
+	$(srcdir)/src/N_DEV_Algorithm.C $(srcdir)/src/N_DEV_Print.C \
 	$(srcdir)/src/N_DEV_CompositeParam.C \
 	$(srcdir)/src/N_DEV_Configuration.C \
 	$(srcdir)/src/N_DEV_DeviceBlock.C \
@@ -123,9 +124,12 @@ am__libDeviceCore_la_SOURCES_DIST =  \
 	$(srcdir)/src/N_DEV_DeviceSensitivities.C \
 	$(srcdir)/src/N_DEV_DeviceState.C \
 	$(srcdir)/src/N_DEV_DeviceSupport.C \
+	$(srcdir)/src/N_DEV_DeviceMaster.C $(srcdir)/src/N_DEV_Dump.C \
 	$(srcdir)/src/N_DEV_MatrixLoadData.C \
+	$(srcdir)/src/N_DEV_Message.C \
+	$(srcdir)/src/N_DEV_NameLevelKey.C \
 	$(srcdir)/src/N_DEV_NumericalJacobian.C \
-	$(srcdir)/src/N_DEV_OutputPars.C $(srcdir)/src/N_DEV_Param.C \
+	$(srcdir)/src/N_DEV_LaTexDoc.C $(srcdir)/src/N_DEV_Param.C \
 	$(srcdir)/src/N_DEV_Pars.C \
 	$(srcdir)/src/N_DEV_RateConstantCalculators.C \
 	$(srcdir)/src/N_DEV_Reaction.C \
@@ -134,6 +138,10 @@ am__libDeviceCore_la_SOURCES_DIST =  \
 	$(srcdir)/src/N_DEV_RxnSet.C $(srcdir)/src/N_DEV_SolverState.C \
 	$(srcdir)/src/N_DEV_Source.C $(srcdir)/src/N_DEV_SourceData.C \
 	$(srcdir)/src/N_DEV_SpecieSource.C $(srcdir)/src/N_DEV_Units.C \
+	$(srcdir)/include/N_DEV_fwd.h \
+	$(srcdir)/include/N_DEV_RegisterDevices.h \
+	$(srcdir)/include/N_DEV_Algorithm.h \
+	$(srcdir)/include/N_DEV_Print.h \
 	$(srcdir)/include/N_DEV_CompositeParam.h \
 	$(srcdir)/include/N_DEV_Configuration.h \
 	$(srcdir)/include/N_DEV_Const.h \
@@ -148,13 +156,16 @@ am__libDeviceCore_la_SOURCES_DIST =  \
 	$(srcdir)/include/N_DEV_DeviceSensitivities.h \
 	$(srcdir)/include/N_DEV_DeviceState.h \
 	$(srcdir)/include/N_DEV_DeviceSupport.h \
-	$(srcdir)/include/N_DEV_DeviceTemplate.h \
+	$(srcdir)/include/N_DEV_DeviceMaster.h \
+	$(srcdir)/include/N_DEV_Dump.h \
 	$(srcdir)/include/N_DEV_ExternData.h \
 	$(srcdir)/include/N_DEV_ExternalSimulationData.h \
 	$(srcdir)/include/N_DEV_Interpolators.h \
 	$(srcdir)/include/N_DEV_MatrixLoadData.h \
+	$(srcdir)/include/N_DEV_Message.h \
+	$(srcdir)/include/N_DEV_NameLevelKey.h \
 	$(srcdir)/include/N_DEV_NumericalJacobian.h \
-	$(srcdir)/include/N_DEV_OutputPars.h \
+	$(srcdir)/include/N_DEV_LaTexDoc.h \
 	$(srcdir)/include/N_DEV_Param.h $(srcdir)/include/N_DEV_Pars.h \
 	$(srcdir)/include/N_DEV_RateConstantCalculators.h \
 	$(srcdir)/include/N_DEV_Reaction.h \
@@ -168,23 +179,24 @@ am__libDeviceCore_la_SOURCES_DIST =  \
 	$(srcdir)/include/N_DEV_Specie.h \
 	$(srcdir)/include/N_DEV_SpecieSource.h \
 	$(srcdir)/include/N_DEV_TransportHelper.h \
-	$(srcdir)/include/N_DEV_Units.h $(srcdir)/include/N_DEV_fwd.h \
-	N_DEV_ReactionParser.cxx N_DEV_ReactionParser.hxx \
-	N_DEV_ReactionLexer.cxx location.hh position.hh stack.hh \
-	$(srcdir)/include/N_DEV_ReactionLexer.h
+	$(srcdir)/include/N_DEV_Units.h N_DEV_ReactionParser.cxx \
+	N_DEV_ReactionParser.hxx N_DEV_ReactionLexer.cxx location.hh \
+	position.hh stack.hh $(srcdir)/include/N_DEV_ReactionLexer.h
 @BUILD_REACTION_PARSER_TRUE@am__objects_1 = N_DEV_ReactionParser.lo \
 @BUILD_REACTION_PARSER_TRUE@	N_DEV_ReactionLexer.lo
 am__objects_2 =
 @BUILD_REACTION_PARSER_TRUE@am__objects_3 = $(am__objects_1) \
 @BUILD_REACTION_PARSER_TRUE@	$(am__objects_2)
-am_libDeviceCore_la_OBJECTS = N_DEV_CompositeParam.lo \
+am_libDeviceCore_la_OBJECTS = N_DEV_RegisterDevices.lo \
+	N_DEV_Algorithm.lo N_DEV_Print.lo N_DEV_CompositeParam.lo \
 	N_DEV_Configuration.lo N_DEV_DeviceBlock.lo \
 	N_DEV_DeviceEntity.lo N_DEV_DeviceInstance.lo \
 	N_DEV_DeviceInterface.lo N_DEV_DeviceMgr.lo \
 	N_DEV_DeviceModel.lo N_DEV_DeviceOptions.lo \
 	N_DEV_DeviceSensitivities.lo N_DEV_DeviceState.lo \
-	N_DEV_DeviceSupport.lo N_DEV_MatrixLoadData.lo \
-	N_DEV_NumericalJacobian.lo N_DEV_OutputPars.lo N_DEV_Param.lo \
+	N_DEV_DeviceSupport.lo N_DEV_DeviceMaster.lo N_DEV_Dump.lo \
+	N_DEV_MatrixLoadData.lo N_DEV_Message.lo N_DEV_NameLevelKey.lo \
+	N_DEV_NumericalJacobian.lo N_DEV_LaTexDoc.lo N_DEV_Param.lo \
 	N_DEV_Pars.lo N_DEV_RateConstantCalculators.lo \
 	N_DEV_Reaction.lo N_DEV_ReactionNetwork.lo N_DEV_Region.lo \
 	N_DEV_RegionData.lo N_DEV_RxnSet.lo N_DEV_SolverState.lo \
@@ -339,6 +351,7 @@ MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MAYBE_NONFREE = @MAYBE_NONFREE@
+MAYBE_PLUGIN = @MAYBE_PLUGIN@
 MAYBE_RAD = @MAYBE_RAD@
 MKDIR_P = @MKDIR_P@
 NM = @NM@
@@ -446,7 +459,9 @@ PARSER_HEADER_DEPS = $(am__append_1)
 
 #these are extra parser-related files that we want to include conditionally
 PARSER_SRCS = $(srcdir)/include/N_DEV_ReactionLexer.h
-libDeviceCore_la_SOURCES = $(srcdir)/src/N_DEV_CompositeParam.C \
+libDeviceCore_la_SOURCES = $(srcdir)/src/N_DEV_RegisterDevices.C \
+	$(srcdir)/src/N_DEV_Algorithm.C $(srcdir)/src/N_DEV_Print.C \
+	$(srcdir)/src/N_DEV_CompositeParam.C \
 	$(srcdir)/src/N_DEV_Configuration.C \
 	$(srcdir)/src/N_DEV_DeviceBlock.C \
 	$(srcdir)/src/N_DEV_DeviceEntity.C \
@@ -458,9 +473,12 @@ libDeviceCore_la_SOURCES = $(srcdir)/src/N_DEV_CompositeParam.C \
 	$(srcdir)/src/N_DEV_DeviceSensitivities.C \
 	$(srcdir)/src/N_DEV_DeviceState.C \
 	$(srcdir)/src/N_DEV_DeviceSupport.C \
+	$(srcdir)/src/N_DEV_DeviceMaster.C $(srcdir)/src/N_DEV_Dump.C \
 	$(srcdir)/src/N_DEV_MatrixLoadData.C \
+	$(srcdir)/src/N_DEV_Message.C \
+	$(srcdir)/src/N_DEV_NameLevelKey.C \
 	$(srcdir)/src/N_DEV_NumericalJacobian.C \
-	$(srcdir)/src/N_DEV_OutputPars.C $(srcdir)/src/N_DEV_Param.C \
+	$(srcdir)/src/N_DEV_LaTexDoc.C $(srcdir)/src/N_DEV_Param.C \
 	$(srcdir)/src/N_DEV_Pars.C \
 	$(srcdir)/src/N_DEV_RateConstantCalculators.C \
 	$(srcdir)/src/N_DEV_Reaction.C \
@@ -469,6 +487,10 @@ libDeviceCore_la_SOURCES = $(srcdir)/src/N_DEV_CompositeParam.C \
 	$(srcdir)/src/N_DEV_RxnSet.C $(srcdir)/src/N_DEV_SolverState.C \
 	$(srcdir)/src/N_DEV_Source.C $(srcdir)/src/N_DEV_SourceData.C \
 	$(srcdir)/src/N_DEV_SpecieSource.C $(srcdir)/src/N_DEV_Units.C \
+	$(srcdir)/include/N_DEV_fwd.h \
+	$(srcdir)/include/N_DEV_RegisterDevices.h \
+	$(srcdir)/include/N_DEV_Algorithm.h \
+	$(srcdir)/include/N_DEV_Print.h \
 	$(srcdir)/include/N_DEV_CompositeParam.h \
 	$(srcdir)/include/N_DEV_Configuration.h \
 	$(srcdir)/include/N_DEV_Const.h \
@@ -483,13 +505,16 @@ libDeviceCore_la_SOURCES = $(srcdir)/src/N_DEV_CompositeParam.C \
 	$(srcdir)/include/N_DEV_DeviceSensitivities.h \
 	$(srcdir)/include/N_DEV_DeviceState.h \
 	$(srcdir)/include/N_DEV_DeviceSupport.h \
-	$(srcdir)/include/N_DEV_DeviceTemplate.h \
+	$(srcdir)/include/N_DEV_DeviceMaster.h \
+	$(srcdir)/include/N_DEV_Dump.h \
 	$(srcdir)/include/N_DEV_ExternData.h \
 	$(srcdir)/include/N_DEV_ExternalSimulationData.h \
 	$(srcdir)/include/N_DEV_Interpolators.h \
 	$(srcdir)/include/N_DEV_MatrixLoadData.h \
+	$(srcdir)/include/N_DEV_Message.h \
+	$(srcdir)/include/N_DEV_NameLevelKey.h \
 	$(srcdir)/include/N_DEV_NumericalJacobian.h \
-	$(srcdir)/include/N_DEV_OutputPars.h \
+	$(srcdir)/include/N_DEV_LaTexDoc.h \
 	$(srcdir)/include/N_DEV_Param.h $(srcdir)/include/N_DEV_Pars.h \
 	$(srcdir)/include/N_DEV_RateConstantCalculators.h \
 	$(srcdir)/include/N_DEV_Reaction.h \
@@ -503,8 +528,7 @@ libDeviceCore_la_SOURCES = $(srcdir)/src/N_DEV_CompositeParam.C \
 	$(srcdir)/include/N_DEV_Specie.h \
 	$(srcdir)/include/N_DEV_SpecieSource.h \
 	$(srcdir)/include/N_DEV_TransportHelper.h \
-	$(srcdir)/include/N_DEV_Units.h $(srcdir)/include/N_DEV_fwd.h \
-	$(am__append_2)
+	$(srcdir)/include/N_DEV_Units.h $(am__append_2)
 
 # these can't be in "SOURCES" above or automake screams about YACC.
 EXTRA_DIST = $(srcdir)/src/N_DEV_ReactionLexer.l \
@@ -566,23 +590,29 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Algorithm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_CompositeParam.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Configuration.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceBlock.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceEntity.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceInstance.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceInterface.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceMaster.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceMgr.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceModel.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceOptions.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceSensitivities.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceState.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_DeviceSupport.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Dump.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_LaTexDoc.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_MatrixLoadData.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Message.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_NameLevelKey.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_NumericalJacobian.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_OutputPars.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Param.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Pars.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Print.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_RateConstantCalculators.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Reaction.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_ReactionLexer.Plo@am__quote@
@@ -590,6 +620,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_ReactionParser.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Region.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_RegionData.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_RegisterDevices.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_RxnSet.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_SolverState.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_Source.Plo@am__quote@
@@ -617,6 +648,27 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LTCXXCOMPILE) -c -o $@ $<
+
+N_DEV_RegisterDevices.lo: $(srcdir)/src/N_DEV_RegisterDevices.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_RegisterDevices.lo -MD -MP -MF $(DEPDIR)/N_DEV_RegisterDevices.Tpo -c -o N_DEV_RegisterDevices.lo `test -f '$(srcdir)/src/N_DEV_RegisterDevices.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_RegisterDevices.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_RegisterDevices.Tpo $(DEPDIR)/N_DEV_RegisterDevices.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_RegisterDevices.C' object='N_DEV_RegisterDevices.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_RegisterDevices.lo `test -f '$(srcdir)/src/N_DEV_RegisterDevices.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_RegisterDevices.C
+
+N_DEV_Algorithm.lo: $(srcdir)/src/N_DEV_Algorithm.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Algorithm.lo -MD -MP -MF $(DEPDIR)/N_DEV_Algorithm.Tpo -c -o N_DEV_Algorithm.lo `test -f '$(srcdir)/src/N_DEV_Algorithm.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Algorithm.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Algorithm.Tpo $(DEPDIR)/N_DEV_Algorithm.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Algorithm.C' object='N_DEV_Algorithm.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Algorithm.lo `test -f '$(srcdir)/src/N_DEV_Algorithm.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Algorithm.C
+
+N_DEV_Print.lo: $(srcdir)/src/N_DEV_Print.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Print.lo -MD -MP -MF $(DEPDIR)/N_DEV_Print.Tpo -c -o N_DEV_Print.lo `test -f '$(srcdir)/src/N_DEV_Print.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Print.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Print.Tpo $(DEPDIR)/N_DEV_Print.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Print.C' object='N_DEV_Print.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Print.lo `test -f '$(srcdir)/src/N_DEV_Print.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Print.C
 
 N_DEV_CompositeParam.lo: $(srcdir)/src/N_DEV_CompositeParam.C
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_CompositeParam.lo -MD -MP -MF $(DEPDIR)/N_DEV_CompositeParam.Tpo -c -o N_DEV_CompositeParam.lo `test -f '$(srcdir)/src/N_DEV_CompositeParam.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_CompositeParam.C
@@ -702,12 +754,40 @@ N_DEV_DeviceSupport.lo: $(srcdir)/src/N_DEV_DeviceSupport.C
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_DeviceSupport.lo `test -f '$(srcdir)/src/N_DEV_DeviceSupport.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceSupport.C
 
+N_DEV_DeviceMaster.lo: $(srcdir)/src/N_DEV_DeviceMaster.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_DeviceMaster.lo -MD -MP -MF $(DEPDIR)/N_DEV_DeviceMaster.Tpo -c -o N_DEV_DeviceMaster.lo `test -f '$(srcdir)/src/N_DEV_DeviceMaster.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceMaster.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_DeviceMaster.Tpo $(DEPDIR)/N_DEV_DeviceMaster.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_DeviceMaster.C' object='N_DEV_DeviceMaster.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_DeviceMaster.lo `test -f '$(srcdir)/src/N_DEV_DeviceMaster.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_DeviceMaster.C
+
+N_DEV_Dump.lo: $(srcdir)/src/N_DEV_Dump.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Dump.lo -MD -MP -MF $(DEPDIR)/N_DEV_Dump.Tpo -c -o N_DEV_Dump.lo `test -f '$(srcdir)/src/N_DEV_Dump.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Dump.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Dump.Tpo $(DEPDIR)/N_DEV_Dump.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Dump.C' object='N_DEV_Dump.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Dump.lo `test -f '$(srcdir)/src/N_DEV_Dump.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Dump.C
+
 N_DEV_MatrixLoadData.lo: $(srcdir)/src/N_DEV_MatrixLoadData.C
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_MatrixLoadData.lo -MD -MP -MF $(DEPDIR)/N_DEV_MatrixLoadData.Tpo -c -o N_DEV_MatrixLoadData.lo `test -f '$(srcdir)/src/N_DEV_MatrixLoadData.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MatrixLoadData.C
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_MatrixLoadData.Tpo $(DEPDIR)/N_DEV_MatrixLoadData.Plo
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_MatrixLoadData.C' object='N_DEV_MatrixLoadData.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_MatrixLoadData.lo `test -f '$(srcdir)/src/N_DEV_MatrixLoadData.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_MatrixLoadData.C
+
+N_DEV_Message.lo: $(srcdir)/src/N_DEV_Message.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Message.lo -MD -MP -MF $(DEPDIR)/N_DEV_Message.Tpo -c -o N_DEV_Message.lo `test -f '$(srcdir)/src/N_DEV_Message.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Message.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_Message.Tpo $(DEPDIR)/N_DEV_Message.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_Message.C' object='N_DEV_Message.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_Message.lo `test -f '$(srcdir)/src/N_DEV_Message.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Message.C
+
+N_DEV_NameLevelKey.lo: $(srcdir)/src/N_DEV_NameLevelKey.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_NameLevelKey.lo -MD -MP -MF $(DEPDIR)/N_DEV_NameLevelKey.Tpo -c -o N_DEV_NameLevelKey.lo `test -f '$(srcdir)/src/N_DEV_NameLevelKey.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_NameLevelKey.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_NameLevelKey.Tpo $(DEPDIR)/N_DEV_NameLevelKey.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_NameLevelKey.C' object='N_DEV_NameLevelKey.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_NameLevelKey.lo `test -f '$(srcdir)/src/N_DEV_NameLevelKey.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_NameLevelKey.C
 
 N_DEV_NumericalJacobian.lo: $(srcdir)/src/N_DEV_NumericalJacobian.C
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_NumericalJacobian.lo -MD -MP -MF $(DEPDIR)/N_DEV_NumericalJacobian.Tpo -c -o N_DEV_NumericalJacobian.lo `test -f '$(srcdir)/src/N_DEV_NumericalJacobian.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_NumericalJacobian.C
@@ -716,12 +796,12 @@ N_DEV_NumericalJacobian.lo: $(srcdir)/src/N_DEV_NumericalJacobian.C
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_NumericalJacobian.lo `test -f '$(srcdir)/src/N_DEV_NumericalJacobian.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_NumericalJacobian.C
 
-N_DEV_OutputPars.lo: $(srcdir)/src/N_DEV_OutputPars.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_OutputPars.lo -MD -MP -MF $(DEPDIR)/N_DEV_OutputPars.Tpo -c -o N_DEV_OutputPars.lo `test -f '$(srcdir)/src/N_DEV_OutputPars.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_OutputPars.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_OutputPars.Tpo $(DEPDIR)/N_DEV_OutputPars.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_OutputPars.C' object='N_DEV_OutputPars.lo' libtool=yes @AMDEPBACKSLASH@
+N_DEV_LaTexDoc.lo: $(srcdir)/src/N_DEV_LaTexDoc.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_LaTexDoc.lo -MD -MP -MF $(DEPDIR)/N_DEV_LaTexDoc.Tpo -c -o N_DEV_LaTexDoc.lo `test -f '$(srcdir)/src/N_DEV_LaTexDoc.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_LaTexDoc.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_LaTexDoc.Tpo $(DEPDIR)/N_DEV_LaTexDoc.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_LaTexDoc.C' object='N_DEV_LaTexDoc.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_OutputPars.lo `test -f '$(srcdir)/src/N_DEV_OutputPars.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_OutputPars.C
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_LaTexDoc.lo `test -f '$(srcdir)/src/N_DEV_LaTexDoc.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_LaTexDoc.C
 
 N_DEV_Param.lo: $(srcdir)/src/N_DEV_Param.C
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_Param.lo -MD -MP -MF $(DEPDIR)/N_DEV_Param.Tpo -c -o N_DEV_Param.lo `test -f '$(srcdir)/src/N_DEV_Param.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_Param.C

@@ -15,8 +15,8 @@
       Revision Information:
       ====================-
 
-      Revision Number: $Revision: 1.43.2.2 $
-      Revision Date:   $Date: 2013/10/03 17:48:20 $
+      Revision Number: $Revision: 1.55 $
+      Revision Date:   $Date: 2014/02/24 23:49:29 $
       Current Owner:   $Author: tvrusso $
     -->
 <admst:for-each select="/module">
@@ -57,7 +57,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -101,22 +101,25 @@
     <admst:variable name="guardSymbol" select="%s"/>
   </admst:apply-templates>
   <admst:text format="#ifndef $guardSymbol\n#define $guardSymbol\n"/>
-// ----------   Xyce Includes   ----------
+
 #include &lt;Sacado.hpp&gt;
+
+#include &lt;N_DEV_Configuration.h&gt;
+#include &lt;N_DEV_Const.h&gt;
 #include &lt;N_DEV_DeviceBlock.h&gt;
 #include &lt;N_DEV_DeviceInstance.h&gt;
 #include &lt;N_DEV_DeviceModel.h&gt;
 
-#include &lt;N_DEV_Param.h&gt;
+<admst:apply-templates select="." match="xyceIncludeModelBaseHeader"/>
 
 namespace Xyce {
 namespace Device {
+namespace <admst:text format="%($nameSpace)"/> {
 
-<admst:text format="namespace %($nameSpace) {"/>
+class Model;
+class Instance;
 
-// ---------- Forward Declarations ----------
-
-  <admst:text format="class Model;"/>
+  <admst:apply-templates select="." match="xyceDeclareTraits"/>
 
   <!-- this GLOBAL VARIABLE (ugh) used in templates to figure out how to access
      certain class members (e.g. how to get at model variables from an instance
@@ -141,46 +144,36 @@ namespace Device {
 {
   friend class ParametricData&lt;Instance&gt;;
   friend class Model;
+  friend class Traits;
 
 // This typedef is for our automatic differentiation:
   typedef Sacado::Fad::SFad&lt;double,%(xyceNumberProbes(.))&gt; AdmsFadType;
 
   public:
-    static ParametricData&lt;Instance&gt; &amp;getParametricData();
+    Instance(
+      const Configuration &amp;       configuration,
+      const InstanceBlock &amp;       instance_block,
+      Model &amp;                     model,
+      const FactoryBlock &amp;        factory_block);
 
-    virtual const ParametricData&lt;void> &amp;getMyParametricData() const
-    {
-      return getParametricData();
-    }
-
-
-  <admst:text format="    Instance(InstanceBlock &amp; IB,
-                        Model &amp; Miter,
-                        MatrixLoadData &amp; mlData1,
-                        SolverState &amp;ss1,
-                        ExternData  &amp;ed1,
-                        DeviceOptions &amp; do1);\n"/>
-     // destructor
-
-    <admst:text format="    ~Instance();"/>
+    ~Instance();
 
 private:
-
-    <admst:text format="  Instance(const Instance &amp;);\n"/>
-    <admst:text format="  Instance &amp;operator=(const Instance &amp;);"/>
+    Instance(const Instance &amp;);
+    Instance &amp;operator=(const Instance &amp;);
 
 public:
-    void registerLIDs( const vector&lt;int&gt; &amp; intLIDVecRef,
-                       const vector&lt;int&gt; &amp; extLIDVecRef );
-    void registerStateLIDs( const vector&lt;int&gt; &amp; staLIDVecRef );
+    void registerLIDs( const std::vector&lt;int&gt; &amp; intLIDVecRef,
+                       const std::vector&lt;int&gt; &amp; extLIDVecRef );
+    void registerStateLIDs( const std::vector&lt;int&gt; &amp; staLIDVecRef );
     void setupPointers();
 
-    map&lt;int,string&gt; &amp; getIntNameMap ();
+    std::map&lt;int,std::string&gt; &amp; getIntNameMap ();
 
-    const vector&lt; vector&lt;int&gt; &gt; &amp; jacobianStamp() const;
-    void registerJacLIDs( const vector&lt; vector&lt;int&gt; &gt; &amp; jacLIDVec );
+    const std::vector&lt; std::vector&lt;int&gt; &gt; &amp; jacobianStamp() const;
+    void registerJacLIDs( const std::vector&lt; std::vector&lt;int&gt; &gt; &amp; jacLIDVec );
 
-    bool processParams (string param = "");
+    bool processParams();
     bool updateTemperature ( const double &amp; temp = -999.0 );
     bool updateIntermediateVars ();
     bool updatePrimaryState ();
@@ -237,10 +230,10 @@ public:
 
     <admst:if test="[count(@limitedProbes)>0]">
     // This array stores the differences between original and limited variables.
-    vector&lt;double&gt; probeDiffs;
+    std::vector&lt;double&gt; probeDiffs;
     // These store the Jdxp's for F and Q, respectively
-    vector&lt;double&gt; Jdxp_static;
-    vector&lt;double&gt; Jdxp_dynamic;
+    std::vector&lt;double&gt; Jdxp_static;
+    std::vector&lt;double&gt; Jdxp_dynamic;
     </admst:if>
 
     // this is what we'll use when any model uses \$temperature.  We'll
@@ -262,14 +255,14 @@ public:
 
     <admst:choose>
       <admst:when test="[count(node[#collapsible='yes'])=0]">
-    static vector&lt; vector&lt;int&gt; &gt; jacStamp;
-    static vector&lt;int&gt; jacMap;
-    static vector&lt; vector&lt;int&gt; &gt; jacMap2;
+    static std::vector&lt; std::vector&lt;int&gt; &gt; jacStamp;
+    static std::vector&lt;int&gt; jacMap;
+    static std::vector&lt; std::vector&lt;int&gt; &gt; jacMap2;
       </admst:when>
       <admst:otherwise>
-    vector&lt; vector&lt;int&gt; &gt; jacStamp;
-    vector&lt;int&gt; jacMap;
-    vector&lt; vector&lt;int&gt; &gt; jacMap2;
+    std::vector&lt; std::vector&lt;int&gt; &gt; jacStamp;
+    std::vector&lt;int&gt; jacMap;
+    std::vector&lt; std::vector&lt;int&gt; &gt; jacMap2;
       </admst:otherwise>
     </admst:choose>
     };
@@ -313,37 +306,31 @@ class AnalogFunctions
 
     <admst:text format="class Model : public DeviceModel"/>
 {
-  typedef std::vector&lt;Instance *&gt; InstanceVector;
+    typedef std::vector&lt;Instance *&gt; InstanceVector;
 
-  friend class ParametricData&lt;Model&gt;;
-  friend class Instance;
+    friend class ParametricData&lt;Model&gt;;
+    friend class Instance;
+    friend class Traits;
 
-  typedef Sacado::Fad::SFad&lt;double,%(xyceNumberProbes(.))&gt; AdmsFadType;
+    typedef Sacado::Fad::SFad&lt;double,%(xyceNumberProbes(.))&gt; AdmsFadType;
 
   public:
-    static ParametricData&lt;Model&gt; &amp;getParametricData();
+    Model(
+      const Configuration &amp;       configuration,
+      const ModelBlock &amp;          model_block,
+      const FactoryBlock &amp;        factory_block);
 
-    virtual const ParametricData&lt;void&gt; &amp;getMyParametricData() const
-    {
-      return getParametricData();
-    }
-
-
-    <admst:text format="    Model(const ModelBlock &amp;MB,
-                         SolverState &amp; ss1,
-                         DeviceOptions &amp; do1);\n"/>
-    <admst:text format="    ~Model();"/>
+    ~Model();
 
 private:
-
-    <admst:text format="    Model();\n"/>
-    <admst:text format="    Model(const Model &amp;);\n"/>
-    <admst:text format="    Model &amp;operator=(const Model &amp;);"/>
+    Model(const Model &amp;);
+    Model &amp;operator=(const Model &amp;);
 
 public:
+    virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
     virtual std::ostream &amp;printOutInstances(std::ostream &amp;os) const;
-    bool processParams (string param = "");
-    bool processInstanceParams (string param = "");
+    bool processParams();
+    bool processInstanceParams();
 
   private:
     <admst:if test="[exists(analogfunction)]">
@@ -351,6 +338,11 @@ public:
     </admst:if>
 
   public:
+    void addInstance(Instance *instance)
+    {
+      instanceContainer.push_back(instance);
+    }
+
     InstanceVector &amp;getInstanceVector()
     {
       return instanceContainer;
@@ -362,7 +354,7 @@ public:
     }
 
   private:
-    vector&lt;Instance*&gt; instanceContainer;
+    std::vector&lt;Instance*&gt; instanceContainer;
 
   private:
 
@@ -374,14 +366,12 @@ public:
     <admst:apply-templates select="." match="xyceDeclareModelVariables"/>
 };
 
+void registerDevice();
+
 
 <admst:text format="} // namespace %($nameSpace)"/>
 } // namespace Device
 } // namespace Xyce
-
-
-<admst:text format="typedef Xyce::Device::%($nameSpace)::Instance %($instanceName);\n"/>
-<admst:text format="typedef Xyce::Device::%($nameSpace)::Model %($modelName);\n\n"/>
 
 <admst:text format="#endif //$guardSymbol\n"/>
   </admst:open>

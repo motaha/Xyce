@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.17.6.2 $
+// Revision Number: $Revision: 1.22.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Date  : $Date: 2014/02/26 20:42:38 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -47,75 +47,75 @@
 #ifndef N_IO_FUNCTIONBLOCK_H
 #define N_IO_FUNCTIONBLOCK_H
 
-// ---------- Standard Includes ----------
-
 #include <string>
-
 #include <vector>
 
-// ---------- Forward Declarations ----------
-
-class N_IO_CircuitBlock;
-
-// ----------   Xyce Includes   ----------
-
+#include <N_IO_fwd.h>
 #include <N_IO_SpiceSeparatedFieldTool.h>
-#include <N_UTL_Param.h>
 #include <N_UTL_Packable.h> 
 
-class N_IO_FunctionBlock : public Packable
+namespace Xyce {
+namespace IO {
+
+class FunctionBlock : public Packable
 {
-  public:
-    // Constructor.
-     N_IO_FunctionBlock(){};
+public:
+  // Constructor.
+  FunctionBlock(){};
 
-    // Constructor.
-    N_IO_FunctionBlock(
-        string const& fileName,
-        vector<N_IO_SpiceSeparatedFieldTool::StringToken> 
-        const& parsedInputLine);
+  // Constructor.
+  FunctionBlock(
+     std::string const& fileName,
+     std::vector<N_IO_SpiceSeparatedFieldTool::StringToken> 
+     const& parsedInputLine);
 
-    // Copy Constructor
-    N_IO_FunctionBlock(N_IO_FunctionBlock const& rhsFB);
+  // Copy Constructor
+  FunctionBlock(FunctionBlock const& rhsFB);
 
-    // Destructor
-    ~N_IO_FunctionBlock(){};
+  // Destructor
+  ~FunctionBlock(){};
 
-    // Public data.
-    vector<N_IO_SpiceSeparatedFieldTool::StringToken> parsedLine;
+  // Public data.
+  std::vector<N_IO_SpiceSeparatedFieldTool::StringToken> parsedLine;
 
-    string functionName;
+  std::string functionName;
 
-    string functionNameAndArgs;
+  std::string functionNameAndArgs;
 
-    vector<string> functionArgs;
+  std::vector<std::string> functionArgs;
 
-    string functionBody;
+  std::string functionBody;
 
-    // Public methods.
+  // Public methods.
 
-    void print();
-    // Prints the details of an ParameterBlock to standard out.
+  void print();
+  // Prints the details of an ParameterBlock to standard out.
 
-    bool extractData();
-    //- Extract model data from parsedLine using model metadata.
-
-    
-    // Packing functionality.
-    Packable * instance() const;
-  
-    // Counts bytes needed to pack block.
-    int packedByteCount() const;
-  
-    // Packs OptionBlock into char buffer using MPI_PACK.
-    void pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) const;
-  
-    // Unpacks OptionBlock from char buffer using MPI_UNPACK.
-    void unpack(char * pB, int bsize, int & pos, N_PDS_Comm * comm);
+  bool extractData();
+  //- Extract model data from parsedLine using model metadata.
 
     
-  private:
-    string netlistFileName_;
+  // Packing functionality.
+  Packable * instance() const;
+  
+  // Counts bytes needed to pack block.
+  int packedByteCount() const;
+  
+  // Packs OptionBlock into char buffer using MPI_PACK.
+  void pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) const;
+  
+  // Unpacks OptionBlock from char buffer using MPI_UNPACK.
+  void unpack(char * pB, int bsize, int & pos, N_PDS_Comm * comm);
+
+    
+private:
+  std::string netlistFileName_;
 };
 
+} // namespace IO
+} // namespace Xyce
+
+typedef Xyce::IO::FunctionBlock FunctionBlock;
+
 #endif
+

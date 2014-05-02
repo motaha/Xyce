@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,21 +37,16 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.13.2.2 $
+// Revision Number: $Revision: 1.27.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/03/06 23:33:44 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ----------  Standard Includes ----------
-#include <N_UTL_Misc.h>
-#ifdef Xyce_DEBUG_DEVICE
 #include <iostream>
-#endif
 
 #ifdef HAVE_CMATH
 #include <cmath>
@@ -59,29 +54,20 @@
 #include <math.h>
 #endif
 
-// ----------   Xyce Includes   ----------
+#include <N_DEV_DeviceOptions.h>
 #include <N_DEV_DiodePDE.h>
 #include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
-#include <N_DEV_DeviceOptions.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_UTL_Misc.h>
 
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<DiodePDE::Model>::ParametricData()
-{}
-
-
 namespace DiodePDE {
 
-
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
+void Traits::loadModelParameters(ParametricData<DiodePDE::Model> &p)
+{}
 
 //-----------------------------------------------------------------------------
 // Function      : Model::processParams
@@ -91,7 +77,7 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   return true;
 }
@@ -104,12 +90,12 @@ bool Model::processParams (string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 03/23/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -129,10 +115,10 @@ bool Model::processInstanceParams(string param)
 //-----------------------------------------------------------------------------
 
 Model::Model(
-  const ModelBlock & MB,
-  SolverState &      ss1,
-  DeviceOptions &    do1)
-  : DevicePDEModel(MB,ss1,do1)
+  const Configuration & configuration,
+  const ModelBlock &            MB,
+  const FactoryBlock &  factory_block)
+  : DevicePDEModel(MB, configuration.getModelParameters(), factory_block)
 {
   processParams ();
 }
@@ -147,9 +133,9 @@ Model::Model(
 //-----------------------------------------------------------------------------
 Model::~Model()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -168,23 +154,46 @@ Model::~Model()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i;
-  os << endl;
-  os << "    name     getModelName()  Parameters" << endl;
+  os << std::endl;
+  os << "    name     model name  Parameters" << std::endl;
   for (i = 0, iter = first; iter != last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "      ";
-    os << (*iter)->getModelName();
+    os << getName();
     //os << "   C = " << (*iter)-> C;
     //os << "  IC = " << (*iter)->IC;
-    os << endl;
+    os << std::endl;
   }
-  os << endl;
+  os << std::endl;
+
+  return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 } // namespace DiodePDE
 } // namespace Device

@@ -25,9 +25,9 @@
 //-------------------------------------------------------------------------
 // Filename       : $RCSfile: N_DEV_Pars.C,v $
 //
-// Purpose        : 
+// Purpose        :
 //
-// Special Notes  : 
+// Special Notes  :
 //
 // Creator        : David Baur
 //
@@ -36,157 +36,169 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.4.2.3 $
+// Revision Number: $Revision: 1.12.2.4 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/11 18:50:03 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: dgbaur $
 //-------------------------------------------------------------------------
 
 #include <ostream>
 #include <string>
 
 #include <N_DEV_Pars.h>
-#include <N_UTL_IndentStreamBuf.h>
+
+#include <N_DEV_DeviceOptions.h>
+#include <N_ERH_Message.h>
 #include <N_UTL_Demangle.h>
 
 namespace Xyce {
 namespace Device {
 
-typedef std::map<std::pair<ParameterBase *, int>, double>  OriginalValueMap;
-typedef std::map<std::pair<ParameterBase *, int>, bool>  GivenValueMap;
-
-OriginalValueMap s_originalValueMap;                  ///< Map from device entity and original value index to original value
-GivenValueMap s_givenValueMap;                        ///< Map from device entity and serial number to value given flag
-
-
-/** 
- * Retrieve a parameter's original value
- *
- * @param entity device entity holding parameter
- * @param original_value_index index of original value
- *
- * @return original value of the parameter
- *
- * @date   Tue Aug  6 13:51:16 2013
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
- */
-double getOriginalValue(ParameterBase *entity, int original_value_index)
+//-----------------------------------------------------------------------------
+// Function      : setDefaultParameters
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : David G. Baur  Raytheon  Sandia National Laboratories 1355
+// Creation Date : Mon Mar 10 11:14:01 2014
+//-----------------------------------------------------------------------------
+///
+/// Iterates over parameters of parameter_base object, setting parameter_base members variables to the default value
+/// provided when the addPar() function created the parameter descrption
+///
+/// @param parameter_base       DeviceEntity or CompositeParam
+/// @param begin                Begin iterator of parameter descriptions
+/// @param end                  End iterator of parameters descriptions
+/// @param device_options       Device options
+///
+void setDefaultParameters(ParameterBase &parameter_base, ParameterMap::const_iterator begin, ParameterMap::const_iterator end, const DeviceOptions &device_options)
 {
-  return s_originalValueMap[OriginalValueMap::key_type(entity, original_value_index)];
-}
+// First, allocate and zero out original and given vals
+  for (ParameterMap::const_iterator it = begin ; it != end ; ++it)
+  {
+    Descriptor &param = *(*it).second;
+    Xyce::Device::setValueGiven(parameter_base, param.getSerialNumber(), false);
+    if (param.hasGivenMember())
+      param.setGiven(parameter_base, false);
 
-
-/** 
- * Set a parameter's original value
- *
- * @param entity device entity holding parameter
- * @param original_value_index index of original value
- * @param value value to be stored
- *
- * @date   Tue Aug  6 13:53:29 2013
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
- */
-void setOriginalValue(ParameterBase *entity, int original_value_index, double value)
-{
-  s_originalValueMap[OriginalValueMap::key_type(entity, original_value_index)] = value;
-}
-
-
-/** 
- * Return true if a value was provided for the device
- *
- * @param entity device entity holding parameter
- * @param serial_number serial number of parameter
- *
- * @return true if a value was provided for the device
- *
- * @date   Tue Aug  6 13:54:25 2013
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
- */
-bool wasValueGiven(ParameterBase *entity, int serial_number)
-{
-  return s_givenValueMap[GivenValueMap::key_type(entity, serial_number)];
-}
-
-
-/** 
- * Set the given value state of a parameter
- *
- * @param entity device entity holding parameter
- * @param serial_number serial number of parameter
- * @param value true if the value was given
- *
- * @date   Tue Aug  6 13:55:34 2013
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
- */
-void setValueGiven(ParameterBase *entity, int serial_number, bool value)
-{
-  s_givenValueMap[GivenValueMap::key_type(entity, serial_number)] = value;
-}
-
-/** 
- * Adds an entry to the parameter name to descriptor map.
- *
- *
- * @param name Name or parameter to declare
- * @param descriptor Type information of parameter
- * @param parameter_data_class Typeinfo to display name of class on error
- * 
- * @date   Tue Aug  6 13:22:21 2013
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
- */
-void ParametricData<void>::addDescriptor(const std::string &name, Descriptor *descriptor, const std::type_info &parameter_data_class)
-{
-  std::pair<ParameterMap::iterator, bool> result = map_.insert(ParameterMap::value_type(name, descriptor));
-
-  if (!result.second) {
-    std::ostringstream oss;
-
-    oss << "Parameter " << name << " already added to class " << demangle(parameter_data_class.name());
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, oss.str());
+    if (param.isType<double>()) 
+    {
+      if (param.getExpressionAccess() & MIN_RES)
+      {
+        setDefaultValue<double>(param, device_options.minRes);
+      }
+      else if (param.getExpressionAccess() & MIN_CAP)
+      {
+        setDefaultValue<double>(param, device_options.minCap);
+      }
+      param.value<double>(parameter_base) = getDefaultValue<double>(param);
+    }
+    else if (param.isType<bool>())
+      param.value<bool>(parameter_base) = getDefaultValue<bool>(param);
+    else if (param.isType<int>())
+      param.value<int>(parameter_base) = getDefaultValue<int>(param);
+    else if (param.isType<long>())
+      param.value<long>(parameter_base) = getDefaultValue<long>(param);
+    else if (param.isType<std::string>())
+      param.value<std::string>(parameter_base) = getDefaultValue<std::string>(param);
+    else if (param.isType<std::vector<int> >())
+      (param.value<std::vector<int> >(parameter_base)).clear();
+    else if (param.isType<std::vector<double> >())
+      (param.value<std::vector<double> >(parameter_base)).clear();
+    else if (param.isType<std::vector<std::string> >())
+      (param.value<std::vector<std::string> >(parameter_base)).clear();
   }
 }
 
-/** 
- * Report casting error when attempting to cast from from_type to to_type
- *
- * 
- * @param from_type Typeinfo casting from
- * @param to_type Typeinfo casting to
- *
- * @date   Tue Aug  6 13:40:56 2013
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
- */
-void typeMismatch(const std::type_info &from_type, const::type_info &to_type)
+//-----------------------------------------------------------------------------
+// Function      : nonexistentParameter
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : David G. Baur  Raytheon  Sandia National Laboratories 1355
+// Creation Date : Mon Mar 10 11:28:31 2014
+//-----------------------------------------------------------------------------
+///
+/// Report casting error when attempting to cast from from_type to to_type
+///
+/// @param name          parameter name
+/// @param entity_type   entity
+///
+void nonexistentParameter(const std::string &name, const std::type_info &entity_type)
 {
-  std::ostringstream oss;
-
-  oss << "Attempting to cast parameter of type " << demangle(from_type.name()) << " to type " << demangle(to_type.name());
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, oss.str());
+  Report::DevelFatal0() << "Parameter " << name << " does not exist in " << demangle(entity_type.name());
 }
 
-/** 
- * Report error if both MIN_CAP and MIN_RES have been specified.
- * 
- * @param name Parameter name
- * @param expr_access Parameter expr access to verify
- * @param parameter_data_class Typeinfo to display name of class on error
- *
- * @author Dave Shirley, PSSI
- * @date   03/03/06
- */
+//-----------------------------------------------------------------------------
+// Function      : Xyce::Device::typeMismatch
+// Purpose       : 
+// Special Notes : 
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 8/6/2014
+//-----------------------------------------------------------------------------
+///
+/// Report casting error when attempting to cast from from_type to to_type
+///
+/// @param from_type Typeinfo casting from
+/// @param to_type Typeinfo casting to
+///
+void typeMismatch(const std::type_info &from_type, const std::type_info &to_type)
+{
+  Report::DevelFatal0() << "Attempting to cast parameter of type " << demangle(from_type.name()) << " to type " << demangle(to_type.name());
+}
+
+//-----------------------------------------------------------------------------
+// Function      : checkExprAccess
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : David G. Baur  Raytheon  Sandia National Laboratories 1355
+// Creation Date : Mon Mar 10 11:28:53 2014
+//-----------------------------------------------------------------------------
+///
+/// Report error if both MIN_CAP and MIN_RES have been specified.
+///
+/// @param name Parameter name
+/// @param expr_access Parameter expr access to verify
+/// @param parameter_data_class Typeinfo to display name of class on error
+///
 void checkExprAccess(const std::string &name, ParameterType::ExprAccess &expr_access, const std::type_info &parameter_data_class)
 {
   if ((expr_access & ParameterType::MIN_CAP) && (expr_access & ParameterType::MIN_RES))
-  {
-    std::ostringstream oss;
+    Report::DevelFatal0() << "Attempt to set MIN_CAP and MIN_RES on ParameterType::ExprAccess for parameter " << name << " in class " << parameter_data_class.name();
+}
 
-    oss << "Attempt to set MIN_CAP and MIN_RES on ParameterType::ExprAccess for parameter " << name << " in class " << parameter_data_class.name();
 
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, oss.str());
-  }
+//-----------------------------------------------------------------------------
+// Function      : ParametricData<void>::addDescriptor
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : David G. Baur  Raytheon  Sandia National Laboratories 1355
+// Creation Date : Mon Mar 10 11:22:43 2014
+//-----------------------------------------------------------------------------
+///
+/// Adds an entry to descriptor map.
+///
+/// The serial number of the parameter is set in the descriptor.
+///
+/// @invariant descriptor serial number is unique for each descriptor
+/// @invariant parameter descriptor has unique name
+///
+/// @param name                 Name or parameter to declare
+/// @param descriptor           Type information of parameter
+/// @param parameter_data_class Typeinfo to display name of class on error
+///
+void ParametricData<void>::addDescriptor(const std::string &name, Descriptor *descriptor, const std::type_info &parameter_data_class)
+{
+  descriptor->setSerialNumber(map_.size());
+
+  std::pair<ParameterMap::iterator, bool> result = map_.insert(ParameterMap::value_type(name, descriptor));
+
+  if (!result.second)
+    Report::DevelFatal0() << "Parameter " << name << " already added to class " << demangle(parameter_data_class.name());
 }
 
 } // namespace Device

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.12.6.2 $
+// Revision Number: $Revision: 1.17 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,23 +46,15 @@
 #ifndef Xyce_N_PDS_GlobalAccessor_h
 #define Xyce_N_PDS_GlobalAccessor_h
 
-// ---------- Standard Includes ----------
-
 #include <string>
 #include <list>
 #include <map>
 #include <vector>
 
-// ---------- Forward Declarations -------
+#include <N_PDS_fwd.h>
 
 class N_LAS_MultiVector;
-class N_PDS_Comm;
 class N_PDS_ParMap;
-
-#ifdef Xyce_PARALLEL_MPI
-//class GSComm_Plan;
-//class GSComm_Comm;
-#endif
 class Epetra_Distributor;
 
 // ----------   Xyce Includes   ----------
@@ -109,7 +101,7 @@ public:
   // Registration methods for pointer attributes.
   void registerPDSComm(N_PDS_Comm * comm) { pdsComm_ = comm; }
 
-  void registerExternGIDVector(const vector < pair < int,
+  void registerExternGIDVector(const std::vector< std::pair< int,
                                int > > & extGIDVector);
 
   // Uses data from TopoLSUtil::ExternSVarList to generate migration plan using
@@ -121,12 +113,12 @@ public:
   void migrateMultiVector(N_LAS_MultiVector * mVector);
 
   // Migrator for integer array (currently to be used for global index reset).
-  void migrateIntArray(map < int, int > & sendMap, map < int,
+  void migrateIntArray(std::map< int, int > & sendMap, std::map< int,
                        int > & recvMap);
 
   // Migrator for integer array (currently to be used for global index reset).
-  void migrateIntVecs(map < int, vector < int > > & sendMap, map < int,
-                      vector < int > > & recvMap);
+  void migrateIntVecs(std::map< int, std::vector< int > > & sendMap, std::map< int,
+                      std::vector< int > > & recvMap);
 
 private:
 
@@ -135,13 +127,13 @@ private:
 
   // Vector listing extern GIDs and their respective procs needed for nonlocal
   // dependencies.
-  vector < pair < int, int > > externGIDVector_;
+  std::vector< std::pair< int, int > > externGIDVector_;
 
   // Number of objects to be received.
   int numReceiveObjs_;
 
   // Vector listing receive GIDs.
-  vector < pair < int, int > > receiveGIDVector_;
+  std::vector< std::pair< int, int > > receiveGIDVector_;
 
   int * arrayReceiveGIDs_;
   int * arrayReceiveLIDs_;
@@ -155,7 +147,7 @@ private:
   int numSendObjs_;
 
   // Vector listing sending GIDs.
-  vector < pair < int, int > > sendGIDVector_;
+  std::vector< std::pair< int, int > > sendGIDVector_;
 
   int * arraySendGIDs_;
   int * arraySendLIDs_;
@@ -183,7 +175,7 @@ private:
 // Creation Date : 06/07/00
 //-----------------------------------------------------------------------------
 inline void N_PDS_GlobalAccessor::registerExternGIDVector(
-  const vector < pair < int, int > > & extGIDVector)
+  const std::vector< std::pair< int, int > > & extGIDVector)
 {
 
   // First, clear the vector...

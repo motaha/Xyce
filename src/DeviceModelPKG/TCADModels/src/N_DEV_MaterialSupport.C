@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.23.2.2 $
+// Revision Number: $Revision: 1.29 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/24 23:49:18 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -114,7 +114,7 @@ MaterialSupport::MaterialSupport
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 7/19/03
 // ----------------------------------------------------------------------------
-double MaterialSupport::getEffectiveMassN (const string & material)
+double MaterialSupport::getEffectiveMassN (const std::string & material)
 {
   ExtendedString mater = material;
   mater.toLower();
@@ -148,9 +148,7 @@ double MaterialSupport::getEffectiveMassN (const string & material)
   }
   else
   {
-    string msg = material;
-    msg += " material not recognized.\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,msg);
+    Report::UserFatal0() << material << " material not recognized.";
   }
 
   return mass;
@@ -167,7 +165,7 @@ double MaterialSupport::getEffectiveMassN (const string & material)
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 7/19/03
 // ----------------------------------------------------------------------------
-double MaterialSupport::getEffectiveMassP (const string & material)
+double MaterialSupport::getEffectiveMassP (const std::string & material)
 {
   ExtendedString mater = material;
   mater.toLower();
@@ -213,9 +211,7 @@ double MaterialSupport::getEffectiveMassP (const string & material)
   }
   else
   {
-    string msg = material;
-    msg += " material not recognized.\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,msg);
+    Report::UserFatal0() << material << " material not recognized.";
   }
 
   return mass;
@@ -230,7 +226,7 @@ double MaterialSupport::getEffectiveMassP (const string & material)
 // Creator       : Eric R. Keiter, SNL
 // Creation Date :
 // ----------------------------------------------------------------------------
-double MaterialSupport::getDOSEffectiveMassN (const string & material)
+double MaterialSupport::getDOSEffectiveMassN (const std::string & material)
 {
   ExtendedString mater = material;
   mater.toLower();
@@ -266,9 +262,7 @@ double MaterialSupport::getDOSEffectiveMassN (const string & material)
   }
   else
   {
-    string msg = material;
-    msg += " material not recognized.\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,msg);
+    Report::UserFatal0() << material << " material not recognized.";
   }
 
   mass *= Mc;
@@ -284,7 +278,7 @@ double MaterialSupport::getDOSEffectiveMassN (const string & material)
 // Creator       : Eric R. Keiter, SNL
 // Creation Date :
 // ----------------------------------------------------------------------------
-double MaterialSupport::getDOSEffectiveMassP (const string & material)
+double MaterialSupport::getDOSEffectiveMassP (const std::string & material)
 {
   ExtendedString mater = material;
   mater.toLower();
@@ -322,9 +316,7 @@ double MaterialSupport::getDOSEffectiveMassP (const string & material)
   }
   else
   {
-    string msg = material;
-    msg += " material not recognized.\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,msg);
+    Report::UserFatal0() << material << " material not recognized.";
   }
 
   mass *= Mc;
@@ -341,7 +333,7 @@ double MaterialSupport::getDOSEffectiveMassP (const string & material)
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 10/24/12
 // ----------------------------------------------------------------------------
-double MaterialSupport::getNi (const string & material, double temp)
+double MaterialSupport::getNi (const std::string & material, double temp)
 {
   ExtendedString mater = material;
   mater.toLower();
@@ -364,12 +356,12 @@ double MaterialSupport::getNi (const string & material, double temp)
   ni = sqrt (Nc * Nv) * exp(-bg/(2.0 * kbq * temp));
 
 #ifdef Xyce_DEBUG_DEVICE
-  std::cout << "mnDOS = " <<mnDOS   <<std::endl;
-  std::cout << "mpDOS = " <<mpDOS   <<std::endl;
-  std::cout << "dnbnd0 = " <<  dnbnd0 <<std::endl;
-  std::cout << "Nc = " <<  Nc <<std::endl;
-  std::cout << "Nv = " <<  Nv <<std::endl;
-  std::cout << "Ni = " <<  ni <<std::endl;
+  Xyce::dout() << "mnDOS = " <<mnDOS   <<std::endl;
+  Xyce::dout() << "mpDOS = " <<mpDOS   <<std::endl;
+  Xyce::dout() << "dnbnd0 = " <<  dnbnd0 <<std::endl;
+  Xyce::dout() << "Nc = " <<  Nc <<std::endl;
+  Xyce::dout() << "Nv = " <<  Nv <<std::endl;
+  Xyce::dout() << "Ni = " <<  ni <<std::endl;
 #endif
   return ni;
 }
@@ -382,7 +374,7 @@ double MaterialSupport::getNi (const string & material, double temp)
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 7/19/03
 // ----------------------------------------------------------------------------
-double MaterialSupport::getNi_old (const string & material, double temp)
+double MaterialSupport::getNi_old (const std::string & material, double temp)
 {
   ExtendedString mater = material;
   mater.toLower();
@@ -438,7 +430,7 @@ double MaterialSupport::getNi_old (const string & material, double temp)
   }
   else
   {
-    string msg = "MaterialSupport::getNi:  ";
+    std::string msg = "MaterialSupport::getNi:  ";
     msg += material;
     msg += " material not recognized.\n";
     N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
@@ -455,7 +447,7 @@ double MaterialSupport::getNi_old (const string & material, double temp)
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 7/19/03
 // ----------------------------------------------------------------------------
-double MaterialSupport::getRelPerm (const string & material)
+double MaterialSupport::getRelPerm (const std::string & material)
 {
   ExtendedString mater = material;
   mater.toLower();
@@ -491,9 +483,7 @@ double MaterialSupport::getRelPerm (const string & material)
   }
   else
   {
-    string msg = material;
-    msg += " material not recognized.\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,msg);
+    Report::UserFatal0() << material << " material not recognized.";
   }
 
   return perm;
@@ -515,7 +505,7 @@ double MaterialSupport::getRelPerm (const string & material)
 // Creation Date : 6/27/03
 // ----------------------------------------------------------------------------
 double MaterialSupport::calcRsrh
-  (const string & material, double ni, double n, double p, double tn, double tp)
+  (const std::string & material, double ni, double n, double p, double tn, double tp)
 {
   double Ni = ni;
   double pn = Ni*Ni;
@@ -546,7 +536,7 @@ double MaterialSupport::calcRsrh
 // Creation Date : 7/19/03
 // ----------------------------------------------------------------------------
 double MaterialSupport::pdRsrhN
-  (const string & material, double ni, double n, double p, double tn, double tp)
+  (const std::string & material, double ni, double n, double p, double tn, double tp)
 {
   double Ni = ni;
   double pdRsrhN;
@@ -591,7 +581,7 @@ double MaterialSupport::pdRsrhN
 // Creation Date : 7/19/03
 // ----------------------------------------------------------------------------
 double MaterialSupport::pdRsrhP
-  (const string & material, double ni, double n, double p, double tn, double tp)
+  (const std::string & material, double ni, double n, double p, double tn, double tp)
 {
   double Ni = ni;
   double pdRsrhP;
@@ -637,7 +627,7 @@ double MaterialSupport::pdRsrhP
 // Creation Date : 6/27/03
 // ----------------------------------------------------------------------------
 double MaterialSupport::calcRaug
-  (const string & material, double ni, double n, double p)
+  (const std::string & material, double ni, double n, double p)
 {
   double Ni = ni;
   double Cn = 2.8e-31;
@@ -671,7 +661,7 @@ double MaterialSupport::calcRaug
 // Creation Date : 7/19/03
 // ----------------------------------------------------------------------------
 double MaterialSupport::pdRaugN
-  (const string & material, double ni, double n, double p)
+  (const std::string & material, double ni, double n, double p)
 {
   double Ni = ni;
   double pdRaugN;
@@ -717,7 +707,7 @@ double MaterialSupport::pdRaugN
 // Creation Date : 7/19/03
 // ----------------------------------------------------------------------------
 double MaterialSupport::pdRaugP
-  (const string & material, double ni, double n, double p)
+  (const std::string & material, double ni, double n, double p)
 {
   double Ni = ni;
   double pdRaugP;
@@ -756,7 +746,7 @@ double MaterialSupport::pdRaugP
 // Creator       : Deborah Fixel, SNL, Parallel Computational Sciences
 // Creation Date : 7/15/03
 //----------------------------------------------------------------------------
-double MaterialSupport::workfunc(string & metal)
+double MaterialSupport::workfunc(std::string & metal)
 {
   double wkfunc=0.0;
 
@@ -809,9 +799,7 @@ double MaterialSupport::workfunc(string & metal)
   }
   else
   {
-    string msg = metalName;
-    msg += " material not recognized.\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,msg);
+    Report::UserFatal0() << metalName << " material not recognized.";
   }
 
   return wkfunc;
@@ -827,7 +815,7 @@ double MaterialSupport::workfunc(string & metal)
 // Creator       : Deborah Fixel, SNL, Parallel Computational Sciences
 // Creation Date : 7/15/03
 //---------------------------------------------------------------------------
-double MaterialSupport::affin(const string & material)
+double MaterialSupport::affin(const std::string & material)
 {
 
   double afty=0.0;
@@ -861,9 +849,7 @@ double MaterialSupport::affin(const string & material)
   }
   else
   {
-    string msg = materialName;
-    msg += " material not recognized.\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,msg);
+    Report::UserError0() << materialName << " material not recognized.";
   }
 
   return afty;
@@ -883,7 +869,7 @@ double MaterialSupport::affin(const string & material)
 // Creator       : Deborah Fixel, SNL, Parallel Computational Sciences
 // Creation Date : 7/18/03
 //---------------------------------------------------------------------------
-double MaterialSupport::bandgap(const string & material,  double temp)
+double MaterialSupport::bandgap(const std::string & material,  double temp)
 {
   double gap = 0.0;
   ExtendedString materialName = material;
@@ -933,9 +919,7 @@ double MaterialSupport::bandgap(const string & material,  double temp)
   }
   else
   {
-    string msg = materialName;
-    msg += " material not recognized.\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,msg);
+    Report::UserError0() << materialName << " material not recognized.";
   }
 
   return gap;

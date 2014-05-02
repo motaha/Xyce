@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.3.6.2 $
+// Revision Number: $Revision: 1.7 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,25 +46,19 @@
 #ifndef N_TOP_System_h
 #define N_TOP_System_h 1
 
-// ---------- Standard Includes ----------
-
 #include <iosfwd>
 #include <map>
 #include <string>
 
-// ----------   Xyce Includes   ----------
-
 #include <N_UTL_Xyce.h>
-
-// ---------- Forward Declarations ----------
 
 class N_PDS_Manager;
 
 namespace Xyce {
-namespace Topology {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Class         : Xyce::Topology::System
+// Class         : Xyce::Topo::System
 // Purpose       : Abstract System Interface
 // Special Notes :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
@@ -102,7 +96,9 @@ class System
   friend ostream & operator<<( ostream & os, const System & );
 };
 
-} //namespace Topology
+} //namespace Topo
 } //namespace Xyce
+
+typedef Xyce::Topo::System N_TOP_System;
 
 #endif

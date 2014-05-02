@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,28 +31,32 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.15.2.3 $
-// Revision Date  : $Date: 2013/12/03 23:30:12 $
+// Revision Number: $Revision: 1.33.2.4 $
+// Revision Date  : $Date: 2014/03/10 21:18:46 $
 // Current Owner  : $Author: rlschie $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-// ---------- Standard Includes ----------
+#include <iterator>
 
-// ----------   Xyce Includes   ----------
-#include<N_IO_MeasureBase.h>
+#include <N_IO_MeasureBase.h>
+#include <N_IO_Op.h>
 #include <N_ERH_ErrorMgr.h>
 
+namespace Xyce {
+namespace IO {
+namespace Measure {
+
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureBase::N_IO_MeasureBase
+// Function      : MeasureBase::MeasureBase
 // Purpose       : Constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-----------------------------------------------------------------------------
-N_IO_MeasureBase::N_IO_MeasureBase( const N_UTL_OptionBlock & measureBlock,  N_IO_OutputMgr &output_manager )
+Base::Base( const Util::OptionBlock & measureBlock,  IO::OutputMgr &output_manager )
   : name_(""),
  mode_(""),
  type_(""),
@@ -100,12 +104,14 @@ N_IO_MeasureBase::N_IO_MeasureBase( const N_UTL_OptionBlock & measureBlock,  N_I
  trigFracMaxGiven_(false),
  targFracMax_(0.0),
  targFracMaxGiven_(false),
- numDepSolVars_(0),
  outputValueTarget_(0.0),
  outputValueTargetGiven_(false),
  lastOutputValue_(0.0),
  calculationDone_(false),
- calculationResult_(0.0),
+ calculationResult_(-1.0),
+ independentVarColumn_(0),
+ independentVar2Column_(0),
+ dependentVarColumn_(0),
   outputManager_(output_manager)
 {
   // since many of the measure types share the use of keywords (like TD=<delay time>) we'll
@@ -119,23 +125,25 @@ N_IO_MeasureBase::N_IO_MeasureBase( const N_UTL_OptionBlock & measureBlock,  N_I
   bool inTrigBlock = false;
   bool inTargBlock = false;
 
-  list<N_UTL_Param>::iterator currentParamIt = const_cast<N_UTL_OptionBlock &>(measureBlock).begin();
-  list<N_UTL_Param>::iterator endParamIt = const_cast<N_UTL_OptionBlock &>(measureBlock).end();
+  std::list<N_UTL_Param>::iterator currentParamIt = const_cast<N_UTL_OptionBlock &>(measureBlock).begin();
+  std::list<N_UTL_Param>::iterator endParamIt = const_cast<N_UTL_OptionBlock &>(measureBlock).end();
   while( currentParamIt != endParamIt )
   {
-    string tag = currentParamIt->tag();
+    
+    std::string tag = currentParamIt->tag();
+    //Xyce::dout() << " in meaasure base setup: tag = \"" << tag << "\"" << std::endl;
     if( tag == "NAME" )
     {
-      name_ = currentParamIt->sVal();
+      name_ = currentParamIt->stringValue();
     }
     else if( tag == "MODE" )
     {
-      mode_ = currentParamIt->sVal();
+      mode_ = currentParamIt->stringValue();
     }
     else if( tag == "TYPE" )
     {
-      type_ = currentParamIt->sVal();
-      // if type is TRIG or TARG then the next N_UTL_Param in the list the
+      type_ = currentParamIt->stringValue();
+      // if type is TRIG or TARG then the next Util::Param in the list the
       // node or expression that is the Trigger or Target.  We'll need to
       // catch and save this.  This oddity arises because all of the other
       // measures have one objective to read while the TRIG/TARG of the Rise
@@ -156,56 +164,56 @@ N_IO_MeasureBase::N_IO_MeasureBase( const N_UTL_OptionBlock & measureBlock,  N_I
     }
     else if( tag == "TD" )
     {
-      td_ = currentParamIt->dVal();
+      td_ = currentParamIt->getImmutableValue<double>();
       tdGiven_ = true;
     }
-    else if( tag == "GOAL" )
+    else if( ( tag == "GOAL" ) || ( tag == "VALUE" ) )
     {
-      goal_ = currentParamIt->dVal();
+      goal_ = currentParamIt->getImmutableValue<double>();
     }
     else if( tag == "WEIGHT" )
     {
-      weight_ = currentParamIt->dVal();
+      weight_ = currentParamIt->getImmutableValue<double>();
     }
     else if( tag == "MAX_THRESH" )
     {
-      maxThresh_ = currentParamIt->dVal();
+      maxThresh_ = currentParamIt->getImmutableValue<double>();
       maxThreshGiven_ = true;
     }
     else if( tag == "MIN_THRESH" )
     {
-      minThresh_ = currentParamIt->dVal();
+      minThresh_ = currentParamIt->getImmutableValue<double>();
       minThreshGiven_ = true;
     }
     else if( tag == "MINVAL" )
     {
-      minval_ = currentParamIt->dVal();
+      minval_ = currentParamIt->getImmutableValue<double>();
     }
     else if( tag == "AT" )
     {
-      at_ = currentParamIt->dVal();
+      at_ = currentParamIt->getImmutableValue<double>();
     }
     else if( tag == "FROM" )
     {
-      from_ = currentParamIt->dVal();
+      from_ = currentParamIt->getImmutableValue<double>();
       fromGiven_ = true;
     }
     else if( tag == "TO" )
     {
-      to_ = currentParamIt->dVal();
+      to_ = currentParamIt->getImmutableValue<double>();
       toGiven_ = true;
     }
     else if( (tag == "IGNORE") || (tag == "YMIN") )
     {
-      ymin_ = currentParamIt->dVal();
+      ymin_ = currentParamIt->getImmutableValue<double>();
     }
     else if( tag == "YMAX" )
     {
-      ymax_ = currentParamIt->dVal();
+      ymax_ = currentParamIt->getImmutableValue<double>();
     }
     else if( tag == "RISE" )
     {
-      if( currentParamIt->getType() == STR )
+      if( currentParamIt->getType() == Xyce::Util::STR )
       {
         // user requested LAST rise in simulation
         // so measure all of them and just report the last one.
@@ -213,13 +221,13 @@ N_IO_MeasureBase::N_IO_MeasureBase( const N_UTL_OptionBlock & measureBlock,  N_I
       }
       else
       {
-        rise_ = currentParamIt->iVal();
+        rise_ = currentParamIt->getImmutableValue<int>();
       }
       riseGiven_ = true;
     }
     else if( tag == "FALL" )
     {
-      if( currentParamIt->getType() == STR )
+      if( currentParamIt->getType() == Xyce::Util::STR )
       {
         // user requested LAST fall in simulation
         // so measure all of them and just report the last one.
@@ -227,13 +235,13 @@ N_IO_MeasureBase::N_IO_MeasureBase( const N_UTL_OptionBlock & measureBlock,  N_I
       }
       else
       {
-        fall_ = currentParamIt->iVal();
+        fall_ = currentParamIt->getImmutableValue<int>();
       }
       fallGiven_ = true;
     }
     else if( tag == "CROSS" )
     {
-      if( currentParamIt->getType() == STR )
+      if( currentParamIt->getType() == Xyce::Util::STR )
       {
         // user requested LAST cross in simulation
         // so measure all of them and just report the last one.
@@ -241,7 +249,7 @@ N_IO_MeasureBase::N_IO_MeasureBase( const N_UTL_OptionBlock & measureBlock,  N_I
       }
       else
       {
-        cross_ = currentParamIt->iVal();
+        cross_ = currentParamIt->getImmutableValue<int>();
       }
       crossGiven_ = true;
     }
@@ -249,63 +257,41 @@ N_IO_MeasureBase::N_IO_MeasureBase( const N_UTL_OptionBlock & measureBlock,  N_I
     {
       if( inTrigBlock )
       {
-        trigFracMax_ = currentParamIt->dVal();
+        trigFracMax_ = currentParamIt->getImmutableValue<double>();
         trigFracMaxGiven_ = true;
       }
       else if( inTargBlock )
       {
-        targFracMax_ = currentParamIt->dVal();
+        targFracMax_ = currentParamIt->getImmutableValue<double>();
         targFracMaxGiven_ = true;
       }
     }
-    else if( (tag == "V") || (tag == "I") )
+    else if( Xyce::Util::hasExpressionTag(tag) )
     {
-
-      int nodes = currentParamIt->iVal();
-      N_UTL_Param aParam;
-      aParam.set( tag, nodes );
-
-      if( inTrigBlock )
-      {
-        //std::cout << "In TRIG and aParam is " << aParam << std::endl;
-        trig_ = aParam;
-      }
-      else if( inTargBlock )
-      {
-        //std::cout << "In TARG and aParam is " << aParam << std::endl;
-        targ_ = aParam;
-      }
-
-      // at this point trig and targ hold the beginning of the argument and how
-      // many nodes it depends on (typically 1 or 2)  That's all we need there
-      // to later use outputVars_ and depSolVarIterVector_ to get their values.
-
-      // here we just store the needed parts of V(a) or v(a,b) or I(device).
-      // only the v(a,b) case will need an extra node in the outputVars_ array.
-
       numDepSolVars_++;
-      // use list::insert() to keep an iterator pointing to this spot
-      list<N_UTL_Param>::iterator newDepSolVarItr = outputVars_.insert( outputVars_.end(), aParam);
-      depSolVarIterVector_.push_back( newDepSolVarItr );
-      for( int i=0; i<nodes; i++ )
-      {
-        currentParamIt++;
-        aParam.set( currentParamIt->tag(), currentParamIt->dVal() );
-        outputVars_.push_back( aParam );
-      }
-
+      depSolVarIterVector_.push_back(*currentParamIt);
     }
     else if( tag == "OBJVAL" )
     {
-      if( currentParamIt->getType() == INT )
+      if( currentParamIt->getType() == Xyce::Util::INT )
       {
-        outputValueTarget_ = currentParamIt->iVal();
+        outputValueTarget_ = currentParamIt->getImmutableValue<int>();
+        outputValueTargetGiven_ = true;
       }
-      else
+      else if( currentParamIt->getType() == Xyce::Util::DBLE )
       {
-        outputValueTarget_ = currentParamIt->dVal();
+        outputValueTarget_ = currentParamIt->getImmutableValue<double>();
+        outputValueTargetGiven_ = true;
       }
-      outputValueTargetGiven_ = true;
+      else if( currentParamIt->getType() == Xyce::Util::STR )
+      {
+        // a bare string name that we will have to resovle
+        Util::Param aParam;
+        aParam.set( currentParamIt->stringValue(), 0 );
+        numDepSolVars_++;
+        depSolVarIterVector_.push_back(aParam);
+      }
+      
       if( inTrigBlock )
       {
         trigOutputValueTarget_ = outputValueTarget_;
@@ -321,27 +307,85 @@ N_IO_MeasureBase::N_IO_MeasureBase( const N_UTL_OptionBlock & measureBlock,  N_I
     }
     else if( tag == "ON" )
     {
-      onValue_ = currentParamIt->dVal();
+      onValue_ = currentParamIt->getImmutableValue<double>();
       onValueGiven_ = true;
     }
     else if( tag == "OFF" )
     {
-      offValue_ = currentParamIt->dVal();
+      offValue_ = currentParamIt->getImmutableValue<double>();
       offValueGiven_ = true;
     }
     else if( tag == "NUMFREQ" )
     {
-      numFreq_ = currentParamIt->iVal();
+      numFreq_ = currentParamIt->getImmutableValue<int>();
     }
     else if( tag == "GRIDSIZE" )
     {
-      gridSize_ = currentParamIt->iVal();
+      gridSize_ = currentParamIt->getImmutableValue<int>();
     }
+    else if( tag == "FILE" )
+    {
+      dataFileName_ = currentParamIt->stringValue();
+    }
+    else if( tag == "COMP_FUNCTION" )
+    {
+      comparisonFunctionName_ = currentParamIt->stringValue();
+    }
+    else if( tag == "INDEPVARCOL" )
+    {
+      independentVarColumn_ = currentParamIt->getImmutableValue<int>();
+    }
+    else if( tag == "INDEPVAR2COL" )
+    {
+      independentVar2Column_ = currentParamIt->getImmutableValue<int>();
+    }
+    else if( tag == "DEPVARCOL" )
+    {
+      dependentVarColumn_ = currentParamIt->getImmutableValue<int>();
+    }
+    else if( tag == "DEFAULT_VAL" )
+    {
+      calculationResult_ = currentParamIt->getImmutableValue<double>();
+    }
+    else if( tag[0]=='V' || tag[0]=='I' || tag[0]=='N' ) 
+    {
+      // this if clause must come last because we are only checking the 
+      // first letter and don't with to get confused with kewords 
+      // that happen to start with V, I or N
+      int nodes = currentParamIt->getImmutableValue<int>();
+      Util::Param aParam;
+      aParam.set( tag, nodes );
+
+      if( inTrigBlock )
+      {
+        trig_ = aParam;
+      }
+      else if( inTargBlock )
+      {
+        targ_ = aParam;
+      }
+
+      // at this point trig and targ hold the beginning of the argument and how
+      // many nodes it depends on (typically 1 or 2)  That's all we need there
+      // to later use outputVars_ and depSolVarIterVector_ to get their values.
+
+      // here we just store the needed parts of V(a) or v(a,b) or I(device).
+      // only the v(a,b) case will need an extra node in the outputVars_ array.
+
+      numDepSolVars_++;
+
+      depSolVarIterVector_.push_back(aParam);
+      for( int i=0; i<nodes; i++ )
+      {
+        currentParamIt++;
+        aParam.set( currentParamIt->tag(), currentParamIt->getImmutableValue<double>() );
+        depSolVarIterVector_.push_back( aParam );
+      }
+    }
+
     else
     {
-      // unknown tag.  Issue a warning.
-      string msg = "Unknown tag in measure statement: " + tag + " Will try to ignore.";
-      N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_WARNING, msg);
+      Xyce::Report::UserWarning() << "Unknown tag in measure statement: " << tag << ", ignoring";
     }
     currentParamIt++;
   }
@@ -349,18 +393,27 @@ N_IO_MeasureBase::N_IO_MeasureBase( const N_UTL_OptionBlock & measureBlock,  N_I
 }
 
 
+void
+Base::fixupMeasureParameters() 
+{
+  makeOps(outputManager_, depSolVarIterVector_.begin(), depSolVarIterVector_.end(), std::back_inserter(outputVars_));
+
+  prepareOutputVariables();
+}
+
+
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureBase::withinTransientWindow
+// Function      : MeasureBase::withinTransientWindow
 // Purpose       : Checks if current time is within measurement window
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-----------------------------------------------------------------------------
- bool N_IO_MeasureBase::withinTransientWindow( double time )
+ bool Base::withinTransientWindow( double time )
  {
    bool retVal = true;
-   if( time < td_ )
+   if( tdGiven_ && (time < td_) )
    {
      retVal = false;
    }
@@ -368,14 +421,14 @@ N_IO_MeasureBase::N_IO_MeasureBase( const N_UTL_OptionBlock & measureBlock,  N_I
  }
 
  //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureBase::withinFromToWindow
+// Function      : MeasureBase::withinFromToWindow
 // Purpose       : Checks if current time is within measurement window
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-----------------------------------------------------------------------------
- bool N_IO_MeasureBase::withinFromToWindow( double time )
+ bool Base::withinFromToWindow( double time )
  {
    bool retVal = true;
    if( (fromGiven_ && (time < from_ )) || (toGiven_ && (time > to_)) )
@@ -386,14 +439,14 @@ N_IO_MeasureBase::N_IO_MeasureBase( const N_UTL_OptionBlock & measureBlock,  N_I
  }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureBase::withinRiseFallCrossWindow
+// Function      : MeasureBase::withinRiseFallCrossWindow
 // Purpose       : Checks if current value is within measurement window
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-----------------------------------------------------------------------------
-bool N_IO_MeasureBase::withinRiseFallCrossWindow( double measureVal )
+bool Base::withinRiseFallCrossWindow( double measureVal, double crossVal )
 {
   bool retVal = true;
   if( riseGiven_ || fallGiven_ || crossGiven_ )
@@ -414,10 +467,12 @@ bool N_IO_MeasureBase::withinRiseFallCrossWindow( double measureVal )
       isFalling_ = true;
       actualFall_++;
     }
-    if( ((measureVal < 0.0) && (lastOutputValue_ > 0.0)) || ((measureVal > 0.0) && (lastOutputValue_ < 0.0)) )
+    if( (((measureVal-crossVal) < 0.0) && ((lastOutputValue_-crossVal) > 0.0)) 
+     || (((measureVal-crossVal) > 0.0) && ((lastOutputValue_-crossVal) < 0.0)) )
     {
-      // we've crossed zero
+      // we've crossed measureVal-crossVal == 0 
       actualCross_++;
+      //Xyce::dout() << name_ << " actualCross = " << actualCross_ << " with lastOutputValue_ = " << lastOutputValue_ << std::endl;
     }
 
     // now check if we're in the right window
@@ -434,20 +489,21 @@ bool N_IO_MeasureBase::withinRiseFallCrossWindow( double measureVal )
     {
       retVal=true;
     }
+    lastOutputValue_=measureVal;
   }
   return retVal;
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureBase::withinMinMaxThreash
+// Function      : MeasureBase::withinMinMaxThreash
 // Purpose       : Check if value is withing MIN_THRESHOLD & MAX_THRESHOLD
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-----------------------------------------------------------------------------
-bool N_IO_MeasureBase::withinMinMaxThreash( double value)
+bool Base::withinMinMaxThreash( double value)
 {
   bool returnValue = true;
   if( (minThreshGiven_ && (value < minThresh_)) )
@@ -462,61 +518,41 @@ bool N_IO_MeasureBase::withinMinMaxThreash( double value)
 
 //-----------------------------------------------------------------------------
 // Function      : MeasureBase::updateOutputVars
-// Purpose       : Call's the OutputMgr's getPrintValue() function to update 
+// Purpose       : Call's the OutputMgr's getValue() function to update 
 //                 the objects in std::list<N_UTL_Param> outputVars_;
 // Special Notes : 
 // Scope         : public
 // Creator       : Richard Schiek, Electrical and Microsystem Modeling
 // Creation Date : 11/01/2013
 //-----------------------------------------------------------------------------
-void N_IO_MeasureBase::updateOutputVars(std::vector<double> & outputVarVec, const double circuitTime, RCP< N_LAS_Vector > solnVecRCP)
-{
+void Base::updateOutputVars(std::vector<double> & outputVarVec, const double circuitTime, const N_LAS_Vector *solnVec, 
+  const N_LAS_Vector *stateVec, const N_LAS_Vector * storeVec, const N_LAS_Vector *imaginaryVec )
 
-  std::list<N_UTL_Param>::iterator currentParamIt = outputVars_.begin();
+{
   int vecIndex = 0;
-  while( currentParamIt != outputVars_.end() )
+  for (std::vector<Util::Operator *>::const_iterator it = outputVars_.begin(); it != outputVars_.end(); ++it)
   {
-    if( currentParamIt->getSimContext() == UNDEFINED )
-    {
-      // call set param context
-      outputManager_.setParamContextType_( currentParamIt );
-    }
-    
-    if( currentParamIt->getSimContext() == NODE_OR_DEVICE_NAME )
-    {
-      // delete any unneeded Param objects from the outputVars_ list.
-      currentParamIt = outputVars_.erase(currentParamIt); 
-    }
-    else
-    {
-      outputVarVec[ vecIndex ]  = outputManager_.getPrintValue( currentParamIt, solnVecRCP.getRawPtr() );
-      vecIndex++;
-      currentParamIt++;
-    }
-    
+    outputVarVec[vecIndex] = getValue(outputManager_.getCommPtr()->comm(), *(*it), solnVec, imaginaryVec, stateVec, storeVec ).real();
+    vecIndex++;
   }
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureBase::getOutputValue
-// Purpose       : Call's the OutputMgr's getPrintValue() function to get sol. vars.
+// Function      : MeasureBase::getOutputValue
+// Purpose       : Call's the OutputMgr's getPrgetImmutableValue<int>() function to get sol. vars.
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-----------------------------------------------------------------------------
-double N_IO_MeasureBase::getOutputValue(list<N_UTL_Param>::iterator & paramListIt, RCP< N_LAS_Vector > solnVecRCP)
+double Base::getOutputValue(Xyce::Util::Operator *op, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, 
+  const N_LAS_Vector * storeVec, const N_LAS_Vector *imaginaryVec )
 {
-#ifdef Xyce_DEBUG_IO
-  std::cout << "In N_IO_MeasureBase::getOutputValue() about to call getPrintValue..." << std::endl;
-#endif
-
-  if( paramListIt->getSimContext() == UNDEFINED )
-  {
-    // call set param context
-    outputManager_.setParamContextType_( paramListIt );
-  }
-  double retVal = outputManager_.getPrintValue( paramListIt, solnVecRCP.getRawPtr() );
+  double retVal = getValue(outputManager_.getCommPtr()->comm(), *op, solnVec, imaginaryVec, stateVec, storeVec ).real();
   return retVal;
 }
+
+} // namespace IO
+} // namespace IO
+} // namespace Xyce

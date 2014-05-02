@@ -1,11 +1,15 @@
 // @HEADER
 // ***********************************************************************
+// 
 //   Copyright 2002 Sandia Corporation. Under the terms
 //   of Contract DE-AC04-94AL85000 with Sandia Corporation, the U.S.
 //   Government retains certain rights in this software.
-// 
+//
 //                Amesos: Direct Sparse Solver Package
 //                 Copyright (2004) Sandia Corporation
+// 
+// Under terms of Contract DE-AC04-94AL85000, there is a non-exclusive
+// license for use of this work by or on behalf of the U.S. Government.
 // 
 // This library is free software; you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as

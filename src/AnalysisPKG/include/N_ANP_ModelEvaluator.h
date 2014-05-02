@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -39,15 +39,16 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.5.6.2 $
+// Revision Number: $Revision: 1.12 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:30 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 #ifndef N_ANP_MODEL_EVALUATOR_H
 #define N_ANP_MODEL_EVALUATOR_H
 
+#undef HAVE_LIBPARMETIS
 #include <EpetraExt_ModelEvaluator.h>
 #include <N_CIR_Xyce.h>
 
@@ -61,18 +62,22 @@ class N_LAS_BlockVector;
 
 using Teuchos::RCP;
 
+namespace Xyce {
+namespace Analysis {
+
 RCP<N_LAS_BlockVector> convertEpetraToNLASBlockVectorView(
     const RCP<const Epetra_Vector>& vec,
-    const Epetra_Map& map
+    const RCP<Epetra_Map>& map
     );
 RCP<N_LAS_Vector> convertEpetraToNLASVectorView(
     const RCP<const Epetra_Vector>& vec
     );
 
-class N_ANP_ModelEvaluator : public EpetraExt::ModelEvaluator {
+
+class ModelEvaluator : public EpetraExt::ModelEvaluator {
 public:
-  N_ANP_ModelEvaluator();
-  virtual ~N_ANP_ModelEvaluator();
+  ModelEvaluator();
+  virtual ~ModelEvaluator();
 
   void initialize(int iargs, char* cargs[]);
 
@@ -117,7 +122,7 @@ private:
   mutable RCP<N_LAS_Vector> tempVoltLimFVector_;
   mutable RCP<N_LAS_Vector> tempVoltLimQVector_;
   RCP<N_LAS_Vector> eVec_; // Used for filling diagonal on identity matrices
-  RCP<Epetra_Map> blockMap_;
+  RCP<N_PDS_ParMap> blockMap_;
 
   // Used for Xyce loads where overlap_gnd map is required, so we copy the data in & out.
   RCP<N_LAS_Vector> x_gnd_;
@@ -130,6 +135,11 @@ private:
   RCP<N_LAS_Matrix> dFdx_gnd_matrix_;
 
 };
+
+} // namespace Analysis
+} // namespace Xyce
+
+typedef Xyce::Analysis::ModelEvaluator N_ANP_ModelEvaluator;
 
 #endif // N_ANP_MODEL_EVALUATOR_H
 

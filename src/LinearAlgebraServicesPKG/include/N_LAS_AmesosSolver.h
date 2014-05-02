@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.14.2.2 $
+// Revision Number: $Revision: 1.20 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:44 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,23 +46,20 @@
 #ifndef Xyce_N_LAS_AmesosSolver_h
 #define Xyce_N_LAS_AmesosSolver_h
 
-// ---------- Standard Includes ----------
-
 #include <string>
+
 #include <N_UTL_fwd.h>
+
+#include <N_LAS_Solver.h>
+#include <N_LAS_TransformTool.h>
+#include <Teuchos_RCP.hpp>
+
+class N_LAS_Problem;
 
 class Amesos_BaseSolver;
 class Epetra_LinearProblem;
 class Epetra_CrsMatrix;
 class Epetra_Export;
-
-// ----------   Xyce Includes   ----------
-
-#include <N_LAS_Solver.h>
-#include <N_LAS_TransformTool.h>
-#include <Teuchos_RCP.hpp>
-class N_LAS_Problem;
-class N_UTL_Timer;
 
 //-----------------------------------------------------------------------------
 // Class         : N_LAS_AmesosSolver
@@ -76,7 +73,7 @@ class N_LAS_AmesosSolver : public N_LAS_Solver
 
 public:
   // Constructor
-  N_LAS_AmesosSolver( const string & type,
+  N_LAS_AmesosSolver( const std::string & type,
                       N_LAS_Problem & prob,
                       N_UTL_OptionBlock & options );
 
@@ -86,7 +83,7 @@ public:
   // Set the solver options
   bool setOptions(const N_UTL_OptionBlock & OB);
   bool setDefaultOptions();
-  bool setDefaultOption( const string & option );
+  bool setDefaultOption( const std::string & option );
 
   // Set individual options
   bool setParam( const N_UTL_Param & param );
@@ -103,7 +100,7 @@ public:
 private:
 
   //Solver Type
-  const string type_;
+  const std::string type_;
 
   //Primary problem access
   N_LAS_Problem & lasProblem_;
@@ -114,6 +111,9 @@ private:
 
   //Repivot every time or use static pivoting
   bool repivot_;
+  
+  //Have Amesos reindex the linear problem
+  bool reindex_;
 
   //Output linear system every outputLS_ calls
   int outputLS_;

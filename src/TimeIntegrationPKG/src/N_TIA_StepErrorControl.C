@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,36 +37,23 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.214.2.2 $
+// Revision Number: $Revision: 1.227 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
-#include <N_UTL_Misc.h>
-
 #include <iostream>
-#include <stdio.h>
-
 #include <sstream>
- 
-#ifdef HAVE_ALGORITHM
-#include <algorithm>
-#else
-#ifdef HAVE_ALGO_H
-#include <algo.h>
-#else
-#error Must have either <algorithm> or <algo.h>!
-#endif
-#endif
 
-// ----------   Xyce Includes   ----------
+#ifdef HAVE_CSTDIO
+#include <cstdio>
+#else
+#include <stdio.h>
+#endif
 
 #include <N_ANP_AnalysisManager.h>
 #include <N_TIA_TimeIntegrationMethods.h>
@@ -74,8 +61,10 @@
 #include <N_TIA_TIAParams.h>
 #include <N_TIA_TimeIntInfo.h>
 
+#include <N_UTL_Xyce.h>
 #include <N_UTL_BreakPoint.h>
 #include <N_UTL_Functors.h>
+#include <N_UTL_SaveIOSState.h>
 
 #include <N_PDS_Comm.h>
 
@@ -146,9 +135,9 @@ N_TIA_StepErrorControl::N_TIA_StepErrorControl(
     cj_ (0.0),      // $-\alpha_s/h_n$ coefficient used in local error test
     ck_ (0.0),      // local error coefficient gamma_[0] = 0; // $\gamma_j(n)=\sum_{l=1}^{j-1}1/\psi_l(n)$ coefficient used to
     sigma_(6,0.0),  // $\sigma_j(n) = \frac{h_n^j(j-1)!}{\psi_1(n)*\cdots *\psi_j(n)}$
-    gamma_(6,0.0),  // calculate time derivative of history array for predictor 
+    gamma_(6,0.0),  // calculate time derivative of history array for predictor
     beta_(6,0.0),   // coefficients used to evaluate predictor from history array
-    psi_(6,0.0),    // $\psi_j(n) = t_n-t_{n-j}$ intermediary variable used to 
+    psi_(6,0.0),    // $\psi_j(n) = t_n-t_{n-j}$ intermediary variable used to
                     // compute $\beta_j(n)$
     numberOfSteps_(0),   // number of total time integration steps taken
     nef_(0),
@@ -186,12 +175,12 @@ N_TIA_StepErrorControl::N_TIA_StepErrorControl(
     r_hincr_(2.0),
     max_LET_fail_(15)
 {
-  // make sure we initialize the iterator currentPauseBP to a valid but 
+  // make sure we initialize the iterator currentPauseBP to a valid but
   // bad value until it is calulcated
   currentPauseBP = breakPoints_.end();
 
   setTIAParams();
-  setBreakPoint(N_UTL_BreakPoint(tiaParams_.finalTime,PAUSE_BREAKPOINT));
+  setBreakPoint(N_UTL_BreakPoint(tiaParams_.finalTime, Xyce::Util::PAUSE_BREAKPOINT));
 
   h0_max_factor_ = tiaParams_.restartTimeStepScale;
 }
@@ -254,7 +243,7 @@ bool N_TIA_StepErrorControl::setTIAParams()
   // did not.  This little block of code should fix that.
   if( anaManager_.getBlockAnalysisFlag() == true )
   {
-    set<N_UTL_BreakPoint>::iterator lastBP  = breakPoints_.end();
+    std::set<N_UTL_BreakPoint>::iterator lastBP  = breakPoints_.end();
     lastBP--;
     updatePauseTime(*lastBP);
   }
@@ -284,7 +273,7 @@ double N_TIA_StepErrorControl::getEstOverTol() const
 
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_StepErrorControl::getTranOPFlag
-// Purpose       : Get flag from analysis manager for DC op part of a 
+// Purpose       : Get flag from analysis manager for DC op part of a
 //                 transient run.
 // Special Notes :
 // Scope         : public
@@ -298,7 +287,7 @@ bool N_TIA_StepErrorControl::getTranOPFlag() const
 
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_StepErrorControl::setTimeStep
-// Purpose       : 
+// Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
@@ -333,14 +322,14 @@ void N_TIA_StepErrorControl::setTimeStep(double newTimeStep)
 //                 can be started from the beginning.
 //
 // Special Notes : This function was needed for the .STEP capability.
-// 
+//
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 11/04/03
 //-----------------------------------------------------------------------------
 bool N_TIA_StepErrorControl::resetAll ()
 {
-  // reset a bunch of variables.  
+  // reset a bunch of variables.
   tiaParams_.pauseSetAtZero = false;
   tiaParams_.pauseTime = 0.0;
 
@@ -387,20 +376,16 @@ bool N_TIA_StepErrorControl::resetAll ()
   if (currentTimeStep <= 0.0)  currentTimeStep  = 1.0e-10;
 
 #ifdef Xyce_DEBUG_TIME
-  const string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
   if (tiaParams_.debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           "  N_TIA_StepErrorControl::resetAll");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           "  before initializeBreakPoints()");
-    printBreakPoints(cout);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           "  currentPauseBP = ", currentPauseBP->value());
+    Xyce::dout() << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() <<
+                           "  N_TIA_StepErrorControl::resetAll" << std::endl;
+    Xyce::dout() <<
+                           "  before initializeBreakPoints( << std::endl" << std::endl;
+    printBreakPoints(Xyce::dout());
+    Xyce::dout() <<"  currentPauseBP = " <<  currentPauseBP->value() << std::endl;
 
   }
 #endif // Xyce_DEBUG_TIME
@@ -410,34 +395,32 @@ bool N_TIA_StepErrorControl::resetAll ()
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams_.debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           "  after initializeBreakPoints()");
-    printBreakPoints(cout);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           "  currentPauseBP = ", currentPauseBP->value());
+    Xyce::dout() <<
+                           "  after initializeBreakPoints( << std::endl" << std::endl;
+    printBreakPoints(Xyce::dout());
+    Xyce::dout() << "  currentPauseBP = " <<  currentPauseBP->value() << std::endl;
   }
 #endif // Xyce_DEBUG_TIME
- 
+
    // ERK: Note:  always do this, not just for block solves?
   //if( anaManager_.getBlockAnalysisFlag() == true ) // if MPDE or HB
   //{
-    set<N_UTL_BreakPoint>::iterator lastBP  = breakPoints_.end();
+  std::set<N_UTL_BreakPoint>::iterator lastBP  = breakPoints_.end();
     lastBP--;
     updatePauseTime(*lastBP);
   //}
 
   // need to set a pause breakpoint at the final time.
-  setBreakPoint(N_UTL_BreakPoint(tiaParams_.finalTime ,PAUSE_BREAKPOINT));
+    setBreakPoint(N_UTL_BreakPoint(tiaParams_.finalTime ,Xyce::Util::PAUSE_BREAKPOINT));
 
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams_.debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           "  after updatePauseTime() & setBreakPoint");
-    printBreakPoints(cout);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           "  currentPauseBP = ", currentPauseBP->value());
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+    Xyce::dout() <<
+                           "  after updatePauseTime( << std::endl & setBreakPoint" << std::endl;
+    printBreakPoints(Xyce::dout());
+    Xyce::dout() <<"  currentPauseBP = " <<  currentPauseBP->value() << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
   }
 #endif // Xyce_DEBUG_TIME
 
@@ -462,20 +445,15 @@ void N_TIA_StepErrorControl::initializeStepSizeVariables()
   double time_to_stop = stopTime - currentTime;
 
 #ifdef Xyce_VERBOSE_TIME
-  const string crMsg         = "\n";
-  const string startMsg      = ("* Initial Time Value:\t");
-  const string stopMsg       = (" *  Ending Time Value:\t");
-  const string secondsMsg    = (" secs");
-  const string timeToStopMsg = (" * Time to Stop Value:\t");
+  const std::string crMsg         = "\n";
+  const std::string startMsg      = ("* Initial Time Value:\t");
+  const std::string stopMsg       = (" *  Ending Time Value:\t");
+  const std::string secondsMsg    = (" secs");
+  const std::string timeToStopMsg = (" * Time to Stop Value:\t");
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, crMsg + startMsg,
-                         currentTime, secondsMsg);
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, stopMsg,
-                         stopTime, secondsMsg);
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, timeToStopMsg,
-                         time_to_stop, secondsMsg);
+  Xyce::dout() << crMsg + startMsg << currentTime <<  secondsMsg << std::endl
+               << stopMsg << stopTime <<  secondsMsg << std::endl
+               << timeToStopMsg << time_to_stop <<  secondsMsg << std::endl;
 
 #endif
 
@@ -509,10 +487,10 @@ void N_TIA_StepErrorControl::initializeStepSizeVariables()
   }
 
 #ifdef Xyce_VERBOSE_TIME
-  const string stepMsg      = (" * Initial Step Size: \t");
+  const std::string stepMsg      = (" * Initial Step Size: \t");
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, stepMsg,
-                         currentTimeStep, secondsMsg + crMsg);
+  Xyce::dout() << stepMsg << 
+                         currentTimeStep <<  secondsMsg + crMsg << std::endl;
 #endif // Xyce_VERBOSE_TIME
 
   currentTimeStepRatio = 1.0;
@@ -526,7 +504,7 @@ void N_TIA_StepErrorControl::initializeStepSizeVariables()
   stepAttemptStatus        = true;
 
   nextTime = currentTime + currentTimeStep;
-  
+
   return;
 }
 
@@ -554,9 +532,9 @@ void N_TIA_StepErrorControl::updateStopTime()
 
   if (tiaParams_.bpEnable)
   {
-    set<N_UTL_BreakPoint>::iterator itBP;
-    set<N_UTL_BreakPoint>::iterator firstBP = breakPoints_.begin();
-    set<N_UTL_BreakPoint>::iterator lastBP  = breakPoints_.end();
+    std::set<N_UTL_BreakPoint>::iterator itBP;
+    std::set<N_UTL_BreakPoint>::iterator firstBP = breakPoints_.begin();
+    std::set<N_UTL_BreakPoint>::iterator lastBP  = breakPoints_.end();
 
     // Find the first breakpoint equal to or larger than the
     // current time.
@@ -567,7 +545,7 @@ void N_TIA_StepErrorControl::updateStopTime()
 
     // The breakpoint could be a pause breakpoint, in which case we might
     // need to update the pauseTime:
-    if (itBP->bptype() == PAUSE_BREAKPOINT)
+    if (itBP->bptype() == Xyce::Util::PAUSE_BREAKPOINT)
     {
       updatePauseTime(*itBP);
     }
@@ -595,7 +573,7 @@ void N_TIA_StepErrorControl::updateStopTime()
   // NOTE:  This needs to be a minAll !
     comm->minAll ( &sT, &mST, 1);
     stopTime = mST;
-#endif // Xyce_PARALLEL_MPI 
+#endif // Xyce_PARALLEL_MPI
 
   }
   else
@@ -603,10 +581,10 @@ void N_TIA_StepErrorControl::updateStopTime()
     stopTime = Xycemin(tiaParams_.pauseTime, finalTime);
   }
 
-  if ( anaManager_.getBeginningIntegrationFlag()) 
+  if ( anaManager_.getBeginningIntegrationFlag())
   {
     double time_to_stop = stopTime - currentTime;
-    if (tiaParams_.minTimeStepsBPGiven && (tiaParams_.minTimeStepsBP > 0) ) 
+    if (tiaParams_.minTimeStepsBPGiven && (tiaParams_.minTimeStepsBP > 0) )
     {
       maxTimeStepBP = time_to_stop/tiaParams_.minTimeStepsBP;
     }
@@ -616,27 +594,17 @@ void N_TIA_StepErrorControl::updateStopTime()
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams_.debugLevel >0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       "  stopTime    = ", stopTime);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       "  pauseTime    = ", tiaParams_.pauseTime);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       "  currentTime = ", currentTime);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       "  oldStopTime = ", oldStopTime);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       "  finalTime   = ", finalTime);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       "  maxTimeStepBP = ", maxTimeStepBP);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       "  beginningIntegration = ", anaManager_.getBeginningIntegrationFlag());
-    const string dashedline = 
-      "-------------------------------------------------"
-                       "----------------------------\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+    Xyce::dout() << std::endl
+                 << "  stopTime    = " <<  stopTime << std::endl
+                 << "  pauseTime    = " <<  tiaParams_.pauseTime << std::endl
+                 << "  currentTime = " <<  currentTime << std::endl
+                 << "  oldStopTime = " <<  oldStopTime << std::endl
+                 << "  finalTime   = " <<  finalTime << std::endl
+                 << "  maxTimeStepBP = " <<  maxTimeStepBP << std::endl
+                 << "  beginningIntegration = " <<  anaManager_.getBeginningIntegrationFlag() << std::endl
+                 << Xyce::section_divider << std::endl;
   }
-#endif // Xyce_DEBUG_TIME 
+#endif // Xyce_DEBUG_TIME
 
 }
 
@@ -657,9 +625,9 @@ double N_TIA_StepErrorControl::findNextStopTime()
 
   if (tiaParams_.bpEnable)
   {
-    set<N_UTL_BreakPoint>::iterator itBP;
-    set<N_UTL_BreakPoint>::iterator firstBP = breakPoints_.begin();
-    set<N_UTL_BreakPoint>::iterator lastBP  = breakPoints_.end();
+    std::set<N_UTL_BreakPoint>::iterator itBP;
+    std::set<N_UTL_BreakPoint>::iterator firstBP = breakPoints_.begin();
+    std::set<N_UTL_BreakPoint>::iterator lastBP  = breakPoints_.end();
 
     // Find the first breakpoint equal to or larger than the
     // current time.
@@ -678,7 +646,7 @@ double N_TIA_StepErrorControl::findNextStopTime()
   // NOTE:  This needs to be a minAll !
     comm->minAll ( &nT, &mNT, 1);
     nextTime = mNT;
-#endif // Xyce_PARALLEL_MPI 
+#endif // Xyce_PARALLEL_MPI
 
   }
   else
@@ -716,12 +684,12 @@ void N_TIA_StepErrorControl::evaluateStepError ()
     }
     else
     {
-      testTimeIntegrationError = (anaManager_.getStepNumber() >= 1); 
+      testTimeIntegrationError = (anaManager_.getStepNumber() >= 1);
     }
   }
   else
   {
-    testTimeIntegrationError = (anaManager_.getStepNumber() >= 1 && !(anaManager_.getBeginningIntegrationFlag())); 
+    testTimeIntegrationError = (anaManager_.getStepNumber() >= 1 && !(anaManager_.getBeginningIntegrationFlag()));
   }
 
   if (tiaParams_.testFirstStep)
@@ -735,12 +703,12 @@ void N_TIA_StepErrorControl::evaluateStepError ()
     testTimeIntegrationError = false;
   }
 
-  
+
   if (testTimeIntegrationError)
   {
 #ifdef Xyce_EXTDEV
     // Needed for 2-level Solves:
-    loader_.getInnerLoopErrorSums (anaManager_.dsPtr_->innerErrorInfoVec);
+    loader_.getInnerLoopErrorSums (anaManager_.getTIADataStore()->innerErrorInfoVec);
 #endif
 
     estOverTol_ = wimPtr_->computeErrorEstimate();
@@ -753,29 +721,29 @@ void N_TIA_StepErrorControl::evaluateStepError ()
     {
       sAStatus = false;
     }
-  
+
     if (tiaParams_.timestepsReversal == true)
-    { 
+    {
       if (nIterations <= tiaParams_.NLmax)
         errorOptionStatus = true;
       else
         errorOptionStatus = false;
     }
 #ifdef Xyce_VERBOSE_TIME
-    if (tiaParams_.errorAnalysisOption == 1) 
+    if (tiaParams_.errorAnalysisOption == 1)
     {
-      cout << "ERROROPTION=1:  DOREJECTSTEP = ";
-      if (tiaParams_.timestepsReversal == true) 
+      Xyce::dout() << "ERROROPTION=1:  DOREJECTSTEP = ";
+      if (tiaParams_.timestepsReversal == true)
       {
-        cout << "1" << endl;
-      } 
-      else 
+        Xyce::dout() << "1" << std::endl;
+      }
+      else
       {
-        cout << "0" << endl;
+        Xyce::dout() << "0" << std::endl;
       }
     }
 #endif // Xyce_VERBOSE_TIME
-    
+
     if ( tiaParams_.userSpecMinTimeStepGiven && (currentTimeStep < tiaParams_.userSpecMinTimeStep) )
     {
       // This step has dropped under the user specified min time step, so only
@@ -784,7 +752,7 @@ void N_TIA_StepErrorControl::evaluateStepError ()
 #ifdef Xyce_DEBUG_TIME
       if (tiaParams_.debugLevel > 2)
       {
-        std::cout << "Trying to skip time integrator error checks: " << currentTimeStep 
+        Xyce::dout() << "Trying to skip time integrator error checks: " << currentTimeStep
           << " newton status " << step_attempt_status << std::endl;
       }
 #endif
@@ -796,7 +764,7 @@ void N_TIA_StepErrorControl::evaluateStepError ()
       else if (!(tiaParams_.constantStepSize))
       {
         if (tiaParams_.errorAnalysisOption == 1)
-          step_attempt_status = step_attempt_status && errorOptionStatus;  
+          step_attempt_status = step_attempt_status && errorOptionStatus;
         else
           step_attempt_status = step_attempt_status && sAStatus;
       }
@@ -807,21 +775,18 @@ void N_TIA_StepErrorControl::evaluateStepError ()
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams_.debugLevel > 0)
   {
-    integrationStepReport_ (step_attempt_status, sAStatus, testTimeIntegrationError);
+    integrationStepReport_(Xyce::dout(), step_attempt_status, sAStatus, testTimeIntegrationError);
   }
   else
 #endif
   {
-    terseIntegrationStepReport_ 
-      (step_attempt_status, sAStatus, testTimeIntegrationError);
+    terseIntegrationStepReport_(Xyce::lout(), step_attempt_status, sAStatus, testTimeIntegrationError);
   }
 #endif
 
-  // Now that the status has been completely determined, 
-  // set the class variable for step attempt 
+  // Now that the status has been completely determined,
+  // set the class variable for step attempt
   stepAttemptStatus = step_attempt_status;
-
-  return;
 }
 
 //-----------------------------------------------------------------------------
@@ -832,141 +797,72 @@ void N_TIA_StepErrorControl::evaluateStepError ()
 // Creator       : Eric Keiter, SNL
 // Creation Date : 01/27/07
 //-----------------------------------------------------------------------------
-void N_TIA_StepErrorControl::terseIntegrationStepReport_
-  (bool step_attempt_status, bool sAStatus, bool testedError)
+void N_TIA_StepErrorControl::terseIntegrationStepReport_(std::ostream &os, bool step_attempt_status, bool sAStatus, bool testedError)
 {
-    ostringstream output1;
-
-#ifdef Xyce_DEBUG_TIME
-  string netListFile = commandLine_.getArgumentValue("netlist");
-  output1 << netListFile << "  STEP STATUS:";
-#else
-  output1 << "STEP STATUS:";
-#endif
-
-  if (step_attempt_status)
-  {
-    output1 << " success ";
-  }
-  else
-  {
-    output1 << " fail    ";
-  }
-
-  output1 << " Newton: " << newtonConvergenceStatus;
-
-  if (testedError && !(tiaParams_.constantStepSize))
-  {
-    output1 << "   estOverTol: " << estOverTol_;
-  }
-  else
-  {
-    output1 << "   estOverTol: " << estOverTol_  << " (not used for this step)";
-  }
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, output1.str());
+  os << (Xyce::DEBUG_TIME ? commandLine_.getArgumentValue("netlist") : "")
+     << "  STEP STATUS: " << (step_attempt_status ? " success" : " fail")
+     << "  Newton: " << newtonConvergenceStatus
+     << "   estOverTol: " << estOverTol_ << (testedError && !(tiaParams_.constantStepSize) ? "" : " (not used for this step)") << std::endl;
 }
 
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_StepErrorControl::integrationStepReport_
-// Purpose       : 
+// Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/12/06
 //-----------------------------------------------------------------------------
-void N_TIA_StepErrorControl::integrationStepReport_
-  (bool step_attempt_status, bool sAStatus, bool testedError)
+void N_TIA_StepErrorControl::integrationStepReport_(std::ostream &os, bool step_attempt_status, bool sAStatus, bool testedError)
 {
-      ostringstream output1;
-
-  string dashedline = "-------------------------------------------------"
-                       "----------------------------\n";
-
   if (tiaParams_.debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                              "\n estOverTol      = ", estOverTol_);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                              "  error tolerance = ",
-                              tiaParams_.errTolAcceptance);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                            "\nSTEP ATTEMPT STATUS:");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "NOTE:");
+    os << "\n estOverTol      = " <<  estOverTol_ << std::endl
+       << "  error tolerance = " << tiaParams_.errTolAcceptance << std::endl
+       << std::endl
+       << "\nSTEP ATTEMPT STATUS:" << std::endl
+       << "NOTE:" << std::endl;
 
     if (!(tiaParams_.constantStepSize) &&
-          anaManager_.getStepNumber() >= 1             &&
+          anaManager_.getStepNumber() >= 1 &&
         !(anaManager_.getBeginningIntegrationFlag()))
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-              "  We are running in variable stepsize mode,");
-
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-              "  and we have NOT just passed a breakpoint.  As such,");
-
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-              "  for an integration step to succeed, the ");
-
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-              "  nonlinear solver must succeed, AND the predictor");
-
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-              "  and corrector need to be close within a tolerance.");
+      os << "  We are running in variable stepsize mode << " << std::endl
+         << "  and we have NOT just passed a breakpoint.  As such << " << std::endl
+         << "  for an integration step to succeed <<  the " << std::endl
+         << "  nonlinear solver must succeed <<  AND the predictor" << std::endl
+         << "  and corrector need to be close within a tolerance." << std::endl;
 
       if (tiaParams_.errorAnalysisOption == 1)
       {
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                                "ADDENDUM:  This is with erroption=1, "
-                                "so predictor-corrector is ignored for "
-                                "step error control.");
+        os << "ADDENDUM:  This is with erroption=1 so predictor-corrector is ignored for step error control." << std::endl;
       }
     }
     else
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-              "  We are either running constant stepsize,");
-
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-              "  or we just passed a breakpoint.  As such,");
-
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-              "  the only criteria we use in accepting/rejecting");
-
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-              "  an integration step is the nonlinear solver");
-
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-              "  success/failure.");
+      os << "  We are either running constant stepsize << " << std::endl
+         << "  or we just passed a breakpoint.  As such << " << std::endl
+         << "  the only criteria we use in accepting/rejecting" << std::endl
+         << "  an integration step is the nonlinear solver" << std::endl
+         << "  success/failure." << std::endl;
     }
 
     if (step_attempt_status)
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-              "\n  This has been a successful step:");
+      os << "\n  This has been a successful step:" << std::endl;
     }
     else
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-              "\n  This has NOT been a successful step:");
+      os << "\n  This has NOT been a successful step:" << std::endl;
     }
 
     if ( newtonConvergenceStatus > 0)
     {
-      output1 << "    - Newton solver succeded with return code " 
-              << newtonConvergenceStatus;
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-              output1.str());
+      os << "    - Newton solver succeded with return code " << newtonConvergenceStatus << std::endl << std::endl;
     }
     else
     {
-      output1 << "    - Newton solver failed with return code " 
-              << newtonConvergenceStatus;
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-              output1.str());
+      os << "    - Newton solver failed with return code " << newtonConvergenceStatus << std::endl;
     }
 
     if (testedError)
@@ -975,46 +871,37 @@ void N_TIA_StepErrorControl::integrationStepReport_
       {
         if (sAStatus)
         {
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                  "   - predictor vs. corrector analysis succeeded.");
+          os << "   - predictor vs. corrector analysis succeeded." << std::endl;
         }
         else
         {
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                  "   - predictor vs. corrector analysis failed.");
+          os << "   - predictor vs. corrector analysis failed." << std::endl;
         }
 
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "     (compare estOverTol with error tolerance, above.)");
+        os << "     (compare estOverTol with error tolerance <<  above. << std::endl" << std::endl;
       }
       else
       {
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                "If we had been using it, ");
+        os << "If we had been using it <<  " << std::endl;
 
         if (sAStatus)
         {
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "   - predictor vs. corrector analysis would have succeeded.");
+          os << "   - predictor vs. corrector analysis would have succeeded." << std::endl;
         }
         else
         {
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "   - predictor vs. corrector analysis would have failed.");
+          os << "   - predictor vs. corrector analysis would have failed." << std::endl;
         }
 
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "     (compare estOverTol with error tolerance, above.)");
+        os << "     (compare estOverTol with error tolerance <<  above. << std::endl" << std::endl;
       }
     }
     else
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-              "  predictor vs. corrector was not tested");
+      os << "  predictor vs. corrector was not tested" << std::endl;
     }
 
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-
+    os << Xyce::section_divider << std::endl;
   } // end of debugLevel if statement
 }
 
@@ -1047,7 +934,7 @@ bool N_TIA_StepErrorControl::initializeBreakPoints()
 
   // The final time needs to be the very last breakpoint.
   //setBreakPoint(finalTime);
-  setBreakPoint(N_UTL_BreakPoint(tiaParams_.finalTime ,PAUSE_BREAKPOINT));
+  setBreakPoint(N_UTL_BreakPoint(tiaParams_.finalTime ,Xyce::Util::PAUSE_BREAKPOINT));
 
   // Now add in the user break points. NOT DONE YET.
   //vector<double> ;
@@ -1074,39 +961,35 @@ bool N_TIA_StepErrorControl::updateBreakPoints ()
   bool bsuccess = true;
 
 #ifdef Xyce_DEBUG_TIME
-  const string dashedline =
-"----------------------------------------------------------------------------";
   if (tiaParams_.debugLevel >0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       "  N_TIA_StepErrorControl::updateBreakPoints.  time = ", currentTime);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
+    Xyce::dout() << std::endl
+                 << Xyce::section_divider << std::endl
+                 << "  N_TIA_StepErrorControl::updateBreakPoints.  time = " <<  currentTime << std::endl
+                 << std::endl;
   }
 #endif
 
-  vector<N_UTL_BreakPoint> tmpBP;
+  std::vector<N_UTL_BreakPoint> tmpBP;
   tmpBP.clear ();
 
   loader_.getBreakPoints(tmpBP);
 
   // debug outputs:
-  vector<N_UTL_BreakPoint>::iterator iter;
-  vector<N_UTL_BreakPoint>::iterator first = tmpBP.begin();
-  vector<N_UTL_BreakPoint>::iterator last  = tmpBP.end();
+  std::vector<N_UTL_BreakPoint>::iterator iter;
+  std::vector<N_UTL_BreakPoint>::iterator first = tmpBP.begin();
+  std::vector<N_UTL_BreakPoint>::iterator last  = tmpBP.end();
 
   // add any new breakpoints to the vector of breakpoints:
-  set<N_UTL_BreakPoint>::iterator itBP;
-  set<N_UTL_BreakPoint>::iterator itBP_2;
-  set<N_UTL_BreakPoint>::iterator firstBP = breakPoints_.begin();
-  set<N_UTL_BreakPoint>::iterator lastBP  = breakPoints_.end();
+  std::set<N_UTL_BreakPoint>::iterator itBP;
+  std::set<N_UTL_BreakPoint>::iterator itBP_2;
+  std::set<N_UTL_BreakPoint>::iterator firstBP = breakPoints_.begin();
+  std::set<N_UTL_BreakPoint>::iterator lastBP  = breakPoints_.end();
 
   // Add new breakpoints to the set:
   for (iter=first; iter!=last; ++iter)
   {
-    if (iter->value() < finalTime && iter->value() > lastTime) 
+    if (iter->value() < finalTime && iter->value() > lastTime)
     {
       setBreakPoint(*iter);
     }
@@ -1119,10 +1002,10 @@ bool N_TIA_StepErrorControl::updateBreakPoints ()
   {
     firstBP = breakPoints_.begin();
 
-    string netListFile = commandLine_.getArgumentValue("netlist");
-    string msg = netListFile + "  breakPoints_ vector container, before any removals:";
+    std::string netListFile = commandLine_.getArgumentValue("netlist");
+    std::string msg = netListFile + "  breakPoints_ vector container, before any removals:";
 
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,msg);
+    Xyce::dout() <<msg << std::endl;
 
     for (i=0, itBP=firstBP;itBP!=lastBP;++i,++itBP)
     {
@@ -1135,10 +1018,10 @@ bool N_TIA_StepErrorControl::updateBreakPoints ()
         sprintf(tmp,"%4d %16.8e diff=%16.8e", i, itBP->value(),(itBP->value()-itBP_2->value()));
       }
 
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,tmp);
+      Xyce::dout() <<tmp << std::endl;
       itBP_2 = itBP;
     }
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,"");
+    Xyce::dout() <<"" << std::endl;
   }
 #endif
 
@@ -1154,7 +1037,7 @@ bool N_TIA_StepErrorControl::updateBreakPoints ()
 
   // TVR: only need to do this if the BP tolerance has changed from what it
   // was set to in the breakpoint class --- as things were inserted, near
-  // values were rejected if within tolerance.  Only need to do this if the 
+  // values were rejected if within tolerance.  Only need to do this if the
   // tolerance has gotten looser
 
   // TVR: Cannot use the STL "unique" function to accomplish this, because
@@ -1169,8 +1052,8 @@ bool N_TIA_StepErrorControl::updateBreakPoints ()
 #ifdef Xyce_DEBUG_TIME
     if (tiaParams_.debugLevel >0)
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "  bpTol = ",bpTol);
-      cout << " Must now eliminate new duplicates " << endl;
+      Xyce::dout() << "  bpTol = " << bpTol << std::endl;
+      Xyce::dout() << " Must now eliminate new duplicates " << std::endl;
     }
 #endif
 
@@ -1186,14 +1069,14 @@ bool N_TIA_StepErrorControl::updateBreakPoints ()
            ++icount, ++itBP)
       {
         double diff = (itBP->value() - itBP_2->value());
-        
+
         if (icount != 0)
         {
           if (fabs(diff) < bpTol)
           {
             // If both are simple, just toss the later one
-            if (itBP->bptype() == SIMPLE_BREAKPOINT && 
-                itBP_2->bptype() == SIMPLE_BREAKPOINT)
+            if (itBP->bptype() == Xyce::Util::SIMPLE_BREAKPOINT &&
+                itBP_2->bptype() == Xyce::Util::SIMPLE_BREAKPOINT)
             {
               if (diff > 0.0)
                 breakPoints_.erase(itBP);
@@ -1202,16 +1085,16 @@ bool N_TIA_StepErrorControl::updateBreakPoints ()
             }
             else
             {
-              // one of these breakpoints is not simple!  Determine the 
+              // one of these breakpoints is not simple!  Determine the
               // overriding type, then set a breakpoint at the earliest time
               // with the overriding type:
-              BreakpointType overridingType = itBP->bptype();
+              Xyce::Util::BreakpointType overridingType = itBP->bptype();
               double minTime=Xycemin(itBP->value(),itBP_2->value());
-              
+
               // The following line will need to be changed if any other types
               // besides SIMPLE_BREAKPOINT and PAUSE_BREAKPOINT are ever
               // introduced and any more complex precedence is defined.
-              if (itBP_2->bptype() != SIMPLE_BREAKPOINT)
+              if (itBP_2->bptype() != Xyce::Util::SIMPLE_BREAKPOINT)
               {
                 overridingType = itBP_2->bptype();
               }
@@ -1222,7 +1105,7 @@ bool N_TIA_StepErrorControl::updateBreakPoints ()
               // and just to be very careful, make sure to update the pause
               // time, lest the currentPauseBP iterator be confused.
 #ifdef Xyce_DEBUG_TIME
-              cout << " Purging breakpoints, overriding with breakpoint of type " << tmpBP.bptype();
+              Xyce::dout() << " Purging breakpoints, overriding with breakpoint of type " << tmpBP.bptype();
 #endif
               updatePauseTime(tmpBP);
             }
@@ -1241,8 +1124,8 @@ bool N_TIA_StepErrorControl::updateBreakPoints ()
   {
     firstBP = breakPoints_.begin();
 
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       "  breakPoints_ vector container, after:");
+    Xyce::dout() <<
+       "  breakPoints_ vector container <<  after:" << std::endl;
 
     for (i=0, itBP=firstBP;itBP!=lastBP;++i,++itBP)
     {
@@ -1256,12 +1139,12 @@ bool N_TIA_StepErrorControl::updateBreakPoints ()
                 itBP->bptype(),(itBP->value()-itBP_2->value()));
       }
 
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,tmp);
+      Xyce::dout() <<tmp << std::endl;
       itBP_2 = itBP;
     }
 
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,"");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,dashedline);
+    Xyce::dout() <<"" << std::endl;
+    Xyce::dout() <<Xyce::section_divider << std::endl;
   }
 #endif
 
@@ -1282,13 +1165,11 @@ bool N_TIA_StepErrorControl::updateMaxTimeStep(double suggestedMaxTimeStep)
   bool bsuccess = true;
 
 #ifdef Xyce_DEBUG_TIME
-  const string dashedline =
-"----------------------------------------------------------------------------";
   if (tiaParams_.debugLevel >0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-      "  N_TIA_StepErrorControl::updateMaxTimeStep");
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() <<
+      "  N_TIA_StepErrorControl::updateMaxTimeStep" << std::endl;
   }
 #endif
 
@@ -1314,7 +1195,7 @@ bool N_TIA_StepErrorControl::updateMaxTimeStep(double suggestedMaxTimeStep)
     maxTimeStep = Xycemin( maxTimeStep, suggestedMaxTimeStep );
   }
 
-  if ((maxTimeStepBP > 0.0) && (maxTimeStep > maxTimeStepBP)) 
+  if ((maxTimeStepBP > 0.0) && (maxTimeStep > maxTimeStepBP))
   {
     maxTimeStep = maxTimeStepBP;
   }
@@ -1345,26 +1226,26 @@ bool N_TIA_StepErrorControl::updateMaxTimeStep(double suggestedMaxTimeStep)
   {
     if (!(tiaParams_.maxTimeStepGiven))
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-      "  User did not specify a maximum time step.");
+      Xyce::dout() <<
+      "  User did not specify a maximum time step." << std::endl;
     }
     else
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-      "  User specified a maximum time step. = ", maxTimeStepUser);
+      Xyce::dout() <<
+      "  User specified a maximum time step. = " <<  maxTimeStepUser << std::endl;
     }
 
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-      "  maxDevStep  = ", maxDevStep);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-      "  maxTimeStep = ", maxTimeStep);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,dashedline);
+    Xyce::dout() <<
+      "  maxDevStep  = " <<  maxDevStep << std::endl;
+    Xyce::dout() <<
+      "  maxTimeStep = " <<  maxTimeStep << std::endl;
+    Xyce::dout() <<Xyce::section_divider << std::endl;
   }
 #endif
 
   if(maxTimeStep<=0.0)
   {
-    const string msg = "Maximum Time step is invalid!\n";
+    const std::string msg = "Maximum Time step is invalid!\n";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   }
 
@@ -1399,18 +1280,16 @@ bool N_TIA_StepErrorControl::updateMinTimeStep()
 //-----------------------------------------------------------------------------
 void N_TIA_StepErrorControl::setBreakPoint(N_UTL_BreakPoint theBP)
 {
-  if (theBP.bptype() == SIMPLE_BREAKPOINT)
+  if (theBP.bptype() == Xyce::Util::SIMPLE_BREAKPOINT)
   {
     breakPoints_.insert(theBP);
   }
   else
   {
 #ifdef Xyce_DEBUG_TIME
-  ostringstream ost;
-    ost << "In setBreakPoint, got non-simple breakpoint of type " 
-         << theBP.bptype() << " at time " << theBP.value()  << endl;
+    Xyce::dout() << "In setBreakPoint, got non-simple breakpoint of type "
+                 << theBP.bptype() << " at time " << theBP.value()  << std::endl;
 
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, ost.str());
 #endif
     // We're a pause breakpoint, and must override any simple breakpoint
     // at the same time.
@@ -1450,17 +1329,17 @@ void N_TIA_StepErrorControl::updatePauseTime(N_UTL_BreakPoint BP)
   // 0.0, or we already passed the last pause time!
   // But we mustn't reset it if it's equal to the current time, because
   // that means we need to stop NOW and would overwrite that.
-  //   
-  // If a pause break point is specifically set at 0, then 
+  //
+  // If a pause break point is specifically set at 0, then
   // we shouldn't ignore that here.  So set the pauseSetAtZero flag
   // here if needed.
   //
   // ERK: type>0 means breakpoint is "not simple", ie PAUSE breakpoint.
-  if ((BP.bptype() > 0) && (BP.value() == 0.0)) 
+  if ((BP.bptype() > 0) && (BP.value() == 0.0))
   {
     tiaParams_.pauseSetAtZero = true;
   }
-  
+
   if (tiaParams_.pauseTime < currentTime ||
      ((tiaParams_.pauseTime == tiaParams_.initialTime) && !tiaParams_.pauseSetAtZero))
   {
@@ -1471,19 +1350,16 @@ void N_TIA_StepErrorControl::updatePauseTime(N_UTL_BreakPoint BP)
     tiaParams_.pauseTime = Xycemin(tiaParams_.pauseTime, BP.value());
   }
 
-  // If we used this BP for the pause time, save the iterator to this bp in 
+  // If we used this BP for the pause time, save the iterator to this bp in
   // the list so we can use it later.
   if (tiaParams_.pauseTime == BP.value())
   {
     currentPauseBP = breakPoints_.find(BP);
 #ifdef Xyce_DEBUG_TIME
-    ostringstream ost;
-    string netListFile = commandLine_.getArgumentValue("netlist");
-    ost << "\n" << netListFile;
-    ost << "  UPDATING PAUSE TIME TO " << currentPauseBP->value() 
-      << " encountered breakpoint " << BP.value() << " current time  is " 
-      << currentTime << endl;
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, ost.str());
+    Xyce::dout() << "\n" << commandLine_.getArgumentValue("netlist")
+                 << "  UPDATING PAUSE TIME TO " << currentPauseBP->value()
+                 << " encountered breakpoint " << BP.value() << " current time  is "
+                 << currentTime << std::endl;
 #endif
   }
 
@@ -1494,7 +1370,7 @@ void N_TIA_StepErrorControl::updatePauseTime(N_UTL_BreakPoint BP)
 // Function      : N_TIA_StepErrorControl::simulationPaused
 // Purpose       : public method to clear out breakpoint list and reset
 //                 pause time when pause time is reached
-// Special Notes : Need this method because the prior values get in the way 
+// Special Notes : Need this method because the prior values get in the way
 //                 when we resume.
 // Scope         : public
 // Creator       : Tom Russo, SNL, Component Information and Models
@@ -1509,18 +1385,18 @@ void N_TIA_StepErrorControl::simulationPaused()
 
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_StepErrorControl::printBreakPoints
-// Purpose       : 
-// Special Notes : 
+// Purpose       :
+// Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 10/17/05
 //-----------------------------------------------------------------------------
-void N_TIA_StepErrorControl::printBreakPoints (ostream & os) const
+void N_TIA_StepErrorControl::printBreakPoints (std::ostream & os) const
 {
-  set<N_UTL_BreakPoint>::const_iterator itBP;
-  set<N_UTL_BreakPoint>::const_iterator itBP2;
-  set<N_UTL_BreakPoint>::const_iterator firstBP = breakPoints_.begin();
-  set<N_UTL_BreakPoint>::const_iterator lastBP  = breakPoints_.end();
+  std::set<N_UTL_BreakPoint>::const_iterator itBP;
+  std::set<N_UTL_BreakPoint>::const_iterator itBP2;
+  std::set<N_UTL_BreakPoint>::const_iterator firstBP = breakPoints_.begin();
+  std::set<N_UTL_BreakPoint>::const_iterator lastBP  = breakPoints_.end();
 
   char tmp[128];
 
@@ -1533,7 +1409,7 @@ void N_TIA_StepErrorControl::printBreakPoints (ostream & os) const
       sprintf(tmp,"%4d %16.8e type=%d diff=%16.8e", i, itBP->value(),
 	      itBP->bptype(),(itBP->value()-itBP2->value()));
 
-    os << string(tmp);
+    os << std::string(tmp);
     itBP2 = itBP;
   }
 }
@@ -1541,15 +1417,15 @@ void N_TIA_StepErrorControl::printBreakPoints (ostream & os) const
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_StepErrorControl::restartDataSize
 // Purpose       :
-// Special Notes : This gives the *total* size:  both the base 
-//                 N_TIA_StepErrorControl and the derived 
+// Special Notes : This gives the *total* size:  both the base
+//                 N_TIA_StepErrorControl and the derived
 //                 N_TIA_StepErrorControlDAE, summed together.
 //
 //                 Don't sum them 2x!
 //
-//                 ERK:  6/20/2010:  
+//                 ERK:  6/20/2010:
 //                 There are no longer 2 distinct classes.  The DAE version is
-//                 now part of the original, as one single class.  The two 
+//                 now part of the original, as one single class.  The two
 //                 blocks of code in this function correspond to the original
 //                 class (first block), and the DAE class (second block).
 //
@@ -1573,7 +1449,7 @@ int N_TIA_StepErrorControl::restartDataSize( bool pack )
   //overestimate buffer size for unpacked data
   // assumes there are fewer than 100 possible breakpoints types (i.e.
   // because the type can be represented by two ascii characters)
-  if( !pack ) 
+  if( !pack )
   {                  // 34
     count = 24*((numdoubles+numints) + (breakPoints_.size()))
                 + 2*(breakPoints_.size());
@@ -1599,10 +1475,10 @@ int N_TIA_StepErrorControl::restartDataSize( bool pack )
 }
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_StepErrorControl::dumpRestartData
-// Purpose       : 
-// Special Notes : ERK:  6/20/2010:  
+// Purpose       :
+// Special Notes : ERK:  6/20/2010:
 //                 There are no longer 2 distinct classes.  The DAE version is
-//                 now part of the original, as one single class.  The two 
+//                 now part of the original, as one single class.  The two
 //                 blocks of code in this function correspond to the original
 //                 class (first block), and the DAE class (second block).
 //
@@ -1629,32 +1505,32 @@ bool N_TIA_StepErrorControl::dumpRestartData
   }
 
 #ifdef Xyce_DEBUG_RESTART
-  string netListFile = commandLine_.getArgumentValue("netlist");
-  cout << "TIA Restart Data DUMP!  " << netListFile << "\n";
-  cout << "----------------------------------------\n";
-  cout << "startingTimeStep: " << startingTimeStep << endl;
-  cout << "currentTimeStep: " << currentTimeStep << endl;
-  cout << "lastAttemptedTimeStep: " << lastAttemptedTimeStep << endl;
-  cout << "lastTimeStep: " << lastTimeStep << endl;
-  cout << "minTimeStep: " << minTimeStep << endl;
-  cout << "maxTimeStep: " << maxTimeStep << endl;
-  cout << "maxTimeStepUser: " << maxTimeStepUser << endl;
-  cout << "lastTime: " << lastTime << endl;
-  cout << "currentTime: " << currentTime << endl;
-  cout << "nextTime: " << nextTime << endl;
-  cout << "initialTime: " << initialTime << endl;
-  cout << "estOverTol_: " << estOverTol_ << endl;
-  cout << "breakpts: ";
+  std::string netListFile = commandLine_.getArgumentValue("netlist");
+  Xyce::dout() << "TIA Restart Data DUMP!  " << netListFile << "\n";
+  Xyce::dout() << Xyce::section_divider << std::endl;
+  Xyce::dout() << "startingTimeStep: " << startingTimeStep << std::endl;
+  Xyce::dout() << "currentTimeStep: " << currentTimeStep << std::endl;
+  Xyce::dout() << "lastAttemptedTimeStep: " << lastAttemptedTimeStep << std::endl;
+  Xyce::dout() << "lastTimeStep: " << lastTimeStep << std::endl;
+  Xyce::dout() << "minTimeStep: " << minTimeStep << std::endl;
+  Xyce::dout() << "maxTimeStep: " << maxTimeStep << std::endl;
+  Xyce::dout() << "maxTimeStepUser: " << maxTimeStepUser << std::endl;
+  Xyce::dout() << "lastTime: " << lastTime << std::endl;
+  Xyce::dout() << "currentTime: " << currentTime << std::endl;
+  Xyce::dout() << "nextTime: " << nextTime << std::endl;
+  Xyce::dout() << "initialTime: " << initialTime << std::endl;
+  Xyce::dout() << "estOverTol_: " << estOverTol_ << std::endl;
+  Xyce::dout() << "breakpts: ";
 
-  for (set<N_UTL_BreakPoint>::iterator iterSD = breakPoints_.begin();
+  for (std::set<N_UTL_BreakPoint>::iterator iterSD = breakPoints_.begin();
        iterSD != breakPoints_.end(); ++iterSD )
-    cout << iterSD->value() << " ";
-  cout << endl;
-  cout << "integMethod: " << anaManager_.getIntegrationMethod() << endl;
-  cout << "stepNumber: " << anaManager_.getStepNumber() << endl;
-  cout << "transStepNumber: " << anaManager_.getTranStepNumber() << endl;
-  cout << "breakPointRestartNumber: " << anaManager_.breakPointRestartStep << endl;
-  cout << "----------------------------------------\n\n";
+    Xyce::dout() << iterSD->value() << " ";
+  Xyce::dout() << std::endl;
+  Xyce::dout() << "integMethod: " << anaManager_.getIntegrationMethod() << std::endl;
+  Xyce::dout() << "stepNumber: " << anaManager_.getStepNumber() << std::endl;
+  Xyce::dout() << "transStepNumber: " << anaManager_.getTranStepNumber() << std::endl;
+  Xyce::dout() << "breakPointRestartNumber: " << anaManager_.breakPointRestartStep << std::endl;
+  Xyce::dout() << Xyce::section_divider << std::endl << std::endl;
 #endif
   if( pack )
   {
@@ -1684,18 +1560,18 @@ bool N_TIA_StepErrorControl::dumpRestartData
     // Subtract one, because we won't write out the pause breakpoint at the
     // final time
     int size = breakPoints_.size() -1 ;
-    set<N_UTL_BreakPoint>::iterator bpStart = breakPoints_.begin();
-    set<N_UTL_BreakPoint>::iterator bpEnd = breakPoints_.end();
+    std::set<N_UTL_BreakPoint>::iterator bpStart = breakPoints_.begin();
+    std::set<N_UTL_BreakPoint>::iterator bpEnd = breakPoints_.end();
     comm->pack( &size, 1, buf, bsize, pos );
 
     double val;
     int bptype;
-    for( set<N_UTL_BreakPoint>::iterator iterSD = bpStart;
+    for( std::set<N_UTL_BreakPoint>::iterator iterSD = bpStart;
        iterSD != bpEnd; ++iterSD)
     {
       val=iterSD->value();
       bptype=iterSD->bptype();
-      if (!(bptype == PAUSE_BREAKPOINT && val == finalTime))
+      if (!(bptype == Xyce::Util::PAUSE_BREAKPOINT && val == finalTime))
       {
         comm->pack( &(val), 1, buf, bsize, pos );
         comm->pack( &(bptype), 1, buf, bsize, pos );
@@ -1714,7 +1590,7 @@ bool N_TIA_StepErrorControl::dumpRestartData
   }
   else
   {
-    // count here will be the size for the base N_TIA_StepErrorControl 
+    // count here will be the size for the base N_TIA_StepErrorControl
     // class *only*.
     int count = N_TIA_StepErrorControl::restartDataSize( false );
     int startIndex = pos;
@@ -1722,8 +1598,8 @@ bool N_TIA_StepErrorControl::dumpRestartData
     // Clobber any data in buf lest we leave garbage
     for( int i = startIndex; i < (startIndex+count); ++i) buf[i] = ' ';
 
-    ostringstream ost;
-    ost.width(24);ost.precision(16);ost.setf(ios::scientific);
+    std::ostringstream ost;
+    ost.width(24);ost.precision(16);ost.setf(std::ios::scientific);
     ost << startingTimeStep << " ";
     ost << currentTimeStep << " ";
     ost << lastAttemptedTimeStep << " ";
@@ -1752,18 +1628,18 @@ bool N_TIA_StepErrorControl::dumpRestartData
     int size = breakPoints_.size() - 1;
     ost << size << " ";
 
-    set<N_UTL_BreakPoint>::iterator bpStart = breakPoints_.begin();
-    set<N_UTL_BreakPoint>::iterator bpEnd = breakPoints_.end();
-    for( set<N_UTL_BreakPoint>::iterator iterSD = bpStart;
+    std::set<N_UTL_BreakPoint>::iterator bpStart = breakPoints_.begin();
+    std::set<N_UTL_BreakPoint>::iterator bpEnd = breakPoints_.end();
+    for( std::set<N_UTL_BreakPoint>::iterator iterSD = bpStart;
          iterSD != bpEnd; ++iterSD )
     {
-      if (!(iterSD->bptype() == PAUSE_BREAKPOINT && 
+      if (!(iterSD->bptype() == Xyce::Util::PAUSE_BREAKPOINT &&
             iterSD->value() == finalTime))
       {
         ost << iterSD->value() << " ";
         ost << iterSD->bptype() << " ";
       }
-    }      
+    }
     int im = anaManager_.getIntegrationMethod();
     ost << im << " ";
     int sN = anaManager_.getStepNumber();
@@ -1775,7 +1651,7 @@ bool N_TIA_StepErrorControl::dumpRestartData
     int beginFlag = (anaManager_.getBeginningIntegrationFlag())?1:0;
     ost << beginFlag << " ";
 
-    string data( ost.str() );
+    std::string data( ost.str() );
     for( unsigned int i = 0; i < data.length(); ++i ) buf[startIndex+i] = data[i];
     // The line above copies the characters of the data string into buf,
     // but doesn't null-terminate buf.
@@ -1785,54 +1661,54 @@ bool N_TIA_StepErrorControl::dumpRestartData
     pos += data.length();
 
 #ifdef Xyce_DEBUG_RESTART
-    string outputString(buf);
+    std::string outputString(buf);
 
-    cout << "StepErrorControl UNPACKED output buffer:" << endl;
-    cout << outputString << endl;
+    Xyce::dout() << "StepErrorControl UNPACKED output buffer:" << std::endl;
+    Xyce::dout() << outputString << std::endl;
 #endif
   }
 
 #ifdef Xyce_DEBUG_RESTART
-  cout << "TIA Restart Data DUMP (DAE)!  " << netListFile << "\n";
-  cout << "----------------------------------------\n"<<endl;
-  cout << "alphas_ = " <<alphas_<<endl;
-  cout << "alpha0_ = " <<alpha0_<<endl;
-  cout << "cj_ = " <<cj_<<endl;
-  cout << "ck_ = " <<ck_<<endl;
-  cout << "usedStep_ = " <<usedStep_<<endl;
-  cout << "Ek_ = " <<Ek_<<endl;
-  cout << "Ekm1_ = " <<Ekm1_<<endl;
-  cout << "Ekm2_ = " <<Ekm2_<<endl;
-  cout << "Ekp1_ = " <<Ekp1_<<endl;
-  cout << "Est_ = " <<Est_<<endl;
-  cout << "Tk_ = " <<Tk_<<endl;
-  cout << "Tkm1_ = " <<Tkm1_<<endl;
-  cout << "Tkm2_ = " <<Tkm2_<<endl;
-  cout << "Tkp1_ = " <<Tkp1_<<endl;
-  cout << "h0_safety_ = " <<h0_safety_<<endl;
-  cout << "h0_max_factor_ = " <<h0_max_factor_<<endl;
-  cout << "h_phase0_incr_ = " <<h_phase0_incr_<<endl;
-  cout << "h_max_inv_ = " <<h_max_inv_<<endl;
-  cout << "Tkm1_Tk_safety_ = " <<Tkm1_Tk_safety_<<endl;
-  cout << "Tkp1_Tk_safety_ = " <<Tkp1_Tk_safety_<<endl;
-  cout << "r_factor_ = " <<r_factor_<<endl;
-  cout << "r_safety_ = " <<r_safety_<<endl;
-  cout << "r_fudge_ = " <<r_fudge_<<endl;
-  cout << "r_min_ = " <<r_min_<<endl;
-  cout << "r_max_ = " <<r_max_<<endl;
-  cout << "r_hincr_test_ = " <<r_hincr_test_<<endl;
-  cout << "r_hincr_ = " <<r_hincr_<<endl;
+  Xyce::dout() << "TIA Restart Data DUMP (DAE)!  " << netListFile << "\n";
+  Xyce::dout() << Xyce::section_divider << std::endl<<std::endl;
+  Xyce::dout() << "alphas_ = " <<alphas_<<std::endl;
+  Xyce::dout() << "alpha0_ = " <<alpha0_<<std::endl;
+  Xyce::dout() << "cj_ = " <<cj_<<std::endl;
+  Xyce::dout() << "ck_ = " <<ck_<<std::endl;
+  Xyce::dout() << "usedStep_ = " <<usedStep_<<std::endl;
+  Xyce::dout() << "Ek_ = " <<Ek_<<std::endl;
+  Xyce::dout() << "Ekm1_ = " <<Ekm1_<<std::endl;
+  Xyce::dout() << "Ekm2_ = " <<Ekm2_<<std::endl;
+  Xyce::dout() << "Ekp1_ = " <<Ekp1_<<std::endl;
+  Xyce::dout() << "Est_ = " <<Est_<<std::endl;
+  Xyce::dout() << "Tk_ = " <<Tk_<<std::endl;
+  Xyce::dout() << "Tkm1_ = " <<Tkm1_<<std::endl;
+  Xyce::dout() << "Tkm2_ = " <<Tkm2_<<std::endl;
+  Xyce::dout() << "Tkp1_ = " <<Tkp1_<<std::endl;
+  Xyce::dout() << "h0_safety_ = " <<h0_safety_<<std::endl;
+  Xyce::dout() << "h0_max_factor_ = " <<h0_max_factor_<<std::endl;
+  Xyce::dout() << "h_phase0_incr_ = " <<h_phase0_incr_<<std::endl;
+  Xyce::dout() << "h_max_inv_ = " <<h_max_inv_<<std::endl;
+  Xyce::dout() << "Tkm1_Tk_safety_ = " <<Tkm1_Tk_safety_<<std::endl;
+  Xyce::dout() << "Tkp1_Tk_safety_ = " <<Tkp1_Tk_safety_<<std::endl;
+  Xyce::dout() << "r_factor_ = " <<r_factor_<<std::endl;
+  Xyce::dout() << "r_safety_ = " <<r_safety_<<std::endl;
+  Xyce::dout() << "r_fudge_ = " <<r_fudge_<<std::endl;
+  Xyce::dout() << "r_min_ = " <<r_min_<<std::endl;
+  Xyce::dout() << "r_max_ = " <<r_max_<<std::endl;
+  Xyce::dout() << "r_hincr_test_ = " <<r_hincr_test_<<std::endl;
+  Xyce::dout() << "r_hincr_ = " <<r_hincr_<<std::endl;
 
   for (int i=0;i<6;++i)
   {
-    cout << "  alpha_["<<i<<"] = " <<  alpha_[i]<<endl;
-    cout << "  sigma_["<<i<<"] = " <<  sigma_[i]<<endl;
-    cout << "  gamma_["<<i<<"] = " <<  gamma_[i]<<endl;
-    cout << "  beta_["<<i<<"] = " <<  beta_[i]<<endl;
-    cout << "  psi_["<<i<<"] = " <<  psi_[i]<<endl;
+    Xyce::dout() << "  alpha_["<<i<<"] = " <<  alpha_[i]<<std::endl;
+    Xyce::dout() << "  sigma_["<<i<<"] = " <<  sigma_[i]<<std::endl;
+    Xyce::dout() << "  gamma_["<<i<<"] = " <<  gamma_[i]<<std::endl;
+    Xyce::dout() << "  beta_["<<i<<"] = " <<  beta_[i]<<std::endl;
+    Xyce::dout() << "  psi_["<<i<<"] = " <<  psi_[i]<<std::endl;
   }
 
-  cout << "----------------------------------------\n\n"<<endl;
+  Xyce::dout() << Xyce::section_divider << std::endl << std::endl << std::endl;
 #endif
 
   if( pack )
@@ -1894,8 +1770,8 @@ bool N_TIA_StepErrorControl::dumpRestartData
   }
   else
   {
-    ostringstream ost;
-    ost.width(24);ost.precision(16);ost.setf(ios::scientific);
+    std::ostringstream ost;
+    ost.width(24);ost.precision(16);ost.setf(std::ios::scientific);
 
     // doubles:
     ost << alphas_  << " ";
@@ -1952,17 +1828,17 @@ bool N_TIA_StepErrorControl::dumpRestartData
     int iP = (initialPhase_)?1:0;
     ost << iP << " ";
 
-    string data( ost.str() );
+    std::string data( ost.str() );
     for( unsigned int i = 0; i < data.length(); ++i ) buf[pos+i] = data[i];
     // null terminate buf, essential if buf is used as a string anywhere,
     // including in the string constructor below:
     buf[pos+data.length()] = '\0';
 
 #ifdef Xyce_DEBUG_RESTART
-    string outputString(buf);
+    std::string outputString(buf);
 
-    cout << "StepErrorControlDAE  UNPACKED output buffer:" << endl;
-    cout << outputString << endl;
+    Xyce::dout() << "StepErrorControlDAE  UNPACKED output buffer:" << std::endl;
+    Xyce::dout() << outputString << std::endl;
 #endif
     pos = newPos;
   }
@@ -1972,10 +1848,10 @@ bool N_TIA_StepErrorControl::dumpRestartData
 
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_StepErrorControl::restoreRestartData
-// Purpose       : 
-// Special Notes : ERK:  6/20/2010:  
+// Purpose       :
+// Special Notes : ERK:  6/20/2010:
 //                 There are no longer 2 distinct classes.  The DAE version is
-//                 now part of the original, as one single class.  The two 
+//                 now part of the original, as one single class.  The two
 //                 blocks of code in this function correspond to the original
 //                 class (first block), and the DAE class (second block).
 //
@@ -2019,17 +1895,17 @@ bool N_TIA_StepErrorControl::restoreRestartData
     anaManager_.setBreakpointTol(bpTol);
     tiaParams_.initialTime=initialTime;
     tiaParams_.pauseTime=initialTime;
-    set<N_UTL_BreakPoint> tmpSet = breakPoints_;
+    std::set<N_UTL_BreakPoint> tmpSet = breakPoints_;
     breakPoints_.clear();
-    set<N_UTL_BreakPoint>::iterator iterSD;
-    set<N_UTL_BreakPoint>::iterator firstSD = tmpSet.begin();
-    set<N_UTL_BreakPoint>::iterator lastSD = tmpSet.end();
+    std::set<N_UTL_BreakPoint>::iterator iterSD;
+    std::set<N_UTL_BreakPoint>::iterator firstSD = tmpSet.begin();
+    std::set<N_UTL_BreakPoint>::iterator lastSD = tmpSet.end();
     for (iterSD = firstSD; iterSD != lastSD; ++iterSD)
     {
-      if (iterSD->value() > currentTime) 
+      if (iterSD->value() > currentTime)
       {
         breakPoints_.insert(*iterSD);
-        if (iterSD->bptype() == PAUSE_BREAKPOINT)
+        if (iterSD->bptype() == Xyce::Util::PAUSE_BREAKPOINT)
           updatePauseTime(*iterSD);
       }
     }
@@ -2039,7 +1915,7 @@ bool N_TIA_StepErrorControl::restoreRestartData
     int bptype;
     N_UTL_BreakPoint TmpBP;
     comm->unpack(buf, bsize, pos, &size, 1);
-    
+
     for (int i = 0; i < size; ++i)
     {
       comm->unpack(buf, bsize, pos, &val, 1);
@@ -2048,7 +1924,7 @@ bool N_TIA_StepErrorControl::restoreRestartData
       {
         TmpBP.set(val,bptype);
         breakPoints_.insert(TmpBP);
-        if (TmpBP.bptype() == PAUSE_BREAKPOINT)
+        if (TmpBP.bptype() == Xyce::Util::PAUSE_BREAKPOINT)
         {
           updatePauseTime(TmpBP);
         }
@@ -2069,21 +1945,21 @@ bool N_TIA_StepErrorControl::restoreRestartData
   }
   else
   {
-    string str1(buf);
+    std::string str1(buf);
     int length = str1.size() - pos;
-    string str2(str1,pos,length);
+    std::string str2(str1,pos,length);
 
-    istringstream ist( str2 );
+    std::istringstream ist( str2 );
 
-    // count here will be the size for the base N_TIA_StepErrorControl 
+    // count here will be the size for the base N_TIA_StepErrorControl
     // class *only*.
 
     // THIS IS INCORRECT!  restartDataSize returns the MAXIMUM the thing
     // is allowed to be, which allows for 24 characters for each integer
-    // value in the output.  This is almost always an overestimate, and 
+    // value in the output.  This is almost always an overestimate, and
     // using it as a way of pointing to the next character after our
     // data is a sure-fire way to break downstream processing!
-    // Instead, we'll use the tellg function from the stringstream to 
+    // Instead, we'll use the tellg function from the stringstream to
     // return the offset after we read everything out.
     //    int count = N_TIA_StepErrorControl::restartDataSize( false );
     //    pos += count;
@@ -2118,17 +1994,17 @@ bool N_TIA_StepErrorControl::restoreRestartData
     tiaParams_.initialTime=initialTime;
     tiaParams_.pauseTime=initialTime;
 
-    set<N_UTL_BreakPoint> tmpSet = breakPoints_;
+    std::set<N_UTL_BreakPoint> tmpSet = breakPoints_;
     breakPoints_.clear();
-    set<N_UTL_BreakPoint>::iterator iterSD;
-    set<N_UTL_BreakPoint>::iterator firstSD = tmpSet.begin();
-    set<N_UTL_BreakPoint>::iterator lastSD = tmpSet.end();
+    std::set<N_UTL_BreakPoint>::iterator iterSD;
+    std::set<N_UTL_BreakPoint>::iterator firstSD = tmpSet.begin();
+    std::set<N_UTL_BreakPoint>::iterator lastSD = tmpSet.end();
     for (iterSD = firstSD; iterSD != lastSD; ++iterSD)
     {
       if (iterSD->value() > currentTime)
-      { 
+      {
         breakPoints_.insert(*iterSD);
-        if (iterSD->bptype() == PAUSE_BREAKPOINT)
+        if (iterSD->bptype() == Xyce::Util::PAUSE_BREAKPOINT)
           updatePauseTime(*iterSD);
       }
     }
@@ -2147,7 +2023,7 @@ bool N_TIA_StepErrorControl::restoreRestartData
         {
           TmpBP.set(val,bptype);
           breakPoints_.insert( TmpBP );
-          if (TmpBP.bptype() == PAUSE_BREAKPOINT)
+          if (TmpBP.bptype() == Xyce::Util::PAUSE_BREAKPOINT)
           {
             updatePauseTime(TmpBP);
           }
@@ -2170,34 +2046,34 @@ bool N_TIA_StepErrorControl::restoreRestartData
   }
 
 #ifdef Xyce_DEBUG_RESTART
-  string netListFile = commandLine_.getArgumentValue("netlist");
-  cout << "TIA Restart Data RESTORE!  " << netListFile << "\n";
-  cout << "----------------------------------------\n";
-  cout << "startingTimeStep: " << startingTimeStep << endl;
-  cout << "currentTimeStep: " << currentTimeStep << endl;
-  cout << "lastAttemptedTimeStep: " << lastAttemptedTimeStep << endl;
-  cout << "lastTimeStep: " << lastTimeStep << endl;
-  cout << "minTimeStep: " << minTimeStep << endl;
-  cout << "maxTimeStep: " << maxTimeStep << endl;
-  cout << "maxTimeStepUser: " << maxTimeStepUser << endl;
-  cout << "lastTime: " << lastTime << endl;
-  cout << "currentTime: " << currentTime << endl;
-  cout << "nextTime: " << nextTime << endl;
-  cout << "initialTime: " << initialTime << endl;
-  cout << "estOverTol_: " << estOverTol_ << endl;
-  cout << "breakpts: ";
-  for (set<N_UTL_BreakPoint>::iterator iterSD = breakPoints_.begin();
+  std::string netListFile = commandLine_.getArgumentValue("netlist");
+  Xyce::dout() << "TIA Restart Data RESTORE!  " << netListFile << "\n";
+  Xyce::dout() << Xyce::section_divider << std::endl;
+  Xyce::dout() << "startingTimeStep: " << startingTimeStep << std::endl;
+  Xyce::dout() << "currentTimeStep: " << currentTimeStep << std::endl;
+  Xyce::dout() << "lastAttemptedTimeStep: " << lastAttemptedTimeStep << std::endl;
+  Xyce::dout() << "lastTimeStep: " << lastTimeStep << std::endl;
+  Xyce::dout() << "minTimeStep: " << minTimeStep << std::endl;
+  Xyce::dout() << "maxTimeStep: " << maxTimeStep << std::endl;
+  Xyce::dout() << "maxTimeStepUser: " << maxTimeStepUser << std::endl;
+  Xyce::dout() << "lastTime: " << lastTime << std::endl;
+  Xyce::dout() << "currentTime: " << currentTime << std::endl;
+  Xyce::dout() << "nextTime: " << nextTime << std::endl;
+  Xyce::dout() << "initialTime: " << initialTime << std::endl;
+  Xyce::dout() << "estOverTol_: " << estOverTol_ << std::endl;
+  Xyce::dout() << "breakpts: ";
+  for (std::set<N_UTL_BreakPoint>::iterator iterSD = breakPoints_.begin();
        iterSD != breakPoints_.end(); ++iterSD)
   {
-    cout << iterSD->value() << " " << iterSD->bptype() << endl;
+    Xyce::dout() << iterSD->value() << " " << iterSD->bptype() << std::endl;
   }
-  cout << endl;
-  cout << "integMethod: " << anaManager_.getIntegrationMethod() << endl;
-  cout << "stepNumber: " << anaManager_.getStepNumber() << endl;
-  cout << "tranStepNumber: " << anaManager_.getTranStepNumber() << endl;
-  cout << "breakPointRestartStep: " << anaManager_.breakPointRestartStep <<
-    endl;
-  cout << "----------------------------------------\n\n";
+  Xyce::dout() << std::endl;
+  Xyce::dout() << "integMethod: " << anaManager_.getIntegrationMethod() << std::endl;
+  Xyce::dout() << "stepNumber: " << anaManager_.getStepNumber() << std::endl;
+  Xyce::dout() << "tranStepNumber: " << anaManager_.getTranStepNumber() << std::endl;
+  Xyce::dout() << "breakPointRestartStep: " << anaManager_.breakPointRestartStep <<
+    std::endl;
+  Xyce::dout() << Xyce::section_divider << std::endl << std::endl;
 #endif
 
   // DAE class variables:
@@ -2262,13 +2138,13 @@ bool N_TIA_StepErrorControl::restoreRestartData
   }
   else
   {
-    // want the string stream to only represent the new-DAE part of 
+    // want the string stream to only represent the new-DAE part of
     // the buf array.
-    string str1(buf);
+    std::string str1(buf);
     int length = str1.size() - pos;
-    string str2(str1,pos,length);
+    std::string str2(str1,pos,length);
 
-    istringstream ist( str2 );
+    std::istringstream ist( str2 );
 
     int count = N_TIA_StepErrorControl::restartDataSize(false);
     pos = count;  // can update here, as pos isn't used after this.
@@ -2332,46 +2208,46 @@ bool N_TIA_StepErrorControl::restoreRestartData
   }
 
 #ifdef Xyce_DEBUG_RESTART
-  cout << "TIA Restart Data RESTORE (DAE)!  " << netListFile << "\n";
-  cout << "----------------------------------------\n"<<endl;
-  cout << "alphas_ = " <<alphas_<<endl;
-  cout << "alpha0_ = " <<alpha0_<<endl;
-  cout << "cj_ = " <<cj_<<endl;
-  cout << "ck_ = " <<ck_<<endl;
-  cout << "usedStep_ = " <<usedStep_<<endl;
-  cout << "Ek_ = " <<Ek_<<endl;
-  cout << "Ekm1_ = " <<Ekm1_<<endl;
-  cout << "Ekm2_ = " <<Ekm2_<<endl;
-  cout << "Ekp1_ = " <<Ekp1_<<endl;
-  cout << "Est_ = " <<Est_<<endl;
-  cout << "Tk_ = " <<Tk_<<endl;
-  cout << "Tkm1_ = " <<Tkm1_<<endl;
-  cout << "Tkm2_ = " <<Tkm2_<<endl;
-  cout << "Tkp1_ = " <<Tkp1_<<endl;
-  cout << "h0_safety_ = " <<h0_safety_<<endl;
-  cout << "h0_max_factor_ = " <<h0_max_factor_<<endl;
-  cout << "h_phase0_incr_ = " <<h_phase0_incr_<<endl;
-  cout << "h_max_inv_ = " <<h_max_inv_<<endl;
-  cout << "Tkm1_Tk_safety_ = " <<Tkm1_Tk_safety_<<endl;
-  cout << "Tkp1_Tk_safety_ = " <<Tkp1_Tk_safety_<<endl;
-  cout << "r_factor_ = " <<r_factor_<<endl;
-  cout << "r_safety_ = " <<r_safety_<<endl;
-  cout << "r_fudge_ = " <<r_fudge_<<endl;
-  cout << "r_min_ = " <<r_min_<<endl;
-  cout << "r_max_ = " <<r_max_<<endl;
-  cout << "r_hincr_test_ = " <<r_hincr_test_<<endl;
-  cout << "r_hincr_ = " <<r_hincr_<<endl;
+  Xyce::dout() << "TIA Restart Data RESTORE (DAE)!  " << netListFile << "\n";
+  Xyce::dout() << Xyce::section_divider << std::endl<<std::endl;
+  Xyce::dout() << "alphas_ = " <<alphas_<<std::endl;
+  Xyce::dout() << "alpha0_ = " <<alpha0_<<std::endl;
+  Xyce::dout() << "cj_ = " <<cj_<<std::endl;
+  Xyce::dout() << "ck_ = " <<ck_<<std::endl;
+  Xyce::dout() << "usedStep_ = " <<usedStep_<<std::endl;
+  Xyce::dout() << "Ek_ = " <<Ek_<<std::endl;
+  Xyce::dout() << "Ekm1_ = " <<Ekm1_<<std::endl;
+  Xyce::dout() << "Ekm2_ = " <<Ekm2_<<std::endl;
+  Xyce::dout() << "Ekp1_ = " <<Ekp1_<<std::endl;
+  Xyce::dout() << "Est_ = " <<Est_<<std::endl;
+  Xyce::dout() << "Tk_ = " <<Tk_<<std::endl;
+  Xyce::dout() << "Tkm1_ = " <<Tkm1_<<std::endl;
+  Xyce::dout() << "Tkm2_ = " <<Tkm2_<<std::endl;
+  Xyce::dout() << "Tkp1_ = " <<Tkp1_<<std::endl;
+  Xyce::dout() << "h0_safety_ = " <<h0_safety_<<std::endl;
+  Xyce::dout() << "h0_max_factor_ = " <<h0_max_factor_<<std::endl;
+  Xyce::dout() << "h_phase0_incr_ = " <<h_phase0_incr_<<std::endl;
+  Xyce::dout() << "h_max_inv_ = " <<h_max_inv_<<std::endl;
+  Xyce::dout() << "Tkm1_Tk_safety_ = " <<Tkm1_Tk_safety_<<std::endl;
+  Xyce::dout() << "Tkp1_Tk_safety_ = " <<Tkp1_Tk_safety_<<std::endl;
+  Xyce::dout() << "r_factor_ = " <<r_factor_<<std::endl;
+  Xyce::dout() << "r_safety_ = " <<r_safety_<<std::endl;
+  Xyce::dout() << "r_fudge_ = " <<r_fudge_<<std::endl;
+  Xyce::dout() << "r_min_ = " <<r_min_<<std::endl;
+  Xyce::dout() << "r_max_ = " <<r_max_<<std::endl;
+  Xyce::dout() << "r_hincr_test_ = " <<r_hincr_test_<<std::endl;
+  Xyce::dout() << "r_hincr_ = " <<r_hincr_<<std::endl;
 
   for (int i=0;i<6;++i)
   {
-    cout << "  alpha_["<<i<<"] = " <<  alpha_[i]<<endl;
-    cout << "  sigma_["<<i<<"] = " <<  sigma_[i]<<endl;
-    cout << "  gamma_["<<i<<"] = " <<  gamma_[i]<<endl;
-    cout << "  beta_["<<i<<"] = " <<  beta_[i]<<endl;
-    cout << "  psi_["<<i<<"] = " <<  psi_[i]<<endl;
+    Xyce::dout() << "  alpha_["<<i<<"] = " <<  alpha_[i]<<std::endl;
+    Xyce::dout() << "  sigma_["<<i<<"] = " <<  sigma_[i]<<std::endl;
+    Xyce::dout() << "  gamma_["<<i<<"] = " <<  gamma_[i]<<std::endl;
+    Xyce::dout() << "  beta_["<<i<<"] = " <<  beta_[i]<<std::endl;
+    Xyce::dout() << "  psi_["<<i<<"] = " <<  psi_[i]<<std::endl;
   }
 
-  cout << "----------------------------------------\n\n"<<endl;
+  Xyce::dout() << Xyce::section_divider << std::endl << std::endl << std::endl;
 #endif
 
   return true;
@@ -2379,7 +2255,7 @@ bool N_TIA_StepErrorControl::restoreRestartData
 
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_StepErrorControl::updateTwoLevelTimeInfo
-// Purpose       : 
+// Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel ComputationalSciences.
@@ -2408,7 +2284,6 @@ void N_TIA_StepErrorControl::updateTwoLevelTimeInfo (const N_TIA_TimeIntInfo & t
   currentOrder_ = tiInfo.currentOrder;
 }
 
-#ifdef Xyce_VERBOSE_TIME
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_StepErrorControl::outputTimeInfo
 // Purpose       :
@@ -2418,38 +2293,54 @@ void N_TIA_StepErrorControl::updateTwoLevelTimeInfo (const N_TIA_TimeIntInfo & t
 // Creation Date : 03/04/08
 //-----------------------------------------------------------------------------
 
-void N_TIA_StepErrorControl::outputTimeInfo()
+void N_TIA_StepErrorControl::outputTimeInfo(std::ostream &os)
 {
-  ostringstream ost;
-  streamsize width=ost.width();
-  streamsize precision=ost.precision();
-  ios_base::fmtflags ff=ost.flags();
+  {
+    Xyce::ios_flags_saver flagsave(os);
+    
+    os << " " << (Xyce::DEBUG_TIME ? commandLine_.getArgumentValue("netlist") : "   ") << " "
+       << "Current,Next,Step: "
+       << std::setw(Xyce::DEBUG_TIME ? 14 : 16) << std::setprecision(Xyce::DEBUG_TIME ? 7 : 9)
+       << currentTime << ", " << nextTime << ", " << currentTimeStep;
+  }
 
-#ifdef Xyce_DEBUG_TIME
-  string netListFile = commandLine_.getArgumentValue("netlist");
-  ost << " " << netListFile  << " ";
-#else
-  ost << "     ";
-#endif
-
-  ost << "Current,Next,Step: ";
-
-#ifdef Xyce_DEBUG_TIME
-  ost.width(14);    ost.precision(7); ost.setf(ios::scientific); 
-#else
-  ost.width(16);    ost.precision(9); ost.setf(ios::scientific); 
-#endif
-
-  //ost << currentTime << ", " << nextTime << ", " << currentTimeStep << endl;
-  ost << currentTime << ", " << nextTime << ", " << currentTimeStep;
-
-  // Restore width,precision and flags
-  ost.width(width);    ost.precision(precision); ost.flags(ff);
-
-  ost << "    ("<<numberOfSteps_<<") Used, Next Order:  ";
-  //ost << usedOrder_ << ", " << currentOrder_ << endl;
-  ost << usedOrder_ << ", " << currentOrder_;
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, ost.str());
+  os << "    ("<<numberOfSteps_<<") Used, Next Order:  " << usedOrder_ << ", " << currentOrder_;
 }
-#endif
+
+//-----------------------------------------------------------------------------
+// Function      : operator<<
+// Purpose       : "<<" operator for step error control class.
+// Special Notes :
+// Scope         : public
+// Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
+// Creation Date : 10/17/05
+//-----------------------------------------------------------------------------
+std::ostream & operator<<(std::ostream & os, const N_TIA_StepErrorControl & sec)
+{
+  os << "\n\n-----------------------------------------" << std::endl
+     << "\tStepErrorControl:\n"
+     << "\t\tstartingTimeStep      = " << sec.startingTimeStep << std::endl 
+     << "\t\tcurrentTimeStep       = " << sec.currentTimeStep << std::endl 
+     << "\t\tlastAttemptedTimeStep = " << sec.lastAttemptedTimeStep << std::endl 
+     << "\t\tlastTimeStep          = " << sec.lastTimeStep << std::endl 
+     << "\t\tminTimeStep           = " << sec.minTimeStep << std::endl 
+     << "\t\tmaxTimeStep           = " << sec.maxTimeStep << std::endl 
+     << "\t\tmaxTimeStepUser       = " << sec.maxTimeStepUser << std::endl 
+     << "\t\tlastTime              = " << sec.lastTime << std::endl 
+     << "\t\tcurrentTime           = " << sec.currentTime << std::endl 
+     << "\t\tnextTime              = " << sec.nextTime << std::endl 
+     << "\t\tstopTime              = " << sec.stopTime << std::endl 
+     << "\t\tinitialTime           = " << sec.initialTime << std::endl 
+     << "\t\tfinalTime             = " << sec.finalTime << std::endl 
+     << std::endl
+     << "\t\tBreak Points:" << std::endl;
+
+  sec.printBreakPoints (os);
+
+
+  os << Xyce::section_divider << std::endl;
+  os << std::endl;
+
+  return os;
+}
+

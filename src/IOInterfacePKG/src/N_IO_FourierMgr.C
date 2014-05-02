@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,35 +31,33 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.1.2.10 $
-// Revision Date  : $Date: 2013/10/03 17:23:43 $
+// Revision Number: $Revision: 1.13 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-#include <Teuchos_RCP.hpp>
-using Teuchos::RCP;
-using Teuchos::rcp;
-
 #include <iostream>
 
-// ----------   Xyce Includes   ----------
 #include <N_IO_FourierMgr.h>
+
 #include <N_ERH_ErrorMgr.h>
 #include <N_IO_OutputMgr.h>
+#include <N_IO_Op.h>
+
+namespace Xyce {
+namespace IO {
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_FourierMgr::N_IO_FourierMgr
+// Function      : FourierMgr::FourierMgr
 // Purpose       : constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist, SNL, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-----------------------------------------------------------------------------
-N_IO_FourierMgr::N_IO_FourierMgr( N_IO_OutputMgr &outputManager )
+FourierMgr::FourierMgr( OutputMgr &outputManager )
   : outputManager_(outputManager),
     numFreq_(10),
     gridSize_(200),
@@ -70,33 +68,48 @@ N_IO_FourierMgr::N_IO_FourierMgr( N_IO_OutputMgr &outputManager )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_FourierMgr::N_IO_FourierMgr
+// Function      : FourierMgr::FourierMgr
 // Purpose       : destructor
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist, SNL, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-----------------------------------------------------------------------------
-N_IO_FourierMgr::~N_IO_FourierMgr()
+FourierMgr::~FourierMgr()
 {
+  for (Util::OpList::iterator it = outputVars_.begin(); it != outputVars_.end(); ++it)
+    delete *it;
 
 }
 
+void
+FourierMgr::fixupFourierParameters() 
+{
+  IO::makeOps(outputManager_, depSolVarIterVector_.begin(), depSolVarIterVector_.end(), std::back_inserter(outputVars_));
+
+  int numSolVars = outputVars_.size();
+  
+  // Store number of solution variables for this .four line.
+  int oVPsize = outputVarsPtr_.size();
+  outputVarsPtr_.push_back( outputVarsPtr_[oVPsize-1] + numSolVars );
+  
+}
+
 //-----------------------------------------------------------------------------
-// Function      : N_IO_FourierMgr::addFourierAnalysis
+// Function      : FourierMgr::addFourierAnalysis
 // Purpose       : Entry point when .four lines are pased in the netlist
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist, SNL, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-----------------------------------------------------------------------------
-bool N_IO_FourierMgr::addFourierAnalysis(const N_UTL_OptionBlock & fourierBlock)
+bool FourierMgr::addFourierAnalysis(const Util::OptionBlock & fourierBlock)
 {
   // based on what's in the option block passed in, we
   // create the needed fourier instance
 #ifdef Xyce_DEBUG_IO
-  std::cout << "In N_IO_FourierMgr::addFourier" << std::endl;
-  std::cout << ".FOUR line passed was: " << std::endl << fourierBlock << std::endl;
+  Xyce::dout() << "In FourierMgr::addFourier" << std::endl;
+  Xyce::dout() << ".FOUR line passed was: " << std::endl << fourierBlock << std::endl;
 #endif
 
   if( !fourierBlock.tagExists( "FREQ" ) )
@@ -105,44 +118,39 @@ bool N_IO_FourierMgr::addFourierAnalysis(const N_UTL_OptionBlock & fourierBlock)
     N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL, "Missing FREQ in .FOUR line!");
   }
 
-  int numSolVars = 0;
-
-  list<N_UTL_Param>::iterator currentParamIt = const_cast<N_UTL_OptionBlock &>(fourierBlock).begin();
-  list<N_UTL_Param>::iterator endParamIt = const_cast<N_UTL_OptionBlock &>(fourierBlock).end();
-  while( currentParamIt != endParamIt )
+  for (std::list<N_UTL_Param>::const_iterator currentParamIt = fourierBlock.begin(); currentParamIt != const_cast<N_UTL_OptionBlock &>(fourierBlock).end(); ++currentParamIt)
   {
     std::string name = "";
-    string tag = currentParamIt->tag();
+    std::string tag = currentParamIt->tag();
 
     if( tag == "FREQ" )
     {
-      freqVector_.push_back( currentParamIt->dVal() );
+      freqVector_.push_back( currentParamIt->getImmutableValue<double>() );
     }
     else if( (tag == "V") || (tag == "I") )
     {
-      int nodes = currentParamIt->iVal();
-      N_UTL_Param aParam;
+      int nodes = currentParamIt->getImmutableValue<int>();
+      Util::Param aParam;
       aParam.set( tag, nodes );
       name += tag;
       name += "(";
 
       // here we just store the needed parts of V(a) or v(a,b) or I(device).
       // only the v(a,b) case will need an extra node in the outputVars_ array.
-      numSolVars++;
       // use list::insert() to keep an iterator pointing to this spot
-      list<N_UTL_Param>::iterator newDepSolVarItr = outputVars_.insert( outputVars_.end(), aParam);
-      depSolVarIterVector_.push_back( newDepSolVarItr );
+    
+      depSolVarIterVector_.push_back( aParam );
       for( int i=0; i<nodes; i++ )
       {
         currentParamIt++;
-        aParam.set( currentParamIt->tag(), currentParamIt->dVal() );
+        aParam.set( currentParamIt->tag(), currentParamIt->getImmutableValue<double>() );
+        depSolVarIterVector_.push_back( aParam );
         name += currentParamIt->tag(); 
         if (i != nodes-1 && nodes > 1) name += ",";
-        outputVars_.push_back( aParam );
       }
       name += ")";
+
     }
-    currentParamIt++;
 
     // Save voltage or current variable name.
     if (name != "")
@@ -151,34 +159,26 @@ bool N_IO_FourierMgr::addFourierAnalysis(const N_UTL_OptionBlock & fourierBlock)
     }
   }
 
-  // Store number of solution variables for this .four line.
-  int oVPsize = outputVarsPtr_.size();
-  outputVarsPtr_.push_back( outputVarsPtr_[oVPsize-1] + numSolVars );
 
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_FourierMgr::updateFourierData
+// Function      : FourierMgr::updateFourierData
 // Purpose       : Called during the simulation to update the fourier objects
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist, SNL, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-----------------------------------------------------------------------------
-void N_IO_FourierMgr::updateFourierData( const double circuitTime, RCP< N_LAS_Vector > solnVecRCP)
+void FourierMgr::updateFourierData( const double circuitTime, const N_LAS_Vector *solnVec)
 {
   // Save the time.
   time_.push_back(circuitTime);
 
-  for (unsigned int i=0; i<depSolVarIterVector_.size(); ++i)
+  for (unsigned int i=0; i<outputVars_.size(); ++i)
   {
-     if( depSolVarIterVector_[i]->getSimContext() == UNDEFINED )
-     {
-       // call set param context
-       outputManager_.setParamContextType_( depSolVarIterVector_[i] );
-     }
-     double retVal = outputManager_.getPrintValue( depSolVarIterVector_[i], solnVecRCP.getRawPtr() );
+    double retVal = getValue(outputManager_.getCommPtr()->comm(), *outputVars_[i], solnVec, 0, 0, 0).real();
 
      outputVarsValues_.push_back(retVal);
   }
@@ -186,17 +186,17 @@ void N_IO_FourierMgr::updateFourierData( const double circuitTime, RCP< N_LAS_Ve
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_FourierMgr::outputResults
+// Function      : FourierMgr::outputResults
 // Purpose       : Output fourier results at end of simulation
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist, SNL, Electrical and Microsystem Modeling
 // Creation Date : 03/10/2009
 //-----------------------------------------------------------------------------
-void N_IO_FourierMgr::outputResults(std::ostream& outputStream)
+void FourierMgr::outputResults(std::ostream& outputStream)
 {
   // Only calculate something if a .four line was encountered and transient data was collected.
-  int numOutVars = depSolVarIterVector_.size();
+  int numOutVars = outputVars_.size();
 
   if ( numOutVars && !time_.empty() && !calculated_ )
   {
@@ -214,14 +214,14 @@ void N_IO_FourierMgr::outputResults(std::ostream& outputStream)
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_FourierMgr::getLastPeriod_()
+// Function      : FourierMgr::getLastPeriod_()
 // Purpose       : finds the indices to access the last period of simulation
 // Special Notes :
 // Scope         : private
 // Creator       : Heidi Thornquist, SNL, Electrical Models & Simulation
 // Creation Date : 6/21/13
 //-----------------------------------------------------------------------------
-void N_IO_FourierMgr::getLastPeriod_()
+void FourierMgr::getLastPeriod_()
 {
   // We want to do the analysis on only the last period of the transient window. So here we find the indices
   // to access the endpoints of that interval.
@@ -254,25 +254,25 @@ void N_IO_FourierMgr::getLastPeriod_()
     } 
     else
     {
-      string msg = "Error: The period is greater than the length of the time simulation. Exiting.";
+      std::string msg = "Error: The period is greater than the length of the time simulation. Exiting.";
       N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL, msg);
     }
   }
 } 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_FourierMgr::interpolateData_()
+// Function      : FourierMgr::interpolateData_()
 // Purpose       : evaluates interpolating polynomial at equidistant time pts
 // Special Notes :
 // Scope         : private
 // Creator       : Heidi Thornquist, SNL, Electrical Models & Simulation
 // Creation Date : 6/21/13
 //-----------------------------------------------------------------------------
-bool N_IO_FourierMgr::interpolateData_()
+bool FourierMgr::interpolateData_()
 {
   double A, B, C;
 
-  int numOutVars = depSolVarIterVector_.size();
+  int numOutVars = outputVars_.size();
   int numPoints = time_.size();
   int nFreq = freqVector_.size();
 
@@ -287,11 +287,11 @@ bool N_IO_FourierMgr::interpolateData_()
     // Get the number of time points in the final period
     int nData = numPoints-prdStart_[j];
     double period = 1.0/freqVector_[j];
-    vector<double> h(nData-1, 0.0);
-    vector<double> b(nData-1, 0.0);
-    vector<double> u(nData-1, 0.0);
-    vector<double> v(nData-1, 0.0);
-    vector<double> z(nData, 0.0);
+    std::vector<double> h(nData-1, 0.0);
+    std::vector<double> b(nData-1, 0.0);
+    std::vector<double> u(nData-1, 0.0);
+    std::vector<double> v(nData-1, 0.0);
+    std::vector<double> z(nData, 0.0);
 
     // Compute new, equally spaced time points.
     double step = period/gridSize_;
@@ -352,16 +352,16 @@ bool N_IO_FourierMgr::interpolateData_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_FourierMgr::calculateFT_()
+// Function      : FourierMgr::calculateFT_()
 // Purpose       : performs fourier analysis
 // Special Notes :
 // Scope         : private
 // Creator       : Heidi Thornquist, SNL, Electrical Models & Simulation
 // Creation Date : 6/21/13
 //-----------------------------------------------------------------------------
-void N_IO_FourierMgr::calculateFT_()
+void FourierMgr::calculateFT_()
 { 
-  int numOutVars = depSolVarIterVector_.size();
+  int numOutVars = outputVars_.size();
   int nFreq = freqVector_.size();
 
   mag_.resize(numFreq_*numOutVars, 0.0);
@@ -413,14 +413,14 @@ void N_IO_FourierMgr::calculateFT_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_FourierMgr::printResult_( std::ostream& os )
+// Function      : FourierMgr::printResult_( std::ostream& os )
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist, SNL, Electrical Models & Simulation
 // Creation Date : 6/21/13
 //-----------------------------------------------------------------------------
-std::ostream& N_IO_FourierMgr::printResult_( std::ostream& os )
+std::ostream& FourierMgr::printResult_( std::ostream& os )
 { 
   // Compute measure.
   if (calculated_)
@@ -454,3 +454,5 @@ std::ostream& N_IO_FourierMgr::printResult_( std::ostream& os )
   return os;
 }
 
+} // namespace IO
+} // namespace Xyce

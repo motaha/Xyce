@@ -1,0 +1,25 @@
+var N__DEV__MOSFET__B3SOI_8C =
+[
+    [ "CEXP", "N__DEV__MOSFET__B3SOI_8C.html#a9fca7c4a5a27a36cf60fa4c4190fd683", null ],
+    [ "CONSTboltz", "N__DEV__MOSFET__B3SOI_8C.html#a147cc29b18c8b768df699e498a1a50b7", null ],
+    [ "CONSTEg300", "N__DEV__MOSFET__B3SOI_8C.html#abfa12d5677765f1f6509375fc6672122", null ],
+    [ "CONSTEPSOX", "N__DEV__MOSFET__B3SOI_8C.html#abc9b8f0dcf8cfc0121b87ae71ad63d70", null ],
+    [ "CONSTEPSSI", "N__DEV__MOSFET__B3SOI_8C.html#a8a8bc3bb63f013202b13c0d74a53640f", null ],
+    [ "CONSTKoverQ", "N__DEV__MOSFET__B3SOI_8C.html#ac4443c80520dad562b4b5d4f07a987db", null ],
+    [ "CONSTQ", "N__DEV__MOSFET__B3SOI_8C.html#a10344a23f1c1e3fd2b86a316f8a6fb28", null ],
+    [ "DELT_Vbseff", "N__DEV__MOSFET__B3SOI_8C.html#add9ac9146b5699ea9730e42036c17971", null ],
+    [ "DELTA_1", "N__DEV__MOSFET__B3SOI_8C.html#af1af7d83d5655d2bb2fcfc0154a2aba0", null ],
+    [ "DELTA_2", "N__DEV__MOSFET__B3SOI_8C.html#a34ea54e9c401912e16b3a0ea268ba555", null ],
+    [ "DELTA_3", "N__DEV__MOSFET__B3SOI_8C.html#aa1e6648319b0c22c0744db5a4c165303", null ],
+    [ "DELTA_3_SOI", "N__DEV__MOSFET__B3SOI_8C.html#ad826553bcb0cc74ae2ec10529affe47c", null ],
+    [ "DELTA_4", "N__DEV__MOSFET__B3SOI_8C.html#a09d0ad285cba08222990106d202bae05", null ],
+    [ "DELTA_VFB", "N__DEV__MOSFET__B3SOI_8C.html#ae723c5668f19dc9bd03741916af034ea", null ],
+    [ "DEXP", "N__DEV__MOSFET__B3SOI_8C.html#a7bcc7c96c51ef87442067b0bf3b0ace7", null ],
+    [ "EXPL_THRESHOLD", "N__DEV__MOSFET__B3SOI_8C.html#adc74b12e495ca20f8ef821160b3de0e4", null ],
+    [ "M_PI", "N__DEV__MOSFET__B3SOI_8C.html#ae71449b1cc6e6250b91f539153a7a0d3", null ],
+    [ "MAX_EXPL", "N__DEV__MOSFET__B3SOI_8C.html#aaffdab264cb393a4a2c07a9f9937b732", null ],
+    [ "MIN_EXPL", "N__DEV__MOSFET__B3SOI_8C.html#a2cd30fc80bbb9ba7370e30bff3a24b4f", null ],
+    [ "OFF_Vbsitf", "N__DEV__MOSFET__B3SOI_8C.html#a9914b03d8f265e15adb423c30cc0af41", null ],
+    [ "Xyce_USE_BSIMSOI_CONST", "N__DEV__MOSFET__B3SOI_8C.html#a6cec7d352ea292b27b816a7b2fd4438a", null ],
+    [ "registerDevice", "N__DEV__MOSFET__B3SOI_8C.html#a75fc98f36b112344487c8314f01d52f4", null ]
+];

@@ -1,0 +1,9 @@
+<map id="N_DEV_RegisterDevices.h" name="N_DEV_RegisterDevices.h">
+<area shape="rect" id="node2" href="$N__DEV__DeviceMgr_8C.html" title="N_DEV_DeviceMgr.C" alt="" coords="5,80,163,107"/>
+<area shape="rect" id="node3" href="$Core_2src_2N__DEV__RegisterDevices_8C.html" title="N_DEV_RegisterDevices.C" alt="" coords="187,80,379,107"/>
+<area shape="rect" id="node4" href="$OpenModels_2src_2N__DEV__RegisterDevices_8C.html" title="N_DEV_RegisterDevices.C" alt="" coords="403,80,595,107"/>
+<area shape="rect" id="node5" href="$N__DEV__RegisterOpenDevices_8C.html" title="N_DEV_RegisterOpenDevices.C" alt="" coords="619,80,845,107"/>
+<area shape="rect" id="node6" href="$N__DEV__RegisterADMSDevices_8C.html" title="N_DEV_RegisterADMSDevices.C" alt="" coords="869,80,1101,107"/>
+<area shape="rect" id="node7" href="$N__DEV__RegisterNeuronDevices_8C.html" title="N_DEV_RegisterNeuronDevices.C" alt="" coords="1126,80,1364,107"/>
+<area shape="rect" id="node8" href="$N__DEV__RegisterTCADDevices_8C.html" title="N_DEV_RegisterTCADDevices.C" alt="" coords="1389,80,1619,107"/>
+</map>

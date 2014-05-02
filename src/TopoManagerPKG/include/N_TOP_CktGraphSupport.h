@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.7.6.2 $
+// Revision Number: $Revision: 1.12 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:50 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,44 +46,44 @@
 #ifndef N_TOP_CktGraphSupport_h
 #define N_TOP_CktGraphSupport_h 1
 
-// ---------- Standard Includes ----------
-
 #include <string>
 
-// ---------- Xyce Includes ----------
+#include <N_TOP_fwd.h>
 
-#include <N_UTL_Xyce.h>
-
-// ---------- Forward Declarations ----------
-
-class N_TOP_CktGraphCreator;
+namespace Xyce {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Class         : N_TOP_CktGraphSupport
+// Class         : CktGraphSupport
 // Purpose       : Factory class for CktGraphCreator
 // Special Notes :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-class N_TOP_CktGraphSupport
+class CktGraphSupport
 {
 
 private:
 
   // Constructor (private).
-  N_TOP_CktGraphSupport();
+  CktGraphSupport();
 
   // Copy constructor (private).
-  N_TOP_CktGraphSupport(const N_TOP_CktGraphSupport & right);
+  CktGraphSupport(const CktGraphSupport & right);
 
   // Destructor (private).
-  ~N_TOP_CktGraphSupport();
+  ~CktGraphSupport();
 
 public:
 
   // Circuit graph factory.
-  static N_TOP_CktGraphCreator * factory(const string & typeID, const int maxTries);
+  static CktGraphCreator * factory(const std::string & typeID, const int maxTries);
 
 };
+
+} // namespace Topo
+} // namespace Xyce
+
+typedef Xyce::Topo::CktGraphSupport N_TOP_CktGraphSupport;
 
 #endif

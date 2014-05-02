@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,11 +36,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.36.2.2 $
+// Revision Number: $Revision: 1.56.2.3 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/03/12 16:50:27 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: dgbaur $
 //-----------------------------------------------------------------------------
 
 #ifndef Xyce_N_DEV_Digital_h
@@ -48,7 +48,8 @@
 
 // ----------   Xyce Includes   ----------
 //Genie 110812
-#include <N_DEV_DeviceTemplate.h>
+#include <N_DEV_Configuration.h>
+#include <N_DEV_DeviceMaster.h>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceInstance.h>
 #include <N_DEV_DeviceModel.h>
@@ -57,9 +58,22 @@ namespace Xyce {
 namespace Device {
 namespace Digital {
 
-// ---------- Forward Declarations ----------
 class Model;
 class Instance; //Genie 110812
+
+struct Traits : public DeviceTraits<Model, Instance>
+{
+    static const char *name() {return "Behavioral Digital";}
+    static const char *deviceTypeName() {return "Digital level 1";}
+    static const int numNodes() {return 2;}
+    static const int numOptionalNodes() {return 20;}
+    static const bool modelRequired() {return true;}
+    static const bool isLinearDevice() {return true;}
+
+    static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+    static void loadModelParameters(ParametricData<Model> &model_parameters);
+    static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : Instance
@@ -75,25 +89,21 @@ class Instance; //Genie 110812
 
 class Instance : public DeviceInstance
 {
-  friend class ParametricData<Instance>;
-  friend class Model;
-  friend class Master;
+    friend class ParametricData<Instance>;
+    friend class Model;
+    friend class Traits;
+    friend class Master;
 
-  enum gType {NOT, AND, NAND, OR, NOR, ADD, XOR, NXOR, DFF};
+    // NOT is deprecated now, and replaced by INV.
+    enum gType {INV, NOT, AND, NAND, OR, NOR, ADD, XOR, NXOR, DFF, DLTCH, BUF};
 
 public:
-  static ParametricData<Instance> &getParametricData();
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Instance(InstanceBlock & IB,
-           Model & Diter,
-           MatrixLoadData & mlData1,
-           SolverState &ss1,
-           ExternData  &ed1,
-           DeviceOptions & do1);
+  Instance(
+    const Configuration &       configuration,
+    const InstanceBlock &       IB,
+    Model &                     Diter,
+    const FactoryBlock &        factory_block);
 
 
   ~Instance();
@@ -104,21 +114,21 @@ private:
 
 public:
   // Additional Public Declarations
-  void registerLIDs( const vector<int> & intLIDVecRef,
-                     const vector<int> & extLIDVecRef );
-  void registerStateLIDs( const vector<int> & staLIDVecRef );
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
+  void registerStateLIDs( const std::vector<int> & staLIDVecRef );
 
-  map<int,string> & getIntNameMap ();
+  std::map<int,std::string> & getIntNameMap ();
 
-  const vector< vector<int> > & jacobianStamp() const;
-  void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-  bool processParams (string param = "");
+  bool processParams ();
 
   bool updateIntermediateVars () { return true; };
   bool updatePrimaryState ();
   bool updateSecondaryState ();
-  bool getInstanceBreakPoints (vector<N_UTL_BreakPoint> &);
+  bool getInstanceBreakPoints (std::vector<N_UTL_BreakPoint> &);
 
   // load functions, residual:
   bool loadDAEQVector ();
@@ -127,6 +137,9 @@ public:
   // load functions, Jacobian:
   bool loadDAEdQdx ();
   bool loadDAEdFdx ();
+
+  // Used to support U vs. Y syntax
+  std::string getDeviceLetter ();
 
 public:
   // iterator reference to the model which owns this instance.
@@ -145,30 +158,30 @@ private:
 
   // state variables:
 
-  vector<double> qlo;      // charge in the capacitor
-  vector<double> ilo;      // current throught the capacitor
-  vector<double> vcaplo;   // voltage drop across capacitor
-  vector<double> qhi;
-  vector<double> ihi;
-  vector<double> vcaphi;
-  vector<double> qref;
-  vector<double> iref;
-  vector<double> vcapref;
+  std::vector<double> qlo;      // charge in the capacitor
+  std::vector<double> ilo;      // current throught the capacitor
+  std::vector<double> vcaplo;   // voltage drop across capacitor
+  std::vector<double> qhi;
+  std::vector<double> ihi;
+  std::vector<double> vcaphi;
+  std::vector<double> qref;
+  std::vector<double> iref;
+  std::vector<double> vcapref;
 
-  vector<double> rilo;
-  vector<double> rihi;
-  vector<double> riref;
-  vector<double> currentOut;
-  vector<double> currentIn;
+  std::vector<double> rilo;
+  std::vector<double> rihi;
+  std::vector<double> riref;
+  std::vector<double> currentOut;
+  std::vector<double> currentIn;
 
-  vector<double> glo;
-  vector<double> ghi;
+  std::vector<double> glo;
+  std::vector<double> ghi;
 
-  vector<double> qInp;      // charge in the capacitor
-  vector<double> iInp;      // current throught the capacitor
-  vector<double> vcapInp;   // voltage drop across capacitor
+  std::vector<double> qInp;      // charge in the capacitor
+  std::vector<double> iInp;      // current throught the capacitor
+  std::vector<double> vcapInp;   // voltage drop across capacitor
 
-  vector<double> currentInp;
+  std::vector<double> currentInp;
 
   // input params:
 
@@ -184,27 +197,27 @@ private:
   int li_Lo;
   int li_Hi;
   int li_Ref;
-  vector<int> li_Inp;
-  vector<int> li_Out;
+  std::vector<int> li_Inp;
+  std::vector<int> li_Out;
 
   // Input state vars
-  vector<int> li_currentStateInp;
-  vector<int> li_transitionTimeInp;
-  vector<int> li_QinpState;
-  vector<int> li_IinpState;
+  std::vector<int> li_currentStateInp;
+  std::vector<int> li_transitionTimeInp;
+  std::vector<int> li_QinpState;
+  std::vector<int> li_IinpState;
 
   // Output state vars
-  vector<int> li_currentStateOut;
-  vector<int> li_transitionTimeOut;
-  vector<int> li_QloState;
-  vector<int> li_IloState;
-  vector<int> li_QhiState;
-  vector<int> li_IhiState;
+  std::vector<int> li_currentStateOut;
+  std::vector<int> li_transitionTimeOut;
+  std::vector<int> li_QloState;
+  std::vector<int> li_IloState;
+  std::vector<int> li_QhiState;
+  std::vector<int> li_IhiState;
 
-  vector<bool> inpL;
-  vector<double> iTime;
-  vector<bool> outL;
-  vector<double> oTime;
+  std::vector<bool> inpL;
+  std::vector<double> iTime;
+  std::vector<bool> outL;
+  std::vector<double> oTime;
 
   double breakTime;
 
@@ -212,14 +225,14 @@ private:
   int row_Lo;
   int row_Hi;
   int row_Ref;
-  vector< vector<int> > li_jac_Ref;
-  vector< vector<int> > li_jac_Lo;
-  vector< vector<int> > li_jac_Hi;
+  std::vector< std::vector<int> > li_jac_Ref;
+  std::vector< std::vector<int> > li_jac_Lo;
+  std::vector< std::vector<int> > li_jac_Hi;
 
-  vector< vector<int> > jacStamp;
+  std::vector< std::vector<int> > jacStamp;
 
   //Genie 110812. change state var
-  //vector<bool> changeState;
+  //std::vector<bool> changeState;
 };
 
 //-----------------------------------------------------------------------------
@@ -231,22 +244,17 @@ private:
 //-----------------------------------------------------------------------------
 class Model  : public DeviceModel
 {
-  typedef std::vector<Instance *> InstanceVector;
-
-  friend class ParametricData<Model>;
-  friend class Instance;
-  friend class Master;
+    typedef std::vector<Instance *> InstanceVector;
+    
+    friend class ParametricData<Model>;
+    friend class Instance;
+    friend class Traits;friend class Master;
 
 public:
-  static ParametricData<Model> &getParametricData();
-
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Model    (const ModelBlock & MB,
-            SolverState & ss1,
-            DeviceOptions & do1);
+  Model(
+    const Configuration &       configuration,
+    const ModelBlock &          MB,
+    const FactoryBlock &        factory_block);
   ~Model   ();
 
 private:
@@ -255,11 +263,17 @@ private:
   Model &operator=(const Model &);
 
 public:
-  bool processParams (string param = "");
-  bool processInstanceParams (string param = "");
+  bool processParams ();
+  bool processInstanceParams ();
+    virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
+
   virtual std::ostream &printOutInstances(std::ostream &os) const;
 
 public:
+    void addInstance(Instance *instance) {
+      instanceContainer.push_back(instance);
+    }
+
   InstanceVector &getInstanceVector() {
     return instanceContainer;
   }
@@ -269,7 +283,7 @@ public:
   }
 
 private:
-  vector<Instance*> instanceContainer;
+  std::vector<Instance*> instanceContainer;
 
 private:
 
@@ -306,25 +320,23 @@ private:
 // Creator       : Genie Hsieh, SNL, Parallel Computational Sciences
 // Creation Date : 10/23/12
 //-----------------------------------------------------------------------------
-class Master : public Xyce::Device::DeviceTemplate<Model, Instance>
+class Master : public DeviceMaster<Traits>
 {
-public:
-  Master (
-    const std::string &dn,
-    const std::string &cn,
-    const std::string &dmName,
-    vector< pair<string,double> > & parNames,
-    LinearDevice linearDev,
-    SolverState & ss1,
-    DeviceOptions & do1)
-    : Xyce::Device::DeviceTemplate<Model, Instance>(
-      dn, cn, dmName, linearDev, ss1, do1)
-  {
+    friend class Instance;
+    friend class Model;
 
-  }
+  public:
+    Master(
+    std::vector< std::pair<std::string,double> > & parNames,
+      const Configuration &       configuration,
+    const FactoryBlock &        factory_block,
+    const SolverState & ss1,
+    const DeviceOptions & do1)
+      : DeviceMaster<Traits>(configuration, factory_block, ss1, do1)
+  {}
 
   // Genie 110812. For now override nothing and use the template functions of the following
-  // from DeviceTemplate.h
+  // from DeviceMaster.h
   /*virtual bool updateState (double * solVec, double * staVec) ;
     virtual bool updateSecondaryState (double * staDeriv);
 
@@ -333,9 +345,9 @@ public:
     virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
   */
 
-  friend class Instance;
-  friend class Model;
 };
+
+void registerDevice();
 
 } // namespace Digital
 } // namespace Device

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,23 +31,23 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.7.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:31 $
+// Revision Number: $Revision: 1.13 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 #include <Xyce_config.h>
 
-// ---------- Standard Includes ----------
-
-// ----------   Xyce Includes   ----------
 #include <N_ANP_AnalysisManager.h>
 #include <N_ANP_Dakota.h>
 #include <N_ERH_ErrorMgr.h>
 
+namespace Xyce {
+namespace Analysis {
+
 #ifndef Xyce_Dakota
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Dakota::run()
+// Function      : Dakota::run()
 // Purpose       : provide stub function here for linking and
 //                 generate an error if they're called
 // Special Notes :
@@ -55,10 +55,10 @@
 // Creator       : Rich Schiek, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_ANP_Dakota::run()
+bool Dakota::run()
 {
-  string msg;
-  msg = "N_ANP_Dakota::run() - Dakota analysis requested in a non-Dakota enabled build of Xyce";
+  std::string msg;
+  msg = "Dakota::run() - Dakota analysis requested in a non-Dakota enabled build of Xyce";
   N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   return false;
 }
@@ -66,7 +66,7 @@ bool N_ANP_Dakota::run()
 #else
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Dakota::run()
+// Function      : Dakota::run()
 // Purpose       : This is the main controlling loop for Dakota analysis.
 //
 // Special Notes :
@@ -74,7 +74,7 @@ bool N_ANP_Dakota::run()
 // Creator       : Eric Keiter, SNL
 // Creation Date : 10/04/00
 //-----------------------------------------------------------------------------
-bool N_ANP_Dakota::run()
+bool Dakota::run()
 {
   bool integration_status = false;
   mainAnalysisRCPtr_->resetForStepAnalysis();
@@ -84,7 +84,5 @@ bool N_ANP_Dakota::run()
 
 #endif // Xyce_Dakota
 
-
-
-
-
+} // namespace Analysis
+} // namespace Xyce

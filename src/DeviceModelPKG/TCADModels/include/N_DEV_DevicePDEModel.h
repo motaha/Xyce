@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.9.2.2 $
+// Revision Number: $Revision: 1.15.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:35 $
+// Revision Date  : $Date: 2014/02/26 20:16:31 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -66,12 +66,11 @@ namespace Device {
 class DevicePDEModel: public DeviceModel
 {
 public:
-
   DevicePDEModel(
-    const ModelBlock & MB,
-    SolverState &      ss1,
-    DeviceOptions &    do1)
-    : DeviceModel (MB, ss1, do1),
+     const ModelBlock &          model_block,
+     ParametricData<void> &      parametric_data,
+     const FactoryBlock &        factory_block)
+    : DeviceModel(model_block, parametric_data, factory_block),
       dopeInfoMap(),
       regionMap(),
       nodeMap()
@@ -81,11 +80,12 @@ public:
 
 private:
   DevicePDEModel(const DevicePDEModel &);
+  DevicePDEModel &operator=(const DevicePDEModel &);
 
 public:
-  map<string, DopeInfo *> dopeInfoMap;
-  map<string, CompositeParam *> regionMap;
-  map<string, CompositeParam *> nodeMap;
+  std::map<std::string, DopeInfo *> dopeInfoMap;
+  std::map<std::string, CompositeParam *> regionMap;
+  std::map<std::string, CompositeParam *> nodeMap;
 };
 
 } // namespace Device

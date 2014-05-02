@@ -1,7 +1,7 @@
 //-------------------------------------------------------------------------
 // Copyright Notice
 //
-// Copyright (c) 2000, Sandia Corporation, Albuquerque, NM.
+// Copyright (c) 2000, 2013, Sandia Corporation, Albuquerque, NM.
 //-------------------------------------------------------------------------
 
 //-------------------------------------------------------------------------
@@ -18,11 +18,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.4 $
+// Revision Number: $Revision: 1.5 $
 //
-// Revision Date  : $Date: 2010/04/26 23:19:13 $
+// Revision Date  : $Date: 2013/09/18 20:27:38 $
 //
-// Current Owner  : $Author: erkeite $
+// Current Owner  : $Author: dgbaur $
 //-------------------------------------------------------------------------
 
 
@@ -32,8 +32,6 @@
 #include <string>
 
 #include "basecmp.h"
-
-using namespace std;
 
 //-----------------------------------------------------------------------------
 // Class         : ExtendedString
@@ -45,11 +43,11 @@ using namespace std;
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
-class ExtendedString : public string
+class ExtendedString : public std::string
 {
   public:
     ExtendedString        (const char *X) : string(X) {};
-    ExtendedString        (const string X) : string(X) {};
+    ExtendedString        (const std::string &X) : string(X) {};
     ExtendedString & toUpper();
     ExtendedString & toLower();
     ExtendedString & removeWhiteSpace();
@@ -66,7 +64,7 @@ class ExtendedString : public string
 //-----------------------------------------------------------------------------
 inline ExtendedString & ExtendedString::toUpper(void)
 {
-  for( string::size_type i = 0; i < length(); i++ )
+  for( std::string::size_type i = 0; i < length(); i++ )
     (*this)[i] = toupper( (*this)[i] );
 
   return (*this);
@@ -83,7 +81,7 @@ inline ExtendedString & ExtendedString::toUpper(void)
 //-----------------------------------------------------------------------------
 inline ExtendedString & ExtendedString::toLower(void)
 {
-  for( string::size_type i = 0; i < length(); i++ )
+  for( std::string::size_type i = 0; i < length(); i++ )
     (*this)[i] = tolower( (*this)[i] );
 
   return (*this);
@@ -99,20 +97,18 @@ inline ExtendedString & ExtendedString::toLower(void)
 //-----------------------------------------------------------------------------
 inline ExtendedString & ExtendedString::removeWhiteSpace(void)
 {
-  string::size_type N = string::npos - 1;
+  std::string::size_type N = std::string::npos - 1;
 
-  while (N != string::npos)
+  while (N != std::string::npos)
   {
     N = find(" ");
-    if (N != string::npos) erase (N, 1);
+    if (N != std::string::npos) erase (N, 1);
   }
 
   return (*this);
 }
 
-void readSpiceNamesFile (ifstream * inStream1, map <int, string> & chileMap1, map <string, int> & chileMap2);
-void readXyceNamesFile  (ifstream * inStream2, map <int, string> & XyceMap1, map <string, int> & XyceMap2);
-
-
+void readSpiceNamesFile (ifstream * inStream1, std::map<int, std::string> & chileMap1, std::map<std::string, int> & chileMap2);
+void readXyceNamesFile  (ifstream * inStream2, std::map<int, std::string> & XyceMap1, std::map<std::string, int> & XyceMap2);
 
 #endif

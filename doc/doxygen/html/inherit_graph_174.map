@@ -1,0 +1,8 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classXyce_1_1Device_1_1RateCalculator.html" title="Abstract interface class for &quot;rate calculator&quot; strategy pattern." alt="" coords="6,143,207,169"/>
+<area shape="rect" id="node2" href="$classXyce_1_1Device_1_1CaptureRateCalculator.html" title="Rate constant calculator for Electron or Hole capture reaction." alt="" coords="266,5,454,46"/>
+<area shape="rect" id="node3" href="$classXyce_1_1Device_1_1ComplexRateCalculator.html" title="Rate constant calculator for a irreversible two&#45;species complexing reaction." alt="" coords="263,70,457,111"/>
+<area shape="rect" id="node4" href="$classXyce_1_1Device_1_1DecomplexRateCalculator.html" title="Xyce::Device::DecomplexRate\lCalculator" alt="" coords="256,135,464,177"/>
+<area shape="rect" id="node5" href="$classXyce_1_1Device_1_1EmissionRateCalculator.html" title="Rate constant calculator for Electron or Hole emission reaction." alt="" coords="263,201,457,242"/>
+<area shape="rect" id="node6" href="$classXyce_1_1Device_1_1SimpleRateCalculator.html" title="Class for trivial, constant rate constant (independent of temperature)" alt="" coords="270,266,450,307"/>
+</map>

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,33 +36,33 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.13.6.2 $
+// Revision Number: $Revision: 1.18 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
 #include <iostream>
 
-// ----------   Xyce Includes   ----------
 #include <N_TOP_CktNode.h>
 #include <N_TOP_NodeBlock.h>
 
+namespace Xyce {
+namespace Topo {
+
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNode::N_TOP_CktNode
+// Function      : CktNode::CktNode
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-N_TOP_CktNode::N_TOP_CktNode( const N_TOP_NodeBlock & nb,
-				N_TOP_GraphNode * gN )
+CktNode::CktNode( const NodeBlock & nb,
+				GraphNode * gN )
 {
   id_ = nb.get_id();
   gID_ = nb.get_gID();
@@ -77,18 +77,18 @@ N_TOP_CktNode::N_TOP_CktNode( const N_TOP_NodeBlock & nb,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNode::extractNodeBlock
+// Function      : CktNode::extractNodeBlock
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 3/4/01
 //-----------------------------------------------------------------------------
-N_TOP_NodeBlock * N_TOP_CktNode::extractNodeBlock()
+NodeBlock * CktNode::extractNodeBlock()
 {
-  list<tagged_param> emptyList;
+  std::list<tagged_param> emptyList;
 
-  return new N_TOP_NodeBlock( id_, emptyList, emptyList, isOwned_,
+  return new NodeBlock( id_, emptyList, emptyList, isOwned_,
 	gID_, procNum_, solnVarGIDList_, 
   stateVarGIDList_ , storeVarGIDList_ );
 }
@@ -101,8 +101,10 @@ N_TOP_NodeBlock * N_TOP_CktNode::extractNodeBlock()
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-ostream& operator<< (ostream& os, const N_TOP_CktNode& cn)
+std::ostream& operator<< (std::ostream& os, const CktNode& cn)
 {
   return cn.put(os);
 }
 
+} // namespace Topo
+} // namespace Xyce

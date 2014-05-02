@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,24 +36,17 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.23.2.2 $
+// Revision Number: $Revision: 1.30 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:43 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
 #include <iostream>
-
-//#ifdef PPC
 #include <iterator>
-//#endif
-
-//------- Xyce Includes ----------
 
 #include <N_IO_RestartNode.h>
 
@@ -63,17 +56,18 @@
 
 #include <N_ERH_ErrorMgr.h>
 
-//------ Misc Includes --------
+namespace Xyce {
+namespace IO {
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_RestartNode::N_IO_RestartNode
+// Function      : RestartNode::RestartNode
 // Purpose       : Copy
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 8/22/01
 //-----------------------------------------------------------------------------
-N_IO_RestartNode::N_IO_RestartNode(const N_IO_RestartNode & right)
+RestartNode::RestartNode(const RestartNode & right)
 : ID(right.ID),
   type(right.type),
   solnVarData(right.solnVarData),
@@ -81,18 +75,18 @@ N_IO_RestartNode::N_IO_RestartNode(const N_IO_RestartNode & right)
   storeVarData(right.storeVarData),
   devState(0)
 {
-  if( right.devState ) devState = new N_DEV_DeviceState( *(right.devState) );
+  if( right.devState ) devState = new Device::DeviceState( *(right.devState) );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_RestartNode::operator=
+// Function      : RestartNode::operator=
 // Purpose       : Assign
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 8/22/01
 //-----------------------------------------------------------------------------
-N_IO_RestartNode & N_IO_RestartNode::operator=(const N_IO_RestartNode & right)
+RestartNode & RestartNode::operator=(const RestartNode & right)
 {
   ID = right.ID;
   type = right.type;
@@ -100,33 +94,33 @@ N_IO_RestartNode & N_IO_RestartNode::operator=(const N_IO_RestartNode & right)
   solnVarData = right.solnVarData;
   stateVarData = right.stateVarData;
   storeVarData = right.storeVarData;
-  if( right.devState ) devState = new N_DEV_DeviceState( *(right.devState) );
+  if( right.devState ) devState = new Device::DeviceState( *(right.devState) );
 
   return *this;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_RestartNode::~N_IO_RestartNode
+// Function      : RestartNode::~RestartNode
 // Purpose       : Destructor
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 8/22/01
 //-----------------------------------------------------------------------------
-N_IO_RestartNode::~N_IO_RestartNode()
+RestartNode::~RestartNode()
 {
   if( devState != 0 ) delete devState;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_RestartNode::packedByteCount
+// Function      : RestartNode::packedByteCount
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 8/22/01
 //-----------------------------------------------------------------------------
-int N_IO_RestartNode::packedByteCount() const
+int RestartNode::packedByteCount() const
 {
   int byteCount = ID.length() + 2*sizeof(int); // ID + length + type
 
@@ -153,14 +147,14 @@ int N_IO_RestartNode::packedByteCount() const
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_RestartNode::pack
+// Function      : RestartNode::pack
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Rob Hoekstra, SNL
 // Creation Date : 8/22/01
 //-----------------------------------------------------------------------------
-void N_IO_RestartNode::pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) const
+void RestartNode::pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) const
 {
   int size, size2;
   int predictedPos = pos+packedByteCount();
@@ -209,25 +203,25 @@ void N_IO_RestartNode::pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm)
   if( devState ) devState->pack( buf, bsize, pos, comm );
   if (pos != predictedPos)
   {
-    string msg("Predicted pos does not match actual pos in N_IO_RestartNode::pack");
+    std::string msg("Predicted pos does not match actual pos in RestartNode::pack");
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_RestartNode::unpack
+// Function      : RestartNode::unpack
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Rob Hoekstra, SNL
 // Creation Date : 8/22/01
 //-----------------------------------------------------------------------------
-void N_IO_RestartNode::unpack(char * buf, int bsize, int & pos,
+void RestartNode::unpack(char * buf, int bsize, int & pos,
   N_PDS_Comm * comm)
 {
   int size, size2;
   comm->unpack( buf, bsize, pos, &size, 1 );
-  ID = string( (buf+pos), size);
+  ID = std::string( (buf+pos), size);
   pos += size;
   comm->unpack( buf, bsize, pos, &type, 1 );
 
@@ -265,7 +259,7 @@ void N_IO_RestartNode::unpack(char * buf, int bsize, int & pos,
   comm->unpack( buf, bsize, pos, &flag, 1 );
   if( flag )
   {
-    devState = new N_DEV_DeviceState();
+    devState = new Device::DeviceState();
     devState->unpack( buf, bsize, pos, comm );
   }
 }
@@ -278,61 +272,61 @@ void N_IO_RestartNode::unpack(char * buf, int bsize, int & pos,
 // Creator       : Rob Hoekstra, SNL
 // Creation Date : 8/22/01
 //-----------------------------------------------------------------------------
-ostream & operator<<(ostream & os, const N_IO_RestartNode & rn)
+std::ostream & operator<<(std::ostream & os, const RestartNode & rn)
 {
-  os << "Restart Node: " << rn.ID << " ( type = " << rn.type << " )" << endl;
-  os << "--------------------------\n";
-  ostream_iterator<double> out( os, " " );
+  os << Xyce::subsection_divider << std::endl
+     << "Restart Node: " << rn.ID << " ( type = " << rn.type << " )" << std::endl;
+  std::ostream_iterator<double> out( os, " " );
   if( !rn.solnVarData.empty() )
   {
-    os << " SolnVarData: " << endl;
+    os << " SolnVarData: " << std::endl;
     for( unsigned int i = 0; i < rn.solnVarData.size(); ++i )
     {
       os << " " << i << " ";
       copy( rn.solnVarData[i].begin(), rn.solnVarData[i].end(), out );
-      os << endl;
+      os << std::endl;
     }
-    os << endl;
+    os << std::endl;
   }
   if( !rn.stateVarData.empty() )
   {
-    os << " StateVarData: " << endl;
+    os << " StateVarData: " << std::endl;
     for( unsigned int i = 0; i < rn.stateVarData.size(); ++i )
     {
       os << " " << i << " ";
       copy( rn.stateVarData[i].begin(), rn.stateVarData[i].end(), out );
-      os << endl;
+      os << std::endl;
     }
-    os << endl;
+    os << std::endl;
   }
 
   if( !rn.storeVarData.empty() )
   {
-    os << " StoreVarData: " << endl;
+    os << " StoreVarData: " << std::endl;
     for( unsigned int i = 0; i < rn.storeVarData.size(); ++i )
     {
       os << " " << i << " ";
       copy( rn.storeVarData[i].begin(), rn.storeVarData[i].end(), out );
-      os << endl;
+      os << std::endl;
     }
-    os << endl;
+    os << std::endl;
   }
 
-  if( rn.devState ) os << *(rn.devState) << endl;
+  if( rn.devState ) os << *(rn.devState) << std::endl;
 
-  os << "--------------------------\n";
+  os << Xyce::subsection_divider << std::endl;
   return os;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_RestartNode::dump
+// Function      : RestartNode::dump
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Rob Hoekstra, SNL
 // Creation Date : 7/23/03
 //-----------------------------------------------------------------------------
-void N_IO_RestartNode::dump( ostream & os )
+void RestartNode::dump( std::ostream & os )
 {
   os << ID << " ";
   os << type << " ";
@@ -381,14 +375,14 @@ void N_IO_RestartNode::dump( ostream & os )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_RestartNode::restore
+// Function      : RestartNode::restore
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Rob Hoekstra, SNL
 // Creation Date : 7/23/03
 //-----------------------------------------------------------------------------
-void N_IO_RestartNode::restore( istream & is )
+void RestartNode::restore( std::istream & is )
 {
   is >> ID;
   is >> type;
@@ -431,7 +425,10 @@ void N_IO_RestartNode::restore( istream & is )
   is >> flag;
   if( flag == 1 )
   {
-    devState = new N_DEV_DeviceState();
+    devState = new Device::DeviceState();
     devState->restore(is);
   }
 }
+
+} // namespace IO
+} // namespace Xyce

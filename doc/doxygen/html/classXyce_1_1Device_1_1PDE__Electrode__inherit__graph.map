@@ -1,0 +1,6 @@
+<map id="Xyce::Device::PDE_Electrode" name="Xyce::Device::PDE_Electrode">
+<area shape="rect" id="node4" href="$classXyce_1_1Device_1_1PDE__1DElectrode.html" title="Xyce::Device::PDE_1DElectrode" alt="" coords="5,229,227,256"/>
+<area shape="rect" id="node5" href="$classXyce_1_1Device_1_1PDE__2DElectrode.html" title="Xyce::Device::PDE_2DElectrode" alt="" coords="251,229,473,256"/>
+<area shape="rect" id="node2" href="$classXyce_1_1Device_1_1CompositeParam.html" title="CompositeParam is the base class for classes that wish to only manage the processing of parameter dat..." alt="" coords="131,80,347,107"/>
+<area shape="rect" id="node3" href="$classXyce_1_1Device_1_1ParameterBase.html" title="Base class for all parameters." alt="" coords="135,5,341,32"/>
+</map>

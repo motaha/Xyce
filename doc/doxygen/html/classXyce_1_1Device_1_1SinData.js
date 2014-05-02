@@ -1,0 +1,28 @@
+var classXyce_1_1Device_1_1SinData =
+[
+    [ "SinData", "classXyce_1_1Device_1_1SinData.html#aeca1ba3c0a3a8cbc7203f589e569e170", null ],
+    [ "SinData", "classXyce_1_1Device_1_1SinData.html#a327a25986e31b5b63a44bdadf785fe6a", null ],
+    [ "~SinData", "classXyce_1_1Device_1_1SinData.html#adddb0a5f73a3b5fbda407131e7eabbbb", null ],
+    [ "getMaxTimeStepSize", "classXyce_1_1Device_1_1SinData.html#ac5a24cac43c8da4145ad98195dd27e78", null ],
+    [ "getParams", "classXyce_1_1Device_1_1SinData.html#a56528a70334541e6920ad56d50b29746", null ],
+    [ "initializeSource", "classXyce_1_1Device_1_1SinData.html#aacd9b0181792fa92a3c3fcfa894b2a9d", null ],
+    [ "period", "classXyce_1_1Device_1_1SinData.html#aee780524adc1da39a265aef81767ed78", null ],
+    [ "setParams", "classXyce_1_1Device_1_1SinData.html#a965a7efbcf9f736cf8575be35fec2c56", null ],
+    [ "updateSource", "classXyce_1_1Device_1_1SinData.html#afa9c71c67cf31ab77c96d85a1015f935", null ],
+    [ "ISRCInstance", "classXyce_1_1Device_1_1SinData.html#aa885adaa7ef7b30493637a1d950c8040", null ],
+    [ "ISRCModel", "classXyce_1_1Device_1_1SinData.html#ae53290ea390535c58abc9246407edd04", null ],
+    [ "VsrcInstance", "classXyce_1_1Device_1_1SinData.html#a91c5193966cd0aca16555baa4a100d02", null ],
+    [ "VsrcModel", "classXyce_1_1Device_1_1SinData.html#ad172ffc610e6a73f18213977cde50f6b", null ],
+    [ "FREQ", "classXyce_1_1Device_1_1SinData.html#a281abdb4c5127b5c4277e214af243ff9", null ],
+    [ "FREQgiven", "classXyce_1_1Device_1_1SinData.html#a6f2a9acd2014a9f70213323f61befb6d", null ],
+    [ "PHASE", "classXyce_1_1Device_1_1SinData.html#a6d9e7a3673a45f09a8f9d502edd7703b", null ],
+    [ "PHASEgiven", "classXyce_1_1Device_1_1SinData.html#af4ffd3e3b83a538e039314efbcee3293", null ],
+    [ "TD", "classXyce_1_1Device_1_1SinData.html#a6ab6a34c60eddcf1d9fb8a6896ea36fd", null ],
+    [ "TDgiven", "classXyce_1_1Device_1_1SinData.html#aaee0db0b393e0a2bb395c81b8a2f813e", null ],
+    [ "THETA", "classXyce_1_1Device_1_1SinData.html#ae5c31e223730bb938ef89d29c7c9cd24", null ],
+    [ "THETAgiven", "classXyce_1_1Device_1_1SinData.html#a375129ee2e9cbb70eeb943e6ff28cef7", null ],
+    [ "V0", "classXyce_1_1Device_1_1SinData.html#a1c6fb6c34f19052dc6118bfc6729bdf7", null ],
+    [ "V0given", "classXyce_1_1Device_1_1SinData.html#a9baec25c32ae74740a1e647e0a7293ae", null ],
+    [ "VA", "classXyce_1_1Device_1_1SinData.html#aa6e3ee2e01a85243467c4b468adaa18a", null ],
+    [ "VAgiven", "classXyce_1_1Device_1_1SinData.html#a730d7f4944833a78716d6abc2073b93e", null ]
+];

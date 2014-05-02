@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,56 +31,60 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.5.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
-// Current Owner  : $Author: tvrusso $
+// Revision Number: $Revision: 1.13.2.1 $
+// Revision Date  : $Date: 2014/03/10 19:28:04 $
+// Current Owner  : $Author: rlschie $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
-
-// ----------   Xyce Includes   ----------
 #include <N_IO_MeasureFindWhen.h>
 #include <N_ERH_ErrorMgr.h>
 
+namespace Xyce {
+namespace IO {
+namespace Measure {
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureFindWhen::N_IO_MeasureFindWhen()
+// Function      : FindWhen::FindWhen()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-N_IO_MeasureFindWhen::N_IO_MeasureFindWhen( const N_UTL_OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr ):
-  N_IO_MeasureBase(measureBlock, outputMgr)
+FindWhen::FindWhen( const Util::OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr ):
+  Base(measureBlock, outputMgr),
+  initialized_(false),
+  lastIndepVarValue_(0.0),
+  lastDepVarValue_(0.0)
+
 {
   // indicate that this measure type is supported and should be processed in simulation
   typeSupported_ = true;
 
+}
+
+void FindWhen::prepareOutputVariables() 
+{
   // this measurement can involve up to three solution variables
-  numOutVars_ = depSolVarIterVector_.size();
-  outVarValues_.resize( numOutVars_ );
-  for( int i=0; i< numOutVars_; i++ )
-  {
-    outVarValues_[i] = 0.0;
-  }
+  numOutVars_ = outputVars_.size();
+  outVarValues_.resize( numOutVars_, 0.0 );
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureFindWhen::updateTran()
+// Function      : FindWhen::updateTran()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-void N_IO_MeasureFindWhen::updateTran( const double circuitTime, RCP< N_LAS_Vector > solnVecRCP)
+void FindWhen::updateTran( const double circuitTime, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec)
 {
+  
+
   if( !calculationDone_ && withinTransientWindow( circuitTime ) )
   {
     // we're in the transient window, now we need to calculate the value of this
@@ -88,45 +92,84 @@ void N_IO_MeasureFindWhen::updateTran( const double circuitTime, RCP< N_LAS_Vect
     double tempResult = 0.0;
 
     // update our outVarValues_ vector
-    for( int i=0; i< numOutVars_; i++ )
+    updateOutputVars( outVarValues_, circuitTime, solnVec, stateVec, storeVec, 0);
+    if( !initialized_ )
     {
-      outVarValues_[i] = getOutputValue(depSolVarIterVector_[i], solnVecRCP);
+      // assigned last dependent and independent var to current time and outVarValue_[0] 
+      // while we can't interpolate on this step, it ensurs that the initial history is
+      // something realistic
+      lastIndepVarValue_=circuitTime;
+      lastDepVarValue_=outVarValues_[0];
+      initialized_=true;
+    }  
+
+    double targVal=0.0;
+    bool doneIfFound=false;
+    if( outputValueTargetGiven_ )
+    {
+      // This is the form WHEN v(a)=fixed value
+      targVal = outputValueTarget_;
+      doneIfFound = true;
+    }
+    else
+    {
+      // This is the form WHEN v(a)= potentially changing value
+      targVal = outVarValues_[1];
+      // since we can't determine if the calculation is done at this piont
+        // we don't set calculationDone_ = true;
+      doneIfFound = false;
+    }
+    
+    // I think type_ is always "WHEN" here need to check 
+    if( (type_ == "WHEN") &&  withinRiseFallCrossWindow( outVarValues_[0], targVal ) )
+    {
+      // this is the simple case where Xyce output a value within tolerace 
+      // to the target value 
+      if( fabs(outVarValues_[0] - targVal) < minval_ )
+      {
+        calculationResult_ = circuitTime;
+        calculationDone_ = doneIfFound;
+      }
+      else
+      {
+        // check an see if last point and this point bound the target point 
+        double backDiff    = lastDepVarValue_ - targVal;
+        double forwardDiff = outVarValues_[0] - targVal;
+
+        // if we bound the target then either
+        //  (backDiff < 0) && (forwardDiff > 0)  
+        //   OR
+        //  (backDiff > 0) && (forwardDiff < 0) 
+        // or more simpley sgn( backDiff ) = - sgn( forwardDiff ) 
+        if( ((backDiff < 0.0) && (forwardDiff > 0.0)) || ((backDiff > 0.0) && (forwardDiff < 0.0)) )
+        {
+          // bound the solution so interpolate to find the target time (or frequency etc)
+          calculationResult_ = circuitTime - ( ((circuitTime - lastIndepVarValue_)/(outVarValues_[0]-lastDepVarValue_)) * (outVarValues_[0]-targVal) );
+          calculationDone_ = doneIfFound;
+        }
+      }
     }
 
-    if( withinRiseFallCrossWindow( outVarValues_[0] ) )
-    {
-      if( (type_ == "WHEN") && outputValueTargetGiven_ )
-      {
-        // This is the form WHEN v(a)=value
-        if( fabs(outVarValues_[0] - outputValueTarget_) < minval_ )
-        {
-          calculationResult_ = circuitTime;
-          calculationDone_ = true;
-        }
-      }
-      else if( (type_ == "WHEN") && (numOutVars_==2) )
-      {
-        // This is the form WHEN v(a)=value
-        if( fabs(outVarValues_[0] - outVarValues_[1]) < minval_ )
-        {
-          calculationResult_ = circuitTime;
-          calculationDone_ = true;
-        }
-      }
-    }
   }
+
+  // remember the last point in case we need to interpolate
+  // to the time when v(a)=x
+  lastIndepVarValue_=circuitTime;
+  lastDepVarValue_=outVarValues_[0]; 
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureFindWhen::updateDC()
+// Function      : FindWhen::updateDC()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-void N_IO_MeasureFindWhen::updateDC( const vector<N_ANP_SweepParam> & dcParamsVec, RCP< N_LAS_Vector > solnVecRCP)
-{
+void FindWhen::updateDC( const std::vector<N_ANP_SweepParam> & dcParamsVec, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec)
+{}
 
-}
+} // namespace Measure
+} // namespace IO
+} // namespace Xyce

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.79.2.2 $
+// Revision Number: $Revision: 1.97.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -47,22 +47,34 @@
 #define Xyce_N_DEV_Bsrc_h
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_DeviceTemplate.h>
+#include <N_DEV_Configuration.h>
+#include <N_DEV_DeviceMaster.h>
 #include <N_DEV_Source.h>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceInstance.h>
 #include <N_DEV_DeviceModel.h>
 #include <N_DEV_Param.h>
+#include <N_UTL_fwd.h>
 #include <N_UTL_BreakPoint.h>
-
-// ---------- Forward Declarations ----------
-class N_UTL_Expression;
 
 namespace Xyce {
 namespace Device {
 namespace Bsrc {
 
 class Model;
+class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance>
+{
+  static const char *name() {return "Expression Based Voltage or Current Source";}
+  static const char *deviceTypeName() {return "B level 1";}
+  static const int numNodes() {return 2;}
+  static const bool isLinearDevice() {return true;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : Instance
@@ -73,131 +85,126 @@ class Model;
 //-----------------------------------------------------------------------------
 class Instance : public DeviceInstance
 {
-    friend class ParametricData<Instance>;
-    friend class Model;
-    friend class Master;
+  friend class ParametricData<Instance>;
+  friend class Model;
+  friend class Traits;friend class Master;
 
-  public:
-    static ParametricData<Instance> &getParametricData();
+public:
 
-    virtual const ParametricData<void> &getMyParametricData() const {
-      return getParametricData();
-    }
+  Instance(
+     const Configuration &       configuration,
+     const InstanceBlock &     IB,
+     Model &                   BMiter,
+     const FactoryBlock &      factory_block);
 
-    Instance(InstanceBlock & IB,
-             Model & BMiter,
-             MatrixLoadData & mlData1,
-             SolverState &ss1,
-             ExternData  &ed1,
-             DeviceOptions & do1);
+  ~Instance();
 
-    ~Instance();
+private:
+  Instance(const Instance &);
+  Instance &operator=(const Instance &);
 
-  private:
-    Instance(const Instance &);
-    Instance &operator=(const Instance &);
+public:
+  void registerLIDs(const std::vector<int> & intLIDVecRef,
+                    const std::vector<int> & extLIDVecRef );
+  void registerStateLIDs(const std::vector<int> & staLIDVecRef);
+  void registerStoreLIDs(const std::vector<int> & stoLIDVecRef );
 
-  public:
-    void registerLIDs(const vector<int> & intLIDVecRef,
-                      const vector<int> & extLIDVecRef );
-    void registerStateLIDs(const vector<int> & staLIDVecRef);
-    void registerStoreLIDs(const vector<int> & stoLIDVecRef );
+  std::map<int,std::string> & getIntNameMap ();
+  std::map<int,std::string> & getStoreNameMap ();
 
-    map<int,string> & getIntNameMap ();
-    map<int,string> & getStoreNameMap ();
-
-    const vector<std::string> & getDepSolnVars();
+  const std::vector<std::string> & getDepSolnVars();
 
 
-    const vector< vector<int> > & jacobianStamp() const;
-    void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-    bool processParams (string param = "");
+  bool processParams ();
 
-    bool updateIntermediateVars ();
-    bool updatePrimaryState ();
-    bool updateSecondaryState ();
+  bool updateIntermediateVars ();
+  bool updatePrimaryState ();
+  bool updateSecondaryState ();
 
-    // load functions, residual:
-    bool loadDAEQVector () {return true;}
-    bool loadDAEFVector ();
+  // load functions, residual:
+  bool loadDAEQVector () {return true;}
+  bool loadDAEFVector ();
 
-    // load functions, Jacobian:
-    bool loadDAEdQdx () {return true;}
-    bool loadDAEdFdx ();
+  // load functions, Jacobian:
+  bool loadDAEdQdx () {return true;}
+  bool loadDAEdFdx ();
 
-    void setupPointers();
+  void setupPointers();
 
-    void varTypes( vector<char> & varTypeVec );
+  void varTypes( std::vector<char> & varTypeVec );
 
-  public:
-    // iterator reference to the bsrc model which owns this instance.
-    // Getters and setters
-    Model &getModel() {
-      return model_;
-    }
+public:
+  // iterator reference to the bsrc model which owns this instance.
+  // Getters and setters
+  Model &getModel() 
+  {
+    return model_;
+  }
 
-  private:
+private:
 
-    Model &       model_;         //< Owning model
+  Model &       model_;         //< Owning model
 
-    N_UTL_Expression * Exp_ptr;
+  Util::Expression * Exp_ptr;
 
-    int            expNumVars;
-    int            expBaseVar;
-    int            expNumDdt;
-    list<std::string>   evnList;
+  int            expNumVars;
+  int            expBaseVar;
+  int            expNumDdt;
+  std::list<std::string>   evnList;
 
-    vector<double> expVarDerivs;
-    vector<double> myVarVals;
-    vector<double> ddtVals;
-    double         expVal;
+  std::vector<double> expVarDerivs;
+  std::vector<double> myVarVals;
+  std::vector<double> ddtVals;
+  double         expVal;
 
-    InstanceBlock IB;
+  InstanceBlock IB;
 
-    // flag for voltage src, needs current variable
-    bool isVSRC;
+  // flag for voltage src, needs current variable
+  bool isVSRC;
 
-    // Value of voltage or current expression
-    double V;
-    double I;
+  // Value of voltage or current expression
+  double V;
+  double I;
 
-    // scale factor
-    double scale;
-    int nlstep;
+  // scale factor
+  double scale;
+  int nlstep;
 
-    // indices into state vector:
-    vector<int>    li_ddt;
+  // indices into state vector:
+  std::vector<int>    li_ddt;
 
-    // solution vector indices:
-    // rhs vector indices:
-    int li_Pos;
-    int li_Neg;
-    int li_Bra;
-    int li_store_branch;  // branch current stored in store vector
-    // if it is not part of the solution vector
+  // solution vector indices:
+  // rhs vector indices:
+  int li_Pos;
+  int li_Neg;
+  int li_Bra;
+  int li_store_branch;  // branch current stored in store vector
+  // if it is not part of the solution vector
 
-    // Local offset variables for all of the above index variables.
-    int ABraEquPosNodeOffset;
-    int ABraEquNegNodeOffset;
-    int APosEquBraVarOffset;
-    int ANegEquBraVarOffset;
+  // Local offset variables for all of the above index variables.
+  int ABraEquPosNodeOffset;
+  int ABraEquNegNodeOffset;
+  int APosEquBraVarOffset;
+  int ANegEquBraVarOffset;
 
-    vector<int> APosEquExpVarOffsets;
-    vector<int> ANegEquExpVarOffsets;
-    vector<int> ABraEquExpVarOffsets;
+  std::vector<int> APosEquExpVarOffsets;
+  std::vector<int> ANegEquExpVarOffsets;
+  std::vector<int> ABraEquExpVarOffsets;
 
-    // Local offset variables for all of the above index variables.
-    double * fBraEquPosNodePtr;
-    double * fBraEquNegNodePtr;
-    double * fPosEquBraVarPtr;
-    double * fNegEquBraVarPtr;
+  // Local offset variables for all of the above index variables.
+  double * fBraEquPosNodePtr;
+  double * fBraEquNegNodePtr;
+  double * fPosEquBraVarPtr;
+  double * fNegEquBraVarPtr;
 
-    vector<double *> fPosEquExpVarPtrs;
-    vector<double *> fNegEquExpVarPtrs;
-    vector<double *> fBraEquExpVarPtrs;
+  std::vector<double *> fPosEquExpVarPtrs;
+  std::vector<double *> fNegEquExpVarPtrs;
+  std::vector<double *> fBraEquExpVarPtrs;
 
-    vector< vector<int> > jacStamp;
+  std::vector< std::vector<int> > jacStamp;
 };
 
 //-----------------------------------------------------------------------------
@@ -209,80 +216,84 @@ class Instance : public DeviceInstance
 //-----------------------------------------------------------------------------
 class Model : public DeviceModel
 {
-    typedef std::vector<Instance *> InstanceVector;
+  typedef std::vector<Instance *> InstanceVector;
 
-    friend class ParametricData<Model>;
-    friend class Instance;
-    friend class Master;
+  friend class ParametricData<Model>;
+  friend class Instance;
+  friend class Traits;friend class Master;
 
-  public:
-    static ParametricData<Model> &getParametricData();
+public:
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &        MB,
+     const FactoryBlock &      factory_block);
+  ~Model ();
 
-    virtual const ParametricData<void> &getMyParametricData() const {
-      return getParametricData();
-    }
+private:
+  Model();
+  Model(const Model &);
+  Model &operator=(const Model &);
 
-    Model (const ModelBlock & MB,
-           SolverState & ss1,
-           DeviceOptions & do1);
-    ~Model ();
+public:
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
 
-  private:
-    Model();
-    Model(const Model &);
-    Model &operator=(const Model &);
+  virtual std::ostream &printOutInstances(std::ostream &os) const;
+  virtual bool processParams();
+  virtual bool processInstanceParams();
 
-  public:
-    virtual std::ostream &printOutInstances(std::ostream &os) const;
-    virtual bool processParams(std::string param = "");
-    virtual bool processInstanceParams(std::string param = "");
+public:
+  void addInstance(Instance *instance) 
+  {
+    instanceContainer.push_back(instance);
+  }
 
-  public:
-    InstanceVector &getInstanceVector() {
-      return instanceContainer;
-    }
+  InstanceVector &getInstanceVector() 
+  {
+    return instanceContainer;
+  }
 
-    const InstanceVector &getInstanceVector() const {
-      return instanceContainer;
-    }
+  const InstanceVector &getInstanceVector() const 
+  {
+    return instanceContainer;
+  }
 
-  private:
-    vector<Instance*> instanceContainer;
+private:
+  std::vector<Instance*> instanceContainer;
 
-  private:
+private:
 
 
-    // This is the dc and transient analysis value of the
-    // source.
-    double DC_TRAN;
+  // This is the dc and transient analysis value of the
+  // source.
+  double DC_TRAN;
 
-    // This is the AC magnitude
-    double ACMAG;
+  // This is the AC magnitude
+  double ACMAG;
 
-    // This is the AC phase.
-    double ACPHASE;
+  // This is the AC phase.
+  double ACPHASE;
 
-    // This parameter is part of the specification that the
-    // source has distortion inputs at a frequency of this
-    // magnitude.  It is triggered by the DISTOF1 keyword in
-    // the netlist.
-    double F1MAG;
+  // This parameter is part of the specification that the
+  // source has distortion inputs at a frequency of this
+  // magnitude.  It is triggered by the DISTOF1 keyword in
+  // the netlist.
+  double F1MAG;
 
-    // This parameter is part of the specification that the
-    // source has distortion inputs at a frequency of this
-    // magnitude.  It is triggered by the DISTOF2 keyword in
-    // the netlist.
-    double F2MAG;
+  // This parameter is part of the specification that the
+  // source has distortion inputs at a frequency of this
+  // magnitude.  It is triggered by the DISTOF2 keyword in
+  // the netlist.
+  double F2MAG;
 
-    // This parameter is associated with the specification that
-    // the source has a distortion input.  This is the phase
-    // associated with DISTOF1.
-    double F1PHASE;
+  // This parameter is associated with the specification that
+  // the source has a distortion input.  This is the phase
+  // associated with DISTOF1.
+  double F1PHASE;
 
-    // This parameter is associated with the specification that
-    // the source has a distortion input.  This is the phase
-    // associated with DISTOF2.
-    double F2PHASE;
+  // This parameter is associated with the specification that
+  // the source has a distortion input.  This is the phase
+  // associated with DISTOF2.
+  double F2PHASE;
 };
 
 //-----------------------------------------------------------------------------
@@ -292,34 +303,31 @@ class Model : public DeviceModel
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 11/26/08
 //-----------------------------------------------------------------------------
-class Master : public Xyce::Device::DeviceTemplate<Model, Instance>
+class Master : public DeviceMaster<Traits>
 {
-  public:
-    Master (
-      const std::string &dn,
-      const std::string &cn,
-      const std::string &dmName,
-      LinearDevice linearDev,
-      SolverState & ss1,
-      DeviceOptions & do1)
-      : Xyce::Device::DeviceTemplate<Model, Instance>(
-        dn, cn, dmName, linearDev, ss1, do1)
-    {
+  friend class Instance;
+  friend class Model;
 
-    }
+public:
+  Master(
+     const Configuration &       configuration,
+     const FactoryBlock &      factory_block,
+     const SolverState & ss1,
+     const DeviceOptions & do1)
+    : DeviceMaster<Traits>(configuration, factory_block, ss1, do1)
+  {}
 
-    virtual bool updateState (double * solVec, double * staVec, double * stoVec);
-    virtual bool updateSecondaryState (double * staDeriv, double * stoVec);
+  virtual bool updateState (double * solVec, double * staVec, double * stoVec);
+  virtual bool updateSecondaryState (double * staDeriv, double * stoVec);
 
-    // load functions, residual:
-    virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
+  // load functions, residual:
+  virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
 
-    // load functions, Jacobian:
-    virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
-
-    friend class Instance;
-    friend class Model;
+  // load functions, Jacobian:
+  virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
 };
+
+void registerDevice();
 
 } // namespace Bsrc
 } // namespace Device

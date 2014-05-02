@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -40,9 +40,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.12.6.2 $
+// Revision Number: $Revision: 1.16 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -140,7 +140,7 @@ N_LAS_MultiVector * N_LAS_LAFactory::newMultiVector( N_LAS_DataType type,
 //-----------------------------------------------------------------------------
 N_LAS_Matrix * N_LAS_LAFactory::newMatrix( N_LAS_DataType type,
                                            N_PDS_ParMap & map,
-					   vector<int> & diagArray)
+					   std::vector<int> & diagArray)
 {
   N_LAS_Matrix * tmp = new N_LAS_Matrix( map, diagArray );
 //  tmp->put( type );

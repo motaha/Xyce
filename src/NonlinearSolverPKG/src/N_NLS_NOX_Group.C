@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.27.2.2 $
+// Revision Number: $Revision: 1.32 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -156,7 +156,7 @@ Group::Group(const Group& source, NOX::CopyType type) :
     break;
 
   default:
-    const string message =  "ERROR: N_NLS::NOX::Group::Group() - Invalid ConstructorType for group copy constructor";
+    const std::string message =  "N_NLS::NOX::Group::Group() - Invalid ConstructorType for group copy constructor";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
   }
 }
@@ -656,7 +656,7 @@ const NOX::Abstract::Vector& Group::getF() const
 double Group::getNormF() const
 {
   if (!isF()) {
-    //cout << "ERROR: N_NLS_NOX::Group::getNormF() - F is not current "
+    //cout << "N_NLS_NOX::Group::getNormF() - F is not current "
     // << "with respect to the solution vector!" << endl;
     //throw "NOX Error";
     (const_cast<N_NLS_NOX::Group*>(this))->computeF();
@@ -741,10 +741,10 @@ void Group::resetIsValid_()
 //-----------------------------------------------------------------------------
 void Group::throwError(std::string method, std::string message) const
 {
-  const string leader = "ERROR: N_NLS::NOX::Group::";
-  const string fcn = "() - ";
+  const std::string leader = "N_NLS::NOX::Group::";
+  const std::string fcn = "() - ";
 
-  string error = leader + method + fcn + message;
+  std::string error = leader + method + fcn + message;
 
   N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, error);
 }

@@ -35,6 +35,7 @@ libNonlinearSolver_la_SOURCES = \
   $(srcdir)/src/N_NLS_NOX_AugmentLinSys_OPStart.C \
   $(srcdir)/src/N_NLS_NOX_AugmentLinSys_IC.C \
   $(srcdir)/src/N_NLS_NOX_AugmentLinSys_IC_Gmin.C \
+  $(srcdir)/src/N_NLS_ReturnCodes.C \
   $(srcdir)/include/N_NLS_ConstraintBT.h \
   $(srcdir)/include/N_NLS_DampedNewton.h \
   $(srcdir)/include/N_NLS_TwoLevelNewton.h \

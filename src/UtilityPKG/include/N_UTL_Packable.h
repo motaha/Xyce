@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.7.6.2 $
+// Revision Number: $Revision: 1.12 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,16 +46,9 @@
 #ifndef  _PACKABLE_H
 #define  _PACKABLE_H
 
-// ---------- Standard Includes ----------
-
-// ----------   Xyce Includes   ----------
-
 #include <N_UTL_Xyce.h>
 #include <N_UTL_Misc.h>
-
-// ----------   Fwd Declares    ----------
-
-class N_PDS_Comm;
+#include <N_PDS_fwd.h>
 
 //-----------------------------------------------------------------------------
 // Class         : Packable
@@ -66,9 +59,7 @@ class N_PDS_Comm;
 //-----------------------------------------------------------------------------
 class Packable
 {
-
 public:
-
   virtual Packable * instance() const = 0;
 
   // Counts bytes needed to pack block (abstract).

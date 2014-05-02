@@ -20,12 +20,15 @@ libIOInterface_la_SOURCES = \
   $(srcdir)/src/N_IO_DeviceBlock.C \
   $(srcdir)/src/N_IO_OptionBlock.C \
   $(srcdir)/src/N_IO_ParameterBlock.C \
+  $(srcdir)/src/N_IO_Report.C \
   $(srcdir)/src/N_IO_FunctionBlock.C \
   $(srcdir)/src/N_IO_RestartNode.C \
+  $(srcdir)/src/N_IO_Op.C \
   $(srcdir)/src/N_IO_mmio.C \
   $(srcdir)/src/N_IO_PkgOptionsMgr.C \
   $(srcdir)/src/N_IO_FourierMgr.C \
   $(srcdir)/include/N_IO_fwd.h \
+  $(srcdir)/include/N_IO_Op.h \
   $(srcdir)/include/N_IO_NetlistImportTool.h \
   $(srcdir)/include/N_IO_DistributionTool.h \
   $(srcdir)/include/N_IO_SpiceSeparatedFieldTool.h \
@@ -39,6 +42,7 @@ libIOInterface_la_SOURCES = \
   $(srcdir)/include/N_IO_CmdParse.h \
   $(srcdir)/include/N_IO_mmio.h \
   $(srcdir)/include/N_IO_OutputMgr.h \
+  $(srcdir)/include/N_IO_Report.h \
   $(srcdir)/include/N_IO_Outputter.h \
   $(srcdir)/include/N_IO_Objective.h \
   $(srcdir)/include/N_IO_RestartMgr.h \

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,221 +36,222 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.13.6.2 $
+// Revision Number: $Revision: 1.18 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
-// ----------   Xyce Includes   ----------
 #include <N_TOP_CktNodeCreator.h>
 #include <N_TOP_CktNode.h>
 #include <N_TOP_CktNode_V.h>
 #include <N_TOP_CktNode_Ckt.h>
 #include <N_TOP_CktNode_Dev.h>
 
+namespace Xyce {
+namespace Topo {
+
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNodeCreator::N_TOP_CktNodeCreator
+// Function      : CktNodeCreator::CktNodeCreator
 // Purpose       :
 // Special Notes :
 // Scope         : private
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-N_TOP_CktNodeCreator::N_TOP_CktNodeCreator(const N_TOP_CktNodeCreator &right)
+CktNodeCreator::CktNodeCreator(const CktNodeCreator &right)
 {
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNodeCreator::instance
+// Function      : CktNodeCreator::instance
 // Purpose       :
 // Special Notes : singleton
 // Scope         : private
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/27/01
 //-----------------------------------------------------------------------------
-N_TOP_CktNodeCreator * N_TOP_CktNodeCreator::instance()
+CktNodeCreator * CktNodeCreator::instance()
 {
-  N_TOP_CktNodeCreator * cPtr = new N_TOP_CktNodeCreator ();
+  CktNodeCreator * cPtr = new CktNodeCreator ();
   return cPtr;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNodeCreator::operator=
+// Function      : CktNodeCreator::operator=
 // Purpose       :
 // Special Notes :
 // Scope         : private
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-N_TOP_CktNodeCreator & N_TOP_CktNodeCreator::operator=(const N_TOP_CktNodeCreator &right)
+CktNodeCreator & CktNodeCreator::operator=(const CktNodeCreator &right)
 {
   return (*this);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNodeCreator::operator==
+// Function      : CktNodeCreator::operator==
 // Purpose       :
 // Special Notes :
 // Scope         : private
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-bool N_TOP_CktNodeCreator::operator==(const N_TOP_CktNodeCreator &right) const
+bool CktNodeCreator::operator==(const CktNodeCreator &right) const
 {
   return false;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNodeCreator::operator!=
+// Function      : CktNodeCreator::operator!=
 // Purpose       :
 // Special Notes :
 // Scope         : private
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-bool N_TOP_CktNodeCreator::operator!=(const N_TOP_CktNodeCreator &right) const
+bool CktNodeCreator::operator!=(const CktNodeCreator &right) const
 {
   return false;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNodeCreator::CreateVoltageNode
+// Function      : CktNodeCreator::CreateVoltageNode
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-N_TOP_CktNode* N_TOP_CktNodeCreator::CreateVoltageNode( const
-		string & ID ) const
+CktNode* CktNodeCreator::CreateVoltageNode( const
+		std::string & ID ) const
 {
-  return new N_TOP_CktNode_V(ID);
+  return new CktNode_V(ID);
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNodeCreator::CreateVoltageNode
+// Function      : CktNodeCreator::CreateVoltageNode
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-N_TOP_CktNode* N_TOP_CktNodeCreator::CreateVoltageNode( const
+CktNode* CktNodeCreator::CreateVoltageNode( const
 		tagged_param & tpID ) const
 {
-  return new N_TOP_CktNode_V(tpID.tag,static_cast<const int>(tpID.param));
+  return new CktNode_V(tpID.tag,static_cast<const int>(tpID.param));
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNodeCreator::CreateVoltageNode
+// Function      : CktNodeCreator::CreateVoltageNode
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-N_TOP_CktNode* N_TOP_CktNodeCreator::CreateVoltageNode( const
-		N_TOP_NodeBlock & nb ) const
+CktNode* CktNodeCreator::CreateVoltageNode( const
+		NodeBlock & nb ) const
 {
-  return new N_TOP_CktNode_V( nb );
+  return new CktNode_V( nb );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNodeCreator::CreateDeviceNode
+// Function      : CktNodeCreator::CreateDeviceNode
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-N_TOP_CktNode* N_TOP_CktNodeCreator::CreateDeviceNode( const
-		string & ID, N_DEV_DeviceInstance *
+CktNode* CktNodeCreator::CreateDeviceNode( const
+		std::string & ID, Device::DeviceInstance *
 		instancePtr ) const
 {
-  return new N_TOP_CktNode_Dev(instancePtr, ID);
+  return new CktNode_Dev(instancePtr, ID);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNodeCreator::CreateDeviceNode
+// Function      : CktNodeCreator::CreateDeviceNode
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-N_TOP_CktNode* N_TOP_CktNodeCreator::CreateDeviceNode( const
-		string & ID, N_DEV_DeviceInstance *
-		instancePtr, int gID, list<int> varGIDList ) const
+CktNode* CktNodeCreator::CreateDeviceNode( const
+		std::string & ID, Device::DeviceInstance *
+		instancePtr, int gID, std::list<int> varGIDList ) const
 {
-  return new N_TOP_CktNode_Dev(instancePtr, ID, gID, varGIDList);
+  return new CktNode_Dev(instancePtr, ID, gID, varGIDList);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNodeCreator::CreateDeviceNode
+// Function      : CktNodeCreator::CreateDeviceNode
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-N_TOP_CktNode* N_TOP_CktNodeCreator::CreateDeviceNode( const
-		N_TOP_NodeBlock & nb, N_DEV_DeviceInstance *
+CktNode* CktNodeCreator::CreateDeviceNode( const
+		NodeBlock & nb, Device::DeviceInstance *
 		instancePtr ) const
 {
-  return new N_TOP_CktNode_Dev(instancePtr, nb);
+  return new CktNode_Dev(instancePtr, nb);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNodeCreator::CreateDeviceNode
+// Function      : CktNodeCreator::CreateDeviceNode
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 9/02/03
 //-----------------------------------------------------------------------------
-N_TOP_CktNode* N_TOP_CktNodeCreator::CreateDeviceNode(
-	       	const N_TOP_NodeBlock & nb,
-		      const Teuchos::RCP<N_DEV_InstanceBlock> ibPtr,
-		      N_DEV_DeviceInterface & devIF ) const
+CktNode* CktNodeCreator::CreateDeviceNode(
+	       	const NodeBlock & nb,
+		      const Teuchos::RCP<Device::InstanceBlock> ibPtr,
+		      Device::DeviceInterface & devIF ) const
 {
-  return new N_TOP_CktNode_Dev( nb, ibPtr, devIF );
+  return new CktNode_Dev( nb, ibPtr, devIF );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNodeCreator::CreateSubCktNode
+// Function      : CktNodeCreator::CreateSubCktNode
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-N_TOP_CktNode* N_TOP_CktNodeCreator::CreateSubCktNode( const
-		string & ID, N_TOP_CktGraph*
+CktNode* CktNodeCreator::CreateSubCktNode( const
+		std::string & ID, CktGraph*
 		grphPtr ) const
 {
-  return new N_TOP_CktNode_Ckt(grphPtr, ID);
+  return new CktNode_Ckt(grphPtr, ID);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNodeCreator::CreateSubCktNode
+// Function      : CktNodeCreator::CreateSubCktNode
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-N_TOP_CktNode* N_TOP_CktNodeCreator::CreateSubCktNode( const
-		N_TOP_NodeBlock & nb, N_TOP_CktGraph*
+CktNode* CktNodeCreator::CreateSubCktNode( const
+		NodeBlock & nb, CktGraph*
 		grphPtr ) const
 {
-  return new N_TOP_CktNode_Ckt(grphPtr, nb);
+  return new CktNode_Ckt(grphPtr, nb);
 }
 
+} // namespace Topo
+} // namespace Xyce

@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.16.2.1 $
+// Revision Number: $Revision: 1.30.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:33 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -47,10 +47,13 @@
 #define Xyce_N_DEV_Synapse3_h
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_DeviceTemplate.h>
+#include <N_DEV_Configuration.h>
+#include <N_DEV_DeviceMaster.h>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceInstance.h>
 #include <N_DEV_DeviceModel.h>
+
+#include <N_DEV_Synapse.h>
 
 #include <Sacado.hpp>
 
@@ -58,9 +61,20 @@ namespace Xyce {
 namespace Device {
 namespace Synapse3 {
 
-// ---------- Forward Declarations -------
 class Model;
 class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance, Synapse::Traits>
+{
+  static const char *name() {return "Synapse, Clopath";}
+  static const char *deviceTypeName() {return "YSYNAPSE level 3";}
+  static const int numNodes() {return 2;}
+  static const bool isLinearDevice() {return true;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : 3
@@ -89,21 +103,16 @@ class Instance : public DeviceInstance
 {
   friend class ParametricData<Instance>;
   friend class Model;
+  friend class Traits;
 
 public:
-  static vector< vector<int> > jacStamp;
-  static ParametricData<Instance> &getParametricData();
+  static std::vector< std::vector<int> > jacStamp;
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Instance(InstanceBlock & IB,
-           Model & Riter,
-           MatrixLoadData & mlData1,
-           SolverState &ss1,
-           ExternData  &ed1,
-           DeviceOptions & do1);
+  Instance(
+     const Configuration &       configuration,
+     const InstanceBlock &       IB,
+     Model &                     Riter,
+     const FactoryBlock &        factory_block);
 
   ~Instance();
 
@@ -112,13 +121,13 @@ private:
   Instance &operator=(const Instance &);
 
 public:
-  void registerLIDs( const vector<int> & intLIDVecRef,
-                     const vector<int> & extLIDVecRef );
-  void registerStoreLIDs( const vector<int> & storeLIDVecRef );
-  map<int,string> & getStoreNameMap ();
-  map<int,string> & getIntNameMap ();
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
+  void registerStoreLIDs( const std::vector<int> & storeLIDVecRef );
+  std::map<int,std::string> & getStoreNameMap ();
+  std::map<int,std::string> & getIntNameMap ();
 
-  bool processParams (string param = "");
+  bool processParams ();
 
   bool updateTemperature(const double & temp_tmp);
 
@@ -126,8 +135,8 @@ public:
   bool updatePrimaryState ();
   bool updateSecondaryState ();
 
-  const vector< vector<int> > & jacobianStamp() const;
-  void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
   // load functions, residual:
   bool loadDAEQVector ();
@@ -144,7 +153,8 @@ public:
 
   void setupPointers();
 
-  Model &getModel() {
+  Model &getModel() 
+  {
     return model_;
   }
 
@@ -221,17 +231,13 @@ class Model : public DeviceModel
 
   friend class ParametricData<Model>;
   friend class Instance;
+  friend class Traits;
 
 public:
-  static ParametricData<Model> &getParametricData();
-
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Model(const ModelBlock & MB,
-        SolverState & ss1,
-        DeviceOptions & do1);
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &          MB,
+     const FactoryBlock &        factory_block);
   ~Model();
 
 private:
@@ -240,23 +246,32 @@ private:
   Model &operator=(const Model &);
 
 public:
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
+
   virtual std::ostream &printOutInstances(std::ostream &os) const;
 
-  bool processParams (string param = "");
-  bool processInstanceParams (string param = "");
+  bool processParams ();
+  bool processInstanceParams ();
 
 
 public:
-  InstanceVector &getInstanceVector() {
+  void addInstance(Instance *instance) 
+  {
+    instanceContainer.push_back(instance);
+  }
+
+  InstanceVector &getInstanceVector() 
+  {
     return instanceContainer;
   }
 
-  const InstanceVector &getInstanceVector() const {
+  const InstanceVector &getInstanceVector() const 
+  {
     return instanceContainer;
   }
 
 private:
-  vector<Instance*> instanceContainer;
+  std::vector<Instance*> instanceContainer;
 
 private:
 
@@ -285,12 +300,13 @@ private:
   double factor;	// used to ensure peak conductance = 1S for weight (gMax) = 1
 };
 
+void registerDevice();
+
 } // namespace Synapse3
 } // namespace Device
 } // namespace Xyce
 
 typedef Xyce::Device::Synapse3::Instance N_DEV_SynapseInstance3;
 typedef Xyce::Device::Synapse3::Model N_DEV_SynapseModel3;
-
 
 #endif

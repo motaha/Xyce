@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.46.2.2 $
+// Revision Number: $Revision: 1.58 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -63,6 +63,7 @@
 
 #include <N_LAS_TransformTool.h>
 
+#include <N_UTL_fwd.h>
 #include <N_UTL_Timer.h>
 #include <N_UTL_OptionBlock.h>
 
@@ -81,7 +82,7 @@
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/04
 //-----------------------------------------------------------------------------
-N_LAS_AmesosSolver::N_LAS_AmesosSolver( const string & type,
+N_LAS_AmesosSolver::N_LAS_AmesosSolver( const std::string& type,
                                         N_LAS_Problem & prob,
                                         N_UTL_OptionBlock & options )
  : N_LAS_Solver(false),
@@ -90,6 +91,7 @@ N_LAS_AmesosSolver::N_LAS_AmesosSolver( const string & type,
    problem_(prob.epetraObj()),
    solver_(0),
    repivot_(true),
+   reindex_(false),
    outputLS_(0),
    outputBaseLS_(0),
    outputFailedLS_(0),
@@ -132,18 +134,20 @@ N_LAS_AmesosSolver::~N_LAS_AmesosSolver()
 //-----------------------------------------------------------------------------
 bool N_LAS_AmesosSolver::setOptions( const N_UTL_OptionBlock & OB )
 {
-  for( list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
+  for( std::list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
          it_tpL != OB.getParams().end(); ++it_tpL )
   {
-    string tag = it_tpL->uTag();
+    std::string tag = it_tpL->uTag();
 
-    if( tag == "KLU_REPIVOT" ) repivot_ = static_cast<bool>(it_tpL->iVal());
+    if( tag == "KLU_REPIVOT" ) repivot_ = static_cast<bool>(it_tpL->getImmutableValue<int>());
+    
+    if( tag == "KLU_REINDEX" ) reindex_ = static_cast<bool>(it_tpL->getImmutableValue<int>());
 
-    if( tag == "OUTPUT_LS" ) outputLS_ = it_tpL->iVal();
+    if( tag == "OUTPUT_LS" ) outputLS_ = it_tpL->getImmutableValue<int>();
 
-    if( tag == "OUTPUT_BASE_LS" ) outputBaseLS_ = it_tpL->iVal();
+    if( tag == "OUTPUT_BASE_LS" ) outputBaseLS_ = it_tpL->getImmutableValue<int>();
 
-    if( tag == "OUTPUT_FAILED_LS" ) outputFailedLS_ = it_tpL->iVal();
+    if( tag == "OUTPUT_FAILED_LS" ) outputFailedLS_ = it_tpL->getImmutableValue<int>();
   }
 
   if( options_ ) delete options_;
@@ -185,7 +189,7 @@ bool N_LAS_AmesosSolver::setDefaultOptions()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/04
 //-----------------------------------------------------------------------------
-bool N_LAS_AmesosSolver::setDefaultOption( const string & option )
+bool N_LAS_AmesosSolver::setDefaultOption( const std::string & option )
 {
   return true;
 }
@@ -297,7 +301,7 @@ int N_LAS_AmesosSolver::solve( bool ReuseFactors )
     // the Query() function expects a string
     // in lower case with the first letter in upper case
     // So, our "KLU" must become "Klu"
-    string solverType( type_ );
+    std::string solverType( type_ );
     if( type_ == "KLU" )
     {
         solverType = "Amesos_Klu";
@@ -363,12 +367,15 @@ int N_LAS_AmesosSolver::solve( bool ReuseFactors )
     }
 #endif
 
+    // Let Amesos reindex the linear problem.
+    // NOTE:  This is used by MPDE and HB since the map indices are not continguous.
+    if (reindex_) {
+      params.set( "Reindex", reindex_ );
+    }
+
 #ifdef Xyce_VERBOSE_LINEAR
-    std::string msg1 = "N_LAS_AmesosSolver::solve() setting solver : " + type_;
-    std::string msg2 = "N_LAS_AmesosSolver::solve() setting parameters : ";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg1);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg2);
-    N_ERH_ErrorMgr::Output(true) << params << endl;
+    Xyce::lout() << "N_LAS_AmesosSolver::solve() setting solver : " << type_ << "\n"
+                 << "N_LAS_AmesosSolver::solve() setting parameters : " << params << std::endl;
 #endif
 
     solver_->SetParameters( params );
@@ -383,9 +390,8 @@ int N_LAS_AmesosSolver::solve( bool ReuseFactors )
 
 #ifdef Xyce_VERBOSE_LINEAR
     double endSymTime = timer_->elapsedTime();
-    std::string msg3 = "  Amesos (" + type_ + ") Symbolic Factorization Time: "
-      + Teuchos::Utils::toString(endSymTime-begSymTime);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg3);
+    Xyce::lout() << "  Amesos (" << type_ << ") Symbolic Factorization Time: "
+                 << (endSymTime - begSymTime) << std::endl;
 #endif
   }
 
@@ -399,9 +405,8 @@ int N_LAS_AmesosSolver::solve( bool ReuseFactors )
     linearStatus = solver_->NumericFactorization();
 #ifdef Xyce_VERBOSE_LINEAR
     double endNumTime = timer_->elapsedTime();
-    std::string msg4 = "  Amesos (" + type_ + ") Numeric Factorization Time: "
-      + Teuchos::Utils::toString(endNumTime-begNumTime);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg4);
+    Xyce::lout() << "  Amesos (" << type_ << ") Numeric Factorization Time: "
+                 << (endNumTime - begNumTime) << std::endl;
 #endif
     if (linearStatus != 0) {
 
@@ -440,9 +445,8 @@ int N_LAS_AmesosSolver::solve( bool ReuseFactors )
 
 #ifdef Xyce_VERBOSE_LINEAR
     double endSolveTime = timer_->elapsedTime();
-    std::string msg5 = "  Amesos (" + type_ + ") Solve Time: "
-      + Teuchos::Utils::toString(endSolveTime-begSolveTime);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg5);
+    Xyce::lout() << "  Amesos (" << type_ << ") Solve Time: "
+                 << (endSolveTime - begSolveTime) << std::endl;
 #endif
 
 #ifdef Xyce_DEBUG_LINEAR
@@ -452,9 +456,8 @@ int N_LAS_AmesosSolver::solve( bool ReuseFactors )
     res.Update( 1.0, *(prob->GetRHS()), -1.0 );
     res.Norm2( &resNorm );
     prob->GetRHS()->Norm2( &bNorm );
-    std::string msg6 = "Linear System Residual (AMESOS_" + type_ + "): "
-      + Teuchos::Utils::toString(resNorm/bNorm);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg6);
+    Xyce::lout() << "Linear System Residual (AMESOS_" << type_ << "): "
+                 << (resNorm/bNorm) << std::endl;
 #endif
 
   if( transform_.get() ) transform_->rvs();
@@ -481,9 +484,8 @@ int N_LAS_AmesosSolver::solve( bool ReuseFactors )
   solutionTime_ = timer_->elapsedTime();
 
 #ifdef Xyce_VERBOSE_LINEAR
-  std::string msg7 = "Total Linear Solution Time (Amesos " + type_ + "): "
-    + Teuchos::Utils::toString(solutionTime_);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg7);
+  Xyce::lout() << "Total Linear Solution Time (Amesos " << type_ << "): "
+               << solutionTime_ << std::endl;
 #endif
 
   return 0;

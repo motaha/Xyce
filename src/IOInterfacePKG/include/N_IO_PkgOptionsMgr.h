@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.8.6.2 $
+// Revision Number: $Revision: 1.14.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Date  : $Date: 2014/02/26 20:42:38 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -64,57 +64,57 @@ using Teuchos::rcp;
 
 #include <N_ERH_ErrorMgr.h>
 
-// ---------- Forward Declarations ----------
-
+namespace Xyce {
+namespace IO {
 
 //-----------------------------------------------------------------------------
-// Class         : N_IO_PkgOptionsReg
+// Class         : PkgOptionsReg
 // Purpose       : Abstract IF for pkg option registration
 // Special Notes :
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 1/28/03
 //-----------------------------------------------------------------------------
-struct N_IO_PkgOptionsReg
+struct PkgOptionsReg
 {
-  virtual ~N_IO_PkgOptionsReg() {}
+  virtual ~PkgOptionsReg() {}
 
-  virtual bool operator()( const N_UTL_OptionBlock & options ) = 0;
+  virtual bool operator()( const Util::OptionBlock & options ) = 0;
 };
 
 //-----------------------------------------------------------------------------
-// Class         : N_IO_PkgOptionsMgr
+// Class         : PkgOptionsMgr
 // Purpose       :
 // Special Notes :
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 1/28/03
 //-----------------------------------------------------------------------------
-class N_IO_PkgOptionsMgr
+class PkgOptionsMgr
 {
 
- public:
-  N_IO_PkgOptionsMgr();
-  ~N_IO_PkgOptionsMgr();
+public:
+  PkgOptionsMgr();
+  ~PkgOptionsMgr();
 
   // registration functions:
-  bool submitRegistration ( const string & regName, 
-                            const string & circName, 
-                            N_IO_PkgOptionsReg * reg );
+  bool submitRegistration ( const std::string & regName, 
+                            const std::string & circName, 
+                            PkgOptionsReg * reg );
 
-  bool submitOptions( const N_UTL_OptionBlock & options, const string & circName );
+  bool submitOptions( const Util::OptionBlock & options, const std::string & circName );
   
- private:
+private:
 
-  typedef pair<const string,N_IO_PkgOptionsReg*> RegistrationsValueType ;
-  typedef pair<const string,N_UTL_OptionBlock> OptionsValueType;
+  typedef std::pair<const std::string,PkgOptionsReg*> RegistrationsValueType ;
+  typedef std::pair<const std::string,Util::OptionBlock> OptionsValueType;
 
-  typedef multimap<string,N_IO_PkgOptionsReg*> RegistrationsMap;
-  typedef multimap<string,N_UTL_OptionBlock> OptionsMap;
+  typedef std::multimap<std::string,PkgOptionsReg*> RegistrationsMap;
+  typedef std::multimap<std::string,Util::OptionBlock> OptionsMap;
 
   typedef RegistrationsMap::iterator RegistrationsIterator;
   typedef OptionsMap::iterator OptionsIterator;
 
-  typedef map <string, RegistrationsMap > circRegsMap;
-  typedef map <string, OptionsMap> circOptsMap;
+  typedef std::map<std::string, RegistrationsMap > circRegsMap;
+  typedef std::map<std::string, OptionsMap> circOptsMap;
   typedef circRegsMap::iterator circRegsIterator;
   typedef circOptsMap::iterator circOptsIterator;
 
@@ -122,6 +122,12 @@ class N_IO_PkgOptionsMgr
   circOptsMap circSpecificOpts_;
 
 };
+
+} // namespace IO
+} // namespace Xyce
+
+typedef Xyce::IO::PkgOptionsMgr N_IO_PkgOptionsMgr;
+typedef Xyce::IO::PkgOptionsReg N_IO_PkgOptionsReg;
 
 #endif
 

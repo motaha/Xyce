@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.20.2.2 $
+// Revision Number: $Revision: 1.26.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -75,10 +75,10 @@ class NumericalJacobian
 {
 public:
   NumericalJacobian (
-    MatrixLoadData & mlData1,
-    SolverState &ss1,
-    ExternData  &ed1,
-    DeviceOptions & do1);
+     MatrixLoadData & mlData1,
+     const SolverState &ss1,
+     const ExternData  &ed1,
+     const DeviceOptions & do1);
 
   NumericalJacobian (const NumericalJacobian & right);
 
@@ -90,9 +90,10 @@ public:
   void loadLocalDAEVectors  (DeviceInstance & instance);
 
   void printJacobian_
-  (DeviceInstance & instance,
-   const std::vector<std::string> & nameVec,
-   bool failed);
+  (  std::ostream &                        os,
+     DeviceInstance & instance,
+     const std::vector<std::string> & nameVec,
+     bool failed);
 
   void testDebugHead
   ( DeviceInstance & instance,
@@ -112,19 +113,19 @@ public:
 public:
   MatrixLoadData & mlData;
 
-  vector<int>     & cols;
-  vector<double>  & vals;
-  vector<double>  & Qvals;
+  std::vector<int>     & cols;
+  std::vector<double>  & vals;
+  std::vector<double>  & Qvals;
 
-  vector<valData> & val_local;
-  vector<valData> & Qval_local;
-  vector<colData> & col_local;
-  vector<int>     & row_local;
-  vector<int>     & internalFlag;
+  std::vector<valData> & val_local;
+  std::vector<valData> & Qval_local;
+  std::vector<colData> & col_local;
+  std::vector<int>     & row_local;
+  std::vector<int>     & internalFlag;
 
-  DeviceOptions & devOptions;
-  SolverState   & solState;
-  ExternData    & extData;
+  const DeviceOptions & devOptions;
+  const SolverState   & solState;
+  const ExternData    & extData;
 
   int maxCols;
 };

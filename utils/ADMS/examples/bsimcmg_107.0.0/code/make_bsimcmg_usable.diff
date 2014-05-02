@@ -1,0 +1,35 @@
+--- N_DEV_ADMSbsimcmg.C	2013-10-30 14:03:00.465470807 -0600
++++ ../../../../../src/DeviceModelPKG/ADMS/src/N_DEV_ADMSbsimcmg.C	2013-10-30 13:59:04.252220076 -0600
+@@ -1525,6 +1525,7 @@
+   if (!given("XYCEADMSINSTTEMP"))
+     admsInstTemp=getDeviceOptions().temp.getImmutableValue<double>();
+ 
++
+   //calculate any parameters specified as expressions
+   updateDependentParameters();
+ 
+@@ -2739,6 +2740,11 @@
+     {
+       devsign = (-1);
+     }
++
++    // Manually added code:
++    if (model_.getType() == "pmos" || model_.getType() == "PMOS")
++      devsign = -1;
++
+     epssub = ((model_.EPSRSUB)*8.8542e-12);
+     epssp = ((model_.EPSRSP)*8.8542e-12);
+     cox = ((3.9*8.8542e-12)/(model_.EOT));
+@@ -9786,6 +9792,12 @@
+   if (!given("XYCEADMSMODTEMP"))
+     admsModTemp=getDeviceOptions().temp.getImmutableValue<double>();
+ 
++  // Fix the TNOM parameter that has "helpfully" been converted to Kelvin
++  // by the DeviceEntity class
++
++  if (given("TNOM"))
++    TNOM -= CONSTCtoK;
++
+   // Calculate any parameters specified as expressions:
+ 
+   updateDependentParameters();

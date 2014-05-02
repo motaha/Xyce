@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.76.2.2 $
+// Revision Number: $Revision: 1.84 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:26 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -173,13 +173,13 @@ class N_TIA_DataStore
     
     // this is a simple vector indicating var types.  Now
     // we just handle V and I differently, but we could do more with this
-    vector<char> varTypeVec;
+    std::vector<char> varTypeVec;
     
     // To remove conditionals from setErrorWtVector() we'll create
     // lists of indexes of unknows that are handled in different ways
-    vector<int> indexVVars;
-    vector<int> indexIVars;
-    vector<int> indexMaskedVars;
+    std::vector<int> indexVVars;
+    std::vector<int> indexIVars;
+    std::vector<int> indexMaskedVars;
     int numVVars, numIVars, numMaskedVars;
     bool indexVecsInitialized;
     
@@ -187,7 +187,7 @@ class N_TIA_DataStore
     bool limiterFlag;
 
     // 2-level information:
-    vector <N_TIA_TwoLevelError> innerErrorInfoVec;
+    std::vector<N_TIA_TwoLevelError> innerErrorInfoVec;
 
     // new-DAE data (originally from the new-DAE derrived class)
     // Error Vectors
@@ -210,11 +210,11 @@ class N_TIA_DataStore
     N_LAS_Vector * dFdxVecVectorPtr;
 
     // History arrays
-    vector <N_LAS_Vector*> xHistory;
-    vector <N_LAS_Vector*> qHistory;
-    vector <N_LAS_Vector*> sHistory;    // state history
-    vector <N_LAS_Vector*> stoHistory;  // store history
-    vector <N_LAS_Vector*> stoLeadCurrQCompHistory;  // store history for lead current Q component.
+    std::vector<N_LAS_Vector*> xHistory;
+    std::vector<N_LAS_Vector*> qHistory;
+    std::vector<N_LAS_Vector*> sHistory;    // state history
+    std::vector<N_LAS_Vector*> stoHistory;  // store history
+    std::vector<N_LAS_Vector*> stoLeadCurrQCompHistory;  // store history for lead current Q component.
 
     // Predictors
     N_LAS_Vector * qn0Ptr;
@@ -244,13 +244,21 @@ class N_TIA_DataStore
     N_LAS_Vector * tmpXn0BPtr;
 
     // These are for MPDE fast time scale points
-    vector<double> timeSteps;
-    vector<bool> timeStepsBreakpointFlag;
-    vector<N_LAS_Vector*> fastTimeSolutionVec;
-    vector<N_LAS_Vector*> fastTimeStateVec;
-    vector<N_LAS_Vector*> fastTimeQVec;
-    vector<N_LAS_Vector*> fastTimeStoreVec;
-    //vector<N_LAS_Vector*> pastQVecHistory;
+    std::vector<double> timeSteps;
+    std::vector<bool> timeStepsBreakpointFlag;
+    std::vector<N_LAS_Vector*> fastTimeSolutionVec;
+    std::vector<N_LAS_Vector*> fastTimeStateVec;
+    std::vector<N_LAS_Vector*> fastTimeQVec;
+    std::vector<N_LAS_Vector*> fastTimeStoreVec;
+    //std::vector<N_LAS_Vector*> pastQVecHistory;
+
+    // these are placeholders until the transient sensitivites are set 
+    // up properly
+    std::vector<double> objectiveVec_; 
+    std::vector<double> dOdpVec_; 
+    std::vector<double> dOdpAdjVec_;
+    std::vector<double> scaled_dOdpVec_; 
+    std::vector<double> scaled_dOdpAdjVec_;
 
   protected:
 
@@ -265,7 +273,7 @@ class N_TIA_DataStore
     void updateSolDataArrays();
     bool updateStateDataArrays();
 
-    void outputSolDataArrays();
+    void outputSolDataArrays(std::ostream &os);
     virtual void setConstantHistory();
     virtual void setZeroHistory();
     virtual void setErrorWtVector();
@@ -280,17 +288,15 @@ class N_TIA_DataStore
     virtual double globalLength ();
     void computeDividedDifferences();
 
-    void computeDivDiffsBlock(const list<index_pair> & solGIDList,
-                              const list<index_pair> & staGIDList);
+    void computeDivDiffsBlock(const std::list<index_pair> & solGIDList,
+                              const std::list<index_pair> & staGIDList);
 
     void printOutPointers ();
     bool equateTmpVectors ();
     bool usePreviousSolAsPredictor ();
 
-#ifdef Xyce_DEBUG_TIME
-    void outputPredictedSolution();
-    void outputPredictedDerivative();
-#endif
+    void outputPredictedSolution(std::ostream &os);
+    void outputPredictedDerivative(std::ostream &os);
 
     virtual void stepLinearCombo ();
 
@@ -302,12 +308,12 @@ class N_TIA_DataStore
     virtual double delta_x_errorNorm_p1();
     virtual double delta_x_errorNorm_q1();
 
-    virtual bool getSolnVarData( const int & gid, vector<double> & varData );
-    virtual bool getStateVarData( const int & gid, vector<double> & varData );
-    virtual bool setSolnVarData( const int & gid, const vector<double> & varData );
-    virtual bool setStateVarData( const int & gid, const vector<double> & varData );
-    virtual bool getStoreVarData( const int & gid, vector<double> & varData );
-    virtual bool setStoreVarData( const int & gid, const vector<double> & varData );
+    virtual bool getSolnVarData( const int & gid, std::vector<double> & varData );
+    virtual bool getStateVarData( const int & gid, std::vector<double> & varData );
+    virtual bool setSolnVarData( const int & gid, const std::vector<double> & varData );
+    virtual bool setStateVarData( const int & gid, const std::vector<double> & varData );
+    virtual bool getStoreVarData( const int & gid, std::vector<double> & varData );
+    virtual bool setStoreVarData( const int & gid, const std::vector<double> & varData );
 
     N_LAS_System * lasSysPtr;
 

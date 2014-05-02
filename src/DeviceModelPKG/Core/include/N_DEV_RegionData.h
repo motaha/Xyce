@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.2.2.2 $
+// Revision Number: $Revision: 1.8 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/24 23:49:14 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -74,25 +74,21 @@ class RegionData : public CompositeParam
 public:
   static ParametricData<RegionData> &getParametricData();
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
   RegionData ();
 
   void processParams ();
 
 #ifdef Xyce_DEBUG_DEVICE
-  friend ostream & operator<<(ostream & os, const RegionData & rd);
+  friend std::ostream & operator<<(std::ostream & os, const RegionData & rd);
 #endif
 
 private:
 
 public:
-  string name;
-  string outName;
-  string type;
-  string reactionFile;
+  std::string name;
+  std::string outName;
+  std::string type;
+  std::string reactionFile;
   double area;
   double xloc;
 

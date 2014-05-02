@@ -1,16 +1,15 @@
 //-------------------------------------------------------------------------
 // Copyright Notice
 //
-// Copyright (c) 2002-2013, Sandia Corporation, Albuquerque, NM, USA.
-// Under the terms of Contract DE-AC04-94AL85000, there is a
-// non-exclusive license for use of this work by or on behalf of the
-// U.S. Government.  Export of this program may require a license from
-// the United States Government.
+//   Copyright 2002 Sandia Corporation. Under the terms
+//   of Contract DE-AC04-94AL85000 with Sandia Corporation, the U.S.
+//   Government retains certain rights in this software.
+//
 // ------NOTE: The notice below must be removed before inserting this header
 // ------      into components of Xyce that are not open source.  Remove
 // ------      this note regardless. 
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -43,9 +42,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.2.6.1 $
+// Revision Number: $Revision: 1.5 $
 //
-// Revision Date  : $Date: 2013/08/09 16:50:58 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------

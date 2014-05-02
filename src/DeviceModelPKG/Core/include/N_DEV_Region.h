@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.3.2.2 $
+// Revision Number: $Revision: 1.10.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -72,20 +72,21 @@ class Region
   // functions:
 public:
   Region ( RegionData & rd,
-           DeviceOptions & devOp,
-           SolverState & solst, bool sourceOn=true);
+           const DeviceOptions & devOp,
+           const SolverState & solst,
+           bool sourceOn=true);
 
   // constructor that allows a non-default reaction network:
   Region ( RegionData & rd,
-           DeviceOptions & devOp,
-           SolverState & solst,
-           N_DEV_ReactionNetwork & reactionNet);
+           const DeviceOptions & devOp,
+           const SolverState & solst,
+           ReactionNetwork & reactionNet);
 
   virtual ~Region ();
 
   bool outputTecplot ();
 
-///
+  ///
   void initializeReactionNetwork(ScalingVars & sv);
   void setInitialCondition (const std::string & name, const double val);
   void setRateConstants(double T);
@@ -94,37 +95,37 @@ public:
   void unscaleVariables ();
   void scaleRateConstants ();
   void unscaleRateConstants ();
-  void addSource(string speciesName, N_UTL_Expression *expr);
-  void addMasterSource(string speciesName);
+  void addSource(std::string speciesName, Util::Expression *expr);
+  void addMasterSource(std::string speciesName);
   inline void setMasterSourceValue(double msv) {theReactions.setMasterSourceValue(msv);};
   inline void setSimTime(double time) {  theReactions.setSimTime(time);};
 
-  bool reactantExist(string reactantname)
+  bool reactantExist(std::string reactantname)
   {
     return theReactions.reactantExist(reactantname);
   };
 
-  bool constantExist(string constantname)
+  bool constantExist(std::string constantname)
   {
     return theReactions.constantExist(constantname);
   };
 
   bool getDoNothingFlag ();
-  inline string getName () { return name; }
+  inline std::string getName () { return name; }
 
   double getBreakTime();
 
-  void setupJacStamp ( vector< vector<int> > & jacStamp, vector<int> & colDep, int & firstReactant, int & lastIndex );
+  void setupJacStamp ( std::vector< std::vector<int> > & jacStamp, std::vector<int> & colDep, int & firstReactant, int & lastIndex );
 
-  void registerLIDs( const vector<int> & intLIDVec, const vector<int> & extLIDVec, int & intIndex);
+  void registerLIDs( const std::vector<int> & intLIDVec, const std::vector<int> & extLIDVec, int & intIndex);
 
-  void augmentNameMap ( map<int,string> & intNameMap, DeviceInstance & di);
+  void augmentNameMap ( std::map<int,std::string> & intNameMap, DeviceInstance & di);
 
-  void registerStateLIDs (const vector<int> & staLIDVecRef, int & i);
+  void registerStateLIDs (const std::vector<int> & staLIDVecRef, int & i);
 
-  void registerJacLIDs ( const vector< vector<int> > & jacLIDVec,
-                         const vector<int> &map,
-                         const vector< vector<int> > &map2 );
+  void registerJacLIDs ( const std::vector< std::vector<int> > & jacLIDVec,
+                         const std::vector<int> &map,
+                         const std::vector< std::vector<int> > &map2 );
 
   void setupPointers (N_LAS_Matrix & dfdx, N_LAS_Matrix & dqdx);
 
@@ -159,7 +160,7 @@ public:
   // one region to another without having to re-parse every time.
   // We return a const reference so nobody can tinker with our internal
   // data.
-  const N_DEV_ReactionNetwork & getReactionNetwork() {
+  ReactionNetwork & getReactionNetwork() {
     return theReactions;
   }
 
@@ -187,7 +188,7 @@ public:
   const double getSpeciesVal(int i);
   const double getConstantsVal(int i);
 
-///
+  ///
 
 private:
   void createDefaultReactionNetwork(const std::string & reactionSpecFile);
@@ -197,8 +198,8 @@ public:
 
 protected:
   // data:
-  string name;
-  string outputName;
+  std::string name;
+  std::string outputName;
 
   bool explicitCarrierFlag;
   bool useScaledVariablesFlag;
@@ -207,37 +208,37 @@ protected:
   int callsOTEC;
 
   // reactions
-  N_DEV_ReactionNetwork theReactions;
+  ReactionNetwork theReactions;
   // vector of constant concentrations (species held fixed)
-  vector<double> theConstantConcentrations;
+  std::vector<double> theConstantConcentrations;
   // working storage for communicating between updateIntermediateVars
   // and updatePrimaryState
-  vector<double> tempConcentrations;
+  std::vector<double> tempConcentrations;
   // actual time derivatives of concentrations
-  vector<double> tempConcentrationDerivs;
+  std::vector<double> tempConcentrationDerivs;
   // initial conditions
-  vector<double> initialConcentrations;
-  vector<double> ddt;
-  vector< vector<double> > tempJac;
-  vector< vector<double> > tempAuxJac;
+  std::vector<double> initialConcentrations;
+  std::vector<double> ddt;
+  std::vector< std::vector<double> > tempJac;
+  std::vector< std::vector<double> > tempAuxJac;
 
   int baseReactionIndex;
 
-  vector< vector<double *> > dfdxConcEquConcVarPtrs;
-  vector< vector<double *> > dqdxConcEquConcVarPtrs;
+  std::vector< std::vector<double *> > dfdxConcEquConcVarPtrs;
+  std::vector< std::vector<double *> > dqdxConcEquConcVarPtrs;
 
-  vector< vector<double *> > dfdxConcEquAuxVarPtrs;
-  vector< vector<double *> > dqdxConcEquAuxVarPtrs;
+  std::vector< std::vector<double *> > dfdxConcEquAuxVarPtrs;
+  std::vector< std::vector<double *> > dqdxConcEquAuxVarPtrs;
 
-  vector< vector<int> > AConcentrationEquConcentrationNodeOffsets;
-  vector< vector<int> > AConcentrationEquAuxNodeOffsets;
+  std::vector< std::vector<int> > AConcentrationEquConcentrationNodeOffsets;
+  std::vector< std::vector<int> > AConcentrationEquAuxNodeOffsets;
 
   // reaction species indices:
-  vector<int> li_Concentrations;
+  std::vector<int> li_Concentrations;
 
   // reaction state vars... these are redundant storage, because we also
   // need concentration derivatives
-  vector<int> li_state_Concentrations;
+  std::vector<int> li_state_Concentrations;
 
   // Rxn set scaling variables.
   double x0;  // distance scaling (cm)
@@ -255,8 +256,8 @@ protected:
   bool outputBefore1;
   bool outputBefore2;
 
-  DeviceOptions & devOptions;
-  SolverState & solState;
+  const DeviceOptions & devOptions;
+  const SolverState & solState;
 };
 
 //-----------------------------------------------------------------------------

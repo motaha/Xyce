@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.16.2.2 $
+// Revision Number: $Revision: 1.21 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,47 +46,44 @@
 #ifndef N_TOP_CktNode_V_h
 #define N_TOP_CktNode_V_h 1
 
-// ---------- Standard Includes ----------
-
-// ----------   Xyce Includes   ----------
-
 #include <N_TOP_CktNode.h>
 
-// ---------- Forward Declarations ----------
+namespace Xyce {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Class         : N_TOP_CktNode_V
+// Class         : CktNode_V
 // Purpose       :
 // Special Notes :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-class N_TOP_CktNode_V : public N_TOP_CktNode
+class CktNode_V : public CktNode
 {
 
 public:
 
   // Constructor
-  N_TOP_CktNode_V(const string & nodeID = string(""), const int & globalID = 0,
-                  const list < int > & varGIDList = list < int > (),
-                  const list < int > & statevarGIDList = list < int > (),
-                  const list < int > & storevarGIDList = list < int > (),
+  CktNode_V(const std::string & nodeID = std::string(""), const int & globalID = 0,
+                  const std::list< int > & varGIDList = std::list< int > (),
+                  const std::list< int > & statevarGIDList = std::list< int > (),
+                  const std::list< int > & storevarGIDList = std::list< int > (),
                   const int & pNum = 0, const bool & owned = true)
-    : N_TOP_CktNode(nodeID, globalID, varGIDList, statevarGIDList, storevarGIDList, pNum, owned),
+    : CktNode(nodeID, globalID, varGIDList, statevarGIDList, storevarGIDList, pNum, owned),
     noDCPath_(false),
     connToOneTerm_(false)
     {}
 
   // Constructor
-  N_TOP_CktNode_V(const N_TOP_NodeBlock & nb)
-    : N_TOP_CktNode(nb),
+  CktNode_V(const NodeBlock & nb)
+    : CktNode(nb),
     noDCPath_(false),
     connToOneTerm_(false)
     {}
 
   // Copy constructor
-  N_TOP_CktNode_V(const N_TOP_CktNode_V & right)
-  : N_TOP_CktNode(right.id_, right.gID_, right.solnVarGIDList_,
+  CktNode_V(const CktNode_V & right)
+  : CktNode(right.id_, right.gID_, right.solnVarGIDList_,
                   right.stateVarGIDList_, 
                   right.storeVarGIDList_, 
                   right.procNum_, right.isOwned_),
@@ -95,7 +92,7 @@ public:
   { }
 
   // Destructor
-  ~N_TOP_CktNode_V() { }
+  ~CktNode_V() { }
 
   int type() const { return _VNODE; }
 
@@ -109,7 +106,7 @@ public:
   
   void setTrueConnToOneTermVar() { connToOneTerm_ = true;}
 
-  ostream & put(ostream & os) const;
+  std::ostream & put(std::ostream & os) const;
 
 private:
   //These new boolean variables are being introduced to detect nodes for 
@@ -121,5 +118,10 @@ private:
   bool connToOneTerm_;
 
 };
+
+} // namespace Topo
+} // namespace Xyce
+
+typedef Xyce::Topo::CktNode_V N_TOP_CktNode_V;
 
 #endif

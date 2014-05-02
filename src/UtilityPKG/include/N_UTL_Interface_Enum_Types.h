@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -59,7 +59,8 @@ enum XEXP_TYPES
   XEXP_SPECIAL,        //  5
   XEXP_VARIABLE,       //  6
   XEXP_FUNCTION,       //  7
-  XEXP_COUNT           //  8
+  XEXP_NODAL_COMPUTATION, //8
+  XEXP_COUNT           //  9
 };
 
 #endif // N_UTL_EXPRESSION_H

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -39,9 +39,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.47.2.2 $
+// Revision Number: $Revision: 1.53 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:47 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -49,17 +49,14 @@
 #ifndef Xyce_N_NLS_NOX_Interface_h
 #define Xyce_N_NLS_NOX_Interface_h
 
-// ---------- Standard Includes ----------
-
-// ----------   Xyce Includes   ----------
 #include <N_UTL_Misc.h>
+#include <N_PDS_fwd.h>
+#include <N_IO_fwd.h>
 
 #include <N_NLS_Manager.h>	// defines AnalysisMode
 #include <N_NLS_NonLinearSolver.h>
 #include <N_NLS_NOX_ParameterSet.h>
 
-// ---------- Forward Declarations ----------
-class N_PDS_Comm;
 class N_PDS_Manager;
 
 namespace NOX {
@@ -93,7 +90,6 @@ namespace N_NLS_LOCA {
 }
 
 class N_LOA_Loader;
-class N_IO_CmdParse;
 
 //-----------------------------------------------------------------------------
 // Class         : N_NLS_NonLinearSolver
@@ -132,7 +128,6 @@ public:
   double getMaxNormF() const;
   int getMaxNormFindex() const;
 
-#ifdef Xyce_DEBUG_NONLINEAR
   int getDebugLevel() const;
   bool getScreenOutputFlag () const;
   double getDebugMinTime() const;
@@ -140,7 +135,6 @@ public:
   int getDebugMinTimeStep() const;
   int getDebugMaxTimeStep() const;
   bool getMMFormat () const;
-#endif
 
   // Returns the continuation step number if available.
   int getContinuationStep() const;

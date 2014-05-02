@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,11 +36,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.64.2.2 $
+// Revision Number: $Revision: 1.72.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/03/06 17:23:42 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: erkeite $
 //-----------------------------------------------------------------------------
 
 #ifndef N_TOP_Topology_h
@@ -58,69 +58,57 @@
 using Teuchos::RefCountPtr;
 using Teuchos::rcp;
 
-// ----------   Xyce Includes   ----------
+#include <N_TOP_fwd.h>
 #include <N_DEV_fwd.h>
 #include <N_UTL_fwd.h>
+#include <N_ANP_fwd.h>
+#include <N_IO_fwd.h>
 #include <N_UTL_Xyce.h>
 #include <N_UTL_NoCase.h>
 #include <N_TOP_Misc.h>
 
-// ---------- Forward Declarations ----------
-
-class N_TOP_CktGraph;
-class N_TOP_CktGraphCreator;
-class N_TOP_CktNodeCreator;
-class N_TOP_CktNode;
-class N_TOP_NodeDevBlock;
-class N_TOP_NodeBlock;
-class N_TOP_TopoLSUtil;
-class N_TOP_Directory;
-
-class N_ANP_AnalysisInterface;
-
 class N_PDS_Manager;
 
-class N_IO_RestartNode;
-class N_IO_CmdParse;
-class N_IO_PkgOptionsMgr;
+namespace Xyce {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Class         : N_TOP_Topology
+// Class         : Topology
 // Purpose       :
 // Special Notes :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-class N_TOP_Topology
+class Topology
 {
 
 public:
 
   // Default constructor.
-  N_TOP_Topology(N_IO_CmdParse & cp);
+  Topology(IO::CmdParse & cp);
 
   // Constructor.
-  N_TOP_Topology(N_DEV_DeviceInterface * devInt, N_IO_CmdParse & cp);
+  Topology(Device::DeviceInterface * devInt, IO::CmdParse & cp);
 
   // Constructor.
-  N_TOP_Topology(
-      N_DEV_DeviceInterface * devInt,
-      const string & graphType,
-      N_IO_CmdParse & cp);
+  Topology(
+      Device::DeviceInterface * devInt,
+      const std::string & graphType,
+      IO::CmdParse & cp);
 
   // Destructor
-  ~N_TOP_Topology();
+  ~Topology();
 
   // Registration functions:
 
   // Register the pointer to the device interface.
-  bool registerDeviceInterface(N_DEV_DeviceInterface * devInt);
+  bool registerDeviceInterface(Device::DeviceInterface * devInt);
   // Register the pointer to the parallel services manager.
   bool registerParallelMgr(N_PDS_Manager * pdsmgr);
   // Register the pointer to the time-integration manager.
-  bool registeranaInt(N_ANP_AnalysisInterface * anaInt);
+  bool registeranaInt(Xyce::Analysis::AnalysisInterface * anaInt);
   // Method to register the package options manager
-  bool registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr );
+  bool registerPkgOptionsMgr( IO::PkgOptionsMgr *pkgOptPtr );
 
   bool registerICs(const N_UTL_OptionBlock & ob);
 
@@ -130,9 +118,9 @@ public:
 
   // Current add methods for voltage nodes tailored to work with device
   // ghosting.
-  void addVoltageNode(const N_TOP_NodeBlock & nb);
+  void addVoltageNode(const NodeBlock & nb);
   // Current add methods for devices tailored to work with device ghosting.
-  void addDevice(const N_TOP_NodeBlock & nb, const Teuchos::RefCountPtr<N_DEV_InstanceBlock> ibPtr);
+  void addDevice(const NodeBlock & nb, const Teuchos::RefCountPtr<Device::InstanceBlock> ibPtr);
 
   // Main call to register global id's with device instances.
   void registerGIDswithDevs();
@@ -176,59 +164,59 @@ public:
   void instantiateDevices();
 
   // Use ordered node list to generate ordered global id list.
-  void returnNodeGIDVec(vector<int> & nodeGIDVec);
+  void returnNodeGIDVec(std::vector<int> & nodeGIDVec);
 
   // Generate ordered externnode global id vector using orderedNodeList.
-  void returnExternNodeGIDVec(vector< pair<int,int> > & nodeGIDVec);
+    void returnExternNodeGIDVec(std::vector<std::pair<int,int> > & nodeGIDVec);
 
   // Generate ordered soln var global id vector using orderedNodeList.
-  void returnSVarGIDVec(vector<int> & sVarGIDVec);
+  void returnSVarGIDVec(std::vector<int> & sVarGIDVec);
 
   // Generate ordered soln var global id vector using orderedNodeList for
   // external nodes.
-  void returnExternSVarGIDVec(vector< pair<int,int> > & sVarGIDVec);
+  void returnExternSVarGIDVec(std::vector< std::pair<int,int> > & sVarGIDVec);
 
   // Generate ordered state var global id vector using orderedNodeList.
-  void returnStateVarGIDVec(vector<int> & sVarGIDVec);
+  void returnStateVarGIDVec(std::vector<int> & sVarGIDVec);
 
   // Generate ordered store var global id vector using orderedNodeList.
-  void returnStoreVarGIDVec(vector<int> & sVarGIDVec);
+  void returnStoreVarGIDVec(std::vector<int> & sVarGIDVec);
 
   // Generate ordered state var global id vector using orderedNodeList for
   // external nodes.
-  void returnExternStateVarGIDVec(vector< pair<int,int> > & sVarGIDVec);
+  void returnExternStateVarGIDVec(std::vector< std::pair<int,int> > & sVarGIDVec);
 
   // Generate ordered store var global id vector using orderedNodeList for
   // external nodes.
-  void returnExternStoreVarGIDVec(vector< pair<int,int> > & sVarGIDVec);
+  void returnExternStoreVarGIDVec(std::vector< std::pair<int,int> > & sVarGIDVec);
 
   // Generate ordered list of variable types
-  void returnVarTypeVec(vector<char> & varTypeVec) const;
+  void returnVarTypeVec(std::vector<char> & varTypeVec) const;
 
   // Generate list of voltage node sVar GIDs
-  void returnSVarVNodeGIDVec(vector<int> & sVarVNodeGIDVec);
+  void returnSVarVNodeGIDVec(std::vector<int> & sVarVNodeGIDVec);
 
   // Generate list of vsrc sVar GIDs
-  void returnSVarVsrcGIDVec(vector<int> & sVarVsrcGIDVec);
+  void returnSVarVsrcGIDVec(std::vector<int> & sVarVsrcGIDVec);
 
   // Generate list of node voltage IDs that have no DC path to ground
   // NOTE:  The IDs returned from this method are ONLY related to _VNODE.
-  void returnSVarNoDCPathIDVec( vector<string> & SVarNoDCPathGIDVec );
+  void returnSVarNoDCPathIDVec( std::vector<std::string> & SVarNoDCPathGIDVec );
 
   // Generate list of node voltage IDs that are connected to only one device
   // terminal.
   // NOTE:  The IDs returned from this method are ONLY related to _VNODE.
-  void returnSVarConnToOneTermIDVec( vector<string> & SVarConnToOneTermGIDVec );
+  void returnSVarConnToOneTermIDVec( std::vector<std::string> & SVarConnToOneTermGIDVec );
 
   // Return list of solution var indices for named node.  Returns false if node
   // not owned or not local.
   bool getNodeSVarGIDs( const NodeID& id,
-                        list<int> & sVarGIDList,
-                        list<int> & extSVarGIDList,
+                        std::list<int> & sVarGIDList,
+                        std::list<int> & extSVarGIDList,
                         char & type );
 
   // Accessor to get utility class for linear solver.
-  N_TOP_TopoLSUtil * get_LinSolvUtil();
+  TopoLSUtil * get_LinSolvUtil();
 
   // Migrate Functionality:
 
@@ -244,11 +232,11 @@ public:
   void clearMigrateNodeMap();
 
   // Get node from migration node map.
-  map < int, N_TOP_NodeDevBlock * > & getMigrateNode(const int & id);
+  std::map< int, NodeDevBlock * > & getMigrateNode(const int & id);
 
   // Add node to migration node map.
-  void addMigrateNode(const int & id, map < int,
-                      N_TOP_NodeDevBlock * > & ndbL);
+  void addMigrateNode(const int & id, std::map< int,
+                      NodeDevBlock * > & ndbL);
 
   // Prune out unnecessary circuit nodes
   void pruneCkt(const int & num, const int * nodeGIDs);
@@ -261,116 +249,119 @@ public:
   bool generateICLoader();
 
   // Restart capability.
-  bool getRestartNodes(vector < N_IO_RestartNode * > & nodeVec);
-  bool restoreRestartNodes(vector < N_IO_RestartNode * > & nodeVec);
+  bool getRestartNodes(std::vector< IO::RestartNode * > & nodeVec);
+  bool restoreRestartNodes(std::vector< IO::RestartNode * > & nodeVec);
 
   // Directory generation.
   bool generateDirectory();
 
-#ifdef Xyce_TEST_SOLN_VAR_MAP
   // Solution variable name output.
-  bool outputNameFile();
-#endif
+  bool outputNameFile(bool overRideOutput=false);
 
   // These calls generate and return node maps.
   // NOTE:  The node type is known, this map will have unique keys.
-  void getNodeNames (map<string, pair<int, double>, Xyce::LessNoCase > &);
-  void getStateNodeNames (map<string, pair<int, double>, Xyce::LessNoCase > &);
-  void getStoreNodeNames (map<string, pair<int, double>, Xyce::LessNoCase > &);
-  void getExternNodeNames (map<string, pair<int, double>, Xyce::LessNoCase > &);
-  void getVsrcNodes (set<string> & vsrcSet);
+  void getNodeNames (std::map<std::string, std::pair<int, double>, Xyce::LessNoCase > &);
+  void getStateNodeNames (std::map<std::string, std::pair<int, double>, Xyce::LessNoCase > &);
+  void getStoreNodeNames (std::map<std::string, std::pair<int, double>, Xyce::LessNoCase > &);
+  void getExternNodeNames (std::map<std::string, std::pair<int, double>, Xyce::LessNoCase > &);
+    void getVsrcNodes (std::set<std::string> & vsrcSet);
 
   // get node ids, names, and types
-  bool getRawData( map< int, string > & nRef, vector< char > & tRef );
+  bool getRawData( std::map< int, std::string > & nRef, std::vector< char > & tRef );
 
-  N_ANP_AnalysisInterface * getTIAManager() const { return anaIntPtr_; }
+  Xyce::Analysis::AnalysisInterface * getTIAManager() const { return anaIntPtr_; }
 
   // These functions are added to augment a copy of the netlist file to
   // include resistors which connect ground to "dangling" nodes.
   // NOTE: These IDs are assumed to be _VNODE, so no need to use NodeID.
 
-  void addResistors(const vector<string> & inputVec, const string & resValue,
-		    const string & netlistFile, bool oneTermNotNoDCPath);
+  void addResistors(const std::vector<std::string> & inputVec, const std::string & resValue,
+		    const std::string & netlistFile, bool oneTermNotNoDCPath);
 
-  void appendEndStatement(const string & netlistFile);
+  void appendEndStatement(const std::string & netlistFile);
 
 private:
 
   // Don't allow copy construction or assignment.
 
   // Copy constructor (private)
-  N_TOP_Topology(const N_TOP_Topology & right);
+  Topology(const Topology & right);
 
   // Assignment operator (private)
-  N_TOP_Topology & operator = (const N_TOP_Topology & right);
+  Topology & operator = (const Topology & right);
 
 private:
 
   // command line object
-  N_IO_CmdParse & commandLine_;
+  IO::CmdParse & commandLine_;
 
   // maximum number of tries to find the graph center.
   int maxTries_;
 
   // Utility class to extract alloc info for linear solver.
-  N_TOP_TopoLSUtil * lsUtilPtr_;
-  N_TOP_Directory * dirPtr_;
-  friend class N_TOP_TopoLSUtil;
-  friend class N_TOP_Directory;
+  TopoLSUtil * lsUtilPtr_;
+  Directory * dirPtr_;
+  friend class TopoLSUtil;
+  friend class Directory;
 
-  list < N_TOP_CktGraph * > graphList_;
+  std::list< CktGraph * > graphList_;
 
-  N_TOP_CktGraph * mainGraphPtr_;
+  CktGraph * mainGraphPtr_;
 
-  N_TOP_CktGraphCreator * graphCreatorPtr_;
+  CktGraphCreator * graphCreatorPtr_;
 
-  N_TOP_CktNodeCreator * nodeCreatorPtr_;
+  CktNodeCreator * nodeCreatorPtr_;
 
-  N_DEV_DeviceInterface * devIntPtr_;
+  Device::DeviceInterface * devIntPtr_;
   // package options manager
-  RCP<N_IO_PkgOptionsMgr> pkgOptMgrPtr_;
+  IO::PkgOptionsMgr *pkgOptMgrPtr_;
 
   // Pointer to the parallel services manager object.
   N_PDS_Manager * pdsMgrPtr_;
 
   // Pointer to the time-integration manager object.
-  N_ANP_AnalysisInterface * anaIntPtr_;
+  Xyce::Analysis::AnalysisInterface * anaIntPtr_;
 
-  mutable list < N_TOP_CktNode * > * orderedNodeListPtr_;
-  list < N_TOP_CktNode * >  deviceNodeListPtr_;
+  mutable std::list< CktNode * > * orderedNodeListPtr_;
+  std::list< CktNode * >  deviceNodeListPtr_;
 
-  map < string, N_DEV_InstanceBlock * > devInstBlockMap_;
-  map < string, int > devInstMap_;
+  std::map< std::string, Device::InstanceBlock * > devInstBlockMap_;
+  std::map< std::string, int > devInstMap_;
 
-  map < int, map < int, N_TOP_NodeDevBlock * > > migrateNodeMap_;
+  std::map< int, std::map< int, NodeDevBlock * > > migrateNodeMap_;
 
   N_UTL_OptionBlock * icSettings_;
 
-  map < int, int > depSolnGIDMap_;
-  map < int, int > depStateGIDMap_;
-  map < int, int > depStoreGIDMap_;
+  std::map< int, int > depSolnGIDMap_;
+  std::map< int, int > depStateGIDMap_;
+  std::map< int, int > depStoreGIDMap_;
 
   // this is a list of nodes to be supernoded
   // format is: nodeToBeReplaced, nodeToBeKept in each pair.
-  list < pair<NodeID, NodeID> > superNodeList;
+  std::list< std::pair<NodeID, NodeID> > superNodeList;
 #ifdef Xyce_PARALLEL_MPI
-  list < pair<NodeID, NodeID> > globalSuperNodeList;
+  std::list< std::pair<NodeID, NodeID> > globalSuperNodeList;
 #endif
 
-  friend ostream & operator << (ostream & os, const N_TOP_Topology & topo);
+    friend std::ostream & operator << (std::ostream & os, const Topology & topo);
 };
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::get_LinSolvUtil
+// Function      : Topology::get_LinSolvUtil
 // Purpose       : Accessor to get utility for linear solver data.
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/27/00
 //-----------------------------------------------------------------------------
-inline N_TOP_TopoLSUtil * N_TOP_Topology::get_LinSolvUtil()
+inline TopoLSUtil * Topology::get_LinSolvUtil()
 {
   return lsUtilPtr_;
 }
+
+} // namespace Topo
+} // namespace Xyce
+
+typedef Xyce::Topo::Topology N_TOP_Topology;
 
 #endif

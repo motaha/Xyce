@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -40,7 +40,7 @@
 //
 // Revision Number: $Revsion$
 //
-// Revsion Date   : $Date: 2013/10/03 17:23:38 $
+// Revsion Date   : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //----------------------------------------------------------------------------
@@ -59,11 +59,13 @@
 
 // ----------   Xyce Includes   ----------
 #include <N_DEV_DAC.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
 #include <N_DEV_DeviceState.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
 
 #include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
@@ -73,71 +75,53 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<DAC::Instance>::ParametricData()
-{
-  // Set up configuration constants:
-  setNumNodes(2);
-  setNumOptionalNodes(0);
-  setNumFillNodes(0);
-  setModelRequired(0);
-  addModelType("DAC");
-
-  // Set up double precision variables:
-
-  // Set up exceptions (ie variables that are not doubles):
-
-  addPar ("FILE", string(""), false, ParameterType::NO_DEP,
-          &DAC::Instance::file, NULL);
-}
-
-template<>
-ParametricData<DAC::Model>::ParametricData()
-{
-  // Set up double precision variables:
-  addPar ("TR", 1.e-9, false,   ParameterType::NO_DEP,
-          &DAC::Model::riseTime,
-          NULL,U_SECOND,CAT_NONE,"Rise Time");
-
-  addPar ("TF", 1.e-9, false,   ParameterType::NO_DEP,
-          &DAC::Model::fallTime,
-          NULL,U_SECOND,CAT_NONE,"Fall Time");
-
-  addPar ("R",   0.01, false,   ParameterType::NO_DEP,
-          &DAC::Model::R,
-          NULL,U_OHM,CAT_NONE,"Resitance");
-
-  addPar ("L",  1.e-5, false,   ParameterType::NO_DEP,
-          &DAC::Model::L,
-          NULL,U_HENRY,CAT_NONE,"Inductance");
-
-  addPar ("C",    0.0, false,   ParameterType::NO_DEP,
-          &DAC::Model::C,
-          NULL,U_FARAD,CAT_NONE,"Capacitance");
-
-  // Set up non-double precision variables:
-  addPar ("TRANBP", true, false, ParameterType::NO_DEP,
-          &DAC::Model::includeTransitionBP_, NULL,
-          U_NONE, CAT_CONTROL, "Flag for transitional breakpoints");
-}
 
 namespace DAC {
 
 
-vector< vector<int> > Instance::jacStamp;
+void Traits::loadInstanceParameters(ParametricData<DAC::Instance> &p)
+{
+  // Set up configuration constants:
+// Set up double precision variables:
 
+  // Set up exceptions (ie variables that are not doubles):
 
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
+  p.addPar ("FILE", std::string(""), &DAC::Instance::file);
 }
 
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
+void Traits::loadModelParameters(ParametricData<DAC::Model> &p)
+{
+  // Set up double precision variables:
+  p.addPar ("TR", 1.e-9, &DAC::Model::riseTime)
+    .setUnit(U_SECOND)
+    .setDescription("Rise Time");
 
-  return parMap;
+  p.addPar ("TF", 1.e-9, &DAC::Model::fallTime)
+    .setUnit(U_SECOND)
+    .setDescription("Fall Time");
+
+  p.addPar ("R",   0.01, &DAC::Model::R)
+    .setUnit(U_OHM)
+    .setDescription("Resistance");
+
+  p.addPar ("L",  1.e-5, &DAC::Model::L)
+    .setUnit(U_HENRY)
+    .setDescription("Inductance");
+
+  p.addPar ("C",    0.0, &DAC::Model::C)
+    .setUnit(U_FARAD)
+    .setDescription("Capacitance");
+
+  // Set up non-double precision variables:
+  p.addPar ("TRANBP", true, &DAC::Model::includeTransitionBP_)
+    .setCategory(CAT_CONTROL)
+    .setDescription("Flag for transitional breakpoints");
 }
+
+
+
+
+std::vector< std::vector<int> > Instance::jacStamp;
 
 
 //----------------------------------------------------------------------------
@@ -148,7 +132,7 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Lon Waters
 // Creation Date : 07/29/2002
 //----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
 
   return true;
@@ -163,13 +147,11 @@ bool Instance::processParams (string param)
 // Creation Date : 07/29/2002
 //----------------------------------------------------------------------------
 Instance::Instance(
-  InstanceBlock & IB,
+  const Configuration & configuration,
+  const InstanceBlock & IB,
   Model & DACiter,
-  MatrixLoadData & mlData1,
-  SolverState &ss1,
-  ExternData  &ed1,
-  DeviceOptions & do1)
-  : DeviceInstance(IB, mlData1, ss1, ed1, do1),
+  const FactoryBlock &  factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(DACiter),
     v_pos(0),
     v_neg(0),
@@ -187,10 +169,6 @@ Instance::Instance(
     APosEquBraVarOffset(-1),
     ANegEquBraVarOffset(-1)
 {
-
-  setName(IB.getName());
-  setModelName(model_.getName());
-
   numIntVars   = 1;
   numExtVars   = 2;
   numStateVars = 0;
@@ -244,40 +222,20 @@ Instance::~Instance()
 // Creator       : Lon Waters
 // Creation Date : 07/29/2002
 //----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                             const vector<int> & extLIDVecRef)
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                             const std::vector<int> & extLIDVecRef)
 {
-  string msg;
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "-----------------------------------------------------------------------------";
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << endl << dashedline << endl;
-    cout << "  DACInstance::registerLIDs" << endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "  DACInstance::registerLIDs" << std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -291,26 +249,26 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
-    cout << "  li_Pos = " << li_Pos << endl;
+    Xyce::dout() << "  li_Pos = " << li_Pos << std::endl;
 #endif
 
   li_Neg = extLIDVec[1];
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
-    cout << "  li_Neg = " << li_Neg << endl;
+    Xyce::dout() << "  li_Neg = " << li_Neg << std::endl;
 #endif
 
   li_Bra = intLIDVec[0];
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
-    cout << "  li_Bra = " << li_Bra << endl;
+    Xyce::dout() << "  li_Bra = " << li_Bra << std::endl;
 #endif
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
 #endif
 }
 
@@ -322,20 +280,9 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Lon Waters
 // Creation Date : 07/29/2002
 //----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef)
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef)
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSTa != numStateVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 }
 
 //-----------------------------------------------------------------------------
@@ -346,12 +293,12 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef)
 // Creator       : Dave Shirley, PSSi
 // Creation Date : 11/20/09
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
-    string tmpstr;
+    std::string tmpstr;
     tmpstr = getName()+"_branch";
     spiceInternalName (tmpstr);
     intNameMap[li_Bra] = tmpstr;
@@ -368,7 +315,7 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator        : Lon Waters
 // Creation Date  : 11/12/2002
 //----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -381,7 +328,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator        : Lon Waters
 // Creation Date  : 11/12/2002
 //----------------------------------------------------------------------------
-void Instance::registerJacLIDs(const vector< vector<int> >& jacLIDVec)
+void Instance::registerJacLIDs(const std::vector< std::vector<int> >& jacLIDVec)
 {
   APosEquBraVarOffset = jacLIDVec[0][0];
   ANegEquBraVarOffset = jacLIDVec[1][0];
@@ -453,22 +400,22 @@ bool Instance::updateSecondaryState()
 // Creation Date  : 06/10/2003
 //----------------------------------------------------------------------------
 bool Instance::updateTVVEC (
-  vector< pair<double, double> > const & newPairsIn )
+  std::vector< std::pair<double, double> > const & newPairsIn )
 {
   int i, last, newStart;
   double transitionTime;
   bool bsuccess = true;
-  vector < pair<double,double> >::iterator itVec, itVec_end;
-  vector< pair<double, double> > newPairs;
-  vector < pair<double,double> >::const_iterator const_itVec;
-  map <double, double> tv;
-  map <double, double>::iterator tv_i, tv_end;
+  std::vector< std::pair<double,double> >::iterator itVec, itVec_end;
+  std::vector< std::pair<double, double> > newPairs;
+  std::vector< std::pair<double,double> >::const_iterator const_itVec;
+  std::map<double, double> tv;
+  std::map<double, double>::iterator tv_i, tv_end;
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "In device " << getName() << endl;
-    cout << "At time = " <<  getSolverState().acceptedTime <<
+    Xyce::dout() << "In device " << getName() << std::endl;
+    Xyce::dout() << "At time = " <<  getSolverState().acceptedTime <<
       ", at beginning of Instance::updateTVVEC():\n"
          << "   TVVEC size = " << numTVpairs_ << "\n"
          << "   TVVEC loc  = " << loc_ << "\n"
@@ -477,13 +424,13 @@ bool Instance::updateTVVEC (
     itVec_end = TVVEC.end();
     for( ; itVec != itVec_end; ++itVec )
     {
-      cout << "   " << (*itVec).first
+      Xyce::dout() << "   " << (*itVec).first
            << "s, " << (*itVec).second
            << "V\n";
     }
-    cout << newPairsIn.size() << " New pairs:" << endl;
+    Xyce::dout() << newPairsIn.size() << " New pairs:" << std::endl;
     for ( const_itVec = newPairsIn.begin() ; const_itVec != newPairsIn.end() ; ++const_itVec )
-      cout << (*const_itVec).first << "  " << (*const_itVec).second << endl;
+      Xyce::dout() << (*const_itVec).first << "  " << (*const_itVec).second << std::endl;
   }
 #endif
 
@@ -498,21 +445,17 @@ bool Instance::updateTVVEC (
   {
     if (getSolverState().acceptedTime == 0)
     {
-      if (TVVEC.size() > 0 && TVVEC[0].first == 0) {
-        TVVEC.resize(1);
-      }
-      else
-      {
-        TVVEC.push_back(pair<double,double>(0,(*(newPairsIn.end()-1)).second));
-      }
-      if ((*(newPairsIn.end()-1)).first > TVVEC[0].first)
+      TVVEC.resize(0);
+      if (newPairsIn.size() > 0)
+        TVVEC.push_back(std::pair<double,double>(0,(*(newPairsIn.end()-1)).second));
+      if (newPairsIn.size() > 1 && (*(newPairsIn.end()-1)).first > TVVEC[0].first)
         TVVEC.push_back(*(newPairsIn.end()-1));
       numTVpairs_ = TVVEC.size();
       updateVoltage(getSolverState().acceptedTime);
       return bsuccess;
     }
-    vector< pair<double, double> >::const_iterator n_i, n_end;
-    vector< pair<double, double> >::iterator t_i, t_end;
+    std::vector< std::pair<double, double> >::const_iterator n_i, n_end;
+    std::vector< std::pair<double, double> >::iterator t_i, t_end;
     n_i = newPairsIn.begin();
     n_end = newPairsIn.end();
     for ( ; n_i != n_end ; ++n_i)
@@ -520,7 +463,7 @@ bool Instance::updateTVVEC (
       if ((*n_i).first < 0)
       {
         double d = -(*n_i).first;
-        tv_i = lower_bound(tv.begin(), tv.end(), pair<const double, double>(d,0));
+        tv_i = lower_bound(tv.begin(), tv.end(), std::pair<const double, double>(d,0));
         tv.erase(tv_i,tv.end());
       }
     }
@@ -531,7 +474,7 @@ bool Instance::updateTVVEC (
       {
         transitionTime = model_.riseTime;
         if (transitionTime > 0) {
-          tv_i = lower_bound(tv.begin(), tv.end(), pair<const double, double>((*n_i).first,0));
+          tv_i = lower_bound(tv.begin(), tv.end(), std::pair<const double, double>((*n_i).first,0));
           if (tv_i != tv.begin())
           {
             --tv_i;
@@ -545,7 +488,7 @@ bool Instance::updateTVVEC (
     }
     tv[getSolverState().acceptedTime] = voltage_;
   }
-  tv_i = lower_bound(tv.begin(), tv.end(), pair<const double, double>(getSolverState().acceptedTime,0));
+  tv_i = lower_bound(tv.begin(), tv.end(), std::pair<const double, double>(getSolverState().acceptedTime,0));
   if (tv_i != tv.begin())
     --tv_i;
   tv.erase(tv.begin(), tv_i);
@@ -557,7 +500,7 @@ bool Instance::updateTVVEC (
   {
     if ((*tv_i).first - lastTimeEntry > 1e-15)
     {
-      TVVEC.push_back(pair<double, double>((*tv_i).first,(*tv_i).second));
+      TVVEC.push_back(std::pair<double, double>((*tv_i).first,(*tv_i).second));
       lastTimeEntry = (*tv_i).first;
     }
   }
@@ -566,14 +509,14 @@ bool Instance::updateTVVEC (
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Instance::updateTVVEC():\n"
+    Xyce::dout() << "Instance::updateTVVEC():\n"
          << "   TVVEC size = " << numTVpairs_ << "\n"
          << "   TVVEC loc  = " << loc_ << "\n"
          << "   TVVEC contents:\n" ;
-    vector< pair<double, double> >::iterator tv_i = TVVEC.begin();
+    std::vector< std::pair<double, double> >::iterator tv_i = TVVEC.begin();
     for( ; tv_i != TVVEC.end(); ++tv_i )
     {
-      cout << "   " << (*tv_i).first
+      Xyce::dout() << "   " << (*tv_i).first
            << "s, " << (*tv_i).second
            << "V\n";
     }
@@ -598,21 +541,21 @@ bool Instance::updateVoltage(double time)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << endl;
-    cout << "  DACInstance::updateVoltage\n";
-    cout << "-------------------------------" << endl;
-    cout << "  Time = " << time << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "  DACInstance::updateVoltage\n";
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() << "  Time = " << time << std::endl;
   }
 #endif
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag &&  numTVpairs_ > 0)
   {
-    cout << "    TVVEC[numTVpairs_-1].first = "
-         << TVVEC[numTVpairs_-1].first << endl;
+    Xyce::dout() << "    TVVEC[numTVpairs_-1].first = "
+         << TVVEC[numTVpairs_-1].first << std::endl;
   }
   for (int i=0 ; i<numTVpairs_ ; ++i) {
-    cout << TVVEC[i].first << " :: " << TVVEC[i].second << endl;
+    Xyce::dout() << TVVEC[i].first << " :: " << TVVEC[i].second << std::endl;
   }
 #endif
 
@@ -644,8 +587,8 @@ bool Instance::updateVoltage(double time)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "  voltage_ = " << voltage_ << endl;
-    cout << "-------------------------------" << endl;
+    Xyce::dout() << "  voltage_ = " << voltage_ << std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
   }
 #endif
 
@@ -718,15 +661,15 @@ bool Instance::loadDAEdFdx ()
 // Creation Date : 2/16/04
 //-----------------------------------------------------------------------------
 
-bool Instance::getInstanceBreakPoints ( vector<N_UTL_BreakPoint> & breakPointTimes)
+bool Instance::getInstanceBreakPoints ( std::vector<N_UTL_BreakPoint> & breakPointTimes)
 {
   bool bsuccess = true;
   double currentTime = getSolverState().currTime;
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "In ::getInstanceBreakPoints " << endl;
-    cout << " I want breakpoints.  Current time is " << currentTime << endl;
+    Xyce::dout() << "In ::getInstanceBreakPoints " << std::endl;
+    Xyce::dout() << " I want breakpoints.  Current time is " << currentTime << std::endl;
   }
 #endif
 
@@ -739,30 +682,29 @@ bool Instance::getInstanceBreakPoints ( vector<N_UTL_BreakPoint> & breakPointTim
     //       problematic.  For reference, light travels 0.3 micron in 1e-15 seconds.
     if (TVVEC[i].first >= currentTime - 1e-15 && model_.riseTime != 0 && model_.fallTime != 0)
     {
-      breakPointTimes.push_back(N_UTL_BreakPoint(TVVEC[i].first,
-                                                 SIMPLE_BREAKPOINT));
+      breakPointTimes.push_back(Util::BreakPoint(TVVEC[i].first, Util::SIMPLE_BREAKPOINT));
     }
   }
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "DAC ----------------------------------------" << endl;
-    cout << "DAC getInstanceBreakPoints " << endl;
-    cout << "DAC Debug output.  name = " << getName() << endl;
-    cout << "DAC setting breakpoints at currentTime = " << currentTime << endl;
-    cout << "DAC breakpoints: " << endl;
+    Xyce::dout() << "DAC ----------------------------------------" << std::endl;
+    Xyce::dout() << "DAC getInstanceBreakPoints " << std::endl;
+    Xyce::dout() << "DAC Debug output.  name = " << getName() << std::endl;
+    Xyce::dout() << "DAC setting breakpoints at currentTime = " << currentTime << std::endl;
+    Xyce::dout() << "DAC breakpoints: " << std::endl;
 
-    vector< N_UTL_BreakPoint  >::iterator beg = breakPointTimes.begin();
-    vector< N_UTL_BreakPoint  >::iterator end = breakPointTimes.end();
-    vector< N_UTL_BreakPoint  >::iterator itBP = beg;
+    std::vector< Util::BreakPoint  >::iterator beg = breakPointTimes.begin();
+    std::vector< Util::BreakPoint  >::iterator end = breakPointTimes.end();
+    std::vector< Util::BreakPoint  >::iterator itBP = beg;
     for (;itBP!=end;++itBP)
     {
-      N_UTL_BreakPoint & bp = *itBP;
-      cout << "DAC breakpoint: " << bp.value() << endl;
+      Util::BreakPoint & bp = *itBP;
+      Xyce::dout() << "DAC breakpoint: " << bp.value() << std::endl;
     }
 
-    cout << "DAC ----------------------------------------" << endl;
+    Xyce::dout() << "DAC ----------------------------------------" << std::endl;
   }
 #endif
 
@@ -816,7 +758,7 @@ bool Instance::setInternalState(const DeviceState &state)
   int vsize,i,j;
   if ( state.ID != getName())
   {
-    string msg;
+    std::string msg;
     msg = "Instance::setInternalState:  ID ("+state.ID+")";
     msg += "from restart does not match my name ("+getName()+")!\n";
     N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL, msg);
@@ -824,7 +766,7 @@ bool Instance::setInternalState(const DeviceState &state)
 
   if (dsize%2 != 0)
   {
-    string msg;
+    std::string msg;
     char msg2[256];
     sprintf(msg2, "Instance::setInternalState: "
             "Data size from restart (%d) not a multiple of 2!",
@@ -854,7 +796,7 @@ bool Instance::setInternalState(const DeviceState &state)
 // Creator       : Eric R. Keiter
 // Creation Date : 05/12/09
 //-----------------------------------------------------------------------------
-void Instance::varTypes( vector<char> & varTypeVec )
+void Instance::varTypes( std::vector<char> & varTypeVec )
 {
   varTypeVec.resize(1);
   varTypeVec[0] = 'I';
@@ -868,7 +810,7 @@ void Instance::varTypes( vector<char> & varTypeVec )
 // Creator       : Lon Waters
 // Creation Date : 07/29/2002
 //----------------------------------------------------------------------------
-bool Model::processParams(string param)
+bool Model::processParams()
 {
   return true;
 }
@@ -881,12 +823,12 @@ bool Model::processParams(string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 03/23/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -904,10 +846,11 @@ bool Model::processInstanceParams(string param)
 // Creator        : Lon Waters
 // Creation Date  : 07/29/2002
 //----------------------------------------------------------------------------
-Model::Model(const ModelBlock& MB,
-             SolverState& ss1,
-             DeviceOptions& do1)
-  : DeviceModel(MB, ss1, do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock&     MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
     riseTime(1.0e-9),
     fallTime(1.0e-9),
     R(.01),
@@ -942,9 +885,9 @@ Model::Model(const ModelBlock& MB,
 //----------------------------------------------------------------------------
 Model::~Model()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -962,26 +905,47 @@ Model::~Model()
 //----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i;
-  os << endl;
-  os << "    name\t\tmodelName\tParameters" << endl;
+  os << std::endl;
+  os << "    name\t\tmodelName\tParameters" << std::endl;
 
   for (i = 0, iter = first; iter != last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
+    os << getName();
     os << "\t\tfile = " << (*iter)->file;
-    os << endl;
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 
 // DAC Master functions:
@@ -996,7 +960,7 @@ std::ostream &Model::printOutInstances(std::ostream &os) const
 //-----------------------------------------------------------------------------
 bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & di = *(*it);
 
@@ -1009,14 +973,14 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
     di.i_bra  = solVec[di.li_Bra];
     di.vDrop = (di.v_pos-di.v_neg-di.voltage_);
 #ifdef Xyce_DEBUG_DEVICE
-    cout << "DAC ----------------------------------------" << endl;
-    cout << "DAC Debug output.  name = " << di.getName() << endl;
-    cout << "DAC v_pos = " << di.v_pos <<endl;
-    cout << "DAC v_neg = " << di.v_neg <<endl;
-    cout << "DAC i_bra = " << di.i_bra <<endl;
-    cout << "DAC vDrop = " << di.vDrop <<endl;
-    cout << "DAC voltage_ = " << di.voltage_ <<endl;
-    cout << "DAC ----------------------------------------" << endl;
+    Xyce::dout() << "DAC ----------------------------------------" << std::endl;
+    Xyce::dout() << "DAC Debug output.  name = " << di.getName() << std::endl;
+    Xyce::dout() << "DAC v_pos = " << di.v_pos <<std::endl;
+    Xyce::dout() << "DAC v_neg = " << di.v_neg <<std::endl;
+    Xyce::dout() << "DAC i_bra = " << di.i_bra <<std::endl;
+    Xyce::dout() << "DAC vDrop = " << di.vDrop <<std::endl;
+    Xyce::dout() << "DAC voltage_ = " << di.voltage_ <<std::endl;
+    Xyce::dout() << "DAC ----------------------------------------" << std::endl;
 #endif
   }
 
@@ -1046,7 +1010,7 @@ bool Master::updateSecondaryState ( double * staDerivVec, double * stoVec )
 //-----------------------------------------------------------------------------
 bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  double * storeLeadF, double * storeLeadQ)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & di = *(*it);
 
@@ -1070,7 +1034,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
 //-----------------------------------------------------------------------------
 bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & di = *(*it);
 
@@ -1093,16 +1057,29 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 // Creator       : Tom Russo, SNL, Component Information and MOdels
 // Creation Date : 05/05/04
 //-----------------------------------------------------------------------------
-bool Master::getDACDeviceNames( vector<string> & dacNames)
+bool Master::getDACDeviceNames( std::vector<std::string> & dacNames)
 {
   bool bSuccess = true;
 
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & di = *(*it);
     dacNames.push_back(di.getName());
   }
   return bSuccess;
+}
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("dac", 1)
+    .registerModelType("dac", 1);
 }
 
 } // namespace DAC

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.2.4.3 $
+// Revision Number: $Revision: 1.14 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/02/24 23:49:15 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -59,23 +59,28 @@
 // Xyce Includes
 #include <N_ERH_ErrorMgr.h>
 #include <N_UTL_Xyce.h>
+#include <N_UTL_fwd.h>
 #include <N_UTL_Expression.h>
 #include <N_DEV_ReactionNetwork.h>
 
 #ifdef Xyce_REACTION_PARSER
 // Grrrr.  Stupid bison 2.4 stopped putting the pre-prologue into the header.
 // need this forward declaration
-class N_DEV_ReactionLexer;
+namespace Xyce {
+namespace Device {
+class ReactionLexer;
+}}
+
 #include "N_DEV_ReactionParser.hxx"
 // BLEAH!   This is here DUPLICATED from N_DEV_ReactionParser.yxx
 // because of STUPID choice in Bison 2.3 to put the post-prologue into the
 // .cxx file instead of the .hxx file that Bison 2.1 used to put it in.
 #undef yyFlexLexer
-  /* CAREFUL watch continuations! */
+ /* CAREFUL watch continuations! */
 #define YY_DECL \
-  int N_DEV_ReactionLexer::getToken(N_DEV::N_DEV_ReactionParser::semantic_value *lvalp, \
-                                       N_DEV::location *llocp, \
-                                       map<string,int> &theSpeciesIDs)
+  int N_DEV_ReactionLexer::getToken(Xyce::Device::N_DEV_ReactionParser::semantic_value *lvalp, \
+                                       Xyce::Device::location *llocp, \
+                                       map<std::string,int> &theSpeciesIDs)
 
   // YECH!  Work around very stupid way that multiple parsers/lexers are 
   // handled.
@@ -92,37 +97,38 @@ class N_DEV_ReactionLexer;
 
 #endif
 
-using namespace std;
+namespace Xyce {
+namespace Device {
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::N_DEV_ReactionNetwork
+// Function      : ReactionNetwork::ReactionNetwork
 // Purpose       : Constructor
 // Special Notes : 
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-N_DEV_ReactionNetwork::N_DEV_ReactionNetwork(string name)
-  :myName(name),
-   sourceScaleFac(1.0),
-   C0(1.0),
-   t0(1.0),
-   x0(1.0),
-   applySources(true)
+ReactionNetwork::ReactionNetwork(const std::string &name)
+  : myName(name),
+    sourceScaleFac(1.0),
+    C0(1.0),
+    t0(1.0),
+    x0(1.0),
+    applySources(true)
 {
   theReactions.reserve(10); // try to cut down on copies
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::N_DEV_ReactionNetwork
+// Function      : ReactionNetwork::ReactionNetwork
 // Purpose       : Copy constructor
 // Special Notes : 
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-N_DEV_ReactionNetwork::N_DEV_ReactionNetwork(
-   const N_DEV_ReactionNetwork &right)
+ReactionNetwork::ReactionNetwork(
+   const ReactionNetwork &right)
   : speciesMap(right.speciesMap),
     species(right.species),
     constantsMap(right.constantsMap),
@@ -150,10 +156,10 @@ N_DEV_ReactionNetwork::N_DEV_ReactionNetwork(
   theSourceTerms.reserve(sourceSize);
   for (i=0;i<sourceSize;++i)
   {
-    N_UTL_Expression *newSource;
+    Util::Expression *newSource;
     // make a new one as a copy of the right one
-    newSource = new N_UTL_Expression(*((right.theSourceTerms[i]).second));
-    theSourceTerms.push_back(pair<int,N_UTL_Expression *>(
+    newSource = new Util::Expression(*((right.theSourceTerms[i]).second));
+    theSourceTerms.push_back(std::pair<int,Util::Expression *>(
                                 (right.theSourceTerms[i]).first,
                                 newSource) );
   }
@@ -161,14 +167,14 @@ N_DEV_ReactionNetwork::N_DEV_ReactionNetwork(
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::~N_DEV_ReactionNetwork
+// Function      : ReactionNetwork::~ReactionNetwork
 // Purpose       : Destructor
 // Special Notes : 
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-N_DEV_ReactionNetwork::~N_DEV_ReactionNetwork()
+ReactionNetwork::~ReactionNetwork()
 {
 
   // It is no longer the case that we store only copies of expression
@@ -182,14 +188,14 @@ N_DEV_ReactionNetwork::~N_DEV_ReactionNetwork()
   // and removing the pair from the vector.  
   while (!theSourceTerms.empty())
   {
-    pair<int,N_UTL_Expression *> tempPair = theSourceTerms.back();
+    std::pair<int,Util::Expression *> tempPair = theSourceTerms.back();
     theSourceTerms.pop_back();
     delete tempPair.second;
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setReactionNetworkFromFile
+// Function      : ReactionNetwork::setReactionNetworkFromFile
 // Purpose       : Parse a reaction network specification file and set the
 //                 network up.
 //                 
@@ -200,39 +206,37 @@ N_DEV_ReactionNetwork::~N_DEV_ReactionNetwork()
 // Creation Date : 08/24/06
 //-----------------------------------------------------------------------------
 void 
-N_DEV_ReactionNetwork::setReactionNetworkFromFile(const string &fileName)
+ReactionNetwork::setReactionNetworkFromFile(const std::string &fileName)
 {
 #ifdef Xyce_REACTION_PARSER
   if (fileName != "") // do nothing if no file specified
   {
     // Get the reaction set from a file
-    N_DEV_ReactionLexer *theLexer;
-    ifstream reactionFile;
-    map <string,int> theSpeciesIDs;        
+    ReactionLexer *theLexer;
+    std::ifstream reactionFile;
+    std::map<std::string,int> theSpeciesIDs;        
     
     // temporary hard-coded filename
-    reactionFile.open(fileName.c_str(),ios::in);
+    reactionFile.open(fileName.c_str(),std::ios::in);
     if (reactionFile.is_open())
     {
-      theLexer=new N_DEV_ReactionLexer(&reactionFile);
+      theLexer=new ReactionLexer(&reactionFile);
     }
     else
     {
-      string msg="N_DEV_ReactionNetwork::setReactionNetworkFromFile:  Cannot open reaction specification file: "+fileName;
+      std::string msg="ReactionNetwork::setReactionNetworkFromFile:  Cannot open reaction specification file: "+fileName;
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
     }
     
-    N_DEV::N_DEV_ReactionParser theParser(theLexer,
-                                            theSpeciesIDs, 
-                                            *this);
+    XyceDevice::ReactionParser theParser(theLexer, theSpeciesIDs, *this);
     
     
     if (theParser.parse())
     {
 #ifdef Xyce_DEBUG_DEVICE
-      cout << *this << endl;
+      Xyce::dout() << *this << std::endl;
 #endif
-      string msg="N_DEV_ReactionNetwork::setReactionNetworkFromFile:  Parsing reaction spec failed.";
+      std::string msg="ReactionNetwork::setReactionNetworkFromFile:  Parsing reaction spec failed.";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
     }
     
@@ -244,7 +248,7 @@ N_DEV_ReactionNetwork::setReactionNetworkFromFile(const string &fileName)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setSpecies
+// Function      : ReactionNetwork::setSpecies
 // Purpose       : register a list of species names used in reactions.
 //                 
 // Special Notes : Once registered this way, it is assumed that all vectors
@@ -255,7 +259,7 @@ N_DEV_ReactionNetwork::setReactionNetworkFromFile(const string &fileName)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::setSpecies(vector<N_DEV::Specie> &theSpeciesVect)
+void ReactionNetwork::setSpecies(std::vector<Specie> &theSpeciesVect)
 {
 
   int i;
@@ -272,7 +276,7 @@ void N_DEV_ReactionNetwork::setSpecies(vector<N_DEV::Specie> &theSpeciesVect)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setConstants
+// Function      : ReactionNetwork::setConstants
 // Purpose       : register a list of constant species names used in reactions.
 //                 
 // Special Notes : Once registered this way, it is assumed that all
@@ -287,7 +291,7 @@ void N_DEV_ReactionNetwork::setSpecies(vector<N_DEV::Specie> &theSpeciesVect)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::setConstants(vector<N_DEV::Specie> &theConstantsVect)
+void ReactionNetwork::setConstants(std::vector<Specie> &theConstantsVect)
 {
 
   int i;
@@ -304,14 +308,14 @@ void N_DEV_ReactionNetwork::setConstants(vector<N_DEV::Specie> &theConstantsVect
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::addSpecie
+// Function      : ReactionNetwork::addSpecie
 // Purpose       : add one to the list of species names used in reactions.
 //                 
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::addSpecie(const N_DEV::Specie &aSpecie)
+void ReactionNetwork::addSpecie(const Specie &aSpecie)
 {
 
   int i=species.size(); // get index of next one we add
@@ -321,14 +325,14 @@ void N_DEV_ReactionNetwork::addSpecie(const N_DEV::Specie &aSpecie)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::addConstant
+// Function      : ReactionNetwork::addConstant
 // Purpose       : add one to the list of constant names used in reactions.
 //                 
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::addConstant(const N_DEV::Specie &aConstant)
+void ReactionNetwork::addConstant(const Specie &aConstant)
 {
 
   int i=constants.size(); // get index of next one we add
@@ -338,41 +342,37 @@ void N_DEV_ReactionNetwork::addConstant(const N_DEV::Specie &aConstant)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::addReaction
+// Function      : ReactionNetwork::addReaction
 // Purpose       : Create a new named reaction in the network
 // Special Notes : 
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::addReaction(string name)
+void ReactionNetwork::addReaction(const std::string &name)
 {
-
   N_DEV_Reaction dummy;
 
-  addReaction(name,dummy);
-
+  addReaction(name, dummy);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::addReaction
+// Function      : ReactionNetwork::addReaction
 // Purpose       : Add a reaction object into the network and give it a name
 // Special Notes : 
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::addReaction(string name, 
-                                             N_DEV_Reaction &reaction)
+void ReactionNetwork::addReaction(const std::string &name, N_DEV_Reaction &reaction)
 {
-
   // first check if there is already a reaction of that name in the
   // reactions map:
 
   if (reactionNamesMap.find(name) != reactionNamesMap.end())
   {
-    ostringstream ost;
-    ost << "  Attempt to add reaction duplicate name " << name << endl;
+    std::ostringstream ost;
+    ost << "  Attempt to add reaction duplicate name " << name << std::endl;
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, ost.str());
   }
 
@@ -390,26 +390,26 @@ void N_DEV_ReactionNetwork::addReaction(string name,
   // If so, keep track of it in a separate vector for such things.
   // we do this so we can later get at them quickly without doing name 
   // searches.
-  if (name.find("_ELECTRON_CAPTURE",0) != string::npos)
+  if (name.find("_ELECTRON_CAPTURE",0) != std::string::npos)
   {
     electronCaptureReactions.push_back(theReactions.size()-1);
   }
-  else if (name.find("_HOLE_CAPTURE",0) != string::npos)
+  else if (name.find("_HOLE_CAPTURE",0) != std::string::npos)
   {
     holeCaptureReactions.push_back(theReactions.size()-1);
   }
-  else if (name.find("_ELECTRON_EMISSION",0) != string::npos)
+  else if (name.find("_ELECTRON_EMISSION",0) != std::string::npos)
   {
     electronEmissionReactions.push_back(theReactions.size()-1);
   }
-  else if (name.find("_HOLE_EMISSION",0) != string::npos)
+  else if (name.find("_HOLE_EMISSION",0) != std::string::npos)
   {
     holeEmissionReactions.push_back(theReactions.size()-1);
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::addReactant
+// Function      : ReactionNetwork::addReactant
 // Purpose       : add a species/stoichiometric coefficient pair to the
 //                 reactant list of a specified named reaction
 //                 The species is specified using its name, and can be either
@@ -420,18 +420,18 @@ void N_DEV_ReactionNetwork::addReaction(string name,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::addReactant(string name, string reactant, double stoich)
+void ReactionNetwork::addReactant(const std::string &name, const std::string &reactant, double stoich)
 {
 
-  map<string,int>::iterator n_i;
+  std::map<std::string,int>::iterator n_i;
   // check that name exists in map
   int reactionNum;
   reactionNum=getReactionNum(name);
   if (reactionNum == -1)
   {
-    ostringstream ost;
+    std::ostringstream ost;
     ost << " Attempt to add reactant " << reactant 
-         << " to non-existant reaction " << name << endl;
+         << " to non-existant reaction " << name << std::endl;
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, ost.str());
   }
   else
@@ -446,10 +446,10 @@ void N_DEV_ReactionNetwork::addReactant(string name, string reactant, double sto
       n_i = constantsMap.find(reactant);
       if (n_i == constantsMap.end())
       { // nope
-        ostringstream ost;
+        std::ostringstream ost;
         ost << "attempt to add unknown reactant " << reactant 
             << " to reaction number " << reactionNum 
-            << "("<<name<<")"<<endl;
+            << "("<<name<<")"<<std::endl;
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, ost.str());
       }
       else
@@ -468,7 +468,7 @@ void N_DEV_ReactionNetwork::addReactant(string name, string reactant, double sto
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::addProduct
+// Function      : ReactionNetwork::addProduct
 // Purpose       : add a species/stoichiometric coefficient pair to the
 //                 product list of a specified named reaction
 //                 The species is specified using its name, and must be
@@ -479,10 +479,10 @@ void N_DEV_ReactionNetwork::addReactant(string name, string reactant, double sto
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::addProduct(string name, string product, double stoich)
+void ReactionNetwork::addProduct(const std::string &name, const std::string &product, double stoich)
 {
 
-  map<string,int>::iterator n_i;
+  std::map<std::string,int>::iterator n_i;
 
   // check that reaction name exists in map
   // check that name exists in map
@@ -490,9 +490,9 @@ void N_DEV_ReactionNetwork::addProduct(string name, string product, double stoic
   reactionNum=getReactionNum(name);
   if (reactionNum == -1)
   {
-    ostringstream ost;
+    std::ostringstream ost;
     ost << " Attempt to add product " << product 
-         << " to non-existant reaction " << name << endl;
+         << " to non-existant reaction " << name << std::endl;
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, ost.str());
   }
   else
@@ -507,22 +507,21 @@ void N_DEV_ReactionNetwork::addProduct(string name, string product, double stoic
       n_i = constantsMap.find(product);
       if (n_i == constantsMap.end())
       { // nope
-        ostringstream ost;
+        std::ostringstream ost;
         ost << "attempt to add unknown product " << product 
             << " to reaction number " << reactionNum 
-            << "("<<name<<")"<<endl;
+            << "("<<name<<")"<<std::endl;
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, ost.str());
       }
       else
       {
-        ostringstream ost;
+        std::ostringstream ost;
 
 #ifdef Xyce_RXN_WARNINGS
-        ost << " Specified constant species " << product
-            << " as product of reaction number "  << reactionNum
-            << "("<<name<<")"<<endl
-            << " IGNORING that product" << endl;
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING, ost.str());
+        Report::UserWarning() << " Specified constant species " << product
+                              << " as product of reaction number " << reactionNum
+                              << "(" << name << ")"<<std::endl
+                              << " IGNORING that product";
 #endif
       }
     }
@@ -538,23 +537,23 @@ void N_DEV_ReactionNetwork::addProduct(string name, string product, double stoic
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setRateConstant
+// Function      : ReactionNetwork::setRateConstant
 // Purpose       : set the rate constant for the named reaction
 // Special Notes : 
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::setRateConstant(string name, double k)
+void ReactionNetwork::setRateConstant(const std::string &name, double k)
 {
   int reactionNum;
   // check that reaction name exists in map
   reactionNum=getReactionNum(name);
   if (reactionNum == -1)
   {
-    ostringstream ost;
+    std::ostringstream ost;
     ost << " Attempt to set rate constant of non-existant reaction " 
-        << name << endl;
+        << name << std::endl;
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, ost.str());
   }
   else
@@ -564,14 +563,14 @@ void N_DEV_ReactionNetwork::setRateConstant(string name, double k)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::scaleRateConstant
+// Function      : ReactionNetwork::scaleRateConstant
 // Purpose       : set the rate constant for the named reaction
 // Special Notes : 
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 06/01/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::scaleRateConstant (string name, double kscale)
+void ReactionNetwork::scaleRateConstant(const std::string &name, double kscale)
 {
 
   int reactionNum;
@@ -579,9 +578,9 @@ void N_DEV_ReactionNetwork::scaleRateConstant (string name, double kscale)
   reactionNum = getReactionNum(name);
   if (reactionNum == -1)
   {
-    ostringstream ost;
+    std::ostringstream ost;
     ost << " Attempt to scale rate constant of non-existant reaction " 
-        << name << endl;
+        << name << std::endl;
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, ost.str());
   }
   else
@@ -591,7 +590,7 @@ void N_DEV_ReactionNetwork::scaleRateConstant (string name, double kscale)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setRateConstantFromCalculator
+// Function      : ReactionNetwork::setRateConstantFromCalculator
 // Purpose       : set the rate constant for the named reaction according
 //                 to its saved method
 // Special Notes : 
@@ -599,8 +598,7 @@ void N_DEV_ReactionNetwork::scaleRateConstant (string name, double kscale)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/01/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::setRateConstantFromCalculator (string name,
-                                                                double T)
+void ReactionNetwork::setRateConstantFromCalculator (const std::string &name, double T)
 {
 
   int reactionNum;
@@ -608,9 +606,9 @@ void N_DEV_ReactionNetwork::setRateConstantFromCalculator (string name,
   reactionNum = getReactionNum(name);
   if (reactionNum == -1)
   {
-    ostringstream ost;
+    std::ostringstream ost;
     ost << " Attempt to scale rate constant of non-existant reaction " 
-        << name << endl;
+        << name << std::endl;
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, ost.str());
   }
   else
@@ -620,7 +618,7 @@ void N_DEV_ReactionNetwork::setRateConstantFromCalculator (string name,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::scaleRateConstantFromCalculator
+// Function      : ReactionNetwork::scaleRateConstantFromCalculator
 // Purpose       : scale the rate constant for the named reaction according
 //                 to its saved method
 // Special Notes : 
@@ -628,7 +626,7 @@ void N_DEV_ReactionNetwork::setRateConstantFromCalculator (string name,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/01/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::scaleRateConstantFromCalculator (string name)
+void ReactionNetwork::scaleRateConstantFromCalculator(const std::string &name)
 {
 
   int reactionNum;
@@ -636,9 +634,9 @@ void N_DEV_ReactionNetwork::scaleRateConstantFromCalculator (string name)
   reactionNum = getReactionNum(name);
   if (reactionNum == -1)
   {
-    ostringstream ost;
+    std::ostringstream ost;
     ost << " Attempt to scale rate constant of non-existant reaction " 
-        << name << endl;
+        << name << std::endl;
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, ost.str());
   }
   else
@@ -648,7 +646,7 @@ void N_DEV_ReactionNetwork::scaleRateConstantFromCalculator (string name)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::unscaleRateConstantFromCalculator
+// Function      : ReactionNetwork::unscaleRateConstantFromCalculator
 // Purpose       : unscale the rate constant for the named reaction according
 //                 to its saved method
 // Special Notes : 
@@ -656,7 +654,7 @@ void N_DEV_ReactionNetwork::scaleRateConstantFromCalculator (string name)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/01/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::unscaleRateConstantFromCalculator (string name)
+void ReactionNetwork::unscaleRateConstantFromCalculator (const std::string &name)
 {
 
   int reactionNum;
@@ -664,9 +662,9 @@ void N_DEV_ReactionNetwork::unscaleRateConstantFromCalculator (string name)
   reactionNum = getReactionNum(name);
   if (reactionNum == -1)
   {
-    ostringstream ost;
+    std::ostringstream ost;
     ost << " Attempt to scale rate constant of non-existant reaction " 
-        << name << endl;
+        << name << std::endl;
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, ost.str());
   }
   else
@@ -676,7 +674,7 @@ void N_DEV_ReactionNetwork::unscaleRateConstantFromCalculator (string name)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setRateConstantsFromCalc
+// Function      : ReactionNetwork::setRateConstantsFromCalc
 // Purpose       : set the rate constant for the all reaction according
 //                 to their saved methods
 // Special Notes : 
@@ -684,7 +682,7 @@ void N_DEV_ReactionNetwork::unscaleRateConstantFromCalculator (string name)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/02/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::setRateConstantsFromCalc(double T)
+void ReactionNetwork::setRateConstantsFromCalc(double T)
 {
   int numReacts=theReactions.size();
   int i;
@@ -695,7 +693,7 @@ void N_DEV_ReactionNetwork::setRateConstantsFromCalc(double T)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::scaleRateConstantsFromCalc
+// Function      : ReactionNetwork::scaleRateConstantsFromCalc
 // Purpose       : scale the rate constant for the all reaction according
 //                 to their saved methods
 // Special Notes : 
@@ -703,7 +701,7 @@ void N_DEV_ReactionNetwork::setRateConstantsFromCalc(double T)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/02/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::scaleRateConstantsFromCalc()
+void ReactionNetwork::scaleRateConstantsFromCalc()
 {
   int numReacts=theReactions.size();
   int i;
@@ -714,7 +712,7 @@ void N_DEV_ReactionNetwork::scaleRateConstantsFromCalc()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::unscaleRateConstantsFromCalc
+// Function      : ReactionNetwork::unscaleRateConstantsFromCalc
 // Purpose       : unscale the rate constant for the all reaction according
 //                 to their saved methods
 // Special Notes : 
@@ -722,7 +720,7 @@ void N_DEV_ReactionNetwork::scaleRateConstantsFromCalc()
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/02/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::unscaleRateConstantsFromCalc()
+void ReactionNetwork::unscaleRateConstantsFromCalc()
 {
   int numReacts=theReactions.size();
   int i;
@@ -733,7 +731,7 @@ void N_DEV_ReactionNetwork::unscaleRateConstantsFromCalc()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setScaleParams
+// Function      : ReactionNetwork::setScaleParams
 // Purpose       : set the scale parameters and pass them down to any existing
 //                 reactions.  Done this way, we make sure that all reactions
 //                 in the network are reset to the same set of scale 
@@ -747,10 +745,10 @@ void N_DEV_ReactionNetwork::unscaleRateConstantsFromCalc()
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/24/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::setScaleParams(double c,double t, double x)
+void ReactionNetwork::setScaleParams(double c,double t, double x)
 {
-  vector<N_DEV_Reaction>::iterator reactionIter=theReactions.begin();
-  vector<N_DEV_Reaction>::iterator reactionIterEnd=theReactions.end();
+  std::vector<N_DEV_Reaction>::iterator reactionIter=theReactions.begin();
+  std::vector<N_DEV_Reaction>::iterator reactionIterEnd=theReactions.end();
   C0=c;
   t0=t;
   x0=x;
@@ -762,29 +760,28 @@ void N_DEV_ReactionNetwork::setScaleParams(double c,double t, double x)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::addSourceTerm
+// Function      : ReactionNetwork::addSourceTerm
 // Purpose       : add an expression for a source term
 // Special Notes : 
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/04/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::addSourceTerm(string speciesName, 
-                                               string expressionStr)
+void ReactionNetwork::addSourceTerm(const std::string &speciesName, const std::string &expressionStr)
 {
   if (applySources)
   {
     int speciesNum=getSpeciesNum(speciesName);
     if (speciesNum >= 0) // the species exists
     {
-      N_UTL_Expression *foo= new N_UTL_Expression(expressionStr);
-      theSourceTerms.push_back( pair<int,N_UTL_Expression *>(speciesNum, foo));
+      Util::Expression *foo= new Util::Expression(expressionStr);
+      theSourceTerms.push_back( std::pair<int,Util::Expression *>(speciesNum, foo));
     }
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::addSourceTerm
+// Function      : ReactionNetwork::addSourceTerm
 // Purpose       : add an expression for a source term given 
 //                 already-constructed expression object.
 // Special Notes : 
@@ -792,21 +789,20 @@ void N_DEV_ReactionNetwork::addSourceTerm(string speciesName,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/04/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::addSourceTerm(string speciesName, 
-                                               N_UTL_Expression *expression)
+void ReactionNetwork::addSourceTerm(const std::string &speciesName, Util::Expression *expression)
 {
   int speciesNum=getSpeciesNum(speciesName);
-  N_UTL_Expression * ExpressionCopy=new N_UTL_Expression(*expression);
+  Util::Expression * ExpressionCopy=new Util::Expression(*expression);
 
   if (speciesNum >= 0) // the species exists
   {
     theSourceTerms.push_back(
-       pair<int,N_UTL_Expression *>(speciesNum,ExpressionCopy));
+       std::pair<int,Util::Expression *>(speciesNum,ExpressionCopy));
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::addMasterSourceTerm
+// Function      : ReactionNetwork::addMasterSourceTerm
 // Purpose       : add an expression for a source term that depends on a
 //                 "master" source value.
 // Special Notes : 
@@ -814,7 +810,7 @@ void N_DEV_ReactionNetwork::addSourceTerm(string speciesName,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/04/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::addMasterSourceTerm(string speciesName) 
+void ReactionNetwork::addMasterSourceTerm(const std::string &speciesName) 
 {
   int speciesNum=getSpeciesNum(speciesName);
 
@@ -825,18 +821,18 @@ void N_DEV_ReactionNetwork::addMasterSourceTerm(string speciesName)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::setSimTime
+// Function      : ReactionNetwork::setSimTime
 // Purpose       : set internal "time" variable for all source terms
 // Special Notes : 
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/04/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::setSimTime(double time)
+void ReactionNetwork::setSimTime(double time)
 {
-  vector< pair<int,N_UTL_Expression *> >::iterator iterSource=
+  std::vector< std::pair<int,Util::Expression *> >::iterator iterSource=
     theSourceTerms.begin();
-  vector< pair<int,N_UTL_Expression *> >::iterator source_end=
+  std::vector< std::pair<int,Util::Expression *> >::iterator source_end=
     theSourceTerms.end();
 
   for (;iterSource != source_end; ++iterSource)
@@ -846,7 +842,7 @@ void N_DEV_ReactionNetwork::setSimTime(double time)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getBreakpointTime
+// Function      : ReactionNetwork::getBreakpointTime
 // Purpose       : return the next time at which any source will have a 
 //                 breakpoint
 // Special Notes : 
@@ -854,12 +850,12 @@ void N_DEV_ReactionNetwork::setSimTime(double time)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-double N_DEV_ReactionNetwork::getBreakpointTime()
+double ReactionNetwork::getBreakpointTime()
 {
   double breaktime=0, btime;
-  vector< pair<int,N_UTL_Expression *> >::iterator iterSource=
+  std::vector< std::pair<int,Util::Expression *> >::iterator iterSource=
     theSourceTerms.begin();
-  vector< pair<int,N_UTL_Expression *> >::iterator source_end=
+  std::vector< std::pair<int,Util::Expression *> >::iterator source_end=
     theSourceTerms.end();
 
   for (;iterSource != source_end; ++iterSource)
@@ -883,15 +879,15 @@ double N_DEV_ReactionNetwork::getBreakpointTime()
 }
   
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getDdt
+// Function      : ReactionNetwork::getDdt
 // Purpose       : compute the time derivative of all species concentrations
 // Special Notes : 
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::getDdt(vector<double> &concs,vector<double> &constant_vec,
-              vector<double> &ddt)
+void ReactionNetwork::getDdt(std::vector<double> &concs,std::vector<double> &constant_vec,
+              std::vector<double> &ddt)
 {
   int rSize=theReactions.size();
   int i;
@@ -901,9 +897,9 @@ void N_DEV_ReactionNetwork::getDdt(vector<double> &concs,vector<double> &constan
   }
 
   // add in the source terms
-  vector< pair<int,N_UTL_Expression *> >::iterator iterSource=
+  std::vector< std::pair<int,Util::Expression *> >::iterator iterSource=
     theSourceTerms.begin();
-  vector< pair<int,N_UTL_Expression *> >::iterator source_end=
+  std::vector< std::pair<int,Util::Expression *> >::iterator source_end=
     theSourceTerms.end();
 
   for (;iterSource != source_end; ++iterSource)
@@ -915,8 +911,8 @@ void N_DEV_ReactionNetwork::getDdt(vector<double> &concs,vector<double> &constan
   }
 
   // Add in the master source terms:
-  vector<int>::iterator iterMasterSource=masterSourceSpecies.begin();
-  vector<int>::iterator masterSource_end=masterSourceSpecies.end();
+  std::vector<int>::iterator iterMasterSource=masterSourceSpecies.begin();
+  std::vector<int>::iterator masterSource_end=masterSourceSpecies.end();
   for (; iterMasterSource!= masterSource_end; ++iterMasterSource)
   {
     ddt[*iterMasterSource] += masterSourceValue*sourceScaleFac;
@@ -925,7 +921,7 @@ void N_DEV_ReactionNetwork::getDdt(vector<double> &concs,vector<double> &constan
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getJac
+// Function      : ReactionNetwork::getJac
 // Purpose       : compute the jacobian of the reaction network, the 
 //                 derivatives of the time derivatives with respect to species
 //                 concentration.
@@ -934,8 +930,8 @@ void N_DEV_ReactionNetwork::getDdt(vector<double> &concs,vector<double> &constan
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::getJac(vector<double> &concs, vector<double> &constant_vec,
-              vector<vector<double> >&jac)
+void ReactionNetwork::getJac(std::vector<double> &concs, std::vector<double> &constant_vec,
+              std::vector<std::vector<double> >&jac)
 {
   int rSize=theReactions.size();
   int i;
@@ -946,7 +942,7 @@ void N_DEV_ReactionNetwork::getJac(vector<double> &concs, vector<double> &consta
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getDFdConst
+// Function      : ReactionNetwork::getDFdConst
 // Purpose       : compute the derivatives of the RHS with respect to 
 //                 a specified constant concentration.
 // Special Notes : 
@@ -954,10 +950,10 @@ void N_DEV_ReactionNetwork::getJac(vector<double> &concs, vector<double> &consta
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 10/17/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::getDFdConst( const string & constantName,
-                                              vector<double> &concs, 
-                                              vector<double> &constant_vec,
-                                              vector<double> &dFdConst)
+void ReactionNetwork::getDFdConst( const std::string & constantName,
+                                              std::vector<double> &concs, 
+                                              std::vector<double> &constant_vec,
+                                              std::vector<double> &dFdConst)
 {
   int rSize=theReactions.size();
   int cSize=concs.size();
@@ -976,7 +972,7 @@ void N_DEV_ReactionNetwork::getDFdConst( const string & constantName,
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getRate
+// Function      : ReactionNetwork::getRate
 // Purpose       : Compute the total rate at which species are "consumed" or
 //                 "produced" by all the capture and emission reactions, 
 //                 if there are any.  This can be used even if the species
@@ -994,10 +990,10 @@ void N_DEV_ReactionNetwork::getDFdConst( const string & constantName,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 09/13/06
 //-----------------------------------------------------------------------------
-double N_DEV_ReactionNetwork::getRate(vector<double> &concs, 
-                                           vector<double> &constant_vec,
-                                           vector<int> &captureVect,
-                                           vector<int> &emissionVect)
+double ReactionNetwork::getRate(std::vector<double> &concs, 
+                                           std::vector<double> &constant_vec,
+                                           std::vector<int> &captureVect,
+                                           std::vector<int> &emissionVect)
 {
   int i;
   double rate=0;
@@ -1016,7 +1012,7 @@ double N_DEV_ReactionNetwork::getRate(vector<double> &concs,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getCaptureLifetime
+// Function      : ReactionNetwork::getCaptureLifetime
 // Purpose       : Given a list of capture reaction numbers and the 
 //                 species number of the concentration consumed by those
 //                 reactions, return the lifetime.
@@ -1028,9 +1024,9 @@ double N_DEV_ReactionNetwork::getRate(vector<double> &concs,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 09/20/06
 //-----------------------------------------------------------------------------
-double N_DEV_ReactionNetwork::getCaptureLifetime(vector<double> &concs, 
-                                           vector<double> &constant_vec,
-                                           vector<int> &captureVect,
+double ReactionNetwork::getCaptureLifetime(std::vector<double> &concs, 
+                                           std::vector<double> &constant_vec,
+                                           std::vector<int> &captureVect,
                                            double & concentration)
 {
   int i;
@@ -1051,7 +1047,7 @@ double N_DEV_ReactionNetwork::getCaptureLifetime(vector<double> &concs,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getCaptureLifetimes
+// Function      : ReactionNetwork::getCaptureLifetimes
 // Purpose       : Given a list of capture reaction numbers and the 
 //                 species number of the concentration consumed by those
 //                 reactions, return a vector of lifetimes due to each 
@@ -1064,11 +1060,11 @@ double N_DEV_ReactionNetwork::getCaptureLifetime(vector<double> &concs,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 09/20/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::getCaptureLifetimes(vector<double> &concs, 
-                                           vector<double> &constant_vec,
-                                           vector<int> &captureVect,
+void ReactionNetwork::getCaptureLifetimes(std::vector<double> &concs, 
+                                           std::vector<double> &constant_vec,
+                                           std::vector<int> &captureVect,
                                            double & concentration,
-                                           vector<double> &lifetimes)
+                                           std::vector<double> &lifetimes)
 {
   int i;
   lifetimes.resize(captureVect.size());
@@ -1087,7 +1083,7 @@ void N_DEV_ReactionNetwork::getCaptureLifetimes(vector<double> &concs,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getDRateDC
+// Function      : ReactionNetwork::getDRateDC
 // Purpose       : Compute the vector of derivatives of the Rate (as returned 
 //                 by getRate) with respect to concentrations
 //             
@@ -1107,15 +1103,15 @@ void N_DEV_ReactionNetwork::getCaptureLifetimes(vector<double> &concs,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 09/13/06
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::getDRateDC(vector<double> &concs, 
-                                            vector<double> &constant_vec,
-                                            vector<int> &captureVect,
-                                            vector<int> &emissionVect,
-                                            vector<double> &dRatedC)
+void ReactionNetwork::getDRateDC(std::vector<double> &concs, 
+                                            std::vector<double> &constant_vec,
+                                            std::vector<int> &captureVect,
+                                            std::vector<int> &emissionVect,
+                                            std::vector<double> &dRatedC)
 {
   int i,j;
   int cSize=dRatedC.size();
-  vector<double> tempdRdC(cSize);
+  std::vector<double> tempdRdC(cSize);
 
   for (i=0;i<cSize;++i)
   {
@@ -1131,7 +1127,7 @@ void N_DEV_ReactionNetwork::getDRateDC(vector<double> &concs,
     {
       dRatedC[j] -= tempdRdC[j];
 #ifdef Xyce_DEBUG_DEVICE
-      //cout << "N_DEV_ReactionNetwork::getDRateDC:  Reaction: "<<captureVect[i]<<" tempdRdC["<<j<<"] = " << tempdRdC[j]<<endl;
+      //cout << "ReactionNetwork::getDRateDC:  Reaction: "<<captureVect[i]<<" tempdRdC["<<j<<"] = " << tempdRdC[j]<<std::endl;
 #endif
     }
   }
@@ -1145,7 +1141,7 @@ void N_DEV_ReactionNetwork::getDRateDC(vector<double> &concs,
     {
       dRatedC[j] += tempdRdC[j];
 #ifdef Xyce_DEBUG_DEVICE
-      //cout << "N_DEV_ReactionNetwork::getDRateDC:  Reaction: "<<emissionVect[i]<<" tempdRdC["<<j<<"] = " << tempdRdC[j]<<endl;
+      //cout << "ReactionNetwork::getDRateDC:  Reaction: "<<emissionVect[i]<<" tempdRdC["<<j<<"] = " << tempdRdC[j]<<std::endl;
 #endif
     }
   }
@@ -1153,7 +1149,7 @@ void N_DEV_ReactionNetwork::getDRateDC(vector<double> &concs,
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_ReactionNetwork::getDRateDConst
+// Function      : ReactionNetwork::getDRateDConst
 //
 // Purpose       : Compute the vector of derivatives of the Rate (as returned 
 //                 by getRate) with respect to constants, like E and H.
@@ -1174,15 +1170,15 @@ void N_DEV_ReactionNetwork::getDRateDC(vector<double> &concs,
 // Creator       : Eric Keiter
 // Creation Date : 11/15/08
 //-----------------------------------------------------------------------------
-void N_DEV_ReactionNetwork::getDRateDConst(vector<double> &concs, 
-                                                vector<double> &constant_vec,
-                                                vector<int> &captureVect,
-                                                vector<int> &emissionVect,
-                                                vector<double> &dRatedConst)
+void ReactionNetwork::getDRateDConst(std::vector<double> &concs, 
+                                                std::vector<double> &constant_vec,
+                                                std::vector<int> &captureVect,
+                                                std::vector<int> &emissionVect,
+                                                std::vector<double> &dRatedConst)
 {
   int i,j;
   int cSize=dRatedConst.size();
-  vector<double> tempdRdConst(cSize);
+  std::vector<double> tempdRdConst(cSize);
 
   for (i=0;i<cSize;++i)
   {
@@ -1198,15 +1194,15 @@ void N_DEV_ReactionNetwork::getDRateDConst(vector<double> &concs,
       theReactions[captureVect[i]].getDRateDConst(j, concs, constant_vec, tempdRdConst[j]);
       dRatedConst[j] -= tempdRdConst[j];
 #ifdef Xyce_DEBUG_DEVICE
-      //cout << "N_DEV_ReactionNetwork::getDRateDConst:  Reaction: "<<captureVect[i]<<" tempdRdConst["<<j<<"] = " << tempdRdConst[j]<<endl;
+      //cout << "ReactionNetwork::getDRateDConst:  Reaction: "<<captureVect[i]<<" tempdRdConst["<<j<<"] = " << tempdRdConst[j]<<std::endl;
 #endif
     }
   }
 #ifdef Xyce_DEBUG_DEVICE
-  //cout << "After capture reactions:"<<endl;
+  //cout << "After capture reactions:"<<std::endl;
   //for (j=0;j<cSize;++j)
   //{
-    //cout << "N_DEV_ReactionNetwork::getDRateDConst:  dRatedConst["<<j<<"] =" << dRatedConst[j] << endl;
+    //cout << "ReactionNetwork::getDRateDConst:  dRatedConst["<<j<<"] =" << dRatedConst[j] << std::endl;
   //}
 #endif
 
@@ -1219,20 +1215,19 @@ void N_DEV_ReactionNetwork::getDRateDConst(vector<double> &concs,
       theReactions[emissionVect[i]].getDRateDConst(j, concs, constant_vec, tempdRdConst[j]);
       dRatedConst[j] += tempdRdConst[j];
 #ifdef Xyce_DEBUG_DEVICE
-      //cout << "N_DEV_ReactionNetwork::getDRateDConst:  Reaction: "<<emissionVect[i]<<" tempdRdConst["<<j<<"] = " << tempdRdConst[j]<<endl;
+      //cout << "ReactionNetwork::getDRateDConst:  Reaction: "<<emissionVect[i]<<" tempdRdConst["<<j<<"] = " << tempdRdConst[j]<<std::endl;
 #endif
     }
   }
 #ifdef Xyce_DEBUG_DEVICE
-  //cout << "After emission reactions:"<<endl;
+  //cout << "After emission reactions:"<<std::endl;
   //for (j=0;j<cSize;++j)
   //{
-    //cout << "N_DEV_ReactionNetwork::getDRateDConst:  dRatedConst["<<j<<"] =" << dRatedConst[j] << endl;
+    //cout << "ReactionNetwork::getDRateDConst:  dRatedConst["<<j<<"] =" << dRatedConst[j] << std::endl;
   //}
 #endif
 
 }
 
-
-
-
+} // namespace Device
+} // namespace Xyce

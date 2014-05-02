@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.4.2.2 $
+// Revision Number: $Revision: 1.7.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -61,41 +61,41 @@ namespace Device {
 template <typename ScalarT>
 class interpolator
 {
-  public:
-    interpolator (){};
+public:
+  interpolator (){};
 
-    virtual void clear (){};
+  virtual void clear (){};
 
-    virtual void init (const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya){};
+  virtual void init (const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya){};
 
-    virtual void eval (
-      const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
-      const ScalarT & x, ScalarT & y){};
+  virtual void eval (
+     const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
+     const ScalarT & x, ScalarT & y){};
 
-    virtual void eval_deriv (
-      const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
-      const ScalarT & x, ScalarT & dydx){};
+  virtual void eval_deriv (
+     const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
+     const ScalarT & x, ScalarT & dydx){};
 
-    virtual void eval_deriv2 (
-      const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
-      const ScalarT & x, ScalarT & ypp){};
+  virtual void eval_deriv2 (
+     const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
+     const ScalarT & x, ScalarT & ypp){};
 
-    virtual void eval_integ (
-      const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
-      const ScalarT & a, const ScalarT & b, ScalarT & result){};
+  virtual void eval_integ (
+     const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
+     const ScalarT & a, const ScalarT & b, ScalarT & result){};
 
-    inline size_t
-    binarySearch(
-        const std::vector<ScalarT> & xa,
-        const ScalarT & x,
-        size_t index_lo,
-        size_t index_hi);
+  inline size_t
+  binarySearch(
+     const std::vector<ScalarT> & xa,
+     const ScalarT & x,
+     size_t index_lo,
+     size_t index_hi);
 
-    inline ScalarT
-    integ_eval (
-        const ScalarT & ai, const ScalarT & bi, const ScalarT & ci,
-        const ScalarT & di, const ScalarT & xi, const ScalarT & a,
-        const ScalarT & b);
+  inline ScalarT
+  integ_eval (
+     const ScalarT & ai, const ScalarT & bi, const ScalarT & ci,
+     const ScalarT & di, const ScalarT & xi, const ScalarT & a,
+     const ScalarT & b);
 };
 
 //-----------------------------------------------------------------------------
@@ -131,10 +131,10 @@ class interpolator
 template <typename ScalarT>
 inline size_t
 interpolator<ScalarT>::binarySearch(
-    const std::vector<ScalarT> & xa,
-    const ScalarT & x,
-    size_t index_lo,
-    size_t index_hi)
+   const std::vector<ScalarT> & xa,
+   const ScalarT & x,
+   size_t index_lo,
+   size_t index_hi)
 {
   size_t ilo = index_lo;
   size_t ihi = index_hi;
@@ -167,13 +167,13 @@ interpolator<ScalarT>::binarySearch(
 template <typename ScalarT>
 inline ScalarT
 interpolator<ScalarT>::integ_eval (
-  const ScalarT & ai,
-  const ScalarT & bi,
-  const ScalarT & ci,
-  const ScalarT & di,
-  const ScalarT & xi,
-  const ScalarT & a,
-  const ScalarT & b)
+   const ScalarT & ai,
+   const ScalarT & bi,
+   const ScalarT & ci,
+   const ScalarT & di,
+   const ScalarT & xi,
+   const ScalarT & a,
+   const ScalarT & b)
 {
   const ScalarT r1 = a - xi;
   const ScalarT r2 = b - xi;
@@ -194,41 +194,41 @@ interpolator<ScalarT>::integ_eval (
 template <typename ScalarT>
 class akima: public interpolator<ScalarT>
 {
-  public:
-    akima () {};
+public:
+  akima () {};
 
-    void init ( const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya);
+  void init ( const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya);
 
-    void clear () { b.clear(); c.clear(); d.clear(); _m.clear(); };
+  void clear () { b.clear(); c.clear(); d.clear(); _m.clear(); };
 
-    void eval (
-      const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
-      const ScalarT & x, ScalarT & y);
+  void eval (
+     const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
+     const ScalarT & x, ScalarT & y);
 
-    void eval_deriv (
-      const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
-      const ScalarT & x, ScalarT & dydx);
+  void eval_deriv (
+     const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
+     const ScalarT & x, ScalarT & dydx);
 
-    void eval_deriv2 (
-      const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
-      const ScalarT & x, ScalarT & ypp);
+  void eval_deriv2 (
+     const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
+     const ScalarT & x, ScalarT & ypp);
 
-    void eval_integ (
-      const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
-      const ScalarT & a, const ScalarT & b, ScalarT & result);
+  void eval_integ (
+     const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
+     const ScalarT & a, const ScalarT & b, ScalarT & result);
 
-    void calc (
-        const std::vector<ScalarT> & xa,
-        std::vector<ScalarT> & b,
-        std::vector<ScalarT> & c,
-        std::vector<ScalarT> & d,
-        std::vector<ScalarT> & m);
+  void calc (
+     const std::vector<ScalarT> & xa,
+     std::vector<ScalarT> & b,
+     std::vector<ScalarT> & c,
+     std::vector<ScalarT> & d,
+     std::vector<ScalarT> & m);
 
-  public:
-    std::vector<ScalarT>  b;
-    std::vector<ScalarT>  c;
-    std::vector<ScalarT>  d;
-    std::vector<ScalarT>  _m;
+public:
+  std::vector<ScalarT>  b;
+  std::vector<ScalarT>  c;
+  std::vector<ScalarT>  d;
+  std::vector<ScalarT>  _m;
 };
 
 //-----------------------------------------------------------------------------
@@ -251,11 +251,11 @@ class akima: public interpolator<ScalarT>
 // ----------------------------------------------------------------------------
 template <typename ScalarT>
 void akima<ScalarT>::calc (
-    const std::vector<ScalarT> & xa,
-    std::vector<ScalarT> & b,
-    std::vector<ScalarT> & c,
-    std::vector<ScalarT> & d,
-    std::vector<ScalarT> & m)
+   const std::vector<ScalarT> & xa,
+   std::vector<ScalarT> & b,
+   std::vector<ScalarT> & c,
+   std::vector<ScalarT> & d,
+   std::vector<ScalarT> & m)
 {
   size_t i;
   size_t size = xa.size();
@@ -306,8 +306,8 @@ void akima<ScalarT>::calc (
 // ----------------------------------------------------------------------------
 template <typename ScalarT>
 void akima<ScalarT>::init (
-    const std::vector<ScalarT> & xa,
-    const std::vector<ScalarT> & ya)
+   const std::vector<ScalarT> & xa,
+   const std::vector<ScalarT> & ya)
 {
   size_t size = xa.size();
 
@@ -340,10 +340,10 @@ void akima<ScalarT>::init (
 // ----------------------------------------------------------------------------
 template <typename ScalarT>
 void akima<ScalarT>::eval (
-    const std::vector<ScalarT> & xa,
-    const std::vector<ScalarT> & ya,
-    const ScalarT & x,
-    ScalarT & y)
+   const std::vector<ScalarT> & xa,
+   const std::vector<ScalarT> & ya,
+   const ScalarT & x,
+   ScalarT & y)
 {
   size_t size = xa.size();
   size_t index = this->binarySearch (xa, x, 0, size - 1);
@@ -364,10 +364,10 @@ void akima<ScalarT>::eval (
 // ----------------------------------------------------------------------------
 template <typename ScalarT>
 void akima<ScalarT>::eval_deriv (
-    const std::vector<ScalarT> & xa,
-    const std::vector<ScalarT> & ya,
-    const ScalarT & x,
-    ScalarT & dydx)
+   const std::vector<ScalarT> & xa,
+   const std::vector<ScalarT> & ya,
+   const ScalarT & x,
+   ScalarT & dydx)
 {
   size_t size = xa.size();
   size_t index = this->binarySearch (xa, x, 0, size - 1);
@@ -388,10 +388,10 @@ void akima<ScalarT>::eval_deriv (
 // ----------------------------------------------------------------------------
 template <typename ScalarT>
 void akima<ScalarT>::eval_deriv2 (
-    const std::vector<ScalarT> & xa,
-    const std::vector<ScalarT> & ya,
-    const ScalarT & x,
-    ScalarT & ypp)
+   const std::vector<ScalarT> & xa,
+   const std::vector<ScalarT> & ya,
+   const ScalarT & x,
+   ScalarT & ypp)
 {
   size_t size = xa.size();
   size_t index = this->binarySearch (xa, x, 0, size - 1);
@@ -412,11 +412,11 @@ void akima<ScalarT>::eval_deriv2 (
 // ----------------------------------------------------------------------------
 template <typename ScalarT>
 void akima<ScalarT>::eval_integ (
-    const std::vector<ScalarT> & xa,
-    const std::vector<ScalarT> & ya,
-    const ScalarT & ai,
-    const ScalarT & bi,
-    ScalarT & result)
+   const std::vector<ScalarT> & xa,
+   const std::vector<ScalarT> & ya,
+   const ScalarT & ai,
+   const ScalarT & bi,
+   ScalarT & result)
 {
   size_t size = xa.size();
   size_t index_a = this->binarySearch (xa, ai, 0, size - 1);
@@ -462,32 +462,32 @@ void akima<ScalarT>::eval_integ (
 template <typename ScalarT>
 class cubicSpline: public interpolator<ScalarT>
 {
-  public:
-    cubicSpline () {};
+public:
+  cubicSpline () {};
 
-    void init ( const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya);
+  void init ( const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya);
 
-    void clear () { y2.clear(); };
+  void clear () { y2.clear(); };
 
-    void eval (
-      const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
-      const ScalarT & x, ScalarT & y);
+  void eval (
+     const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
+     const ScalarT & x, ScalarT & y);
 
-    void eval_deriv (
-      const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
-      const ScalarT & x, ScalarT & dydx);
+  void eval_deriv (
+     const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
+     const ScalarT & x, ScalarT & dydx);
 
-    void eval_deriv2 (
-      const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
-      const ScalarT & x, ScalarT & ypp);
+  void eval_deriv2 (
+     const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
+     const ScalarT & x, ScalarT & ypp);
 
-    // not implemented
-    void eval_integ (
-      const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
-      const ScalarT & a, const ScalarT & b, ScalarT & result) {};
+  // not implemented
+  void eval_integ (
+     const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
+     const ScalarT & a, const ScalarT & b, ScalarT & result) {};
 
-  public:
-    std::vector<ScalarT> y2;
+public:
+  std::vector<ScalarT> y2;
 };
 
 //-----------------------------------------------------------------------------
@@ -502,8 +502,8 @@ class cubicSpline: public interpolator<ScalarT>
 //-----------------------------------------------------------------------------
 template <typename ScalarT>
 void cubicSpline<ScalarT>::init
-  (const std::vector<ScalarT> & xa,
-   const std::vector<ScalarT> & ya)
+(const std::vector<ScalarT> & xa,
+ const std::vector<ScalarT> & ya)
 {
   if (y2.size() != xa.size())
   {
@@ -527,7 +527,7 @@ void cubicSpline<ScalarT>::init
     p = sig*y2[i-1] + 2.0;
     y2[i] = (sig-1.0)/p;
     u[i] = (ya[i+1]-ya[i])/(xa[i+1]-xa[i]) -
-            (ya[i]-ya[i-1])/(xa[i]-xa[i-1]);
+      (ya[i]-ya[i-1])/(xa[i]-xa[i-1]);
     u[i] = (6.0*u[i]/(xa[i+1]-xa[i-1]) - sig*u[i-1])/p;
   }
 
@@ -549,10 +549,10 @@ void cubicSpline<ScalarT>::init
 //-----------------------------------------------------------------------------
 template <typename ScalarT>
 void cubicSpline<ScalarT>::eval(
-      const std::vector<ScalarT> & xa,
-      const std::vector<ScalarT> & ya,
-      const ScalarT & x_position,
-      ScalarT & y_spline)
+   const std::vector<ScalarT> & xa,
+   const std::vector<ScalarT> & ya,
+   const ScalarT & x_position,
+   ScalarT & y_spline)
 {
   // This method adapted from "Numerical Recipes in C++"
   int n = xa.size();
@@ -606,10 +606,10 @@ void cubicSpline<ScalarT>::eval(
 //-----------------------------------------------------------------------------
 template <typename ScalarT>
 void cubicSpline<ScalarT>::eval_deriv(
-      const std::vector<ScalarT> & xa,
-      const std::vector<ScalarT> & ya,
-      const ScalarT & x_position,
-      ScalarT & dydx_spline)
+   const std::vector<ScalarT> & xa,
+   const std::vector<ScalarT> & ya,
+   const ScalarT & x_position,
+   ScalarT & dydx_spline)
 {
   // This method adapted from "Numerical Recipes in C++"
   int n = xa.size();
@@ -660,10 +660,10 @@ void cubicSpline<ScalarT>::eval_deriv(
 //-----------------------------------------------------------------------------
 template <typename ScalarT>
 void cubicSpline<ScalarT>::eval_deriv2(
-      const std::vector<ScalarT> & xa,
-      const std::vector<ScalarT> & ya,
-      const ScalarT & x_position,
-      ScalarT & ypp)
+   const std::vector<ScalarT> & xa,
+   const std::vector<ScalarT> & ya,
+   const ScalarT & x_position,
+   ScalarT & ypp)
 {
   // This method adapted from "Numerical Recipes in C++"
   int n = xa.size();
@@ -709,30 +709,30 @@ void cubicSpline<ScalarT>::eval_deriv2(
 template <typename ScalarT>
 class linear: public interpolator<ScalarT>
 {
-  public:
-    linear () {};
+public:
+  linear () {};
 
-    void init ( const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya) {};
+  void init ( const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya) {};
 
-    void clear () { };
+  void clear () { };
 
-    void eval (
-      const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
-      const ScalarT & x, ScalarT & y);
+  void eval (
+     const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
+     const ScalarT & x, ScalarT & y);
 
-    void eval_deriv (
-      const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
-      const ScalarT & x, ScalarT & dydx);
+  void eval_deriv (
+     const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
+     const ScalarT & x, ScalarT & dydx);
 
-    void eval_deriv2 (
-      const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
-      const ScalarT & x, ScalarT & ypp);
+  void eval_deriv2 (
+     const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
+     const ScalarT & x, ScalarT & ypp);
 
-    void eval_integ (
-      const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
-      const ScalarT & a, const ScalarT & b, ScalarT & result);
+  void eval_integ (
+     const std::vector<ScalarT> & xa, const std::vector<ScalarT> & ya,
+     const ScalarT & a, const ScalarT & b, ScalarT & result);
 
-  public:
+public:
 
 };
 
@@ -747,10 +747,10 @@ class linear: public interpolator<ScalarT>
 //-----------------------------------------------------------------------------
 template <typename ScalarT>
 void linear<ScalarT>::eval(
-      const std::vector<ScalarT> & xa,
-      const std::vector<ScalarT> & ya,
-      const ScalarT & x,
-      ScalarT & y)
+   const std::vector<ScalarT> & xa,
+   const std::vector<ScalarT> & ya,
+   const ScalarT & x,
+   ScalarT & y)
 {
   int n = xa.size();
 
@@ -794,10 +794,10 @@ void linear<ScalarT>::eval(
 //-----------------------------------------------------------------------------
 template <typename ScalarT>
 void linear<ScalarT>::eval_deriv(
-      const std::vector<ScalarT> & xa,
-      const std::vector<ScalarT> & ya,
-      const ScalarT & x,
-      ScalarT & dydx)
+   const std::vector<ScalarT> & xa,
+   const std::vector<ScalarT> & ya,
+   const ScalarT & x,
+   ScalarT & dydx)
 {
   int n = xa.size();
 
@@ -841,10 +841,10 @@ void linear<ScalarT>::eval_deriv(
 //-----------------------------------------------------------------------------
 template <typename ScalarT>
 void linear<ScalarT>::eval_deriv2(
-      const std::vector<ScalarT> & xa,
-      const std::vector<ScalarT> & ya,
-      const ScalarT & x,
-      ScalarT & ypp)
+   const std::vector<ScalarT> & xa,
+   const std::vector<ScalarT> & ya,
+   const ScalarT & x,
+   ScalarT & ypp)
 {
   ypp = 0.0;
 }
@@ -859,11 +859,11 @@ void linear<ScalarT>::eval_deriv2(
 // ----------------------------------------------------------------------------
 template <typename ScalarT>
 void linear<ScalarT>::eval_integ (
-    const std::vector<ScalarT> & xa,
-    const std::vector<ScalarT> & ya,
-    const ScalarT & a,
-    const ScalarT & b,
-    ScalarT & result)
+   const std::vector<ScalarT> & xa,
+   const std::vector<ScalarT> & ya,
+   const ScalarT & a,
+   const ScalarT & b,
+   ScalarT & result)
 {
 
   int size = xa.size();

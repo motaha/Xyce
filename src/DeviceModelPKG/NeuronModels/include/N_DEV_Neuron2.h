@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.9.2.1 $
+// Revision Number: $Revision: 1.23.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:33 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -48,10 +48,12 @@
 
 #include <Sacado.hpp>
 
-// ----------   Xyce Includes   ----------
+#include <N_DEV_Configuration.h>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceInstance.h>
 #include <N_DEV_DeviceModel.h>
+
+#include <N_DEV_Neuron.h>
 
 #ifdef HAVE_MATH_H
 #include <math.h>
@@ -61,8 +63,21 @@ namespace Xyce {
 namespace Device {
 namespace Neuron2 {
 
-// ---------- Forward Declarations ----------
 class Model;
+class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance, Neuron::Traits>
+{
+  static const char *name() {return "Neuron";}
+  static const char *deviceTypeName() {return "YNEURON level 2";}
+  static const int numNodes() {return 2;}
+  static const bool modelRequired() {return true;}
+  static const bool isLinearDevice() {return true;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : Instance
@@ -78,21 +93,16 @@ class Instance : public DeviceInstance
 {
   friend class ParametricData<Instance>;
   friend class Model;
-
+  friend class Traits;
+    
 public:
-  static vector< vector<int> > jacStamp;
-  static ParametricData<Instance> &getParametricData();
+  static std::vector< std::vector<int> > jacStamp;
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Instance(InstanceBlock & IB,
-           Model & Miter,
-           MatrixLoadData & mlData1,
-           SolverState &ss1,
-           ExternData  &ed1,
-           DeviceOptions & do1);
+  Instance(
+     const Configuration &       configuration,
+     const InstanceBlock &       IB,
+     Model &                     Miter,
+     const FactoryBlock &        factory_block);
 
   ~Instance();
 
@@ -101,16 +111,16 @@ private:
   Instance &operator=(const Instance &);
 
 public:
-  void registerLIDs( const vector<int> & intLIDVecRef,
-                     const vector<int> & extLIDVecRef );
-  void registerStateLIDs( const vector<int> & staLIDVecRef );
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
+  void registerStateLIDs( const std::vector<int> & staLIDVecRef );
 
-  map<int,string> & getIntNameMap ();
+  std::map<int,std::string> & getIntNameMap ();
   bool loadDeviceMask();
-  const vector< vector<int> > & jacobianStamp() const;
-  void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-  bool processParams (string param = "");
+  bool processParams ();
   bool updateTemperature(const double & temp_tmp);
 
   bool updateIntermediateVars ();
@@ -118,7 +128,7 @@ public:
   bool updateSecondaryState ();
   bool setIC ();
 
-  void varTypes( vector<char> & varTypeVec );
+  void varTypes( std::vector<char> & varTypeVec );
 
   // load functions, residual:
   bool loadDAEQVector ();
@@ -307,7 +317,7 @@ private:
     ScalarT powMC = MC * MC;
     ScalarT powCC = CC * CC * CC * CC;
     ScalarT r = memG * (Vn1 - Vn2 - restV) + Kg * powN * (Vn1 - Vn2 - Ke ) + NaG * powM * h * (Vn1 - Vn2 - NaE )
-                + Ag * powA * b * (Vn1 - Vn2 - Ae) + CaTg * powMC * HC * (Vn1 - Vn2 - CaE) + KCaG * powCC * (Vn1 - Vn2 - Ke);
+      + Ag * powA * b * (Vn1 - Vn2 - Ae) + CaTg * powMC * HC * (Vn1 - Vn2 - CaE) + KCaG * powCC * (Vn1 - Vn2 - Ke);
     return r;
   }
 
@@ -505,7 +515,8 @@ private:
 public:
   // iterator reference to the Neuron model which owns this instance.
   // Getters and setters
-  Model &getModel() {
+  Model &getModel() 
+  {
     return model_;
   }
 
@@ -632,17 +643,13 @@ class Model : public DeviceModel
 
   friend class ParametricData<Model>;
   friend class Instance;
-
+  friend class Traits;
+    
 public:
-  static ParametricData<Model> &getParametricData();
-
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Model(const ModelBlock & MB,
-        SolverState & ss1,
-        DeviceOptions & do1);
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &          MB,
+     const FactoryBlock &        factory_block);
   ~Model();
 
 private:
@@ -651,10 +658,12 @@ private:
   Model &operator=(const Model &);
 
 public:
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
+    
   virtual std::ostream &printOutInstances(std::ostream &os) const;
 
-  bool processParams (string param = "");
-  bool processInstanceParams (string param = "");
+  bool processParams ();
+  bool processInstanceParams ();
 
 private:
 
@@ -695,17 +704,26 @@ private:
   bool CaTauGiven;
 
 public:
-  InstanceVector &getInstanceVector() {
+  void addInstance(Instance *instance) 
+  {
+    instanceContainer.push_back(instance);
+  }
+
+  InstanceVector &getInstanceVector() 
+  {
     return instanceContainer;
   }
 
-  const InstanceVector &getInstanceVector() const {
+  const InstanceVector &getInstanceVector() const 
+  {
     return instanceContainer;
   }
 
 private:
-  vector<Instance*> instanceContainer;
+  std::vector<Instance*> instanceContainer;
 };
+
+void registerDevice();
 
 } // namespace Neuron2
 } // namespace Device

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.6.2.2 $
+// Revision Number: $Revision: 1.11 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:46 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -56,9 +56,9 @@ using Teuchos::rcp;
 
 // ----------   Xyce Includes   ----------
 #include <N_DEV_fwd.h>
+#include <N_ANP_fwd.h>
 
 // ---------- Forward declarations --------
-class N_ANP_AnalysisInterface;
 class N_NLS_Manager;
 class N_LAS_System;
 
@@ -81,8 +81,8 @@ public:
   void registerAnalysisInterface(RefCountPtr<N_ANP_AnalysisInterface> tmp_anaIntPtr);
   void registerNonlinearSolver (RefCountPtr<N_NLS_Manager> tmp_nlsMgrPtr);
 
-  vector<double> getFastSourcePeriod (vector<string>& sourceNames);
-  vector<double> registerFastSources (vector<string> & sourceNames);
+  std::vector<double> getFastSourcePeriod (std::vector<std::string>& sourceNames);
+  std::vector<double> registerFastSources (std::vector<std::string> & sourceNames);
 
   void deactivateSlowSources();
   void activateSlowSources();

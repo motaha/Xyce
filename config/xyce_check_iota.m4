@@ -16,14 +16,11 @@ ac_cv_xyce_have_iota,
 #else
 #include <algo.h>
 #endif
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
 ]],
 [[
-  vector<int> ipVec(5,0);
+  std::vector<int> ipVec(5,0);
 
-  iota(ipVec.begin(),ipVec.end(),1);
+  std::iota(ipVec.begin(),ipVec.end(),1);
 ]])], ac_cv_xyce_have_iota=yes , ac_cv_xyce_have_iota=no)
 AC_LANG_POP(C++)
 ])

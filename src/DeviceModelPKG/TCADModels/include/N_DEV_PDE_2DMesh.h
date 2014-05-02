@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.15.2.2 $
+// Revision Number: $Revision: 1.20.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/26 20:16:31 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -119,217 +119,216 @@ enum meshType {
 //-----------------------------------------------------------------------------
 class PDE_2DMesh : public PDEMeshContainer
 {
-  public:
-    PDE_2DMesh (DeviceOptions & do1,
-                int sgplotLevel1);
+public:
+  PDE_2DMesh (const DeviceOptions & do1, int sgplotLevel1);
 
-    PDE_2DMesh (const PDE_2DMesh & right);
+  PDE_2DMesh (const PDE_2DMesh & right);
 
-    ~PDE_2DMesh ();
+  ~PDE_2DMesh ();
 
-    // Assignment operator.
-    PDE_2DMesh & operator = (PDE_2DMesh const & rhsMesh);
+  // Assignment operator.
+  PDE_2DMesh & operator=(PDE_2DMesh const & rhsMesh);
 
-    bool initializeMesh (string & meshFileName_tmp);
+  bool initializeMesh (const std::string & meshFileName_tmp);
 
-    bool initializeInternalMesh
-           (int nx, int ny,
-            double xlength, double ylength,
-            int numElectrodes, string & outputMeshFileName,
-            map<string,PDE_2DElectrode*> & elMap,
-            bool cylFlag);
+  bool initializeInternalMesh
+  (int nx, int ny,
+   double xlength, double ylength,
+   int numElectrodes, std::string & outputMeshFileName,
+   std::map<std::string,PDE_2DElectrode*> & elMap,
+   bool cylFlag);
 
-    bool resizeMesh (double xlength, double ylength);
+  bool resizeMesh (double xlength, double ylength);
 
-    // output mesh information:
-    void dumpMesh       ();
-    void printLabels    ();
-    void outputMeshInfo ();
+  // output mesh information:
+  void dumpMesh       ();
+  void printLabels    ();
+  void outputMeshInfo ();
 
-    int getNumNodes ();
-    int getNumEdges ();
-    int getNumCells ();
-    int getNumLabels();
+  int getNumNodes ();
+  int getNumEdges ();
+  int getNumCells ();
+  int getNumLabels();
 
-    int getMaxNodeNN ();
+  int getMaxNodeNN ();
 
-    double getMaxSize ();
+  double getMaxSize ();
 
-    double getXMax ();
-    double getXMin ();
-    double getYMax ();
-    double getYMin ();
+  double getXMax ();
+  double getXMin ();
+  double getYMax ();
+  double getYMin ();
 
-    double interp (double *F, double r, double z);
-    bool interpVector (double *F, double r, double z, double & xvec, double & yvec);
+  double interp (double *F, double r, double z);
+  bool interpVector (double *F, double r, double z, double & xvec, double & yvec);
 
-    void findCell(double r, double z, int & isuccess,
-                  int & inode, int & iCell, int iStartCell = 0);
+  void findCell(double r, double z, int & isuccess,
+                int & inode, int & iCell, int iStartCell = 0);
 
-    double findMinDist(int iCell, double r, double z);
+  double findMinDist(int iCell, double r, double z);
 
-    double compAngle( double x1, double y1,
-                      double x2, double y2,
-                      double x3, double y3);
+  double compAngle( double x1, double y1,
+                    double x2, double y2,
+                    double x3, double y3);
 
-    bool scaleMesh (double xScale);
+  bool scaleMesh (double xScale);
 
-    bool labelNameExist (string & labelName);
-    bool labelEdgeType  (string & labelName);
-    bool dopingVectorExist ();
+  bool labelNameExist (std::string & labelName);
+  bool labelEdgeType  (std::string & labelName);
+  bool dopingVectorExist ();
 
-    bool getDopingVector (vector<double> & cvec_tmp);
-    bool getXVector      (vector<double> & xvec_tmp);
-    bool getYVector      (vector<double> & yvec_tmp);
+  bool getDopingVector (std::vector<double> & cvec_tmp);
+  bool getXVector      (std::vector<double> & xvec_tmp);
+  bool getYVector      (std::vector<double> & yvec_tmp);
 
-    double * getDopingVector ();
-    double * getXVector ();
-    double * getYVector ();
+  double * getDopingVector ();
+  double * getXVector ();
+  double * getYVector ();
 
-    mNode * getNode (int i);
-    mEdge * getEdge (int i);
-    mCell * getCell (int i);
-    mLabel * getLabel (int i);
-    mLabel * getLabel (string & name);
+  mNode * getNode (int i);
+  mEdge * getEdge (int i);
+  mCell * getCell (int i);
+  mLabel * getLabel (int i);
+  mLabel * getLabel (std::string & name);
 
-    double lengthAdjust   (double x1, double y1, double x2, double y2);
+  double lengthAdjust   (double x1, double y1, double x2, double y2);
 
-    int ** getNodeIndexVector ();
+  int ** getNodeIndexVector ();
 
-  protected:
-  private:
-    bool readSGFMeshFile (string & meshFileName_tmp);
+protected:
+private:
+  bool readSGFMeshFile (const std::string & meshFileName_tmp);
 
-    bool writeSGFMeshFile (string & meshFileName_tmp);
+  bool writeSGFMeshFile (const std::string & meshFileName_tmp);
 
-    bool setupInternalMesh (int nx, int ny, double xlength, double ylength);
+  bool setupInternalMesh (int nx, int ny, double xlength, double ylength);
 
-    bool setupInternalAdjacencyInfo ();
+  bool setupInternalAdjacencyInfo ();
 
-    bool errorCheckElectrodes (int numElectrodes,
-            map<string,PDE_2DElectrode*> & elMap);
+  bool errorCheckElectrodes (int numElectrodes,
+                             std::map<std::string,PDE_2DElectrode*> & elMap);
 
-    bool setupDefaultLabels (int numberElectrodes);
+  bool setupDefaultLabels (int numberElectrodes);
 
-    bool setupInternalLabels (int numberElectrodes,
-            map<string,PDE_2DElectrode*> & elMap);
+  bool setupInternalLabels (int numberElectrodes,
+                            std::map<std::string,PDE_2DElectrode*> & elMap);
 
-    bool setupGeometry    ();
+  bool setupGeometry    ();
 
-    bool computeIntPB     (double &x, double &y,
-                           int inodeA,int inodeB,int inodeC);
+  bool computeIntPB     (double &x, double &y,
+                         int inodeA,int inodeB,int inodeC);
 
-    double areaAdjust     (double x1, double y1,
-                           double x2, double y2,
-                           double x3, double y3);
+  double areaAdjust     (double x1, double y1,
+                         double x2, double y2,
+                         double x3, double y3);
 
-    double computeAngle   (int inode1,int inode2,int inode3);
+  double computeAngle   (int inode1,int inode2,int inode3);
 
-    bool cellNodes        ();
+  bool cellNodes        ();
 
-    bool fCCWorder        (int inode1, int inode2, int inode3);
+  bool fCCWorder        (int inode1, int inode2, int inode3);
 
-    void calcAdjacencyInfo ();
+  void calcAdjacencyInfo ();
 
-    void initNodeAdjStructure
-      (NADJ &nadj, int itri, int iVertex, int uIntLabel, bool fCW);
+  void initNodeAdjStructure
+  (NADJ &nadj, int itri, int iVertex, int uIntLabel, bool fCW);
 
-    void getElementInfo
-      (int itri, int *ainode, int *aiedge, int *aitri, int *auLabel);
+  void getElementInfo
+  (int itri, int *ainode, int *aiedge, int *aitri, int *auLabel);
 
-    void elementNodes (int itri, int *ainode);
+  void elementNodes (int itri, int *ainode);
 
-  public:
-    bool cylGeom;   // cylindrical geometry flag. refactor later.
+public:
+  bool cylGeom;   // cylindrical geometry flag. refactor later.
 
-  protected:
+protected:
 
 
-  private:
-    PDE_2DMesh ();
+private:
+  PDE_2DMesh ();
 
-    string meshFileName;
+  std::string meshFileName;
 
-    bool externalMeshFlag;
+  bool externalMeshFlag;
 
-    double xMax;
-    double yMax;
-    double xMin;
-    double yMin;
-    double dx;
-    double dy;
+  double xMax;
+  double yMax;
+  double xMin;
+  double yMin;
+  double dx;
+  double dy;
 
-    double xRatio, yRatio;
+  double xRatio, yRatio;
 
-    double x0;
-    bool   meshScaledFlag;
+  double x0;
+  bool   meshScaledFlag;
 
-    double vol;       // total volume of domain
-    double invVol;    // inverse of the total volume
+  double vol;       // total volume of domain
+  double invVol;    // inverse of the total volume
 
-    double surfArea;  // surface area
-    double circum;    // total circumference
-    double invCircum; // inverse of the total circumference.
+  double surfArea;  // surface area
+  double circum;    // total circumference
+  double invCircum; // inverse of the total circumference.
 
-    double depth;     // if this is a cartesian mesh, depth in z-direction.
+  double depth;     // if this is a cartesian mesh, depth in z-direction.
 
-    int numAdj;       // number of edge adjacency structures
-                      // (>= numNodes.  Every mNode class has at least one.)
+  int numAdj;       // number of edge adjacency structures
+  // (>= numNodes.  Every mNode class has at least one.)
 
-    int numNodes;
-    int numEdges;
-    int numCells;
-    int numLabels;
-    int numRegLabels;  // Number of region labels.  (no edge labels, etc.)
+  int numNodes;
+  int numEdges;
+  int numCells;
+  int numLabels;
+  int numRegLabels;  // Number of region labels.  (no edge labels, etc.)
 
-    int numBndryNodes; // This is the number of nodes that sit on
-                       // boundaries between regions.
+  int numBndryNodes; // This is the number of nodes that sit on
+  // boundaries between regions.
 
-    int maxNodeNN;     // maximum number of nearest neighbors for a node.
+  int maxNodeNN;     // maximum number of nearest neighbors for a node.
 
-    int iRecentCellLookup; // This var is the result of the most
-                           // recent "findCell" call (if that function
-                           // has indeed been called).  It can be used
-                           // for subsequent findCell calls, as the
-                           // iStartCell argument.  The findCell function
-                           // searches over the mesh, proceeding from
-                           // cell to cell via nearest neighbors.
-                           // If it has a good starting point, the search goes
-                           // much, much faster.
+  int iRecentCellLookup; // This var is the result of the most
+  // recent "findCell" call (if that function
+  // has indeed been called).  It can be used
+  // for subsequent findCell calls, as the
+  // iStartCell argument.  The findCell function
+  // searches over the mesh, proceeding from
+  // cell to cell via nearest neighbors.
+  // If it has a good starting point, the search goes
+  // much, much faster.
 
-    bool dopingSet; // doping array was read in from mesh file.
+  bool dopingSet; // doping array was read in from mesh file.
 
-    vector<mNode> mNodeVector;
-    vector<mEdge> mEdgeVector;
-    vector<mCell> mCellVector;
-    vector<mLabel> mLabelVector;
+  std::vector<mNode> mNodeVector;
+  std::vector<mEdge> mEdgeVector;
+  std::vector<mCell> mCellVector;
+  std::vector<mLabel> mLabelVector;
 
-    vector<double> dopingVector;
-    vector<double> xVector;
-    vector<double> yVector;
+  std::vector<double> dopingVector;
+  std::vector<double> xVector;
+  std::vector<double> yVector;
 
-    vector<int> visitCellFlagVec;
+  std::vector<int> visitCellFlagVec;
 
-    map<string, mLabel>  mLabelMap;
+  std::map<std::string, mLabel>  mLabelMap;
 
-    // used for the internally generated mesh.
-    int ixMax;
-    int iyMax;
-    int ** nodeIndices;
-    int ** edgeIndices;
-    int ** cellIndices;
+  // used for the internally generated mesh.
+  int ixMax;
+  int iyMax;
+  int ** nodeIndices;
+  int ** edgeIndices;
+  int ** cellIndices;
 
-    // arrays used by calcAdjacencyInfo:
-    vector<int> afVisitedVec;
-    int * aiBegin;  // change these to STL later...
-    int * aiEnd;
-    bool adjInfoAllocFlag;
+  // arrays used by calcAdjacencyInfo:
+  std::vector<int> afVisitedVec;
+  int * aiBegin;  // change these to STL later...
+  int * aiEnd;
+  bool adjInfoAllocFlag;
 
-    DeviceOptions & devOptions_;
+  const DeviceOptions * devOptions_;
 
-    int sgplotLevel;
+  int sgplotLevel;
 
-    bool useDefaultLabels;
+  bool useDefaultLabels;
 };
 
 //-----------------------------------------------------------------------------
@@ -348,33 +347,33 @@ class PDE_2DMesh : public PDEMeshContainer
 //-----------------------------------------------------------------------------
 class mNode
 {
-  public:
-    mNode ();
+public:
+  mNode ();
 
-  protected:
-  private:
+protected:
+private:
 
-  public:
-    double  x;                 // x coordinate
-    double  y;                 // y coordinate
+public:
+  double  x;                 // x coordinate
+  double  y;                 // y coordinate
 
-    // node adjacency information:
-    double area;               // area of integration box
-    int cnode;                 // number of adjacent nodes
-    int inode;                 // index of node under analysis
-    int numCells;              // number of cells
+  // node adjacency information:
+  double area;               // area of integration box
+  int cnode;                 // number of adjacent nodes
+  int inode;                 // index of node under analysis
+  int numCells;              // number of cells
 
-    int  edgeStatus;           // if boundary between regions = 0
-                               // if exterior then = 1
-                               // if interior then = 2
+  int  edgeStatus;           // if boundary between regions = 0
+  // if exterior then = 1
+  // if interior then = 2
 
-    bool fBndry;               // set if node is a boundary node.
-    bool fGotAll;              // set if all nodes were visited.
+  bool fBndry;               // set if node is a boundary node.
+  bool fGotAll;              // set if all nodes were visited.
 
-    vector<EDGEINFO> edgeInfoVector;
+  std::vector<EDGEINFO> edgeInfoVector;
 
-  protected:
-  private:
+protected:
+private:
 };
 
 //-----------------------------------------------------------------------------
@@ -392,36 +391,36 @@ class mNode
 //-----------------------------------------------------------------------------
 class mEdge
 {
-  public:
-    mEdge ();
+public:
+  mEdge ();
 
-  protected:
-  private:
+protected:
+private:
 
-  public:
-    int   uLabel;               // edge label
-    int   inodeA;               // index of node A
-    int   inodeB;               // index of node B
+public:
+  int   uLabel;               // edge label
+  int   inodeA;               // index of node A
+  int   inodeB;               // index of node B
 
-    int   edgeStatus;          // if boundary between regions = 0
-                               // if exterior then = 1
-                               // if interior then = 2
+  int   edgeStatus;          // if boundary between regions = 0
+  // if exterior then = 1
+  // if interior then = 2
 
-    // edge geometry information:
-    double  ilen;                           // integration length
-    double  elen;                           // edge length
-    double  Area1;                          // partial area 1, nodeA
-    double  Area2;                          // partial area 2, nodeB
+  // edge geometry information:
+  double  ilen;                           // integration length
+  double  elen;                           // edge length
+  double  Area1;                          // partial area 1, nodeA
+  double  Area2;                          // partial area 2, nodeB
 
-    double  angle;                          // angle between edge and x-axis.
-    double  midpoint_x;
-    double  midpoint_y;
+  double  angle;                          // angle between edge and x-axis.
+  double  midpoint_x;
+  double  midpoint_y;
 
-    int     iedge;                          // edge index
-    int     ielem;                          // element index
+  int     iedge;                          // edge index
+  int     ielem;                          // element index
 
-  protected:
-  private:
+protected:
+private:
 };
 
 //-----------------------------------------------------------------------------
@@ -433,35 +432,35 @@ class mEdge
 //-----------------------------------------------------------------------------
 class mCell
 {
-  public:
-    mCell ();
+public:
+  mCell ();
 
-  protected:
-  private:
+protected:
+private:
 
-  public:
-    int   uLabel;               // region label
+public:
+  int   uLabel;               // region label
 
-    int   iedgeAB;              // index of edge AB
-    int   iedgeBC;              // index of edge BC
-    int   iedgeCD;              // index of edge AC or CD
-    int   iedgeDA;              // index of edge DA
+  int   iedgeAB;              // index of edge AB
+  int   iedgeBC;              // index of edge BC
+  int   iedgeCD;              // index of edge AC or CD
+  int   iedgeDA;              // index of edge DA
 
-    int   icellAB;              // index of cell adj. to edge AB
-    int   icellBC;              // index of cell adj. to edge BC
-    int   icellCD;              // index of cell adj. to edge AC or CD
-    int   icellDA;              // index of cell adj. to edge DA
+  int   icellAB;              // index of cell adj. to edge AB
+  int   icellBC;              // index of cell adj. to edge BC
+  int   icellCD;              // index of cell adj. to edge AC or CD
+  int   icellDA;              // index of cell adj. to edge DA
 
-    // owned nodes:
-    int   inodeA;
-    int   inodeB;
-    int   inodeC;
-    int   inodeD;
+  // owned nodes:
+  int   inodeA;
+  int   inodeB;
+  int   inodeC;
+  int   inodeD;
 
-    vector<int> mNodeVector;    // container of owned node indices.
+  std::vector<int> mNodeVector;    // container of owned node indices.
 
-  protected:
-  private:
+protected:
+private:
 };
 
 
@@ -474,22 +473,22 @@ class mCell
 //-----------------------------------------------------------------------------
 class mLabel
 {
-  public:
-    mLabel ();
+public:
+  mLabel ();
 
-  protected:
-  private:
+protected:
+private:
 
-  public:
-    string name;      // label name
-    int iIndex;       // label index
-    int uType;        // label type  (region or edge)
-    int cNode;        // number of nodes
+public:
+  std::string name;      // label name
+  int iIndex;       // label index
+  int uType;        // label type  (region or edge)
+  int cNode;        // number of nodes
 
-    double vol;       // volume of this region. (if it is a region...)
-    double surfArea;  // surface area of this region.
+  double vol;       // volume of this region. (if it is a region...)
+  double surfArea;  // surface area of this region.
 
-    vector<int> mNodeVector;
+  std::vector<int> mNodeVector;
 };
 
 
@@ -502,21 +501,21 @@ class mLabel
 //-----------------------------------------------------------------------------
 class mEdgeInfo
 {
-  public:
-  protected:
-  private:
+public:
+protected:
+private:
 
-  public:
-    double  ilen;              // integration length
-    double  elen;              // edge length
-    double  area1;             // partial area 1
-    double  area2;             // partial area 2
-    int   iedge;               // edge index
-    int   inode;               // node index
-    int   icell;               // cell index
+public:
+  double  ilen;              // integration length
+  double  elen;              // edge length
+  double  area1;             // partial area 1
+  double  area2;             // partial area 2
+  int   iedge;               // edge index
+  int   inode;               // node index
+  int   icell;               // cell index
 
-  protected:
-  private:
+protected:
+private:
 };
 
 
@@ -529,18 +528,18 @@ class mEdgeInfo
 //-----------------------------------------------------------------------------
 class mNodeInfo
 {
-  public:
-  protected:
-  private:
+public:
+protected:
+private:
 
-  public:
-    double area;               // area of integration box
-    int numNeighbors;          // number of neighbors
-    int numCells;              // number of cells
-    mEdgeInfo *mEdgeInfoPtr;   // edge information array
+public:
+  double area;               // area of integration box
+  int numNeighbors;          // number of neighbors
+  int numCells;              // number of cells
+  mEdgeInfo *mEdgeInfoPtr;   // edge information array
 
-  protected:
-  private:
+protected:
+private:
 };
 
 //-----------------------------------------------------------------------------
@@ -585,18 +584,18 @@ public:
 //-----------------------------------------------------------------------------
 class MESHHEAD
 {
-  public:
-    char szLogo[64];                      // text logo
-    char szSign[16];                      // signature
-    unsigned int cConstant;               // number of constants
-    unsigned int cLabel;                  // number of labels
-    unsigned int cArray;                  // number of 1D arrays
-    unsigned int cRegLabel;               // number of region labels
-    unsigned int cBndryNode;              // number of boundary nodes
-    unsigned int cNode;                   // number of nodes
-    unsigned int cEdge;                   // number of edges
-    unsigned int cTriangle;               // number of triangles
-    bool fCylGeom;                        // cylindrical geometry flag
+public:
+  char szLogo[64];                      // text logo
+  char szSign[16];                      // signature
+  unsigned int cConstant;               // number of constants
+  unsigned int cLabel;                  // number of labels
+  unsigned int cArray;                  // number of 1D arrays
+  unsigned int cRegLabel;               // number of region labels
+  unsigned int cBndryNode;              // number of boundary nodes
+  unsigned int cNode;                   // number of nodes
+  unsigned int cEdge;                   // number of edges
+  unsigned int cTriangle;               // number of triangles
+  bool fCylGeom;                        // cylindrical geometry flag
 };
 
 //-----------------------------------------------------------------------------
@@ -608,13 +607,13 @@ class MESHHEAD
 //-----------------------------------------------------------------------------
 class XLATCONST
 {
-  public:
-    char szName[LEN_IDENT+1];             // constant name
-    unsigned int uType;                   // constant type
-    union                                 //
-    { double r;                           // value of real constant
-      int  n;                             // value of integer constant
-    } data;
+public:
+  char szName[LEN_IDENT+1];             // constant name
+  unsigned int uType;                   // constant type
+  union                                 //
+  { double r;                           // value of real constant
+    int  n;                             // value of integer constant
+  } data;
 };
 
 //-----------------------------------------------------------------------------
@@ -626,11 +625,11 @@ class XLATCONST
 //-----------------------------------------------------------------------------
 class XLATLABEL
 {
-  public:
-    char szName[LEN_IDENT+1];             // label name
-    unsigned int iIndex;                  // label index
-    unsigned int uType;                   // label type
-    unsigned int cNode;                   // number of nodes
+public:
+  char szName[LEN_IDENT+1];             // label name
+  unsigned int iIndex;                  // label index
+  unsigned int uType;                   // label type
+  unsigned int cNode;                   // number of nodes
 };
 
 //-----------------------------------------------------------------------------
@@ -642,9 +641,9 @@ class XLATLABEL
 //-----------------------------------------------------------------------------
 class NODE
 {
-  public:
-    double  x;                            // x coordinate
-    double  y;                            // y coordinate
+public:
+  double  x;                            // x coordinate
+  double  y;                            // y coordinate
 };
 
 //-----------------------------------------------------------------------------
@@ -656,10 +655,10 @@ class NODE
 //-----------------------------------------------------------------------------
 class EDGE
 {
-  public:
-    unsigned int  uLabel;                 // edge label
-    int   inodeA;                         // index of node A
-    int   inodeB;                         // index of node B
+public:
+  unsigned int  uLabel;                 // edge label
+  int   inodeA;                         // index of node A
+  int   inodeB;                         // index of node B
 };
 
 //-----------------------------------------------------------------------------
@@ -671,16 +670,16 @@ class EDGE
 //-----------------------------------------------------------------------------
 class TRI
 {
-  public:
-    unsigned int  uLabel;                 // region label
-    int   iedgeAB;                        // index of edge AB
-    int   iedgeBC;                        // index of edge BC
-    int   iedgeAC;                        // index of edge AC or CD
-    int   iedgeAD;                        // index of edge AD
-    int   itriAB;                         // index of tri. adj. to edge AB
-    int   itriBC;                         // index of tri. adj. to edge BC
-    int   itriAC;                         // index of tri. adj. to edge AC or CD
-    int   itriAD;                         // index of tri. adj. to edge AD
+public:
+  unsigned int  uLabel;                 // region label
+  int   iedgeAB;                        // index of edge AB
+  int   iedgeBC;                        // index of edge BC
+  int   iedgeAC;                        // index of edge AC or CD
+  int   iedgeAD;                        // index of edge AD
+  int   itriAB;                         // index of tri. adj. to edge AB
+  int   itriBC;                         // index of tri. adj. to edge BC
+  int   itriAC;                         // index of tri. adj. to edge AC or CD
+  int   itriAD;                         // index of tri. adj. to edge AD
 };
 
 //-----------------------------------------------------------------------------
@@ -692,14 +691,14 @@ class TRI
 //-----------------------------------------------------------------------------
 class EDGEINFO
 {
-  public:
-    double  ilen;                         // integration length
-    double  elen;                         // edge length
-    double  Area1;                        // partial area 1
-    double  Area2;                        // partial area 2
-    int   iedge;                          // edge index
-    int   inode;                          // node index
-    int   ielem;                          // element index
+public:
+  double  ilen;                         // integration length
+  double  elen;                         // edge length
+  double  Area1;                        // partial area 1
+  double  Area2;                        // partial area 2
+  int   iedge;                          // edge index
+  int   inode;                          // node index
+  int   ielem;                          // element index
 
   EDGEINFO() :
     ilen(0.0), elen(0.0), Area1(0.0), Area2(0.0), iedge(-1), inode(-1), ielem(-1)
@@ -717,11 +716,11 @@ class EDGEINFO
 //-----------------------------------------------------------------------------
 class NODEINFO
 {
-  public:
-    double Area;                          // area of integration box
-    unsigned int cNeighbor;               // number of neighbors
-    unsigned int cTriangle;               // number of triangles
-    EDGEINFO *aedgeinfo;                  // edge information array
+public:
+  double Area;                          // area of integration box
+  unsigned int cNeighbor;               // number of neighbors
+  unsigned int cTriangle;               // number of triangles
+  EDGEINFO *aedgeinfo;                  // edge information array
 };
 
 
@@ -736,21 +735,21 @@ class NODEINFO
 //-----------------------------------------------------------------------------
 class mInterpAreaHelp
 {
-  public:
-    double x0,y0;
-    double x1,y1;
-    double x2,y2;
-    double v0,v1,v2;
-    double f0,f1,f2;
-    double vlim;
-    double aa, bb, cc;
-    int errorFlag;
-    int iend;
+public:
+  double x0,y0;
+  double x1,y1;
+  double x2,y2;
+  double v0,v1,v2;
+  double f0,f1,f2;
+  double vlim;
+  double aa, bb, cc;
+  int errorFlag;
+  int iend;
 
-  public:
-    mInterpAreaHelp ();
-    double interpReg(double r, double z);
-    bool findCoef();
+public:
+  mInterpAreaHelp ();
+  double interpReg(double r, double z);
+  bool findCoef();
 };
 
 //-----------------------------------------------------------------------------
@@ -770,26 +769,26 @@ class mInterpAreaHelp
 //-----------------------------------------------------------------------------
 class mInterpEdgeHelp
 {
-  public:
-    double xA;
-    double yA;
-    double xB;
-    double yB;
+public:
+  double xA;
+  double yA;
+  double xB;
+  double yB;
 
-    double AA;
-    double BB;
+  double AA;
+  double BB;
 
-    bool iflagx; // is the passed point between xA and xB of this edge?
-    bool iflagy; // is the passed point between yA and yB of this edge?
+  bool iflagx; // is the passed point between xA and xB of this edge?
+  bool iflagy; // is the passed point between yA and yB of this edge?
 
-    bool x_hiFlag; // is this edge above the passed point in x?
-    bool x_loFlag; // is this edge below the passed point in x?
-    bool y_hiFlag; // is this edge above the passed point in y?
-    bool y_loFlag; // is this edge above the passed point in y?
+  bool x_hiFlag; // is this edge above the passed point in x?
+  bool x_loFlag; // is this edge below the passed point in x?
+  bool y_hiFlag; // is this edge above the passed point in y?
+  bool y_loFlag; // is this edge above the passed point in y?
 
-  public:
-    mInterpEdgeHelp();
-    bool setupEdge (double r, double z);
+public:
+  mInterpEdgeHelp();
+  bool setupEdge (double r, double z);
 
 };
 
@@ -879,14 +878,14 @@ inline double sq(double x)
 // Creator       : Eric R. Keiter, 9233, SNL, Parallel Computational Sciences
 // Creation Date : 04/18/03
 //-----------------------------------------------------------------------------
-inline ostream & operator<<(ostream & os, const PDE_2DElectrode & el)
+inline std::ostream & operator<<(std::ostream & os, const PDE_2DElectrode & el)
 {
   os << el.name << ":\n";
   os << "  node  = " << el.nodeName << "\n";
   os << "  side  = " << el.side << "\n";
   os << "  start = " << el.start << "\n";
   os << "  end   = " << el.end << "\n";
-  os << endl;
+  os << std::endl;
 
   return os;
 }

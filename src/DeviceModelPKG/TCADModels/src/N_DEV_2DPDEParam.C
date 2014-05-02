@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -40,9 +40,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.47.2.2 $
+// Revision Number: $Revision: 1.57 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/24 23:49:18 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -101,7 +101,7 @@ namespace TwoDPDE {
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
   bool bsuccess = true;
 
@@ -117,14 +117,14 @@ bool Instance::processParams (string param)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 4/04/04
 //-----------------------------------------------------------------------------
-bool Instance::processDopingParams (Param & ndParam, string param)
+bool Instance::processDopingParams (Param & ndParam, std::string param)
 {
   ExtendedString tagES = ndParam.tag ();
   tagES.toLower ();
 
   // Start of the new doping section:
   //string tmpTag (tagES,0,3);
-  if (string(tagES,0,3) == "reg" && ndParam.given())
+  if (std::string(tagES,0,3) == "reg" && ndParam.given())
       //if dope region param, continue:
   {
     // the new metadata doesn't have a limitation on the number of
@@ -135,7 +135,7 @@ bool Instance::processDopingParams (Param & ndParam, string param)
     bool foundPeriod = false;
     for (int iloc=0;iloc<tagES.size();++iloc)
     {
-      string singleChar(tagES,iloc,1);
+      std::string singleChar(tagES,iloc,1);
       if (singleChar == ".")
       {
         periodLocation = iloc;
@@ -145,19 +145,19 @@ bool Instance::processDopingParams (Param & ndParam, string param)
     }
     if (!foundPeriod)
     {
-      string msg =
+      std::string msg =
 	"::processDopingParams.  The region specification needs a period\n";
       N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
     }
 
-    string regionName(tagES,0,periodLocation);
+    std::string regionName(tagES,0,periodLocation);
 
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << "tagES = "<< tagES;
-      cout << "  regionName = "<< regionName;
-      cout << "  param: "  << ndParam.sVal () << endl;
+      Xyce::dout() << "tagES = "<< tagES;
+      Xyce::dout() << "  regionName = "<< regionName;
+      Xyce::dout() << "  param: "  << ndParam.stringValue() << std::endl;
     }
 #endif
 
@@ -190,7 +190,7 @@ bool Instance::processElectrodeParams (Param & ndParam)
   ExtendedString tagES = ndParam.tag ();
   tagES.toLower ();
 
-  if (string(tagES,0,4) == "node" && ndParam.given() )
+  if (std::string(tagES,0,4) == "node" && ndParam.given() )
   {
     int periodLocation = 5;
 
@@ -213,7 +213,7 @@ bool Instance::processElectrodeParams (Param & ndParam)
     bool foundPeriod = false;
     for (int iloc=0;iloc<tagES.size();++iloc)
     {
-      string singleChar(tagES,iloc,1);
+      std::string singleChar(tagES,iloc,1);
       if (singleChar == ".")
       {
         periodLocation = iloc;
@@ -227,17 +227,17 @@ bool Instance::processElectrodeParams (Param & ndParam)
     // already been trapped for.
     if (!foundPeriod)
     {
-      string msg =
+      std::string msg =
         "::processParams.  The node specification needs a period\n";
       N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
     }
 
-    string nodeName(tagES,0,periodLocation);
+    std::string nodeName(tagES,0,periodLocation);
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << "tagES      = "<< tagES      << endl;
-      cout << "nodeName = "<< nodeName << endl;
+      Xyce::dout() << "tagES      = "<< tagES      << std::endl;
+      Xyce::dout() << "nodeName = "<< nodeName << std::endl;
     }
 #endif
 
@@ -253,12 +253,12 @@ bool Instance::processElectrodeParams (Param & ndParam)
 
     if (tagSize > periodLocation+1)
     {
-      string tmpParam(tagES,periodLocation+1,tagSize);
+      std::string tmpParam(tagES,periodLocation+1,tagSize);
 
       if (tmpParam == "name")
       {
         DeviceInterfaceNode dINode;
-        ExtendedString dIName = ndParam.sVal ();
+        ExtendedString dIName = ndParam.stringValue();
         dIName.toUpper ();
 
         dINode.eName = dIName;
@@ -272,13 +272,13 @@ bool Instance::processElectrodeParams (Param & ndParam)
 
       if (tmpParam == "bc")
       {
-        ExtendedString nmName = ndParam.sVal ();
+        ExtendedString nmName = ndParam.stringValue();
         nmName.toUpper ();
         if (nmName == "NEUMANN" ||
             nmName == "MIXED" )
         {
           tmpBCmap[nodeName] = nmName;
-          cout << "found a neumann.  name = " << tagES << endl;
+          Xyce::dout() << "found a neumann.  name = " << tagES << std::endl;
         }
       }
 
@@ -286,7 +286,7 @@ bool Instance::processElectrodeParams (Param & ndParam)
       {
         if (ndParam.given())
         {
-          ExtendedString tmpstr = ndParam.sVal ();
+          ExtendedString tmpstr = ndParam.stringValue();
           tmpstr.toLower ();
           electrodeMap[nodeName]->side = tmpstr;
           electrodeMap[nodeName]->sideGiven = true;
@@ -295,19 +295,19 @@ bool Instance::processElectrodeParams (Param & ndParam)
 
       if (tmpParam == "start")
       {
-        electrodeMap[nodeName]->start = ndParam.dVal ();
+        electrodeMap[nodeName]->start = ndParam.getImmutableValue<double>();
         electrodeMap[nodeName]->startGiven = ndParam.given ();
       }
 
       if (tmpParam == "end")
       {
-        electrodeMap[nodeName]->end = ndParam.dVal ();
+        electrodeMap[nodeName]->end = ndParam.getImmutableValue<double>();
         electrodeMap[nodeName]->endGiven = ndParam.given ();
       }
 
       if (tmpParam == "material")
       {
-        ExtendedString tmpName = ndParam.sVal();
+        ExtendedString tmpName = ndParam.stringValue();
         tmpName.toLower();
         electrodeMap[nodeName]->material = tmpName;
         electrodeMap[nodeName]->materialGiven = ndParam.given ();
@@ -315,7 +315,7 @@ bool Instance::processElectrodeParams (Param & ndParam)
 
       if (tmpParam == "oxidebndryflag")
       {
-        if (ndParam.given() && ndParam.iVal() == 1)
+        if (ndParam.given() && ndParam.getImmutableValue<int>() == 1)
           electrodeMap[nodeName]->oxideBndryFlag = true;
         else
           electrodeMap[nodeName]->oxideBndryFlag = false;
@@ -323,12 +323,12 @@ bool Instance::processElectrodeParams (Param & ndParam)
 
       if (tmpParam == "oxthick")
       {
-        electrodeMap[nodeName]->oxthick = ndParam.dVal ();
+        electrodeMap[nodeName]->oxthick = ndParam.getImmutableValue<double>();
       }
 
       if (tmpParam == "oxcharge")
       {
-        electrodeMap[nodeName]->oxcharge = ndParam.dVal ();
+        electrodeMap[nodeName]->oxcharge = ndParam.getImmutableValue<double>();
       }
     }
   }

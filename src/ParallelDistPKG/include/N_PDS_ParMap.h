@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.21.4.2 $
+// Revision Number: $Revision: 1.28 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -56,12 +56,7 @@
 
 #include <N_UTL_Xyce.h>
 #include <N_UTL_Misc.h>
-
-// ----------  Other Includes   ----------
-
-// ----------  Fwd Declarations  ---------
-
-class N_PDS_Comm;
+#include <N_PDS_fwd.h>
 
 class Epetra_Map;
 class Epetra_BlockMap;
@@ -80,14 +75,20 @@ public:
   // Constructors
   N_PDS_ParMap( int & numGlobalEntities,
                 const int & numLocalEntities,
-                const vector<int> & lbMap,
-                const int index_base = 0,
-                N_PDS_Comm * aComm = 0);
+                const std::vector<int> & lbMap,
+                const int index_base,
+                N_PDS_Comm * aComm);
+
+  // Constructor, let the underlying linear algebra determine the IDs.
+  N_PDS_ParMap( int & numGlobalEntities,
+                const int & numLocalEntities,
+                const int index_base,
+                N_PDS_Comm * aComm);
 
   // Destructor
   ~N_PDS_ParMap();
 
-  // Constructor which takes a EPetra map (private).
+  // Constructor which takes a Epetra map (private).
   N_PDS_ParMap(Epetra_Map * pMap,
                N_PDS_Comm * aComm);
 
@@ -142,13 +143,13 @@ public:
 
 protected:
 
-  // Pointer to comm object.
-  N_PDS_Comm * comm_;
-  bool commOwned_;
-
   // Pointer to Petra map object.
   Epetra_Map * petraMap_;
   bool mapOwned_;
+
+  // Pointer to comm object.
+  N_PDS_Comm * comm_;
+  bool commOwned_;
 
 };
 

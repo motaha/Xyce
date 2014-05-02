@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.90.2.2 $
+// Revision Number: $Revision: 1.106 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:31 $
+// Revision Date  : $Date: 2014/02/24 23:49:13 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -46,49 +46,25 @@
 #ifndef Xyce_N_CIR_CIRCUIT_h
 #define Xyce_N_CIR_CIRCUIT_h
 
-// ---------- Standard Includes ----------
-
 #include <string>
 #include <map>
 #include <vector>
 
-// ----------   Xyce Includes   ----------
-#include <N_UTL_Xyce.h>
+#include <N_ANP_fwd.h>
 #include <N_DEV_fwd.h>
+#include <N_ERH_fwd.h>
 #include <N_IO_fwd.h>
-
-#ifdef Xyce_PARALLEL_MPI
-#include <mpi.h>
-#endif
-
-// ---------- Forward Declarations ----------
-
-class N_TOP_Topology;
-
-namespace Xyce
-{
-  namespace Topology
-  {
-    class Manager;
-  }
-}
+#include <N_PDS_fwd.h>
+#include <N_TOP_fwd.h>
+#include <N_PDS_Manager.h>
+#include <N_UTL_ReportHandler.h>
+#include <N_UTL_fwd.h>
 
 class N_LAS_System;
 class N_LAS_Builder;
 
-class N_ANP_AnalysisInterface;
 class N_TIA_TimeIntInfo;
 class N_TIA_TwoLevelError;
-
-class N_PDS_Manager;
-class N_PDS_ParMap;
-
-class N_ERH_ErrorMgr;
-
-class NetlistImportTool;
-
-class N_IO_RestartMgr;
-class N_IO_PkgOptionsMgr;
 
 class N_NLS_Manager;
 
@@ -97,43 +73,44 @@ class N_LOA_CktLoader;
 class N_LOA_NonlinearEquationLoader;
 class N_LOA_LoaderMgr;
 
-class N_UTL_Timer;
-
-class N_UTL_BreakPoint;
-
 class N_LAS_Vector;
 class N_LAS_Matrix;
 class Epetra_CrsGraph;
 
+#include <Teuchos_RefCountPtr.hpp>
+using Teuchos::RefCountPtr;
+using Teuchos::rcp;
+using Teuchos::rcpFromRef;
+
+#include <N_PDS_fwd.h>
 #include <N_IO_CmdParse.h>
 
+namespace Xyce {
+namespace Circuit {
+
 //-----------------------------------------------------------------------------
-// Class         : N_CIR_Xyce
+// Class         : Xyce
 // Purpose       : This is the main "top level" class for Xyce.
 // Special Notes :
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/27/00
 //-----------------------------------------------------------------------------
-class N_CIR_Xyce
+class Simulator
 {
   // Methods
  public:
 
   // Default constructor
-  N_CIR_Xyce(
-#ifdef Xyce_PARALLEL_MPI
-             MPI_Comm * comm = 0
-#endif
-            );
+    Simulator(Xyce::Parallel::Machine comm = 0);
 
   // Default destructor (virtual so we derive other classes from this properly)
-  virtual ~N_CIR_Xyce();
+  virtual ~Simulator();
 
   // These are all the API calls that we are suppose to be making available
   // for external programs and/or other objects
 
   //---------------------------------------------------------------------------
-  // Function      : N_CIR_Xyce::setNetlistParameters
+  // Function      : Xyce::setNetlistParameters
   // Purpose       : This passes a vector of pairs "key", "value" that will
   //                 be substituted during the processing of the netlist.  This
   //                 more easily allows Dakota to change any netlist parameter
@@ -143,11 +120,11 @@ class N_CIR_Xyce
   // Creator       : Richard Schiek, Electrical and MEMS Modeling
   // Creation Date : 10/9/2008
   //---------------------------------------------------------------------------
-  void setNetlistParameters( const vector< pair< string, string > > & externalParams );
+  void setNetlistParameters( const std::vector< std::pair< std::string, std::string > > & externalParams );
 
 
   //---------------------------------------------------------------------------
-  // Function      : N_CIR_Xyce::setNetlistParameters
+  // Function      : Xyce::setNetlistParameters
   // Purpose       : Call through to the output manager to set the suffix to
   //                 be used on the output file, as in circuit + suffix + prn
   //                 This is useful in Dakota controlled runs to keep each
@@ -157,10 +134,10 @@ class N_CIR_Xyce
   // Creator       : Richard Schiek, Electrical and MEMS Modeling
   // Creation Date : 10/9/2008
   //---------------------------------------------------------------------------
-  void setOutputFileSuffix( const string newSuffix );
+  void setOutputFileSuffix( const std::string newSuffix );
 
   //---------------------------------------------------------------------------
-  // Function      : N_CIR_Xyce::run
+  // Function      : Xyce::run
   // Purpose       :
   // Special Notes :
   // Scope         : public
@@ -170,7 +147,7 @@ class N_CIR_Xyce
   bool run(int iargs_tmp, char *cargs_tmp[]);
 
   //---------------------------------------------------------------------------
-  // Function      : N_CIR_Xyce::initialize
+  // Function      : Xyce::initialize
   // Purpose       : To initialize Xyce to be driven by the SAX
   //                 simulation backplane. This includes the following:
   //                    Set up and register the Parallel Manager.
@@ -187,10 +164,10 @@ class N_CIR_Xyce
   // Creator       : Lon Waters, Lisa Renee Maynes
   // Creation Date : 05/28/03
   //---------------------------------------------------------------------------
-  bool initialize(int iargs_tmp, char *cargs_tmp[]);
+  bool initialize(int iargs_tmp, char **cargs_tmp);
 
   //---------------------------------------------------------------------------
-  // Function      : N_CIR_Xyce::runSimulation
+  // Function      : Xyce::runSimulation
   // Purpose       :
   // Special Notes :
   // Scope         : public
@@ -200,7 +177,7 @@ class N_CIR_Xyce
   bool runSimulation();
 
   //---------------------------------------------------------------------------
-  // Function      : N_CIR_Xyce::getDACDeviceNames
+  // Function      : Xyce::getDACDeviceNames
   // Purpose       : Gets the (stripped) names of the DAC devices
   //                 in the circuit.
   // Special Notes :
@@ -208,10 +185,10 @@ class N_CIR_Xyce
   // Creator       : Lon Waters, Lisa Renee Maynes
   // Creation Date : 06/13/03
   //---------------------------------------------------------------------------
-  bool getDACDeviceNames(std::vector< string >& dacNames);
+  bool getDACDeviceNames(std::vector< std::string >& dacNames);
 
   //---------------------------------------------------------------------------
-  // Function      : N_CIR_Xyce::getADCMap
+  // Function      : Xyce::getADCMap
   // Purpose       : Gets the (stripped) names of the ADC devices
   //                 in the circuit(as key of map) and map of parameters
   //                 (keyed by parameter name) for each device
@@ -220,10 +197,10 @@ class N_CIR_Xyce
   // Creator       : Tom Russo, SNL, Component Information and Models
   // Creation Date : 05/06/2004
   //---------------------------------------------------------------------------
-  bool getADCMap(map<string,map<string,double> >& ADCMap);
+  bool getADCMap(std::map<std::string,std::map<std::string,double> >& ADCMap);
 
   //---------------------------------------------------------------------------
-  // Function      : N_CIR_Xyce::updateTimeVoltagePairs
+  // Function      : Xyce::updateTimeVoltagePairs
   // Purpose       : Update the DAC devices in a circuit by adding the set
   //                 of time and voltage pairs built up on the "digital side"
   //                 since the last update and by removing the time-voltage
@@ -234,11 +211,11 @@ class N_CIR_Xyce
   // Creation Date : 06/10/03
   //---------------------------------------------------------------------------
   bool updateTimeVoltagePairs(
-        map< string, vector< pair<double,double> >* > const&
+        std::map< std::string, std::vector< std::pair<double,double> >* > const&
         timeVoltageUpdateMap);
 
   //---------------------------------------------------------------------------
-  // Function      : N_CIR_Xyce::getTimeVoltagePairs
+  // Function      : Xyce::getTimeVoltagePairs
   // Purpose       : query the DAC devices in a circuit for the set
   //                 of time and voltage pairs
   // Special Notes :
@@ -247,7 +224,7 @@ class N_CIR_Xyce
   // Creation Date : 05/10/2004
   //---------------------------------------------------------------------------
   bool getTimeVoltagePairs(
-        map< string, vector< pair<double,double> > > &
+        std::map< std::string, std::vector< std::pair<double,double> > > &
         timeVoltageUpdateMap);
 
   //----------------------------------------------------------------------------
@@ -260,10 +237,10 @@ class N_CIR_Xyce
   // Creator        : Tom Russo
   // Creation Date  : 05/07/2004
   //----------------------------------------------------------------------------
-  bool setADCWidths(map< string, int > const& ADCWidthMap);
+  bool setADCWidths(std::map< std::string, int > const& ADCWidthMap);
 
   //---------------------------------------------------------------------------
-  // Function      : N_CIR_Xyce::simulateUntil
+  // Function      : Xyce::simulateUntil
   // Purpose       : To continue the existing analog circuit simulation
   //                 until either the given <requestedUntilTime> is reached
   //                 or the simulation termination criterion is met.
@@ -279,7 +256,7 @@ class N_CIR_Xyce
   bool simulateUntil(double requestedUntilTime, double& completedUntilTime);
 
   //---------------------------------------------------------------------------
-  // Function      : N_CIR_Xyce::finalize
+  // Function      : Xyce::finalize
   // Purpose       : To clean up after driving Xyce with the SIMBUS
   //                 simulation backplane. This includes the following:
   //                    Free any dynamically allocated memory...
@@ -292,11 +269,11 @@ class N_CIR_Xyce
 
   void reportTotalElapsedTime ();
 
-  void readExternalParamsFromFile( string filename, string & iterationSuffix, vector< pair< string, string > > & paramList );
+  void readExternalParamsFromFile( std::string filename, std::string & iterationSuffix, std::vector< std::pair< std::string, std::string > > & paramList );
 
   // accessor routines for external program controlled simulations that
   // need a response function
-  bool registerResponseVars (string objString, RCP<vector< double > > varVectorPtr );
+  bool registerResponseVars (std::string objString, RCP<std::vector< double > > varVectorPtr );
   void finalizeResponseVars();
 
   // report on whether simulation is finished or not
@@ -306,7 +283,7 @@ class N_CIR_Xyce
   bool provisionalStep
     (double maxtimeStep,
      double &timeStep,
-     map< string, vector< pair<double,double> > > & timeVoltageUpdateMap);
+     std::map< std::string, std::vector< std::pair<double,double> > > & timeVoltageUpdateMap);
 
   void acceptProvisionalStep();
   void rejectProvisionalStep();
@@ -319,28 +296,28 @@ class N_CIR_Xyce
   bool finishSolvers ();
 
   void homotopyStepSuccess
-    (const vector<string> & paramNames,
-     const vector<double> & paramVals);
+    (const std::vector<std::string> & paramNames,
+     const std::vector<double> & paramVals);
 
   void homotopyStepFailure ();
 
   void stepSuccess (int analysis);
   void stepFailure (int analysis);
-  bool getBreakPoints (vector<N_UTL_BreakPoint> &breakPointTimes);
+  bool getBreakPoints (std::vector<N_UTL_BreakPoint> &breakPointTimes);
   bool updateStateArrays ();
   bool startTimeStep (const N_TIA_TimeIntInfo & tiInfo);
   bool startTimeStep (const N_DEV_ExternalSimulationData & ext_data);
   bool endTimeStep (N_DEV_ExternalSimulationData & ext_data);
   void enable_lte_analysis();
-  bool setInternalParam (string & name, double val);
+  bool setInternalParam (std::string & name, double val);
 
   bool getInitialQnorm (N_TIA_TwoLevelError & tle);
 
   bool simulateStep
       ( const N_DEV_SolverState & solState,
-        const map <string,double> & inputMap,
-        vector<double> & outputVector,
-        vector< vector<double> > & jacobian,
+        const std::map<std::string,double> & inputMap,
+        std::vector<double> & outputVector,
+        std::vector< std::vector<double> > & jacobian,
         N_TIA_TwoLevelError & tlError);
 
   // 05/27/09 ModelEvaluator Interface functions
@@ -389,114 +366,108 @@ class N_CIR_Xyce
 
   bool simulateStep
       ( const N_DEV_ExternalSimulationData & ext_data,
-        const map <string,double> & inputMap,
-        vector<double> & outputVector,
-        vector< vector<double> > & jacobian,
+        const std::map<std::string,double> & inputMap,
+        std::vector<double> & outputVector,
+        std::vector< std::vector<double> > & jacobian,
         N_TIA_TwoLevelError & tlError);
 
- private:
+  private:
 
-  bool setupParMgr_(int iargs, char *cargs[]);
-  bool doAllocations_();
-  bool doInitializations_();
-  bool doRegistrations_();
-  bool doDeAllocations_();
-  bool setUpTopology_();
-  bool setUpMatrixStructure_();
-  bool runSolvers_();
+    bool setupParMgr_(int iargs, char **cargs);
+    bool doAllocations_();
+    bool doInitializations_();
+    bool doRegistrations_();
+    bool doDeAllocations_();
+    bool setUpTopology_();
+    bool setUpMatrixStructure_();
+    bool runSolvers_();
 
- public:
+  private:
+    ::Xyce::Parallel::Machine   comm_;
 
-protected:
+  protected:
+    // We put the device interface pointer as a protected method so we can
+    // access it from derived classes without kludges.
 
-private:
+    // Device manager
+    N_DEV_DeviceInterface          * devIntPtr_;
 
-  // Attributes
-public:
+  private:
 
-protected:
-  // We put the device interface pointer as a protected method so we can
-  // access it from derived classes without kludges.
+    // Topology manager
+    ::Xyce::Topo::Manager        * topMgrPtr_;
+    N_TOP_Topology                 * topPtr_;
 
-  // Device manager
-  N_DEV_DeviceInterface          * devIntPtr_;
+    // Linear algebra system
+    N_LAS_System                   * lasSysPtr_;
 
-private:
+    // Linear algebra system builder
+    N_LAS_Builder                  * lasBuilderPtr_;
 
-  // Topology manager
-  Xyce::Topology::Manager        * topMgrPtr_;
-  N_TOP_Topology                 * topPtr_;
+    // Time integration manager
+    N_ANP_AnalysisInterface        * anaIntPtr_;
 
-  // Linear algebra system
-  N_LAS_System                   * lasSysPtr_;
+    // Nonlinear solver manager
+    N_NLS_Manager                  * nlsMgrPtr_;
 
-  // Linear algebra system builder
-  N_LAS_Builder                  * lasBuilderPtr_;
+    // Loader (residual and Jacobian) manager
+    N_LOA_LoaderMgr                * loaderMgrPtr_;
 
-  // Time integration manager
-  N_ANP_AnalysisInterface        * anaIntPtr_;
+    // Loader (residual and Jacobian) pointer
+    //N_LOA_Loader                   * loaderPtr_;
 
-  // Nonlinear solver manager
-  N_NLS_Manager                  * nlsMgrPtr_;
+    // Circuit loader (residual and Jacobian) pointer
+    N_LOA_CktLoader                * cktLoaderPtr_;
 
-  // Loader (residual and Jacobian) manager
-  N_LOA_LoaderMgr                * loaderMgrPtr_;
+    // Dae loader (residual and Jacobian) pointer
+    N_LOA_NonlinearEquationLoader                * nonlinearEquationLoaderPtr_;
 
-  // Loader (residual and Jacobian) pointer
-  //N_LOA_Loader                   * loaderPtr_;
+    // Parallel distribution manager
+    N_PDS_Manager                  * parMgrPtr_;
 
-  // Circuit loader (residual and Jacobian) pointer
-  N_LOA_CktLoader                * cktLoaderPtr_;
+    // Netlist import tool.
+    Xyce::IO::NetlistImportTool *       netlistImportToolPtr_;
 
-  // Dae loader (residual and Jacobian) pointer
-  N_LOA_NonlinearEquationLoader                * nonlinearEquationLoaderPtr_;
+    // Output manager
+    N_IO_OutputMgr                 * outMgrPtr_;
 
-  // Parallel distribution manager
-  N_PDS_Manager                  * parMgrPtr_;
+    // Restart manager
+    N_IO_RestartMgr                * resMgrPtr_;
 
-  // Netlist import tool.
-  NetlistImportTool              * netlistImportToolPtr_;
+    // Xyce solver timing utility
+    N_UTL_Timer                    * XyceTimerPtr_;
 
-  // Output manager
-  N_IO_OutputMgr                 * outMgrPtr_;
+    // Elapsed time from beginning of run
+    N_UTL_Timer                    * ElapsedTimerPtr_;
 
-  // Restart manager
-  N_IO_RestartMgr                * resMgrPtr_;
+    // package options manager
+    N_IO_PkgOptionsMgr          * pkgOptionsMgrPtr_;
 
-  // Xyce solver timing utility
-  N_UTL_Timer                    * XyceTimerPtr_;
+    int         iargs;
+    char **     cargs;
 
-  // Elapsed time from beginning of run
-  N_UTL_Timer                    * ElapsedTimerPtr_;
+    // if the user is providing an externa file with parameters in it,
+    // (as in x=1, y=4) the filename may also have an iteration / realization suffix
+    // such as params.in.1234.  iterationSuffix_ will attempt to capture that unique
+    // identifier while externalNetlistParams_ will map params to values.  The values
+    // are treated as strings at this point but later converted to numbers in parsing.
+    std::string iterationSuffix_;
+    std::vector< std::pair< std::string, std::string> > externalNetlistParams_;
 
-  // package options manager
-  RCP<N_IO_PkgOptionsMgr>          pkgOptionsMgrPtr_;
+    bool isSerialFlag_;
+    bool procZeroFlag_;
+    bool multiThreading_;
+    int numThreads_;
 
-  int iargs;
-  char **cargs;
+    bool initializeAllFlag_;
 
-  // if the user is providing an externa file with parameters in it,
-  // (as in x=1, y=4) the filename may also have an iteration / realization suffix
-  // such as params.in.1234.  iterationSuffix_ will attempt to capture that unique
-  // identifier while externalNetlistParams_ will map params to values.  The values
-  // are treated as strings at this point but later converted to numbers in parsing.
-  string iterationSuffix_;
-  vector< pair< string, string> > externalNetlistParams_;
-
-  bool isSerialFlag_;
-  bool procZeroFlag_;
-  bool multiThreading_;
-  int numThreads_;
-
-  bool initializeAllFlag_;
-
-  N_IO_CmdParse commandLine;
-
-#ifdef Xyce_PARALLEL_MPI
-  MPI_Comm * commPtr_;
-#endif
-
+    N_IO_CmdParse commandLine;
+    Xyce::REH previousReportHandler_;
 };
 
-#endif
+} // namespace Circuit
+} // namespace Xyce
 
+typedef Xyce::Circuit::Simulator N_CIR_Xyce;
+
+#endif // Xyce_N_CIR_CIRCUIT_h

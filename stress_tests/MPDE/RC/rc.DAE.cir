@@ -1,0 +1,22 @@
+Simple RC circuit
+**********************************************************************
+*
+* This circuit has the voltage source applied directly to the
+* resistor, with the capacitor tied to ground.
+*
+*
+* 1/30/03 Todd Coffey  <tscoffe@sandia.gov>
+*
+**********************************************************************
+.param Rval=1Meg Cval=100n sinfreq=1000
+Vsrc    1 0  DC 0V SIN(0V 12V {sinfreq} 0 0)
+R1 1 2 {Rval}
+C1 2 0 {Cval}
+.print tran V(1) V(2) I(Vsrc)
+.tran 0.1ms 10ms
+*.options mpde oscsrc=Vsrc n2=21 T2=0.001 IC=1 
+*.options nonlin nox=1 debuglevel=-10
+*diff=3 ICper=1 freqdomain=0 
+.options timeint newdae=1 maxord=1 reltol=1e-8 abstol=1e-8
+*.options timeint reltol=1e-8 abstol=1e-8
+.END

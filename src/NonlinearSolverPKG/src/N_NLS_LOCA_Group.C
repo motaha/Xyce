@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.44.2.2 $
+// Revision Number: $Revision: 1.51 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -260,7 +260,7 @@ NOX::Abstract::Group::ReturnType N_NLS_LOCA::Group::computeF()
   if (!nonContinuationSolve_)
   {
     for (int i = 0; i < params.length(); ++i) {
-      string label = params.getLabel(i);
+      std::string label = params.getLabel(i);
       loader.setParam(label, params.getValue(i));
 
       if (label == "GSTEPPING" && useAugmentLinSys_)
@@ -295,7 +295,7 @@ NOX::Abstract::Group::ReturnType N_NLS_LOCA::Group::computeJacobian()
   if (!nonContinuationSolve_)
   {
     for (int i = 0; i < params.length(); ++i) {
-      string label = params.getLabel(i);
+      std::string label = params.getLabel(i);
       loader.setParam(label, params.getValue(i));
 
       if (label == "GSTEPPING" && useAugmentLinSys_)
@@ -318,7 +318,7 @@ NOX::Abstract::Group::ReturnType N_NLS_LOCA::Group::computeJacobian()
   {
     N_LAS_Matrix& jacobian =
       const_cast<N_LAS_Matrix&>(sharedSystemPtr_->getJacobian());
-    cout << "After computeJacobian, linear system is:" << endl;
+    Xyce::dout() << "After computeJacobian, linear system is:" << std::endl;
     outputLinearSystem_ (&jacobian, xVec_.getNativeVectorPtr(),
                                    fVec_.getNativeVectorPtr());
   }
@@ -374,9 +374,9 @@ void N_NLS_LOCA::Group::outputLinearSystem_ (N_LAS_Matrix* jacobian,
   Xyce::NodeNamePairMap::iterator op_end;
   int i, row, global_row;
   int num;
-  vector<int> col;
-  vector<double> val;
-  map<int,string> rowOut;
+  std::vector<int> col;
+  std::vector<double> val;
+  std::map<int,std::string> rowOut;
   int rowLen, GID;
 
   if (!outputLinear_)
@@ -391,7 +391,7 @@ void N_NLS_LOCA::Group::outputLinearSystem_ (N_LAS_Matrix* jacobian,
   op_end = allNodes_->end();
   for ( ; op_i != op_end ; ++op_i)
   {
-   ostringstream s;
+   std::ostringstream s;
     row = (*op_i).second.first;
 #ifdef Xyce_PARALLEL_MPI
     global_row = pmap_->localToGlobalIndex(row);
@@ -402,16 +402,16 @@ void N_NLS_LOCA::Group::outputLinearSystem_ (N_LAS_Matrix* jacobian,
     s << " Value: " << (*solPtr_)[row];
     if (serialNumber_ > 0)
     {
-      s << endl;
+      s << std::endl;
       s << "  Delta Value: " << (*solPtr_)[row] - oldSol_[row];
-      s << endl;
+      s << std::endl;
     }
     oldSol_[row] = (*solPtr_)[row];
     s << " Residual: " << (*resPtr_)[row];
 #ifdef Xyce_PARALLEL_MPI
     s << "  proc: " << procID;
 #endif
-    s << endl;
+    s << std::endl;
     rowLen = jacobian->getLocalRowLength(row);
     col.resize(rowLen);
     val.resize(rowLen);
@@ -419,22 +419,22 @@ void N_NLS_LOCA::Group::outputLinearSystem_ (N_LAS_Matrix* jacobian,
     for (i=0 ; i<rowLen ; i++)
     {
       if (i>1 && i%10 == 0)
-      s << endl;
+      s << std::endl;
       GID = col[i];
       s << "  " << GID << "(" << val[i] << ")";
     }
     rowOut[global_row] = s.str();
   }
   serialNumber_++;
-  map<int,string>::iterator row_i;
-  map<int,string>::iterator row_end = rowOut.end();
+  std::map<int,std::string>::iterator row_i;
+  std::map<int,std::string>::iterator row_end = rowOut.end();
   row_i = rowOut.begin();
-  string str;
+  std::string str;
 #ifdef Xyce_PARALLEL_MPI
   int numG;
   int pos, posG;
   int len;
-  string buf;
+  std::string buf;
 #endif
   int big=2000000000;
   for ( ; ; ++row_i )
@@ -468,10 +468,10 @@ void N_NLS_LOCA::Group::outputLinearSystem_ (N_LAS_Matrix* jacobian,
           pdsCommPtr_->recv(&len, 1, posG);
           buf.resize(len);
           pdsCommPtr_->recv(&buf[0], len, posG);
-          cout << buf << endl;
+          Xyce::dout() << buf << std::endl;
         }
         else
-          cout << str << endl;
+          Xyce::dout() << str << std::endl;
       }
       else if (procID == posG)
       {
@@ -483,7 +483,7 @@ void N_NLS_LOCA::Group::outputLinearSystem_ (N_LAS_Matrix* jacobian,
     if (numG == big)
       break;
 #else
-    cout << str << endl;
+    Xyce::dout() << str << std::endl;
     if (num == big)
       break;
 #endif
@@ -554,7 +554,7 @@ double N_NLS_LOCA::Group::getParam(int paramID) const
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_NLS_LOCA::Group::setParam(string paramID, double value)
+void N_NLS_LOCA::Group::setParam(std::string paramID, double value)
 {
   N_NLS_NOX::Group::resetIsValid_();
   params.setValue(paramID, value);
@@ -569,7 +569,7 @@ void N_NLS_LOCA::Group::setParam(string paramID, double value)
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-double N_NLS_LOCA::Group::getParam(string paramID) const
+double N_NLS_LOCA::Group::getParam(std::string paramID) const
 {
   return params.getValue(paramID);
 }
@@ -598,7 +598,7 @@ void N_NLS_LOCA::Group::setScaleVec(const NOX::Abstract::Vector& s)
 const NOX::Abstract::Vector& N_NLS_LOCA::Group::getScaleVec() const
 {
   if (scalingVecPtr == 0) {
-    const string message = "ERROR: N_NLS_LOCA::Group::getScaleVec() - scaling vector not set!";
+    const std::string message = "N_NLS_LOCA::Group::getScaleVec() - scaling vector not set!";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
   }
 
@@ -701,7 +701,7 @@ void N_NLS_LOCA::Group::printSolution (const NOX::Abstract::Vector &x,
 void N_NLS_LOCA::Group::stepFailed    ()
 {
 #ifdef Xyce_DEBUG_NONLINEAR
-  cout << "In N_NLS_LOCA::Group::stepFailed" << endl;
+  Xyce::dout() << "In N_NLS_LOCA::Group::stepFailed" << std::endl;
 #endif
   anaInt.failHomotopyStep ();
 }
@@ -717,14 +717,14 @@ void N_NLS_LOCA::Group::stepFailed    ()
 void N_NLS_LOCA::Group::stepSucceeded ()
 {
 #ifdef Xyce_DEBUG_NONLINEAR
-  cout << "In N_NLS_LOCA::Group::stepSucceeded" << endl;
+  Xyce::dout() << "In N_NLS_LOCA::Group::stepSucceeded" << std::endl;
 #endif
 #ifdef Xyce_UPDATED_LOCA
   // Do nothing.  Unfortunately, this function doesn't get called
   // on the initial solve.  (for continuation param = initial value)
   // So, for now, still have to use the printSolution function, which
   // is called every time.
-    const string message = "ERROR: N_NLS_LOCA::Group::stepSucceeded is not fully supported yet!  Recompile without Xyce_UPDATED_LOCA defined\n";
+    const std::string message = "N_NLS_LOCA::Group::stepSucceeded is not fully supported yet!  Recompile without Xyce_UPDATED_LOCA defined\n";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
 #endif
 }

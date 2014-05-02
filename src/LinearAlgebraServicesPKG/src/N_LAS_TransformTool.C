@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.47.2.2 $
+// Revision Number: $Revision: 1.59 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -122,7 +122,7 @@ operator()( const N_UTL_OptionBlock & options )
 #endif
 
   int    partition = 1;   // Zoltan via Isorropia partitioning
-  string partition_type="GRAPH";
+  std::string partition_type="GRAPH";
 
   // AMD should not be used in serial if KLU is being used.
 #ifdef Xyce_PARALLEL_MPI
@@ -135,37 +135,37 @@ operator()( const N_UTL_OptionBlock & options )
   bool   reindex   = true;
   bool   solverMap = true;
 
-  typedef list<N_UTL_Param>::const_iterator ParamListCIter;
+  typedef std::list<N_UTL_Param>::const_iterator ParamListCIter;
   ParamListCIter iterL = options.getParams().begin();
   ParamListCIter endL  = options.getParams().end();
   for( ; iterL != endL; ++iterL )
   {
-    string tag = iterL->uTag();
+    std::string tag = iterL->uTag();
 
-    if     ( tag == "TR_RCM" )               rcm = iterL->iVal();
-    else if( tag == "TR_RCM_TEST_WIDTH" )    rcmTestWidth= iterL->iVal();
-    else if( tag == "TR_SINGLETON_FILTER" )  sFilter = iterL->iVal();
-    else if( tag == "TR_SCALE" )             scale = iterL->iVal();
-    else if( tag == "TR_SCALE_LEFT" )        lScale = iterL->iVal();
-    else if( tag == "TR_SCALE_RIGHT" )       rScale = iterL->iVal();
-    else if( tag == "TR_SCALE_EXP" )         expScale = iterL->dVal();
-    else if( tag == "TR_SCALE_ITER" )        iterScale = iterL->iVal();
-    else if( tag == "TR_BTF" )               btf = iterL->iVal();
-    else if( tag == "TR_GLOBAL_BTF" )        globalbtf = iterL->iVal();
-    else if( tag == "TR_GLOBAL_BTF_DROPTOL" )globalbtftol = iterL->dVal();
-    else if( tag == "TR_GLOBAL_BTF_VERBOSE" )globalbtfverb = iterL->iVal();
+    if     ( tag == "TR_RCM" )               rcm = iterL->getImmutableValue<int>();
+    else if( tag == "TR_RCM_TEST_WIDTH" )    rcmTestWidth= iterL->getImmutableValue<int>();
+    else if( tag == "TR_SINGLETON_FILTER" )  sFilter = iterL->getImmutableValue<int>();
+    else if( tag == "TR_SCALE" )             scale = iterL->getImmutableValue<int>();
+    else if( tag == "TR_SCALE_LEFT" )        lScale = iterL->getImmutableValue<int>();
+    else if( tag == "TR_SCALE_RIGHT" )       rScale = iterL->getImmutableValue<int>();
+    else if( tag == "TR_SCALE_EXP" )         expScale = iterL->getImmutableValue<double>();
+    else if( tag == "TR_SCALE_ITER" )        iterScale = iterL->getImmutableValue<int>();
+    else if( tag == "TR_BTF" )               btf = iterL->getImmutableValue<int>();
+    else if( tag == "TR_GLOBAL_BTF" )        globalbtf = iterL->getImmutableValue<int>();
+    else if( tag == "TR_GLOBAL_BTF_DROPTOL" )globalbtftol = iterL->getImmutableValue<double>();
+    else if( tag == "TR_GLOBAL_BTF_VERBOSE" )globalbtfverb = iterL->getImmutableValue<int>();
 #ifdef Xyce_TRILINOS_DEV
-    else if( tag == "TR_GLOBAL_AMD" )        globalamd = iterL->iVal();
-    else if( tag == "TR_GLOBAL_AMD_VERBOSE" )globalamdverb = iterL->iVal();
+    else if( tag == "TR_GLOBAL_AMD" )        globalamd = iterL->getImmutableValue<int>();
+    else if( tag == "TR_GLOBAL_AMD_VERBOSE" )globalamdverb = iterL->getImmutableValue<int>();
 #endif
-    else if( tag == "TR_PARTITION" )         partition = iterL->iVal();
+    else if( tag == "TR_PARTITION" )         partition = iterL->getImmutableValue<int>();
 #ifdef Xyce_USE_ISORROPIA
     else if( tag == "TR_PARTITION_TYPE" )    partition_type = iterL->usVal();
 #endif
-    else if( tag == "TR_AMD" )               amd = iterL->iVal();
-    else if( tag == "TR_AMD_VERBOSE" )       amd_verbose = iterL->iVal();
-    else if( tag == "TR_REINDEX" )           reindex = iterL->iVal();
-    else if( tag == "TR_SOLVERMAP" )         solverMap = iterL->iVal();
+    else if( tag == "TR_AMD" )               amd = iterL->getImmutableValue<int>();
+    else if( tag == "TR_AMD_VERBOSE" )       amd_verbose = iterL->getImmutableValue<int>();
+    else if( tag == "TR_REINDEX" )           reindex = iterL->getImmutableValue<int>();
+    else if( tag == "TR_SOLVERMAP" )         solverMap = iterL->getImmutableValue<int>();
   }
 
 // Sort out which partitioning to use.
@@ -186,28 +186,34 @@ operator()( const N_UTL_OptionBlock & options )
 #endif
 
 #ifdef Xyce_VERBOSE_LINEAR
-  string msg = "Linear Transforms\n";
-  msg += "-----------------\n";
-  if( sFilter ) msg += "Singleton Filter\n";
+  Xyce::lout() << "Linear Transforms" << std::endl
+               << "-----------------" << std::endl;
+  if( sFilter )
+    Xyce::lout() << "Singleton Filter" << std::endl;
 #ifdef Xyce_TRILINOS_DEV
-  if( globalamd ) msg += "Global AMD\n";
+  if( globalamd )
+    Xyce::lout() << "Global AMD" << std::endl;
 #endif
-  if( globalbtf ) msg += "Global BTF\n";
-  if( scale ) msg += "Scaling\n";
+  if( globalbtf )
+    Xyce::lout() <<  "Global BTF" << std::endl;
+  if( scale )
+    Xyce::lout() << "Scaling" << std::endl;
 #ifdef Xyce_USE_ISORROPIA
   if( partition == 1 ) {
-    msg += "Isorropia Partitioning (";
-    msg += partition_type;
-    msg += ") \n";
+    Xyce::lout() << "Isorropia Partitioning (" << partition_type << ") " << std::endl;
   }
 #endif
-  if( rcm ) msg += "RCM\n";
-  if( amd ) msg += "AMD\n";
-  if( btf ) msg += "BTF\n";
-  if( reindex ) msg += "Reindexing\n";
-  if( solverMap ) msg += "Column Remapping\n";
-  msg += "-----------------\n";
-  N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_INFO_0, msg );
+  if( rcm )
+    Xyce::lout() << "RCM" << std::endl;
+  if( amd )
+    Xyce::lout() << "AMD" << std::endl;
+  if( btf )
+    Xyce::lout() << "BTF" << std::endl;
+  if( reindex )
+    Xyce::lout() << "Reindexing" << std::endl;
+  if( solverMap )
+    Xyce::lout() << "Column Remapping" << std::endl;
+  Xyce::lout() << "-----------------" << std::endl;
 #endif
 
   Teuchos::RCP<N_LAS_Transform> CompTrans = Teuchos::rcp( new N_LAS_Transform() );

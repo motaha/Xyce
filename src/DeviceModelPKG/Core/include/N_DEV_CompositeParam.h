@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright(C) 2002-2013  Sandia Corporation
+//    Copyright(C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,85 +36,91 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.16.2.2 $
+// Revision Number: $Revision: 1.25.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/03/03 18:29:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 #ifndef Xyce_N_DEV_CompositeParam_h
 #define Xyce_N_DEV_CompositeParam_h
 
-// ---------- Standard Includes ----------
 #include <string>
-#include <vector>
-#include <list>
-#include <map>
 
-// ------------- Xyce Includes ------------
-#include <N_ERH_ErrorMgr.h>
-#include <N_UTL_Xyce.h>
-#include <N_DEV_Param.h>
 #include <N_DEV_Pars.h>
-
-// ---------- Forward Declarations ----------
 
 namespace Xyce {
 namespace Device {
 
-//-----------------------------------------------------------------------------
-// Class         : CompositeParam
-//
-// Purpose       : Base class for vector-composite classes.  This class mostly
-//                 contains parameter processing similar to that of the
-//                 DeviceEntity class.
-//
-// Special Notes :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 05/05/05
-//-----------------------------------------------------------------------------
+///
+/// CompositeParam is the base class for classes that wish to only manage the processing of parameter data.
+///
+/// The DeviceEntity class is vary similar, except that it manages a device as well as the device's parameter data.
+/// During DeviceEntity's processing of parameters, it may create several object of classes derived from CompositeParam
+/// which hold the processes parametric data.  The parametricData_ member holds the parameter descriptions the
+/// Device::setParameters() function populates the values in the object of the derived class while the processParams()
+/// virtual function can handle any additional processing of the parameters after they have been set.
+/// parametricData_ object.
+///
+/// See Device::populateParams() and Device::setParameters() in the DeviceEntity implementation file.
+///
+/// @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+/// @date   Wed Jan 29 17:26:35 2014
+///
 class CompositeParam : public ParameterBase
 {
-  public:
-    typedef Descriptor Pars;
-    typedef Descriptor Parameter;
-    typedef ParametricData<void>::ParameterMap ParameterMap;
+public:
+  ///
+  /// CompositeParam sets the parametric data description.
+  ///
+  ///
+  /// @param parametric_data   reference to the parametric data description
+  ///
+  /// @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+  /// @date   Wed Jan 29 17:33:22 2014
+  /// 
+  CompositeParam(ParametricData<void> &parametric_data)
+    : parametricData_(parametric_data)
+  {}
 
-    CompositeParam();
-    virtual ~CompositeParam();
+  virtual ~CompositeParam()
+  {}
 
-  private:
-    CompositeParam(const CompositeParam &);
-    CompositeParam &operator=(const CompositeParam &);
+private:
+  CompositeParam(const CompositeParam &);                     ///< No copying
+  CompositeParam &operator=(const CompositeParam &);          ///< No assignment
 
-  public:
-    virtual void processParams() {}
+public:
+  ///
+  /// processParams post processes the parameters that have been set in the object of the derived class.
+  ///
+  /// See Device::populateParams() and Device::setParameters() in the DeviceEntity implementation file.
+  ///
+  /// @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+  /// @date   Wed Jan 29 17:34:53 2014
+  ///
+  virtual void processParams() = 0;
 
-    void setDefaultParams();
-    void setParams( const std::string &, const Param & );
-    bool given(const string &parameter_name);
+  bool given(const std::string &parameter_name) const;
 
-    std::ostream &printParams(std::ostream &os);
+  
+  /// getParameterMap returns the parameter map which describes the parameters.
+  /// 
+  /// @return reference to the parameter map
+  ///   
+  /// @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+  /// @date   Wed Jan 29 17:49:10 2014
+  ///
+  const ParameterMap &getParameterMap() const 
+  {
+    return parametricData_.getMap();
+  }
 
-    const std::string &getName() const {
-      return name_;
-    }
-
-  protected:
-    virtual const ParametricData<void> &getMyParametricData() const = 0;
-
-    const ParameterMap *getPMap() const {
-      return reinterpret_cast<const ParameterMap *>(&getMyParametricData().getMap());
-    }
-
-  private:
-    std::string           name_;
+private:
+  ParametricData<void> &      parametricData_;                ///< Parameter data desciptions
 };
 
 } // namespace Device
 } // namespace Xyce
 
-typedef Xyce::Device::CompositeParam N_DEV_CompositeParam;
-
-#endif
-
+#endif // Xyce_N_DEV_CompositeParam_h

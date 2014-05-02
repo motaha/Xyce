@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.14.6.2 $
+// Revision Number: $Revision: 1.23 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:44 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -62,7 +62,6 @@
 
 // --------  Forward Declarations --------
 
-class Epetra_Map;
 class N_PDS_ParMap;
 
 //-----------------------------------------------------------------------------
@@ -75,77 +74,92 @@ class N_PDS_ParMap;
 class N_LAS_BlockVector : public N_LAS_Vector
 {
  public:
+  N_LAS_BlockVector( int numBlocks,
+                     const Teuchos::RCP<N_PDS_ParMap> & globalMap,
+                     const Teuchos::RCP<N_PDS_ParMap> & subBlockMap,
+                     int augmentRows = 0 );
 
+  // Constructor that uses the block size to divide up the number of elements on
+  // each processor into vectors whose values are all "owned" by one processor.
+  // NOTE:  This constructor is handy for frequency-domain representations of time-domain vectors.
+  N_LAS_BlockVector( int blockSize,
+                     const Teuchos::RCP<N_PDS_ParMap> & globalMap );
+  
   // Constructors to map to Petra constructors.
-  N_LAS_BlockVector( int BlockCount,
-                     Epetra_Map & Map,
-                     Epetra_Map & BlockMap,
-                     int augmentRows = 0  );
-
-  N_LAS_BlockVector( int BlockCount,
-                     const Teuchos::RCP<N_PDS_ParMap> & Map,
-                     const Teuchos::RCP<N_PDS_ParMap> & BlockMap,
-                     int augmentRows = 0  );
-
-  // Constructors to map to Petra constructors.
-  N_LAS_BlockVector( int BlockCount,
-                     Epetra_Map & Map,
-                     Epetra_Map & BlockMap,
-                     Epetra_Map & oBlockMap,
-                     int augmentRows = 0  );
-
-  // Constructor that takes the global map and overlap map (Map / oMap) as well as the 
-  // local block map and overlap map (BlockMap / oBlockMap)
-  N_LAS_BlockVector( int Size,
-                     const Teuchos::RCP<N_PDS_ParMap> & Map,
-                     const Teuchos::RCP<N_PDS_ParMap> & oMap,
-                     const Teuchos::RCP<N_PDS_ParMap> & BlockMap,
-                     const Teuchos::RCP<N_PDS_ParMap> & oBlockMap );
+  N_LAS_BlockVector( int numBlocks,
+                     const Teuchos::RCP<N_PDS_ParMap> & globalMap,
+                     const Teuchos::RCP<N_PDS_ParMap> & subBlockMap,
+                     const Teuchos::RCP<N_PDS_ParMap> & osubBlockMap,
+                     int augmentRows = 0 );
 
   //Copy constructor
   N_LAS_BlockVector( const N_LAS_BlockVector & right );
 
   //Copy constructor
-  N_LAS_BlockVector( const N_LAS_Vector & right, const Epetra_Map& subBlockMap, int numBlocks );
+  N_LAS_BlockVector( const N_LAS_Vector & right, const Teuchos::RCP<N_PDS_ParMap> & subBlockMap, int numBlocks );
+
+  //Copy constructor
+  //NOTE:  This constructor assumes that the N_LAS_Vector is divided up into blockSize subvectors,
+  //       whose values are solely owned by one of the processors.
+  N_LAS_BlockVector( const N_LAS_Vector & right, int blockSize );
 
   //View constructor
-  N_LAS_BlockVector( Epetra_Vector * vector, const Epetra_Map& subBlockMap, int numBlocks, bool isOwned );
+  N_LAS_BlockVector( Epetra_Vector * vector, const Teuchos::RCP<N_PDS_ParMap> & subBlockMap, int numBlocks, bool isOwned );
 
   // Destructor
   virtual ~N_LAS_BlockVector() {};
 
   // Block accessors
   N_LAS_Vector & block( int Loc ) const
-  { return *Blocks_[Loc]; }
+  { return *blocks_[Loc]; }
 
   int blockSize() const
   { return globalBlockSize_; }
 
   int blockCount() const
-  { return BlockCount_; }
+  { return numBlocks_; }
+
+  int startBlock() const
+  { return startBlock_; }
+
+  int endBlock() const
+  { return endBlock_; }
 
   double * augmentStart()
-  { return AugmentLoc_; }
+  { return augmentLoc_; }
+ /* 
+  // Fill vector with constant value.
+  void putScalar(const double scalar);
 
-  void printPetraObject() const;
+  // Add to vector with constant value.
+  void addScalar(const double scalar);
+*/
+  // Assemble global vector with blocks
+  // NOTE:  The global vector is not always a view of the local vector, so this function ensures
+  // that the values are sync'ed up.  Call this before using the global vector for computations.
+  void assembleGlobalVector();
+
+  void printPetraObject(std::ostream &os) const;
 
  private:
 
+  bool blocksViewGlobalVec_;
   const int globalBlockSize_;
   const int localBlockSize_;
   const int overlapBlockSize_;
-  const int BlockCount_;
-  const int AugmentCount_;
-  double * AugmentLoc_;
-  int offset_;
+  const int numBlocks_;
+  const int augmentCount_;
 
-  Teuchos::RCP<N_PDS_ParMap> newMap_, newoMap_;
+  // In frequency domain, whole blocks may be owned by one processor.
+  // NOTE:  This assumes they are contiguous.  By default these routines
+  //        will return 0 and numBlocks_ (which is sane for the time domain specs).
+  int startBlock_, endBlock_;
+
+  double * augmentLoc_;
+
   Teuchos::RCP<N_PDS_ParMap> newBlockMap_, newoBlockMap_;
 
-  const Epetra_Map & BlockMap_;
-  const Epetra_Map & oBlockMap_;
-
-  vector<Teuchos::RCP<N_LAS_Vector> > Blocks_;
+  std::vector<Teuchos::RCP<N_LAS_Vector> > blocks_;
 
 };
 

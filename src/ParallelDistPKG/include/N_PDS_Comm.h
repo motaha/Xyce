@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -39,9 +39,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.21.2.2 $
+// Revision Number: $Revision: 1.27 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -49,53 +49,43 @@
 #ifndef Xyce_N_PDS_Comm_h
 #define Xyce_N_PDS_Comm_h
 
-// ---------- Standard Includes ----------
-
 #include <list>
 
-// ----------   Xyce Includes   ----------
+#include <N_PDS_ParallelMachine.h>
 
-// ----------  Other Includes   ----------
-
-// ----------  Fwd Declarations ----------
 
 class Epetra_Comm;
 
+namespace Xyce {
+namespace Parallel {
+
 //-----------------------------------------------------------------------------
-// Class         : N_PDS_Comm
+// Class         : Communicator
 // Purpose       : Abstract parallel communication class for Xyce.  This class
 //                 will contain parallel data and functions.
 // Special Notes :
 // Creator       : Robert Hoekstra, SNL, Parallel Compuational Sciences
 // Creation Date : 06/26/01
 //-----------------------------------------------------------------------------
-class N_PDS_Comm
+class Communicator
 {
 
 public:
+    Communicator()
+    {}
 
-  // Default constructor.
-  N_PDS_Comm() {}
-
-  // Destructor
-  virtual ~N_PDS_Comm() {}
+    virtual ~Communicator()
+    {}
 
 private:
+  Communicator(const Communicator & right);
+  Communicator & operator=(const Communicator & right);
 
-  // Copy and Assign not allowed (use clone to get derived type).
-
-  // Copy constructor (private)
-  N_PDS_Comm(const N_PDS_Comm & right);
-
-  // Assignment operator (private)
-  N_PDS_Comm & operator=(const N_PDS_Comm & right);
-
-  bool operator==(const N_PDS_Comm & right) const;
-  bool operator!=(const N_PDS_Comm & right) const;
+  bool operator==(const Communicator & right) const;
+  bool operator!=(const Communicator & right) const;
 
 public:
-
-  virtual N_PDS_Comm * clone() const = 0;
+  virtual Communicator *clone() const = 0;
 
   // Get my processor ID.
   virtual int procID() const = 0;
@@ -105,6 +95,10 @@ public:
 
   // Get the serial flag (true => serial, not parallel operation).
   virtual bool isSerial() const = 0;
+
+  // Get the last processor flag (by default true in serial)
+  // NOTE:  This is used for generating augmented linear systems.
+  virtual bool isLastProc() const = 0;
 
   // Wrappers for Petra_Comm functionality
   virtual bool scanSum(const double * vals, double * sums, const int & count) const = 0;
@@ -180,6 +174,13 @@ public:
   // the communicator to wait until all processors have arrived.
   virtual void barrier() const = 0;
 
+    virtual Parallel::Machine comm() const = 0;
+    
 };
 
-#endif
+} // namespace Parallel
+} // namespace Xyce
+
+typedef Xyce::Parallel::Communicator N_PDS_Comm;
+
+#endif // Xyce_N_PDS_Comm_h

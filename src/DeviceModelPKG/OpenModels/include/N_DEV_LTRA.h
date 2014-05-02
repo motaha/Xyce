@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.21.2.2 $
+// Revision Number: $Revision: 1.38.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/03/04 23:50:54 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -47,7 +47,8 @@
 #define Xyce_N_DEV_LTRA_h
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_DeviceTemplate.h>
+#include <N_DEV_Configuration.h>
+#include <N_DEV_DeviceMaster.h>
 #include <N_DEV_DeviceInstance.h>
 #include <N_DEV_DeviceModel.h>
 #include <N_UTL_BreakPoint.h>
@@ -108,6 +109,19 @@ namespace LTRA {
 class Model;
 class Instance;
 
+struct Traits : public DeviceTraits<Model, Instance>
+{
+  static const char *name() {return "Lossy Transmission Line";}
+  static const char *deviceTypeName() {return "O level 1";}
+  static const int numNodes() {return 4;}
+  static const bool modelRequired() {return true;}
+  static const bool isLinearDevice() {return true;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
+
 //-----------------------------------------------------------------------------
 // Class         : Instance
 // Purpose       :
@@ -117,184 +131,177 @@ class Instance;
 //-----------------------------------------------------------------------------
 class Instance : public DeviceInstance
 {
-    friend class ParametricData<Instance>;
-    friend class Model;
-    friend class Master;
+  friend class ParametricData<Instance>;
+  friend class Model;
+  friend class Traits;friend class Master;
 
-  public:
-    static ParametricData<Instance> &getParametricData();
+public:
+  Instance(
+     const Configuration &     configuration,
+     const InstanceBlock &     instance_block,
+     Model &                   model,
+     const FactoryBlock &      factory_block);
 
-    virtual const ParametricData<void> &getMyParametricData() const {
-      return getParametricData();
-    }
+  ~Instance();
 
+private:
+  Instance(const Instance &);
+  Instance &operator=(const Instance &);
 
-    Instance(InstanceBlock &IB,
-             Model & Miter,
-             MatrixLoadData & mlData1,
-             SolverState &ss1,
-             ExternData  &ed1,
-             DeviceOptions & do1);
+public:
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
+  void registerStateLIDs( const std::vector<int> & staLIDVecRef );
 
-    ~Instance();
+  std::map<int,std::string> & getIntNameMap ();
 
-  private:
-    Instance(const Instance &);
-    Instance &operator=(const Instance &);
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-  public:
-    void registerLIDs( const vector<int> & intLIDVecRef,
-                       const vector<int> & extLIDVecRef );
-    void registerStateLIDs( const vector<int> & staLIDVecRef );
+  bool processParams ();
+  bool updateIntermediateVars ();
+  bool updatePrimaryState ();
+  bool updateSecondaryState ();
 
-    map<int,string> & getIntNameMap ();
+  bool loadDAEQVector () {return true;}
+  bool loadDAEFVector ();
 
-    const vector< vector<int> > & jacobianStamp() const;
-    void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  bool loadDAEdQdx () {return true;}
+  bool loadDAEdFdx ();
 
-    bool processParams (string param = "");
-    bool updateIntermediateVars ();
-    bool updatePrimaryState ();
-    bool updateSecondaryState ();
+  void setupPointers();
 
-    bool loadDAEQVector () {return true;}
-    bool loadDAEFVector ();
+  bool getInstanceBreakPoints (std::vector<N_UTL_BreakPoint> &breakPointTimes);
+  void acceptStep();
 
-    bool loadDAEdQdx () {return true;}
-    bool loadDAEdFdx ();
+  double getMaxTimeStepSize();
 
-    void setupPointers();
+  DeviceState * getInternalState();
+  bool setInternalState( const DeviceState & state );
+  bool setIC();
 
-    bool getInstanceBreakPoints (vector<N_UTL_BreakPoint> &breakPointTimes);
-    void acceptStep();
+public:
+  Model &getModel()
+  {
+    return model_;
+  }
 
-    double getMaxTimeStepSize();
+private:
+  static std::vector< std::vector<int> > jacStamp;
 
-    DeviceState * getInternalState();
-    bool setInternalState( const DeviceState & state );
-    bool setIC();
+  Model &       model_;         //< Owning model
 
-  public:
-    Model &getModel() {
-      return model_;
-    }
+  void calculateMaxTimeStep_(void);   // Calculate a maximum time step size to minimize errors
 
-  private:
-    static vector< vector<int> > jacStamp;
+  double input1;	// accumulated excitation for port 1
+  double input2;	// accumulated excitation for port 2
 
-    Model &       model_;         //< Owning model
+  double currp1;	// Current at port 1
+  double currp2;	// Current at port 2
 
-    void calculateMaxTimeStep_(void);   // Calculate a maximum time step size to minimize errors
+  double vpos1;	// Voltage at port 1 positive node
+  double vneg1;	// Voltage at port 1 negative node
 
-    double input1;	// accumulated excitation for port 1
-    double input2;	// accumulated excitation for port 2
+  double vpos2;	// Voltage at port 2 positive node
+  double vneg2;	// Voltage at port 2 negative node
 
-    double currp1;	// Current at port 1
-    double currp2;	// Current at port 2
+  double initVolt1;	// initial condition:  voltage on port 1
+  double initVolt2;	// initial condition:  voltage on port 2
 
-    double vpos1;	// Voltage at port 1 positive node
-    double vneg1;	// Voltage at port 1 negative node
+  double initCur1;	// initial condition:  current at port 1
+  double initCur2;	// initial condition:  current at port 2
 
-    double vpos2;	// Voltage at port 2 positive node
-    double vneg2;	// Voltage at port 2 negative node
+  std::vector<double> v1;	// past values of voltage at port 1
+  std::vector<double> v2;	// past values of voltage at port 2
 
-    double initVolt1;	// initial condition:  voltage on port 1
-    double initVolt2;	// initial condition:  voltage on port 2
+  std::vector<double> i1;	// past values of current at port 1
+  std::vector<double> i2;	// past values of current at port 2
 
-    double initCur1;	// initial condition:  current at port 1
-    double initCur2;	// initial condition:  current at port 2
+  size_t listSize;	// Size of variables vectors above
 
-    vector<double> v1;	// past values of voltage at port 1
-    vector<double> v2;	// past values of voltage at port 2
+  bool initVolt1Given;
+  bool initVolt2Given;
 
-    vector<double> i1;	// past values of current at port 1
-    vector<double> i2;	// past values of current at port 2
+  bool initCur1Given;
+  bool initCur2Given;
 
-    size_t listSize;	// Size of variables vectors above
+  // local indices (offsets)
+  int li_Pos1;
+  int li_Neg1;
 
-    bool initVolt1Given;
-    bool initVolt2Given;
+  int li_Pos2;
+  int li_Neg2;
 
-    bool initCur1Given;
-    bool initCur2Given;
+  int li_Ibr1;
+  int li_Ibr2;
 
-    // local indices (offsets)
-    int li_Pos1;
-    int li_Neg1;
+  //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // Matrix elements
+  //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-    int li_Pos2;
-    int li_Neg2;
+  //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  //    Matrix equation offset variables
+  //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  // Positive Node1
+  int APos1EquPos1NodeOffset;
+  int APos1EquIbr1NodeOffset;
+  // Negative Node1
+  int ANeg1EquNeg1NodeOffset;
+  int ANeg1EquIbr1NodeOffset;
+  // Positive Node2
+  int APos2EquPos2NodeOffset;
+  int APos2EquIbr2NodeOffset;
+  // Negative Node1
+  int ANeg2EquNeg2NodeOffset;
+  int ANeg2EquIbr2NodeOffset;
+  // Branch1 equation due to Jajeet LTRA
+  int AIbr1EquPos1NodeOffset;
+  int AIbr1EquNeg1NodeOffset;
+  int AIbr1EquPos2NodeOffset;
+  int AIbr1EquNeg2NodeOffset;
+  int AIbr1EquIbr1NodeOffset;
+  int AIbr1EquIbr2NodeOffset;
+  // Branch2 equation due to Jajeet LTRA
+  int AIbr2EquPos1NodeOffset;
+  int AIbr2EquNeg1NodeOffset;
+  int AIbr2EquPos2NodeOffset;
+  int AIbr2EquNeg2NodeOffset;
+  int AIbr2EquIbr1NodeOffset;
+  int AIbr2EquIbr2NodeOffset;
 
-    int li_Ibr1;
-    int li_Ibr2;
+  //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  //    Entries in matrix corresponding to offsets above
+  //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  double *pos1Pos1Ptr;
+  double *pos1Ibr1Ptr;
 
-    //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-    // Matrix elements
-    //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  double *neg1Neg1Ptr;
+  double *neg1Ibr1Ptr;
 
-    //**********************************************************
-    //    Matrix equation offset variables
-    //**********************************************************
-    // Positive Node1
-    int APos1EquPos1NodeOffset;
-    int APos1EquIbr1NodeOffset;
-    // Negative Node1
-    int ANeg1EquNeg1NodeOffset;
-    int ANeg1EquIbr1NodeOffset;
-    // Positive Node2
-    int APos2EquPos2NodeOffset;
-    int APos2EquIbr2NodeOffset;
-    // Negative Node1
-    int ANeg2EquNeg2NodeOffset;
-    int ANeg2EquIbr2NodeOffset;
-    // Branch1 equation due to Jajeet LTRA
-    int AIbr1EquPos1NodeOffset;
-    int AIbr1EquNeg1NodeOffset;
-    int AIbr1EquPos2NodeOffset;
-    int AIbr1EquNeg2NodeOffset;
-    int AIbr1EquIbr1NodeOffset;
-    int AIbr1EquIbr2NodeOffset;
-    // Branch2 equation due to Jajeet LTRA
-    int AIbr2EquPos1NodeOffset;
-    int AIbr2EquNeg1NodeOffset;
-    int AIbr2EquPos2NodeOffset;
-    int AIbr2EquNeg2NodeOffset;
-    int AIbr2EquIbr1NodeOffset;
-    int AIbr2EquIbr2NodeOffset;
+  double *pos2Pos2Ptr;
+  double *pos2Ibr2Ptr;
 
-    //**********************************************************
-    //    Entries in matrix corresponding to offsets above
-    //**********************************************************
-    double *pos1Pos1Ptr;
-    double *pos1Ibr1Ptr;
+  double *neg2Neg2Ptr;
+  double *neg2Ibr2Ptr;
 
-    double *neg1Neg1Ptr;
-    double *neg1Ibr1Ptr;
+  double *ibr1Pos1Ptr;
+  double *ibr1Neg1Ptr;
+  double *ibr1Pos2Ptr;
+  double *ibr1Neg2Ptr;
+  double *ibr1Ibr1Ptr;
+  double *ibr1Ibr2Ptr;
 
-    double *pos2Pos2Ptr;
-    double *pos2Ibr2Ptr;
+  double *ibr2Pos1Ptr;
+  double *ibr2Neg1Ptr;
+  double *ibr2Pos2Ptr;
+  double *ibr2Neg2Ptr;
+  double *ibr2Ibr1Ptr;
+  double *ibr2Ibr2Ptr;
 
-    double *neg2Neg2Ptr;
-    double *neg2Ibr2Ptr;
+  bool first_BP_call_done;
 
-    double *ibr1Pos1Ptr;
-    double *ibr1Neg1Ptr;
-    double *ibr1Pos2Ptr;
-    double *ibr1Neg2Ptr;
-    double *ibr1Ibr1Ptr;
-    double *ibr1Ibr2Ptr;
-
-    double *ibr2Pos1Ptr;
-    double *ibr2Neg1Ptr;
-    double *ibr2Pos2Ptr;
-    double *ibr2Neg2Ptr;
-    double *ibr2Ibr1Ptr;
-    double *ibr2Ibr2Ptr;
-
-    bool first_BP_call_done;
-
-    bool newBreakPoint;
-    double newBreakPointTime;
+  bool newBreakPoint;
+  double newBreakPointTime;
 };
 
 //-----------------------------------------------------------------------------
@@ -306,207 +313,211 @@ class Instance : public DeviceInstance
 //-----------------------------------------------------------------------------
 class Model : public DeviceModel
 {
-    typedef std::vector<Instance *> InstanceVector;
+  typedef std::vector<Instance *> InstanceVector;
 
-    friend class ParametricData<Model>;
-    friend class Instance;
-    friend class Master;
+  friend class ParametricData<Model>;
+  friend class Instance;
+  friend class Traits;friend class Master;
 
-  public:
-    static ParametricData<Model> &getParametricData();
+public:
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &        MB,
+     const FactoryBlock &      factory_block);
+  ~Model();
 
-    virtual const ParametricData<void> &getMyParametricData() const {
-      return getParametricData();
-    }
+private:
+  Model();
+  Model(const Model &);
+  Model &operator=(const Model &);
 
-    Model(const ModelBlock &MB,
-          SolverState & ss1,
-          DeviceOptions & do1);
-    ~Model();
+public:
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
 
-  private:
-    Model();
-    Model(const Model &);
-    Model &operator=(const Model &);
+  virtual std::ostream &printOutInstances(std::ostream &os) const;
+  bool processParams ();
+  bool processInstanceParams ();
 
-  public:
-    virtual std::ostream &printOutInstances(std::ostream &os) const;
-    bool processParams (string param = "");
-    bool processInstanceParams (string param = "");
+private:
 
-  private:
+  int quadInterp_ (double t, double t1, double t2, double t3, double& c1, double& c2, double& c3);
+  int linInterp_  (double t, double t1, double t2, double& c1, double& c2);
+  double intlinfunc_ (double lolimit, double hilimit,
+                      double lovalue, double hivalue,
+                      double t1, double t2);
+  double twiceintlinfunc_(double lolimit, double hilimit,
+                          double otherlolimit, double lovalue,
+                          double hivalue, double t1, double t2);
+  double thriceintlinfunc_(double lolimit, double hilimit,
+                           double secondlolimit, double thirdlolimit,
+                           double lovalue, double  hivalue,
+                           double t1, double t2);
 
-    int quadInterp_ (double t, double t1, double t2, double t3, double& c1, double& c2, double& c3);
-    int linInterp_  (double t, double t1, double t2, double& c1, double& c2);
-    double intlinfunc_ (double lolimit, double hilimit,
-                        double lovalue, double hivalue,
-                        double t1, double t2);
-    double twiceintlinfunc_(double lolimit, double hilimit,
-                            double otherlolimit, double lovalue,
-                            double hivalue, double t1, double t2);
-    double thriceintlinfunc_(double lolimit, double hilimit,
-                             double secondlolimit, double thirdlolimit,
-                             double lovalue, double  hivalue,
-                             double t1, double t2);
+  bool modelCalculations_(int& isaved, double& qf1, double& qf2, double& qf3,
+                          double& lf2, double& lf3);
 
-    bool modelCalculations_(int& isaved, double& qf1, double& qf2, double& qf3,
-                            double& lf2, double& lf3);
+  // from numerical recipies in C:
+  double bessI0_(double x);
+  double bessI1_(double x);
+  double bessI1xOverX_(double x);
 
-    // from numerical recipies in C:
-    double bessI0_(double x);
-    double bessI1_(double x);
-    double bessI1xOverX_(double x);
+  double rlcH1dashFunc_(double time, double T, double alpha, double beta);
+  double rlcH2Func_(double time, double T, double alpha, double beta);
+  double rlcH3dashFunc_(double time, double T, double alpha, double beta);
+  double rlcH1dashTwiceIntFunc_(double time, double beta);
+  double rlcH3dashIntFunc_(double time, double T, double beta);
+  double rcH1dashTwiceIntFunc_(double time, double cbyr);
+  double rcH2TwiceIntFunc_(double time, double rclsqr);
 
-    double rlcH1dashFunc_(double time, double T, double alpha, double beta);
-    double rlcH2Func_(double time, double T, double alpha, double beta);
-    double rlcH3dashFunc_(double time, double T, double alpha, double beta);
-    double rlcH1dashTwiceIntFunc_(double time, double beta);
-    double rlcH3dashIntFunc_(double time, double T, double beta);
-    double rcH1dashTwiceIntFunc_(double time, double cbyr);
-    double rcH2TwiceIntFunc_(double time, double rclsqr);
+  double rcH3dashTwiceIntFunc_(double time, double cbyr, double rclsqr);
 
-    double rcH3dashTwiceIntFunc_(double time, double cbyr, double rclsqr);
+  // coefficient setups:
+  void rcCoeffsSetup_(
+     double & h1dashfirstcoeff,
+     double & h2firstcoeff,
+     double & h3dashfirstcoeff,
+     std::vector<double> & h1dashcoeffs,
+     std::vector<double> & h2coeffs,
+     std::vector<double> & h3dashcoeffs,
+     size_t listsize, double cbyr, double rclsqr, double curtime,
+     const std::vector<double> & timelist, int timeindex, double reltol);
 
-    // coefficient setups:
-    void rcCoeffsSetup_(
-      double & h1dashfirstcoeff,
-      double & h2firstcoeff,
-      double & h3dashfirstcoeff,
-      vector<double> & h1dashcoeffs,
-      vector<double> & h2coeffs,
-      vector<double> & h3dashcoeffs,
-      size_t listsize, double cbyr, double rclsqr, double curtime,
-      vector<double> & timelist, int timeindex, double reltol);
+  void rlcCoeffsSetup_(
+     double & h1dashfirstcoeff, double & h2firstcoeff, double & h3dashfirstcoeff,
+     std::vector<double> & h1dashcoeffs, std::vector<double> & h2coeffs, std::vector<double> & h3dashcoeffs,
+     size_t listsize, double T, double alpha, double beta, double curtime,
+     const std::vector<double> & timelist, int timeindex, double reltol, int *auxindexptr);
 
-    void rlcCoeffsSetup_(
-      double & h1dashfirstcoeff, double & h2firstcoeff, double & h3dashfirstcoeff,
-      vector<double> & h1dashcoeffs, vector<double> & h2coeffs, vector<double> & h3dashcoeffs,
-      size_t listsize, double T, double alpha, double beta, double curtime,
-      vector<double> & timelist, int timeindex, double reltol, int *auxindexptr);
-
-    bool straightLineCheck_(double x1, double y1,
-                            double x2, double y2,
-                            double x3, double y3,
-                            double reltol, double abstol);
+  bool straightLineCheck_(double x1, double y1,
+                          double x2, double y2,
+                          double x3, double y3,
+                          double reltol, double abstol);
 
 
 
-    double lteCalculate_ ( Instance & instance,
-                           double curtime );
+  double lteCalculate_ ( Instance & instance,
+                         double curtime );
 
-    double SECONDDERIV_(int i, double a, double b, double c);
-
-
-  public:
-    InstanceVector &getInstanceVector() {
-      return instanceContainer;
-    }
-
-    const InstanceVector &getInstanceVector() const {
-      return instanceContainer;
-    }
-
-  private:
-    vector<Instance*> instanceContainer;
-
-  private:
+  double SECONDDERIV_(int i, double a, double b, double c);
 
 
-    double h1dashFirstVal; // first needed value of h1dasg at current timepoint
-    double h2FirstVal;	   // first needed value of h2 at current timepoint
-    double h3dashFirstVal; // first needed value of h3dash at current timepoint
+public:
+  void addInstance(Instance *instance) 
+  {
+    instanceContainer.push_back(instance);
+  }
 
-    double h1dashFirstCoeff; // first needed coeff of h1dash for the current timepoint
-    double h2FirstCoeff;     // first needed coeff of h2 for the current timepoint
-    double h3dashFirstCoeff; // first needed coeff of h3dash for the current timepoint
+  InstanceVector &getInstanceVector() 
+  {
+    return instanceContainer;
+  }
 
-    vector<double> h1dashCoeffs; // list of other coefficients for h1dash
-    vector<double> h2Coeffs;     // list of other coefficients for h2
-    vector<double> h3dashCoeffs; // list of other coefficients for h3dash
+  const InstanceVector &getInstanceVector() const 
+  {
+    return instanceContainer;
+  }
 
-    size_t listSize;       // size of above lists
+private:
+  std::vector<Instance*> instanceContainer;
 
-    // input parameters:
-    double resist;
-    double induct;
-    double conduct;
-    double capac;
-    double length;
-    double reltol;
-    double abstol;
+private:
 
-    bool noStepLimit;	// Don't limit step size to less than line delay
-    bool stepLimit;	// Do limit step size to less than line delay
-    int stepLimitType;	//
+
+  double h1dashFirstVal; // first needed value of h1dasg at current timepoint
+  double h2FirstVal;	   // first needed value of h2 at current timepoint
+  double h3dashFirstVal; // first needed value of h3dash at current timepoint
+
+  double h1dashFirstCoeff; // first needed coeff of h1dash for the current timepoint
+  double h2FirstCoeff;     // first needed coeff of h2 for the current timepoint
+  double h3dashFirstCoeff; // first needed coeff of h3dash for the current timepoint
+
+  std::vector<double> h1dashCoeffs; // list of other coefficients for h1dash
+  std::vector<double> h2Coeffs;     // list of other coefficients for h2
+  std::vector<double> h3dashCoeffs; // list of other coefficients for h3dash
+
+  size_t listSize;       // size of above lists
+
+  // input parameters:
+  double resist;
+  double induct;
+  double conduct;
+  double capac;
+  double length;
+  double reltol;
+  double abstol;
+
+  bool noStepLimit;	// Don't limit step size to less than line delay
+  bool stepLimit;	// Do limit step size to less than line delay
+  int stepLimitType;	//
                         // (These could be combined into a single
                         //  bool, but preserving spice3 compatibility)
 
-    bool linInterp;
-    bool quadInterp;
-    bool mixedInterp;
+  bool linInterp;
+  bool quadInterp;
+  bool mixedInterp;
 
-    double stLineReltol;
-    double stLineAbstol;
+  double stLineReltol;
+  double stLineAbstol;
 
-    bool lteTimeStepControl;      // indicates whether full time step
-                                  // control using local-truncation
-                                  // error estimation is performed
+  bool lteTimeStepControl;      // indicates whether full time step
+  // control using local-truncation
+  // error estimation is performed
 
-    bool truncNR;
-    bool truncDontCut;
+  bool truncNR;
+  bool truncDontCut;
 
-    bool resistGiven;
-    bool inductGiven;
-    bool conductGiven;
-    bool capacGiven;
-    bool lengthGiven;
-    bool reltolGiven;
-    bool abstolGiven;
-    bool noStepLimitGiven;
-    bool stepLimitGiven;
-    bool linInterpGiven;
-    bool quadInterpGiven;
-    bool mixedInterpGiven;
-    bool stLineReltolGiven;
-    bool stLineAbstolGiven;
-    bool lteTimeStepControlGiven;
-    bool truncNRGiven;
-    bool truncDontCutGiven;
+  bool resistGiven;
+  bool inductGiven;
+  bool conductGiven;
+  bool capacGiven;
+  bool lengthGiven;
+  bool reltolGiven;
+  bool abstolGiven;
+  bool noStepLimitGiven;
+  bool stepLimitGiven;
+  bool linInterpGiven;
+  bool quadInterpGiven;
+  bool mixedInterpGiven;
+  bool stLineReltolGiven;
+  bool stLineAbstolGiven;
+  bool lteTimeStepControlGiven;
+  bool truncNRGiven;
+  bool truncDontCutGiven;
 
-    // calculated parameters
-    double td;           // propagation delay T - calculated
-    double imped;        // impedance Z - calculated
-    double admit;        // admittance Y - calculated
-    double alpha;        // alpha - calculated
-    double beta;         // beta - calculated
-    double attenuation;  // e^(-beta T) - calculated
-    double cByR;         // C/R - for the RC line - calculated
-    double rclsqr;       // RCl^2 - for the RC line - calculated
-    double intH1dash;    // \int_0^\inf h'_1(\tau) d \tau - calculated
-    double intH2;        // \int_0^\inf h_2(\tau) d \tau - calculated
-    double intH3dash;    // \int_0^\inf h'_3(\tau) d \tau - calculated
+  // calculated parameters
+  double td;           // propagation delay T - calculated
+  double imped;        // impedance Z - calculated
+  double admit;        // admittance Y - calculated
+  double alpha;        // alpha - calculated
+  double beta;         // beta - calculated
+  double attenuation;  // e^(-beta T) - calculated
+  double cByR;         // C/R - for the RC line - calculated
+  double rclsqr;       // RCl^2 - for the RC line - calculated
+  double intH1dash;    // \int_0^\inf h'_1(\tau) d \tau - calculated
+  double intH2;        // \int_0^\inf h_2(\tau) d \tau - calculated
+  double intH3dash;    // \int_0^\inf h'_3(\tau) d \tau - calculated
 
-    double coshlrootGR;  // cosh(l*sqrt(G*R)), used for DC analysis
-    double rRsLrGRorG;   // sqrt(R)*sinh(l*sqrt(G*R))/sqrt(G)
-    double rGsLrGRorR;   // sqrt(G)*sinh(l*sqrt(G*R))/sqrt(R)
+  double coshlrootGR;  // cosh(l*sqrt(G*R)), used for DC analysis
+  double rRsLrGRorG;   // sqrt(R)*sinh(l*sqrt(G*R))/sqrt(G)
+  double rGsLrGRorR;   // sqrt(G)*sinh(l*sqrt(G*R))/sqrt(R)
 
-    int auxIndex;        // auxiliary index for h2 and h3dash
-    double chopReltol;   // separate reltol for truncation of impulse responses
-    double chopAbstol;   // separate abstol for truncation of impulse responses
+  int auxIndex;        // auxiliary index for h2 and h3dash
+  double chopReltol;   // separate reltol for truncation of impulse responses
+  double chopAbstol;   // separate abstol for truncation of impulse responses
 
-    double maxSafeStep;  // maximum safe step for impulse response calculations
-    double maxTimeStep;  // maximum time step to be used
-    int howToInterp;     // indicates how to interpolate for delayed timepoint
-    bool printFlag;      // flag to indicate whether debugging output should be printed
+  double maxSafeStep;  // maximum safe step for impulse response calculations
+  double maxTimeStep;  // maximum time step to be used
+  int howToInterp;     // indicates how to interpolate for delayed timepoint
+  bool printFlag;      // flag to indicate whether debugging output should be printed
 
-    int specialCase;     // what kind of model (RC, RLC, RL, ...)
+  int specialCase;     // what kind of model (RC, RLC, RL, ...)
 
-    bool tdover;
+  bool tdover;
 
-    bool restartStoredFlag;   // flag to indicate if this particular model has 
-                              // been saved to the restart file already (restart
-                              // functions are instance functions, so the potential
-                              // exists for storing same model multiple times.)
+  bool restartStoredFlag;   // flag to indicate if this particular model has
+  // been saved to the restart file already (restart
+  // functions are instance functions, so the potential
+  // exists for storing same model multiple times.)
 };
 
 //-----------------------------------------------------------------------------
@@ -516,37 +527,34 @@ class Model : public DeviceModel
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 11/26/08
 //-----------------------------------------------------------------------------
-class Master : public Xyce::Device::DeviceTemplate<Model, Instance>
+class Master : public DeviceMaster<Traits>
 {
-  public:
-    Master (
-      const std::string &dn,
-      const std::string &cn,
-      const std::string &dmName,
-      LinearDevice linearDev,
-      SolverState & ss1,
-      DeviceOptions & do1)
-      : Xyce::Device::DeviceTemplate<Model, Instance>(
-        dn, cn, dmName, linearDev, ss1, do1),
-        vars_initialized(false)
-    {
+  friend class Instance;
+  friend class Model;
 
-    }
+public:
+  Master(
+     const Configuration &       configuration,
+     const FactoryBlock &      factory_block,
+     const SolverState & ss1,
+     const DeviceOptions & do1)
+    : DeviceMaster<Traits>(configuration, factory_block, ss1, do1),
+      vars_initialized(false)
+  {}
 
-    virtual bool updateState (double * solVec, double * staVec, double * stoVec);
-    virtual bool updateSecondaryState (double * staDeriv, double * stoVec) {return true;}
+  virtual bool updateState (double * solVec, double * staVec, double * stoVec);
+  virtual bool updateSecondaryState (double * staDeriv, double * stoVec) {return true;}
 
-    virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
-    virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
+  virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
+  virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
 
-    friend class Instance;
-    friend class Model;
+private:
+  bool vars_initialized;
 
-  private:
-    bool vars_initialized;
-
-    void initialize_vars_();
+  void initialize_vars_();
 };
+
+void registerDevice();
 
 } // namespace LTRA
 } // namespace Device

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.74.2.2 $
+// Revision Number: $Revision: 1.83 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:46 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,16 +46,15 @@
 #ifndef Xyce_MPDE_MANAGER_H
 #define Xyce_MPDE_MANAGER_H
 
-// ---------- Standard Includes ----------
-
 #include <string>
 #include <map>
-
-// ----------   Xyce Includes   ----------
 
 #include <N_UTL_Xyce.h>
 #include <N_UTL_Misc.h>
 #include <N_IO_fwd.h>
+#include <N_ANP_fwd.h>
+#include <N_UTL_fwd.h>
+#include <N_TOP_fwd.h>
 
 #include <N_LAS_BlockVector.h>
 
@@ -66,23 +65,15 @@
 #include <N_MPDE_WarpedPhaseCondition.h>
 #include <N_MPDE_DeviceInterface.h>
 
-// ----------   Trilinos Includes   ----------
-
 #include <Teuchos_RCP.hpp>
-
-// ---------- Forward Declarations ----------
 
 class N_MPDE_Loader;
 class N_MPDE_Builder;
 class N_MPDE_Discretization;
 
-class N_ANP_AnalysisInterface;
 class N_TIA_MPDEInterface;
 class N_NLS_Manager;
 class N_PDS_Manager;
-class N_TOP_Topology;
-class N_IO_RestartMgr;
-class N_IO_CmdParse;
 
 class N_LOA_Loader;
 class N_LOA_NonlinearEquationLoader;
@@ -90,10 +81,6 @@ class N_LAS_Builder;
 class N_LAS_System;
 
 class N_LAS_PrecondFactory;
-
-class N_UTL_Timer;
-
-// ---------- Enum Definitions ----------
 
 //-----------------------------------------------------------------------------
 // Class         : N_MPDE_Manager
@@ -178,9 +165,9 @@ class N_MPDE_Manager
   // "get" function for WaMPDE flag. (true if not IC)
   bool getWaMPDEFlag ();
 
-    const vector<double> & getFastTimePoints () const;
+    const std::vector<double> & getFastTimePoints () const;
 
-    const vector<double> & getFreqPoints () const;
+    const std::vector<double> & getFreqPoints () const;
 
   // "get" function for GID of phi variable in Warped MPDE case
   int getPhiGID ();
@@ -269,12 +256,12 @@ class N_MPDE_Manager
   bool maxCalcSizeGiven_;
 
   //MPDE Fast Src driving the fast time scale oscillations
-  string fastSrc_;
+  std::string fastSrc_;
   bool fastSrcGiven_;
-  vector<string> srcVec_;
+  std::vector<std::string> srcVec_;
 
   // Independent variable for warped MPDE.
-  string oscOut_;
+  std::string oscOut_;
   bool oscOutGiven_;
 
   // Number of steps to take during the start of the full MPDE
@@ -308,9 +295,9 @@ class N_MPDE_Manager
   //MPDE fast time points
   // 12/5/06 tscoffe:  Note, the period T2 is the last element in fastTimes.
   // This means that the number of fast time points is fastTimes_.size()-1
-  vector<double> fastTimes_;
+  std::vector<double> fastTimes_;
 
-  vector<double> freqPoints_;
+  std::vector<double> freqPoints_;
 
   // Fast time discretization
   int fastTimeDisc_;
@@ -319,8 +306,8 @@ class N_MPDE_Manager
   //if we pull data directly from an initial transient run, keep
   // a list of the indices we used so that we can pull out the solution
   // and state data too.
-  vector<int> indicesUsed_;
-  vector<bool> nonPeriodicFlags;
+  std::vector<int> indicesUsed_;
+  std::vector<bool> nonPeriodicFlags;
   // warped MPDE setting in netlist
   bool warpMPDE_;
 
@@ -597,7 +584,7 @@ inline void N_MPDE_Manager::registerElapsedTimer (RCP<N_UTL_Timer> et)
 // Creator       : Ting Mei
 // Creation Date : 09/02/08
 //-----------------------------------------------------------------------------
-inline const vector<double> & N_MPDE_Manager::getFreqPoints() const
+inline const std::vector<double> & N_MPDE_Manager::getFreqPoints() const
 {
   return freqPoints_;
 }
@@ -612,7 +599,7 @@ inline const vector<double> & N_MPDE_Manager::getFreqPoints() const
 // Creator       : Eric R. Keiter, 9233, Computational Sciences
 // Creation Date : 04/06/04
 //-----------------------------------------------------------------------------
-inline const vector<double> & N_MPDE_Manager::getFastTimePoints() const
+inline const std::vector<double> & N_MPDE_Manager::getFastTimePoints() const
 {
   return fastTimes_;
 }

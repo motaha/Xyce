@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -25,20 +25,18 @@
 //-------------------------------------------------------------------------
 // Filename       : $RCSfile: mpi_filebuf.C,v $
 //
-// Purpose        :This file was stolen from SIERRA to help support the error
-//                 reporting in Xyce which was modeled, in part, on that in
-//                 SIERRA.
+// Purpose        :
 //
-// Creator        : Scott A. Hutchinson, SNL, Parallel Computational Sciences
+// Creator        : Eric Keiter
 //
 // Creation Date  : 06/02/00
 //
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.4.6.2 $
+// Revision Number: $Revision: 1.8.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:40 $
+// Revision Date  : $Date: 2014/02/27 00:52:17 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -89,16 +87,16 @@ mpi_filebuf * mpi_filebuf::set_buffer_length( const size_t len )
 mpi_filebuf * mpi_filebuf::open(
   MPI_Comm       communicator ,
   const int            root_processor ,
-  const ios::open_mode file_mode ,
+  const std::ios::open_mode file_mode ,
   const char * const   file_name )
 {
   // If already open then abort
   if ( NULL != comm_buffer ) return (mpi_filebuf *) NULL ;
 
   const int mode =
-    ( ios::in  == file_mode ) ? 'r' : (
-      ( ios::out == file_mode ) ? 'w' : (
-        ( ios::app == file_mode ) ? 'a' : -1 ) );
+    ( std::ios::in  == file_mode ) ? 'r' : (
+      ( std::ios::out == file_mode ) ? 'w' : (
+        ( std::ios::app == file_mode ) ? 'a' : -1 ) );
 
   int err ;
   int rank ;

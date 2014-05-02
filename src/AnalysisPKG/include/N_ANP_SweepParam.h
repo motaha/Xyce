@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,15 +36,15 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.3.4.2 $
+// Revision Number: $Revision: 1.8 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:30 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
-#ifndef Xyce_N_TIME_SWEEP_PARAM_H
-#define Xyce_N_TIME_SWEEP_PARAM_H
+#ifndef Xyce_N_ANP_SweepParam_h
+#define Xyce_N_ANP_SweepParam_h
 
 // ---------- Standard Includes ----------
 #include <vector>
@@ -54,8 +54,11 @@
 
 // ---------- Forward Declarations ----------
 
+namespace Xyce {
+namespace Analysis {
+
 //-----------------------------------------------------------------------------
-// Class         : N_ANP_SweepParam
+// Class         : SweepParam
 //
 // Purpose       : This class contains basic parameter data for parameter
 //                 sweeps, for a single parameter.  If there are multiple
@@ -69,11 +72,11 @@
 // Creator       : Eric Keiter, SNL
 // Creation Date : 10/31/03
 //-----------------------------------------------------------------------------
-class N_ANP_SweepParam
+class SweepParam
 {
 public:
   // Default constructor.
-  N_ANP_SweepParam () : 
+  SweepParam () : 
    name(""),
    type("LIN"),
    startVal(0.0),
@@ -91,13 +94,13 @@ public:
    {};
 
   // Destructor
-  ~N_ANP_SweepParam () {};
+  ~SweepParam () {};
 
   bool updateCurrentVal (int stepNumber);
   bool getSweepResetFlag() {return sweepResetFlag_;};
 
-  string name;
-  string type;
+  std::string name;
+  std::string type;
 
   double startVal;
   double stopVal;
@@ -114,7 +117,7 @@ public:
 
   int outerStepNumber;
 
-  vector <double> valList;
+  std::vector<double> valList;
 
  private:
   bool sweepResetFlag_;
@@ -123,20 +126,24 @@ public:
 };
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_SweepParam::operator<<
+// Function      : SweepParam::operator<<
 // Purpose       : "<<" operator
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 7/02/03
 //-----------------------------------------------------------------------------
-inline ostream & operator<<(ostream & os, const N_ANP_SweepParam & sp)
+inline std::ostream & operator<<(std::ostream & os, const SweepParam & sp)
 {
-  os << "\tname            = " << sp.name;
-  os << "\tcurrentVal      = " << sp.currentVal;
-  os << endl;
+  os << "\tname            = " << sp.name
+     << "\tcurrentVal      = " << sp.currentVal
+     << std::endl;
   return os;
 }
 
-#endif // Xyce_N_TIME_SWEEP_PARAM_H
+} // namespace Analysis
+} // namespace Xyce
 
+typedef Xyce::Analysis::SweepParam N_ANP_SweepParam;
+
+#endif // Xyce_N_ANP_SweepParam_h

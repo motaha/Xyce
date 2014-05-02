@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,60 +31,63 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.4.2.8 $
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Number: $Revision: 1.12 $
+// Revision Date  : $Date: 2014/02/24 23:49:20 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
 #include <iostream>
 #include <iomanip>
 
-// ----------   Xyce Includes   ----------
 #include <N_IO_MeasureFourier.h>
 #include <N_ERH_ErrorMgr.h>
 
+namespace Xyce {
+namespace IO {
+namespace Measure {
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureFourier::N_IO_MeasureFourier()
+// Function      : Fourier::Fourier()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist, SNL, Electrical Models & Simulation
 // Creation Date : 6/05/2013
 //-----------------------------------------------------------------------------
-N_IO_MeasureFourier::N_IO_MeasureFourier( const N_UTL_OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr )
-  : N_IO_MeasureBase(measureBlock, outputMgr),
+Fourier::Fourier( const Util::OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr )
+  : Base(measureBlock, outputMgr),
   initialized_(false),
   calculated_(false)
 {
   // indicate that this measure type is supported and should be processed in simulation
   typeSupported_ = true;
+}
 
+void Fourier::prepareOutputVariables() 
+{
   // this measurement should have only one dependent variable.
   // Error for now if it doesn't
-  numOutVars_ = depSolVarIterVector_.size();
+  numOutVars_ = outputVars_.size();
 
   if ( numOutVars_ > 1 )
   {
-    string msg = "Too many dependent variables for statistical measure, \"" + name_ + "\" Exiting.";
+    std::string msg = "Too many dependent variables for statistical measure, \"" + name_ + "\" Exiting.";
     N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL, msg);
   }
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureFourier::updateTran()
+// Function      : Fourier::updateTran()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist, SNL, Electrical Models & Simulation
 // Creation Date : 6/05/2013
 //-----------------------------------------------------------------------------
-void N_IO_MeasureFourier::updateTran( const double circuitTime, RCP< N_LAS_Vector > solnVecRCP)
+void Fourier::updateTran( const double circuitTime, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec)
 {
   if( !calculationDone_ && withinTransientWindow( circuitTime ) )
   {
@@ -96,20 +99,20 @@ void N_IO_MeasureFourier::updateTran( const double circuitTime, RCP< N_LAS_Vecto
     }
 
     time_.push_back(circuitTime);
-    outVarValues_.push_back(getOutputValue(depSolVarIterVector_[0], solnVecRCP));
+    outVarValues_.push_back(getOutputValue(outputVars_[0], solnVec, stateVec, storeVec, 0));
 
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureFourier::getLastPeriod_()
+// Function      : Fourier::getLastPeriod_()
 // Purpose       : finds the indices to access the last period of simulation
 // Special Notes :
 // Scope         : private
 // Creator       : Heidi Thornquist, SNL, Electrical Models & Simulation
 // Creation Date : 6/21/13
 //-----------------------------------------------------------------------------
-void N_IO_MeasureFourier::getLastPeriod_()
+void Fourier::getLastPeriod_()
 {
   // We want to do the analysis on only the last period of the transient window. So here we find the indices
   // to access the endpoints of that interval.
@@ -135,33 +138,33 @@ void N_IO_MeasureFourier::getLastPeriod_()
   }
   else
   {
-    string msg = "Error: The period is greater than the length of the time simulation. Exiting.";
+    std::string msg = "Error: The period is greater than the length of the time simulation. Exiting.";
     N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL, msg);
   }
 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureFourier::updateDC()
+// Function      : Fourier::updateDC()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist, SNL, Electrical Models & Simulation
 // Creation Date : 6/21/13
 //-----------------------------------------------------------------------------
-void N_IO_MeasureFourier::updateDC( const vector<N_ANP_SweepParam> & dcParamsVec, RCP< N_LAS_Vector > solnVecRCP)
+void Fourier::updateDC( const std::vector<N_ANP_SweepParam> & dcParamsVec, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec)
 {
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureFourier::interpolateData_()
+// Function      : Fourier::interpolateData_()
 // Purpose       : evaluates interpolating polynomial at equidistant time pts
 // Special Notes :
 // Scope         : private
 // Creator       : Heidi Thornquist, SNL, Electrical Models & Simulation
 // Creation Date : 6/21/13
 //-----------------------------------------------------------------------------
-bool N_IO_MeasureFourier::interpolateData_()
+bool Fourier::interpolateData_()
 {
   double A, B, C;
   int nData, j;
@@ -169,11 +172,11 @@ bool N_IO_MeasureFourier::interpolateData_()
   // nData is the number of data points in the time_ and outVarValues_ vectors over the last period.
   int numPoints = time_.size();
   nData = numPoints-prdStart_;
-  vector<double> h(nData-1, 0.0);
-  vector<double> b(nData-1, 0.0);
-  vector<double> u(nData-1, 0.0);
-  vector<double> v(nData-1, 0.0);
-  vector<double> z(nData, 0.0);
+  std::vector<double> h(nData-1, 0.0);
+  std::vector<double> b(nData-1, 0.0);
+  std::vector<double> u(nData-1, 0.0);
+  std::vector<double> v(nData-1, 0.0);
+  std::vector<double> z(nData, 0.0);
 
   // Cubic spline interpolation. We first need to find the z's.
   for (int i = 0; i < nData-1; i++)
@@ -227,14 +230,14 @@ bool N_IO_MeasureFourier::interpolateData_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureFourier::calculateFT_()
+// Function      : Fourier::calculateFT_()
 // Purpose       : performs fourier analysis
 // Special Notes :
 // Scope         : private
 // Creator       : Heidi Thornquist, SNL, Electrical Models & Simulation
 // Creation Date : 6/21/13
 //-----------------------------------------------------------------------------
-void N_IO_MeasureFourier::calculateFT_()
+void Fourier::calculateFT_()
 {
   double tmp;
   mag_.resize(numFreq_,0.0);
@@ -273,14 +276,14 @@ void N_IO_MeasureFourier::calculateFT_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureFourier::getMeasureResult()
+// Function      : Fourier::getMeasureResult()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist, SNL, Electrical Models & Simulation
 // Creation Date : 6/21/13
 //-----------------------------------------------------------------------------
-double N_IO_MeasureFourier::getMeasureResult()
+double Fourier::getMeasureResult()
 {
   // Only output results if transient data is available to analyze.
   if( initialized_ && !time_.empty() )
@@ -299,14 +302,14 @@ double N_IO_MeasureFourier::getMeasureResult()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureFourier::printMeasureResult( std::ostream& os )
+// Function      : Fourier::printMeasureResult( std::ostream& os )
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist, SNL, Electrical Models & Simulation
 // Creation Date : 6/21/13
 //-----------------------------------------------------------------------------
-std::ostream& N_IO_MeasureFourier::printMeasureResult( std::ostream& os )
+std::ostream& Fourier::printMeasureResult( std::ostream& os )
 {
 
   // Only output results if transient data is available to analyze.
@@ -337,3 +340,7 @@ std::ostream& N_IO_MeasureFourier::printMeasureResult( std::ostream& os )
   
   return os;
 }
+
+} // namespace Measure
+} // namespace IO
+} // namespace Xyce

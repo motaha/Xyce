@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,7 +36,7 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.29.2.2 $
+// Revision Number: $Revision: 1.40 $
 //
 // Revision Date  : $Date $
 //
@@ -228,10 +228,10 @@ N_NLS_ConductanceExtractor::~N_NLS_ConductanceExtractor()
 // Creator       : Rich Schiek, 1437
 // Creation Date : 10/21/08
 //-----------------------------------------------------------------------------
-bool N_NLS_ConductanceExtractor::registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr )
+bool N_NLS_ConductanceExtractor::registerPkgOptionsMgr( N_IO_PkgOptionsMgr *pkgOptPtr )
 {
   pkgOptMgrPtr_ = pkgOptPtr;
-  string netListFile = "";
+  std::string netListFile = "";
   if (commandLine_.getArgumentValue("netlist") != "")
   {
     netListFile = commandLine_.getArgumentValue("netlist");
@@ -254,13 +254,13 @@ bool N_NLS_ConductanceExtractor::setOptions(const N_UTL_OptionBlock& OB)
 {
   bool bsuccess = true;
 
-  for (list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
+  for (std::list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
        it_tpL != OB.getParams().end(); ++ it_tpL)
   {
     // no-op for now.
     if (it_tpL->uTag() == "DEBUGLEVEL")
     {
-      debugLevel_ = it_tpL->iVal();
+      debugLevel_ = it_tpL->getImmutableValue<int>();
     }
   }
 
@@ -287,7 +287,7 @@ bool N_NLS_ConductanceExtractor::setOptions(const N_UTL_OptionBlock& OB)
 // Creation Date : 03/03/06
 //-----------------------------------------------------------------------------
 bool N_NLS_ConductanceExtractor::setupIDs_
-  (const map<string,double> & inputMap)
+  (const std::map<std::string,double> & inputMap)
 {
   bool bsuccess = true;
 
@@ -308,8 +308,8 @@ bool N_NLS_ConductanceExtractor::setupIDs_
 
   // Loop over the map, which should contain, in the first
   // arguments, the names of the voltage sources we need.
-  map<string,double>::const_iterator iterM = inputMap.begin();
-  map<string,double>::const_iterator  endM = inputMap.end  ();
+  std::map<std::string,double>::const_iterator iterM = inputMap.begin();
+  std::map<std::string,double>::const_iterator  endM = inputMap.end  ();
   int i=0;
   for (; iterM != endM; ++i, ++iterM)
   {
@@ -317,16 +317,16 @@ bool N_NLS_ConductanceExtractor::setupIDs_
     // be all CAPS, or topology won't find it.
     ExtendedString src = iterM->first;
     src.toUpper();
-    string sourceName = src;
+    std::string sourceName = src;
     char type;
     int index;
 
     // This is to get the IDs for the currents through the
     // voltage sources specified in the map.
-    list<int> GIDList, extGIDList;
-    top_.getNodeSVarGIDs(NodeID(sourceName,_DNODE), GIDList, extGIDList, type);
+    std::list<int> GIDList, extGIDList;
+    top_.getNodeSVarGIDs(NodeID(sourceName, Xyce::_DNODE), GIDList, extGIDList, type);
 
-    list<int>::iterator iterI;
+    std::list<int>::iterator iterI;
     if (!(GIDList.empty ()))
     {
       iterI = GIDList.begin();
@@ -339,7 +339,7 @@ bool N_NLS_ConductanceExtractor::setupIDs_
 
       if( vsrcPosLIDs_[i] == -1 )
       {
-        string msg = "N_NLS_ConductanceExtractor::setupIDs_";
+        std::string msg = "N_NLS_ConductanceExtractor::setupIDs_";
         msg += " The " + sourceName + " source has the positive node"
          " owned by another processor.  The 2-level solve can't handle that.";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
@@ -350,7 +350,7 @@ bool N_NLS_ConductanceExtractor::setupIDs_
       int vnegGID = *iterI;
       if (vnegGID != -1)
       {
-        string msg = "N_NLS_ConductanceExtractor::setupIDs_";
+        std::string msg = "N_NLS_ConductanceExtractor::setupIDs_";
         msg += " The " + sourceName + " source has the negative node"
          " connected to something other than ground!  The 2-level solve can't handle that.";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
@@ -362,16 +362,16 @@ bool N_NLS_ConductanceExtractor::setupIDs_
 #ifdef Xyce_DEBUG_CONDUCTANCE
   if (debugLevel_ > 0)
   {
-    cout << "current GIDs: " << endl;
+    cout << "current GIDs: " << std::endl;
     for( int i1=0; i1 < idSize; ++i1 )
     {
-      cout << "  currentGIDs_["<<i1<<"] = " << currentGIDs_[i1] << ", currentLIDs_["<<i1<<"] = " << currentLIDs_[i1] << endl;
+      cout << "  currentGIDs_["<<i1<<"] = " << currentGIDs_[i1] << ", currentLIDs_["<<i1<<"] = " << currentLIDs_[i1] << std::endl;
     }
 
-    cout << "Vsrc pos equation rows: " << endl;
+    cout << "Vsrc pos equation rows: " << std::endl;
     for( int i1=0; i1 < idSize; ++i1 )
     {
-      cout << "  vsrcPosGIDs_["<<i1<<"] = " << vsrcPosGIDs_[i1] << ", vsrcPosLIDs_["<<i1<<"] = " << vsrcPosLIDs_[i1] << endl;
+      cout << "  vsrcPosGIDs_["<<i1<<"] = " << vsrcPosGIDs_[i1] << ", vsrcPosLIDs_["<<i1<<"] = " << vsrcPosLIDs_[i1] << std::endl;
     }
   }
 #endif
@@ -423,8 +423,8 @@ bool N_NLS_ConductanceExtractor::setup_dIdX_Vectors_ ()
       int iRow = vsrcPosGIDs_[iC_row];
       int rowLength = jacobianMatrixPtr_->getRowLength(iRow);
       int numEntries = rowLength;
-      vector<double> coeffs(rowLength, 0.0);
-      vector<int> colIndices(rowLength, -1);
+      std::vector<double> coeffs(rowLength, 0.0);
+      std::vector<int> colIndices(rowLength, -1);
 
       jacobianMatrixPtr_->getRowCopy
         (iRow, rowLength, numEntries, &coeffs[0], &colIndices[0]);
@@ -454,7 +454,7 @@ bool N_NLS_ConductanceExtractor::setup_dIdX_Vectors_ ()
 #ifdef Xyce_DEBUG_CONDUCTANCE
     if (debugLevel_ > 0)
     {
-      cout << "\ndIdx[" << iC_row << "]:" << endl;
+      cout << "\ndIdx[" << iC_row << "]:" << std::endl;
       dIdxPtrVector_[iC_row]->printPetraObject();
     }
 #endif
@@ -472,20 +472,19 @@ bool N_NLS_ConductanceExtractor::setup_dIdX_Vectors_ ()
 // Creation Date : 03/03/06
 //-----------------------------------------------------------------------------
 bool N_NLS_ConductanceExtractor::extract (
-        const map<string,double> & inputMap,
-        vector<double> & outputVector,
-        vector< vector<double> > & jacobian )
+        const std::map<std::string,double> & inputMap,
+        std::vector<double> & outputVector,
+        std::vector< std::vector<double> > & jacobian )
 
 {
   bool bsuccess = true;
 
 #ifdef Xyce_DEBUG_CONDUCTANCE
-  const string dashedline2 = "---------------------";
   if (debugLevel_ > 0)
   {
-    cout << dashedline2 << endl;
-    cout << "N_NLS_ConductanceExtractor::extract" << endl;
-    cout << dashedline2 << endl;
+    cout << subsection_divider << std::endl;
+    cout << "N_NLS_ConductanceExtractor::extract" << std::endl;
+    cout << subsection_divider << std::endl;
   }
 #endif
 
@@ -525,7 +524,7 @@ bool N_NLS_ConductanceExtractor::extract (
 #ifdef Xyce_PARALLEL_MPI
   //sumAll to get all currents locally
   N_PDS_Comm * comm = dfdvVectorPtr_->pmap()->pdsComm();
-  vector<double> tmpVector(idSize,0.0);
+  std::vector<double> tmpVector(idSize,0.0);
   for( int i = 0; i < idSize; ++i )
   {
     tmpVector[i] = outputVector[i];
@@ -541,7 +540,7 @@ bool N_NLS_ConductanceExtractor::extract (
     int itmp;
     for (itmp=0;itmp < outputVector.size();++itmp)
     {
-      cout << "currentVector["<< itmp <<"] = " << outputVector[itmp]<<endl;
+      cout << "currentVector["<< itmp <<"] = " << outputVector[itmp]<<std::endl;
     }
   }
 #endif
@@ -615,8 +614,8 @@ bool N_NLS_ConductanceExtractor::extract (
 
   // This loop is over the different applied V's.
   // This loop is also over columns of the small (output) Jacobian.
-  map<string,double>::const_iterator iterM = inputMap.begin();
-  map<string,double>::const_iterator  endM = inputMap.end  ();
+  std::map<std::string,double>::const_iterator iterM = inputMap.begin();
+  std::map<std::string,double>::const_iterator  endM = inputMap.end  ();
   int iV_col=0;
   for (;iV_col<idSize;++iV_col,++iterM)
   {
@@ -638,9 +637,9 @@ bool N_NLS_ConductanceExtractor::extract (
 #ifdef Xyce_DEBUG_CONDUCTANCE
       if (debugLevel_ > 0)
       {
-        string vsrcName = iterM->first;
+        std::string vsrcName = iterM->first;
         printPetraObjects_ (vsrcName);
-        cout << "dIdv = " << dIdv << endl;
+        cout << "dIdv = " << dIdv << std::endl;
       }
 #endif
       // put dIdV's into the small matrix:
@@ -676,7 +675,7 @@ bool N_NLS_ConductanceExtractor::extract (
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/03/06
 //-----------------------------------------------------------------------------
-bool N_NLS_ConductanceExtractor::setupISO2_IDs_(const string & isoName)
+bool N_NLS_ConductanceExtractor::setupISO2_IDs_(const std::string & isoName)
 {
   bool bsuccess = true;
 
@@ -699,26 +698,26 @@ bool N_NLS_ConductanceExtractor::setupISO2_IDs_(const string & isoName)
   // be all CAPS, or topology won't find it.
   ExtendedString src = isoName;
   src.toUpper();
-  string sourceName = src;
+  std::string sourceName = src;
   char type;
   int index;
 
   // This is to get the IDs for the currents through the
   // voltage sources specified in the map.
-  list<int> GIDList, extGIDList;
-  top_.getNodeSVarGIDs(NodeID(sourceName,_DNODE), GIDList, extGIDList, type);
+  std::list<int> GIDList, extGIDList;
+  top_.getNodeSVarGIDs(NodeID(sourceName, Xyce::_DNODE), GIDList, extGIDList, type);
 
   if (!(GIDList.empty ()))
   {
-    list<int>::iterator gidIter = GIDList.begin();
-    list<int>::iterator gidExtIter = extGIDList.begin();
+    std::list<int>::iterator gidIter = GIDList.begin();
+    std::list<int>::iterator gidExtIter = extGIDList.begin();
 
     int i=0;
     for (i=0;i<idSize;++i,++gidIter,++gidExtIter)
     {
       currentGIDs_[i] = *(gidIter);
       currentLIDs_[i] = dIdxPtrVector_[i]->pmap()->globalToLocalIndex(currentGIDs_[i]);
-      //cout << "currentGIDs_["<<i<<"]="<< currentGIDs_[i]<<endl;
+      //cout << "currentGIDs_["<<i<<"]="<< currentGIDs_[i]<<std::endl;
     }
 
     // reset i, but keep iterating gidExtIter.
@@ -727,11 +726,11 @@ bool N_NLS_ConductanceExtractor::setupISO2_IDs_(const string & isoName)
       vsrcPosGIDs_[i] = *(gidExtIter);
       vsrcPosLIDs_[i] = dIdxPtrVector_[i]->pmap()->globalToLocalIndex(vsrcPosGIDs_[i]);
 
-      //cout << "vsrcPosGIDs_["<<i<<"]="<< vsrcPosGIDs_[i]<<endl;
+      //cout << "vsrcPosGIDs_["<<i<<"]="<< vsrcPosGIDs_[i]<<std::endl;
 
       if( vsrcPosLIDs_[i] == -1 )
       {
-        string msg = "N_NLS_ConductanceExtractor::setupISO_IDs_";
+        std::string msg = "N_NLS_ConductanceExtractor::setupISO_IDs_";
         msg += " The " + sourceName + " source has the positive node"
          " owned by another processor.  The 2-level solve can't handle that.";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
@@ -746,16 +745,16 @@ bool N_NLS_ConductanceExtractor::setupISO2_IDs_(const string & isoName)
 #ifdef Xyce_DEBUG_CONDUCTANCE
   if (debugLevel_ > 0)
   {
-    cout << "current GIDs: " << endl;
+    cout << "current GIDs: " << std::endl;
     for( int i1=0; i1 < idSize; ++i1 )
     {
-      cout << "  currentGIDs_["<<i1<<"] = " << currentGIDs_[i1] << endl;
+      cout << "  currentGIDs_["<<i1<<"] = " << currentGIDs_[i1] << std::endl;
     }
 
-    cout << "Vsrc pos equation rows: " << endl;
+    cout << "Vsrc pos equation rows: " << std::endl;
     for( int i1=0; i1 < idSize; ++i1 )
     {
-      cout << "  vsrcPosGIDs_["<<i1<<"] = " << vsrcPosGIDs_[i1] << endl;
+      cout << "  vsrcPosGIDs_["<<i1<<"] = " << vsrcPosGIDs_[i1] << std::endl;
     }
   }
 #endif
@@ -782,19 +781,18 @@ bool N_NLS_ConductanceExtractor::setupISO2_IDs_(const string & isoName)
 // Creation Date : 03/03/06
 //-----------------------------------------------------------------------------
 bool N_NLS_ConductanceExtractor::extract
-( const string & isoName, vector< vector<double> > & jacobian )
+( const std::string & isoName, std::vector< std::vector<double> > & jacobian )
 {
   bool bsuccess = true;
 
   int idSize = jacobian.size();
 
 #ifdef Xyce_DEBUG_CONDUCTANCE
-  const string dashedline2 = "---------------------";
   if (debugLevel_ > 0)
   {
-    cout << dashedline2 << endl;
-    cout << "N_NLS_ConductanceExtractor::extract - iso2" << endl;
-    cout << dashedline2 << endl;
+    cout << subsection_divider << std::endl;
+    cout << "N_NLS_ConductanceExtractor::extract - iso2" << std::endl;
+    cout << subsection_divider << std::endl;
   }
 #endif
 
@@ -836,9 +834,9 @@ bool N_NLS_ConductanceExtractor::extract
 #ifdef Xyce_DEBUG_CONDUCTANCE
       if (debugLevel_ > 0)
       {
-        string tmpName = "unknown";
+        std::string tmpName = "unknown";
         printPetraObjects_ (tmpName);
-        cout << "dIdv = " << dIdv << endl;
+        cout << "dIdv = " << dIdv << std::endl;
       }
 #endif
       // put dIdV's into the small matrix:
@@ -872,33 +870,33 @@ bool N_NLS_ConductanceExtractor::extract
 // Creation Date : 03/08/06
 //-----------------------------------------------------------------------------
 void N_NLS_ConductanceExtractor::printJacobian_
-    (const map<string,double> & inputMap,
-     vector< vector<double> > & jacobian)
+    (const std::map<std::string,double> & inputMap,
+     std::vector< std::vector<double> > & jacobian)
 {
-  cout.width(15); cout.precision(7); cout.setf(ios::scientific);
-  cout << "Output Jacobian/Conductance array: \n";
-  cout <<"              ";
+  Xyce::dout().width(15); Xyce::dout().precision(7); Xyce::dout().setf(std::ios::scientific);
+  Xyce::dout() << "Output Jacobian/Conductance array: \n";
+  Xyce::dout() <<"              ";
 
   int iE1, iE2;
   int numElectrodes = jacobian.size();
-  map<string,double>::const_iterator iterM = inputMap.begin();
-  map<string,double>::const_iterator  endM = inputMap.end  ();
+  std::map<std::string,double>::const_iterator iterM = inputMap.begin();
+  std::map<std::string,double>::const_iterator  endM = inputMap.end  ();
   for (iE1 = 0; iE1 < numElectrodes; ++iE1,++iterM)
   {
-    cout << "\t"<<iterM->first;
+    Xyce::dout() << "\t"<<iterM->first;
   }
-  cout << endl;
+  Xyce::dout() << std::endl;
   iterM = inputMap.begin();
   for (iE1 = 0; iE1 < numElectrodes; ++iE1,++iterM)
   {
-    cout << "\t"<<iterM->first;
+    Xyce::dout() << "\t"<<iterM->first;
     for (iE2 = 0; iE2 < numElectrodes; ++iE2)
     {
-      cout << "\t" <<jacobian[iE1][iE2];
+      Xyce::dout() << "\t" <<jacobian[iE1][iE2];
     }
-    cout << endl;
+    Xyce::dout() << std::endl;
   }
-  cout << endl;
+  Xyce::dout() << std::endl;
 
   return;
 }
@@ -911,20 +909,20 @@ void N_NLS_ConductanceExtractor::printJacobian_
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/08/06
 //-----------------------------------------------------------------------------
-void N_NLS_ConductanceExtractor::printPetraObjects_ (const string & varName)
+void N_NLS_ConductanceExtractor::printPetraObjects_ (const std::string & varName)
 {
-  cout.width(15); cout.precision(7); cout.setf(ios::scientific);
-  string srcName = varName;
-  cout << "Info for input voltage: " << srcName << endl;
-  cout << "Jacobian:" << endl;
-  jacobianMatrixPtr_->printPetraObject();
+  Xyce::dout().width(15); Xyce::dout().precision(7); Xyce::dout().setf(std::ios::scientific);
+  std::string srcName = varName;
+  Xyce::dout() << "Info for input voltage: " << srcName << std::endl;
+  Xyce::dout() << "Jacobian:" << std::endl;
+  jacobianMatrixPtr_->printPetraObject(Xyce::dout());
 
   // now print out the dxdv vector:
-  cout << "dxdv:" << endl;
-  dxdvVectorPtr_->printPetraObject();
+  Xyce::dout() << "dxdv:" << std::endl;
+  dxdvVectorPtr_->printPetraObject(Xyce::dout());
 
-  cout << "dfdv:" << endl;
-  dfdvVectorPtr_->printPetraObject();
+  Xyce::dout() << "dfdv:" << std::endl;
+  dfdvVectorPtr_->printPetraObject(Xyce::dout());
 
   return;
 }

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,37 +36,29 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.8.2.2 $
+// Revision Number: $Revision: 1.12 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
 #include <iostream>
 #include <string>
 
-// ---------- Xyce Includes --------------
-
 #include <N_TOP_DevInsertionTool.h>
 #include <N_TOP_Topology.h>
-
-//#include <N_TOP_System.h>
-//#include <N_TOP_Node.h>
-
 #include <N_TOP_NodeBlock.h>
 
 #include <N_DEV_DeviceBlock.h>
 
 namespace Xyce {
-namespace Topology {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Function      : Xyce::Topology::DevInsertionTool::insertNode
+// Function      : Xyce::Topo::DevInsertionTool::insertNode
 // Purpose       : Insert Node in System
 // Special Notes : 
 // Scope         : public
@@ -105,5 +97,5 @@ void DevInsertionTool::insertNode( const N_TOP_NodeBlock & nBlock,
 //  delete iBlock;
 }
 
-} //namespace Topology
+} //namespace Topo
 } //namespace Xyce

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,11 +36,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.111.4.4 $
+// Revision Number: $Revision: 1.122 $
 //
-// Revision Date  : $Date: 2013/12/03 23:30:12 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
-// Current Owner  : $Author: rlschie $
+// Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
@@ -60,8 +60,11 @@
 #include <N_UTL_Expression.h>
 #include <N_UTL_ExpressionInternals.h>
 
+namespace Xyce {
+namespace Util {
+
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::N_UTL_Expression
+// Function      : Expression::Expression
 // Purpose       : Constructor
 // Special Notes :
 // Scope         : public
@@ -69,36 +72,30 @@
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
 
-N_UTL_Expression::N_UTL_Expression( const string & exp )
+Expression::Expression( const std::string & exp )
 {
-#ifdef _OMP
-  #pragma omp critical
-#endif
   {
-    expPtr_ = Teuchos::rcp(new N_UTL_ExpressionInternals(exp));
+    expPtr_ = Teuchos::rcp(new ExpressionInternals(exp));
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::N_UTL_Expression
+// Function      : Expression::Expression
 // Purpose       : Copy Constructor
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-N_UTL_Expression::N_UTL_Expression( const N_UTL_Expression & right)
+Expression::Expression( const Expression & right)
 {
-#ifdef _OMP
-  #pragma omp critical
-#endif
   {
     // important distinction here.  If we're calling the copy 
     // constructor, we don't need to copy the underlying ExpressionInternals 
     // object.  We would if people wanted multiple versions of an expression 
     // for factoring or parsing.  
     // Deep Copy Not Needed
-    // expPtr_ = Teuchos::rcp(new N_UTL_ExpressionInternals( *(right.expPtr_)) );
+    // expPtr_ = Teuchos::rcp(new ExpressionInternals( *(right.expPtr_)) );
     // Shallow Copy
     expPtr_ = right.expPtr_;
   }
@@ -107,32 +104,35 @@ N_UTL_Expression::N_UTL_Expression( const N_UTL_Expression & right)
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::~N_UTL_Expression
+// Function      : Expression::~Expression
 // Purpose       : Destructor
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-N_UTL_Expression::~N_UTL_Expression ()
+Expression::~Expression ()
 {
   return;
 }
 
+bool
+Expression::parsed() const {
+  return expPtr_->parsed();
+}
+
+
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::set
+// Function      : Expression::set
 // Purpose       : Set the value of the expression to a string
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-bool N_UTL_Expression::set ( const string & exp )
+bool Expression::set ( const std::string & exp )
 {
-  bool retVal = false;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  bool retVal = false; 
   {
     retVal = expPtr_->set (exp);
   }
@@ -140,18 +140,15 @@ bool N_UTL_Expression::set ( const string & exp )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::get_names
+// Function      : Expression::get_names
 // Purpose       : Returns the names of input quantities by type
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-void N_UTL_Expression::get_names(int const & type, vector<string> & names ) const
-{
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+void Expression::get_names(int const & type, std::vector<std::string> & names ) const
+{ 
   {
     expPtr_->get_names(type,names);
   }
@@ -159,19 +156,16 @@ void N_UTL_Expression::get_names(int const & type, vector<string> & names ) cons
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::get_type
+// Function      : Expression::get_type
 // Purpose       : Finds the type of an input quantity name
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-int N_UTL_Expression::get_type ( const string & var )
+int Expression::get_type ( const std::string & var )
 {
-  int retVal=0;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  int retVal=0; 
   {
     retVal = expPtr_->get_type (var);
   }
@@ -179,19 +173,16 @@ int N_UTL_Expression::get_type ( const string & var )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::get_lead_designator
+// Function      : Expression::get_lead_designator
 // Purpose       : Returns the lead designator (" ", "B", "S", "E", "D", "")
 // Special Notes :
 // Scope         :
 // Creator       : Richard Schiek, SNL
 // Creation Date : 01/15/13
 //-----------------------------------------------------------------------------
-char N_UTL_Expression::get_lead_designator ( const string & var )
+char Expression::get_lead_designator ( const std::string & var )
 {
-  int retVal=0;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  int retVal=0; 
   {
     retVal = expPtr_->get_lead_designator (var);
   }
@@ -199,19 +190,16 @@ char N_UTL_Expression::get_lead_designator ( const string & var )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::make_constant
+// Function      : Expression::make_constant
 // Purpose       : Convert a 'string' placeholder into a constant
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-bool N_UTL_Expression::make_constant (const string & var, const double & val)
+bool Expression::make_constant (const std::string & var, const double & val)
 {
-  bool retVal=false;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  bool retVal=false; 
   {
     retVal = expPtr_->make_constant (var,val);
   }
@@ -219,19 +207,16 @@ bool N_UTL_Expression::make_constant (const string & var, const double & val)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::make_var
+// Function      : Expression::make_var
 // Purpose       : Convert a 'string' placeholder into a variable
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-bool N_UTL_Expression::make_var (string const & var)
+bool Expression::make_var (std::string const & var)
 {
-  bool retVal=false;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  bool retVal=false; 
   {
     retVal = expPtr_->make_var(var);
   }
@@ -239,19 +224,16 @@ bool N_UTL_Expression::make_var (string const & var)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::differentiate
+// Function      : Expression::differentiate
 // Purpose       : Form the analytic derivative trees for all variables
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-int N_UTL_Expression::differentiate ()
+int Expression::differentiate ()
 {
-  int retVal=0;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  int retVal=0; 
   {
     retVal = expPtr_->differentiate ();
   }
@@ -259,20 +241,17 @@ int N_UTL_Expression::differentiate ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::set_var
+// Function      : Expression::set_var
 // Purpose       : Sets the value of an input quantity
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-bool N_UTL_Expression::set_var ( const string & var,
+bool Expression::set_var ( const std::string & var,
                                  const double & val)
 {
-  bool retVal=false;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  bool retVal=false; 
   {
     retVal = expPtr_->set_var (var, val);
   }
@@ -280,19 +259,16 @@ bool N_UTL_Expression::set_var ( const string & var,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::set_vars
+// Function      : Expression::set_vars
 // Purpose       : Sets the values of all input quantities
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-bool N_UTL_Expression::set_vars ( const vector<double> & vals )
+bool Expression::set_vars ( const std::vector<double> & vals )
 {
-  bool retVal=false;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  bool retVal=false; 
   {
     retVal = expPtr_->set_vars ( vals );
   }
@@ -300,19 +276,16 @@ bool N_UTL_Expression::set_vars ( const vector<double> & vals )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::get_expression
+// Function      : Expression::get_expression
 // Purpose       : Returns a string of the expression
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-string N_UTL_Expression::get_expression ()
+std::string Expression::get_expression () const
 {
-  string retVal;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  std::string retVal; 
   {
     retVal = expPtr_->get_expression ();
   }
@@ -320,19 +293,16 @@ string N_UTL_Expression::get_expression ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::get_derivative
+// Function      : Expression::get_derivative
 // Purpose       : Returns a string of a derivative
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-string N_UTL_Expression::get_derivative ( string const & var )
+std::string Expression::get_derivative ( std::string const & var )
 {
-  string retVal;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  std::string retVal; 
   {
     retVal = expPtr_->get_derivative ( var );
   }
@@ -340,19 +310,16 @@ string N_UTL_Expression::get_derivative ( string const & var )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::get_num
+// Function      : Expression::get_num
 // Purpose       : Returns the number of input quantities of a requested type
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-int N_UTL_Expression::get_num(int const & type)
+int Expression::get_num(int const & type)
 {
-  int retVal=0;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  int retVal=0; 
   {
     retVal = expPtr_->get_num(type);
   }
@@ -360,21 +327,18 @@ int N_UTL_Expression::get_num(int const & type)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::evaluate
+// Function      : Expression::evaluate
 // Purpose       : Evaluate expression and derivatives using provided input values
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-int N_UTL_Expression::evaluate ( double & exp_r,
-                                 vector<double> & deriv_r,
-                                 vector<double> & vals )
+int Expression::evaluate ( double & exp_r,
+                                 std::vector<double> & deriv_r,
+                                 std::vector<double> & vals )
 {
-  int retVal=0;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  int retVal=0; 
   {
     retVal = expPtr_->evaluate ( exp_r, deriv_r, vals );
   }
@@ -382,7 +346,7 @@ int N_UTL_Expression::evaluate ( double & exp_r,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::evaluateFunction
+// Function      : Expression::evaluateFunction
 // Purpose       : Evaluate expression using provided input values.  
 // Special Notes : This is for cases in which the user does not need 
 //                 the derivatives.
@@ -390,12 +354,9 @@ int N_UTL_Expression::evaluate ( double & exp_r,
 // Creator       : Eric Keiter, SNL
 // Creation Date : 04/14/08
 //-----------------------------------------------------------------------------
-int N_UTL_Expression::evaluateFunction ( double & exp_r, vector<double> & vals )
+int Expression::evaluateFunction ( double & exp_r, std::vector<double> & vals )
 {
   int retVal=0;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
   {
     retVal = expPtr_->evaluateFunction ( exp_r, vals );
   }
@@ -403,20 +364,17 @@ int N_UTL_Expression::evaluateFunction ( double & exp_r, vector<double> & vals )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::evaluate
+// Function      : Expression::evaluate
 // Purpose       : Evaluate expression and derivatives using stored input values
 // Special Notes :
 // Scope         : private
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-int N_UTL_Expression::evaluate ( double & exp_r,
-                                 vector<double> & deriv_r)
+int Expression::evaluate ( double & exp_r,
+                                 std::vector<double> & deriv_r)
 {
   int retVal=0;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
   {
     retVal = expPtr_->evaluate ( exp_r, deriv_r);
   }
@@ -424,19 +382,16 @@ int N_UTL_Expression::evaluate ( double & exp_r,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::evaluateFunction
+// Function      : Expression::evaluateFunction
 // Purpose       : Evaluate expression using stored input values
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-int N_UTL_Expression::evaluateFunction ( double & exp_r )
+int Expression::evaluateFunction ( double & exp_r )
 {
-  int retVal=0;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  int retVal=0; 
   {
     retVal = expPtr_->evaluateFunction ( exp_r );
   }
@@ -444,19 +399,16 @@ int N_UTL_Expression::evaluateFunction ( double & exp_r )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::set_sim_time
+// Function      : Expression::set_sim_time
 // Purpose       : Set 'time' special variable in expression
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-bool N_UTL_Expression::set_sim_time(double const & time)
+bool Expression::set_sim_time(double const & time)
 {
   bool retVal=false;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
   {
     retVal = expPtr_->set_sim_time(time);
   }
@@ -464,19 +416,16 @@ bool N_UTL_Expression::set_sim_time(double const & time)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::set_temp
+// Function      : Expression::set_temp
 // Purpose       : Set 'temp' special variable in expression
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-bool N_UTL_Expression::set_temp(double const & tempIn)
+bool Expression::set_temp(double const & tempIn)
 {
   bool retVal=false;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
   {
     retVal = expPtr_->set_temp(tempIn);
   }
@@ -484,18 +433,15 @@ bool N_UTL_Expression::set_temp(double const & tempIn)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::set_accepted_time
+// Function      : Expression::set_accepted_time
 // Purpose       : Set accepted time for converged soltion
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-void N_UTL_Expression::set_accepted_time()
-{
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+void Expression::set_accepted_time()
+{ 
   {
     expPtr_->set_accepted_time();
   }
@@ -503,19 +449,16 @@ void N_UTL_Expression::set_accepted_time()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::get_break_time
+// Function      : Expression::get_break_time
 // Purpose       : Returns next breakpoint time
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-double N_UTL_Expression::get_break_time()
+double Expression::get_break_time()
 {
-  double retVal=0.0;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  double retVal=0.0; 
   {
     retVal = expPtr_->get_break_time();
   }
@@ -523,19 +466,16 @@ double N_UTL_Expression::get_break_time()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::get_break_time_i
+// Function      : Expression::get_break_time_i
 // Purpose       : Returns next breakpoint time
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-double N_UTL_Expression::get_break_time_i()
+double Expression::get_break_time_i()
 {
-  double retVal=0.0;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  double retVal=0.0; 
   {
     retVal = expPtr_->get_break_time_i();
   }
@@ -543,20 +483,20 @@ double N_UTL_Expression::get_break_time_i()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::get_input
+// Function      : Expression::get_input
 // Purpose       : Return expression input string
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-const string & N_UTL_Expression::get_input ()
+const std::string & Expression::get_input ()
 {
   return expPtr_->get_input ();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::order_names
+// Function      : Expression::order_names
 // Purpose       : Put input quantity names in a particular order (used for
 //                 replace_func which requires identical ordering for expression
 //                 and user defined function
@@ -565,12 +505,9 @@ const string & N_UTL_Expression::get_input ()
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-int N_UTL_Expression::order_names(vector<string> const & new_names)
+int Expression::order_names(std::vector<std::string> const & new_names)
 {
-  int retVal=0;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  int retVal=0; 
   {
     retVal = expPtr_->order_names(new_names);
   }
@@ -578,21 +515,18 @@ int N_UTL_Expression::order_names(vector<string> const & new_names)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::replace_func
+// Function      : Expression::replace_func
 // Purpose       : Replace user defined function with its definition in expression
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-int N_UTL_Expression::replace_func (string const & func_name,
-                                   N_UTL_Expression & func_def,
+int Expression::replace_func (std::string const & func_name,
+                                   Expression & func_def,
                                    int numArgs)
 {
-  int retVal=0;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  int retVal=0; 
   {
     retVal = expPtr_->replace_func (func_name, *(func_def.expPtr_), numArgs);
   }
@@ -600,7 +534,7 @@ int N_UTL_Expression::replace_func (string const & func_name,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::replace_var
+// Function      : Expression::replace_var
 // Purpose       : Replace a variable usage with a parsed sub-expression
 // Special Notes : This is used for subcircuit parameters that cannot be
 //                 fully resolved to a constant because they have global
@@ -609,13 +543,10 @@ int N_UTL_Expression::replace_func (string const & func_name,
 // Creator       : Thomas Russo, SNL
 // Creation Date : 08/10/2010
 //-----------------------------------------------------------------------------
-int N_UTL_Expression::replace_var (string const & var_name,
-                                   N_UTL_Expression & subexpr )
+int Expression::replace_var (std::string const & var_name,
+                                   Expression & subexpr )
 {
-  int retVal=0;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  int retVal=0; 
   {
     retVal = expPtr_->replace_var (var_name, *(subexpr.expPtr_));
   }
@@ -624,20 +555,17 @@ int N_UTL_Expression::replace_var (string const & var_name,
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::replace_name
+// Function      : Expression::replace_name
 // Purpose       : Change the name of an input quantity
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-bool N_UTL_Expression::replace_name ( const string & old_name,
-                                      const string & new_name)
+bool Expression::replace_name ( const std::string & old_name,
+                                      const std::string & new_name)
 {
-  bool retVal=false;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  bool retVal=false; 
   {
     retVal = expPtr_->replace_name ( old_name, new_name);
   }
@@ -645,19 +573,16 @@ bool N_UTL_Expression::replace_name ( const string & old_name,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::getNumDdt
+// Function      : Expression::getNumDdt
 // Purpose       : Return the number of ddt() calls in the expression
 // Special Notes :
 // Scope         : Public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-int N_UTL_Expression::getNumDdt ()
+int Expression::getNumDdt ()
 {
-  int retVal=0;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  int retVal=0; 
   {
     retVal = expPtr_-> getNumDdt ();
   }
@@ -665,18 +590,15 @@ int N_UTL_Expression::getNumDdt ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::getDdtVals
+// Function      : Expression::getDdtVals
 // Purpose       : Return the most recent arguments of ddt() in the expression
 // Special Notes :
 // Scope         : Public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-void N_UTL_Expression::getDdtVals ( vector<double> & vals )
-{
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+void Expression::getDdtVals ( std::vector<double> & vals )
+{ 
   {
     expPtr_-> getDdtVals ( vals );
   }
@@ -684,7 +606,7 @@ void N_UTL_Expression::getDdtVals ( vector<double> & vals )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::setDdtDerivs
+// Function      : Expression::setDdtDerivs
 // Purpose       : Set the evaluated value of the ddt functions
 // Special Notes : This is normally done with derivative values from the
 //                 time integration package
@@ -692,11 +614,8 @@ void N_UTL_Expression::getDdtVals ( vector<double> & vals )
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-void N_UTL_Expression::setDdtDerivs ( vector<double> & vals )
-{
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+void Expression::setDdtDerivs ( std::vector<double> & vals )
+{ 
   {
     expPtr_->setDdtDerivs ( vals );
   }
@@ -704,19 +623,16 @@ void N_UTL_Expression::setDdtDerivs ( vector<double> & vals )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::num_vars
+// Function      : Expression::num_vars
 // Purpose       : 
 // Special Notes : 
 // Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/17/08
 //-----------------------------------------------------------------------------
-int N_UTL_Expression::num_vars ()
+int Expression::num_vars() const
 {
-  int retVal=0;
-#ifdef _OMP
-  #pragma omp critical
-#endif 
+  int retVal=0; 
   {
     retVal = expPtr_->num_vars();
   }
@@ -738,7 +654,7 @@ int N_UTL_Expression::num_vars ()
 // Creator       : Richard Schiek, SNL
 // Creation Date : 10/07/2013
 //-----------------------------------------------------------------------------
-bool N_UTL_Expression::isTimeDependent() const
+bool Expression::isTimeDependent() const
 {
   bool implicitTimeDep = expPtr_->isTimeDepedent();
   bool explicitTimeDep = false;
@@ -751,17 +667,18 @@ bool N_UTL_Expression::isTimeDependent() const
   return (implicitTimeDep || explicitTimeDep);
 }
 
-#ifdef Xyce_DEBUG_EXPRESSION
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Expression::dumpParseTree
+// Function      : Expression::dumpParseTree
 // Purpose       : Dump out the parse tree for an expression
 // Special Notes : 
 // Scope         :
 // Creator       : Tom Russo, SNL
 // Creation Date : 9/9/10
 //-----------------------------------------------------------------------------
-void N_UTL_Expression::dumpParseTree()
+void Expression::dumpParseTree()
 {
   expPtr_->dumpParseTree();
 }
-#endif
+
+} // namespace Util
+} // namespace Xyce

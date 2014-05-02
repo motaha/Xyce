@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -38,9 +38,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.10.6.2 $
+// Revision Number: $Revision: 1.21 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -77,24 +77,44 @@
 #endif
 
 //-----------------------------------------------------------------------------
+// Function      : generateOffset
+// Purpose       : A helper function that standardizes how offsets are computed 
+// Special Notes : Block maps, graphs, vectors, and matrices require a global
+//               : numbering scheme.  Xyce uses an offset index to space the 
+//               : global ids apart so that they are unique.  The computation
+//               : of this offset is performed by this function using the
+//               : N_PDS_ParMap from the base block object.
+// Creator       : Heidi Thornquist, SNL, Electrical Systems Modeling
+// Creation Date : 10/8/13
+//-----------------------------------------------------------------------------
+int generateOffset( const N_PDS_ParMap& baseMap )
+{
+   // Compute the offset needed for global indexing.
+   int maxGID = baseMap.maxGlobalEntity();
+   int offset = 1;
+   while( offset <= maxGID ) offset *= 10;
+
+   return offset;
+}
+
+//-----------------------------------------------------------------------------
 // Function      : createBlockVector
 // Purpose       : A helper function for creating a block vector.
 // Special Notes :
 // Creator       : Heidi Thornquist, SNL, Electrical Systems Modeling
 // Creation Date : 6/22/11
 //-----------------------------------------------------------------------------
-Teuchos::RCP<N_LAS_BlockVector> createBlockVector( int numBlocks, N_LAS_Vector& subBlockVector )
+Teuchos::RCP<N_LAS_BlockVector> createBlockVector( int numBlocks, N_LAS_Vector& subBlockVector, int augmentRows )
 {
    // Create the parallel block maps based on the distribution of the subBlockVector
-   std::vector<Teuchos::RCP<N_PDS_ParMap> > blockMaps
-     = createBlockParMaps( numBlocks, *(subBlockVector.pmap()), *(subBlockVector.omap()) );
+   Teuchos::RCP<N_PDS_ParMap> globalMap = createBlockParMap( numBlocks, *(subBlockVector.pmap()), augmentRows );
 
    // Create the new N_LAS_BlockVector using the parallel maps
    Teuchos::RCP<N_LAS_BlockVector> newvector 
-     = Teuchos::rcp( new N_LAS_BlockVector( numBlocks, blockMaps[0], blockMaps[1],
+     = Teuchos::rcp( new N_LAS_BlockVector( numBlocks, globalMap,
                                             Teuchos::rcp(subBlockVector.pmap(),false),
-                                            Teuchos::rcp(subBlockVector.omap(),false)
-                                          ) );
+                                            Teuchos::rcp(subBlockVector.omap(),false),
+                                            augmentRows ) );
 
    // Return the new block vector
    return newvector;
@@ -170,10 +190,7 @@ std::vector<Teuchos::RCP<N_PDS_ParMap> > createBlockParMaps( int numBlocks, N_PD
    int oBaseIndex = omap.indexBase();
 
    // Compute the offset needed for global indexing.
-   int maxGID = pmap.petraMap()->MaxAllGID();
-   int numProcs = pmap.pdsComm()->numProc();
-   int offset = 1;
-   while( offset <= maxGID ) offset *= 10;
+   int offset = generateOffset( pmap );
 
    // Determine size of block maps
    int numGlobalElements = numBlocks*globalBlockSize;
@@ -182,8 +199,8 @@ std::vector<Teuchos::RCP<N_PDS_ParMap> > createBlockParMaps( int numBlocks, N_PD
    int onumLocalElements = numBlocks*olocalBlockSize;
 
    // Initialize vectors to hold the GIDs for the original and block map.
-   vector<int> BaseGIDs(localBlockSize), oBaseGIDs(olocalBlockSize);
-   vector<int> GIDs(numLocalElements), oGIDs(onumLocalElements);
+   std::vector<int> BaseGIDs(localBlockSize), oBaseGIDs(olocalBlockSize);
+   std::vector<int> GIDs(numLocalElements), oGIDs(onumLocalElements);
 
    // Extract the global indices.
    pmap.petraMap()->MyGlobalElements( &BaseGIDs[0] );
@@ -251,20 +268,18 @@ std::vector<Teuchos::RCP<N_PDS_ParMap> > createBlockParMaps2( int numBlocks, N_P
    int oBaseIndex = omap.indexBase();
 
    // Compute the offset needed for global indexing.
-   int maxGID = pmap.petraMap()->MaxAllGID();
-   int numProcs = pmap.pdsComm()->numProc();
-   int offset = 1;
-   while( offset <= maxGID ) offset *= 10;
+   int offset = generateOffset( pmap );
 
    // Determine size of block maps
+   int numProcs = pmap.pdsComm()->numProc();
    int numGlobalElements = numBlocks*globalBlockSize;
    int onumGlobalElements = numBlocks*(oglobalBlockSize-numProcs) + numProcs;
    int numLocalElements = numBlocks*localBlockSize;
    int onumLocalElements = numBlocks*(olocalBlockSize-1) + 1;
 
    // Initialize vectors to hold the GIDs for the original and block map.
-   vector<int> BaseGIDs(localBlockSize), oBaseGIDs(olocalBlockSize);
-   vector<int> GIDs(numLocalElements), oGIDs(onumLocalElements);
+   std::vector<int> BaseGIDs(localBlockSize), oBaseGIDs(olocalBlockSize);
+   std::vector<int> GIDs(numLocalElements), oGIDs(onumLocalElements);
 
    // Extract the global indices.
    pmap.petraMap()->MyGlobalElements( &BaseGIDs[0] );
@@ -312,7 +327,8 @@ std::vector<Teuchos::RCP<N_PDS_ParMap> > createBlockParMaps2( int numBlocks, N_P
 // Creator       : Heidi Thornquist, SNL, Electrical Systems Modeling
 // Creation Date : 6/22/11
 //----------------------------------------------------------------------------- 
-Teuchos::RCP<N_PDS_ParMap> createBlockParMap( int numBlocks, N_PDS_ParMap& pmap )
+Teuchos::RCP<N_PDS_ParMap> createBlockParMap( int numBlocks, N_PDS_ParMap& pmap, 
+                                              int augmentRows, std::vector<int>* augmentedGIDs )
 {
    // The information about the current maps, given by pmap 
    // will be used to generate new parallel maps for the block system.
@@ -325,22 +341,32 @@ Teuchos::RCP<N_PDS_ParMap> createBlockParMap( int numBlocks, N_PDS_ParMap& pmap 
    int BaseIndex = pmap.indexBase();
 
    // Compute the offset needed for global indexing.
-   int maxGID = pmap.petraMap()->MaxAllGID();
-   int numProcs = pmap.pdsComm()->numProc();
-   int offset = 1;
-   while( offset <= maxGID ) offset *= 10;
+   int offset = generateOffset( pmap );
 
    // Determine size of block maps
-   int numGlobalElements = numBlocks*globalBlockSize;
+   int numGlobalElements = numBlocks*globalBlockSize + augmentRows;
    int numLocalElements = numBlocks*localBlockSize;
 
+   // Find which processor has the maximum global ID.
+   // NOTE:  In some cases the "last processor" does not have the largest, or any, IDs assigned to it.
+   int maxGID = pmap.maxGlobalEntity();
+   int maxProc = -1;
+   if ( pmap.globalToLocalIndex( maxGID ) >= 0 ) 
+     maxProc = pmap.pdsComm()->procID();
+ 
+   // Add the augmented rows to the final processor (assume there aren't too many of these rows)
+   if (augmentRows && maxProc >= 0)
+   {
+     numLocalElements += augmentRows;
+   }
+
    // Initialize vectors to hold the GIDs for the original and block map.
-   vector<int> BaseGIDs(localBlockSize);
-   vector<int> GIDs(numLocalElements);
+   std::vector<int> BaseGIDs(localBlockSize);
+   std::vector<int> GIDs(numLocalElements);
 
    // Extract the global indices.
    pmap.petraMap()->MyGlobalElements( &BaseGIDs[0] );
-   
+
    for( int i = 0; i < numBlocks; ++i )
    {
      // Setting up GIDs for the map without overlap and ground nodes 
@@ -348,6 +374,29 @@ Teuchos::RCP<N_PDS_ParMap> createBlockParMap( int numBlocks, N_PDS_ParMap& pmap 
      {
        GIDs[i*localBlockSize+j] = BaseGIDs[j] + offset*i;
      }
+   }
+
+   // Add the augmented rows to the final processor (assume there aren't too many of these rows)
+   // All processors will be returned the augmented GIDs.  They will have to determine via the map or by
+   // checking if they are the last processor in the communicator if they own the GID.
+   if (augmentRows && augmentedGIDs)
+   {
+     std::vector<int> tmpAugGIDs( augmentRows, -1 );
+     augmentedGIDs->resize( augmentRows );
+
+     // Add the augmented GIDs to the processor that has the maximum GID.
+     if ( maxProc >= 0 )
+     {
+       for ( int i=0; i<augmentRows; i++ )
+       {
+         GIDs[numLocalElements-augmentRows+i] = GIDs[numLocalElements-augmentRows-1+i] + 1;
+         tmpAugGIDs[i] = GIDs[numLocalElements-augmentRows+i];
+       }
+     }
+
+     // Now communicate the GIDs to all the processors.  Users of this map will have to check if they own the
+     // GID or just check if they are the last processor to whom the GID was assigned.  
+     pmap.pdsComm()->maxAll( &tmpAugGIDs[0], &(*augmentedGIDs)[0], augmentRows );
    }
 
    // Create new maps for the block system 
@@ -416,3 +465,38 @@ Teuchos::RCP<Epetra_CrsGraph> createBlockGraph( int offset, std::vector<std::vec
  
   return newGraph;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : createBlockFreqERFParMap
+// Purpose       : A helper function for creating block parallel maps for
+//               : the frequency domain.  The map generated here has all the
+//               : harmonics for one time point grouped together in expanded
+//               : real form.
+//               : This function returns only the map, not the overlap map.
+// Special Notes :
+// Creator       : Heidi Thornquist, SNL, Electrical Systems Modeling
+// Creation Date : 12/3/13
+//-----------------------------------------------------------------------------
+Teuchos::RCP<N_PDS_ParMap> createBlockFreqERFParMap( int numHarmonics, N_PDS_ParMap& pmap )
+{
+   // The information about the current maps, given by pmap
+   // will be used to generate new parallel maps for the block system.
+
+   // Get the current number of entries owned by this processor and globally.
+   int localBlockSize = pmap.numLocalEntities();
+   int globalBlockSize = pmap.numGlobalEntities();
+
+   // Get the index base from the original maps
+   int BaseIndex = pmap.indexBase();
+
+   // Determine size of block maps
+   int numGlobalElements = 2*numHarmonics*globalBlockSize;
+   int numLocalElements = 2*numHarmonics*localBlockSize;
+
+   // Create new maps for the block system 
+   Teuchos::RCP<N_PDS_ParMap> blockMap = 
+     Teuchos::rcp(new N_PDS_ParMap(numGlobalElements, numLocalElements, BaseIndex, pmap.pdsComm()));
+
+   return blockMap;
+}
+

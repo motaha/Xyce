@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,36 +36,18 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.107.2.2 $
+// Revision Number: $Revision: 1.121.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/03/06 17:23:43 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: erkeite $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-#include <N_UTL_Misc.h>
-
-#ifdef Xyce_TEST_SOLN_VAR_MAP
-#include <fstream>
-#endif
-
-#ifdef HAVE_ALGORITHM
-#include <algorithm>
-#else
-#ifdef HAVE_ALGO_H
-#include <algo.h>
-#else
-#error Must have either <algorithm> or <algo.h>!
-#endif
-#endif
-
 #include <sstream>
 
-// ---------- Xyce Includes --------------
+#include <fstream>
 
 #include <N_TOP_Topology.h>
 
@@ -85,10 +67,8 @@
 #include <N_TOP_CktGraph.h>
 
 
-#ifdef Xyce_TEST_SOLN_VAR_MAP
 #include <N_PDS_Comm.h>
 #include <N_PDS_Manager.h>
-#endif
 
 #ifdef Xyce_PARALLEL_MPI
 #include <N_PDS_Comm.h>
@@ -109,15 +89,18 @@
 
 #include <N_ERH_ErrorMgr.h>
 
+namespace Xyce {
+namespace Topo {
+
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::N_TOP_Topology
+// Function      : Topology::Topology
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-N_TOP_Topology::N_TOP_Topology(N_IO_CmdParse & cp)
+Topology::Topology(IO::CmdParse & cp)
   : commandLine_(cp),
     maxTries_(1),
     lsUtilPtr_(0),
@@ -131,7 +114,7 @@ N_TOP_Topology::N_TOP_Topology(N_IO_CmdParse & cp)
     anaIntPtr_(0),
     icSettings_(0)
 {
-  lsUtilPtr_ = new N_TOP_TopoLSUtil( this, commandLine_ );
+  lsUtilPtr_ = new TopoLSUtil( this, commandLine_ );
 
   // check for maximum tries to compute graph center on command line.
   if ( commandLine_.argExists ("-maxgraphcentertries") )
@@ -141,25 +124,25 @@ N_TOP_Topology::N_TOP_Topology(N_IO_CmdParse & cp)
   }
 
   // check for graph type command-line override:
-  string graphType("Basic");
-  graphCreatorPtr_ = N_TOP_CktGraphSupport::factory( graphType, maxTries_ );
+  std::string graphType("Basic");
+  graphCreatorPtr_ = CktGraphSupport::factory( graphType, maxTries_ );
 
-  nodeCreatorPtr_ = N_TOP_CktNodeCreator::instance();
+  nodeCreatorPtr_ = CktNodeCreator::instance();
 
-  mainGraphPtr_ = graphCreatorPtr_->create( string("") );
+  mainGraphPtr_ = graphCreatorPtr_->create( std::string("") );
 
   graphList_.push_back(mainGraphPtr_);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::N_TOP_Topology
+// Function      : Topology::Topology
 // Purpose       : generate topology with empty graph and put on list
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-N_TOP_Topology::N_TOP_Topology(N_DEV_DeviceInterface* devInt, N_IO_CmdParse & cp)
+Topology::Topology(Device::DeviceInterface* devInt, IO::CmdParse & cp)
   : commandLine_(cp),
     maxTries_(1),
     lsUtilPtr_(0),
@@ -173,7 +156,7 @@ N_TOP_Topology::N_TOP_Topology(N_DEV_DeviceInterface* devInt, N_IO_CmdParse & cp
     anaIntPtr_(0),
     icSettings_(0)
 {
-  lsUtilPtr_ = new N_TOP_TopoLSUtil( this, commandLine_ );
+  lsUtilPtr_ = new TopoLSUtil( this, commandLine_ );
 
   // check for maximum tries to compute graph center on command line.
   if ( commandLine_.argExists ("-maxgraphcentertries") )
@@ -183,24 +166,24 @@ N_TOP_Topology::N_TOP_Topology(N_DEV_DeviceInterface* devInt, N_IO_CmdParse & cp
   }
 
   // check for graph type command-line override:
-  string graphType("Basic");
-  graphCreatorPtr_ = N_TOP_CktGraphSupport::factory( graphType, maxTries_ );
+  std::string graphType("Basic");
+  graphCreatorPtr_ = CktGraphSupport::factory( graphType, maxTries_ );
 
-  mainGraphPtr_ = graphCreatorPtr_->create( string("") );
+  mainGraphPtr_ = graphCreatorPtr_->create( std::string("") );
 
   graphList_.push_back(mainGraphPtr_);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::N_TOP_Topology
+// Function      : Topology::Topology
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-N_TOP_Topology::N_TOP_Topology(N_DEV_DeviceInterface * devInt,
-		const string & graphType, N_IO_CmdParse & cp)
+Topology::Topology(Device::DeviceInterface * devInt,
+		const std::string & graphType, IO::CmdParse & cp)
   : commandLine_(cp),
     maxTries_(1),
     lsUtilPtr_(0),
@@ -214,7 +197,7 @@ N_TOP_Topology::N_TOP_Topology(N_DEV_DeviceInterface * devInt,
     anaIntPtr_(0),
     icSettings_(0)
 {
-  lsUtilPtr_ = new N_TOP_TopoLSUtil( this, commandLine_ );
+  lsUtilPtr_ = new TopoLSUtil( this, commandLine_ );
 
   // check for maximum tries to compute graph center on command line.
   if ( commandLine_.argExists ("-maxgraphcentertries") )
@@ -223,33 +206,33 @@ N_TOP_Topology::N_TOP_Topology(N_DEV_DeviceInterface * devInt,
       atoi( commandLine_.getArgumentValue( "-maxgraphcentertries" ).c_str() );
   }
 
-  graphCreatorPtr_ = N_TOP_CktGraphSupport::factory( graphType, maxTries_ );
+  graphCreatorPtr_ = CktGraphSupport::factory( graphType, maxTries_ );
 
-  mainGraphPtr_ = graphCreatorPtr_->create( string("") );
+  mainGraphPtr_ = graphCreatorPtr_->create( std::string("") );
 
   graphList_.push_back( mainGraphPtr_ );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::~N_TOP_Topology
+// Function      : Topology::~Topology
 // Purpose       : destructor
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-N_TOP_Topology::~N_TOP_Topology()
+Topology::~Topology()
 {
   delete lsUtilPtr_;
 
   if( icSettings_ ) delete icSettings_;
 
-  list<N_TOP_CktGraph*>::iterator it_gL, end_gL;
+  std::list<CktGraph*>::iterator it_gL, end_gL;
   for ( it_gL = graphList_.begin(), end_gL = graphList_.end();
 	it_gL != end_gL; ++it_gL )
     delete *it_gL;
 
-  for( map<string,N_DEV_InstanceBlock*>::iterator it_ibM =
+  for( std::map<std::string,Device::InstanceBlock*>::iterator it_ibM =
 	devInstBlockMap_.begin(); it_ibM != devInstBlockMap_.end(); ++it_ibM )
     if( it_ibM->second ) delete it_ibM->second;
 
@@ -262,56 +245,56 @@ N_TOP_Topology::~N_TOP_Topology()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::registerDeviceInterface
+// Function      : Topology::registerDeviceInterface
 // Purpose       : Basic device processor addes dev node and connected v-nodes.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/8/00
 //-----------------------------------------------------------------------------
-bool N_TOP_Topology::registerDeviceInterface ( N_DEV_DeviceInterface * devInt)
+bool Topology::registerDeviceInterface ( Device::DeviceInterface * devInt)
 {
   return (devIntPtr_ = devInt);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::registerParallelMgr
+// Function      : Topology::registerParallelMgr
 // Purpose       : Registers parallel mgr.
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 2/1/01
 //-----------------------------------------------------------------------------
-bool N_TOP_Topology::registerParallelMgr ( N_PDS_Manager * pdsmgr)
+bool Topology::registerParallelMgr ( N_PDS_Manager * pdsmgr)
 {
-  if(pdsMgrPtr_ = pdsmgr)
+  if( (pdsMgrPtr_ = pdsmgr))
     return lsUtilPtr_->registerParallelMgr( pdsmgr );
   else
-    return STATUS_FAILURE;
+    return false;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::registeranaInt
+// Function      : Topology::registeranaInt
 // Purpose       : Basic device processor addes dev node and connected v-nodes
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/8/00
 //-----------------------------------------------------------------------------
-bool N_TOP_Topology::registeranaInt ( N_ANP_AnalysisInterface * anaInt)
+bool Topology::registeranaInt ( N_ANP_AnalysisInterface * anaInt)
 {
   return (anaIntPtr_ = anaInt);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::registerICs
+// Function      : Topology::registerICs
 // Purpose       : Registers parallel mgr
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 2/1/01
 //-----------------------------------------------------------------------------
-bool N_TOP_Topology::registerICs( const N_UTL_OptionBlock & ob )
+bool Topology::registerICs( const N_UTL_OptionBlock & ob )
 {
   if( icSettings_ ) delete icSettings_;
   icSettings_ = new N_UTL_OptionBlock( ob );
@@ -320,14 +303,14 @@ bool N_TOP_Topology::registerICs( const N_UTL_OptionBlock & ob )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::registerPkgOptionsMgr
+// Function      : Topology::registerPkgOptionsMgr
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, 1437
 // Creation Date : 10/21/08
 //-----------------------------------------------------------------------------
-bool N_TOP_Topology::registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr )
+bool Topology::registerPkgOptionsMgr( IO::PkgOptionsMgr *pkgOptPtr )
 {
   pkgOptMgrPtr_ = pkgOptPtr;
   lsUtilPtr_->registerPkgOptionsMgr( pkgOptMgrPtr_ );
@@ -335,62 +318,62 @@ bool N_TOP_Topology::registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::setupGlobalIndices
+// Function      : Topology::setupGlobalIndices
 // Purpose       : Lin system data setup
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 2/1/01
 //-----------------------------------------------------------------------------
-bool N_TOP_Topology::setupGlobalIndices()
+bool Topology::setupGlobalIndices()
 {
   return lsUtilPtr_->setupRowCol();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::setupGlobalAccessors
+// Function      : Topology::setupGlobalAccessors
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 2/1/01
 //-----------------------------------------------------------------------------
-bool N_TOP_Topology::setupGlobalAccessors()
+bool Topology::setupGlobalAccessors()
 {
   return lsUtilPtr_->setupGlobalAccessors();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::addVoltageNode
+// Function      : Topology::addVoltageNode
 // Purpose       : New v-node instantiator (planarized_ ckts only)
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/20/00
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::addVoltageNode( const N_TOP_NodeBlock & nb )
+void Topology::addVoltageNode( const NodeBlock & nb )
 {
-  list<NodeID> emptyList;
+  std::list<NodeID> emptyList;
 
   mainGraphPtr_->InsertNode( nodeCreatorPtr_->CreateVoltageNode( nb ),
                              emptyList);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::addDevice
+// Function      : Topology::addDevice
 // Purpose       : New dev-node instantiator (planarized ckts only)
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/20/00
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::addDevice( const N_TOP_NodeBlock & nb, const Teuchos::RefCountPtr<N_DEV_InstanceBlock> ibPtr )
+void Topology::addDevice( const NodeBlock & nb, const Teuchos::RefCountPtr<Device::InstanceBlock> ibPtr )
 {
-  list<NodeID> emptyNLList, nlList;
+  std::list<NodeID> emptyNLList, nlList;
   //------ Add connected voltage nodes
 
-  list<tagged_param>::const_iterator it_nlL = nb.get_NodeList().begin();
-  list<tagged_param>::const_iterator end_nlL = nb.get_NodeList().end();
+  std::list<tagged_param>::const_iterator it_nlL = nb.get_NodeList().begin();
+  std::list<tagged_param>::const_iterator end_nlL = nb.get_NodeList().end();
 
   for( ; it_nlL != end_nlL ; ++it_nlL )
   {
@@ -412,7 +395,7 @@ void N_TOP_Topology::addDevice( const N_TOP_NodeBlock & nb, const Teuchos::RefCo
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::registerGIDswithDevs
+// Function      : Topology::registerGIDswithDevs
 // Purpose       : register the int. and ext. global ids stored by
 //                 the cktnodes with their respective devices
 // Special Notes :
@@ -420,7 +403,7 @@ void N_TOP_Topology::addDevice( const N_TOP_NodeBlock & nb, const Teuchos::RefCo
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/22/00
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::registerGIDswithDevs()
+void Topology::registerGIDswithDevs()
 {
   mainGraphPtr_->registerGIDswithDevs();
   mainGraphPtr_->registerStateGIDswithDevs();
@@ -428,7 +411,7 @@ void N_TOP_Topology::registerGIDswithDevs()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::registerLIDswithDevs
+// Function      : Topology::registerLIDswithDevs
 // Purpose       : register the int. and ext. local ids stored by
 //                 the cktnodes with their respective devices
 // Special Notes :
@@ -436,11 +419,11 @@ void N_TOP_Topology::registerGIDswithDevs()
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/12/02
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::registerLIDswithDevs()
+void Topology::registerLIDswithDevs()
 {
   if( commandLine_.getArgumentValue( "-dva" ) != "off" )
   {
-    N_TOP_Indexor indexor( pdsMgrPtr_ );
+    Indexor indexor( pdsMgrPtr_ );
 
     mainGraphPtr_->registerLIDswithDevs( indexor );
     mainGraphPtr_->registerStateLIDswithDevs( indexor );
@@ -453,25 +436,25 @@ void N_TOP_Topology::registerLIDswithDevs()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::registerJacLIDswithDevs
+// Function      : Topology::registerJacLIDswithDevs
 // Purpose       : register the jacobian local offsets with devices
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 9/5/02
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::registerJacLIDswithDevs()
+void Topology::registerJacLIDswithDevs()
 {
   if( commandLine_.getArgumentValue( "-dma" ) != "off" )
   {
-    N_TOP_Indexor indexor( pdsMgrPtr_ );
+    Indexor indexor( pdsMgrPtr_ );
 
     mainGraphPtr_->registerJacLIDswithDevs( indexor );
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::resolveDependentVars
+// Function      : Topology::resolveDependentVars
 // Purpose       : loop through devices and resolve their secondary
 //                 dependencies
 // Special Notes : Used to resolve Expressions and Current Dependencies
@@ -479,14 +462,14 @@ void N_TOP_Topology::registerJacLIDswithDevs()
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/05/01
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::resolveDependentVars()
+void Topology::resolveDependentVars()
 {
   int count = 0;
-  vector<int> locVec;
-  vector<NodeID> nidVec;
-  vector<NodeID> idVec;
-  list<N_TOP_CktNode*>::iterator it_cnL;
-  list<N_TOP_CktNode*>::iterator it_cnL_end;
+  std::vector<int> locVec;
+  std::vector<NodeID> nidVec;
+  std::vector<NodeID> idVec;
+  std::list<CktNode*>::iterator it_cnL;
+  std::list<CktNode*>::iterator it_cnL_end;
 
   it_cnL = mainGraphPtr_->getBFSNodeList()->begin();
   it_cnL_end = mainGraphPtr_->getBFSNodeList()->end();
@@ -504,19 +487,19 @@ void N_TOP_Topology::resolveDependentVars()
   }
   locVec.push_back( count );
 
-  vector< vector<int> > gidVec, indexVec;
-  vector<int> procVec;
+  std::vector< std::vector<int> > gidVec, indexVec;
+  std::vector<int> procVec;
   dirPtr_->getSolnGIDs( nidVec, gidVec, procVec );
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "Resolution of Dependent Solution Variables!\n";
+  Xyce::dout() << "Resolution of Dependent Solution Variables!\n";
   for( unsigned int i = 0; i < nidVec.size(); ++i )
   {
-    cout << " Var: " << nidVec[i].first;
-    cout << " Proc: " << procVec[i] << endl;
+    Xyce::dout() << " Var: " << nidVec[i].first;
+    Xyce::dout() << " Proc: " << procVec[i] << std::endl;
     for( unsigned int ii = 0; ii < gidVec[i].size(); ++ii )
-      cout << " " << gidVec[i][ii];
-    cout << endl;
+      Xyce::dout() << " " << gidVec[i][ii];
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -564,13 +547,13 @@ void N_TOP_Topology::resolveDependentVars()
   dirPtr_->getStateGIDs( nidVec, gidVec, procVec );
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "Resolution of Dependent State Variables!\n";
+  Xyce::dout() << "Resolution of Dependent State Variables!\n";
   for( unsigned int i = 0; i < nidVec.size(); ++i )
   {
-    cout << " Var: " << nidVec[i].first << " Proc: " << procVec[i] << endl;
+    Xyce::dout() << " Var: " << nidVec[i].first << " Proc: " << procVec[i] << std::endl;
     for( unsigned int ii = 0; ii < gidVec[i].size(); ++ii )
-      cout << " " << gidVec[i][ii];
-    cout << endl;
+      Xyce::dout() << " " << gidVec[i][ii];
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -622,13 +605,13 @@ void N_TOP_Topology::resolveDependentVars()
   dirPtr_->getStoreGIDs( nidVec, gidVec, procVec );
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "Resolution of Dependent Store Variables!\n";
+  Xyce::dout() << "Resolution of Dependent Store Variables!\n";
   for( unsigned int i = 0; i < nidVec.size(); ++i )
   {
-    cout << " Var: " << nidVec[i].first << " Proc: " << procVec[i] << endl;
+    Xyce::dout() << " Var: " << nidVec[i].first << " Proc: " << procVec[i] << std::endl;
     for( unsigned int ii = 0; ii < gidVec[i].size(); ++ii )
-      cout << " " << gidVec[i][ii];
-    cout << endl;
+      Xyce::dout() << " " << gidVec[i][ii];
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -659,62 +642,62 @@ void N_TOP_Topology::resolveDependentVars()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::OutputBFSGraphLists
-// Purpose       : Output to cout BFS node list for debugging
+// Function      : Topology::OutputBFSGraphLists
+// Purpose       : Output to Xyce::dout() BFS node list for debugging
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::OutputBFSGraphLists()
+void Topology::OutputBFSGraphLists()
 {
-  list<N_TOP_CktGraph*>::iterator it_cgL, end_cgL;
-  list<N_TOP_CktNode*>::iterator it_cnL, end_cnL;
+  std::list<CktGraph*>::iterator it_cgL, end_cgL;
+  std::list<CktNode*>::iterator it_cnL, end_cnL;
 
-  cout << "BFS Node Listing for Graphs" << endl;
+  Xyce::dout() << "BFS Node Listing for Graphs" << std::endl;
 
   //------ Loop over ckts in graphList_
   for( it_cgL = graphList_.begin(), end_cgL = graphList_.end();
 	it_cgL != end_cgL; ++it_cgL )
   {
-    list<N_TOP_CktNode*> * tmpCNL = (*it_cgL)->getBFSNodeList();
+    std::list<CktNode*> * tmpCNL = (*it_cgL)->getBFSNodeList();
     for( it_cnL = tmpCNL->begin(), end_cnL = tmpCNL->end();
 	it_cnL != end_cnL; ++it_cnL )
     {
-      cout << *(*it_cnL) << endl;
+      Xyce::dout() << *(*it_cnL) << std::endl;
     }
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::OutputDFSGraphLists
-// Purpose       : Output to cout DFS nodelist for debugging
+// Function      : Topology::OutputDFSGraphLists
+// Purpose       : Output to Xyce::dout() DFS nodelist for debugging
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::OutputDFSGraphLists()
+void Topology::OutputDFSGraphLists()
 {
-  list<N_TOP_CktGraph*>::iterator it_cgL, end_cgL;
-  list<N_TOP_CktNode*>::iterator it_cnL, end_cnL;
+  std::list<CktGraph*>::iterator it_cgL, end_cgL;
+  std::list<CktNode*>::iterator it_cnL, end_cnL;
 
-  cout << "DFS Node Listing for Graphs" << endl;
+  Xyce::dout() << "DFS Node Listing for Graphs" << std::endl;
 
   for( it_cgL = graphList_.begin(), end_cgL = graphList_.end();
 	it_cgL != end_cgL; ++it_cgL )
   {
-    list<N_TOP_CktNode*> * tmpCNL = (*it_cgL)->getDFSNodeList();
+    std::list<CktNode*> * tmpCNL = (*it_cgL)->getDFSNodeList();
     for( it_cnL = tmpCNL->begin(), end_cnL = tmpCNL->end();
          it_cnL != end_cnL; ++it_cnL )
     {
-      cout << *(*it_cnL) << endl;
+      Xyce::dout() << *(*it_cnL) << std::endl;
     }
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::setOrderedNodeList
+// Function      : Topology::setOrderedNodeList
 // Purpose       : Currently sets orderedNodeListPtr_ attribute to
 //                 BFS traversal of main ckt.
 // Special Notes :
@@ -722,7 +705,7 @@ void N_TOP_Topology::OutputDFSGraphLists()
 // Creator       : Rob  Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::setOrderedNodeList() const
+void Topology::setOrderedNodeList() const
 {
   orderedNodeListPtr_ = mainGraphPtr_->getBFSNodeList();
 }
@@ -738,22 +721,22 @@ void N_TOP_Topology::setOrderedNodeList() const
 // Creator       : Richard Schiek, Electrical and Microsystems modeling
 // Creation Date : 2/18/2010
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::verifyNodesAndDevices()
+void Topology::verifyNodesAndDevices()
 {
   if( lsUtilPtr_->supernodeFlag() )
   {
     int badDeviceCount=0;
-    ostringstream outputStringStream;
+    std::ostringstream outputStringStream;
 
-    const std::map< NodeID, N_TOP_CktNode* > dataMap = mainGraphPtr_->getNodeList();
-    std::map<NodeID, N_TOP_CktNode*>::const_iterator currentCktNodeItr = dataMap.begin();
-    std::map<NodeID, N_TOP_CktNode*>::const_iterator endCktNodeItr = dataMap.end();
+    const std::map< NodeID, CktNode* > dataMap = mainGraphPtr_->getNodeList();
+    std::map<NodeID, CktNode*>::const_iterator currentCktNodeItr = dataMap.begin();
+    std::map<NodeID, CktNode*>::const_iterator endCktNodeItr = dataMap.end();
     while( currentCktNodeItr != endCktNodeItr )
     {
       if( ((*currentCktNodeItr).second)->type() == _DNODE )
       {
-        N_TOP_CktNode_Dev * cktNodeDevPtr = dynamic_cast<N_TOP_CktNode_Dev*>((*currentCktNodeItr).second);
-        Teuchos::RCP<N_DEV_InstanceBlock> deviceInstanceBlockPtr = cktNodeDevPtr->devBlock();
+        CktNode_Dev * cktNodeDevPtr = dynamic_cast<CktNode_Dev*>((*currentCktNodeItr).second);
+        Teuchos::RCP<Device::InstanceBlock> deviceInstanceBlockPtr = cktNodeDevPtr->devBlock();
         if( Teuchos::nonnull( deviceInstanceBlockPtr ) )
         {
           bool deviceInstanceOk = devIntPtr_->verifyDeviceInstance( *deviceInstanceBlockPtr );
@@ -800,7 +783,7 @@ void N_TOP_Topology::verifyNodesAndDevices()
         else
         {
           // issue fatal error as this case shouldn't occur
-          string msg("N_TOP_Topology::verifyNodesAndDevices() null Device Instance Block pointer.");
+          std::string msg("Topology::verifyNodesAndDevices() null Device Instance Block pointer.");
           N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
         }
       }
@@ -813,7 +796,7 @@ void N_TOP_Topology::verifyNodesAndDevices()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::removeTaggedNodesAndDevices
+// Function      : Topology::removeTaggedNodesAndDevices
 // Purpose       : Remove devices and nodes that were tagged for removal
 //                 during parsing.  Node removal is done through supernoding,
 //                 .i.e. replacing one node globally with another.
@@ -822,26 +805,26 @@ void N_TOP_Topology::verifyNodesAndDevices()
 // Creator       : Richard Schiek, Electrical and Microsystems modeling
 // Creation Date : 2/2/2010
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::removeTaggedNodesAndDevices()
+void Topology::removeTaggedNodesAndDevices()
 {
   if( lsUtilPtr_->supernodeFlag() )
   {
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-    std::cout << "N_TOP_Topology::removeTaggedNodesAndDevices" << std::endl;
-    cout << *this << endl;
+    Xyce::dout() << "Topology::removeTaggedNodesAndDevices" << std::endl;
+    Xyce::dout() << *this << std::endl;
 #endif
 
-    ostringstream outputStringStream;
+    std::ostringstream outputStringStream;
     // storage for oldNode that we'll delete when done with this routine
-    // use a set because we can get the same oldNode N_TOP_CktNode pointer
+    // use a set because we can get the same oldNode CktNode pointer
     // multiple times
-    std::list<N_TOP_CktNode *> oldNodeList;
+    std::list<CktNode *> oldNodeList;
 
     // print out current state of supernode list
-    list< pair<NodeID, NodeID> >::iterator currentNodePair = superNodeList.begin();
-    list< pair<NodeID, NodeID> >::iterator endNodePair = superNodeList.end();
-    set<NodeID> nodesReplaced;
+    std::list< std::pair<NodeID, NodeID> >::iterator currentNodePair = superNodeList.begin();
+    std::list< std::pair<NodeID, NodeID> >::iterator endNodePair = superNodeList.end();
+    std::set<NodeID> nodesReplaced;
     while ( currentNodePair != endNodePair )
     {
       NodeID nodeToBeReplaced( currentNodePair->first );
@@ -860,10 +843,10 @@ void N_TOP_Topology::removeTaggedNodesAndDevices()
 #ifdef Xyce_DEBUG_TOPOLOGY
           if( nodeToBeReplaced.first < replacementNode.first )
           {
-            std::cout << "Ordering is wrong on nodes!" << std::endl;
+            Xyce::dout() << "Ordering is wrong on nodes!" << std::endl;
           }
 #endif
-          N_TOP_CktNode * oldNode = mainGraphPtr_->replaceNode( nodeToBeReplaced, replacementNode );
+          CktNode * oldNode = mainGraphPtr_->replaceNode( nodeToBeReplaced, replacementNode );
           nodesReplaced.insert( nodeToBeReplaced );
 
           // If we delete this old node now, we'll make the orderedNodeListPtr_ untraversable.
@@ -883,7 +866,7 @@ void N_TOP_Topology::removeTaggedNodesAndDevices()
           // If after the B->A substitution we didn't update our list, then we would next bring
           // back the B's with C->B.
           //
-          list< pair<NodeID, NodeID> >::iterator nextNodePair = currentNodePair;
+          std::list< std::pair<NodeID, NodeID> >::iterator nextNodePair = currentNodePair;
           nextNodePair++;
           while ( nextNodePair != endNodePair )
           {
@@ -900,7 +883,7 @@ void N_TOP_Topology::removeTaggedNodesAndDevices()
                 superNodeList.insert( nextNodePair, make_pair( replacementNode, nextNodePair->second ));
               }
               // store iterator to new pair before erasing old pair
-              list< pair<NodeID, NodeID> >::iterator nextNodePairTmp = nextNodePair;
+              std::list< std::pair<NodeID, NodeID> >::iterator nextNodePairTmp = nextNodePair;
               nextNodePairTmp--;
               superNodeList.erase( nextNodePair );
               nextNodePair = nextNodePairTmp;
@@ -918,7 +901,7 @@ void N_TOP_Topology::removeTaggedNodesAndDevices()
                 superNodeList.insert( nextNodePair, make_pair( replacementNode, nextNodePair->first ));
               }
               // store iterator to new pair before erasing old pair
-              list< pair<NodeID, NodeID> >::iterator nextNodePairTmp = nextNodePair;
+              std::list< std::pair<NodeID, NodeID> >::iterator nextNodePairTmp = nextNodePair;
               nextNodePairTmp--;
               superNodeList.erase( nextNodePair );
               nextNodePair = nextNodePairTmp;
@@ -937,12 +920,12 @@ void N_TOP_Topology::removeTaggedNodesAndDevices()
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING, outputStringStream.str());
     }
 
-    std::vector< N_TOP_CktNode * > removedDevices;
+    std::vector< CktNode * > removedDevices;
     mainGraphPtr_->removeRedundantDevices(removedDevices);
 
     // now it's safe to delete the old nodes and device nodes
-    std::list< N_TOP_CktNode * >::iterator currentOldNodeItr = oldNodeList.begin();
-    std::list< N_TOP_CktNode * >::iterator endOldNodeItr = oldNodeList.end();
+    std::list< CktNode * >::iterator currentOldNodeItr = oldNodeList.begin();
+    std::list< CktNode * >::iterator endOldNodeItr = oldNodeList.end();
     while( currentOldNodeItr != endOldNodeItr )
     {
       delete *currentOldNodeItr;
@@ -956,18 +939,18 @@ void N_TOP_Topology::removeTaggedNodesAndDevices()
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING, outputStringStream.str());
 
       // delete old devices that were removed
-      std::vector< N_TOP_CktNode * >::iterator currentCktNodeItr = removedDevices.begin();
-      std::vector< N_TOP_CktNode * >::iterator endCktNodeItr = removedDevices.end();
+      std::vector< CktNode * >::iterator currentCktNodeItr = removedDevices.begin();
+      std::vector< CktNode * >::iterator endCktNodeItr = removedDevices.end();
       while( currentCktNodeItr != endCktNodeItr )
       {
-        N_TOP_CktNode_Dev * cktNodeDevPtr = dynamic_cast<N_TOP_CktNode_Dev*>(*currentCktNodeItr);
-        Teuchos::RCP<N_DEV_InstanceBlock> deviceInstanceBlockPtr = cktNodeDevPtr->devBlock();
+        CktNode_Dev * cktNodeDevPtr = dynamic_cast<CktNode_Dev*>(*currentCktNodeItr);
+        Teuchos::RCP<Device::InstanceBlock> deviceInstanceBlockPtr = cktNodeDevPtr->devBlock();
         if( Teuchos::nonnull(deviceInstanceBlockPtr ))
         {
           // have a valid device.
 #ifdef Xyce_DEBUG_TOPOLOGY
-          string deviceID = (*currentCktNodeItr)->get_id();
-          std::cout << "Device id: \"" << deviceID << "\"" << std::endl;
+          std::string deviceID = (*currentCktNodeItr)->get_id();
+          Xyce::dout() << "Device id: \"" << deviceID << "\"" << std::endl;
 #endif
           // delete the device node
           delete cktNodeDevPtr;
@@ -981,7 +964,7 @@ void N_TOP_Topology::removeTaggedNodesAndDevices()
 
 #ifdef Xyce_PARALLEL_MPI
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::mergeOffProcTaggedNodesAndDevices
+// Function      : Topology::mergeOffProcTaggedNodesAndDevices
 // Purpose       : Merge the off processor superNodeList and communicate
 //                 the same list to all procs so topology reduction is the
 //                 same on all procs
@@ -990,7 +973,7 @@ void N_TOP_Topology::removeTaggedNodesAndDevices()
 // Creator       : Richard Schiek, Electrical and Microsystems modeling
 // Creation Date : 2/2/2010
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::mergeOffProcTaggedNodesAndDevices()
+void Topology::mergeOffProcTaggedNodesAndDevices()
 {
   if( lsUtilPtr_->supernodeFlag() )
   {
@@ -1011,7 +994,7 @@ void N_TOP_Topology::mergeOffProcTaggedNodesAndDevices()
     byteCount += sizeof(int);
 
     // Now count all the NodeIDs in the list
-    for (list< pair<NodeID, NodeID> >::iterator nodePair = superNodeList.begin(); nodePair != superNodeList.end(); nodePair++) {
+    for (std::list< std::pair<NodeID, NodeID> >::iterator nodePair = superNodeList.begin(); nodePair != superNodeList.end(); nodePair++) {
       byteCount += ((nodePair->first).first).length() + 2*sizeof(int);
       byteCount += ((nodePair->second).first).length() + 2*sizeof(int);
     }
@@ -1033,7 +1016,7 @@ void N_TOP_Topology::mergeOffProcTaggedNodesAndDevices()
 
         // Pack number of supernodes on this processor and place in globalSuperNodeList
         commPtr->pack( &localNodes, 1, superNodeBuffer, bsize, pos );
-        for (list< pair<NodeID, NodeID> >::iterator nodePair = superNodeList.begin(); nodePair != superNodeList.end(); nodePair++) {
+        for (std::list< std::pair<NodeID, NodeID> >::iterator nodePair = superNodeList.begin(); nodePair != superNodeList.end(); nodePair++) {
           // Pack first entry of pair.
           int length = ((nodePair->first).first).size();
           commPtr->pack( &length, 1, superNodeBuffer, bsize, pos );
@@ -1071,14 +1054,14 @@ void N_TOP_Topology::mergeOffProcTaggedNodesAndDevices()
 
           // Unpack first pair.
           commPtr->unpack( superNodeBuffer, bsize, pos, &length, 1 );
-          string first_val( (superNodeBuffer+pos), length );
+          std::string first_val( (superNodeBuffer+pos), length );
           pos += length;
           int first_type = 0;
           commPtr->unpack( superNodeBuffer, bsize, pos, &first_type, 1 );
 
           // Unpack second pair.
           commPtr->unpack( superNodeBuffer, bsize, pos, &length, 1 );
-          string second_val( (superNodeBuffer+pos), length );
+          std::string second_val( (superNodeBuffer+pos), length );
           pos += length;
           int second_type = 0;
           commPtr->unpack( superNodeBuffer, bsize, pos, &second_type, 1 );
@@ -1092,12 +1075,12 @@ void N_TOP_Topology::mergeOffProcTaggedNodesAndDevices()
     }
 
     // Now go through the local superNodeList and tack on any boundary cases, where adjacencies may effect device removal.
-    for (list< pair<NodeID, NodeID> >::iterator nodePair = superNodeList.begin(); nodePair != superNodeList.end(); nodePair++)
+    for (std::list< std::pair<NodeID, NodeID> >::iterator nodePair = superNodeList.begin(); nodePair != superNodeList.end(); nodePair++)
     {
       NodeID nodeToBeRemoved = nodePair->first;
       NodeID replacementNode = nodePair->second;
-      list< pair<NodeID, NodeID> >::iterator currentGlobalSN = globalSuperNodeList.begin();
-      list< pair<NodeID, NodeID> >::iterator endGlobalSN = globalSuperNodeList.end();
+      std::list< std::pair<NodeID, NodeID> >::iterator currentGlobalSN = globalSuperNodeList.begin();
+      std::list< std::pair<NodeID, NodeID> >::iterator endGlobalSN = globalSuperNodeList.end();
       while ( currentGlobalSN != endGlobalSN )
       {
         // Add pair if replacement node is node to be removed by another processor.
@@ -1115,42 +1098,42 @@ void N_TOP_Topology::mergeOffProcTaggedNodesAndDevices()
 #endif
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::instantiateDevices
+// Function      : Topology::instantiateDevices
 // Purpose       : Delayed instantiation of devices
 // Special Notes :
 // Scope         : public
 // Creator       : Rob  Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/03
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::instantiateDevices()
+void Topology::instantiateDevices()
 {
   setOrderedNodeList();
 
-  list<N_TOP_CktNode*>::iterator iterCN = orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator endCN = orderedNodeListPtr_->end();
+  std::list<CktNode*>::iterator iterCN = orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator endCN = orderedNodeListPtr_->end();
   for( ; iterCN != endCN; ++iterCN )
   {
-    N_TOP_CktNode_Dev * cnd = dynamic_cast<N_TOP_CktNode_Dev*>(*iterCN);
+    CktNode_Dev * cnd = dynamic_cast<CktNode_Dev*>(*iterCN);
     if( cnd ) cnd->instantiate();
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::returnNodeGIDVec
+// Function      : Topology::returnNodeGIDVec
 // Purpose       : Generate ordered node global id vector using orderedNodeList
 // Special Notes :
 // Scope         : public
 // Creator       : Rob  Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 1/25/01
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::returnNodeGIDVec( vector<int> & nodeGIDVec )
+void Topology::returnNodeGIDVec( std::vector<int> & nodeGIDVec )
 {
   setOrderedNodeList();
 
   nodeGIDVec.clear();
 
-  list<N_TOP_CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
+  std::list<CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
 
   int i = 0;
   for( ; it_cnL != it_cnL_end; ++it_cnL )
@@ -1175,7 +1158,7 @@ void N_TOP_Topology::returnNodeGIDVec( vector<int> & nodeGIDVec )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::returnExternNodeGIDVec
+// Function      : Topology::returnExternNodeGIDVec
 // Purpose       : Generate ordered externnode global id vector using
 //                 orderedNodeList.
 // Special Notes :
@@ -1183,15 +1166,15 @@ void N_TOP_Topology::returnNodeGIDVec( vector<int> & nodeGIDVec )
 // Creator       : Rob  Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 2/23/01
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::returnExternNodeGIDVec( vector< pair<int,int> >
+void Topology::returnExternNodeGIDVec( std::vector< std::pair<int,int> >
 							& nodeGIDVec )
 {
   setOrderedNodeList();
 
   nodeGIDVec.clear();
 
-  list<N_TOP_CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
+  std::list<CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
 
   int i = 0;
   for( ; it_cnL != it_cnL_end; ++it_cnL )
@@ -1210,7 +1193,7 @@ void N_TOP_Topology::returnExternNodeGIDVec( vector< pair<int,int> >
   {
     if( !( (*it_cnL)->get_IsOwned() ) && ( (*it_cnL)->get_gID() != -1 ) )
     {
-      nodeGIDVec.push_back( pair<int,int>( (*it_cnL)->get_gID(),
+      nodeGIDVec.push_back( std::pair<int,int>( (*it_cnL)->get_gID(),
 					(*it_cnL)->get_ProcNum() ) );
     }
   }
@@ -1218,7 +1201,7 @@ void N_TOP_Topology::returnExternNodeGIDVec( vector< pair<int,int> >
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::returnSVarGIDVec
+// Function      : Topology::returnSVarGIDVec
 // Purpose       : Generate ordered soln var global id vector using
 //                 orderedNodeList.
 // Special Notes :
@@ -1226,15 +1209,15 @@ void N_TOP_Topology::returnExternNodeGIDVec( vector< pair<int,int> >
 // Creator       : Rob  Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 1/25/01
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::returnSVarGIDVec( vector<int> & sVarGIDVec )
+void Topology::returnSVarGIDVec( std::vector<int> & sVarGIDVec )
 {
 
   setOrderedNodeList();
 
   sVarGIDVec.clear();
 
-  list<N_TOP_CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
+  std::list<CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
 
   int i = 0;
   for( ; it_cnL != it_cnL_end; ++it_cnL )
@@ -1253,26 +1236,15 @@ void N_TOP_Topology::returnSVarGIDVec( vector<int> & sVarGIDVec )
   for( ; it_cnL != it_cnL_end; ++it_cnL )
   {
     if( (*it_cnL)->get_IsOwned() && ( (*it_cnL)->get_gID() != -1 ) )
-#ifdef HAVE_FLEXIBLE_INSERT
       sVarGIDVec.insert( sVarGIDVec.end(),
         (*it_cnL)->get_SolnVarGIDList().begin(),
         (*it_cnL)->get_SolnVarGIDList().end() );
-#else
-    {
-      list<int>::const_iterator iterIL = (*it_cnL)->get_SolnVarGIDList().begin();
-      list<int>::const_iterator endIL = (*it_cnL)->get_SolnVarGIDList().end();
-      for( ; iterIL != endIL; ++iterIL )
-      {
-        sVarGIDVec.push_back( *iterIL );
-      }
-    }
-#endif
   }
 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::returnExternSVarGIDVec
+// Function      : Topology::returnExternSVarGIDVec
 // Purpose       : Generate ordered soln var global id vector using
 //                 orderedNodeList for external nodes.
 // Special Notes :
@@ -1280,13 +1252,13 @@ void N_TOP_Topology::returnSVarGIDVec( vector<int> & sVarGIDVec )
 // Creator       : Rob  Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 1/25/01
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::returnExternSVarGIDVec(
-		vector< pair<int,int> > & sVarGIDVec )
+void Topology::returnExternSVarGIDVec(
+		std::vector< std::pair<int,int> > & sVarGIDVec )
 {
   setOrderedNodeList();
 
-  list<N_TOP_CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
+  std::list<CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
 
   sVarGIDVec.clear();
 
@@ -1307,14 +1279,14 @@ void N_TOP_Topology::returnExternSVarGIDVec(
   {
     if( !( (*it_cnL)->get_IsOwned() ) && ( (*it_cnL)->get_gID() != -1 ) )
     {
-      list<int>::const_iterator it_svL =
+      std::list<int>::const_iterator it_svL =
        (*it_cnL)->get_SolnVarGIDList().begin();
-      list<int>::const_iterator it_svL_end =
+      std::list<int>::const_iterator it_svL_end =
        (*it_cnL)->get_SolnVarGIDList().end();
 
       for(  ; it_svL != it_svL_end; ++it_svL )
       {
-        sVarGIDVec.push_back( pair<int,int>( *it_svL,
+        sVarGIDVec.push_back( std::pair<int,int>( *it_svL,
                                   (*it_cnL)->get_ProcNum() ) );
       }
     }
@@ -1323,7 +1295,7 @@ void N_TOP_Topology::returnExternSVarGIDVec(
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::returnStateVarGIDVec
+// Function      : Topology::returnStateVarGIDVec
 // Purpose       : Generate ordered state var global id vector using
 //                 orderedNodeList.
 // Special Notes :
@@ -1331,13 +1303,13 @@ void N_TOP_Topology::returnExternSVarGIDVec(
 // Creator       : Rob  Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 1/25/01
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::returnStateVarGIDVec( vector<int> & sVarGIDVec )
+void Topology::returnStateVarGIDVec( std::vector<int> & sVarGIDVec )
 {
   setOrderedNodeList();
   sVarGIDVec.clear();
 
-  list<N_TOP_CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
+  std::list<CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
 
   int i = 0;
   for( ; it_cnL != it_cnL_end; ++it_cnL)
@@ -1355,25 +1327,14 @@ void N_TOP_Topology::returnStateVarGIDVec( vector<int> & sVarGIDVec )
   for( ; it_cnL != it_cnL_end; ++it_cnL )
   {
     if( (*it_cnL)->get_IsOwned() && ( (*it_cnL)->get_gID() != -1 ) )
-#ifdef HAVE_FLEXIBLE_INSERT
       sVarGIDVec.insert( sVarGIDVec.end(),
                         (*it_cnL)->get_StateVarGIDList().begin(),
                         (*it_cnL)->get_StateVarGIDList().end() );
-#else
-    {
-      list<int>::const_iterator iterIL = (*it_cnL)->get_StateVarGIDList().begin();
-      list<int>::const_iterator endIL = (*it_cnL)->get_StateVarGIDList().end();
-      for( ; iterIL != endIL; ++iterIL )
-      {
-        sVarGIDVec.push_back( *iterIL );
-      }
-    }
-#endif
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::returnStoreVarGIDVec
+// Function      : Topology::returnStoreVarGIDVec
 // Purpose       : Generate ordered store var global id vector using
 //                 orderedNodeList.
 // Special Notes :
@@ -1381,13 +1342,13 @@ void N_TOP_Topology::returnStateVarGIDVec( vector<int> & sVarGIDVec )
 // Creator       : Eric Keiter
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::returnStoreVarGIDVec( vector<int> & sVarGIDVec )
+void Topology::returnStoreVarGIDVec( std::vector<int> & sVarGIDVec )
 {
   setOrderedNodeList();
   sVarGIDVec.clear();
 
-  list<N_TOP_CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
+  std::list<CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
 
   int i = 0;
   for( ; it_cnL != it_cnL_end; ++it_cnL)
@@ -1405,25 +1366,14 @@ void N_TOP_Topology::returnStoreVarGIDVec( vector<int> & sVarGIDVec )
   for( ; it_cnL != it_cnL_end; ++it_cnL )
   {
     if( (*it_cnL)->get_IsOwned() && ( (*it_cnL)->get_gID() != -1 ) )
-#ifdef HAVE_FLEXIBLE_INSERT
       sVarGIDVec.insert( sVarGIDVec.end(),
                         (*it_cnL)->get_StoreVarGIDList().begin(),
                         (*it_cnL)->get_StoreVarGIDList().end() );
-#else
-    {
-      list<int>::const_iterator iterIL = (*it_cnL)->get_StoreVarGIDList().begin();
-      list<int>::const_iterator endIL = (*it_cnL)->get_StoreVarGIDList().end();
-      for( ; iterIL != endIL; ++iterIL )
-      {
-        sVarGIDVec.push_back( *iterIL );
-      }
-    }
-#endif
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::returnExternStateVarGIDVec
+// Function      : Topology::returnExternStateVarGIDVec
 // Purpose       : Generate ordered state var global id vector using
 //                 orderedNodeList for external nodes.
 // Special Notes :
@@ -1431,13 +1381,13 @@ void N_TOP_Topology::returnStoreVarGIDVec( vector<int> & sVarGIDVec )
 // Creator       : Rob  Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 1/25/01
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::returnExternStateVarGIDVec(
-		vector< pair<int,int> > & sVarGIDVec )
+void Topology::returnExternStateVarGIDVec(
+		std::vector< std::pair<int,int> > & sVarGIDVec )
 {
   setOrderedNodeList();
 
-  list<N_TOP_CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
+  std::list<CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
 
   sVarGIDVec.clear();
 
@@ -1458,14 +1408,14 @@ void N_TOP_Topology::returnExternStateVarGIDVec(
   {
     if( !( (*it_cnL)->get_IsOwned() ) && ( (*it_cnL)->get_gID() != -1 ) )
     {
-      list<int>::const_iterator it_svL =
+      std::list<int>::const_iterator it_svL =
        (*it_cnL)->get_StateVarGIDList().begin();
-      list<int>::const_iterator it_svL_end =
+      std::list<int>::const_iterator it_svL_end =
        (*it_cnL)->get_StateVarGIDList().end();
 
       for( ; it_svL != it_svL_end; ++it_svL )
       {
-        sVarGIDVec.push_back( pair<int,int>( *it_svL,
+        sVarGIDVec.push_back( std::pair<int,int>( *it_svL,
                                 (*it_cnL)->get_ProcNum() ) );
       }
     }
@@ -1473,7 +1423,7 @@ void N_TOP_Topology::returnExternStateVarGIDVec(
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::returnExternStoreVarGIDVec
+// Function      : Topology::returnExternStoreVarGIDVec
 // Purpose       : Generate ordered store var global id vector using
 //                 orderedNodeList for external nodes.
 // Special Notes :
@@ -1481,13 +1431,13 @@ void N_TOP_Topology::returnExternStateVarGIDVec(
 // Creator       : Rob  Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 1/25/01
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::returnExternStoreVarGIDVec(
-		vector< pair<int,int> > & sVarGIDVec )
+void Topology::returnExternStoreVarGIDVec(
+		std::vector< std::pair<int,int> > & sVarGIDVec )
 {
   setOrderedNodeList();
 
-  list<N_TOP_CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
+  std::list<CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
 
   sVarGIDVec.clear();
 
@@ -1508,14 +1458,14 @@ void N_TOP_Topology::returnExternStoreVarGIDVec(
   {
     if( !( (*it_cnL)->get_IsOwned() ) && ( (*it_cnL)->get_gID() != -1 ) )
     {
-      list<int>::const_iterator it_svL =
+      std::list<int>::const_iterator it_svL =
        (*it_cnL)->get_StoreVarGIDList().begin();
-      list<int>::const_iterator it_svL_end =
+      std::list<int>::const_iterator it_svL_end =
        (*it_cnL)->get_StoreVarGIDList().end();
 
       for( ; it_svL != it_svL_end; ++it_svL )
       {
-        sVarGIDVec.push_back( pair<int,int>( *it_svL,
+        sVarGIDVec.push_back( std::pair<int,int>( *it_svL,
                                 (*it_cnL)->get_ProcNum() ) );
       }
     }
@@ -1523,20 +1473,20 @@ void N_TOP_Topology::returnExternStoreVarGIDVec(
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::returnVarTypeVec
+// Function      : Topology::returnVarTypeVec
 // Purpose       : Generate ordered list of variable types
 // Special Notes :
 // Scope         : public
 // Creator       : Rob  Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 1/25/01
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::returnVarTypeVec( vector<char> & varTypeVec ) const
+void Topology::returnVarTypeVec( std::vector<char> & varTypeVec ) const
 {
   setOrderedNodeList();
 
   varTypeVec.clear();
 
-  list<N_TOP_CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
 
   for( ; it_cnL != orderedNodeListPtr_->end(); ++it_cnL )
   {
@@ -1546,7 +1496,7 @@ void N_TOP_Topology::returnVarTypeVec( vector<char> & varTypeVec ) const
         varTypeVec.push_back( 'V' );
       else if( (*it_cnL)->solnVarCount() )
       {
-        vector<char> typeList;
+        std::vector<char> typeList;
         (*it_cnL)->varTypeList( typeList ); // types set by individual devices.
 
         if( typeList.empty() )
@@ -1565,21 +1515,21 @@ void N_TOP_Topology::returnVarTypeVec( vector<char> & varTypeVec ) const
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::returnSVarVNodeGIDVec
+// Function      : Topology::returnSVarVNodeGIDVec
 // Purpose       : Generate ordered list of variable types
 // Special Notes :
 // Scope         : public
 // Creator       : Rob  Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 1/25/01
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::returnSVarVNodeGIDVec( vector<int> & SVarVNodeGIDVec )
+void Topology::returnSVarVNodeGIDVec( std::vector<int> & SVarVNodeGIDVec )
 {
   setOrderedNodeList();
 
   SVarVNodeGIDVec.clear();
 
-  list<N_TOP_CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
+  std::list<CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
 
   for( ; it_cnL != it_cnL_end; ++it_cnL )
   {
@@ -1592,21 +1542,21 @@ void N_TOP_Topology::returnSVarVNodeGIDVec( vector<int> & SVarVNodeGIDVec )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::returnSVarVsrcGIDVec
+// Function      : Topology::returnSVarVsrcGIDVec
 // Purpose       : Generate ordered vector of variables connected to vsrcs.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 10/15/07
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::returnSVarVsrcGIDVec( vector<int> & SVarVsrcGIDVec )
+void Topology::returnSVarVsrcGIDVec( std::vector<int> & SVarVsrcGIDVec )
 {
   setOrderedNodeList();
 
   SVarVsrcGIDVec.clear();
 
-  list<N_TOP_CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
+  std::list<CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
 
   for( ; it_cnL != it_cnL_end; ++it_cnL )
   {
@@ -1616,19 +1566,19 @@ void N_TOP_Topology::returnSVarVsrcGIDVec( vector<int> & SVarVsrcGIDVec )
       int type = (*it_cnL)->type();
       if (type == _DNODE)
       {
-        const string & id = (*it_cnL)->get_id();
-        string::size_type col = id.find_first_of(':');
+        const std::string & id = (*it_cnL)->get_id();
+        std::string::size_type col = id.find_first_of(':');
 
         if ( id[col+1] == 'V' || id[col+1] == 'v' )
         {
-          list<int>::const_iterator iterIL = (*it_cnL)->get_SolnVarGIDList().begin();
-          list<int>::const_iterator endIL = (*it_cnL)->get_SolnVarGIDList().end();
+          std::list<int>::const_iterator iterIL = (*it_cnL)->get_SolnVarGIDList().begin();
+          std::list<int>::const_iterator endIL = (*it_cnL)->get_SolnVarGIDList().end();
           for( ; iterIL != endIL; ++iterIL )
           {
             SVarVsrcGIDVec.push_back( *iterIL );
           }
-          list<int>::const_iterator iterEIL = (*it_cnL)->get_ExtSolnVarGIDList().begin();
-          list<int>::const_iterator endEIL = (*it_cnL)->get_ExtSolnVarGIDList().end();
+          std::list<int>::const_iterator iterEIL = (*it_cnL)->get_ExtSolnVarGIDList().begin();
+          std::list<int>::const_iterator endEIL = (*it_cnL)->get_ExtSolnVarGIDList().end();
           for( ; iterEIL != endEIL; ++iterEIL )
           {
             SVarVsrcGIDVec.push_back( *iterEIL );
@@ -1642,14 +1592,14 @@ void N_TOP_Topology::returnSVarVsrcGIDVec( vector<int> & SVarVsrcGIDVec )
     int isize= SVarVsrcGIDVec.size();
     for (int ieric=0;ieric<isize;++ieric)
     {
-      cout << "SVarVsrcGIDVec["<<ieric<<"] = " << SVarVsrcGIDVec[ieric] << endl;
+      Xyce::dout() << "SVarVsrcGIDVec["<<ieric<<"] = " << SVarVsrcGIDVec[ieric] << std::endl;
     }
 #endif
 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::returnSVarNoDCPathIDVec
+// Function      : Topology::returnSVarNoDCPathIDVec
 // Purpose       : Generate ordered list of solution IDs with no dc path to
 //                 ground.
 // Special Notes :
@@ -1657,15 +1607,15 @@ void N_TOP_Topology::returnSVarVsrcGIDVec( vector<int> & SVarVsrcGIDVec )
 // Creator       : Keith Santarelli, SNL, Electrical and Microsystems Modeling
 // Creation Date : 11/27/07
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::returnSVarNoDCPathIDVec( vector<string> &
+void Topology::returnSVarNoDCPathIDVec( std::vector<std::string> &
 					       SVarNoDCPathIDVec )
 {
   setOrderedNodeList();
 
   SVarNoDCPathIDVec.clear();
 
-  list<N_TOP_CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
+  std::list<CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
 
   for( ; it_cnL != it_cnL_end; ++it_cnL )
   {
@@ -1681,22 +1631,22 @@ void N_TOP_Topology::returnSVarNoDCPathIDVec( vector<string> &
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::returnSVarConnToOneTermIDVec
+// Function      : Topology::returnSVarConnToOneTermIDVec
 // Purpose       : Generate ordered list of solution vars that are only
 //                 connected to one terminal.
 // Scope         : public
 // Creator       : Keith Santarelli, SNL, Electrical and Microsystems Modeling
 // Creation Date : 11/27/07
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::returnSVarConnToOneTermIDVec( vector<string> &
+void Topology::returnSVarConnToOneTermIDVec( std::vector<std::string> &
 					       SVarConnToOneTermIDVec )
 {
   setOrderedNodeList();
 
   SVarConnToOneTermIDVec.clear();
 
-  list<N_TOP_CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
+  std::list<CktNode*>::iterator it_cnL = orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator it_cnL_end = orderedNodeListPtr_->end();
 
   for( ; it_cnL != it_cnL_end; ++it_cnL )
   {
@@ -1712,46 +1662,29 @@ void N_TOP_Topology::returnSVarConnToOneTermIDVec( vector<string> &
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::getNodeSVarGIDs
+// Function      : Topology::getNodeSVarGIDs
 // Purpose       : Return list of solution var indices for named node.
 // Special Notes : returns false if node not owned or not local.
 // Scope         : public
 // Creator       : Rob  Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 10/11/00
 //-----------------------------------------------------------------------------
-bool N_TOP_Topology::getNodeSVarGIDs( const NodeID& id,
-		                      list<int> & sVarGIDList,
-		                      list<int> & extSVarGIDList,
+bool Topology::getNodeSVarGIDs( const NodeID& id,
+		                      std::list<int> & sVarGIDList,
+		                      std::list<int> & extSVarGIDList,
                                       char & type )
 {
-  N_TOP_CktNode * cnPtr = mainGraphPtr_->FindCktNode( id );
+  CktNode * cnPtr = mainGraphPtr_->FindCktNode( id );
 
   if( cnPtr != NULL )
   {
     if( cnPtr->type() == _DNODE ) type = 'D';
     else                          type = 'V';
 
-#ifdef HAVE_FLEXIBLE_INSERT
     sVarGIDList.assign( cnPtr->get_SolnVarGIDList().begin(),
                         cnPtr->get_SolnVarGIDList().end() );
     extSVarGIDList.assign( cnPtr->get_ExtSolnVarGIDList().begin(),
                         cnPtr->get_ExtSolnVarGIDList().end() );
-#else
-    sVarGIDList.clear();
-    list<int>::const_iterator iterIL = cnPtr->get_SolnVarGIDList().begin();
-    list<int>::const_iterator endIL = cnPtr->get_SolnVarGIDList().end();
-    for( ; iterIL != endIL; ++iterIL )
-    {
-      sVarGIDList.push_back( *iterIL );
-    }
-    extSVarGIDList.clear();
-    list<int>::const_iterator iterEIL = cnPtr->get_ExtSolnVarGIDList().begin();
-    list<int>::const_iterator endEIL = cnPtr->get_ExtSolnVarGIDList().end();
-    for( ; iterEIL != endEIL; ++iterEIL )
-    {
-      extSVarGIDList.push_back( *iterEIL );
-    }
-#endif
     if( cnPtr->get_IsOwned() )
     {
       return true;
@@ -1767,20 +1700,20 @@ bool N_TOP_Topology::getNodeSVarGIDs( const NodeID& id,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::extractMigrateNodes
+// Function      : Topology::extractMigrateNodes
 // Purpose       : Extracts nodes and devices to be migrated.
 // Special Notes :
 // Scope         : public
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 3/3/01
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::extractMigrateNodes( const int & num,
+void Topology::extractMigrateNodes( const int & num,
 			const int * nodeGIDs, const int * procs )
 {
-  N_TOP_CktNode * nodePtr;
-  N_TOP_NodeBlock * nodeBlockPtr;
-  N_DEV_InstanceBlock * devBlockPtr;
-  N_TOP_NodeDevBlock * migrateNodePtr;
+  CktNode * nodePtr;
+  NodeBlock * nodeBlockPtr;
+  Device::InstanceBlock * devBlockPtr;
+  NodeDevBlock * migrateNodePtr;
 
   bool devFlag = false;
 
@@ -1797,8 +1730,8 @@ void N_TOP_Topology::extractMigrateNodes( const int & num,
     if( devInstBlockMap_.find( nodePtr->get_id() ) != devInstBlockMap_.end() )
       devFlag = true;
 
-    list<int> gidList, svGIDList, procList;
-    list<NodeID> idList;
+    std::list<int> gidList, svGIDList, procList;
+    std::list<NodeID> idList;
     mainGraphPtr_->returnAdjNodesWithGround( nodeGIDs[i], gidList,
 		svGIDList, procList, idList );
 
@@ -1806,10 +1739,10 @@ void N_TOP_Topology::extractMigrateNodes( const int & num,
     {
       devBlockPtr = devInstBlockMap_[ nodePtr->get_id() ];
 
-      list<tagged_param> nList, npList;
-      list<NodeID>::iterator it_idL = idList.begin();
-      list<int>::iterator it_gidL = gidList.begin();
-      list<int>::iterator it_pL = procList.begin();
+      std::list<tagged_param> nList, npList;
+      std::list<NodeID>::iterator it_idL = idList.begin();
+      std::list<int>::iterator it_gidL = gidList.begin();
+      std::list<int>::iterator it_pL = procList.begin();
       for( ; it_idL != idList.end(); ++it_idL, ++it_gidL, ++it_pL )
       {
         nList.push_back( tagged_param( (*it_idL).first, *it_gidL ) );
@@ -1819,11 +1752,11 @@ void N_TOP_Topology::extractMigrateNodes( const int & num,
       nodeBlockPtr->set_NodeList( nList );
       nodeBlockPtr->set_NodeProcList( npList );
 
-      migrateNodePtr = new N_TOP_NodeDevBlock( *nodeBlockPtr, *devBlockPtr );
+      migrateNodePtr = new NodeDevBlock( *nodeBlockPtr, *devBlockPtr );
     }
     else
     {
-      migrateNodePtr = new N_TOP_NodeDevBlock( *nodeBlockPtr );
+      migrateNodePtr = new NodeDevBlock( *nodeBlockPtr );
       migrateNodePtr->getDevBlock().setName("");
     }
 
@@ -1840,34 +1773,34 @@ void N_TOP_Topology::extractMigrateNodes( const int & num,
     delete nodeBlockPtr;
 
     //Add neighbors to migrateNodeMap_
-    list<int>::iterator it_iL = gidList.begin();
+    std::list<int>::iterator it_iL = gidList.begin();
     for( ; it_iL != gidList.end(); ++it_iL )
     {
       nodePtr = mainGraphPtr_->FindCktNode( *it_iL );
 
       if( *it_iL == -1 )
-        nodeBlockPtr = new N_TOP_NodeBlock( "0", list<tagged_param>(),
-                                    list<tagged_param>(), false, -1 );
+        nodeBlockPtr = new NodeBlock( "0", std::list<tagged_param>(),
+                                    std::list<tagged_param>(), false, -1 );
       else
         nodeBlockPtr = nodePtr->extractNodeBlock();
 
       nodeBlockPtr->set_IsOwned( false );
 
-      list<int> gidList2;
+      std::list<int> gidList2;
 
       if( !devFlag )
       {
         devBlockPtr = devInstBlockMap_[ nodePtr->get_id() ];
 
-        list<int> svGIDList2, procList2;
-        list<NodeID> idList2;
+        std::list<int> svGIDList2, procList2;
+        std::list<NodeID> idList2;
         mainGraphPtr_->returnAdjNodesWithGround( *it_iL, gidList2,
             svGIDList2, procList2, idList2 );
 
-        list<tagged_param> nList2, npList2;
-        list<NodeID>::iterator it_idL2 = idList2.begin();
-        list<int>::iterator it_gidL2 = gidList2.begin();
-        list<int>::iterator it_pL2 = procList2.begin();
+        std::list<tagged_param> nList2, npList2;
+        std::list<NodeID>::iterator it_idL2 = idList2.begin();
+        std::list<int>::iterator it_gidL2 = gidList2.begin();
+        std::list<int>::iterator it_pL2 = procList2.begin();
         for( ; it_idL2 != idList2.end(); ++it_idL2, ++it_gidL2, ++it_pL2 )
         {
           nList2.push_back( tagged_param( (*it_idL2).first, *it_gidL2 ) );
@@ -1877,11 +1810,11 @@ void N_TOP_Topology::extractMigrateNodes( const int & num,
         nodeBlockPtr->set_NodeList( nList2 );
         nodeBlockPtr->set_NodeProcList( npList2 );
 
-        migrateNodePtr = new N_TOP_NodeDevBlock( *nodeBlockPtr, *devBlockPtr );
+        migrateNodePtr = new NodeDevBlock( *nodeBlockPtr, *devBlockPtr );
       }
       else
       {
-        migrateNodePtr = new N_TOP_NodeDevBlock( *nodeBlockPtr );
+        migrateNodePtr = new NodeDevBlock( *nodeBlockPtr );
         migrateNodePtr->getDevBlock().setName("");
       }
 
@@ -1900,7 +1833,7 @@ void N_TOP_Topology::extractMigrateNodes( const int & num,
       //if initial node is voltage node, add neighbors neighbors
       if( !devFlag )
       {
-        for( list<int>::iterator it_iL2 = gidList2.begin();
+        for( std::list<int>::iterator it_iL2 = gidList2.begin();
               it_iL2 != gidList2.end(); ++it_iL2 )
         {
           nodePtr = mainGraphPtr_->FindCktNode( *it_iL2 );
@@ -1908,7 +1841,7 @@ void N_TOP_Topology::extractMigrateNodes( const int & num,
           nodeBlockPtr = nodePtr->extractNodeBlock();
           nodeBlockPtr->set_IsOwned( false );
 
-          migrateNodePtr = new N_TOP_NodeDevBlock( *nodeBlockPtr );
+          migrateNodePtr = new NodeDevBlock( *nodeBlockPtr );
           migrateNodePtr->getDevBlock().setName("");
 
           if( migrateNodeMap_[ nodeGIDs[i] ].find( nodePtr->get_gID() )
@@ -1923,40 +1856,40 @@ void N_TOP_Topology::extractMigrateNodes( const int & num,
       }
     }
 
-    map<int,N_TOP_NodeDevBlock*>::iterator it_ndbM =
+    std::map<int,NodeDevBlock*>::iterator it_ndbM =
 	    migrateNodeMap_[ nodeGIDs[i] ].begin();
-    map<int,N_TOP_NodeDevBlock*>::iterator it_ndbM_end =
+    std::map<int,NodeDevBlock*>::iterator it_ndbM_end =
       migrateNodeMap_[nodeGIDs[i] ].end();
 
-    cout << "Extracting Migrate Node: " << nodeGIDs[i] << endl;
+    Xyce::dout() << "Extracting Migrate Node: " << nodeGIDs[i] << std::endl;
 
     for( ; it_ndbM != it_ndbM_end; ++it_ndbM )
     {
-      cout << it_ndbM->second->getNodeBlock() << endl;
+      Xyce::dout() << it_ndbM->second->getNodeBlock() << std::endl;
     }
-    cout << endl;
+    Xyce::dout() << std::endl;
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::insertMigrateNodes
+// Function      : Topology::insertMigrateNodes
 // Purpose       : Inserts nodes and devices from migration Map.
 // Special Notes :
 // Scope         : public
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 3/3/01
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::insertMigrateNodes( const int & num,
+void Topology::insertMigrateNodes( const int & num,
 			const int * nodeGIDs, const int * procs )
 {
-  map<string,int> foundMap;
-  map<string,int> ownMap;
+  std::map<std::string,int> foundMap;
+  std::map<std::string,int> ownMap;
 
   for( int i = 0; i < num; ++i )
   {
-    map<int,N_TOP_NodeDevBlock *>::iterator it_ndbM =
+    std::map<int,NodeDevBlock *>::iterator it_ndbM =
           migrateNodeMap_[ nodeGIDs[i] ].begin();
-    map<int,N_TOP_NodeDevBlock *>::iterator it_ndbM_end =
+    std::map<int,NodeDevBlock *>::iterator it_ndbM_end =
           migrateNodeMap_[ nodeGIDs[i] ].end();
 
     for( ; it_ndbM != it_ndbM_end ; ++it_ndbM )
@@ -1970,98 +1903,98 @@ void N_TOP_Topology::insertMigrateNodes( const int & num,
 
   for( int i = 0; i < num; ++i )
   {
-    cout << "Inserting Migrate Node: " << nodeGIDs[i] << endl;
+    Xyce::dout() << "Inserting Migrate Node: " << nodeGIDs[i] << std::endl;
 
-    map<int,N_TOP_NodeDevBlock *>::iterator it_ndbM =
+    std::map<int,NodeDevBlock *>::iterator it_ndbM =
       migrateNodeMap_[ nodeGIDs[i] ].begin();
 
-    map<int,N_TOP_NodeDevBlock *>::iterator it_ndbM_end =
+    std::map<int,NodeDevBlock *>::iterator it_ndbM_end =
       migrateNodeMap_[ nodeGIDs[i] ].end();
 
     for( ; it_ndbM != it_ndbM_end; ++it_ndbM )
     {
-      cout << it_ndbM->second->getNodeBlock() << endl;
-      cout << it_ndbM->second->isDevice() << endl;
+      Xyce::dout() << it_ndbM->second->getNodeBlock() << std::endl;
+      Xyce::dout() << it_ndbM->second->isDevice() << std::endl;
       if( it_ndbM->second->isDevice() )
       {
         if( ownMap.find( it_ndbM->second->getID() ) != ownMap.end() &&
             it_ndbM->second->getNodeBlock().get_IsOwned() )
         {
-          Teuchos::RCP<N_DEV_InstanceBlock> ibRcp = rcp(  new N_DEV_InstanceBlock(it_ndbM->second->getDevBlock()) );
+          Teuchos::RCP<Device::InstanceBlock> ibRcp = rcp(  new Device::InstanceBlock(it_ndbM->second->getDevBlock()) );
           addDevice( it_ndbM->second->getNodeBlock(),ibRcp );
         }
         else if( foundMap.find( it_ndbM->second->getID() ) == foundMap.end() )
         {
           foundMap[ it_ndbM->second->getID() ] = 1;
-          Teuchos::RCP<N_DEV_InstanceBlock> ibRcp = rcp( new N_DEV_InstanceBlock(it_ndbM->second->getDevBlock()) );
+          Teuchos::RCP<Device::InstanceBlock> ibRcp = rcp( new Device::InstanceBlock(it_ndbM->second->getDevBlock()) );
           addDevice( it_ndbM->second->getNodeBlock(), ibRcp );
         }
       }
       else
       {
-        cout << "Adding Voltage Node: " << it_ndbM->second->getID() << endl;
+        Xyce::dout() << "Adding Voltage Node: " << it_ndbM->second->getID() << std::endl;
         addVoltageNode( it_ndbM->second->getNodeBlock() );
       }
     }
-    //cout << endl << endl;
+    //Xyce::dout() << std::endl << std::endl;
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::clearMigrateNodeMap
+// Function      : Topology::clearMigrateNodeMap
 // Purpose       : Clears migration map.
 // Special Notes :
 // Scope         : public
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 3/3/01
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::clearMigrateNodeMap()
+void Topology::clearMigrateNodeMap()
 {
-  for( map<int,map<int,N_TOP_NodeDevBlock *> >::iterator it_ndbM =
+  for( std::map<int,std::map<int,NodeDevBlock *> >::iterator it_ndbM =
 	migrateNodeMap_.begin(); it_ndbM != migrateNodeMap_.end(); ++it_ndbM )
-    for( map<int,N_TOP_NodeDevBlock *>::iterator it_ndbM2 =
+    for( std::map<int,NodeDevBlock *>::iterator it_ndbM2 =
 	it_ndbM->second.begin(); it_ndbM2 != it_ndbM->second.end(); ++it_ndbM2 )
       if( it_ndbM2->second != NULL ) delete it_ndbM2->second;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::addMigrateNode
+// Function      : Topology::addMigrateNode
 // Purpose       : Add node to migration node map.
 // Special Notes :
 // Scope         : public
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 3/3/01
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::addMigrateNode( const int & id,
-		map<int,N_TOP_NodeDevBlock *> & ndbL )
+void Topology::addMigrateNode( const int & id,
+		std::map<int,NodeDevBlock *> & ndbL )
 {
   migrateNodeMap_[id] = ndbL;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::getMigrateNode
+// Function      : Topology::getMigrateNode
 // Purpose       : Get node from migration node map.
 // Special Notes :
 // Scope         : public
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 3/3/01
 //-----------------------------------------------------------------------------
-map<int,N_TOP_NodeDevBlock *> & N_TOP_Topology::getMigrateNode( const int & id )
+std::map<int,NodeDevBlock *> & Topology::getMigrateNode( const int & id )
 {
   return migrateNodeMap_[id];
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::pruneCkt
+// Function      : Topology::pruneCkt
 // Purpose       : Prune out unnecessary nodes.
 // Special Notes :
 // Scope         : public
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 3/3/01
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::pruneCkt( const int & num, const int * nodeGIDs )
+void Topology::pruneCkt( const int & num, const int * nodeGIDs )
 {
-  N_TOP_CktNode * nodePtr;
+  CktNode * nodePtr;
 
   for( int i = 0; i < num; ++i )
   {
@@ -2075,13 +2008,13 @@ void N_TOP_Topology::pruneCkt( const int & num, const int * nodeGIDs )
       }
       else
       {
-        list<int> gidList, svGIDList, procList;
-        list<NodeID> idList;
+        std::list<int> gidList, svGIDList, procList;
+        std::list<NodeID> idList;
         mainGraphPtr_->returnAdjNodes( nodeGIDs[i], gidList, svGIDList,
                                        procList, idList );
 
-        list<int>::iterator it_iL = gidList.begin();
-        list<int>::iterator it_iL_end = gidList.end();
+        std::list<int>::iterator it_iL = gidList.begin();
+        std::list<int>::iterator it_iL_end = gidList.end();
         for( ; it_iL != it_iL_end; ++it_iL )
         {
           if( !(mainGraphPtr_->FindCktNode( *it_iL )->get_IsOwned()) )
@@ -2096,19 +2029,19 @@ void N_TOP_Topology::pruneCkt( const int & num, const int * nodeGIDs )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::pruneDevNode
+// Function      : Topology::pruneDevNode
 // Purpose       : prune out unnecessary nodes
 // Special Notes :
 // Scope         : public
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 3/3/01
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::pruneDevNode( const int & node )
+void Topology::pruneDevNode( const int & node )
 {
-  N_TOP_CktNode * nodePtr;
+  CktNode * nodePtr;
 
-  list<int> gidList, svGIDList, procList;
-  list<NodeID> idList;
+  std::list<int> gidList, svGIDList, procList;
+  std::list<NodeID> idList;
   mainGraphPtr_->returnAdjNodes( node, gidList, svGIDList, procList,
 		idList );
 
@@ -2118,8 +2051,8 @@ void N_TOP_Topology::pruneDevNode( const int & node )
 
   if( nodePtr != NULL )
   {
-    list<int>::iterator it_iL = gidList.begin();
-    list<int>::iterator it_iL_end = gidList.end();
+    std::list<int>::iterator it_iL = gidList.begin();
+    std::list<int>::iterator it_iL_end = gidList.end();
     for( ; it_iL != it_iL_end; ++it_iL )
     {
       if( mainGraphPtr_->FindCktNode( *it_iL )->get_IsOwned() ) needed = true;
@@ -2135,8 +2068,8 @@ void N_TOP_Topology::pruneDevNode( const int & node )
       delete nodePtr;
 
       //Check Neighboring V-nodes
-      list<int>::iterator it_iL = gidList.begin();
-      list<int>::iterator it_iL_end = gidList.end();
+      std::list<int>::iterator it_iL = gidList.begin();
+      std::list<int>::iterator it_iL_end = gidList.end();
       for( ; it_iL != it_iL_end; ++it_iL )
       {
         if( mainGraphPtr_->returnNumEdges( *it_iL ) == 0 )
@@ -2151,14 +2084,14 @@ void N_TOP_Topology::pruneDevNode( const int & node )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::regenerateGIDNodeMap
+// Function      : Topology::regenerateGIDNodeMap
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 3/6/01
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::regenerateGIDNodeMap()
+void Topology::regenerateGIDNodeMap()
 {
   mainGraphPtr_->regenerateGIDNodeMap();
 }
@@ -2171,43 +2104,43 @@ void N_TOP_Topology::regenerateGIDNodeMap()
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-ostream& operator<<(ostream& os, const N_TOP_Topology &topo)
+std::ostream& operator<<(std::ostream& os, const Topology &topo)
 {
-  list<N_TOP_CktGraph*>::const_iterator it_gL, end_gL;
+  std::list<CktGraph*>::const_iterator it_gL, end_gL;
 
   for ( it_gL = topo.graphList_.begin(), end_gL = topo.graphList_.end();
 				 it_gL != end_gL; ++it_gL )
-    os << *(*it_gL) << endl;
+    os << *(*it_gL) << std::endl;
 
   return os;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::generateICLoader
+// Function      : Topology::generateICLoader
 // Purpose       : SuperNode all nodes associated with voltage sources
 // Special Notes :
 // Scope         : public
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 3/20/01
 //-----------------------------------------------------------------------------
-bool N_TOP_Topology::generateICLoader()
+bool Topology::generateICLoader()
 {
-  vector< pair<int,double> > * vecP = NULL;
+  std::vector< std::pair<int,double> > * vecP = NULL;
   if( icSettings_ != NULL )
   {
-    std::cout << *icSettings_;
+    Xyce::dout() << *icSettings_;
 
-    vecP = new vector< pair<int,double> >();
+    vecP = new std::vector< std::pair<int,double> >();
 
-    N_TOP_CktNode * cnp;
-    for( list<N_UTL_Param>::iterator iterPL = icSettings_->getParams().begin();
+    CktNode * cnp;
+    for( std::list<N_UTL_Param>::iterator iterPL = icSettings_->getParams().begin();
          iterPL != icSettings_->getParams().end(); ++iterPL )
     {
       cnp = mainGraphPtr_->FindCktNode( NodeID( iterPL->tag(), -1 ) );
       if( cnp != NULL )
         if( cnp->get_IsOwned() )
-          vecP->push_back( pair<int,double>(
-		*(cnp->get_SolnVarGIDList().begin()), iterPL->dVal() ) );
+          vecP->push_back( std::pair<int,double>(
+		*(cnp->get_SolnVarGIDList().begin()), iterPL->getImmutableValue<double>() ) );
     }
 
     return devIntPtr_->registerICLoads( vecP );
@@ -2217,58 +2150,58 @@ bool N_TOP_Topology::generateICLoader()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::getRestartNodes
+// Function      : Topology::getRestartNodes
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 8/29/01
 //-----------------------------------------------------------------------------
-bool N_TOP_Topology::getRestartNodes( vector<N_IO_RestartNode*> & nodeVec )
+bool Topology::getRestartNodes( std::vector<IO::RestartNode*> & nodeVec )
 {
   if( orderedNodeListPtr_ == NULL ) return false;
 
   int count = 0;
-  list<N_TOP_CktNode*>::iterator iterCN = orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator endCN = orderedNodeListPtr_->end();
+  std::list<CktNode*>::iterator iterCN = orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator endCN = orderedNodeListPtr_->end();
   for( ; iterCN != endCN; ++iterCN )
     if( (*iterCN)->get_IsOwned() && (*iterCN)->get_gID() != -1 ) ++count;
 
   nodeVec.resize(count);
 
-  N_TOP_CktNode * cnP;
+  CktNode * cnP;
   iterCN = orderedNodeListPtr_->begin();
   count = 0;
   for( iterCN = orderedNodeListPtr_->begin(); iterCN != endCN; ++iterCN )
     if( (*iterCN)->get_IsOwned() && (*iterCN)->get_gID() != -1 )
     {
       cnP = *iterCN;
-      nodeVec[count] = new N_IO_RestartNode( cnP->get_id(), cnP->type() );
+      nodeVec[count] = new IO::RestartNode( cnP->get_id(), cnP->type() );
 
       int i = 0;
-      const list<int> & gidList = cnP->get_SolnVarGIDList();
+      const std::list<int> & gidList = cnP->get_SolnVarGIDList();
       nodeVec[count]->solnVarData.resize( gidList.size() );
-      for( list<int>::const_iterator iterIC = gidList.begin();
+      for( std::list<int>::const_iterator iterIC = gidList.begin();
            iterIC != gidList.end(); ++iterIC, ++i )
         anaIntPtr_->getSolnVarData( *iterIC, nodeVec[count]->solnVarData[i] );
 
       i = 0;
-      const list<int> & gidList2 = cnP->get_StateVarGIDList();
+      const std::list<int> & gidList2 = cnP->get_StateVarGIDList();
       nodeVec[count]->stateVarData.resize( gidList2.size() );
-      for( list<int>::const_iterator iterIC = gidList2.begin();
+      for( std::list<int>::const_iterator iterIC = gidList2.begin();
            iterIC != gidList2.end(); ++iterIC, ++i )
         anaIntPtr_->getStateVarData( *iterIC, nodeVec[count]->stateVarData[i] );
 
       i = 0;
-      const list<int> & gidList3 = cnP->get_StoreVarGIDList();
+      const std::list<int> & gidList3 = cnP->get_StoreVarGIDList();
       nodeVec[count]->storeVarData.resize( gidList3.size() );
-      for( list<int>::const_iterator iterIC = gidList3.begin();
+      for( std::list<int>::const_iterator iterIC = gidList3.begin();
            iterIC != gidList3.end(); ++iterIC, ++i )
         anaIntPtr_->getStoreVarData( *iterIC, nodeVec[count]->storeVarData[i] );
 
       if( cnP->type() == _DNODE )
         nodeVec[count]->devState =
-         (dynamic_cast<N_TOP_CktNode_Dev*>(cnP))->getDevState();
+         (dynamic_cast<CktNode_Dev*>(cnP))->getDevState();
 
       ++count;
     }
@@ -2277,16 +2210,16 @@ bool N_TOP_Topology::getRestartNodes( vector<N_IO_RestartNode*> & nodeVec )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::restoreRestartNodes
+// Function      : Topology::restoreRestartNodes
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 8/29/01
 //-----------------------------------------------------------------------------
-bool N_TOP_Topology::restoreRestartNodes( vector<N_IO_RestartNode*> & nodeVec )
+bool Topology::restoreRestartNodes( std::vector<IO::RestartNode*> & nodeVec )
 {
-  N_TOP_CktNode * cnP;
+  CktNode * cnP;
 
   for( unsigned int i = 0; i < nodeVec.size(); ++i )
   {
@@ -2295,29 +2228,29 @@ bool N_TOP_Topology::restoreRestartNodes( vector<N_IO_RestartNode*> & nodeVec )
     if( cnP != NULL )
     {
 #ifdef Xyce_DEBUG_RESTART
-      cout << "Restoring Node: " << nodeVec[i]->ID << endl;
+      Xyce::dout() << "Restoring Node: " << nodeVec[i]->ID << std::endl;
 #endif
 
-      const list<int> & gidList = cnP->get_SolnVarGIDList();
+      const std::list<int> & gidList = cnP->get_SolnVarGIDList();
       int pos = 0;
-      for( list<int>::const_iterator iterIC = gidList.begin();
+      for( std::list<int>::const_iterator iterIC = gidList.begin();
            iterIC != gidList.end(); ++iterIC, ++pos )
         anaIntPtr_->setSolnVarData( *iterIC, nodeVec[i]->solnVarData[pos] );
 
-      const list<int> & gidList2 = cnP->get_StateVarGIDList();
+      const std::list<int> & gidList2 = cnP->get_StateVarGIDList();
       pos = 0;
-      for( list<int>::const_iterator iterIC = gidList2.begin();
+      for( std::list<int>::const_iterator iterIC = gidList2.begin();
            iterIC != gidList2.end(); ++iterIC, ++pos )
         anaIntPtr_->setStateVarData( *iterIC, nodeVec[i]->stateVarData[pos] );
 
-      const list<int> & gidList3 = cnP->get_StoreVarGIDList();
+      const std::list<int> & gidList3 = cnP->get_StoreVarGIDList();
       pos = 0;
-      for( list<int>::const_iterator iterIC = gidList3.begin();
+      for( std::list<int>::const_iterator iterIC = gidList3.begin();
            iterIC != gidList3.end(); ++iterIC, ++pos )
         anaIntPtr_->setStoreVarData( *iterIC, nodeVec[i]->storeVarData[pos] );
 
       if( nodeVec[i]->devState != NULL && nodeVec[i]->devState != 0 )
-        (dynamic_cast<N_TOP_CktNode_Dev*>(cnP))->setDevState( *nodeVec[i]->devState );
+        (dynamic_cast<CktNode_Dev*>(cnP))->setDevState( *nodeVec[i]->devState );
     }
   }
 
@@ -2325,25 +2258,24 @@ bool N_TOP_Topology::restoreRestartNodes( vector<N_IO_RestartNode*> & nodeVec )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::generateDirectory
+// Function      : Topology::generateDirectory
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 8/29/01
 //-----------------------------------------------------------------------------
-bool N_TOP_Topology::generateDirectory()
+bool Topology::generateDirectory()
 {
-  dirPtr_ = new N_TOP_Directory( this, pdsMgrPtr_ );
+  dirPtr_ = new Directory( this, pdsMgrPtr_ );
   dirPtr_->generateDirectory();
 
   return true;
 }
 
-#ifdef Xyce_TEST_SOLN_VAR_MAP
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::outputNameFile
+// Function      : Topology::outputNameFile
 // Purpose       : This is a kludgy function designed to output all the
 //                 solution variable indices and their respective names
 //                 to a file.
@@ -2357,149 +2289,159 @@ bool N_TOP_Topology::generateDirectory()
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 9/07/01
 //-----------------------------------------------------------------------------
-
-bool N_TOP_Topology::outputNameFile ()
+bool Topology::outputNameFile (bool overRideOutput)
 {
-  string netListFile("");
-  if (commandLine_.getArgumentValue("netlist") != "")
+  if( lsUtilPtr_->namesFileFlag() || overRideOutput )
   {
-    netListFile = commandLine_.getArgumentValue("netlist");
-  }
-
-  string fileName("namesMap_"+netListFile+".txt");
-
-  int masterRank = 0;
-  int numProcs = 1;
-  int thisProc = 0;
-
-#ifdef Xyce_PARALLEL_MPI
-  N_PDS_Comm * commPtr = pdsMgrPtr_->getPDSComm();
-  numProcs = commPtr->numProc();
-  thisProc = commPtr->procID();
-#endif
-
-  for( int p = 0; p < numProcs; ++p )
-  {
-#ifdef Xyce_PARALLEL_MPI
-    commPtr->barrier();
-#endif
-
-    if (p==thisProc)
+    std::string netListFile("");
+    if (commandLine_.getArgumentValue("netlist") != "")
     {
-      ostream * outStreamPtr_;
-      if( masterRank == thisProc )
-      {
-        outStreamPtr_ = new ofstream(fileName.c_str());
-      }
-      else
-      {
-        outStreamPtr_ = new ofstream(fileName.c_str(),std::ios_base::app);
-      }
+      netListFile = commandLine_.getArgumentValue("netlist");
+    }
 
-      if (p==0)
+    std::string fileName("namesMap_"+netListFile+".txt");
+
+    int masterRank = 0;
+    int numProcs = 1;
+    int thisProc = 0;
+
+#ifdef Xyce_PARALLEL_MPI
+    N_PDS_Comm * commPtr = pdsMgrPtr_->getPDSComm();
+    numProcs = commPtr->numProc();
+    thisProc = commPtr->procID();
+#endif
+
+    for( int p = 0; p < numProcs; ++p )
+    {
+#ifdef Xyce_PARALLEL_MPI
+      commPtr->barrier();
+#endif
+
+      if (p==thisProc)
       {
-        // to line up with the outputted files of N_LAS_Vector, which start with N.
-        (*outStreamPtr_) << "HEADER" << endl;
-      }
-
-      // Loop over the graph.  If this is a voltage node, just output
-      // the name and solution variable index.  If a device node,
-      // call the device package to print out names of internal nodes.
-
-      list<N_TOP_CktNode*>::iterator iterONL = orderedNodeListPtr_->begin();
-      list<N_TOP_CktNode*>::iterator endONL  = orderedNodeListPtr_->end  ();
-
-      for( ; iterONL != endONL; ++iterONL )
-      {
-        int owned = (*iterONL)->get_IsOwned();
-        if (owned)
+        std::ostream * outStreamPtr_;
+        if( masterRank == thisProc )
         {
-          // get node type:
-          int type = (*iterONL)->type();
-
-          // if voltage node, just output first GID and the name.
-          if (type == _VNODE )
-          {
-
-            // get GID list:
-            list<int> gidList = (*iterONL)->get_SolnVarGIDList ();
-            list<int>::iterator iterGID = gidList.begin ();
-            list<int>::iterator endGID  = gidList.end   ();
-
-            if ( (*iterGID) >= 0 )
-            {
-              (*outStreamPtr_) << "\t";
-              // index
-              (*outStreamPtr_) << (*iterGID) << "\t";
-              // name
-              outStreamPtr_->width(12);
-              (*outStreamPtr_) << ExtendedString((*iterONL)->get_id()).toLower();
-              (*outStreamPtr_) <<endl;
-            }
-          }
-          // if device node, call the device and have it output indices
-          // of the internal variables, plus names.  (only the device
-          // itself knows these names, I think).
-          else if (type == _DNODE)
-          {
-#ifdef Xyce_PARALLEL_MPI
-            N_TOP_Indexor indexor( pdsMgrPtr_ );
-#endif
-            string mapName("SOLUTION_OVERLAP_GND");
-            vector<int> convIntVec(1,0);
-
-            map <int,string> & inMap = (*iterONL)->getIntNameMap ();
-
-            map<int,string>::iterator iterMap = inMap.begin();
-            map<int,string>::iterator  endMap = inMap.end  ();
-
-            for ( ;iterMap != endMap ; ++iterMap )
-            {
-              convIntVec[0] = iterMap->first;
-#ifdef Xyce_PARALLEL_MPI
-              bool success = indexor.localToGlobal( mapName, convIntVec );
-#endif
-              if ( convIntVec[0] != -1 )
-              //if ( (iterMap->first) != -1 )
-              {
-                (*outStreamPtr_) << "\t";
-                (*outStreamPtr_) << convIntVec[0] << "\t"; // index
-                outStreamPtr_->width(12);
-                (*outStreamPtr_) <<ExtendedString(iterMap->second).toLower(); // name
-                (*outStreamPtr_) <<endl;
-              }
-            }
-          }
-          else
-            N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL,
-              "Trying to output something other than a vnode or dnode!\n" );
+          outStreamPtr_ = new std::ofstream(fileName.c_str());
         }
-      }
+        else
+        {
+          outStreamPtr_ = new std::ofstream(fileName.c_str(),std::ios_base::app);
+        }
 
-      delete outStreamPtr_;
+        if(outStreamPtr_->fail())
+        {
+          if (p==0)
+          {
+            Report::UserWarning() << "Unable to open names file" <<std::endl;
+          }
+        }
+        else
+        {
+          if (p==0)
+          {
+            // to line up with the outputted files of N_LAS_Vector, which start with N.
+            (*outStreamPtr_) << "HEADER" << std::endl;
+          }
+
+          // Loop over the graph.  If this is a voltage node, just output
+          // the name and solution variable index.  If a device node,
+          // call the device package to print out names of internal nodes.
+
+          std::list<CktNode*>::iterator iterONL = orderedNodeListPtr_->begin();
+          std::list<CktNode*>::iterator endONL  = orderedNodeListPtr_->end  ();
+
+          for( ; iterONL != endONL; ++iterONL )
+          {
+            int owned = (*iterONL)->get_IsOwned();
+            if (owned)
+            {
+              // get node type:
+              int type = (*iterONL)->type();
+
+              // if voltage node, just output first GID and the name.
+              if (type == _VNODE )
+              {
+
+                // get GID list:
+                std::list<int> gidList = (*iterONL)->get_SolnVarGIDList ();
+                std::list<int>::iterator iterGID = gidList.begin ();
+                std::list<int>::iterator endGID  = gidList.end   ();
+
+                if ( (*iterGID) >= 0 )
+                {
+                  (*outStreamPtr_) << "\t";
+                  // index
+                  (*outStreamPtr_) << (*iterGID) << "\t";
+                  // name
+                  outStreamPtr_->width(12);
+                  (*outStreamPtr_) << ExtendedString((*iterONL)->get_id()).toLower();
+                  (*outStreamPtr_) <<std::endl;
+                }
+              }
+              // if device node, call the device and have it output indices
+              // of the internal variables, plus names.  (only the device
+              // itself knows these names, I think).
+              else if (type == _DNODE)
+              {
+#ifdef Xyce_PARALLEL_MPI
+                Indexor indexor( pdsMgrPtr_ );
+#endif
+                std::string mapName("SOLUTION_OVERLAP_GND");
+                std::vector<int> convIntVec(1,0);
+
+                std::map<int,std::string> & inMap = (*iterONL)->getIntNameMap ();
+
+                std::map<int,std::string>::iterator iterMap = inMap.begin();
+                std::map<int,std::string>::iterator  endMap = inMap.end  ();
+
+                for ( ;iterMap != endMap ; ++iterMap )
+                {
+                  convIntVec[0] = iterMap->first;
+#ifdef Xyce_PARALLEL_MPI
+                  bool success = indexor.localToGlobal( mapName, convIntVec );
+#endif
+                  if ( convIntVec[0] != -1 )
+                  //if ( (iterMap->first) != -1 )
+                  {
+                    (*outStreamPtr_) << "\t";
+                    (*outStreamPtr_) << convIntVec[0] << "\t"; // index
+                    outStreamPtr_->width(12);
+                    (*outStreamPtr_) <<ExtendedString(iterMap->second).toLower(); // name
+                    (*outStreamPtr_) <<std::endl;
+                  }
+                }
+              }
+              else
+                N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL,
+                  "Trying to output something other than a vnode or dnode!\n" );
+            }
+          }
+
+        }
+        delete outStreamPtr_;
+      }
     }
   }
 
   return true;
 }
 
-#endif
-
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::getNodeNames
+// Function      : Topology::getNodeNames
 // Purpose       : get node names for nodes owned by this processor
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::getNodeNames (map<string, pair<int, double>, Xyce::LessNoCase > & nodeNames)
+void Topology::getNodeNames (std::map<std::string, std::pair<int, double>, Xyce::LessNoCase > & nodeNames)
 {
-  list<N_TOP_CktNode*>::iterator iterONL = orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator endONL  = orderedNodeListPtr_->end  ();
-  N_TOP_Indexor indexor( pdsMgrPtr_ );
-  string mapName("SOLUTION_OVERLAP_GND");
-  vector<int> intVec(1,0);
+  std::list<CktNode*>::iterator iterONL = orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator endONL  = orderedNodeListPtr_->end  ();
+  Indexor indexor( pdsMgrPtr_ );
+  std::string mapName("SOLUTION_OVERLAP_GND");
+  std::vector<int> intVec(1,0);
 
   // two other functions will do identical searches over the node list looking
   // for devices.  At this time we will fill up another list with just devices
@@ -2519,8 +2461,8 @@ void N_TOP_Topology::getNodeNames (map<string, pair<int, double>, Xyce::LessNoCa
       int type = (*iterONL)->type();
       if (type == _VNODE )
       {
-        list<int> gidList = (*iterONL)->get_SolnVarGIDList ();
-        list<int>::iterator iterGID = gidList.begin ();
+        std::list<int> gidList = (*iterONL)->get_SolnVarGIDList ();
+        std::list<int>::iterator iterGID = gidList.begin ();
         if (*iterGID >= 0)
         {
           intVec[0] = *iterGID;
@@ -2538,10 +2480,10 @@ void N_TOP_Topology::getNodeNames (map<string, pair<int, double>, Xyce::LessNoCa
           deviceNodeListPtr_.push_back( *iterONL);
         }
 
-        map <int,string> & inMap = (*iterONL)->getIntNameMap ();
+        std::map<int,std::string> & inMap = (*iterONL)->getIntNameMap ();
 
-        map<int,string>::iterator iterMap = inMap.begin();
-        map<int,string>::iterator  endMap = inMap.end  ();
+        std::map<int,std::string>::iterator iterMap = inMap.begin();
+        std::map<int,std::string>::iterator  endMap = inMap.end  ();
 
         for ( ;iterMap != endMap ; ++iterMap )
         {
@@ -2559,19 +2501,19 @@ void N_TOP_Topology::getNodeNames (map<string, pair<int, double>, Xyce::LessNoCa
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::getStateNodeNames
+// Function      : Topology::getStateNodeNames
 // Purpose       : get node names for state vector elements owned by this processor
 // Special Notes :
 // Scope         :
 // Creator       : Richard Schiek, SNL, Electrical Systems Modeling
 // Creation Date : 08/01/2012
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::getStateNodeNames (map<string, pair<int, double>, Xyce::LessNoCase > & nodeNames)
+void Topology::getStateNodeNames (std::map<std::string, std::pair<int, double>, Xyce::LessNoCase > & nodeNames)
 {
   if( deviceNodeListPtr_.empty() )
   {
-    list<N_TOP_CktNode*>::iterator iterONL = orderedNodeListPtr_->begin();
-    list<N_TOP_CktNode*>::iterator endONL  = orderedNodeListPtr_->end  ();
+    std::list<CktNode*>::iterator iterONL = orderedNodeListPtr_->begin();
+    std::list<CktNode*>::iterator endONL  = orderedNodeListPtr_->end  ();
 
     for( ; iterONL != endONL; ++iterONL )
     {
@@ -2585,10 +2527,10 @@ void N_TOP_Topology::getStateNodeNames (map<string, pair<int, double>, Xyce::Les
         //}
         if (type == _DNODE)
         {
-          map <int,string> & inMap = (*iterONL)->getStateNameMap ();
+          std::map<int,std::string> & inMap = (*iterONL)->getStateNameMap ();
 
-          map<int,string>::iterator iterMap = inMap.begin();
-          map<int,string>::iterator  endMap = inMap.end  ();
+          std::map<int,std::string>::iterator iterMap = inMap.begin();
+          std::map<int,std::string>::iterator  endMap = inMap.end  ();
 
           for ( ;iterMap != endMap ; ++iterMap )
           {
@@ -2605,15 +2547,15 @@ void N_TOP_Topology::getStateNodeNames (map<string, pair<int, double>, Xyce::Les
   {
     // we can do a slightly simpler loop here as we already have a list of
     // owned, device nodes.
-    list<N_TOP_CktNode*>::iterator iterONL = deviceNodeListPtr_.begin();
-    list<N_TOP_CktNode*>::iterator endONL  = deviceNodeListPtr_.end  ();
+    std::list<CktNode*>::iterator iterONL = deviceNodeListPtr_.begin();
+    std::list<CktNode*>::iterator endONL  = deviceNodeListPtr_.end  ();
 
     for( ; iterONL != endONL; ++iterONL )
     {
-      map <int,string> & inMap = (*iterONL)->getStateNameMap ();
+      std::map<int,std::string> & inMap = (*iterONL)->getStateNameMap ();
 
-      map<int,string>::iterator iterMap = inMap.begin();
-      map<int,string>::iterator  endMap = inMap.end  ();
+      std::map<int,std::string>::iterator iterMap = inMap.begin();
+      std::map<int,std::string>::iterator  endMap = inMap.end  ();
 
       for ( ;iterMap != endMap ; ++iterMap )
       {
@@ -2630,19 +2572,19 @@ void N_TOP_Topology::getStateNodeNames (map<string, pair<int, double>, Xyce::Les
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::getStoreNodeNames
+// Function      : Topology::getStoreNodeNames
 // Purpose       : get node names for store vector elements owned by this processor
 // Special Notes :
 // Scope         :
 // Creator       : Richard Schiek, SNL, Electrical Systems Modeling
 // Creation Date : 08/01/2012
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::getStoreNodeNames (map<string, pair<int, double>, Xyce::LessNoCase > & nodeNames)
+void Topology::getStoreNodeNames (std::map<std::string, std::pair<int, double>, Xyce::LessNoCase > & nodeNames)
 {
   if( deviceNodeListPtr_.size() == 0 )
   {
-    list<N_TOP_CktNode*>::iterator iterONL = orderedNodeListPtr_->begin();
-    list<N_TOP_CktNode*>::iterator endONL  = orderedNodeListPtr_->end  ();
+    std::list<CktNode*>::iterator iterONL = orderedNodeListPtr_->begin();
+    std::list<CktNode*>::iterator endONL  = orderedNodeListPtr_->end  ();
 
     for( ; iterONL != endONL; ++iterONL )
     {
@@ -2656,10 +2598,10 @@ void N_TOP_Topology::getStoreNodeNames (map<string, pair<int, double>, Xyce::Les
         //}
         if (type == _DNODE)
         {
-          map <int,string> & inMap = (*iterONL)->getStoreNameMap ();
+          std::map<int,std::string> & inMap = (*iterONL)->getStoreNameMap ();
 
-          map<int,string>::iterator iterMap = inMap.begin();
-          map<int,string>::iterator  endMap = inMap.end  ();
+          std::map<int,std::string>::iterator iterMap = inMap.begin();
+          std::map<int,std::string>::iterator  endMap = inMap.end  ();
 
           for ( ;iterMap != endMap ; ++iterMap )
           {
@@ -2676,15 +2618,15 @@ void N_TOP_Topology::getStoreNodeNames (map<string, pair<int, double>, Xyce::Les
   {
     // we can do a slightly simpler loop here as we already have a list of
     // owned, device nodes.
-    list<N_TOP_CktNode*>::iterator iterONL = deviceNodeListPtr_.begin();
-    list<N_TOP_CktNode*>::iterator endONL  = deviceNodeListPtr_.end  ();
+    std::list<CktNode*>::iterator iterONL = deviceNodeListPtr_.begin();
+    std::list<CktNode*>::iterator endONL  = deviceNodeListPtr_.end  ();
 
     for( ; iterONL != endONL; ++iterONL )
     {
-      map <int,string> & inMap = (*iterONL)->getStoreNameMap ();
+      std::map<int,std::string> & inMap = (*iterONL)->getStoreNameMap ();
 
-      map<int,string>::iterator iterMap = inMap.begin();
-      map<int,string>::iterator  endMap = inMap.end  ();
+      std::map<int,std::string>::iterator iterMap = inMap.begin();
+      std::map<int,std::string>::iterator  endMap = inMap.end  ();
 
       for ( ;iterMap != endMap ; ++iterMap )
       {
@@ -2700,20 +2642,20 @@ void N_TOP_Topology::getStoreNodeNames (map<string, pair<int, double>, Xyce::Les
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::getExternNodeNames
+// Function      : Topology::getExternNodeNames
 // Purpose       : get node names for nodes owned by this processor
 // Special Notes :
 // Scope         :
 // Creator       : Eric R. Keiter
 // Creation Date : 4/25/2012
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::getExternNodeNames (map<string, pair<int, double>, Xyce::LessNoCase > & nodeNames)
+void Topology::getExternNodeNames (std::map<std::string, std::pair<int, double>, Xyce::LessNoCase > & nodeNames)
 {
-  list<N_TOP_CktNode*>::iterator iterONL = orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator endONL  = orderedNodeListPtr_->end  ();
-  N_TOP_Indexor indexor( pdsMgrPtr_ );
-  string mapName("SOLUTION_OVERLAP_GND");
-  vector<int> intVec(1,0);
+  std::list<CktNode*>::iterator iterONL = orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator endONL  = orderedNodeListPtr_->end  ();
+  Indexor indexor( pdsMgrPtr_ );
+  std::string mapName("SOLUTION_OVERLAP_GND");
+  std::vector<int> intVec(1,0);
 
   for( ; iterONL != endONL; ++iterONL )
   {
@@ -2723,8 +2665,8 @@ void N_TOP_Topology::getExternNodeNames (map<string, pair<int, double>, Xyce::Le
       int type = (*iterONL)->type();
       if (type == _VNODE )
       {
-        list<int> gidList = (*iterONL)->get_SolnVarGIDList ();
-        list<int>::iterator iterGID = gidList.begin ();
+        std::list<int> gidList = (*iterONL)->get_SolnVarGIDList ();
+        std::list<int>::iterator iterGID = gidList.begin ();
         if (*iterGID >= 0)
         {
           intVec[0] = *iterGID;
@@ -2745,24 +2687,24 @@ void N_TOP_Topology::getExternNodeNames (map<string, pair<int, double>, Xyce::Le
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::getVsrcNodes
+// Function      : Topology::getVsrcNodes
 // Purpose       :
 // Special Notes :
 // Scope         :
 // Creator       : Eric Keiter, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::getVsrcNodes (set<string> & vsrcSet)
+void Topology::getVsrcNodes (std::set<std::string> & vsrcSet)
 {
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "In N_TOP_Topology::getVsrcNodes" << endl;
+  Xyce::dout() << "In Topology::getVsrcNodes" << std::endl;
 #endif
 
   if( deviceNodeListPtr_.size() == 0 )
   {
-    list<N_TOP_CktNode*>::iterator iterONL = orderedNodeListPtr_->begin();
-    list<N_TOP_CktNode*>::iterator endONL  = orderedNodeListPtr_->end  ();
+    std::list<CktNode*>::iterator iterONL = orderedNodeListPtr_->begin();
+    std::list<CktNode*>::iterator endONL  = orderedNodeListPtr_->end  ();
 
     for( ; iterONL != endONL; ++iterONL )
     {
@@ -2772,21 +2714,21 @@ void N_TOP_Topology::getVsrcNodes (set<string> & vsrcSet)
         int type = (*iterONL)->type();
         if (type == _DNODE)
         {
-          vector<NodeID> adj_ids;
-          const string & id = (*iterONL)->get_id();
-          string::size_type col = id.find_first_of(':');
+          std::vector<NodeID> adj_ids;
+          const std::string & id = (*iterONL)->get_id();
+          std::string::size_type col = id.find_first_of(':');
 
           if ( id[col+1] == 'V' || id[col+1] == 'v' )
           {
   #ifdef Xyce_DEBUG_TOPOLOGY
-            cout << "Getting adjacent nodes for: " << id << endl;
+            Xyce::dout() << "Getting adjacent nodes for: " << id << std::endl;
   #endif
             mainGraphPtr_->returnAdjIDs( NodeID(id,type), adj_ids );
             int adjSize = adj_ids.size();
             for( int i = 0; i < adjSize; ++i )
             {
   #ifdef Xyce_DEBUG_TOPOLOGY
-              cout << "adj_ids["<<i<<"] = " << adj_ids[i] << endl;
+              Xyce::dout() << "adj_ids["<<i<<"] = " << adj_ids[i] << std::endl;
   #endif
               if( adj_ids[i].first != "0" )
               {
@@ -2801,26 +2743,26 @@ void N_TOP_Topology::getVsrcNodes (set<string> & vsrcSet)
   else
   {
     // slightly simpler loop as we already have a list of owned, device nodes
-    list<N_TOP_CktNode*>::iterator iterONL = deviceNodeListPtr_.begin();
-    list<N_TOP_CktNode*>::iterator endONL  = deviceNodeListPtr_.end  ();
+    std::list<CktNode*>::iterator iterONL = deviceNodeListPtr_.begin();
+    std::list<CktNode*>::iterator endONL  = deviceNodeListPtr_.end  ();
     for( ; iterONL != endONL; ++iterONL )
     {
-      vector<NodeID> adj_ids;
-      const string & id = (*iterONL)->get_id();
+      std::vector<NodeID> adj_ids;
+      const std::string & id = (*iterONL)->get_id();
       int type = (*iterONL)->type();
-      string::size_type col = id.find_first_of(':');
+      std::string::size_type col = id.find_first_of(':');
 
       if ( id[col+1] == 'V' || id[col+1] == 'v' )
       {
 #ifdef Xyce_DEBUG_TOPOLOGY
-        cout << "Getting adjacent nodes for: " << id << endl;
+        Xyce::dout() << "Getting adjacent nodes for: " << id << std::endl;
 #endif
         mainGraphPtr_->returnAdjIDs( NodeID(id,type), adj_ids );
         int adjSize = adj_ids.size();
         for( int i = 0; i < adjSize; ++i )
         {
 #ifdef Xyce_DEBUG_TOPOLOGY
-          cout << "adj_ids["<<i<<"] = " << adj_ids[i] << endl;
+          Xyce::dout() << "adj_ids["<<i<<"] = " << adj_ids[i] << std::endl;
 #endif
           if( adj_ids[i].first != "0" )
           {
@@ -2835,21 +2777,21 @@ void N_TOP_Topology::getVsrcNodes (set<string> & vsrcSet)
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::getRawData
+// Function      : Topology::getRawData
 // Purpose       : get node ids, names, and types
 // Special Notes :
 // Scope         :
 // Creator       : Eric Rankin
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_TOP_Topology::getRawData( map< int, string > & nRef, vector< char > & tRef )
+bool Topology::getRawData( std::map< int, std::string > & nRef, std::vector< char > & tRef )
 {
   // collect internal soln var types
-  vector< char > varTypeVec;
+  std::vector< char > varTypeVec;
   returnVarTypeVec( tRef );
 
-  list<N_TOP_CktNode*>::iterator iterONL = orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator endONL  = orderedNodeListPtr_->end  ();
+  std::list<CktNode*>::iterator iterONL = orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator endONL  = orderedNodeListPtr_->end  ();
 
   for( ; iterONL != endONL; ++iterONL )
   {
@@ -2859,7 +2801,7 @@ bool N_TOP_Topology::getRawData( map< int, string > & nRef, vector< char > & tRe
     // if voltage node, just retrieve the first GID and the name.
     if( type == _VNODE )
     {
-      list<int> gidList = (*iterONL)->get_SolnVarGIDList ();
+      std::list<int> gidList = (*iterONL)->get_SolnVarGIDList ();
 
       if ( *gidList.begin() != -1 )
       {
@@ -2871,10 +2813,10 @@ bool N_TOP_Topology::getRawData( map< int, string > & nRef, vector< char > & tRe
     // of the internal variables, plus names.
     else if( type == _DNODE )
     {
-      map< int,string > & inMap = (*iterONL)->getIntNameMap();
+      std::map< int,std::string > & inMap = (*iterONL)->getIntNameMap();
 
-      map<int,string>::iterator iterMap = inMap.begin();
-      map<int,string>::iterator  endMap = inMap.end  ();
+      std::map<int,std::string>::iterator iterMap = inMap.begin();
+      std::map<int,std::string>::iterator  endMap = inMap.end  ();
 
       for( ; iterMap != endMap ; ++iterMap )
       {
@@ -2897,7 +2839,7 @@ bool N_TOP_Topology::getRawData( map< int, string > & nRef, vector< char > & tRe
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::addResistors
+// Function      : Topology::addResistors
 // Purpose       : Adds resistors (between ground and nodes which are connected
 //                 to only one device terminal) to a copy of the netlist file.
 // Special Notes :
@@ -2905,17 +2847,17 @@ bool N_TOP_Topology::getRawData( map< int, string > & nRef, vector< char > & tRe
 // Creator       : Keith Santarelli, SNL, Electrical and Microsystems Modeling
 // Creation Date : 12/11/07
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::addResistors
- (const vector<string> & inputVec,
-  const string & resValue,
-  const string & netlistFile, bool oneTermNotNoDCPath)
+void Topology::addResistors
+ (const std::vector<std::string> & inputVec,
+  const std::string & resValue,
+  const std::string & netlistFile, bool oneTermNotNoDCPath)
 {
-  string netlistCopy(netlistFile);
+  std::string netlistCopy(netlistFile);
   netlistCopy += "_xyce.cir";
-  ofstream copyFile;
-  copyFile.open(netlistCopy.c_str(),ios::app);  //put in append mode
+  std::ofstream copyFile;
+  copyFile.open(netlistCopy.c_str(),std::ios::app);  //put in append mode
 
-  string msg("");
+  std::string msg("");
 
 #ifdef Xyce_DEBUG_IO
   if (oneTermNotNoDCPath)
@@ -2934,7 +2876,7 @@ void N_TOP_Topology::addResistors
     msg += netlistCopy;
   }
 
-  cout << msg << endl;
+  Xyce::dout() << msg << std::endl;
 #endif
 
   //Some error checking in case we can't open the file.
@@ -2969,7 +2911,7 @@ void N_TOP_Topology::addResistors
   //  {
   //#endif
 
-  string banner("");
+  std::string banner("");
 
   if (oneTermNotNoDCPath)
   {
@@ -2982,7 +2924,7 @@ void N_TOP_Topology::addResistors
     banner += "nodes with no DC path to ground:";
   }
 
-  copyFile << endl << endl << banner << endl << endl;
+  copyFile << std::endl << std::endl << banner << std::endl << std::endl;
 
   //#ifdef Xyce_PARALLEL_MPI
   //}
@@ -2990,9 +2932,9 @@ void N_TOP_Topology::addResistors
 
   //Now, loop through the ids in inputVec and add the resistors.
 
-  vector<string>::const_iterator inputit = inputVec.begin();
-  vector<string>::const_iterator inputend = inputVec.end();
-  string node("");
+  std::vector<std::string>::const_iterator inputit = inputVec.begin();
+  std::vector<std::string>::const_iterator inputend = inputVec.end();
+  std::string node("");
   int count = 0;
 
   while (inputit != inputend)
@@ -3013,7 +2955,7 @@ void N_TOP_Topology::addResistors
     }
     else
     {
-      string resname("R");
+      std::string resname("R");
 
       if (oneTermNotNoDCPath)
       {
@@ -3026,7 +2968,7 @@ void N_TOP_Topology::addResistors
 
       copyFile << resname;
       copyFile << count+1 << " " << node << " 0 " << resValue;
-      copyFile << endl;
+      copyFile << std::endl;
     }
     inputit++;
     count++;
@@ -3035,21 +2977,21 @@ void N_TOP_Topology::addResistors
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_Topology::appendEndStatement
+// Function      : Topology::appendEndStatement
 // Purpose       : Adds ".END" to a copy of the netlist file.
 // Special Notes :
 // Scope         : public
 // Creator       : Keith Santarelli, SNL, Electrical and Microsystems Modeling
 // Creation Date : 12/11/07
 //-----------------------------------------------------------------------------
-void N_TOP_Topology::appendEndStatement(const string & netlistFile)
+void Topology::appendEndStatement(const std::string & netlistFile)
 {
-  string netlistCopy(netlistFile);
+  std::string netlistCopy(netlistFile);
   netlistCopy += "_xyce.cir";
-  ofstream copyFile;
-  copyFile.open(netlistCopy.c_str(),ios::app);  //put in append mode
+  std::ofstream copyFile;
+  copyFile.open(netlistCopy.c_str(),std::ios::app);  //put in append mode
 
-  string msg("");
+  std::string msg("");
 
   //Some error checking in case we can't open the file.
   if(copyFile.fail())
@@ -3060,6 +3002,9 @@ void N_TOP_Topology::appendEndStatement(const string & netlistFile)
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg);
   }
 
-  copyFile << endl << ".END" << endl;
+  copyFile << std::endl << ".END" << std::endl;
   copyFile.close();
 }
+
+} // namespace Topo
+} // namespace Xyce

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -38,11 +38,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.134.2.5 $
+// Revision Number: $Revision: 1.158.2.4 $
 //
-// Revision Date  : $Date: 2013/12/03 23:30:12 $
+// Revision Date  : $Date: 2014/03/13 21:51:25 $
 //
-// Current Owner  : $Author: rlschie $
+// Current Owner  : $Author: dgbaur $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
@@ -62,36 +62,40 @@
 #include <N_IO_CircuitMetadata.h>
 #include <N_IO_CircuitBlock.h>
 #include <N_IO_OptionBlock.h>
+#include <N_IO_Report.h>
 #include <N_ERH_ErrorMgr.h>
 
 #include <N_UTL_Misc.h>
 #include <N_UTL_Expression.h>
 
+namespace Xyce {
+namespace IO {
+
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::N_IO_OptionBlock
+// Function      : OptionBlock::OptionBlock
 // Purpose       : constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 01/17/2006
 //-----------------------------------------------------------------------------
-N_IO_OptionBlock::N_IO_OptionBlock( N_IO_CircuitMetadata & md)
+OptionBlock::OptionBlock( N_IO_CircuitMetadata & md)
 : metadata_(md)
 {
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::N_IO_OptionBlock
+// Function      : OptionBlock::OptionBlock
 // Purpose       : constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/10/2001
 //-----------------------------------------------------------------------------
-N_IO_OptionBlock::N_IO_OptionBlock(
-    string const& fileName,
-    vector<N_IO_SpiceSeparatedFieldTool::StringToken> const& parsedInputLine,
-    N_IO_CircuitMetadata & md)
+OptionBlock::OptionBlock(
+    std::string const& fileName,
+    std::vector<SpiceSeparatedFieldTool::StringToken> const& parsedInputLine,
+    CircuitMetadata & md)
 : netlistFileName_(fileName),
   parsedLine(parsedInputLine),
   metadata_(md)
@@ -100,15 +104,15 @@ N_IO_OptionBlock::N_IO_OptionBlock(
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::N_IO_OptionBlock
+// Function      : OptionBlock::OptionBlock
 // Purpose       : constructor
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-N_IO_OptionBlock::N_IO_OptionBlock( string const& fileName,
- N_IO_CircuitMetadata & md )
+OptionBlock::OptionBlock( std::string const& fileName,
+ CircuitMetadata & md )
  : netlistFileName_( fileName ),
    metadata_ (md)
 {
@@ -116,14 +120,14 @@ N_IO_OptionBlock::N_IO_OptionBlock( string const& fileName,
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::N_IO_OptionBlock
+// Function      : OptionBlock::OptionBlock
 // Purpose       : copy constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/10/2001
 //-----------------------------------------------------------------------------
-N_IO_OptionBlock::N_IO_OptionBlock(N_IO_OptionBlock const& rhsOB)
+OptionBlock::OptionBlock(OptionBlock const& rhsOB)
   : netlistFileName_(rhsOB.netlistFileName_),
     parsedLine(rhsOB.parsedLine),
     optionData(rhsOB.optionData),
@@ -132,14 +136,14 @@ N_IO_OptionBlock::N_IO_OptionBlock(N_IO_OptionBlock const& rhsOB)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::operator=
+// Function      : OptionBlock::operator=
 // Purpose       : assignment operator
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 01/17/2006
 //-----------------------------------------------------------------------------
-N_IO_OptionBlock & N_IO_OptionBlock::operator=(const N_IO_OptionBlock & right)
+OptionBlock & OptionBlock::operator=(const OptionBlock & right)
 {
   metadata_ = right.metadata_;
 
@@ -153,53 +157,50 @@ N_IO_OptionBlock & N_IO_OptionBlock::operator=(const N_IO_OptionBlock & right)
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::printDiagnostic
+// Function      : OptionBlock::printDiagnostic
 // Purpose       : Output the details of a device block to standard out.
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/10/2001
 //-----------------------------------------------------------------------------
-void N_IO_OptionBlock::printDiagnostic() const
+void OptionBlock::printDiagnostic() const
 {
-  cout << endl;
-  cout << "Option Information" << endl;
-  cout << "------------------" << endl;
+  Xyce::dout() << std::endl;
+  Xyce::dout() << "Option Information" << std::endl;
+  Xyce::dout() << "------------------" << std::endl;
 
   if (getName() != "")
   {
-    cout << "input line:" << endl;
+    Xyce::dout() << "input line:" << std::endl;
     unsigned int size = parsedLine.size();
     for (unsigned int i = 0; i < size; ++i)
     {
-      cout << "  " << parsedLine[i].string_;
+      Xyce::dout() << "  " << parsedLine[i].string_;
     }
-    cout << endl;
-    cout << "  name: " << getName() << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "  name: " << getName() << std::endl;
   }
 
-  cout << "  parameters: " << endl;
+  Xyce::dout() << "  parameters: " << std::endl;
   int numParameters = getNumberOfParameters();
   for (int i = 0; i < numParameters; ++i)
   {
-    cout << "  " << getParameter(i).tag() << "  ";
-    cout << getParameter(i).sVal() << endl;
+    Xyce::dout() << "  " << getParameter(i).tag() << "  ";
+    Xyce::dout() << getParameter(i).stringValue() << std::endl;
   }
-  cout << endl;
-
-  cout << "------------------" << endl;
-  cout << endl;
+  Xyce::dout() << std::endl << std::endl;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractData
+// Function      : OptionBlock::extractData
 // Purpose       : Determine option type and extract the data appropriately.
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 05/22/2002
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractData()
+bool OptionBlock::extractData()
 {
   bool result;
   int line;
@@ -208,6 +209,8 @@ bool N_IO_OptionBlock::extractData()
   line = parsedLine[0].lineNumber_;
   lineType.toUpper();
   bool optionsForSensitivity=false;
+
+  setNetlistLocation(netlistFileName_, line);
 
   ExtendedString optionName("");
   if (parsedLine.size() > 1)
@@ -289,9 +292,8 @@ bool N_IO_OptionBlock::extractData()
   }
   else if ( lineType == ".FFT" )
   {
-    string msg("N_IO_OptionBlock::extractData():  .FFT option not supported.");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-       netlistFileName_, line);
+    Report::UserError0().at(netlistFileName_, line)
+      << "OptionBlock::extractData():  .FFT option not supported.";
   }
   else if ( lineType == ".RESULT" )
   {
@@ -336,21 +338,20 @@ bool N_IO_OptionBlock::extractData()
   // cases, attempts to use expressions on .options lines will result in
   // the value being set incorrectly to zero.
   if (lineType != ".PARAM" && lineType != ".GLOBAL_PARAM" &&
-      lineType != ".RESULT" && lineType != ".OBJECTIVE" && lineType != ".TRAN"
+      lineType != ".RESULT" && lineType != ".OBJECTIVE" && 
+      lineType != ".TRAN" && lineType != ".MEASURE"
       && !(optionsForSensitivity)
      )
   {
-    list<N_UTL_Param>::const_iterator paramIter, paramEnd;
+    std::list<Util::Param>::const_iterator paramIter, paramEnd;
     paramEnd = optionData.getParams().end();
     paramIter = optionData.getParams().begin();
     for ( ; paramIter != paramEnd ; ++paramIter)
     {
       if ((*paramIter).hasExpressionValue())
       {
-        string msg("Expressions are not supported for ");
-        msg += lineType;
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-          netlistFileName_, line);
+        Report::UserError0().at(netlistFileName_, line)
+          << "Expressions are not supported for " << lineType;
       }
     }
   }
@@ -359,7 +360,7 @@ bool N_IO_OptionBlock::extractData()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractOPData
+// Function      : OptionBlock::extractOPData
 // Purpose       : Extract the parameters from a netlist .OP line held in
 //                 parsedLine.
 // Special Notes :
@@ -367,16 +368,14 @@ bool N_IO_OptionBlock::extractData()
 // Creator       : Lon Waters, SNL
 // Creation Date : 10/05/2001
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractOPData()
+bool OptionBlock::extractOPData()
 {
   int numFields = parsedLine.size();
 
   // Check that the minimum required number of fields are on the line.
   if ( numFields > 1 )
   {
-    string msg("ignoring extra fields on .OP line\n");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING_0, msg,
-        netlistFileName_, parsedLine[0].lineNumber_);
+    Report::UserWarning0().at(netlistFileName_, parsedLine[0].lineNumber_) << "Ignoring extra fields on .OP line";
   }
 
   // Set the OptionBlock name.
@@ -386,23 +385,23 @@ bool N_IO_OptionBlock::extractOPData()
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_OptionBlock::extractDCOPData
+// Function       : OptionBlock::extractDCOPData
 // Purpose        :
 // Special Notes  :
 // Scope          :
 // Creator        : Dave Shirley, PSSI
 // Creation Date  : 05/08/06
 //----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractDCOPData()
+bool OptionBlock::extractDCOPData()
 {
   int numFields = parsedLine.size();
   int linePosition = 0;
-  set<string> pars;
+  std::set<std::string> pars;
 
   // Set the OptionBlock name.
   setName( "OP_IO" );
 
-  N_UTL_Param parameter("", "");
+  Util::Param parameter("", "");
   ExtendedString ES("");
 
   ++linePosition;
@@ -412,11 +411,8 @@ bool N_IO_OptionBlock::extractDCOPData()
     ES.toUpper ();
     if (pars.find(ES) != pars.end())
     {
-      string msg("Multiple ");
-      msg += ES;
-      msg += " name specifications in .DCOP line";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-        netlistFileName_, parsedLine[0].lineNumber_);
+      Report::UserError().at(netlistFileName_, parsedLine[0].lineNumber_)
+        << "Multiple " << ES << " name specifications in .DCOP line";
     }
     if (ES == "INPUT" || ES == "OUTPUT" )
     {
@@ -445,9 +441,8 @@ bool N_IO_OptionBlock::extractDCOPData()
       }
       else
       {
-        string msg("Unrecognized field in .DCOP line");
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-          netlistFileName_, parsedLine[0].lineNumber_);
+        Report::UserError().at(netlistFileName_, parsedLine[0].lineNumber_)
+          << "Unrecognized field in .DCOP line";
       }
     }
   }
@@ -456,50 +451,48 @@ bool N_IO_OptionBlock::extractDCOPData()
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_OptionBlock::extractOutputData
+// Function       : OptionBlock::extractOutputData
 // Purpose        :
 // Special Notes  :
 // Scope          :
 // Creator        : Lon Waters
 // Creation Date  : 08/26/2003
 //----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractOutputData()
+bool OptionBlock::extractOutputData()
 {
   int numFields = parsedLine.size();
 
   // Check that the number of fields is as expected.
   if (numFields != 3)
   {
-    string msg(".OUTPUT line requires exactly two parameters, the\n");
-    msg += "beginning time and the output step size.\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-        netlistFileName_, parsedLine[0].lineNumber_);
+    Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+      << ".OUTPUT line requires exactly two parameters, the beginning time and the output step size.";
   }
 
   // Set the OptionBlock name.
   setName("OUTPUT-LINE");
 
   // Extract the output parameters
-  N_UTL_Param time( "TIME", "" );
+  Util::Param time( "TIME", "" );
   time.setVal(parsedLine[1].string_);
   addParameter(time);
 
-  N_UTL_Param interval( "INTERVAL", "" );
+  Util::Param interval( "INTERVAL", "" );
   interval.setVal(parsedLine[2].string_);
   addParameter(interval);
 
-  // Further processing is needed by the N_IO_CircuitBlock which initiated
+  // Further processing is needed by the CircuitBlock which initiated
   // this method. For convenience, we add the line number of the .OUTPUT
-  // line as a parameter in case the N_IO_CircuitBlock cannot find the
+  // line as a parameter in case the CircuitBlock cannot find the
   // .OPTIONS OUTPUT line that should have preceded this .OUTPUT line.
-  N_UTL_Param lineNum( "LINENUMBER", static_cast<int> (parsedLine[0].lineNumber_) );
+  Util::Param lineNum( "LINENUMBER", static_cast<int> (parsedLine[0].lineNumber_) );
   addParameter(lineNum);
 
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractParamData
+// Function      : OptionBlock::extractParamData
 // Purpose       : Extract the parameters from a netlist .PARAM line held in
 //                 parsedLine.
 // Special Notes :
@@ -507,21 +500,20 @@ bool N_IO_OptionBlock::extractOutputData()
 // Creator       : Lon Waters, SNL
 // Creation Date : 10/05/2001
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractParamData()
+bool OptionBlock::extractParamData()
 {
   int numFields = parsedLine.size();
 
   // Check that the minimum required number of fields are on the line.
   if ( numFields < 4 )
   {
-    string msg(".param line has an unexpected number of fields\n");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-        netlistFileName_, parsedLine[0].lineNumber_);
+    Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+      << ".param line has an unexpected number of fields";
   }
 
   int linePosition = 1;   // Start of parameters on .param line.
 
-  N_UTL_Param parameter("", "");
+  Util::Param parameter("", "");
   while ( linePosition < numFields )
   {
     parameter.setTag( parsedLine[linePosition].string_ );
@@ -529,37 +521,30 @@ bool N_IO_OptionBlock::extractParamData()
     if ( (parameter.uTag() == "TEMP") || (parameter.uTag() == "VT") ||
          (parameter.uTag() == "GMIN") || (parameter.uTag() == "TIME") )
     {
-      string msg("Parameter name " + parameter.uTag());
-      msg += " is not permitted\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-          netlistFileName_, parsedLine[linePosition].lineNumber_);
+      Report::UserError0().at(netlistFileName_, parsedLine[linePosition].lineNumber_)
+        << "Parameter name " << parameter.uTag() << " is not permitted";
     }
 
     if ( linePosition + 2 >= numFields )
     {
-      // Hit end of line unexpectedly.
-      string msg("Unexpectedly reached end of line while looking for\n");
-      msg += " parameters in .PARAM statement";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-          netlistFileName_, parsedLine[linePosition].lineNumber_);
+      Report::UserError0().at(netlistFileName_, parsedLine[linePosition].lineNumber_)
+        << "Unexpectedly reached end of line while looking for parameters in .PARAM statement";
     }
 
     if ( parsedLine[ linePosition+1].string_ != "=" )
     {
-      string msg("Equal sign (=) required between parameter and value in");
-      msg += ".PARAM statement\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-          netlistFileName_, parsedLine[linePosition+1].lineNumber_);
+      Report::UserError0().at(netlistFileName_, parsedLine[linePosition+1].lineNumber_)
+        << "Equal sign (=) required between parameter and value in .PARAM statement";
     }
 
     linePosition += 2;   // Advance to parameter value field.
 
     if (parsedLine[linePosition].string_[0] == '{')
     {
-      N_UTL_Expression expPtr(parsedLine[linePosition].string_);
+      Util::Expression expPtr(parsedLine[linePosition].string_);
 
-      vector<string> junk;
-      string msg;
+      std::vector<std::string> junk;
+      std::string msg;
       expPtr.get_names(XEXP_NODE, junk);
       if (junk.size() > 0)
         msg = "Node Voltage";
@@ -571,11 +556,8 @@ bool N_IO_OptionBlock::extractParamData()
         msg = "Lead Current";
       if (msg != "")
       {
-        msg += " may not be used in parameter expression (";
-        msg += parameter.tag();
-        msg += ")";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-            netlistFileName_, parsedLine[0].lineNumber_);
+        Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+          << msg << " may not be used in parameter expression (" << parameter.tag() << ")";
       }
       parameter.setVal(parsedLine[linePosition].string_);
 //DNS: It should be this?      parameter.setVal(expPtr);
@@ -585,9 +567,9 @@ bool N_IO_OptionBlock::extractParamData()
     {
       ExtendedString tmp ( parsedLine[linePosition].string_ );
       if (tmp.possibleParam())
-        parameter.setVal(string("{" + parsedLine[linePosition].string_ + "}"));
+        parameter.setVal(std::string("{" + parsedLine[linePosition].string_ + "}"));
 //DNS: this expr should be parsed here?
-//        parameter.setVal(N_UTL_Expression(string("{" + parsedLine[linePosition].string_ + "}")));
+//        parameter.setVal(Util::Expression(std::string("{" + parsedLine[linePosition].string_ + "}")));
       else
         parameter.setVal(parsedLine[linePosition].string_);
     }
@@ -606,14 +588,14 @@ bool N_IO_OptionBlock::extractParamData()
   // Once data is extracted, the info in parsedLine is no longer
   // needed, trim it now using the swap trick.
   parsedLine.clear();
-  vector<N_IO_SpiceSeparatedFieldTool::StringToken>
+  std::vector<SpiceSeparatedFieldTool::StringToken>
     (parsedLine).swap(parsedLine);
 
   return true; // Only get here on success.
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractOptionsData
+// Function      : OptionBlock::extractOptionsData
 // Purpose       : Extract the parameters from a netlist .OPTIONS line held in
 //                 parsedLine.
 // Special Notes :
@@ -621,7 +603,7 @@ bool N_IO_OptionBlock::extractParamData()
 // Creator       : Lon Waters, SNL
 // Creation Date : 10/05/2001
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractOptionsData()
+bool OptionBlock::extractOptionsData()
 {
   int numFields = parsedLine.size();
 
@@ -641,37 +623,65 @@ bool N_IO_OptionBlock::extractOptionsData()
     // Check to see if this is PSPICE style option line or if an unrecognized
     // package name was given. Do this by checking for an "=" in either the
     // 3rd or 4th position on the line.
-    if ( parsedLine[2].string_ == "=" )
+    if (numFields > 2 && parsedLine[2].string_ == "=" )
     {
-      setName( "PSPICE" );
-      parameterStartPos = 1;
+      // look for TEMP and/or TNOM  If they are the only tags present on the 
+      // rest of the line, they try setting the package name to DEVICE 
+      //
+      // assume we only found TEMP and TNOM for now.
+      bool foundOnlyTempAndTnom=true;
+      
+      // format of parsed line at this point is <tag> = <value> 
+      // with the first tag starting at position 1 (hence why 
+      // parsedLine[2].string_ == "="  was true to get into this if block.)
+      // Check every 3rd item starting from i=1 to only check the tags. 
+      for (int i=1; i<numFields; i=i+3 )
+      {
+        ExtendedString tag ( parsedLine[i].string_ );
+        tag.toUpper();
+        if( (tag != "TNOM") && (tag != "TEMP") )
+        {
+          foundOnlyTempAndTnom=false;
+        }
+      }
+      
+      if(foundOnlyTempAndTnom)
+      {
+        setName("DEVICE");
+        parameterStartPos = 1;
+      }
+      else
+      {
+        setName( "PSPICE" );
+        parameterStartPos = 1;
 
-      string msg("PSPICE style options are not currently supported in Xyce\n");
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-          netlistFileName_, parsedLine[0].lineNumber_);
-      return false;
+        Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+          << "PSPICE style options are not currently supported in Xyce";
+
+        return false;
+      }
     }
     else
     {
-      string msg("Unrecognized .OPTIONS package " + optionName + "\n");
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-          netlistFileName_, parsedLine[1].lineNumber_);
+      Report::UserError0().at(netlistFileName_, parsedLine[1].lineNumber_)
+        << "Unrecognized .OPTIONS package " << optionName;
+      return false;
     }
   }
 
   // Create an option block to temporarily store the default options.
-  N_IO_OptionBlock defaultOptions("", parsedLine, metadata_ );
+  OptionBlock defaultOptions("", parsedLine, metadata_ );
 
   // Get the default options from metadata.
   defaultOptions.addDefaultOptionsParameters( getName() );
 
   // Extract the parameters from parsedLine.
   int parameterEndPos = numFields - 1;
-  vector<N_UTL_Param> inputParameters;
-  N_UTL_Param parameter("", "");
+  std::vector<Util::Param> inputParameters;
+  Util::Param parameter("", "");
   int intervalParameterStart = -1;
   int i = parameterStartPos;
-  string paramBaseName;
+  std::string paramBaseName;
   while (i <= parameterEndPos-1)
   {
     // Check for equal sign.
@@ -679,10 +689,9 @@ bool N_IO_OptionBlock::extractOptionsData()
     {
       if ( optionName != "OUTPUT" && optionName != "RESTART" )
       {
-        string msg("Equal sign required between parameter name\n");
-        msg += "and value in .OPTIONS " + getName() + "\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-            netlistFileName_, parsedLine[i].lineNumber_);
+        Report::UserError0().at(netlistFileName_, parsedLine[i].lineNumber_)
+           << "Equal sign required between parameter name and value in .OPTIONS " << getName();
+        return false;
       }
       else
       {
@@ -698,18 +707,14 @@ bool N_IO_OptionBlock::extractOptionsData()
     // parameter list. Check to see if the parameter is "VECTOR"
     // valued and treat accordingly.
     parameter.set( parsedLine[i].string_, "" );
-    N_UTL_Param* parameterPtr = defaultOptions.findParameter(parameter);
+    Util::Param* parameterPtr = defaultOptions.findParameter(parameter);
     if (parameterPtr == NULL)
     {
-      // Options parameter not found, print out warning.
-      string msg("No options parameter " + parameter.tag());
-      msg += " found in metadata.\n";
-      msg += "This parameter will be ignored.\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING_0, msg,
-          netlistFileName_, parsedLine[0].lineNumber_);
+      Report::UserWarning0().at(netlistFileName_, parsedLine[0].lineNumber_)
+        << "No options parameter " << parameter.tag() << " found, parameter will be ignored.";
       i+= 3;
     }
-    else if (parameterPtr->sVal() != "VECTOR")
+    else if (parameterPtr->stringValue() != "VECTOR")
     {
       parameter.setVal( parsedLine[i+2].string_ );
       inputParameters.push_back( parameter );
@@ -717,10 +722,9 @@ bool N_IO_OptionBlock::extractOptionsData()
 
       if (i < parameterEndPos-1 && parsedLine[i].string_ == ",")
       {
-        string msg("Options parameter " + parameter.tag());
-        msg += " is flagged as not VECTOR, but has comma in value.\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-                                 netlistFileName_, parsedLine[0].lineNumber_);
+        Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+          << "Options parameter " << parameter.tag() << " is flagged as not VECTOR, but has comma in value.";
+        return false;
       }
     }
     else
@@ -728,7 +732,7 @@ bool N_IO_OptionBlock::extractOptionsData()
       // We have a vector valued parameter.
       // Name the jth component of the parameter of the vector by appending
       // "j" to the parameter name.
-      ostringstream paramName;
+      std::ostringstream paramName;
       paramBaseName = ExtendedString(parsedLine[i].string_).toUpper();
       int j = 1;
 
@@ -763,7 +767,7 @@ bool N_IO_OptionBlock::extractOptionsData()
   int numInputParameters = inputParameters.size();
   for ( int k = 0; k < numInputParameters; ++k )
   {
-    N_UTL_Param* parameterPtr =
+    Util::Param* parameterPtr =
       defaultOptions.findParameter( inputParameters[k] );
     if ( parameterPtr != NULL )
     {
@@ -772,12 +776,8 @@ bool N_IO_OptionBlock::extractOptionsData()
     }
     else
     {
-      // Options parameter not found, print out warning.
-      string msg("No options parameter " + inputParameters[k].tag());
-      msg += " found in metadata.\n";
-      msg += "This parameter will be ignored.\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING_0, msg,
-          netlistFileName_, parsedLine[0].lineNumber_);
+      Report::UserWarning0().at(netlistFileName_, parsedLine[0].lineNumber_)
+        << "No options parameter " << inputParameters[k].tag() << " found, parameter will be ignored.";
     }
   }
 
@@ -786,8 +786,8 @@ bool N_IO_OptionBlock::extractOptionsData()
   if ( (optionName == "OUTPUT" || optionName == "RESTART") &&
         intervalParameterStart != -1)
   {
-    N_UTL_Param time( "TIME", "" );
-    N_UTL_Param interval( "INTERVAL", "" );
+    Util::Param time( "TIME", "" );
+    Util::Param interval( "INTERVAL", "" );
 
     int i = intervalParameterStart;
     while ( i < parameterEndPos )
@@ -805,14 +805,14 @@ bool N_IO_OptionBlock::extractOptionsData()
   // Once data is extracted, the info in parsedLine is no longer
   // needed, trim it now using the swap trick.
   parsedLine.clear();
-  vector<N_IO_SpiceSeparatedFieldTool::StringToken>
+  std::vector<SpiceSeparatedFieldTool::StringToken>
     (parsedLine).swap(parsedLine);
 
   return true; // Only get here on success.
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::addDefaultOptionsParameters
+// Function      : ParameterBlock::addDefaultOptionsParameters
 // Purpose       : Add the default parameters for a model from metadata.
 // Special Notes : While not required, it is generally expected that
 //                 the parameters given in the input netlist will have
@@ -821,21 +821,18 @@ bool N_IO_OptionBlock::extractOptionsData()
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/17/2001
 //-----------------------------------------------------------------------------
-void N_IO_OptionBlock::addDefaultOptionsParameters( string const& optionName )
+void OptionBlock::addDefaultOptionsParameters(const std::string &optionName )
 {
-  vector<N_UTL_Param> * optionsParameterPtr =
-    metadata_.getPtrToOptionsParameters(optionName);
-
-  addParameters(*optionsParameterPtr);
+  addParameters(metadata_.getOptionsParameters(optionName));
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_ParameterBlock::extractDCData
+// Function      : ParameterBlock::extractDCData
 // Purpose       : Determine number of sweep variables on this DC line
 //                : and create option blocks for each, storing the blocks
 //                : in the referenced vector.
 //-----------------------------------------------------------------------------
-int N_IO_OptionBlock::extractDCData( vector< N_IO_OptionBlock > & oBs )
+int OptionBlock::extractDCData( std::vector< OptionBlock > & oBs )
 {
   // length of the original .DC line
   int numFields = parsedLine.size();
@@ -850,12 +847,13 @@ int N_IO_OptionBlock::extractDCData( vector< N_IO_OptionBlock > & oBs )
   while( linePosition < numFields )
   {
     // create a new option block for this source
-    oBs.push_back( N_IO_OptionBlock( netlistFileName_, metadata_ ) );
+    oBs.push_back( OptionBlock( netlistFileName_, metadata_ ) );
     oBs[sourcesFound].setName( "DC" );
 
-    N_UTL_Param parameter("", "");
-    ExtendedString stringVal ( parsedLine[linePosition + 1].string_ );
-    stringVal.toUpper();
+    Util::Param parameter("", "");
+
+    std::string stringVal = parsedLine[linePosition + 1].string_;
+    Util::toUpper(stringVal);
 
     ExtendedString curr ( parsedLine[linePosition].string_ );
     curr.toUpper();
@@ -877,7 +875,7 @@ int N_IO_OptionBlock::extractDCData( vector< N_IO_OptionBlock > & oBs )
 
       // collect values in this list until next sweep variable name is found
       while( ++linePosition < numFields &&
-       ( N_UTL_Param( "", parsedLine[linePosition].string_ ) ).isNumeric() )
+       ( Util::Param( "", parsedLine[linePosition].string_ ) ).isNumeric() )
       {
         parameter.setTag( "VAL" );
         parameter.setVal( parsedLine[linePosition].string_ );
@@ -887,10 +885,10 @@ int N_IO_OptionBlock::extractDCData( vector< N_IO_OptionBlock > & oBs )
 
     else
     {
-      string sweepStepTag ("STEP");
+      std::string sweepStepTag ("STEP");
 
       // check for non-LIST default (LINear sweep)
-      if( ( N_UTL_Param( "", stringVal ) ).isNumeric() )
+      if( ( Util::Param( "", stringVal ) ).isNumeric() )
       {
         stringVal = "LIN";
       }
@@ -900,7 +898,8 @@ int N_IO_OptionBlock::extractDCData( vector< N_IO_OptionBlock > & oBs )
       {
         // get sweep type name and move to sweep variable name
         stringVal = parsedLine[linePosition++].string_;
-        stringVal.toUpper();
+//        stringVal.toUpper();
+        Util::toUpper(stringVal);
 
         // change sweep step tag
         sweepStepTag = "NUMSTEPS";
@@ -914,27 +913,27 @@ int N_IO_OptionBlock::extractDCData( vector< N_IO_OptionBlock > & oBs )
       // simple check for expected four items; semantic errors pass through
       if( numFields <= linePosition + 3 )
       {
-        string msg(".DC line not formatted correctly, found unexpected number ");
-        msg += "of fields\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-         netlistFileName_, parsedLine[0].lineNumber_);
+        Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+          << ".DC line not formatted correctly, found unexpected number of fields";
+        linePosition = numFields;
       }
+      else {
+        parameter.setTag( "PARAM" );
+        parameter.setVal( parsedLine[linePosition++].string_ );
+        oBs[sourcesFound].addParameter( parameter );
 
-      parameter.setTag( "PARAM" );
-      parameter.setVal( parsedLine[linePosition++].string_ );
-      oBs[sourcesFound].addParameter( parameter );
+        parameter.setTag( "START" );
+        parameter.setVal( parsedLine[linePosition++].string_ );
+        oBs[sourcesFound].addParameter( parameter );
 
-      parameter.setTag( "START" );
-      parameter.setVal( parsedLine[linePosition++].string_ );
-      oBs[sourcesFound].addParameter( parameter );
+        parameter.setTag( "STOP" );
+        parameter.setVal( parsedLine[linePosition++].string_ );
+        oBs[sourcesFound].addParameter( parameter );
 
-      parameter.setTag( "STOP" );
-      parameter.setVal( parsedLine[linePosition++].string_ );
-      oBs[sourcesFound].addParameter( parameter );
-
-      parameter.setTag( sweepStepTag );
-      parameter.setVal( parsedLine[linePosition++].string_ );
-      oBs[sourcesFound].addParameter( parameter );
+        parameter.setTag( sweepStepTag );
+        parameter.setVal( parsedLine[linePosition++].string_ );
+        oBs[sourcesFound].addParameter( parameter );
+      }
     }
 
     // record this source (and move on to the next)
@@ -946,7 +945,7 @@ int N_IO_OptionBlock::extractDCData( vector< N_IO_OptionBlock > & oBs )
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractDCData
+// Function      : OptionBlock::extractDCData
 // Purpose       : Extract the parameters from a netlist .DC line held in
 //                 parsedLine.
 // Special Notes :
@@ -954,7 +953,7 @@ int N_IO_OptionBlock::extractDCData( vector< N_IO_OptionBlock > & oBs )
 // Creator       : Lon Waters, SNL
 // Creation Date : 10/05/2001
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractDCData()
+bool OptionBlock::extractDCData()
 {
   int numFields = parsedLine.size();
 
@@ -964,49 +963,48 @@ bool N_IO_OptionBlock::extractDCData()
   // Check that the minimum required number of fields are on the line.
   if ( (numFields-1)%4 != 0 )
   {
-    string msg(".DC line not formatted correctly, found unexpected number ");
-    msg += "of fields\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-        netlistFileName_, parsedLine[0].lineNumber_);
+    Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+      << ".DC line not formatted correctly, found unexpected number of fields";
   }
+  else {
+    int linePosition = 1;   // Start of parameters on .param line.
 
-  int linePosition = 1;   // Start of parameters on .param line.
+    Util::Param parameter("", "");
+    while ( linePosition < numFields )
+    {
+      parameter.setTag( "VSOURCE" );
+      parameter.setVal( parsedLine[linePosition].string_ );
+      addParameter( parameter );
+      ++linePosition;     // Advance to next parameter.
 
-  N_UTL_Param parameter("", "");
-  while ( linePosition < numFields )
-  {
-    parameter.setTag( "VSOURCE" );
-    parameter.setVal( parsedLine[linePosition].string_ );
-    addParameter( parameter );
-    ++linePosition;     // Advance to next parameter.
+      parameter.setTag( "VSTART" );
+      parameter.setVal( parsedLine[linePosition].string_ );
+      addParameter( parameter );
+      ++linePosition;     // Advance to next parameter.
 
-    parameter.setTag( "VSTART" );
-    parameter.setVal( parsedLine[linePosition].string_ );
-    addParameter( parameter );
-    ++linePosition;     // Advance to next parameter.
+      parameter.setTag( "VSTOP" );
+      parameter.setVal( parsedLine[linePosition].string_ );
+      addParameter( parameter );
+      ++linePosition;     // Advance to next parameter.
 
-    parameter.setTag( "VSTOP" );
-    parameter.setVal( parsedLine[linePosition].string_ );
-    addParameter( parameter );
-    ++linePosition;     // Advance to next parameter.
-
-    parameter.setTag( "VSTEP" );
-    parameter.setVal( parsedLine[linePosition].string_ );
-    addParameter( parameter );
-    ++linePosition;     // Advance to next parameter.
+      parameter.setTag( "VSTEP" );
+      parameter.setVal( parsedLine[linePosition].string_ );
+      addParameter( parameter );
+      ++linePosition;     // Advance to next parameter.
+    }
   }
-
+  
   // Once data is extracted, the info in parsedLine is no longer
   // needed, trim it now using the swap trick.
   parsedLine.clear();
-  vector<N_IO_SpiceSeparatedFieldTool::StringToken>
+  std::vector<SpiceSeparatedFieldTool::StringToken>
     (parsedLine).swap(parsedLine);
 
   return true; // Only get here on success.
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractSTEPData
+// Function      : OptionBlock::extractSTEPData
 // Purpose       : Extract the parameters from a netlist .STEP line held in
 //                 parsedLine.
 // Special Notes :
@@ -1014,7 +1012,7 @@ bool N_IO_OptionBlock::extractDCData()
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 10/30/2003
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractSTEPData()
+bool OptionBlock::extractSTEPData()
 {
   int numFields = parsedLine.size();
 
@@ -1027,7 +1025,7 @@ bool N_IO_OptionBlock::extractSTEPData()
 
   bool typeExplicitSetLinDecOct = false;
   bool typeExplicitSetList = false;
-  string type("LIN");
+  std::string type("LIN");
   int typeIndex = -1;
   while ( pos1 < numFields )
   {
@@ -1062,14 +1060,13 @@ bool N_IO_OptionBlock::extractSTEPData()
   {
     if ( (numFields-offset)%4 != 0 )
     {
-      string msg(".STEP line not formatted correctly.\n");
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-          netlistFileName_, parsedLine[0].lineNumber_);
+      Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+        << ".STEP line not formatted correctly.";
     }
   }
 
   int linePosition = 1;   // Start of parameters on .param line.
-  N_UTL_Param parameter("", "");
+  Util::Param parameter("", "");
 
   // Add the type (which was determined above) to the parameter list.
   parameter.setTag( "TYPE" );
@@ -1174,21 +1171,21 @@ bool N_IO_OptionBlock::extractSTEPData()
   }
   else
   {
-    string msg(".STEP line contains an unrecognized type");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg);
+    Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+      << ".STEP line contains an unrecognized type";
   }
 
   // Once data is extracted, the info in parsedLine is no longer
   // needed, trim it now using the swap trick.
   parsedLine.clear();
-  vector<N_IO_SpiceSeparatedFieldTool::StringToken>
+  std::vector<SpiceSeparatedFieldTool::StringToken>
     (parsedLine).swap(parsedLine);
 
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractMPDEData
+// Function      : OptionBlock::extractMPDEData
 // Purpose       : Extract the parameters from a netlist .DC line held in
 //                 parsedLine.
 // Special Notes :
@@ -1196,7 +1193,7 @@ bool N_IO_OptionBlock::extractSTEPData()
 // Creator       : Todd Coffey, Rich Schiek
 // Creation Date : 7/23/08
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractMPDEData()
+bool OptionBlock::extractMPDEData()
 {
   int numFields = parsedLine.size();
 
@@ -1206,15 +1203,14 @@ bool N_IO_OptionBlock::extractMPDEData()
   // Check that the minimum required number of fields are on the line.
   if ( numFields < 3 || numFields > 6 )
   {
-    string msg(".MPDE line has an unexpected number of fields\n");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-        netlistFileName_, parsedLine[0].lineNumber_);
+    Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+      << ".MPDE line has an unexpected number of fields";
   }
 
   int linePosition = 1;   // Start of parameters on .param line.
   int endPosition = numFields - 1;
 
-  N_UTL_Param parameter("", "");
+  Util::Param parameter("", "");
 
   // TSTEP and TSTOP are required, get them now.
   parameter.setTag( "TSTEP" );
@@ -1237,10 +1233,8 @@ bool N_IO_OptionBlock::extractMPDEData()
   }
   else if ( numFields == 6)
   {
-    string msg("expected NOOP/UIC field on .MPDE line but found");
-    msg += parameter.usVal() + "\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-        netlistFileName_, parsedLine[endPosition].lineNumber_);
+    Report::UserError0().at(netlistFileName_, parsedLine[endPosition].lineNumber_)
+      << "expected NOOP/UIC field on .MPDE line but found" << parameter.usVal();
   }
 
   if ( linePosition <= endPosition )
@@ -1262,14 +1256,14 @@ bool N_IO_OptionBlock::extractMPDEData()
   // Once data is extracted, the info in parsedLine is no longer
   // needed, trim it now using the swap trick.
   parsedLine.clear();
-  vector<N_IO_SpiceSeparatedFieldTool::StringToken>
+  std::vector<SpiceSeparatedFieldTool::StringToken>
     (parsedLine).swap(parsedLine);
 
   return true; // Only get here on success.
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractHBData
+// Function      : OptionBlock::extractHBData
 // Purpose       : Extract the parameters from a netlist .DC line held in
 //                 parsedLine.
 // Special Notes :
@@ -1277,7 +1271,7 @@ bool N_IO_OptionBlock::extractMPDEData()
 // Creator       : Todd Coffey, Rich Schiek
 // Creation Date : 7/23/08
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractHBData()
+bool OptionBlock::extractHBData()
 {
   int numFields = parsedLine.size();
 
@@ -1285,34 +1279,53 @@ bool N_IO_OptionBlock::extractHBData()
   setName( "HB" );
 
   // Check that the minimum required number of fields are on the line.
-  if ( numFields < 1 || numFields > 2 )
+  if ( numFields < 2 )
   {
-    string msg(".HB line has an unexpected number of fields\n");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-        netlistFileName_, parsedLine[0].lineNumber_);
+    Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+      << ".HB line has an unexpected number of fields";
   }
 
   int linePosition = 1;   // Start of parameters on .param line.
-  int endPosition = numFields - 1;
+  int endPosition = numFields;
 
-  N_UTL_Param parameter("", "");
+  Util::Param parameter("", "");
 
-  // frequency of oscillation is required
+// frequency of oscillation is required
+  std::vector<double> freqs(numFields - 1);
+
+  int i = 0;
+  while( linePosition < endPosition )
+  {
+    std::string & value = parsedLine[linePosition].string_;
+    if (Util::isValue(value))
+    {
+      freqs[i] = Util::Value(value);
+    }
+    else
+    {
+      Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+        << "Attempt to assign value for FREQ from " << value;
+    }
+    ++linePosition;
+    ++i;
+  }
+
   parameter.setTag( "FREQ" );
-  parameter.setVal( parsedLine[linePosition].string_ );
+  parameter.setVal( freqs );
   addParameter( parameter );
+//  ++linePosition;
 
   // Once data is extracted, the info in parsedLine is no longer
   // needed, trim it now using the swap trick.
   parsedLine.clear();
-  vector<N_IO_SpiceSeparatedFieldTool::StringToken>
+  std::vector<SpiceSeparatedFieldTool::StringToken>
     (parsedLine).swap(parsedLine);
 
   return true; // Only get here on success.
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractTRANData
+// Function      : OptionBlock::extractTRANData
 // Purpose       : Extract the parameters from a netlist .DC line held in
 //                 parsedLine.
 // Special Notes :
@@ -1320,7 +1333,7 @@ bool N_IO_OptionBlock::extractHBData()
 // Creator       : Lon Waters, SNL
 // Creation Date : 10/05/2001
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractTRANData()
+bool OptionBlock::extractTRANData()
 {
   int numFields = parsedLine.size();
 
@@ -1330,15 +1343,14 @@ bool N_IO_OptionBlock::extractTRANData()
   // Check that the minimum required number of fields are on the line.
   if ( numFields < 3 || numFields > 6 )
   {
-    string msg(".TRAN line has an unexpected number of fields\n");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-        netlistFileName_, parsedLine[0].lineNumber_);
+    Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+      << ".TRAN line has an unexpected number of fields";
   }
 
   int linePosition = 1;   // Start of parameters on .param line.
   int endPosition = numFields;
 
-  N_UTL_Param parameter("", "");
+  Util::Param parameter("", "");
 
   // TSTEP and TSTOP are required, get them now.
   parameter.setTag( "TSTEP" );
@@ -1399,10 +1411,8 @@ bool N_IO_OptionBlock::extractTRANData()
         }
         else
         {
-          string msg("expected NOOP/UIC field on .TRAN line but found");
-          msg += parameter.usVal() + "\n";
-          N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-              netlistFileName_, parsedLine[linePosition].lineNumber_);
+          Report::UserError0().at(netlistFileName_, parsedLine[linePosition].lineNumber_)
+            << "expected NOOP/UIC field on .TRAN line but found" << parameter.usVal();
         }
       }
     }
@@ -1412,14 +1422,14 @@ bool N_IO_OptionBlock::extractTRANData()
   // Once data is extracted, the info in parsedLine is no longer
   // needed, trim it now using the swap trick.
   parsedLine.clear();
-  vector<N_IO_SpiceSeparatedFieldTool::StringToken>
+  std::vector<SpiceSeparatedFieldTool::StringToken>
     (parsedLine).swap(parsedLine);
 
   return true; // Only get here on success.
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractPrintData
+// Function      : OptionBlock::extractPrintData
 // Purpose       : Extract the parameters from a netlist .PRINT line held in
 //                 parsedLine.
 // Special Notes :
@@ -1427,7 +1437,7 @@ bool N_IO_OptionBlock::extractTRANData()
 // Creator       : Lon Waters, SNL
 // Creation Date : 05/02/2002
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractPrintData()
+bool OptionBlock::extractPrintData()
 {
   int numFields = parsedLine.size();
 
@@ -1437,43 +1447,38 @@ bool N_IO_OptionBlock::extractPrintData()
 #ifdef Xyce_DEBUG_IO
   for (int ieric=0;ieric<parsedLine.size();++ieric)
   {
-    cout << "parsedLine["<<ieric<<"] = " << parsedLine[ieric].string_ << endl;
+    Xyce::dout() << "parsedLine["<<ieric<<"] = " << parsedLine[ieric].string_ << std::endl;
   }
 #endif
 
   // Set the TYPE and add it the parameters.
-  ExtendedString tmpString = parsedLine[1].string_;
-  tmpString.toUpper();
+  std::string tmpString = parsedLine[1].string_;
+  Util::toUpper(tmpString);
   if (tmpString == "TR")
   {
     tmpString = "TRAN"; // TR is a synonym for TRAN
   }
-  //N_UTL_Param typeParameter("TYPE", parsedLine[1].string_);
-  N_UTL_Param typeParameter("TYPE", tmpString);
+  Util::Param typeParameter("TYPE", tmpString);
   if ( typeParameter.usVal() != "DC" &&
        typeParameter.usVal() != "TRAN" &&
        typeParameter.usVal() != "AC" &&
        typeParameter.usVal() != "HB" &&
        typeParameter.usVal() != "MOR" )
   {
-    string msg("Invalid type \"" + typeParameter.usVal());
-    msg += "\" for .PRINT statement\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-        netlistFileName_, parsedLine[1].lineNumber_);
+    Report::UserError0().at(netlistFileName_, parsedLine[1].lineNumber_)
+      << "Invalid type \"" << typeParameter.usVal() << "\" for .PRINT statement";
   }
 
   // Add the options parameter set to the model.
   addDefaultOptionsParameters( "PRINT" );
 
   // Reset the default TYPE with the value found.
-  N_UTL_Param* parameterPtr = findParameter( typeParameter );
+  Util::Param* parameterPtr = findParameter( typeParameter );
 
   if( parameterPtr == NULL )
   {
-    string msg("Failed to find parameter\"" + typeParameter.usVal());
-    msg += "\" in optionData for .PRINT statement\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-                             netlistFileName_, parsedLine[1].lineNumber_);
+    Report::UserError0().at(netlistFileName_, parsedLine[1].lineNumber_)
+      << "Failed to find parameter\"" << typeParameter.usVal() << "\" in optionData for .PRINT statement";
   }
 
   parameterPtr->setVal( typeParameter.usVal() );
@@ -1482,18 +1487,16 @@ bool N_IO_OptionBlock::extractPrintData()
   // if the user set FILE=vale it will be picked up here.  Otherwise
   // the output manager will use the top level simulation netlist name
   // as the default.
-  N_UTL_Param fileParameter("FILE", "");
+  Util::Param fileParameter("FILE", "");
   parameterPtr = findParameter( fileParameter );
 
   if( parameterPtr == NULL )
   {
-    string msg("Failed to find parameter\"" + typeParameter.usVal());
-    msg += "\" in optionData for .PRINT statement\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-                             netlistFileName_, parsedLine[1].lineNumber_);
+    Report::UserError0().at(netlistFileName_, parsedLine[1].lineNumber_)
+      << "Failed to find parameter\"" << typeParameter.usVal() << "\" in optionData for .PRINT statement";
   }
 
-  parameterPtr->setVal( fileParameter.sVal() );
+  parameterPtr->setVal( fileParameter.stringValue() );
 
   //
   // Note: The PRINT control parameters (FORMAT, WIDTH, FILE, ...) must be
@@ -1507,12 +1510,12 @@ bool N_IO_OptionBlock::extractPrintData()
   if ( numFields > parameterStartPos + 1 && parsedLine[parameterStartPos + 1].string_ == "=" )
   {
      // Tagged parameters found.
-     N_UTL_Param* parameterPtr;
+     Util::Param* parameterPtr;
      while ( position+1 < parsedLine.size() &&
              parsedLine[position+1].string_ == "=" )
      {
 
-       parameterPtr = findParameter( N_UTL_Param(parsedLine[position].string_, "") );
+       parameterPtr = findParameter( Util::Param(parsedLine[position].string_, "") );
        if ( parameterPtr != NULL )
        {
          if (parameterPtr->tag() != "FILE")
@@ -1523,34 +1526,27 @@ bool N_IO_OptionBlock::extractPrintData()
        }
        else
        {
-         // Options parameter not found, print out warning.
-         string msg("No PRINT parameter " + parsedLine[position].string_);
-         msg += " found in metadata.\n";
-         msg += "This parameter will be ignored.\n";
-         N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING_0, msg,
-             netlistFileName_, parsedLine[position].lineNumber_);
+         Report::UserWarning0().at(netlistFileName_, parsedLine[0].lineNumber_)
+           << "No PRINT parameter " << parsedLine[position].string_ << " found, parameter will be ignored.";
          return false;
        }
 
        position += 3;
      }
   }
-#ifdef Xyce_DEBUG_IO
-  // There is no point to this warning unless we're debugging
-  else
+  else if (Xyce::DEBUG_IO) // There is no point to this warning unless we're debugging
   {
-    string msg("No tagged parameters found\n");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING_0, msg);
+    Report::UserWarning0().at(netlistFileName_, parsedLine[0].lineNumber_)
+      << "No tagged parameters found";
   }
-#endif
 
   // Complete the PRINT line parsing.
   // Some of the remaining fields are of the
   // form I(Vname), V(node) or V(node1,node2), and these fields need
   // special treatment.
-  N_UTL_Param parameter;
+  Util::Param parameter;
   ExtendedString field("");
-  string msg("");
+  std::ostringstream msg;
   int p_err;
   while ( position < numFields )
   {
@@ -1592,7 +1588,7 @@ bool N_IO_OptionBlock::extractPrintData()
         }
         else
         {
-          msg = "Unrecognized current specification";
+          msg << "Unrecognized current specification";
           p_err = position;
         }
       }
@@ -1618,7 +1614,9 @@ bool N_IO_OptionBlock::extractPrintData()
         }
         else if( parsedLine[position+5].string_ == ")" )
         {
-          parameter.setTag("V");
+          field = parsedLine[position].string_;
+          field.toUpper();
+          parameter.setTag(field);
           parameter.setVal( 2.0 );
           addParameter( parameter );
 
@@ -1638,7 +1636,7 @@ bool N_IO_OptionBlock::extractPrintData()
         }
         else
         {
-          msg = "Unrecognized parenthetical specification";
+          msg << "Unrecognized parenthetical specification";
           p_err = position;
         }
       }
@@ -1660,13 +1658,13 @@ bool N_IO_OptionBlock::extractPrintData()
         }
         else
         {
-          msg = "Unrecognized parenthetical specification";
+          msg << "Unrecognized parenthetical specification";
           p_err = position;
         }
       }
       else
       {
-        msg = "Unrecognized parenthetical specification";
+        msg << "Unrecognized parenthetical specification";
         p_err = position;
       }
     }
@@ -1674,7 +1672,7 @@ bool N_IO_OptionBlock::extractPrintData()
     {
       if (parsedLine[position].string_ == "(" || parsedLine[position].string_ == ")")
       {
-        msg = "Unrecognized parenthesis";
+        msg << "Unrecognized parenthesis";
         p_err = position;
       }
       field = parsedLine[position].string_;
@@ -1684,9 +1682,9 @@ bool N_IO_OptionBlock::extractPrintData()
       addParameter ( parameter );
       ++position;
     }
-    if (msg != "")
+    if (!msg.str().empty())
     {
-      msg += " in .print near:\n";
+      msg << " in .print near ";
       position = p_err+4;
       p_err -= 2;
       if (p_err<0)
@@ -1695,31 +1693,32 @@ bool N_IO_OptionBlock::extractPrintData()
         position = numFields;
       while (p_err < position)
       {
-        msg += parsedLine[p_err].string_ + " ";
+        msg << parsedLine[p_err].string_ + " ";
         ++p_err;
       }
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg);
+      Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+        << msg.str();
     }
   }
 
   // Once data is extracted, the info in parsedLine is no longer
   // needed, trim it now using the swap trick.
   parsedLine.clear();
-  vector<N_IO_SpiceSeparatedFieldTool::StringToken>
+  std::vector<SpiceSeparatedFieldTool::StringToken>
     (parsedLine).swap(parsedLine);
 
   return true; // Only get here on success.
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractRESULTData
+// Function      : OptionBlock::extractRESULTData
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 08/29/2004
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractRESULTData()
+bool OptionBlock::extractRESULTData()
 {
   int numFields = parsedLine.size();
 
@@ -1730,12 +1729,19 @@ bool N_IO_OptionBlock::extractRESULTData()
   // print out the parsed line
   for (int ieric=0;ieric<parsedLine.size();++ieric)
   {
-    cout << "parsedLine["<<ieric<<"] = " << parsedLine[ieric].string_ << endl;
+    Xyce::dout() << "parsedLine["<<ieric<<"] = " << parsedLine[ieric].string_ << std::endl;
   }
 #endif
 
   int linePosition = 1;   // Start of parameters on .param line.
-  N_UTL_Param parameter("", "");
+  Util::Param parameter("", "");
+
+  if (parsedLine.size () <= 1)
+  {
+    Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+      << "Too few fields in the .RESULT line";
+    return false;
+  }
 
   parameter.setTag( "EXPRESSION" );
   parameter.setVal( parsedLine[linePosition].string_ );
@@ -1743,8 +1749,8 @@ bool N_IO_OptionBlock::extractRESULTData()
 
   if (linePosition != (parsedLine.size () - 1))
   {
-    string msg("Too many fields in the .RESULT line\n");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg);
+    Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+      << "Too many fields in the .RESULT line";
     return false;
   }
 
@@ -1753,7 +1759,7 @@ bool N_IO_OptionBlock::extractRESULTData()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractACData
+// Function      : OptionBlock::extractACData
 // Purpose       : Extract the parameters from a netlist .AC line held in
 //                 parsedLine.
 // Special Notes :
@@ -1761,7 +1767,7 @@ bool N_IO_OptionBlock::extractRESULTData()
 // Creator       :
 // Creation Date : 7/23/08
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractACData()
+bool OptionBlock::extractACData()
 {
   int numFields = parsedLine.size();
 
@@ -1771,15 +1777,14 @@ bool N_IO_OptionBlock::extractACData()
   // Check that the minimum required number of fields are on the line.
   if ( numFields < 4 || numFields > 5)
   {
-    string msg(".AC line has an unexpected number of fields\n");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-        netlistFileName_, parsedLine[0].lineNumber_);
+    Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+      << ".AC line has an unexpected number of fields";
   }
 
   int linePosition = 1;   // Start of parameters on .param line.
   int endPosition = numFields - 1;
 
-  N_UTL_Param parameter("", "");
+  Util::Param parameter("", "");
 
   // type is required
   parameter.setTag( "TYPE" );
@@ -1813,14 +1818,14 @@ bool N_IO_OptionBlock::extractACData()
   // Once data is extracted, the info in parsedLine is no longer
   // needed, trim it now using the swap trick.
   parsedLine.clear();
-  vector<N_IO_SpiceSeparatedFieldTool::StringToken>
+  std::vector<SpiceSeparatedFieldTool::StringToken>
     (parsedLine).swap(parsedLine);
 
   return true; // Only get here on success.
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractMORData
+// Function      : OptionBlock::extractMORData
 // Purpose       : Extract the parameters from a netlist .MOR line held in
 //                 parsedLine.
 // Special Notes :
@@ -1828,7 +1833,7 @@ bool N_IO_OptionBlock::extractACData()
 // Creator       :
 // Creation Date : 5/25/12
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractMORData()
+bool OptionBlock::extractMORData()
 {
   int numFields = parsedLine.size();
 
@@ -1838,14 +1843,13 @@ bool N_IO_OptionBlock::extractMORData()
   // Check that the minimum required number of fields are on the line.
   if ( numFields < 2 )
   {
-    string msg(".MOR line has an unexpected number of fields\n");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-        netlistFileName_, parsedLine[0].lineNumber_);
+    Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+      << ".MOR line has an unexpected number of fields";
   }
 
   int linePosition = 1;   // Start of parameters on .param line.
 
-  N_UTL_Param parameter("", "");
+  Util::Param parameter("", "");
 
   // type is required
   parameter.setTag( "SIZE" );
@@ -1873,27 +1877,27 @@ bool N_IO_OptionBlock::extractMORData()
   // Once data is extracted, the info in parsedLine is no longer
   // needed, trim it now using the swap trick.
   parsedLine.clear();
-  vector<N_IO_SpiceSeparatedFieldTool::StringToken>
+  std::vector<SpiceSeparatedFieldTool::StringToken>
     (parsedLine).swap(parsedLine);
 
   return true; // Only get here on success.
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractOBJETIVEData
+// Function      : OptionBlock::extractOBJETIVEData
 // Purpose       : Extract the parameters from a netlist .OBJECTIVE line 
 //
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractOBJECTIVEData()
+bool OptionBlock::extractOBJECTIVEData()
 {
   int numFields = parsedLine.size();
   int linePosition = 0;
-  set<string> pars;
+  std::set<std::string> pars;
 
   // Set the OptionBlock name.
   setName( "OBJECTIVE" );
 
-  N_UTL_Param parameter("", "");
+  Util::Param parameter("", "");
   ExtendedString ES("");
 
   ++linePosition;
@@ -1903,11 +1907,8 @@ bool N_IO_OptionBlock::extractOBJECTIVEData()
     ES.toUpper ();
     if (pars.find(ES) != pars.end())
     {
-      string msg("Multiple ");
-      msg += ES;
-      msg += " name specifications in .OBJECTIVE line";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-        netlistFileName_, parsedLine[0].lineNumber_);
+      Report::UserError().at(netlistFileName_, parsedLine[0].lineNumber_)
+        << "Multiple " << ES << " name specifications in .OBJECTIVE line";
     }
     if (ES == "FILE" || ES == "FUNCTION" || ES == "VALUE" ||
         ES == "WEIGHT" || ES == "NAME")
@@ -1922,12 +1923,8 @@ bool N_IO_OptionBlock::extractOBJECTIVEData()
       {
         if (!parameter.hasExpressionValue ())
         {
-          string msg("Non-Expression specified in .OBJECTIVE argument: ");
-          msg += ES;
-          msg += " = ";
-          msg += parsedLine[linePosition].string_;
-          N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-              netlistFileName_, parsedLine[0].lineNumber_);
+          Report::UserError().at(netlistFileName_, parsedLine[0].lineNumber_)
+            << "Non-Expression specified in .OBJECTIVE argument: " << ES << " = " << parsedLine[linePosition].string_;
         }
       }
       addParameter( parameter );
@@ -1943,11 +1940,11 @@ bool N_IO_OptionBlock::extractOBJECTIVEData()
 //      if (++linePosition >= numFields) return true;
 //      parameter.setTag( "MATCH" );
 //    }
-//    string::size_type first=parsedLine[linePosition].string_.find_first_of(':');
+//    std::string::size_type first=parsedLine[linePosition].string_.find_first_of(':');
 //    if (first != parsedLine[linePosition].string_.find_last_of(':') ||
-//        first == string::npos)
+//        first == std::string::npos)
 //    {
-//      string msg("Match specification '");
+//      std::string msg("Match specification '");
 //      msg += parsedLine[linePosition].string_;
 //      msg += "' in .OBJECTIVE does not contain a single colon";
 //      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
@@ -1969,9 +1966,8 @@ bool N_IO_OptionBlock::extractOBJECTIVEData()
       }
       else
       {
-        string msg("Unrecognized field in .OBJECTIVE line");
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-          netlistFileName_, parsedLine[0].lineNumber_);
+        Report::UserError().at(netlistFileName_, parsedLine[0].lineNumber_)
+          << "Unrecognized field in .OBJECTIVE line";
       }
     }
   }
@@ -1981,14 +1977,14 @@ bool N_IO_OptionBlock::extractOBJECTIVEData()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractMEASUREData
+// Function      : OptionBlock::extractMEASUREData
 // Purpose       : Convert a .measure line to an options block
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, Electrical and Microsystems Modeling
 // Creation Date : 03/10/2009
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractMEASUREData()
+bool OptionBlock::extractMEASUREData()
 {
   // .measure has a lot of optonal and complex syntax.
   //
@@ -2006,7 +2002,8 @@ bool N_IO_OptionBlock::extractMEASUREData()
   //              ERROR = Error
   //              FOUR = Fourier analysis (similar to .FOUR)
   //       output_var = simulation variale to be measured.  This can be any of the following
-  //              v(a), v(a,b), v(a)=number v(a)=v(b).  So it really could be one or more
+  //              v(a), v(a,b), v(a)=number v(a)=v(b), i(a) ix(a) or an expression.  
+  //              So it really could be one or more
   //              variables and or a real number.  The comparison is always equity.
   //       options = these are keywords=value pairs that set limits on when or how
   //              the measurement is done. Value is usually a number, but can be a string in
@@ -2014,70 +2011,76 @@ bool N_IO_OptionBlock::extractMEASUREData()
   //
 
   // we will use these sets to test for measure types and keywords.
-  set<string> typeSet;
-  typeSet.insert( string("TRIG") );
-  typeSet.insert( string("TARG") );
-  typeSet.insert( string("AVG") );
-  typeSet.insert( string("MAX") );
-  typeSet.insert( string("MIN") );
-  typeSet.insert( string("PP") );
-  typeSet.insert( string("RMS") );
-  typeSet.insert( string("FREQ") );
-  typeSet.insert( string("FIND") );
-  typeSet.insert( string("WHEN") );
-  typeSet.insert( string("PARAM") );
-  typeSet.insert( string("DERIVATIVE") );
-  typeSet.insert( string("DERIV") );
-  typeSet.insert( string("DUTY") );
-  typeSet.insert( string("INTEGRAL") );
-  typeSet.insert( string("INTEG") );
-  typeSet.insert( string("ERROR") );
-  typeSet.insert( string("ON_TIME") );
-  typeSet.insert( string("OFF_TIME") );
-  typeSet.insert( string("FOUR") );
+  std::set<std::string> typeSet;
+  typeSet.insert( std::string("TRIG") );
+  typeSet.insert( std::string("TARG") );
+  typeSet.insert( std::string("AVG") );
+  typeSet.insert( std::string("MAX") );
+  typeSet.insert( std::string("MIN") );
+  typeSet.insert( std::string("PP") );
+  typeSet.insert( std::string("RMS") );
+  typeSet.insert( std::string("FREQ") );
+  typeSet.insert( std::string("FIND") );
+  typeSet.insert( std::string("WHEN") );
+  typeSet.insert( std::string("PARAM") );
+  typeSet.insert( std::string("EQN") );
+  typeSet.insert( std::string("DERIVATIVE") );
+  typeSet.insert( std::string("DERIV") );
+  typeSet.insert( std::string("DUTY") );
+  typeSet.insert( std::string("INTEGRAL") );
+  typeSet.insert( std::string("INTEG") );
+  typeSet.insert( std::string("ERROR") );
+  typeSet.insert( std::string("ON_TIME") );
+  typeSet.insert( std::string("OFF_TIME") );
+  typeSet.insert( std::string("FOUR") );
 
-  set<string> keywords;
-  set<string> simpleKeywords;
-  set<string> numOrTextKeywords;
+  std::set<std::string> keywords;
+  std::set<std::string> simpleKeywords;
+  std::set<std::string> numOrTextKeywords;
 
-  simpleKeywords.insert( string("TD") );
-  simpleKeywords.insert( string("GOAL") );
-  simpleKeywords.insert( string("WEIGHT") );
-  simpleKeywords.insert( string("MINVAL") );
-  simpleKeywords.insert( string("AT") );
-  simpleKeywords.insert( string("FROM") );
-  simpleKeywords.insert( string("TO") );
-  simpleKeywords.insert( string("IGNORE") );
-  simpleKeywords.insert( string("YMIN") );
-  simpleKeywords.insert( string("YMAX") );
-  simpleKeywords.insert( string("ON") );
-  simpleKeywords.insert( string("OFF") );
-  simpleKeywords.insert( string("FRAC_MAX") );
-  simpleKeywords.insert( string("MIN_THRESH") );
-  simpleKeywords.insert( string("MAX_THRESH") );
-  simpleKeywords.insert( string("NUMFREQ") );
-  simpleKeywords.insert( string("GRIDSIZE") );
-
-  numOrTextKeywords.insert( string("RISE") );
-  numOrTextKeywords.insert( string("FALL") );
-  numOrTextKeywords.insert( string("CROSS") );
-
+  simpleKeywords.insert( std::string("TD") );
+  simpleKeywords.insert( std::string("GOAL") );
+  simpleKeywords.insert( std::string("WEIGHT") );
+  simpleKeywords.insert( std::string("MINVAL") );
+  simpleKeywords.insert( std::string("AT") );
+  simpleKeywords.insert( std::string("FROM") );
+  simpleKeywords.insert( std::string("TO") );
+  simpleKeywords.insert( std::string("IGNORE") );
+  simpleKeywords.insert( std::string("YMIN") );
+  simpleKeywords.insert( std::string("YMAX") );
+  simpleKeywords.insert( std::string("ON") );
+  simpleKeywords.insert( std::string("OFF") );
+  simpleKeywords.insert( std::string("FRAC_MAX") );
+  simpleKeywords.insert( std::string("MIN_THRESH") );
+  simpleKeywords.insert( std::string("MAX_THRESH") );
+  simpleKeywords.insert( std::string("NUMFREQ") );
+  simpleKeywords.insert( std::string("GRIDSIZE") );
+  simpleKeywords.insert( std::string("DEFAULT_VAL") );
+  simpleKeywords.insert( std::string("INDEPVARCOL") ); 
+  simpleKeywords.insert( std::string("INDEPVAR2COL") );
+  simpleKeywords.insert( std::string("DEPVARCOL") );
+ 
+  numOrTextKeywords.insert( std::string("RISE") );
+  numOrTextKeywords.insert( std::string("FALL") );
+  numOrTextKeywords.insert( std::string("CROSS") );
+  numOrTextKeywords.insert( std::string("FILE") );
+  numOrTextKeywords.insert( std::string("COMP_FUNCTION") );
   // make a union for the keywords set
   set_union( simpleKeywords.begin(), simpleKeywords.end(), numOrTextKeywords.begin(),
-             numOrTextKeywords.end(), inserter<set<string> >(keywords, keywords.begin()) );
+             numOrTextKeywords.end(), std::inserter<std::set<std::string> >(keywords, keywords.begin()) );
 
   int numFields = parsedLine.size();
+
   if( numFields < 4 )
   {
-    string msg("Too few items on .MEASURE line.  Need at lest .MEASURE <mode> <name> <type>");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg, netlistFileName_,
-         parsedLine[0].lineNumber_);
+    Report::UserError().at(netlistFileName_,parsedLine[0].lineNumber_)
+      << "Too few items on .MEASURE line.  Need at lest .MEASURE <mode> <name> <type>";
   }
 
   // Set the OptionBlock name.
   setName( "MEASURE" );
 
-  N_UTL_Param parameter;
+  Util::Param parameter;
 
   // look for the fixed items
   ExtendedString currentWord(parsedLine[1].string_);
@@ -2087,16 +2090,15 @@ bool N_IO_OptionBlock::extractMEASUREData()
     currentWord = "TRAN"; // TR is a synonym for TRAN
   }
 
-  if( currentWord == "DC" || currentWord == "TRAN")
+  if( currentWord == "DC" || currentWord == "TRAN" || currentWord == "AC" )
   {
     parameter.set("MODE", currentWord);
     addParameter(parameter);
   }
   else
   {
-    string msg("Unknown mode in .MEASURE line.  Should be DC or TRAN/TR");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg, netlistFileName_,
-        parsedLine[1].lineNumber_);
+    Report::UserError().at(netlistFileName_, parsedLine[1].lineNumber_)
+      << "Unknown mode in .MEASURE line.  Should be DC, AC or TRAN/TR";
   }
 
   currentWord = parsedLine[2].string_;
@@ -2112,9 +2114,8 @@ bool N_IO_OptionBlock::extractMEASUREData()
   }
   else
   {
-    string msg("Illegal name in .MEASURE line.  Cannot be AC, DC or TRAN/TR ");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg, netlistFileName_,
-        parsedLine[2].lineNumber_);
+    Report::UserError().at(netlistFileName_, parsedLine[2].lineNumber_)
+      << "Illegal name in .MEASURE line.  Cannot be AC, DC or TRAN/TR ";
   }
 
   currentWord = parsedLine[3].string_;
@@ -2126,14 +2127,11 @@ bool N_IO_OptionBlock::extractMEASUREData()
   }
   else
   {
-    string msg("Illegal type in .MEASURE line.  Must be one of: TRIG, TARG, AVG, ");
-    msg += "MAX, MIN, PP, RMS, INTEG, FIND, WHEN, PARAM, DERIVATIVE, DERIV, ";
-    msg += "INTEGRAL, ERROR, FOUR";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg, netlistFileName_,
-        parsedLine[3].lineNumber_);
+    Report::UserError().at(netlistFileName_, parsedLine[3].lineNumber_)
+      << "Illegal type in .MEASURE line.  Must be one of: TRIG, TARG, AVG, MAX, MIN, PP, RMS, INTEG, FIND, WHEN, PARAM, DERIVATIVE, DERIV, INTEGRAL, ERROR, FOUR";
   }
 
-  // already got MEASURE <DC|TRAN> name TYPE
+  // already got MEASURE <DC|AC|TRAN> name TYPE
   // now try and parse of the rest of the line catching keywords when they're found
   int position = 4;
   while ( position < numFields )
@@ -2158,14 +2156,14 @@ bool N_IO_OptionBlock::extractMEASUREData()
         {
           valPosition = ++position;
         }
-        string & value = parsedLine[valPosition].string_;
-        if( N_UTL::isInt(value) )
+        std::string & value = parsedLine[valPosition].string_;
+        if( Util::isInt(value) )
         {
-          parameter.set(currentWord, N_UTL::Ival(value) );
+          parameter.set(currentWord, Util::Ival(value) );
         }
-        else if( N_UTL::isValue(value) )
+        else if( Util::isValue(value) )
         {
-          int valAsInt = static_cast<int>(N_UTL::Value(value));
+          int valAsInt = static_cast<int>(Util::Value(value));
           parameter.set(currentWord, valAsInt);
         }
         else
@@ -2176,10 +2174,8 @@ bool N_IO_OptionBlock::extractMEASUREData()
       }
       else
       {
-        string msg("Incomplete .MEASURE line.  RISE, FALL, CROSS must be ");
-        msg += "followed by a value or LAST";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg, netlistFileName_,
-            parsedLine[position].lineNumber_);
+        Report::UserError().at(netlistFileName_, parsedLine[position].lineNumber_)
+          << "Incomplete .MEASURE line.  RISE, FALL, CROSS must be followed by a value or LAST";
       }
 
     }
@@ -2195,34 +2191,37 @@ bool N_IO_OptionBlock::extractMEASUREData()
         {
           valPosition = ++position;
         }
-        string & value = parsedLine[valPosition].string_;
-        if( N_UTL::isValue(value) )
+        std::string & value = parsedLine[valPosition].string_;
+        if( Util::isValue(value) )
         {
-          parameter.set(currentWord, N_UTL::Value(value) );
+          parameter.set(currentWord, Util::Value(value) );
         }
-        else if( N_UTL::isInt(value) )
+        else if( Util::isInt(value) )
         {
-          parameter.set(currentWord, N_UTL::Ival(value) );
+          parameter.set(currentWord, Util::Ival(value) );
         }
         else
         {
-          string msg("Incomplete .MEASURE line.  TD, GOAL, WEIGHT, MINVAL, AT, ");
-          msg += "TO, IGNORE, YMIN, YMAX must be followed by a value";
-          N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg, netlistFileName_,
-              parsedLine[position].lineNumber_);
+          Report::UserError().at(netlistFileName_, parsedLine[position].lineNumber_)
+            << "Incomplete .MEASURE line.  TD, GOAL, WEIGHT, MINVAL, AT, TO, IGNORE, YMIN, YMAX must be followed by a value";
         }
         addParameter(parameter);
       }
       else
       {
-        string msg("Incomplete .MEASURE line.  TD, GOAL, WEIGHT, MINVAL, AT, TO, ");
-        msg += "IGNORE, YMIN, YMAX must be followed by a value";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg, netlistFileName_,
-            parsedLine[position].lineNumber_);
+        Report::UserError().at(netlistFileName_, parsedLine[position].lineNumber_)
+          << "Incomplete .MEASURE line.  TD, GOAL, WEIGHT, MINVAL, AT, TO, IGNORE, YMIN, YMAX must be followed by a value";
       }
     }
     else
     {
+      if( (currentWord[0]=='{') && (currentWord[currentWord.size()-1]=='}') ) 
+      {
+         parameter.set(currentWord, currentWord);
+         addParameter(parameter);
+      }
+      else 
+      {
       // the last form of legal syntax is out_var, out_var=val or out_var1=out_var2
       // first figure out how many positions between here and the next legal keyword or
       // the end of the line
@@ -2251,12 +2250,16 @@ bool N_IO_OptionBlock::extractMEASUREData()
       // ok, package up the output vars
       // it will be in the form ( [] indicate optional items )
       // V or I nodeName [nodeName] [ val | V or I nodeName [nodeName] ]
+      // or { } expression deliminated
 
       while( position < endPosition )
       {
         nextWord = parsedLine[position].string_;
         nextWord.toUpper();
-        if( nextWord == "I" || nextWord == "V" )
+        // the second part of this if clause it to ensure we don't catch keywords that start 
+        // with I, V or N and mistake them for Ixxx( ) or Vxxx() 
+        if( (nextWord[0] == 'I' || nextWord[0] == 'V' || nextWord[0] == 'N') && 
+            (simpleKeywords.find( nextWord ) == simpleKeywords.end() ) )
         {
           // need to do a bit of look ahead here to see if this is a V(a) or V(a,b)
           int numNodes = 1;
@@ -2287,22 +2290,29 @@ bool N_IO_OptionBlock::extractMEASUREData()
           }
           else
           {
-            string msg("Error in .MEASURE line.  Could not parse voltage/current variable");
-            N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg, netlistFileName_,
-                parsedLine[position].lineNumber_);
+            Report::UserError().at(netlistFileName_, parsedLine[position].lineNumber_)
+              << "Error in .MEASURE line.  Could not parse voltage/current variable";
           }
 
         }
         else if( nextWord.isValue() )
         {
-          string objValue("OBJVAL");
+          std::string objValue("OBJVAL");
           parameter.set( objValue, nextWord.Value());
           addParameter( parameter );
         }
         else if( nextWord.isInt() )
         {
-          string objValue( "OBJVAL");
+          std::string objValue( "OBJVAL");
           parameter.set( objValue, nextWord.Ival());
+          addParameter( parameter );
+        }
+        else if( nextWord.possibleParam() )
+        {
+          // could be a param or measure name that will be evaluated 
+          // during the simulation.  
+          std::string objValue( "OBJVAL");
+          parameter.set( objValue, nextWord);
           addParameter( parameter );
         }
         position++;
@@ -2310,37 +2320,37 @@ bool N_IO_OptionBlock::extractMEASUREData()
       // reset the position indicator to the end - 1 because
       // we're going to increment it at the end of the while loop
       position = endPosition - 1;
+      }
 
     }
     position++;
   }
 #ifdef Xyce_DEBUG_IO
-  N_IO_OptionBlock::printDiagnostic();
+  OptionBlock::printDiagnostic();
 #endif
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractFOURIERData
+// Function      : OptionBlock::extractFOURIERData
 // Purpose       : Convert a .four line to an options block
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist
 // Creation Date : 06/03/2013
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractFOURIERData()
+bool OptionBlock::extractFOURIERData()
 {
   // Set the OptionBlock name
   setName( "FOUR" );
 
-  N_UTL_Param parameter;
+  Util::Param parameter;
   ExtendedString nextWord("");
   
   if(parsedLine.size() < 3)
   {
-    string msg("Error: the .FOUR line requires at least 3 arguments '.FOUR freq ov1 <ov2 ov3 ...>'");
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg, netlistFileName_,
-          parsedLine[0].lineNumber_);
+    Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+      << "Error: the .FOUR line requires at least 3 arguments '.FOUR freq ov1 <ov2 ov3 ...>'";
   }
 
   parameter.setTag("FREQ");
@@ -2385,16 +2395,14 @@ bool N_IO_OptionBlock::extractFOURIERData()
       }
       else
       {
-        string msg("Error in .FOUR line.  Could not parse variable");
-          N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg, netlistFileName_,
-              parsedLine[position].lineNumber_);
+        Report::UserError().at(netlistFileName_, parsedLine[position].lineNumber_)
+          << "Could not parse .FOUR variable";
       }
     }
     else
     {
-      string msg = "Error in .FOUR line.  Could not parse variable: " + nextWord;
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg, netlistFileName_,
-            parsedLine[position].lineNumber_);
+      Report::UserFatal().at(netlistFileName_, parsedLine[position].lineNumber_)
+        << "Could not parse .FOUR variable " << nextWord;
     }
     position+=2;
 
@@ -2405,14 +2413,14 @@ return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractICData
+// Function      : OptionBlock::extractICData
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 09/07/2007
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractICData()
+bool OptionBlock::extractICData()
 {
   int numFields = parsedLine.size();
 
@@ -2422,12 +2430,12 @@ bool N_IO_OptionBlock::extractICData()
 #ifdef Xyce_DEBUG_IO
   for (int ieric=0;ieric<parsedLine.size();++ieric)
   {
-    cout << "parsedLine["<<ieric<<"] = " << parsedLine[ieric].string_ << endl;
+    Xyce::dout() << "parsedLine["<<ieric<<"] = " << parsedLine[ieric].string_ << std::endl;
   }
 #endif
 
-  string msg("");
-  N_UTL_Param parameter;
+  std::ostringstream msg;
+  Util::Param parameter;
   ExtendedString field("");
   int p_err;
   int parameterStartPos  = 1;
@@ -2459,14 +2467,14 @@ bool N_IO_OptionBlock::extractICData()
         // current variables.  ERK: Note, originally I thought to have it
         // be possible to set both voltages and currents.  However, it
         // appears (I think) that other codes just set voltages.
-        string & posString = parsedLine[position].string_;
+        std::string & posString = parsedLine[position].string_;
 
         if (posString == "I" || posString == "i"
          || (posString.size() == 2 &&
              (posString[0] == 'I' || posString[0] == 'i')))
         {
           {
-            msg = "Unsupported current specification.";
+            msg << "Unsupported current specification.";
             p_err = position;
           }
         }
@@ -2497,30 +2505,30 @@ bool N_IO_OptionBlock::extractICData()
           }
           else if( parsedLine[position+6].string_ == "," )
           {
-            msg = "Voltage differences not supported.";
+            msg << "Voltage differences not supported.";
             p_err = position;
           }
           else
           {
-            msg = "Unrecognized parenthetical specification.";
+            msg << "Unrecognized parenthetical specification.";
             p_err = position;
           }
         }
         else
         {
-          msg = "Unrecognized parenthetical specification";
+          msg << "Unrecognized parenthetical specification";
           p_err = position;
         }
       }
       else // This is either an expression, or a STEP parameter.
       {
-        msg = "Unrecognized .IC and/or .DCVOLT specification";
+        msg << "Unrecognized .IC and/or .DCVOLT specification";
         p_err = position;
       }
 
-      if (msg != "")
+      if (!msg.str().empty())
       {
-        msg += " in .IC and/or .DCVOLT near:\n";
+        msg << " in .IC and/or .DCVOLT near ";
         position = p_err+4;
         p_err -= 2;
         if (p_err<0)
@@ -2529,10 +2537,11 @@ bool N_IO_OptionBlock::extractICData()
           position = numFields;
         while (p_err < position)
         {
-          msg += parsedLine[p_err].string_ + " ";
+          msg << parsedLine[p_err].string_ + " ";
           ++p_err;
         }
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg);
+        Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+          << msg.str();
       }
     }
   }
@@ -2565,21 +2574,21 @@ bool N_IO_OptionBlock::extractICData()
   // Once data is extracted, the info in parsedLine is no longer
   // needed, trim it now using the swap trick.
   parsedLine.clear();
-  vector<N_IO_SpiceSeparatedFieldTool::StringToken>
+  std::vector<SpiceSeparatedFieldTool::StringToken>
     (parsedLine).swap(parsedLine);
 
   return true; // Only get here on success.
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractNodeSetData
+// Function      : OptionBlock::extractNodeSetData
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 09/07/2007
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractNodeSetData()
+bool OptionBlock::extractNodeSetData()
 {
   int numFields = parsedLine.size();
 
@@ -2589,13 +2598,13 @@ bool N_IO_OptionBlock::extractNodeSetData()
 #ifdef Xyce_DEBUG_IO
   for (int ieric=0;ieric<parsedLine.size();++ieric)
   {
-    cout << "parsedLine["<<ieric<<"] = " << parsedLine[ieric].string_ << endl;
+    Xyce::dout() << "parsedLine["<<ieric<<"] = " << parsedLine[ieric].string_ << std::endl;
   }
 #endif
 
-  string msg("");
+  std::ostringstream msg;
 
-  N_UTL_Param parameter;
+  Util::Param parameter;
   ExtendedString field("");
   int p_err;
   int parameterStartPos  = 1;
@@ -2626,14 +2635,14 @@ bool N_IO_OptionBlock::extractNodeSetData()
       if (position+5 < numFields && parsedLine[position+1].string_ == "(")
       {
         // current variables:
-        string & posString = parsedLine[position].string_;
+        std::string & posString = parsedLine[position].string_;
 
         if (posString == "I" || posString == "i"
          || (posString.size() == 2 &&
              (posString[0] == 'I' || posString[0] == 'i')))
         {
           {
-            msg = "Unsupported current specification.";
+            msg << "Unsupported current specification.";
             p_err = position;
           }
         }
@@ -2663,30 +2672,30 @@ bool N_IO_OptionBlock::extractNodeSetData()
           }
           else if( parsedLine[position+6].string_ == "," )
           {
-            msg = "Voltage differences not supported.";
+            msg << "Voltage differences not supported.";
             p_err = position;
           }
           else
           {
-            msg = "Unrecognized parenthetical specification.";
+            msg << "Unrecognized parenthetical specification.";
             p_err = position;
           }
         }
         else
         {
-          msg = "Unrecognized parenthetical specification";
+          msg << "Unrecognized parenthetical specification";
           p_err = position;
         }
       }
       else // This is either an expression, or a STEP parameter.
       {
-        msg = "Unrecognized .NODESET specification";
+        msg << "Unrecognized .NODESET specification";
         p_err = position;
       }
 
-      if (msg != "")
+      if (!msg.str().empty())
       {
-        msg += " in .NODESET near:\n";
+        msg << " in .NODESET near ";
         position = p_err+4;
         p_err -= 2;
         if (p_err<0)
@@ -2695,10 +2704,11 @@ bool N_IO_OptionBlock::extractNodeSetData()
           position = numFields;
         while (p_err < position)
         {
-          msg += parsedLine[p_err].string_ + " ";
+          msg << parsedLine[p_err].string_ + " ";
           ++p_err;
         }
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg);
+        Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+          << msg.str();
       }
     }
   }
@@ -2731,21 +2741,21 @@ bool N_IO_OptionBlock::extractNodeSetData()
   // Once data is extracted, the info in parsedLine is no longer
   // needed, trim it now using the swap trick.
   parsedLine.clear();
-  vector<N_IO_SpiceSeparatedFieldTool::StringToken>
+  std::vector<SpiceSeparatedFieldTool::StringToken>
     (parsedLine).swap(parsedLine);
 
   return true; // Only get here on success.
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractSaveData
+// Function      : OptionBlock::extractSaveData
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 10/11/2007
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractSaveData()
+bool OptionBlock::extractSaveData()
 {
   int numFields = parsedLine.size();
   int linePosition = 0;
@@ -2756,13 +2766,13 @@ bool N_IO_OptionBlock::extractSaveData()
 #ifdef Xyce_DEBUG_IO
   for (int ieric=0;ieric<parsedLine.size();++ieric)
   {
-    cout << "parsedLine["<<ieric<<"] = " << parsedLine[ieric].string_ << endl;
+    Xyce::dout() << "parsedLine["<<ieric<<"] = " << parsedLine[ieric].string_ << std::endl;
   }
 #endif
 
-  string msg("");
+  std::string msg("");
 
-  N_UTL_Param parameter("", "");
+  Util::Param parameter("", "");
   ExtendedString ES("");
 
   ++linePosition;
@@ -2783,16 +2793,15 @@ bool N_IO_OptionBlock::extractSaveData()
     }
     else
     {
-      string msg("Unrecognized field in .SAVE line");
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-        netlistFileName_, parsedLine[0].lineNumber_);
+      Report::UserError().at(netlistFileName_, parsedLine[0].lineNumber_)
+        << "Unrecognized field in .SAVE line";
     }
   }
 
   // Once data is extracted, the info in parsedLine is no longer
   // needed, trim it now using the swap trick.
   parsedLine.clear();
-  vector<N_IO_SpiceSeparatedFieldTool::StringToken>
+  std::vector<SpiceSeparatedFieldTool::StringToken>
     (parsedLine).swap(parsedLine);
 
 
@@ -2800,14 +2809,14 @@ bool N_IO_OptionBlock::extractSaveData()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractLoadData
+// Function      : OptionBlock::extractLoadData
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 10/11/2007
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractLoadData()
+bool OptionBlock::extractLoadData()
 {
   int numFields = parsedLine.size();
 
@@ -2817,25 +2826,25 @@ bool N_IO_OptionBlock::extractLoadData()
 #ifdef Xyce_DEBUG_IO
   for (int ieric=0;ieric<parsedLine.size();++ieric)
   {
-    cout << "parsedLine["<<ieric<<"] = " << parsedLine[ieric].string_ << endl;
+    Xyce::dout() << "parsedLine["<<ieric<<"] = " << parsedLine[ieric].string_ << std::endl;
   }
 #endif
 
-  string msg("");
+  std::string msg("");
 
 
   return true; // Only get here on success.
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::extractSENSData
+// Function      : OptionBlock::extractSENSData
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 10/11/2007
 //-----------------------------------------------------------------------------
-bool N_IO_OptionBlock::extractSENSData()
+bool OptionBlock::extractSENSData()
 {
   int numFields = parsedLine.size();
 
@@ -2845,18 +2854,18 @@ bool N_IO_OptionBlock::extractSENSData()
   int parameterStartPos = 1;
 
   // Create an option block to temporarily store the default options.
-  N_IO_OptionBlock defaultOptions("", parsedLine, metadata_ );
+  OptionBlock defaultOptions("", parsedLine, metadata_ );
 
   // Get the default options from metadata.
   defaultOptions.addDefaultOptionsParameters( getName() );
 
   // Extract the parameters from parsedLine.
   int parameterEndPos = numFields - 1;
-  vector<N_UTL_Param> inputParameters;
-  N_UTL_Param parameter("", "");
+  std::vector<Util::Param> inputParameters;
+  Util::Param parameter("", "");
   int intervalParameterStart = -1;
   int i = parameterStartPos;
-  string paramBaseName;
+  std::string paramBaseName;
   while (i <= parameterEndPos-1)
   {
     // Check for equal sign.
@@ -2873,18 +2882,14 @@ bool N_IO_OptionBlock::extractSENSData()
     // parameter list. Check to see if the parameter is "VECTOR"
     // valued and treat accordingly.
     parameter.set( parsedLine[i].string_, "" );
-    N_UTL_Param* parameterPtr = defaultOptions.findParameter(parameter);
+    Util::Param* parameterPtr = defaultOptions.findParameter(parameter);
     if (parameterPtr == NULL)
     {
-      // Options parameter not found, print out warning.
-      string msg("No options parameter " + parameter.tag());
-      msg += " found in metadata.\n";
-      msg += "This parameter will be ignored.\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING_0, msg,
-          netlistFileName_, parsedLine[0].lineNumber_);
+      Report::UserWarning0().at(netlistFileName_, parsedLine[0].lineNumber_)
+        << "No options parameter " << parameter.tag() << " found, parameter will be ignored.";
       i+= 3;
     }
-    else if (parameterPtr->sVal() != "VECTOR")
+    else if (parameterPtr->stringValue() != "VECTOR")
     {
       parameter.setVal( parsedLine[i+2].string_ );
       inputParameters.push_back( parameter );
@@ -2892,10 +2897,8 @@ bool N_IO_OptionBlock::extractSENSData()
 
       if (i < parameterEndPos-1 && parsedLine[i].string_ == ",")
       {
-        string msg("Options parameter " + parameter.tag());
-        msg += " is flagged as not VECTOR, but has comma in value.\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-                                 netlistFileName_, parsedLine[0].lineNumber_);
+        Report::UserError0().at(netlistFileName_, parsedLine[0].lineNumber_)
+          << "Options parameter " << parameter.tag() << " is flagged as not VECTOR, but has comma in value.";
       }
     }
     else
@@ -2903,7 +2906,7 @@ bool N_IO_OptionBlock::extractSENSData()
       // We have a vector valued parameter.
       // Name the jth component of the parameter of the vector by appending
       // "j" to the parameter name.
-      ostringstream paramName;
+      std::ostringstream paramName;
       paramBaseName = ExtendedString(parsedLine[i].string_).toUpper();
       int j = 1;
 
@@ -2938,7 +2941,7 @@ bool N_IO_OptionBlock::extractSENSData()
   int numInputParameters = inputParameters.size();
   for ( int k = 0; k < numInputParameters; ++k )
   {
-    N_UTL_Param* parameterPtr =
+    Util::Param* parameterPtr =
       defaultOptions.findParameter( inputParameters[k] );
     if ( parameterPtr != NULL )
     {
@@ -2947,19 +2950,15 @@ bool N_IO_OptionBlock::extractSENSData()
     }
     else
     {
-      // Options parameter not found, print out warning.
-      string msg("No options parameter " + inputParameters[k].tag());
-      msg += " found in metadata.\n";
-      msg += "This parameter will be ignored.\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING_0, msg,
-          netlistFileName_, parsedLine[0].lineNumber_);
+      Report::UserWarning0().at(netlistFileName_, parsedLine[0].lineNumber_)
+        << "No options parameter " << inputParameters[k].tag() << " found, parameter will be ignored.";
     }
   }
 
   // Once data is extracted, the info in parsedLine is no longer
   // needed, trim it now using the swap trick.
   parsedLine.clear();
-  vector<N_IO_SpiceSeparatedFieldTool::StringToken>
+  std::vector<SpiceSeparatedFieldTool::StringToken>
     (parsedLine).swap(parsedLine);
 
   return true; // Only get here on success.
@@ -2967,104 +2966,109 @@ bool N_IO_OptionBlock::extractSENSData()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::setName
+// Function      : OptionBlock::setName
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-void N_IO_OptionBlock::setName( string const& nameIn )
+void OptionBlock::setName(const std::string &nameIn)
 {
   optionData.setName(nameIn);
 }
 
+void OptionBlock::setNetlistLocation(const std::string &path, int line_number) 
+{
+  optionData.setNetlistLocation(NetlistLocation(path, line_number));
+}
+
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::addParameter
+// Function      : OptionBlock::addParameter
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-void N_IO_OptionBlock::addParameter( N_UTL_Param const& parameter )
+void OptionBlock::addParameter( Util::Param const& parameter )
 {
   optionData.getParams().push_back( parameter );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::addParameters
+// Function      : OptionBlock::addParameters
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-void N_IO_OptionBlock::addParameters( vector<N_UTL_Param> const& parametersIn )
+void OptionBlock::addParameters( std::vector<Util::Param> const& parametersIn )
 {
   optionData.getParams().insert( optionData.getParams().end(), parametersIn.begin(), parametersIn.end() );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::clearParameters
+// Function      : OptionBlock::clearParameters
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-void N_IO_OptionBlock::clearParameters()
+void OptionBlock::clearParameters()
 {
   optionData.getParams().clear();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::setParamter
+// Function      : OptionBlock::setParamter
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-void N_IO_OptionBlock::setParameter( int const& i, N_UTL_Param const& parameter )
+void OptionBlock::setParameter( int const& i, Util::Param const& parameter )
 {
   if ( i < getNumberOfParameters() )
   {
-    list<N_UTL_Param>::iterator paramIter;
+    std::list<Util::Param>::iterator paramIter;
     paramIter = optionData.getParams().begin();
     for ( int j = 0; j < i; ++j )
     {
       ++paramIter;
     }
 
-    paramIter->setVal( parameter.sVal() );
+    paramIter->setVal( parameter.stringValue() );
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::getName
+// Function      : OptionBlock::getName
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-const string& N_IO_OptionBlock::getName() const
+const std::string &OptionBlock::getName() const
 {
   return optionData.getName();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::findParameter
+// Function      : OptionBlock::findParameter
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-N_UTL_Param* N_IO_OptionBlock::findParameter( N_UTL_Param const& parameter )
+Util::Param* OptionBlock::findParameter( Util::Param const& parameter )
 {
-  list<N_UTL_Param>::iterator paramIter = find( optionData.getParams().begin(), optionData.getParams().end(), parameter );
+  std::list<Util::Param>::iterator paramIter = find( optionData.getParams().begin(), optionData.getParams().end(), parameter );
   if ( paramIter != optionData.getParams().end())
   {
     return &(*paramIter);
@@ -3076,29 +3080,29 @@ N_UTL_Param* N_IO_OptionBlock::findParameter( N_UTL_Param const& parameter )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::findParameter
+// Function      : OptionBlock::findParameter
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-N_UTL_Param* N_IO_OptionBlock::findParameter( string const& parameterName )
+Util::Param* OptionBlock::findParameter( std::string const& parameterName )
 {
-  N_UTL_Param parameter( parameterName, "");
+  Util::Param parameter( parameterName, "");
 
   return findParameter( parameter );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_OptionBlock::getNumberOfParameters
+// Function      : OptionBlock::getNumberOfParameters
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-int N_IO_OptionBlock::getNumberOfParameters() const
+int OptionBlock::getNumberOfParameters() const
 {
   return optionData.getParams().size();
 }
@@ -3111,11 +3115,11 @@ int N_IO_OptionBlock::getNumberOfParameters() const
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/08/2001
 //-----------------------------------------------------------------------------
-N_UTL_Param N_IO_OptionBlock::getParameter( int const& i ) const
+Util::Param OptionBlock::getParameter( int const& i ) const
 {
   if ( i < getNumberOfParameters() )
   {
-    list<N_UTL_Param>::const_iterator paramIter;
+    std::list<Util::Param>::const_iterator paramIter;
     paramIter = optionData.getParams().begin();
     for ( int j = 0; j < i; ++j )
     {
@@ -3126,6 +3130,9 @@ N_UTL_Param N_IO_OptionBlock::getParameter( int const& i ) const
   }
   else
   {
-    return N_UTL_Param( "", "" );
+    return Util::Param( "", "" );
   }
 }
+
+} // namespace IO
+} // namespace Xyce

@@ -26,10 +26,10 @@ AC_LINK_IFELSE(
 #else
 #include <math.h>
 #endif
-]],[[using namespace std;
+]],[[
 
 double x = 1.0; 
-isnan(x); isinf(x);
+std::isnan(x); std::isinf(x);
 return 0;]])],
  ac_cv_xyce_have_finite_number=yes, ac_cv_xyce_have_finite_number=no)
  LIBS="$ac_save_LIBS"

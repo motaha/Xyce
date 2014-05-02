@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,32 +31,30 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.4.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
-// Current Owner  : $Author: tvrusso $
+// Revision Number: $Revision: 1.11.2.1 $
+// Revision Date  : $Date: 2014/03/10 19:28:04 $
+// Current Owner  : $Author: rlschie $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
-
-// ----------   Xyce Includes   ----------
 #include <N_IO_MeasureAverage.h>
 #include <N_ERH_ErrorMgr.h>
 
+namespace Xyce {
+namespace IO {
+namespace Measure {
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureAverage::N_IO_MeasureAverage()
+// Function      : Average::Average()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-N_IO_MeasureAverage::N_IO_MeasureAverage( const N_UTL_OptionBlock & measureBlock, N_IO_OutputMgr & outputMgr ):
-  N_IO_MeasureBase(measureBlock, outputMgr),
+Average::Average( const Util::OptionBlock & measureBlock, N_IO_OutputMgr & outputMgr ):
+  Base(measureBlock, outputMgr),
   averageValue_(0.0),
   lastTimeValue_(0.0),
   lastSignalValue_(0.0),
@@ -66,34 +64,33 @@ N_IO_MeasureAverage::N_IO_MeasureAverage( const N_UTL_OptionBlock & measureBlock
   // indicate that this measure type is supported and should be processed in simulation
   typeSupported_ = true;
 
+}
+
+void Average::prepareOutputVariables() 
+{
   // this measurement should have only one dependent variable.
   // Error for now if it doesn't
-  numOutVars_ = depSolVarIterVector_.size();
+  numOutVars_ = outputVars_.size();
 
   if ( numOutVars_ > 1 )
   {
-    string msg = "Too many dependent variables for statistical measure, \"" + name_ + "\" Exiting.";
+    std::string msg = "Too many dependent variables for statistical measure, \"" + name_ + "\" Exiting.";
     N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL, msg);
   }
-
-  outVarValues_.resize( numOutVars_ );
-  for( int i=0; i< numOutVars_; i++ )
-  {
-    outVarValues_[i] = 0.0;
-  }
-
+  Xyce::dout() << " In Average::prepareOutputVariables ..." << std::endl;
+  outVarValues_.resize( numOutVars_, 0.0 );
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureAverage::updateTran()
+// Function      : Average::updateTran()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-void N_IO_MeasureAverage::updateTran( const double circuitTime, RCP< N_LAS_Vector > solnVecRCP)
+void Average::updateTran( const double circuitTime, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec)
 {
   if( !calculationDone_ && withinFromToWindow( circuitTime ) )
   {
@@ -103,7 +100,7 @@ void N_IO_MeasureAverage::updateTran( const double circuitTime, RCP< N_LAS_Vecto
     // update our outVarValues_ vector
     for( int i=0; i< numOutVars_; i++ )
     {
-      outVarValues_[i] = getOutputValue(depSolVarIterVector_[i], solnVecRCP);
+      outVarValues_[i] = getOutputValue(outputVars_[i], solnVec, stateVec, storeVec, 0);
     }
 
     if( initialized_ && withinMinMaxThreash( outVarValues_[0] ) )
@@ -121,32 +118,36 @@ void N_IO_MeasureAverage::updateTran( const double circuitTime, RCP< N_LAS_Vecto
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureAverage::updateDC()
+// Function      : Average::updateDC()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-void N_IO_MeasureAverage::updateDC( const vector<N_ANP_SweepParam> & dcParamsVec, RCP< N_LAS_Vector > solnVecRCP)
+void Average::updateDC( const std::vector<N_ANP_SweepParam> & dcParamsVec, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec)
 {
 
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureAverage::getMeasureResult()
+// Function      : Average::getMeasureResult()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-double N_IO_MeasureAverage::getMeasureResult()
+double Average::getMeasureResult()
 {
   if( initialized_ )
   {
     calculationResult_ =  averageValue_ / totalAveragingWindow_;
   }
   return calculationResult_;
-};
+}
+
+} // namespace Measure
+} // namespace IO
+} // namespace Xyce

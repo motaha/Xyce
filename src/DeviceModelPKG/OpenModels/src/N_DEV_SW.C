@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -41,9 +41,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.137.2.2 $
+// Revision Number: $Revision: 1.157.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //----------------------------------------------------------------------------
@@ -60,11 +60,13 @@
 #endif
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_SW.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SW.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
 
 #include <N_LAS_Matrix.h>
 #include <N_LAS_Vector.h>
@@ -74,81 +76,57 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<SW::Instance>::ParametricData()
-{
-    setNumNodes(2);
-    setNumOptionalNodes(2);
-    setNumFillNodes(0);
-    setModelRequired(1);
-    addModelType("SWITCH");
-    addModelType("ISWITCH");
-    addModelType("VSWITCH");
-
-    // Set up double precision variables:
-    addPar ("CONTROL", 0.0, false, ParameterType::SOLN_DEP,
-        &SW::Instance::CONTROL,
-        NULL, U_NONE,CAT_NONE,"");
-
-    // Set up non-double precision variables:
-    addPar ("ON", false, false, ParameterType::NO_DEP,
-            &SW::Instance::ON, NULL);
-    addPar ("OFF", false, false, ParameterType::NO_DEP,
-            &SW::Instance::OFF, NULL);
-}
-
-template<>
-ParametricData<SW::Model>::ParametricData()
-{
-    addPar ("RON",      1.0,   false, ParameterType::NO_DEP,
-        &SW::Model::RON,
-        NULL,U_OHM,CAT_NONE,"On resistance");
-
-    addPar ("ROFF",     1.0e6, false, ParameterType::NO_DEP,
-        &SW::Model::ROFF,
-        NULL,U_OHM,CAT_NONE,"Off resistance");
-
-    addPar ("VON",      1.0,   false, ParameterType::NO_DEP,
-        &SW::Model::VON,
-        NULL,U_VOLT,CAT_NONE,"On voltage");
-
-    addPar ("VOFF",     0.0,   false, ParameterType::NO_DEP,
-        &SW::Model::VOFF,
-        NULL,U_VOLT,CAT_NONE,"Off voltage");
-
-    addPar ("ION",      0.001, false, ParameterType::NO_DEP,
-        &SW::Model::ION,
-        NULL,U_AMP,CAT_NONE,"On current");
-
-    addPar ("IOFF",     0.0,   false, ParameterType::NO_DEP,
-        &SW::Model::IOFF,
-        NULL,U_AMP,CAT_NONE,"Off current");
-
-    addPar ("ON",       1.0,   false, ParameterType::NO_DEP,
-        &SW::Model::ON,
-        NULL,U_NONE,CAT_NONE,"On control value");
-
-    addPar ("OFF",      0.0,   false, ParameterType::NO_DEP,
-        &SW::Model::OFF,
-        NULL,U_NONE,CAT_NONE,"Off control value");
-}
 
 namespace SW {
 
 
+void Traits::loadInstanceParameters(ParametricData<SW::Instance> &p)
+{
+// Set up double precision variables:
+    p.addPar ("CONTROL", 0.0, false, ParameterType::SOLN_DEP,
+        &SW::Instance::CONTROL,
+        NULL, U_NONE,CAT_NONE,"");
 
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
+    // Set up non-double precision variables:
+    p.addPar ("ON", false,  &SW::Instance::ON);
+    p.addPar ("OFF", false, &SW::Instance::OFF);
 }
 
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
+void Traits::loadModelParameters(ParametricData<SW::Model> &p)
+{
+    p.addPar ("RON",      1.0,   false, ParameterType::NO_DEP,
+        &SW::Model::RON,
+        NULL,U_OHM,CAT_NONE,"On resistance");
 
-  return parMap;
+    p.addPar ("ROFF",     1.0e6, false, ParameterType::NO_DEP,
+        &SW::Model::ROFF,
+        NULL,U_OHM,CAT_NONE,"Off resistance");
+
+    p.addPar ("VON",      1.0,   false, ParameterType::NO_DEP,
+        &SW::Model::VON,
+        NULL,U_VOLT,CAT_NONE,"On voltage");
+
+    p.addPar ("VOFF",     0.0,   false, ParameterType::NO_DEP,
+        &SW::Model::VOFF,
+        NULL,U_VOLT,CAT_NONE,"Off voltage");
+
+    p.addPar ("ION",      0.001, false, ParameterType::NO_DEP,
+        &SW::Model::ION,
+        NULL,U_AMP,CAT_NONE,"On current");
+
+    p.addPar ("IOFF",     0.0,   false, ParameterType::NO_DEP,
+        &SW::Model::IOFF,
+        NULL,U_AMP,CAT_NONE,"Off current");
+
+    p.addPar ("ON",       1.0,   false, ParameterType::NO_DEP,
+        &SW::Model::ON,
+        NULL,U_NONE,CAT_NONE,"On control value");
+
+    p.addPar ("OFF",      0.0,   false, ParameterType::NO_DEP,
+        &SW::Model::OFF,
+        NULL,U_NONE,CAT_NONE,"Off control value");
 }
+
 
 // Class Instance
 //-----------------------------------------------------------------------------
@@ -160,7 +138,7 @@ ParametricData<Model> &Model::getParametricData() {
 // Creation Date : 03/16/05
 //-----------------------------------------------------------------------------
 
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
   return true;
 }
@@ -174,14 +152,11 @@ bool Instance::processParams (string param)
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
 Instance::Instance(
-  InstanceBlock & IB,
+  const Configuration & configuration,
+  const InstanceBlock & IB,
   Model & SWiter,
-  MatrixLoadData & mlData1,
-  SolverState &ss1,
-  ExternData  &ed1,
-  DeviceOptions & do1)
-
-  : DeviceInstance(IB,mlData1,ss1,ed1,do1),
+  const FactoryBlock &  factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(SWiter),
     R(0.0),
     ON(false),
@@ -207,9 +182,6 @@ Instance::Instance(
   numStateVars = 1;
   numLeadCurrentStoreVars = 1; // for device lead current if needed.
 
-  setName(IB.getName());
-  setModelName(model_.getName());
-
   jacStamp.resize(2);
   jacStamp[0].resize(2);
   jacStamp[0][0]=0;
@@ -229,24 +201,18 @@ Instance::Instance(
   {
     if (given("ON"))
     {
-      string msg = "Cannot specify both 'on' and off' for switch";
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+      UserError0(*this) << "Cannot specify both 'on' and off' for switch";
     }
     ON = !OFF;
   }
   if (!given("CONTROL"))
   {
-    string msg = "Must specify 'control' for switch";
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Must specify 'control' for switch";
   }
 
-  vector<sDepend>::iterator d;
-  vector<sDepend>::iterator begin = dependentParams.begin();
-  vector<sDepend>::iterator end = dependentParams.end();
+  std::vector<sDepend>::iterator d;
+  std::vector<sDepend>::iterator begin = dependentParams.begin();
+  std::vector<sDepend>::iterator end = dependentParams.end();
 
   for  (d = begin ; d != end ; ++d)
   {
@@ -300,29 +266,11 @@ Instance::~Instance ()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/20/02
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                                     const vector<int> & extLIDVecRef)
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                                     const std::vector<int> & extLIDVecRef)
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -345,21 +293,9 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 06/20/02
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars ||
-      numStateVars != expNumDdt+1)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
   // copy over the global ID lists:
   staLIDVec = staLIDVecRef;
@@ -379,20 +315,10 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 04/05/2013
 //-----------------------------------------------------------------------------
-void N_DEV_SWInstance::registerStoreLIDs(const vector<int> & stoLIDVecRef )
+void N_DEV_SWInstance::registerStoreLIDs(const std::vector<int> & stoLIDVecRef )
 {
-  string msg;
+  AssertLIDs(stoLIDVecRef.size() == getNumStoreVars());
 
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSto = stoLIDVecRef.size();
-
-  if (numSto != getNumStoreVars())
-  {
-    msg = "N_DEV_SWInstance::registerStoreLIDs:";
-    msg += "numSto != numStoreVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
   if( loadLeadCurrent )
   {
     li_store_dev_i = stoLIDVecRef[0];
@@ -407,16 +333,16 @@ void N_DEV_SWInstance::registerStoreLIDs(const vector<int> & stoLIDVecRef )
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 04/05/2013
 //-----------------------------------------------------------------------------
-map<int,string> & N_DEV_SWInstance::getStoreNameMap ()
+std::map<int,std::string> & N_DEV_SWInstance::getStoreNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if( loadLeadCurrent && storeNameMap.empty ())
   {
     // change subcircuitname:devicetype_deviceName to
     // devicetype:subcircuitName:deviceName
-    string modName(getName());
+    std::string modName(getName());
     spiceInternalName(modName);
-    string tmpstr;
+    std::string tmpstr;
     tmpstr = modName+":DEV_I";
     storeNameMap[ li_store_dev_i ] = tmpstr;
   }
@@ -433,7 +359,7 @@ map<int,string> & N_DEV_SWInstance::getStoreNameMap ()
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 06/06/01
 //-----------------------------------------------------------------------------
-const vector<string> & Instance::getDepSolnVars()
+const std::vector<std::string> & Instance::getDepSolnVars()
 {
   return DeviceInstance::getDepSolnVars();
 }
@@ -447,7 +373,7 @@ const vector<string> & Instance::getDepSolnVars()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 09/2/02
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -460,7 +386,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 09/2/02
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
 
@@ -707,10 +633,11 @@ bool Instance::loadDAEdFdx ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-                                    SolverState & ss1,
-                                    DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
   dtype(1),
   RON(0.0),
   ROFF(0.0),
@@ -730,11 +657,7 @@ Model::Model (const ModelBlock & MB,
     }
     else
     {
-      string msg = "Unrecognized model type: ";
-      msg += getType();
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+      UserError0(*this) << "Unrecognized model type " << getType();
     }
   }
 
@@ -778,7 +701,7 @@ Model::Model (const ModelBlock & MB,
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 03/16/05
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   double del;
   Lm = log (sqrt(RON*ROFF));
@@ -803,12 +726,12 @@ bool Model::processParams (string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 03/23/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -828,9 +751,9 @@ bool Model::processInstanceParams(string param)
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
     delete (*iter);
@@ -846,27 +769,48 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i;
-  os << endl;
-  os << "    name     getModelName()  Parameters" << endl;
+  os << std::endl;
+  os << "    name     model name  Parameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "      ";
-    os << (*iter)->getModelName();
+    os << getName();
     os << "    R = " << (*iter)->R;
     os << "  G = " << (*iter)->G;
     os << "  State = " << (*iter)->SW_STATE;
-    os << endl;
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 //-----------------------------------------------------------------------------
 // SW Master functions:
@@ -884,7 +828,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 {
   bool bsuccess = true;
 
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & si = *(*it);
 
@@ -909,7 +853,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 //-----------------------------------------------------------------------------
 bool Master::updateSecondaryState ( double * staDerivVec, double * stoVec )
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & si = *(*it);
 
@@ -992,7 +936,7 @@ bool Master::updateSecondaryState ( double * staDerivVec, double * stoVec )
 //-----------------------------------------------------------------------------
 bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  double * storeLeadF, double * storeLeadQ)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
      Instance & si = *(*it);
     // F-vector:
@@ -1018,7 +962,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
 //-----------------------------------------------------------------------------
 bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
      Instance & si = *(*it);
 #ifndef Xyce_NONPOINTER_MATRIX_LOAD
@@ -1054,6 +998,27 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 #endif
   }
   return true;
+}
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("s", 1)
+
+#ifdef Xyce_OLD_SWITCH
+    .registerModelType("sw", 1)
+#else
+    .registerModelType("switch", 1)
+    .registerModelType("iswitch", 1)
+    .registerModelType("vswitch", 1)
+#endif
+    ;
 }
 
 } // namespace SW

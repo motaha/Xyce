@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.77.2.2 $
+// Revision Number: $Revision: 1.95.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -47,19 +47,32 @@
 #define Xyce_N_DEV_SW_h
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_DeviceTemplate.h>
+#include <N_DEV_Configuration.h>
+#include <N_DEV_DeviceMaster.h>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceInstance.h>
 #include <N_DEV_DeviceModel.h>
-
-class N_UTL_Expression;
 
 namespace Xyce {
 namespace Device {
 namespace SW {
 
-// ----------   Fwd Declarations  -------
 class Model;
+class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance>
+{
+  static const char *name() {return "Controlled Switch";}
+  static const char *deviceTypeName() {return "S level 1";}
+  static const int numNodes() {return 2;}
+  static const int numOptionalNodes() {return 2;}
+  static const bool modelRequired() {return true;}
+  static const bool isLinearDevice() {return true;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : Instance
@@ -72,62 +85,57 @@ class Instance : public DeviceInstance
 {
   friend class ParametricData<Instance>;
   friend class Model;
-  friend class Master;
+  friend class Traits;friend class Master;
 
-  public:
-  static ParametricData<Instance> &getParametricData();
+public:
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-    Instance(InstanceBlock &IB,
-                     Model & SWiter,
-                     MatrixLoadData & mlData1,
-                     SolverState &ss1,
-                     ExternData  &ed1,
-                     DeviceOptions & do1);
+  Instance(
+     const Configuration &       configuration,
+     const InstanceBlock &     IB,
+     Model &                   SWiter,
+     const FactoryBlock &      factory_block);
 
 
-    ~Instance();
+  ~Instance();
 
 private:
   Instance(const Instance &);
   Instance &operator=(const Instance &);
 
 public:
-    void registerLIDs( const vector<int> & intLIDVecRef,
-	               const vector<int> & extLIDVecRef );
-    void registerStateLIDs( const vector<int> & staLIDVecRef );
-    void registerStoreLIDs( const vector<int> & stoLIDVecRef );
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
+  void registerStateLIDs( const std::vector<int> & staLIDVecRef );
+  void registerStoreLIDs( const std::vector<int> & stoLIDVecRef );
 
-    map<int,string> & getStoreNameMap();
-    
-    bool processParams (string param = "");
+  std::map<int,std::string> & getStoreNameMap();
+
+  bool processParams ();
 
   const std::vector<std::string> & getDepSolnVars();
 
-    const vector< vector<int> > & jacobianStamp() const;
-    void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-    bool updateIntermediateVars ();
-    bool updatePrimaryState ();
-    bool updateSecondaryState ();
+  bool updateIntermediateVars ();
+  bool updatePrimaryState ();
+  bool updateSecondaryState ();
 
-    // load functions, residual:
-    bool loadDAEQVector () {return true;}
-    bool loadDAEFVector ();
+  // load functions, residual:
+  bool loadDAEQVector () {return true;}
+  bool loadDAEFVector ();
 
-    // load functions, Jacobian:
-    bool loadDAEdQdx () {return true;}
-    bool loadDAEdFdx ();
+  // load functions, Jacobian:
+  bool loadDAEdQdx () {return true;}
+  bool loadDAEdFdx ();
 
-    void setupPointers();
+  void setupPointers();
 
-  public:
-    // iterator reference to the switch model which owns this instance
+public:
+  // iterator reference to the switch model which owns this instance
   // Getters and setters
-  Model &getModel() {
+  Model &getModel() 
+  {
     return model_;
   }
 
@@ -135,71 +143,71 @@ private:
 
   Model &       model_;         //< Owning model
 
-    N_UTL_Expression * Exp_ptr;
-    int            expNumVars;
-    int            expBaseVar;
-    int            expNumDdt;
-    list<string>   evnList;
+  Util::Expression * Exp_ptr;
+  int            expNumVars;
+  int            expBaseVar;
+  int            expNumDdt;
+  std::list<std::string>   evnList;
 
-    vector<double> expVarDerivs;
-    vector<double> myVarVals;
-    vector<double> ddtVals;
-    double         expVal;
+  std::vector<double> expVarDerivs;
+  std::vector<double> myVarVals;
+  std::vector<double> ddtVals;
+  double         expVal;
 
 
-    // user specified parameters
-    double R;     // resistance (ohms)
-    double CONTROL;   // Value of control expression
-    bool ON, OFF;      // whether switch is on or off initially
+  // user specified parameters
+  double R;     // resistance (ohms)
+  double CONTROL;   // Value of control expression
+  bool ON, OFF;      // whether switch is on or off initially
 
-    // derived parameters
-    double G;     // conductance (1.0/ohms)
-    double dGdI,dGdV;
+  // derived parameters
+  double G;     // conductance (1.0/ohms)
+  double dGdI,dGdV;
 
-    // places to store node voltages
-    double v_pos;
-    double v_neg;
+  // places to store node voltages
+  double v_pos;
+  double v_neg;
 
-    double LeadCurrent;
+  double LeadCurrent;
 
-    // double for current state of switch
-    double SW_STATE;
+  // double for current state of switch
+  double SW_STATE;
 
-    // and a state variable to save the SW_STATE
-    double switch_state;
+  // and a state variable to save the SW_STATE
+  double switch_state;
 
-    vector<int>    li_ddt;
+  std::vector<int>    li_ddt;
 
-    int li_switch_state;
+  int li_switch_state;
 
-    // local indices (offsets)
-    int li_Pos;
-    int li_Neg;
-    
-    // store vector location for device lead current
-    int li_store_dev_i;
+  // local indices (offsets)
+  int li_Pos;
+  int li_Neg;
 
-    // Offset variables corresponding to the above declared indices.
-    int APosEquPosNodeOffset;
-    int APosEquNegNodeOffset;
-    int ANegEquPosNodeOffset;
-    int ANegEquNegNodeOffset;
+  // store vector location for device lead current
+  int li_store_dev_i;
 
-    // Offsets into the control nodes
-    vector<int> APosEquControlNodeOffset;
-    vector<int> ANegEquControlNodeOffset;
+  // Offset variables corresponding to the above declared indices.
+  int APosEquPosNodeOffset;
+  int APosEquNegNodeOffset;
+  int ANegEquPosNodeOffset;
+  int ANegEquNegNodeOffset;
 
-    // Ptr variables corresponding to the above declared indices.
-    double * fPosEquPosNodePtr;
-    double * fPosEquNegNodePtr;
-    double * fNegEquPosNodePtr;
-    double * fNegEquNegNodePtr;
+  // Offsets into the control nodes
+  std::vector<int> APosEquControlNodeOffset;
+  std::vector<int> ANegEquControlNodeOffset;
 
-    // Ptrs into the control nodes
-    vector<double *> fPosEquControlNodePtr;
-    vector<double *> fNegEquControlNodePtr;
+  // Ptr variables corresponding to the above declared indices.
+  double * fPosEquPosNodePtr;
+  double * fPosEquNegNodePtr;
+  double * fNegEquPosNodePtr;
+  double * fNegEquNegNodePtr;
 
-    vector< vector<int> > jacStamp;
+  // Ptrs into the control nodes
+  std::vector<double *> fPosEquControlNodePtr;
+  std::vector<double *> fNegEquControlNodePtr;
+
+  std::vector< std::vector<int> > jacStamp;
 };
 
 //-----------------------------------------------------------------------------
@@ -215,20 +223,15 @@ class Model : public DeviceModel
 
   friend class ParametricData<Model>;
   friend class Instance;
-  friend class Master;
+  friend class Traits;friend class Master;
 
-  public:
-  static ParametricData<Model> &getParametricData();
+public:
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &        MB,
+     const FactoryBlock &      factory_block);
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-    Model(const ModelBlock &MB,
-                        SolverState & ss1,
-                     DeviceOptions & do1);
-
-    ~Model();
+  ~Model();
 
 private:
   Model();
@@ -236,38 +239,47 @@ private:
   Model &operator=(const Model &);
 
 public:
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
+
   virtual std::ostream &printOutInstances(std::ostream &os) const;
 
-    bool processParams (string param = "");
-    bool processInstanceParams (string param = "");
+  bool processParams ();
+  bool processInstanceParams ();
 
 
 public:
-  InstanceVector &getInstanceVector() {
+  void addInstance(Instance *instance) 
+  {
+    instanceContainer.push_back(instance);
+  }
+
+  InstanceVector &getInstanceVector() 
+  {
     return instanceContainer;
   }
 
-  const InstanceVector &getInstanceVector() const {
+  const InstanceVector &getInstanceVector() const 
+  {
     return instanceContainer;
   }
 
-  private:
-    vector<Instance*> instanceContainer;
+private:
+  std::vector<Instance*> instanceContainer;
 
-  private:
+private:
 
-    int dtype;      // device type: 1=SWITCH, 2=ISWITCH, 3=VSWITCH
-    double VON;
-    double VOFF;
-    double ION;
-    double IOFF;
-    double RON;
-    double ROFF;
-    double ON;
-    double OFF;
-    double dInv;    // the inverse of (ON-OFF) or 1e-12, if too small.
-    double Lm;      // log mean of resistances
-    double Lr;      // log ratio of resistor values
+  int dtype;      // device type: 1=SWITCH, 2=ISWITCH, 3=VSWITCH
+  double VON;
+  double VOFF;
+  double ION;
+  double IOFF;
+  double RON;
+  double ROFF;
+  double ON;
+  double OFF;
+  double dInv;    // the inverse of (ON-OFF) or 1e-12, if too small.
+  double Lm;      // log mean of resistances
+  double Lr;      // log ratio of resistor values
 };
 
 //-----------------------------------------------------------------------------
@@ -277,34 +289,31 @@ public:
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 11/26/08
 //-----------------------------------------------------------------------------
-class Master : public Xyce::Device::DeviceTemplate<Model, Instance>
+class Master : public DeviceMaster<Traits>
 {
-  public:
-    Master (
-      const std::string &dn,
-      const std::string &cn,
-      const std::string &dmName,
-           LinearDevice linearDev,
-           SolverState & ss1,
-           DeviceOptions & do1)
-      : Xyce::Device::DeviceTemplate<Model, Instance>(
-           dn, cn, dmName, linearDev, ss1, do1)
-    {
+  friend class Instance;
+  friend class Model;
 
-    }
+public:
+  Master(
+     const Configuration &       configuration,
+     const FactoryBlock &      factory_block,
+     const SolverState & ss1,
+     const DeviceOptions & do1)
+    : DeviceMaster<Traits>(configuration, factory_block, ss1, do1)
+  {}
 
-    virtual bool updateState (double * solVec, double * staVec, double * stoVec);
-    virtual bool updateSecondaryState (double * staDeriv, double * stoVec);
+  virtual bool updateState (double * solVec, double * staVec, double * stoVec);
+  virtual bool updateSecondaryState (double * staDeriv, double * stoVec);
 
-    // load functions, residual:
-    virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
+  // load functions, residual:
+  virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
 
-    // load functions, Jacobian:
-    virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
-
-    friend class Instance;
-    friend class Model;
+  // load functions, Jacobian:
+  virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
 };
+
+void registerDevice();
 
 } // namespace SW
 } // namespace Device

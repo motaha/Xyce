@@ -1,0 +1,9 @@
+<map id="Parameter Definitions" name="Parameter Definitions">
+<area shape="rect" id="node1" href="$group__xyce__device__instance__implementation.html" title="The Instance class." alt="" coords="437,5,613,32"/>
+<area shape="rect" id="node2" href="$group__xyce__device__model__implementation.html" title="The Model class." alt="" coords="445,56,606,83"/>
+<area shape="rect" id="node3" href="$group__xyce__device__master__implementation.html" title="Master Implementation" alt="" coords="442,107,609,133"/>
+<area shape="rect" id="node4" href="$group__xyce__device__parameters__declaration.html" title="Circuit Device Declarations\l for Parameter Processing" alt="" coords="430,158,621,199"/>
+<area shape="rect" id="node5" href="$group__xyce__device__parameters__implementation.html" title="Device Implementation" alt="" coords="443,224,608,251"/>
+<area shape="rect" id="node6" href="$group__xyce__device__package.html" title="The Xyce Circuit Device package provides the classes and interfaces to define a circuit device..." alt="" coords="6,129,173,170"/>
+<area shape="rect" id="node8" href="$group__xyce__device__parameters__detail.html" title="Device models, device instances and composite parameters are collectively called an entity..." alt="" coords="458,275,593,301"/>
+</map>

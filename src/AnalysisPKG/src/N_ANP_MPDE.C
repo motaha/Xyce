@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,8 +31,8 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.9.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:31 $
+// Revision Number: $Revision: 1.14 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 #include <Xyce_config.h>
@@ -51,16 +51,19 @@
 
 #include<N_ANP_MPDE.h>
 
+namespace Xyce {
+namespace Analysis {
+
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MPDE::N_ANP_MPDE( N_ANP_AnalysisManager * )
+// Function      : MPDE::MPDE( AnalysisManager * )
 // Purpose       : 
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-N_ANP_MPDE::N_ANP_MPDE( N_ANP_AnalysisManager * anaManagerPtr ) :
-  N_ANP_AnalysisBase(anaManagerPtr),
+MPDE::MPDE( AnalysisManager * anaManagerPtr ) :
+  AnalysisBase(anaManagerPtr),
   isPaused(false),
   startDCOPtime(0.0),  
   endTRANtime(0.0)
@@ -72,112 +75,117 @@ N_ANP_MPDE::N_ANP_MPDE( N_ANP_AnalysisManager * anaManagerPtr ) :
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MPDE::run()
+// Function      : MPDE::run()
 // Purpose       : 
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_MPDE::run()
+bool MPDE::run()
 {
-  anaManagerRCPtr_->mpdeMgrPtr_->run();
+  anaManagerRCPtr_->getMPDEManager()->run();
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MPDE::init()
+// Function      : MPDE::init()
 // Purpose       : 
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_MPDE::init()
+bool MPDE::init()
 {
   return false;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MPDE::loopProcess()
+// Function      : MPDE::loopProcess()
 // Purpose       : Conduct the time stepping loop.
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_MPDE::loopProcess()
+bool MPDE::loopProcess()
 {
   return false;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MPDE::processSuccessfulDCOP()
+// Function      : MPDE::processSuccessfulDCOP()
 // Purpose       : 
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_MPDE::processSuccessfulDCOP()
+bool MPDE::processSuccessfulDCOP()
 {
   return false;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MPDE::processSuccessfulStep()
+// Function      : MPDE::processSuccessfulStep()
 // Purpose       : 
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_MPDE::processSuccessfulStep()
+bool MPDE::processSuccessfulStep()
 {
   return false;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MPDE::processFailedStep
+// Function      : MPDE::processFailedStep
 // Purpose       : 
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_MPDE::processFailedStep()
+bool MPDE::processFailedStep()
 {
   return false;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MPDE::processFailedDCOP
+// Function      : MPDE::processFailedDCOP
 // Purpose       : 
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_MPDE::processFailedDCOP()
+bool MPDE::processFailedDCOP()
 {
   return false;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MPDE::finish
+// Function      : MPDE::finish
 // Purpose       : 
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_MPDE::finish()
+bool MPDE::finish()
 {
   return false;
 }
 
+bool MPDE::handlePredictor()
+{
+  return true;
+}
+
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MPDE::resetForStepAnalysis() 
+// Function      : MPDE::resetForStepAnalysis() 
 // Purpose       : When doing a .STEP sweep, some data must be reset to its 
 //                 initial state.
 // Special Notes :
@@ -185,7 +193,7 @@ bool N_ANP_MPDE::finish()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 8/26/04
 //-----------------------------------------------------------------------------
-bool N_ANP_MPDE::resetForStepAnalysis()
+bool MPDE::resetForStepAnalysis()
 {
   totalNumberSuccessStepsThisParameter_ = 0;
   return false;
@@ -193,54 +201,29 @@ bool N_ANP_MPDE::resetForStepAnalysis()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MPDE::finalVerboseOutput
+// Function      : MPDE::finalVerboseOutput
 // Purpose       : 
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_MPDE::finalVerboseOutput()
+bool MPDE::finalVerboseOutput()
 {
   return false;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MPDE::takeAnIntegrationStep_
+// Function      : MPDE::takeAnIntegrationStep_
 // Purpose       : Take a transient integration step.
 // Special Notes :
 // Scope         : private
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 01/24/08
 //-----------------------------------------------------------------------------
-void N_ANP_MPDE::takeAnIntegrationStep_()
+void MPDE::takeAnIntegrationStep_()
 {
 }
 
-//-----------------------------------------------------------------------------
-// Function      : N_ANP_MPDE::printStepHeader()
-// Purpose       : Prints out time step information.
-// Special Notes : 
-// Scope         : public
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 6/26/00
-//-----------------------------------------------------------------------------
-void N_ANP_MPDE::printStepHeader() 
-{
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_ANP_MPDE::printProgress()
-// Purpose       : Outputs run completion percentage and estimated
-//                 time-to-completion.
-//
-// Special Notes : This will need some fixing to work with .STEP.
-//
-// Scope         : public
-// Creator       : Scott A. Hutchinson, SNL, Computational Sciences
-// Creation Date : 06/07/2002
-//-----------------------------------------------------------------------------
-void N_ANP_MPDE::printProgress() 
-{
-}
-
+} // namespace Analysis
+} // namespace Xyce

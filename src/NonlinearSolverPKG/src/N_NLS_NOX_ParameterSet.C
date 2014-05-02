@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.88.2.2 $
+// Revision Number: $Revision: 1.100 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -69,6 +69,7 @@
 #include "N_NLS_NOX_LargeUpdateTest.h"
 #include "N_ERH_ErrorMgr.h"
 #include "N_UTL_Param.h"
+#include "N_PDS_fwd.h"
 #include "N_UTL_OptionBlock.h"
 #include "LOCA.H"
 #include "N_NLS_ReturnCodes.h"
@@ -85,9 +86,6 @@
 #include "N_LAS_System.h"
 #include "N_LAS_QueryUtil.h"
 #include "Epetra_MapColoring.h"
-
-// -----------  Forward declarations  -------
-class N_PDS_Comm;
 
 using namespace N_NLS_NOX;
 
@@ -112,14 +110,12 @@ ParameterSet::ParameterSet(AnalysisMode mode) :
   voltageListType_(VLT_None),
   gstepping_minimum_conductance_(0.0),
   savedLocaOptions_(false),
-#ifdef Xyce_DEBUG_NONLINEAR
   debugLevel_(0),
   debugMinTimeStep_(0),
   debugMaxTimeStep_(N_UTL_MachineDependentParams::IntMax()),
   debugMinTime_(0.0),
   debugMaxTime_(N_UTL_MachineDependentParams::DoubleMax()),
   screenOutputFlag_(false),
-#endif
   voltageScaleFactor_(1.0)
 {
   // Add the main status test to the list of tests to delete in dtor
@@ -175,7 +171,7 @@ ParameterSet::ParameterSet(AnalysisMode mode) :
     //noxParams_.sublist("Direction").sublist("Newton")
     //.sublist("Linear Solver").set("Tolerance", 1.0e-9);
     break;
-  case HB:
+  case HB_MODE:
     // These values correspond to N_NLS_DampedNewton.C; see the constructor
     statusTestParams_.set("ABSTOL", 1.0e-9);
     statusTestParams_.set("RELTOL", 1.0e-3);
@@ -281,7 +277,7 @@ bool ParameterSet::setOutputOptions(int myPID, int outputProcess)
 // Creation Date :
 //-----------------------------------------------------------------------------
 bool ParameterSet::createStatusTests(N_LAS_Vector** currSolVectorPtrPtr,
-				     N_LOA_Loader& loader, vector<char> & varTypeVec
+				     N_LOA_Loader& loader, std::vector<char> & varTypeVec
 #ifdef Xyce_NLS_MASKED_WRMS_NORMS
              , bool nonTrivialDeviceMaskFlag,  N_LAS_Vector * maskVectorPtr)
 #else
@@ -480,7 +476,7 @@ Teuchos::RefCountPtr<NOX::StatusTest::Generic> ParameterSet::getStatusTests()
 {
   if (!isStatusTestsSet_)
   {
-    const string message = "Error: N_NLS::NOX::ParameterSet::getStatusTests() - Status tests are not set!";
+    const std::string message = "Error: N_NLS::NOX::ParameterSet::getStatusTests() - Status tests are not set!";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
   }
 
@@ -547,9 +543,9 @@ Teuchos::RefCountPtr<Teuchos::ParameterList> ParameterSet::getDebugParams()
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-void ParameterSet::unsupportedOption_(const string& tag)
+void ParameterSet::unsupportedOption_(const std::string& tag)
 {
-  const string warning =
+  const std::string warning =
     "Tag \"" + tag + "\" is unsupported by the NOX interface at this time.\n";
   N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, warning);
 }
@@ -580,54 +576,54 @@ bool ParameterSet::parseOptionBlock_(const N_UTL_OptionBlock& OB)
 
 
   // Loop over all parameters in the option block
-  for (list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
+  for (std::list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
        it_tpL != OB.getParams().end(); ++ it_tpL)
   {
-    const string tag = it_tpL->uTag();
+    const std::string tag = it_tpL->uTag();
 
 
     // Parameters for nonlinear convergence tests
     if (tag == "ABSTOL")
     {
-      statusTestParams_.set("ABSTOL", it_tpL->dVal());
+      statusTestParams_.set("ABSTOL", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "RELTOL")
     {
-      statusTestParams_.set("RELTOL", it_tpL->dVal());
+      statusTestParams_.set("RELTOL", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "DELTAXTOL")
     {
-      statusTestParams_.set("DELTAXTOL", it_tpL->dVal());
+      statusTestParams_.set("DELTAXTOL", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "RHSTOL")
     {
-      statusTestParams_.set("RHSTOL", it_tpL->dVal());
+      statusTestParams_.set("RHSTOL", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "MAXSTEP")
     {
-      statusTestParams_.set("MAXSTEP", it_tpL->iVal());
+      statusTestParams_.set("MAXSTEP", it_tpL->getImmutableValue<int>());
     }
     else if (tag == "SMALLUPDATETOL")
     {
-      statusTestParams_.set("SMALLUPDATETOL", it_tpL->dVal());
+      statusTestParams_.set("SMALLUPDATETOL", it_tpL->getImmutableValue<double>());
     }
 
     // Check devices for convergence (by calls to cktloader)
     else if (tag == "ENFORCEDEVICECONV")
     {
-      statusTestParams_.set("ENFORCEDEVICECONV", it_tpL->iVal());
+      statusTestParams_.set("ENFORCEDEVICECONV", it_tpL->getImmutableValue<int>());
     }
 	  else if (tag == "FASTTESTS")
     {
-      statusTestParams_.set("FASTTESTS", it_tpL->bVal());
+      statusTestParams_.set("FASTTESTS", it_tpL->getImmutableValue<bool>());
     }
     else if (tag == "VOLTZEROTOL")
     {
-      statusTestParams_.set("VOLTZEROTOL", it_tpL->dVal());
+      statusTestParams_.set("VOLTZEROTOL", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "ABSZEROTOL")
     {
-      statusTestParams_.set("ABSZEROTOL", it_tpL->dVal());
+      statusTestParams_.set("ABSZEROTOL", it_tpL->getImmutableValue<double>());
     }
 
     // Unsupported options
@@ -653,42 +649,40 @@ bool ParameterSet::parseOptionBlock_(const N_UTL_OptionBlock& OB)
     }
     else if (tag == "NORMLVL")
     {
-      if (it_tpL->iVal() != 2)
+      if (it_tpL->getImmutableValue<int>() != 2)
         unsupportedOption_(tag);
     }
-#ifdef Xyce_DEBUG_NONLINEAR
     else if (tag == "DEBUGLEVEL")
     {
-      debugLevel_ = it_tpL->iVal();
+      debugLevel_ = it_tpL->getImmutableValue<int>();
     }
     else if (tag == "SCREENOUTPUT")
     {
-      screenOutputFlag_ = it_tpL->bVal();
+      screenOutputFlag_ = it_tpL->getImmutableValue<bool>();
     }
     else if (tag == "DEBUGMINTIMESTEP")
     {
-      debugMinTimeStep_ = it_tpL->iVal();
+      debugMinTimeStep_ = it_tpL->getImmutableValue<int>();
     }
     else if (tag == "DEBUGMAXTIMESTEP")
     {
-      debugMaxTimeStep_ = it_tpL->iVal();
+      debugMaxTimeStep_ = it_tpL->getImmutableValue<int>();
     }
     else if (tag == "DEBUGMINTIME")
     {
-      debugMinTime_ = it_tpL->dVal();
+      debugMinTime_ = it_tpL->getImmutableValue<double>();
     }
     else if (tag == "DEBUGMAXTIME")
     {
-      debugMaxTime_ = it_tpL->dVal();
+      debugMaxTime_ = it_tpL->getImmutableValue<double>();
     }
-#endif
     else if (tag == "DLSDEBUG")
       unsupportedOption_(tag);
 
     // Nonlinear Strategy
     else if (tag == "NLSTRATEGY")
     {
-      int val = it_tpL->iVal();
+      int val = it_tpL->getImmutableValue<int>();
       if (val == 0)		// Newton
       {
         noxParams_.set("Nonlinear Solver", "Line Search Based");
@@ -735,20 +729,20 @@ bool ParameterSet::parseOptionBlock_(const N_UTL_OptionBlock& OB)
       else if (val == 7)	// Fast Newton Direction
       {
         // RPP: No longer supported
-        const string warning =
+        const std::string warning =
           "NLStrategy = 7 is no longer supported.\n";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, warning);
       }
       else if (val == 8)	// Newton/Steepest Descent Combo Direction
       {
         // RPP: No longer supported
-        const string warning =
+        const std::string warning =
           "NLStrategy = 8 is no longer supported.\n";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, warning);
       }
       else
       {
-        const string warning =
+        const std::string warning =
           "NLStrategy is not found!\n";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, warning);
       }
@@ -757,7 +751,7 @@ bool ParameterSet::parseOptionBlock_(const N_UTL_OptionBlock& OB)
     // Line search method
     else if (tag == "SEARCHMETHOD")
     {
-      int val = it_tpL->iVal();
+      int val = it_tpL->getImmutableValue<int>();
       if (val == 0)
       {
         noxParams_.sublist("Line Search").set("Method", "Full Step");
@@ -788,7 +782,7 @@ bool ParameterSet::parseOptionBlock_(const N_UTL_OptionBlock& OB)
         std::ostringstream ost;
         ost << "N_NLS_NOX::ParameterSet::parseOptionBlock_ - "
             << "SEARCHMETHOD = " << val
-            << " not supported by Xyce at this time." << endl;
+            << " not supported by Xyce at this time." << std::endl;
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, ost.str());
       }
     }
@@ -797,42 +791,42 @@ bool ParameterSet::parseOptionBlock_(const N_UTL_OptionBlock& OB)
     else if (tag == "TRMINRADIUS")
     {
       noxParams_.sublist("Trust Region")
-        .set("Minimum Trust Region Radius", it_tpL->dVal());
+        .set("Minimum Trust Region Radius", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "TRMAXRADIUS")
     {
       noxParams_.sublist("Trust Region")
-        .set("Maximum Trust Region Radius", it_tpL->dVal());
+        .set("Maximum Trust Region Radius", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "TRMINIMPROVEMENTRATIO")
     {
       noxParams_.sublist("Trust Region")
-        .set("Minimum Improvement Ratio", it_tpL->dVal());
+        .set("Minimum Improvement Ratio", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "TRCONTRACTIONRATIO")
     {
       noxParams_.sublist("Trust Region")
-        .set("Contraction Trigger Ratio", it_tpL->dVal());
+        .set("Contraction Trigger Ratio", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "TRCONTRACTIONFACTOR")
     {
       noxParams_.sublist("Trust Region")
-        .set("Contraction Factor", it_tpL->dVal());
+        .set("Contraction Factor", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "TREXPANSIONRATIO")
     {
       noxParams_.sublist("Trust Region")
-        .set("Expansion Trigger Ratio", it_tpL->dVal());
+        .set("Expansion Trigger Ratio", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "TREXPANSIONFACTOR")
     {
       noxParams_.sublist("Trust Region")
-        .set("Expansion Factor", it_tpL->dVal());
+        .set("Expansion Factor", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "TRRECOVERYSTEP")
     {
       noxParams_.sublist("Trust Region")
-        .set("Recovery Step", it_tpL->dVal());
+        .set("Recovery Step", it_tpL->getImmutableValue<double>());
     }
 
     // RPP: Why this is here???
@@ -851,11 +845,11 @@ bool ParameterSet::parseOptionBlock_(const N_UTL_OptionBlock& OB)
     {
       if (it_tpL->isNumeric())
       {
-        noxSolver = it_tpL->iVal();
+        noxSolver = it_tpL->getImmutableValue<int>();
       }
       else
       {
-        ExtendedString p(it_tpL->sVal());
+        ExtendedString p(it_tpL->stringValue());
         p.toUpper();
         if (p.substr(0,4) == "STAN")
         {
@@ -907,8 +901,8 @@ bool ParameterSet::parseOptionBlock_(const N_UTL_OptionBlock& OB)
         }
         else
         {
-          string message = "Unknown specification in .options for 'continuation': ";
-          message += it_tpL->sVal();
+          std::string message = "Unknown specification in .options for 'continuation': ";
+          message += it_tpL->stringValue();
           N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
         }
 
@@ -917,8 +911,10 @@ bool ParameterSet::parseOptionBlock_(const N_UTL_OptionBlock& OB)
 #ifndef Xyce_NOX_LOCA_ARTIFICIAL_HOMOTOPY_SUPPORT
         if (noxSolver == 33)
         {
-          const string message = "Error: N_NLS_NOX::ParameterSet::parseOptionBlock() - option \"continuation=33\" requires Xyce to be built with -DXyce_NOX_LOCA_ARTIFICIAL_HOMOTOPY_SUPPORT in the configure script.  Please rebuild Xyce or choose a different continuation method.\n";
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
+          Xyce::Report::UserFatal0() << "Nonlinear Solver (NOX::Interface) Artificial parameter continuation requires "
+                                     << "building xyce with the define: -DXyce_NOX_LOCA_ARTIFICIAL_HOMOTOPY_SUPPORT to "
+                                     << "allow LOCA to augment the diagonal of Jacobian! Either rebuild Xyce or do not "
+                                     << "run Xyce with \"continuation=33\"";
         }
 #endif
       }
@@ -928,62 +924,60 @@ bool ParameterSet::parseOptionBlock_(const N_UTL_OptionBlock& OB)
     // have been parsed
     else if (tag == "MAXSEARCHSTEP")
     {
-      maxSearchStep = it_tpL->iVal();
+      maxSearchStep = it_tpL->getImmutableValue<int>();
     }
     else if (tag == "IN_FORCING")
     {
-      in_Forcing = it_tpL->iVal();
+      in_Forcing = it_tpL->getImmutableValue<int>();
     }
     else if (tag == "AZ_TOL")
     {
-      AZ_tol = it_tpL->dVal();
+      AZ_tol = it_tpL->getImmutableValue<double>();
     }
     else if (tag == "RECOVERYSTEPTYPE")
     {
-      recoveryStepType = it_tpL->iVal();
+      recoveryStepType = it_tpL->getImmutableValue<int>();
     }
     else if (tag == "RECOVERYSTEP")
     {
-      recoveryStep = it_tpL->dVal();
+      recoveryStep = it_tpL->getImmutableValue<double>();
     }
     else if (tag == "MEMORY")
     {
-      memory = it_tpL->iVal();
+      memory = it_tpL->getImmutableValue<int>();
     }
 
     // Parameters that can't be set in the list until all options
     // have been parsed
     else if (tag == "MAXSEARCHSTEP")
     {
-      maxSearchStep = it_tpL->iVal();
+      maxSearchStep = it_tpL->getImmutableValue<int>();
     }
     else if (tag == "IN_FORCING")
     {
-      in_Forcing = it_tpL->iVal();
+      in_Forcing = it_tpL->getImmutableValue<int>();
     }
     else if (tag == "AZ_TOL")
     {
-      AZ_tol = it_tpL->dVal();
+      AZ_tol = it_tpL->getImmutableValue<double>();
     }
     else if (tag == "RECOVERYSTEPTYPE")
     {
-      recoveryStepType = it_tpL->iVal();
+      recoveryStepType = it_tpL->getImmutableValue<int>();
     }
     else if (tag == "RECOVERYSTEP")
     {
-      recoveryStep = it_tpL->dVal();
+      recoveryStep = it_tpL->getImmutableValue<double>();
     }
     else if (tag == "MEMORY")
     {
-      memory = it_tpL->iVal();
+      memory = it_tpL->getImmutableValue<int>();
     }
 
     // Warn user about unrecognized solver option
     else
     {
-      string tmp = "  Warning: " + tag +
-      " is not a recognized nonlinear solver option.\n";
-      N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_INFO_0,  tmp);
+      Xyce::Report::UserWarning() << tag << " is not a recognized nonlinear solver option.\n" << std::endl;
     }
 
   } // end loop over all options in block
@@ -998,10 +992,10 @@ bool ParameterSet::parseOptionBlock_(const N_UTL_OptionBlock& OB)
      parameters until the entire option block is parsed and then set
      them in the correct sublist.
   */
-  string directionMethod =
+  std::string directionMethod =
     noxParams_.sublist("Direction").get("Method", "Newton");
 
-  string lineSearchMethod =
+  std::string lineSearchMethod =
     noxParams_.sublist("Line Search").get("Method", "Full Step");
 
   // MAXSEARCHSTEP
@@ -1080,11 +1074,11 @@ bool ParameterSet::setLocaOptions(const N_UTL_OptionBlock& OB, bool saveCopy)
     savedLocaOB_ = OB; // save a copy to re-assert defaults later, if needed.
   }
 
-  for (list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
+  for (std::list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
        it_tpL != OB.getParams().end(); ++ it_tpL)
   {
-    const string tag = it_tpL->uTag();
-    string baseTag=tag.substr(0,8);
+    const std::string tag = it_tpL->uTag();
+    std::string baseTag=tag.substr(0,8);
     bool isVectorParam=false;
     if (baseTag == "CONPARAM" ||
         baseTag == "MINVALUE" ||
@@ -1116,7 +1110,7 @@ bool ParameterSet::setLocaOptions(const N_UTL_OptionBlock& OB, bool saveCopy)
         baseTag = "AGGRESSIVENESS";
       }
 
-      string num=tag.substr(baseTag.size(),tag.size()-baseTag.size());
+      std::string num=tag.substr(baseTag.size(),tag.size()-baseTag.size());
       int index=ExtendedString(num).Ival();
       vectorParams[baseTag].push_back(*it_tpL);
       isVectorParam=true;
@@ -1126,7 +1120,7 @@ bool ParameterSet::setLocaOptions(const N_UTL_OptionBlock& OB, bool saveCopy)
       stepperGiven=true;
       if (it_tpL->isNumeric())
       {
-        int iType = it_tpL->iVal();
+        int iType = it_tpL->getImmutableValue<int>();
         if (iType == 1)
         {
           stepperList.set("Continuation Method", "Arc Length");
@@ -1140,7 +1134,7 @@ bool ParameterSet::setLocaOptions(const N_UTL_OptionBlock& OB, bool saveCopy)
       }
       else
       {
-        ExtendedString p(it_tpL->sVal());
+        ExtendedString p(it_tpL->stringValue());
         p.toUpper();
         if (p.substr(0,3) == "ARC")
         {
@@ -1154,8 +1148,8 @@ bool ParameterSet::setLocaOptions(const N_UTL_OptionBlock& OB, bool saveCopy)
         }
         else
         {
-          string message = "Unknown specification in .options for 'stepper': ";
-          message += it_tpL->sVal();
+          std::string message = "Unknown specification in .options for 'stepper': ";
+          message += it_tpL->stringValue();
           message += ".  Legal choices are ARCLENGTH or NATURAL, which may be abbreviated to three characters.";
           N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
         }
@@ -1166,7 +1160,7 @@ bool ParameterSet::setLocaOptions(const N_UTL_OptionBlock& OB, bool saveCopy)
       predictorGiven=true;
       if (it_tpL->isNumeric())
       {
-        int iType = it_tpL->iVal();
+        int iType = it_tpL->getImmutableValue<int>();
         if (iType == 1)
         {
           predictorList.set("Method", "Tangent");
@@ -1186,7 +1180,7 @@ bool ParameterSet::setLocaOptions(const N_UTL_OptionBlock& OB, bool saveCopy)
       }
       else
       {
-        ExtendedString p(it_tpL->sVal());
+        ExtendedString p(it_tpL->stringValue());
         p.toUpper();
         if (p.substr(0,3) == "TAN")
         {
@@ -1206,8 +1200,8 @@ bool ParameterSet::setLocaOptions(const N_UTL_OptionBlock& OB, bool saveCopy)
         }
         else
         {
-          string message = "Unknown specification in .options for 'predictor': ";
-          message += it_tpL->sVal();
+          std::string message = "Unknown specification in .options for 'predictor': ";
+          message += it_tpL->stringValue();
           message += ".  Legal choices are TANGENT, SECANT, RANDOM, CONSTANT, which may be abbreviated to three characters.";
           N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
         }
@@ -1218,65 +1212,65 @@ bool ParameterSet::setLocaOptions(const N_UTL_OptionBlock& OB, bool saveCopy)
     // "alternate" vector handling
     else if (tag == "CONPARAM1") // continuation parameter
     {
-      stepperList.set("Continuation Parameter", it_tpL->sVal());
+      stepperList.set("Continuation Parameter", it_tpL->stringValue());
     }
     else if (tag == "INITIALVALUE1")
     {
-      stepperList.set("Initial Value", it_tpL->dVal());
+      stepperList.set("Initial Value", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "MINVALUE1")
     {
-      gstepping_min_value_ = it_tpL->dVal();
-      stepperList.set("Min Value", it_tpL->dVal());
+      gstepping_min_value_ = it_tpL->getImmutableValue<double>();
+      stepperList.set("Min Value", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "RESIDUALCONDUCTANCE")
     {
-      gstepping_minimum_conductance_ = it_tpL->dVal();
+      gstepping_minimum_conductance_ = it_tpL->getImmutableValue<double>();
       if (gstepping_minimum_conductance_ > 0)
       {
-        string message = "You have specified a non-zero value for the GMIN Stepping residual conductance (RESIDUALCONDUCTANCE= ";
-        message += it_tpL->sVal();
+        std::string message = "You have specified a non-zero value for the GMIN Stepping residual conductance (RESIDUALCONDUCTANCE= ";
+        message += it_tpL->stringValue();
         message += ").\nThis option should never be used unless absolutely necessary to obtain an initial condition for transient runs with ill-posed DC operating points.  The operating point obtained by GMIN Stepping will not be a valid steady state condition for the circuit as defined in the netlist, but might possibly produce a reasonable initial condition for transient runs.\n";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, message);
       }
     }
     else if (tag == "INITIALSTEPSIZE1")
     {
-      stepSizeList.set("Initial Step Size", it_tpL->dVal());
+      stepSizeList.set("Initial Step Size", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "MINSTEPSIZE1")
     {
-      stepSizeList.set("Min Step Size", it_tpL->dVal());
+      stepSizeList.set("Min Step Size", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "MAXSTEPSIZE1")
     {
-      stepSizeList.set("Max Step Size", it_tpL->dVal());
+      stepSizeList.set("Max Step Size", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "AGGRESSIVENESS1")
     {
-      stepSizeList.set("Aggressiveness", it_tpL->dVal());
+      stepSizeList.set("Aggressiveness", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "MAXVALUE1")
     {
-      stepperList.set("Max Value", it_tpL->dVal());
+      stepperList.set("Max Value", it_tpL->getImmutableValue<double>());
     }
     else if (tag == "BIFPARAM") // bifurcation parameter
     {
-      stepperList.set("Bifurcation Parameter", it_tpL->sVal());
+      stepperList.set("Bifurcation Parameter", it_tpL->stringValue());
     }
     else if (tag == "MAXSTEPS")
     {
-      stepperList.set("Max Steps", it_tpL->iVal());
+      stepperList.set("Max Steps", it_tpL->getImmutableValue<int>());
     }
     else if (tag == "MAXNLITERS")
     {
-      stepperList.set("Max Nonlinear Iterations", it_tpL->iVal());
+      stepperList.set("Max Nonlinear Iterations", it_tpL->getImmutableValue<int>());
     }
     else if (tag == "STEPCONTROL")
     {
       if (it_tpL->isNumeric())
       {
-        int iType = it_tpL->iVal();
+        int iType = it_tpL->getImmutableValue<int>();
         if (iType == 1)
           stepSizeList.set("Method", "Adaptive");
         else
@@ -1284,7 +1278,7 @@ bool ParameterSet::setLocaOptions(const N_UTL_OptionBlock& OB, bool saveCopy)
       }
       else
       {
-        ExtendedString p(it_tpL->sVal());
+        ExtendedString p(it_tpL->stringValue());
         p.toUpper();
         if (p.substr(0,3) == "ADA")
         {
@@ -1296,8 +1290,8 @@ bool ParameterSet::setLocaOptions(const N_UTL_OptionBlock& OB, bool saveCopy)
         }
         else
         {
-          string message = "Unknown specification in .options for 'stepcontrol': ";
-          message += it_tpL->sVal();
+          std::string message = "Unknown specification in .options for 'stepcontrol': ";
+          message += it_tpL->stringValue();
           message += ".  Legal choices are ADAPTIVE or CONSTANT, which may be abbreviated to three characters.";
           N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
         }
@@ -1305,11 +1299,11 @@ bool ParameterSet::setLocaOptions(const N_UTL_OptionBlock& OB, bool saveCopy)
     }
     else if (tag == "POWERNODE") // continuation parameter
     {
-      stepperList.set("Power Node", it_tpL->sVal());
+      stepperList.set("Power Node", it_tpL->stringValue());
     }
     else if (tag == "VOLTAGELIST")
     {
-      ExtendedString p(it_tpL->sVal());
+      ExtendedString p(it_tpL->stringValue());
       p.toUpper();
       if (p.substr(0,3) == "DOF") // DOFS - degrees of freedom
       {
@@ -1321,21 +1315,21 @@ bool ParameterSet::setLocaOptions(const N_UTL_OptionBlock& OB, bool saveCopy)
       }
       else
       {
-        string message = "Unknown specification in .options loca for 'voltagelist': ";
-        message += it_tpL->sVal();
+        std::string message = "Unknown specification in .options loca for 'voltagelist': ";
+        message += it_tpL->stringValue();
         message += ".  Legal choices are DOFS or NODES, which may be abbreviated to three characters.";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
       }
     }
     else if(tag == "VOLTAGESCALEFACTOR")
     {
-      voltageScaleFactor_ = it_tpL->dVal();
+      voltageScaleFactor_ = it_tpL->getImmutableValue<double>();
     }
     // Start of the new parameter section
-    else if (string(tag,0,10) == "PARAMLIST")
+    else if (std::string(tag,0,10) == "PARAMLIST")
     {
       // don't know what to do yet.
-      cout << "tag = " << tag << endl;
+      Xyce::dout() << "tag = " << tag << std::endl;
     }
     else
     {
@@ -1343,9 +1337,7 @@ bool ParameterSet::setLocaOptions(const N_UTL_OptionBlock& OB, bool saveCopy)
       // of the loop.  Otherwise it's an unrecognized parameter.
       if (!isVectorParam)
       {
-        string tmp =
-          "  Warning: " + tag +
-          " is not a recognized loca option.\n";
+        std::string tmp =tag + " is not a recognized loca option.\n";
         N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_WARNING_0,  tmp);
       }
     }
@@ -1376,12 +1368,12 @@ bool ParameterSet::setLocaOptions(const N_UTL_OptionBlock& OB, bool saveCopy)
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 02/02/06
 //-----------------------------------------------------------------------------
-bool ParameterSet::getVectorParam (const string & tag, int index, double & value)
+bool ParameterSet::getVectorParam (const std::string & tag, int index, double & value)
 {
   if (vectorParams.find(tag) != vectorParams.end() &&
       vectorParams[tag].size() > index)
   {
-    value = vectorParams[tag][index].dVal();
+    value = vectorParams[tag][index].getImmutableValue<double>();
     return true;
   }
   else
@@ -1398,12 +1390,12 @@ bool ParameterSet::getVectorParam (const string & tag, int index, double & value
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 02/02/06
 //-----------------------------------------------------------------------------
-bool ParameterSet::getVectorParam (const string & tag, int index, string & value)
+bool ParameterSet::getVectorParam (const std::string & tag, int index, std::string & value)
 {
   if (vectorParams.find(tag) != vectorParams.end() &&
       vectorParams[tag].size() > index)
   {
-    value = vectorParams[tag][index].sVal();
+    value = vectorParams[tag][index].stringValue();
     return true;
   }
   else
@@ -1420,7 +1412,7 @@ bool ParameterSet::getVectorParam (const string & tag, int index, string & value
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-int ParameterSet::getVectorParamSize(const string& tag)
+int ParameterSet::getVectorParamSize(const std::string& tag)
 {
   if (vectorParams.find(tag) != vectorParams.end())
   {
@@ -1453,7 +1445,7 @@ int ParameterSet::getStatusTestReturnCode() const
     Teuchos::rcp_dynamic_cast<N_NLS_NOX::XyceTests>(tests_[1]);
   if (Teuchos::is_null(testPtr))
   {
-    const string message = "N_NLS_NOX::getStatusTestReturnCode - Dynamic cast on Xyce Tests check failed.";
+    const std::string message = "N_NLS_NOX::getStatusTestReturnCode - Dynamic cast on Xyce Tests check failed.";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
   }
 
@@ -1476,7 +1468,7 @@ void ParameterSet::setStatusTestReturnCodes
     Teuchos::rcp_dynamic_cast<N_NLS_NOX::XyceTests>(tests_[1]);
   if (Teuchos::is_null(testPtr))
   {
-    const string message = "N_NLS_NOX::setStatusTestReturnCode - Dynamic cast on Xyce Tests check failed.";
+    const std::string message = "N_NLS_NOX::setStatusTestReturnCode - Dynamic cast on Xyce Tests check failed.";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
   }
 
@@ -1498,7 +1490,7 @@ double ParameterSet::getMaxNormF() const
     Teuchos::rcp_dynamic_cast<N_NLS_NOX::XyceTests>(tests_[1]);
   if (Teuchos::is_null(testPtr))
   {
-    const string message = "N_NLS_NOX::getMaxNormF - Dynamic cast on Xyce Tests check failed.";
+    const std::string message = "N_NLS_NOX::getMaxNormF - Dynamic cast on Xyce Tests check failed.";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
   }
 
@@ -1520,7 +1512,7 @@ int ParameterSet::getMaxNormFindex () const
     Teuchos::rcp_dynamic_cast<N_NLS_NOX::XyceTests>(tests_[1]);
   if (Teuchos::is_null(testPtr))
   {
-    const string message = "N_NLS_NOX::getMaxNormFindex - Dynamic cast on Xyce Tests check failed.";
+    const std::string message = "N_NLS_NOX::getMaxNormFindex - Dynamic cast on Xyce Tests check failed.";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
   }
 
@@ -1597,7 +1589,7 @@ ParameterSet::createAugmentLinearSystem(N_LAS_System* ls) const
   }
   else
   {
-    string message = "N_NLS_NOX::createAugmentLinearSystem - The \'continuation\' ";
+    std::string message = "N_NLS_NOX::createAugmentLinearSystem - The \'continuation\' ";
     message += "parameter in the .options nox list must be set to PSEUDO or NATURAL for ";
     message += "this function to be called!";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);

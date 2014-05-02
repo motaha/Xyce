@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.99.2.2 $
+// Revision Number: $Revision: 1.110 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:47 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -54,20 +54,16 @@
 using Teuchos::RefCountPtr;
 using Teuchos::rcp;
 
-// ----------   Xyce Includes   ----------
+#include <N_IO_fwd.h>
+#include <N_TOP_fwd.h>
 #include <N_UTL_OptionBlock.h>
 #include <N_NLS_ReturnCodes.h>
 
-#include <N_IO_fwd.h>
+#include <N_ANP_fwd.h>
 #include <N_IO_PkgOptionsMgr.h>
-
-// ---------- Forward Declarations ----------
 
 // Nonlinear solver
 class N_NLS_NonLinearSolver;
-
-// Time Integrator
-class N_ANP_AnalysisInterface;
 
 // Loader for RHS and Jacobian
 class N_LOA_Loader;
@@ -83,10 +79,6 @@ class N_NLS_TwoLevelNewton;
 class N_NLS_Sensitivity;
 class N_NLS_ConductanceExtractor;
 class N_NLS_NonLinInfo;
-class N_TOP_Topology;
-
-class N_IO_PkgOptionsMgr;
-class N_IO_CmdParse;
 
 class N_PDS_Manager;
 
@@ -103,7 +95,7 @@ enum AnalysisMode
   DC_OP,
   DC_SWEEP,
   TRANSIENT,
-  HB,
+  HB_MODE,
   NUM_MODES
 };
 
@@ -146,7 +138,7 @@ public:
 
   bool registerAnalysisInterface(N_ANP_AnalysisInterface* ptr);
   bool registerTopology(N_TOP_Topology * topPtr);
-  bool registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr );
+  bool registerPkgOptionsMgr( N_IO_PkgOptionsMgr *pkgOptPtr );
   bool registerParallelMgr(N_PDS_Manager * pdsMgrPtr);
   void setReturnCodes (const N_NLS_ReturnCodes & retCodeTmp);
   N_NLS_ReturnCodes getReturnCodes() const;
@@ -180,16 +172,19 @@ public:
   void getNonLinInfo (N_NLS_NonLinInfo & nlInfo);
 
   bool enableSensitivity ();
-  bool calcSensitivity ();
+  bool calcSensitivity (
+      std::vector<double> & objectiveVec,
+      std::vector<double> & dOdpVec, std::vector<double> & dOdpAdjVec,
+      std::vector<double> & scaled_dOdpVec, std::vector<double> & scaled_dOdpAdjVec);
 
   bool obtainConductances (
-        const map<string,double> & inputMap,
-        vector<double> & outputVector,
-        vector< vector<double> > & jacobian );
+        const std::map<std::string,double> & inputMap,
+        std::vector<double> & outputVector,
+        std::vector< std::vector<double> > & jacobian );
 
   bool obtainConductances (
-        const string & isoName,
-        vector< vector<double> > & jacobian );
+        const std::string & isoName,
+        std::vector< std::vector<double> > & jacobian );
 
   void setMatrixFreeFlag(bool matrixFreeFlag);
   void allocateTranSolver();
@@ -389,7 +384,7 @@ private:
 
   N_IO_CmdParse & commandLine_;
   // package options manager
-  RCP<N_IO_PkgOptionsMgr> pkgOptMgrPtr_;
+  N_IO_PkgOptionsMgr * pkgOptMgrPtr_;
 
   // Flag to determine if we are doing 2-level newton or not.
   bool twoLevelNewtonFlag_;
@@ -401,7 +396,7 @@ private:
 
   // container to hold netlist option blocks until we know which
   // solver to allocate.
-  map<string,N_UTL_OptionBlock> optionBlockMap_;
+  std::map<std::string,N_UTL_OptionBlock> optionBlockMap_;
 
   bool setupSensFlag_;
 

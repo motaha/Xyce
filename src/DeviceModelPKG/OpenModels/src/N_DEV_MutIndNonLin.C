@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.125.2.3 $
+// Revision Number: $Revision: 1.150.2.3 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -60,13 +60,14 @@
 #include <set>
 
 // ----------   Xyce Includes   ----------
-
-#include <N_DEV_MutIndNonLin.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_DeviceMaster.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
-#include <N_DEV_OutputPars.h>
+#include <N_DEV_MutIndNonLin.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
 
 //This contains important constants like permitivity of free space
 #include <N_DEV_Const.h>
@@ -81,167 +82,146 @@ using Teuchos::rcp;
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<MutIndNonLin::Instance>::ParametricData()
+
+namespace MutIndNonLin {
+
+
+void Traits::loadInstanceParameters(ParametricData<MutIndNonLin::Instance> &p)
 {
-  getConfigTable().primaryParameter = "";
-  getConfigTable().modelTypes.clear();
-
     // Set up configuration constants:
-    setNumNodes(2);
-    setNumOptionalNodes(0);
-    setNumFillNodes(0);
-    setModelRequired(1);
-    addModelType("CORE");
-
-    // Set up double precision variables:
-    addPar ("COUP_VAL",   1.0, false, ParameterType::NO_DEP,
+// Set up double precision variables:
+    p.addPar ("COUP_VAL",   1.0, false, ParameterType::NO_DEP,
         &MutIndNonLin::Instance::mutualCup,
         &MutIndNonLin::Instance::mutualCupGiven,
         U_NONE, CAT_NONE, "Coupling coefficient");
 
-    addPar ("NONLINEARCOUPLING", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("NONLINEARCOUPLING", 0.0, false, ParameterType::NO_DEP,
         &MutIndNonLin::Instance::nonlinFlag,
         &MutIndNonLin::Instance::nonlinFlagGiven,
         U_NONE, CAT_NONE, "Nonlinear coupling flag");
 
     // Set up non-double precision variables:
-    addPar ("COUPLEDMutIndNonLin", std::vector<string>(), false, ParameterType::NO_DEP,
+    p.addPar ("COUPLEDMutIndNonLin", std::vector<std::string>(), false, ParameterType::NO_DEP,
             &MutIndNonLin::Instance::inductorNames, NULL, U_NONE, CAT_NONE, "" );
-    addPar ("COUPLEDINDUCTANCE", std::vector<double>(), false, ParameterType::NO_DEP,
+    p.addPar ("COUPLEDINDUCTANCE", std::vector<double>(), false, ParameterType::NO_DEP,
             &MutIndNonLin::Instance::inductorInductances, NULL, U_NONE, CAT_NONE, "");
-    addPar ("NODE1", std::vector<string>(), false, ParameterType::NO_DEP,
+    p.addPar ("NODE1", std::vector<std::string>(), false, ParameterType::NO_DEP,
             &MutIndNonLin::Instance::inductorsNode1, NULL, U_NONE, CAT_NONE, "");
-    addPar ("NODE2", std::vector<string>(), false, ParameterType::NO_DEP,
+    p.addPar ("NODE2", std::vector<std::string>(), false, ParameterType::NO_DEP,
             &MutIndNonLin::Instance::inductorsNode2, NULL, U_NONE, CAT_NONE, "");
-    addPar ("COUPLING", std::vector<double>(), false, ParameterType::NO_DEP,
+    p.addPar ("COUPLING", std::vector<double>(), false, ParameterType::NO_DEP,
             &MutIndNonLin::Instance::couplingCoefficient, NULL, U_NONE, CAT_NONE, "Coupling coefficient");
-    addPar ("COUPLEDINDUCTOR", std::vector<string>(), false, ParameterType::NO_DEP,
+    p.addPar ("COUPLEDINDUCTOR", std::vector<std::string>(), false, ParameterType::NO_DEP,
             &MutIndNonLin::Instance::couplingInductor, NULL, U_NONE, CAT_NONE, "");
 }
 
-template<>
-ParametricData<MutIndNonLin::Model>::ParametricData()
+void Traits::loadModelParameters(ParametricData<MutIndNonLin::Model> &p)
 {
-    addPar ("A", 1000.0, false, ParameterType::NO_DEP,
+    p.addPar ("A", 1000.0, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::A,
       NULL, U_AMPMM1, CAT_MATERIAL, "Thermal energy parameter");
 
-    addPar ("AREA", 0.1, false, ParameterType::NO_DEP,
+    p.addPar ("AREA", 0.1, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::Area,
       NULL, U_CM2, CAT_GEOMETRY, "Mean magnetic cross-sectional area");
 
-    addPar ("ALPHA", 5.0e-5, false, ParameterType::NO_DEP,
+    p.addPar ("ALPHA", 5.0e-5, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::Alpha,
       NULL, U_NONE, CAT_GEOMETRY, "Domain coupling parameter");
 
-    addPar ("BETAH", 0.0001, false, ParameterType::NO_DEP,
+    p.addPar ("BETAH", 0.0001, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::BetaH,
       NULL, U_NONE, CAT_NONE, "Modeling constant");
 
-    addPar ("BETAM", 3.125e-5, false, ParameterType::NO_DEP,
+    p.addPar ("BETAM", 3.125e-5, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::BetaM,
       NULL, U_NONE, CAT_NONE, "Modeling constant");
 
-    addPar ("C", 0.2, false, ParameterType::NO_DEP,
+    p.addPar ("C", 0.2, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::C,
-      NULL, U_NONE, CAT_MATERIAL, "Domain flesing parameter");
+      NULL, U_NONE, CAT_MATERIAL, "Domain flexing parameter");
 
-    addPar ("DELV", 0.1, false, ParameterType::NO_DEP,
-      &MutIndNonLin::Model::DeltaV,
+    //p.addPar ("DELVSCALING", 1.0e3, false, ParameterType::NO_DEP,
+    p.addPar ("DELVSCALING", 1.0e-1, false, ParameterType::NO_DEP,
+      &MutIndNonLin::Model::DeltaVScaling,
       NULL, U_VOLT, CAT_NONE, "Smoothing coefficient for voltage difference over first inductor");
 
-    addPar ("GAP", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CONSTDELVSCALING", true, false, ParameterType::NO_DEP,
+      &MutIndNonLin::Model::UseConstantDeltaVScaling,
+      NULL, U_VOLT, CAT_NONE, "Use constant scaling factor to smooth voltage difference over first inductor");
+
+    p.addPar ("GAP", 0.0, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::Gap,
       NULL, U_CM, CAT_GEOMETRY, "Effective air gap");
 
-    addPar ("K", 500.0, false, ParameterType::NO_DEP,
+    p.addPar ("K", 500.0, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::Kirr,
       NULL, U_AMPMM1, CAT_MATERIAL, "Domain anisotropy parameter");
 
-    addPar ("KIRR", 500.0, false, ParameterType::NO_DEP,
+    p.addPar ("KIRR", 500.0, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::Kirr,
       NULL, U_AMPMM1, CAT_MATERIAL, "Domain anisotropy parameter");
 
-    addPar ("MS", 1.0e+6, false, ParameterType::NO_DEP,
+    p.addPar ("MS", 1.0e+6, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::Ms,
       NULL, U_AMPMM1, CAT_MATERIAL, "Saturation magnetization");
 
-    addPar ("LEVEL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LEVEL", 0.0, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::LevelIgnored,
       NULL, U_NONE, CAT_NONE, "for pspice compatibility -- ignored");
 
-    addPar ("PACK", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PACK", 0.0, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::PackIgnored,
       NULL, U_NONE, CAT_NONE, "for pspice compatibility -- ignored");
 
-    addPar ("PATH", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("PATH", 1.0, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::Path,
       NULL, U_CM, CAT_GEOMETRY, "Total mean magnetic path");
 
-    addPar ("VINF", 1.0, false, ParameterType::NO_DEP,
-      &MutIndNonLin::Model::Vinf,
-      NULL, U_VOLT, CAT_NONE, "Smoothing coefficient for voltage difference over first inductor");
-
-    addPar ("TNOM", 27.0, false, ParameterType::NO_DEP,
+    p.addPar ("TNOM", 27.0, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::tnom,
       NULL, U_DEGC, CAT_MATERIAL, "Reference temperature");
 
-    addPar ("TC1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TC1", 0.0, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::tempCoeff1,
       NULL, U_NONE, CAT_MATERIAL, "First order temperature coeff.");
 
-    addPar ("TC2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TC2", 0.0, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::tempCoeff2,
       NULL, U_NONE, CAT_MATERIAL, "Second order temperature coeff.");
 
-    addPar ("PZEROTOL", 0.1, false, ParameterType::NO_DEP,
+    p.addPar ("PZEROTOL", 0.1, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::pZeroTol,
       NULL, U_NONE, CAT_NONE, "Tolerance for nonlinear zero crossing");
 
-    addPar ("MVARSCALING", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("MVARSCALING", 1.0, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::mVarScaling,
       NULL, U_NONE, CAT_NONE, "M-variable scaling.");
 
-    addPar ("RVARSCALING", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("RVARSCALING", 1.0, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::rVarScaling,
       NULL, U_NONE, CAT_NONE, "R-variable scaling");
 
-    addPar ("MEQNSCALING", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("MEQNSCALING", 1.0, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::mEqScaling,
       NULL, U_NONE, CAT_NONE, "M-equation scaling");
 
-    addPar ("REQNSCALING", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("REQNSCALING", 1.0, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::rEqScaling,
       NULL, U_NONE, CAT_NONE, "R-equation scaling");
 
     // Set up non-double precision variables:
-    addPar ("OUTPUTSTATEVARS", 0, false, ParameterType::NO_DEP,
+    p.addPar ("OUTPUTSTATEVARS", 0, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::outputStateVars,
       NULL, U_NONE, CAT_NONE, "Flag to save state variables" );
-    addPar ("FACTORMS", 0, false, ParameterType::NO_DEP,
+    p.addPar ("FACTORMS", 0, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::factorMS,
       NULL, U_NONE, CAT_NONE, "Flag to save state variables" );
-      addPar ("BHSIUNITS", 0, false, ParameterType::NO_DEP,
+    p.addPar ("BHSIUNITS", 0, false, ParameterType::NO_DEP,
       &MutIndNonLin::Model::BHSiUnits,
       NULL, U_NONE, CAT_NONE, "Flag to report B and H in SI units" );
 }
 
-namespace MutIndNonLin {
-
-
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
-}
-
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
 
 // Class Instance
 
@@ -253,16 +233,16 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-Instance::Instance(InstanceBlock & IB,
-                                Model & Iiter,
-                                MatrixLoadData & mlData1,
-                                SolverState &ss1,
-                                ExternData  &ed1,
-                                DeviceOptions & do1)
-  : DeviceInstance (IB, mlData1, ss1, ed1, do1),
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock &         IB,
+  Model &                       Iiter,
+  const FactoryBlock &          factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(Iiter),
-    temp(getDeviceOptions().temp.dVal()),
-    outputStateVarsFlag( false )
+    temp(getDeviceOptions().temp.getImmutableValue<double>()),
+    outputStateVarsFlag( false ),
+    maxVoltageDrop(1.0e-10)
 {
   scalingRHS = 1.0;
   numExtVars   = 2;
@@ -273,33 +253,14 @@ Instance::Instance(InstanceBlock & IB,
 
   tempGiven    = false;
 
-  setName(IB.getName());
   const int ibev = IB.numExtVars;
   const int ibiv = IB.numIntVars;
-  setModelName(model_.getName());
-
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0)
-    {
-      cout << "Instance::Instance() " << endl;
-    }
-#endif
 
   // Set params to constant default values:
   setDefaultParams ();
 
   // Set params according to instance line and constant defaults from metadata:
   setParams (IB.params);
-
-  // Set any non-constant parameter defaults:
-#ifdef Xyce_DEBUG_DEVICE
-  //if (getDeviceOptions().debugLevel > 0)
-  //{
-    //cout << "\n\nInstance Params:\n";
-    //outputParams(*this, OutputMode::DEFAULT);
-  //}
-#endif
 
   // now load the instance data vector
   for( int i=0; i<inductorNames.size(); ++i )
@@ -366,15 +327,15 @@ Instance::Instance(InstanceBlock & IB,
     replace( filename.begin(), filename.end(), '%', '_' );
     replace( filename.begin(), filename.end(), ':', '_' );
 
-    outputFileStreamPtr = rcp( new ofstream() );
+    outputFileStreamPtr = rcp( new std::ofstream() );
     outputFileStreamPtr->open( filename.c_str() );
     if( !(*outputFileStreamPtr) )
     {
-      string msg("Instance constructor.\n");
+      std::string msg("Instance constructor.\n");
       msg += "\tCould not open file for output of state variables. name =" + getName();
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
     }
-    (*outputFileStreamPtr).setf(ios::scientific, ios::floatfield );
+    (*outputFileStreamPtr).setf(std::ios::scientific, std::ios::floatfield );
     (*outputFileStreamPtr).width(20);
     (*outputFileStreamPtr).precision(12);
   }
@@ -499,24 +460,24 @@ Instance::Instance(InstanceBlock & IB,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "Instance::Instance----------" << endl;
-    cout << "numExtVars = " << numExtVars << ", " << ibev << endl
-      << "numIntVars = " << numIntVars << ", " << ibiv << endl
-      << "numStateVars = " << numStateVars << endl
-      << "numInductors = " << numInductors << endl
-      << "jacStamp = " << endl;
+    Xyce::dout() << "Instance::Instance----------" << std::endl;
+    Xyce::dout() << "numExtVars = " << numExtVars << ", " << ibev << std::endl
+      << "numIntVars = " << numIntVars << ", " << ibiv << std::endl
+      << "numStateVars = " << numStateVars << std::endl
+      << "numInductors = " << numInductors << std::endl
+      << "jacStamp = " << std::endl;
     for( int i = 0; i<jacStamp.size(); ++i )
     {
-      cout << "jacStamp[ " << i << " ] = { ";
+      Xyce::dout() << "jacStamp[ " << i << " ] = { ";
       for( int j=0; j<jacStamp[i].size(); ++j)
       {
-        cout << jacStamp[i][j];
+        Xyce::dout() << jacStamp[i][j];
         if( j != ( jacStamp[i].size() -1 ) )
         {
-          cout << ", ";
+          Xyce::dout() << ", ";
         }
       }
-      cout << " }" << endl;
+      Xyce::dout() << " }" << std::endl;
     }
   }
 #endif
@@ -538,7 +499,7 @@ Instance::~Instance()
     outputFileStreamPtr->close();
     if( !(*outputFileStreamPtr) )
     {
-      string msg("Instance destructor.\n");
+      std::string msg("Instance destructor.\n");
       msg+= "\tCould not close file for output of state variables. name =" + getName();
          N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
     }
@@ -546,8 +507,8 @@ Instance::~Instance()
     // we don't need to delete it.
   }
 
-  vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
+  std::vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
+  std::vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
   for ( ; currentInductor != endInductor ; ++currentInductor)
   {
     if (*currentInductor != NULL)
@@ -566,7 +527,7 @@ Instance::~Instance()
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-bool Instance::processParams(string param)
+bool Instance::processParams()
 {
   // now set the temperature related stuff.
   if (tempGiven)
@@ -586,30 +547,11 @@ bool Instance::processParams(string param)
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs(const vector<int> & intLIDVecRef,
-                                          const vector<int> & extLIDVecRef)
+void Instance::registerLIDs(const std::vector<int> & intLIDVecRef,
+                                          const std::vector<int> & extLIDVecRef)
 {
-  string msg;
-  string tmpstr;
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -619,8 +561,8 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
   // linear algebra entities.  This assumes an order.
   // For the matrix  indices, first do the rows.
   // get the current values of the inductances and currentOffsets
-  vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
+  std::vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
+  std::vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
   int i = 0;
   int j = 0;
   while( currentInductor != endInductor )
@@ -638,19 +580,19 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "Instance::registerLIDs------------------------" << endl;
+    Xyce::dout() << "Instance::registerLIDs------------------------" << std::endl;
     currentInductor = instanceData.begin();
     i=0;
     while( currentInductor != endInductor )
     {
-      cout << "Inductor [ " << i++ << " ] "
+      Xyce::dout() << "Inductor [ " << i++ << " ] "
            << "   li_Pos = " << (*currentInductor)->li_Pos
            << "   li_Neg = " << (*currentInductor)->li_Neg
-           << "   li_Branch = " << (*currentInductor)->li_Branch << endl;
+           << "   li_Branch = " << (*currentInductor)->li_Branch << std::endl;
       currentInductor++;
     }
-    cout << " li_MagVar = " << li_MagVar << endl
-         << " li_RVar = " << li_RVar << endl;
+    Xyce::dout() << " li_MagVar = " << li_MagVar << std::endl
+         << " li_RVar = " << li_RVar << std::endl;
   }
 #endif
 }
@@ -663,16 +605,16 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap()
+std::map<int,std::string> & Instance::getIntNameMap()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
-    string baseString(getName() + "_");
-    string tempString;
-    vector< InductorInstanceData* >::iterator
+    std::string baseString(getName() + "_");
+    std::string tempString;
+    std::vector< InductorInstanceData* >::iterator
       currentInductor = instanceData.begin();
-    vector< InductorInstanceData* >::iterator
+    std::vector< InductorInstanceData* >::iterator
       endInductor = instanceData.end();
     int i = 0;
     int j = 0;
@@ -702,37 +644,13 @@ map<int,string> & Instance::getIntNameMap()
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
   // copy over the global ID lists.
   staLIDVec = staLIDVecRef;
   int i = 0;
-
-  /*
-  vector< InductorInstanceData* >::iterator currentInductor;
-  vector< InductorInstanceData* >::iterator endInductor;
-  endInductor = instanceData.end();
-  currentInductor = instanceData.begin();
-  while( currentInductor != endInductor )
-  {
-    (*currentInductor)->li_currentState = staLIDVec[ i++ ];
-    (*currentInductor)->li_voltageState = staLIDVec[ i++ ];
-    currentInductor++;
-  }
-  */
 
   li_MagVarState = staLIDVec[i++];
   li_MagVarDerivState = staLIDVec[i++];
@@ -740,10 +658,10 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "Instance::registerStateLIDs-------------------" << endl;
+    Xyce::dout() << "Instance::registerStateLIDs-------------------" << std::endl;
 
-    cout << "li_MagVarState = " << li_MagVarState << endl
-      << "li_MagVarDerivState = " << li_MagVarDerivState << endl
+    Xyce::dout() << "li_MagVarState = " << li_MagVarState << std::endl
+      << "li_MagVarDerivState = " << li_MagVarDerivState << std::endl
       ;
   }
 #endif
@@ -757,27 +675,16 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 // Creator       : Richard Schiek, SNL
 // Creation Date : 8/17/2012
 //-----------------------------------------------------------------------------
-void Instance::registerStoreLIDs(const vector<int> & stoLIDVecRef )
+void Instance::registerStoreLIDs(const std::vector<int> & stoLIDVecRef )
 {
-  string msg;
+  AssertLIDs(stoLIDVecRef.size() == getNumStoreVars());
 
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSto = stoLIDVecRef.size();
-
-  if (numSto != getNumStoreVars())
-  {
-    msg = "Instance::registerStoreLIDs:";
-    msg += "numSto != numStoreVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
   // copy over the global ID lists.
   stoLIDVec = stoLIDVecRef;
 
   li_RVarStore = stoLIDVec[0];
   li_BVarStore = stoLIDVec[1];
   li_HVarStore = stoLIDVec[2];
-
 }
 
 //-----------------------------------------------------------------------------
@@ -788,13 +695,13 @@ void Instance::registerStoreLIDs(const vector<int> & stoLIDVecRef )
 // Creator       : Rich Schiek, SNL, Electrical Systems Modeling
 // Creation Date : 08/01/2012
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getStateNameMap()
+std::map<int,std::string> & Instance::getStateNameMap()
 {
   // set up the internal name map, if it hasn't been already.
   if (stateNameMap.empty ())
   {
-    string baseString(getName() + "_");
-    string tempString;
+    std::string baseString(getName() + "_");
+    std::string tempString;
     tempString = baseString + "m";
     stateNameMap[ li_MagVarState ] = tempString;
     tempString = baseString + "dmdt";
@@ -813,14 +720,14 @@ map<int,string> & Instance::getStateNameMap()
 // Creator       : Rich Schiek, SNL, Electrical Systems Modeling
 // Creation Date : 08/01/2012
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getStoreNameMap()
+std::map<int,std::string> & Instance::getStoreNameMap()
 {
 
   // set up the internal name map, if it hasn't been already.
   if (storeNameMap.empty ())
   {
-    string baseString(getName() + "_");
-    string tempString;
+    std::string baseString(getName() + "_");
+    std::string tempString;
     tempString = baseString + "r";
     storeNameMap[ li_RVarStore ] = tempString;
     tempString = baseString + "b";
@@ -839,7 +746,7 @@ map<int,string> & Instance::getStoreNameMap()
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -852,33 +759,33 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "Instance::registerJacLIDs ----------------------------" << endl;
+    Xyce::dout() << "Instance::registerJacLIDs ----------------------------" << std::endl;
 
-    cout << "jacLIDVec = " << endl;
+    Xyce::dout() << "jacLIDVec = " << std::endl;
     for( int i = 0; i<jacStamp.size(); ++i )
     {
-      cout << "jacLIDVec[ " << i << " ] = { ";
+      Xyce::dout() << "jacLIDVec[ " << i << " ] = { ";
       for( int j=0; j<jacLIDVec[i].size(); ++j)
       {
-        cout << jacLIDVec[i][j];
+        Xyce::dout() << jacLIDVec[i][j];
         if( j != ( jacLIDVec[i].size() -1 ) )
         {
-          cout << ", ";
+          Xyce::dout() << ", ";
         }
       }
-      cout << " }" << endl;
+      Xyce::dout() << " }" << std::endl;
     }
   }
 #endif
 
-  vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
+  std::vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
+  std::vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
   // int numInductors = instanceData.size();  // don't need this as it's defined at class level
   int i = 0;
   while( currentInductor != endInductor )
@@ -931,41 +838,41 @@ void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
     i=0;
     while( currentInductor != endInductor )
     {
-      cout << "Inductor [ " << i << " ] " << (*currentInductor)->name << endl
-           << "   APosEquBraVarOffset = " << (*currentInductor)->APosEquBraVarOffset << endl
-           << "   ANegEquBraVarOffset = " << (*currentInductor)->ANegEquBraVarOffset << endl
-           << "   vPosOffset = " << (*currentInductor)->vPosOffset << endl
-           << "   vNegOffset = " << (*currentInductor)->vNegOffset << endl
-           << "   ABraEquPosNodeOffset = " << (*currentInductor)->ABraEquPosNodeOffset << endl
-           << "   ABraEquNegNodeOffset = " << (*currentInductor)->ABraEquNegNodeOffset << endl
-           << "   ABraEquBraVarOffset = " << (*currentInductor)->ABraEquBraVarOffset << endl
-           << "   magOffset = " << (*currentInductor)->magOffset << endl;
-      cout << "\tInductor branch offsets = { ";
+      Xyce::dout() << "Inductor [ " << i << " ] " << (*currentInductor)->name << std::endl
+           << "   APosEquBraVarOffset = " << (*currentInductor)->APosEquBraVarOffset << std::endl
+           << "   ANegEquBraVarOffset = " << (*currentInductor)->ANegEquBraVarOffset << std::endl
+           << "   vPosOffset = " << (*currentInductor)->vPosOffset << std::endl
+           << "   vNegOffset = " << (*currentInductor)->vNegOffset << std::endl
+           << "   ABraEquPosNodeOffset = " << (*currentInductor)->ABraEquPosNodeOffset << std::endl
+           << "   ABraEquNegNodeOffset = " << (*currentInductor)->ABraEquNegNodeOffset << std::endl
+           << "   ABraEquBraVarOffset = " << (*currentInductor)->ABraEquBraVarOffset << std::endl
+           << "   magOffset = " << (*currentInductor)->magOffset << std::endl;
+      Xyce::dout() << "\tInductor branch offsets = { ";
       for( int j=0; j<numInductors ; ++j )
       {
-        cout << (*currentInductor)->inductorCurrentOffsets[ j ] << ", ";
+        Xyce::dout() << (*currentInductor)->inductorCurrentOffsets[ j ] << ", ";
       }
-      cout << "} " << endl;
+      Xyce::dout() << "} " << std::endl;
       i++;
       currentInductor++;
     }
 
-    cout << "mEquVPosOffset = " << mEquVPosOffset << "\tmEquVNegOffset = " << mEquVNegOffset << endl;
-    cout << "mEquInductorOffsets = ";
+    Xyce::dout() << "mEquVPosOffset = " << mEquVPosOffset << "\tmEquVNegOffset = " << mEquVNegOffset << std::endl;
+    Xyce::dout() << "mEquInductorOffsets = ";
     for(i=0;i<numInductors; ++i)
     {
-      cout << mEquInductorOffsets[i] << ", ";
+      Xyce::dout() << mEquInductorOffsets[i] << ", ";
     }
-    cout << endl
-      << "mEquMOffset = " << mEquMOffset << "\tmEquROffset = " << mEquROffset  << endl;
+    Xyce::dout() << std::endl
+      << "mEquMOffset = " << mEquMOffset << "\tmEquROffset = " << mEquROffset  << std::endl;
 
-    cout << "rEquInductorOffsets = ";
+    Xyce::dout() << "rEquInductorOffsets = ";
     for(i=0;i<numInductors; ++i)
     {
-      cout << rEquInductorOffsets[i] << ", ";
+      Xyce::dout() << rEquInductorOffsets[i] << ", ";
     }
-    cout << endl
-      << "rEquROffset = " << rEquROffset << endl;
+    Xyce::dout() << std::endl
+      << "rEquROffset = " << rEquROffset << std::endl;
   }
 #endif
 }
@@ -985,7 +892,7 @@ bool Instance::updateTemperature ( const double & temp)
   // current temp difference from reference temp.
   double difference = temp - model_.tnom;
 
-  vector< InductorInstanceData* >::iterator currentData = instanceData.begin();
+  std::vector< InductorInstanceData* >::iterator currentData = instanceData.begin();
   while( currentData != instanceData.end() )
   {
     double factor = 1.0 + (model_.tempCoeff1)*difference +
@@ -1015,7 +922,7 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0  && getSolverState().debugTimeFlag)
   {
-    cout << "Instance::updateIntermediateVars " << endl;
+    Xyce::dout() << "Instance::updateIntermediateVars " << std::endl;
   }
 #endif
 
@@ -1028,12 +935,11 @@ bool Instance::updateIntermediateVars ()
   const double BetaH  = model_.BetaH;
   const double BetaM  = model_.BetaM;
   const double C      = model_.C;
-  const double DeltaV = model_.DeltaV;
+  const double DeltaVScaling = model_.DeltaVScaling;
   const double Gap    = model_.Gap;
   const double Ms     = model_.Ms;
   const double Kirr   = model_.Kirr;
   const double Path   = model_.Path;
-  const double Vinf   = model_.Vinf;
 
   const double mVarScaling = model_.mVarScaling;
   const double rVarScaling = model_.rVarScaling;
@@ -1044,14 +950,34 @@ bool Instance::updateIntermediateVars ()
   // as this is needed later
   double Vpos = solVector[(instanceData[0])->li_Pos];
   double Vneg = solVector[(instanceData[0])->li_Neg];
+
   // voltage drop over first inductor.
   double voltageDrop= Vpos - Vneg;
 
-  // calculate important params
-  qV = DeltaV * voltageDrop / Vinf;
-  //qV = Vinf * voltageDrop / DeltaV;
+  // only update maxVoltageDrop when system has converged or we may
+  // get wildly wrong values.
+  N_LAS_Vector & lastSolVector = *(extData.currSolVectorPtr);
+  double lastVoltageDrop = lastSolVector[(instanceData[0])->li_Pos] - lastSolVector[(instanceData[0])->li_Neg];
+  if ( (getSolverState().newtonIter == 0) && (fabs(lastVoltageDrop) > maxVoltageDrop) )
+  {
+    maxVoltageDrop=fabs(lastVoltageDrop);
+    Xyce::dout() << std::endl << " maxVoltageDrop = " << maxVoltageDrop << std::endl;
+  }
+
+  // approximate the sgn( voltageDrop ) with
+  // tanh ( scalefactor * voltageDrop / maxVoltageDrop )
+  if( model_.UseConstantDeltaVScaling )
+  {
+    qV = DeltaVScaling * voltageDrop;
+  }
+  else
+  {
+    qV = DeltaVScaling * voltageDrop / maxVoltageDrop;
+  }
+
   double tanh_qV = 0.0;
-  if (fabs(qV) < CONSTTANH_THRESH)
+
+  if ( (fabs(qV) < CONSTTANH_THRESH) )
   {
     tanh_qV = tanh(qV);
   }
@@ -1065,8 +991,8 @@ bool Instance::updateIntermediateVars ()
   }
 
   Happ = 0.0;
-  vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
+  std::vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
+  std::vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
   int il=0;
   while( currentInductor != endInductor )
   {
@@ -1105,9 +1031,6 @@ bool Instance::updateIntermediateVars ()
 
   if( model_.factorMS )
   {
-    //Mirrp = (delM * tanh_qV + sq_delM02delM2 ) / (2*( Kirr- Alpha * Ms * sq_delM02delM2));
-    //Manp =  (A + Heo2/sq_Heo2He2) / pow(A + sq_Heo2He2, 2.0);
-    //P = ( C * Manp + (1 - C) * Mirrp) / (1 + (gap_path - Alpha) * C * Ms * Manp + gap_path * (1-C) * Ms * Mirrp);
     Mirrp = (delM * tanh_qV + sq_delM02delM2 ) / (2*( Kirr- Alpha * sq_delM02delM2));
     Manp =  Ms * (A + Heo2/sq_Heo2He2) / pow(A + sq_Heo2He2, 2.0);
     P = ( C * Manp + (1 - C) * Mirrp) / ((1 + (gap_path - Alpha) * C * Manp + gap_path * (1-C) * Mirrp)*Ms);
@@ -1122,75 +1045,49 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0  && getSolverState().debugTimeFlag)
   {
-    cout << "\tA = " << A << endl
-         << "\tArea = " << Area << endl
-         << "\tPath = " << Path << endl
-         << "\tGap = " << Gap << endl
-         << "\tC = " << C << endl
-         << "\tVpos = " << Vpos << endl
-         << "\tVneg = " << Vneg << endl
-         << "\tvoltageDrop = " << voltageDrop << endl
-         << "\tqV = " << qV << endl
-         << "\tdelM0 = " << delM0 << endl
+    Xyce::dout() << "\tA = " << A << std::endl
+         << "\tArea = " << Area << std::endl
+         << "\tPath = " << Path << std::endl
+         << "\tGap = " << Gap << std::endl
+         << "\tC = " << C << std::endl
+         << "\tVpos = " << Vpos << std::endl
+         << "\tVneg = " << Vneg << std::endl
+         << "\tvoltageDrop = " << voltageDrop << std::endl
+         << "\tqV = " << qV << std::endl
+         << "\tdelM0 = " << delM0 << std::endl
          << "\tHapp = " << Happ
          << "\tlatestMag = " << latestMag
-         << "\tlatestR = " <<  rVarScaling * solVector[ li_RVar ] << endl
-         << "\tHe = " << He << endl
-         << "\tH = " << H << endl
-         << "\tHeo = " << Heo << endl
-         << "\tMan = " << Man << endl
-         << "\tdelM = " << delM << endl
-         << "\tMirrp = " << Mirrp << endl
-         << "\tManp = " << Manp << endl
-         << "\tP  = " << P << endl
-         << "\tgetSolverState().newtonIter = " << getSolverState().newtonIter << endl
-         << endl;
+         << "\tlatestR = " <<  rVarScaling * solVector[ li_RVar ] << std::endl
+         << "\tHe = " << He << std::endl
+         << "\tH = " << H << std::endl
+         << "\tHeo = " << Heo << std::endl
+         << "\tMan = " << Man << std::endl
+         << "\tdelM = " << delM << std::endl
+         << "\tMirrp = " << Mirrp << std::endl
+         << "\tManp = " << Manp << std::endl
+         << "\tP  = " << P << std::endl
+         << "\tgetSolverState().newtonIter = " << getSolverState().newtonIter << std::endl
+         << std::endl;
   }
 #endif
 
   // now calculate important derivative quantities
 
-  // dHe_dM = -(lg/lt-alpha*S(1));
   double dHe_dM =  ((Alpha - gap_path) * mVarScaling);
 
-  //      dManp_dM = ( ( (-Ms*Heo^2*(Heo^2+He^2)^(-3/2)*He*dHe_dM) * (A + sqrt(Heo^2+He^2))^2 ) - ...
-  //        ( ((A+sqrt(Heo^2+He^2))*(Heo^2+He^2)^(-1/2)*2*He*dHe_dM) * (Ms*(A + Heo^2/(sqrt(Heo^2+He^2)))) ) ...
-  //              ) / ...
-  //          (A + sqrt(Heo^2+He^2))^4;
   double dManp_dM = ( -Ms * He / (pow(A + sq_Heo2He2, 2.0)*sq_Heo2He2)) *
                     ( (Heo2 / (Heo2 + He2)) + (2.0*(A + Heo2 / sq_Heo2He2)/(A+sq_Heo2He2)) ) * dHe_dM;
-  //      ddelM_dM = ( (Ms*dHe_dM) * (A+sqrt(Heo^2+He^2)) - ...
-  //                (Ms*He) * ((Heo^2+He^2)^(-1/2)*He*dHe_dM) ...
-  //          ) / ...
-  //          (A + sqrt(Heo^2+He^2))^2 - S(1);
 
-  //double ddelM_dM = ( (Ms*dHe_dM) * (A + sqrt(Heo2 + He2)) -
-  //                (Ms*He) * (1/sqrt(Heo2 + He2) * He * dHe_dM) ) /
-  //           (pow((A + sqrt(Heo2 + He2)), 2.0)) - unscaledMag;
   double ddelM_dM = ( dHe_dM*Ms/(A + sq_Heo2He2) ) * (1.0 - He2 / ((A + sq_Heo2He2)*sq_Heo2He2)) - mVarScaling;
 
-  //     dMirrp_dM = ( (ddelM_dM*tanh(qV)+(delM0^2+delM^2)^(-1/2)*delM*ddelM_dM) * (2*(Kirr-alpha*sqrt(delM0^2+delM^2))) - ...
-  //                (-alpha*(delM0^2+delM^2)^(-1/2)*2*delM*ddelM_dM) * (delM*tanh(qV)+sqrt(delM0^2+delM^2)) ...
-  //      ) / ...
-  //      (2*(Kirr-alpha*sqrt(delM0^2+delM^2)))^2;
   double dMirrp_dM = (1.0/(2.0*(Kirr - Alpha*sq_delM02delM2))) *
                      (tanh_qV + delM/sq_delM02delM2 +
                        (2.0*Alpha*delM*(delM*tanh_qV + sq_delM02delM2)
                      /(2.0*(Kirr-Alpha*sq_delM02delM2)*sq_delM02delM2))) * ddelM_dM;
 
-  //   dP_dM = ( (c*dManp_dM+(1-c)*dMirrp_dM) * (1+(lg/lt-alpha)*c*Manp+(lg/lt)*(1-c)*Mirrp) - ...
-  //              ((lg/lt-alpha)*c*dManp_dM + (lg/lt)*(1-c)*dMirrp_dM) * (c*Manp+(1-c)*Mirrp) ...
-  //        ) / ...
-  //        (1+(lg/lt-alpha)*c*Manp+(lg/lt)*(1-c)*Mirrp)^2;
-
   double dP_Denom=0.0;
   if( model_.factorMS )
   {
-    //   double dP_Denom = 1.0 + (gap_path - Alpha)*C*Ms*Manp + gap_path * (1.0-C) * Ms * Mirrp;
-    //
-    //   dP_dM = (1.0/dP_Denom) * (C * dManp_dM + (1.0-C) * dMirrp_dM) -
-    //             ( (C*Manp + (1.0-C)*Mirrp)/pow(dP_Denom,2.0) ) *
-    //               ( (gap_path - Alpha)*C*Ms*dManp_dM + gap_path*(1.0-C)*Ms*dMirrp_dM );
     dP_Denom = 1.0 + (gap_path - Alpha)*C*Manp + gap_path * (1.0-C) * Mirrp;
 
     dP_dM = (1.0/dP_Denom) * (C * dManp_dM + (1.0-C) * dMirrp_dM) -
@@ -1210,25 +1107,23 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "\tA = " << A << endl
-      << "\tAlpha = " << Alpha << endl
-      << "\tC = " << C << endl
-      << "\tDeltaV = " << DeltaV << endl
-      << "\tGap = " << Gap << endl
-      << "\tMs = " << Ms << endl
-      << "\tKirr = " << Kirr << endl
-      << "\tPath = " << Path << endl
-      << "\tVinf = " << Vinf << endl
-      << "\tHe2 = " << He2 << endl
-      << "\tHeo2 = " << Heo2 << endl
-      << "\tdelM2 = " << delM2 << endl
-      << "\tdelM02 = " << delM02 << endl
-      << "\tdHe_dM = " << dHe_dM << endl
-      << "\tdManp_dM = " << dManp_dM << endl
-      << "\tddelM_dM = " << ddelM_dM << endl
-      << "\tdMirrp_dM = " << dMirrp_dM << endl
-      << "\tdP_dM = " << dP_dM << endl
-      << "\tdenom 1+(1-lg/lt)P = " << (1+(1-Gap/Path)*P) << endl;
+    Xyce::dout() << "\tA = " << A << std::endl
+      << "\tAlpha = " << Alpha << std::endl
+      << "\tC = " << C << std::endl
+      << "\tGap = " << Gap << std::endl
+      << "\tMs = " << Ms << std::endl
+      << "\tKirr = " << Kirr << std::endl
+      << "\tPath = " << Path << std::endl
+      << "\tHe2 = " << He2 << std::endl
+      << "\tHeo2 = " << Heo2 << std::endl
+      << "\tdelM2 = " << delM2 << std::endl
+      << "\tdelM02 = " << delM02 << std::endl
+      << "\tdHe_dM = " << dHe_dM << std::endl
+      << "\tdManp_dM = " << dManp_dM << std::endl
+      << "\tddelM_dM = " << ddelM_dM << std::endl
+      << "\tdMirrp_dM = " << dMirrp_dM << std::endl
+      << "\tdP_dM = " << dP_dM << std::endl
+      << "\tdenom 1+(1-lg/lt)P = " << (1+(1-Gap/Path)*P) << std::endl;
   }
 #endif
 
@@ -1238,56 +1133,14 @@ bool Instance::updateIntermediateVars ()
   for( int i=0; i<numInductors; ++i )
   {
 
-    /*
-    // I thought that adding in this missing derivative term would help but it didn't
-    double dM = solVector[ li_MagVar ] - (*lastSolVectorPtr)[ li_MagVar ];
-    double dI = solVector[(*currentInductor)->li_Branch] - (*lastSolVectorPtr)[(*currentInductor)->li_Branch];
-    double dM_dI = 0.0;
-    if( fabs( dI ) > 1.0e-10 )
-    {
-      dM_dI = dM/dI;
-    }
-    //std::cout << "Inductor " << i << "\tdM = " << dM << "\tdI = " << dI << "\tdM/dI = " << dM_dI << std::endl;
-    dHe_dI[ i ] = inductanceVals[ i ] / Path + (Alpha-gap_path)*dM_dI;
-    */
-
-    //    dHe_dI = (1/lt)*N; % vector
     dHe_dI[ i ] = inductanceVals[ i ] / Path;
-
-    //    dManp_dI = ( ( (-Ms*Heo^2*(Heo^2+He^2)^(-3/2)*He*dHe_dI) * (A + sqrt(Heo^2+He^2))^2 ) - ...
-    //                ( ((A+sqrt(Heo^2+He^2))*(Heo^2+He^2)^(-1/2)*2*He*dHe_dI) * (Ms*(A + Heo^2/(sqrt(Heo^2+He^2)))) ) ...
-    //              ) / ...
-    //          (A + sqrt(Heo^2+He^2))^4; % vector
-
-    /*
-    dManp_dI[i] = dHe_dI[i] * ( ( (-Ms * Heo2 * pow((Heo2+He2),(-3.0/2.0)) * He) * pow((A + sqrt(Heo2 + He2)),2.0) ) -
-                    ( ( (A + sqrt(Heo2 + He2)) * (1/sqrt(Heo2 + He2)) * 2 * He) *
-                      (Ms * (A + Heo2/(sqrt(Heo2 + He2)))) ) ) /
-                  pow((A + sqrt(Heo2 + He2)),4.0);
-    */
     dManp_dI[i] = ( -Ms * He / (pow(A + sq_Heo2He2, 2.0)*sq_Heo2He2)) *
                    ( (Heo2 / (Heo2 + He2)) + (2.0*(A + Heo2 / sq_Heo2He2)/(A+sq_Heo2He2)) ) * dHe_dI[i];
-    // ddelM_dI = ( (Ms*dHe_dI) * (A+sqrt(Heo^2+He^2)) - ...
-    //            (Ms*He) * ((Heo^2+He^2)^(-1/2)*He*dHe_dI) ...
-    //          ) / ...
-    //      (A + sqrt(Heo^2+He^2))^2; % vector
-
-    //ddelM_dI[i] = (Ms / (A + sq_Heo2He2)) * (1.0 - He2/sq_Heo2He2) * dHe_dI[i];
-    //ddelM_dI[i] = (Ms / (A + sq_Heo2He2)) * (1.0 - He2/((A + sq_Heo2He2)*sq_Heo2He2)) * dHe_dI[i] - dM_dI;
     ddelM_dI[i] = (Ms / (A + sq_Heo2He2)) * (1.0 - He2/((A + sq_Heo2He2)*sq_Heo2He2)) * dHe_dI[i];
-    // dMirrp_dI = ( (ddelM_dI*tanh(qV)+(delM0^2+delM^2)^(-1/2)*delM*ddelM_dI) * (2*(Kirr-alpha*sqrt(delM0^2+delM^2))) - ...
-    //                (-alpha*(delM0^2+delM^2)^(-1/2)*2*delM*ddelM_dI) * (delM*tanh(qV)+sqrt(delM0^2+delM^2)) ...
-    //      ) / ...
-    //      (2*(Kirr-alpha*sqrt(delM0^2+delM^2)))^2; % vector
     dMirrp_dI[i] = (1.0/(2.0*(Kirr - Alpha*sq_delM02delM2))) *
                    (tanh_qV + delM/sq_delM02delM2 +
                      (2.0*Alpha*delM*(delM*tanh_qV +
                        sq_delM02delM2)/(2.0*(Kirr-Alpha*sq_delM02delM2)*sq_delM02delM2))) * ddelM_dI[i];
-
-    // dP_dI = ( (c*dManp_dI+(1-c)*dMirrp_dI) * (1+(lg/lt-alpha)*c*Manp+(lg/lt)*(1-c)*Mirrp) - ...
-    //            ((lg/lt-alpha)*c*dManp_dI + (lg/lt)*(1-c)*dMirrp_dI) * (c*Manp+(1-c)*Mirrp) ...
-    //      ) / ...
-    //      (1+(lg/lt-alpha)*c*Manp+(lg/lt)*(1-c)*Mirrp)^2; % vector
     dP_dI[i] = (1.0/dP_Denom) * (C * dManp_dI[i] + (1.0-C) * dMirrp_dI[i]) -
           ( (C*Manp + (1.0-C)*Mirrp)/pow(dP_Denom,2.0) ) *
             ( (gap_path - Alpha)*C*dManp_dI[i] + gap_path*(1.0-C)*dMirrp_dI[i] );
@@ -1300,18 +1153,18 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-       cout << "\tdHe_dI[ " << i << " ] =" << dHe_dI[ i ] << endl
-            << "\tdManp_dI[ " << i << " ] = " << dManp_dI[i] << endl
-            << "\tddelM_dI[ " << i << " ] = " << ddelM_dI[i] << endl
-            << "\tMirrp_dI[ " << i << " ] = " << dMirrp_dI[i] << endl
-            << "\tdP_dI[ " << i << " ] = " << dP_dI[i] << endl;
+       Xyce::dout() << "\tdHe_dI[ " << i << " ] =" << dHe_dI[ i ] << std::endl
+            << "\tdManp_dI[ " << i << " ] = " << dManp_dI[i] << std::endl
+            << "\tddelM_dI[ " << i << " ] = " << ddelM_dI[i] << std::endl
+            << "\tMirrp_dI[ " << i << " ] = " << dMirrp_dI[i] << std::endl
+            << "\tdP_dI[ " << i << " ] = " << dP_dI[i] << std::endl;
     }
 #endif
     currentInductor++;
   }
 
   // Now find (dP/dV_1):
-  double dMirrp_dVp = (delM * (DeltaV/Vinf) * (1.0-pow(tanh_qV,2.0))) /
+  double dMirrp_dVp = (delM * DeltaVScaling * (1.0-pow(tanh_qV,2.0))) /
                       (2.0 * (Kirr - Alpha * sq_delM02delM2));
   double dMirrp_dVn = -dMirrp_dVp;
 
@@ -1328,10 +1181,10 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "\tdMirrp_dVp = " << dMirrp_dVp << endl
-      << "\tdMirrp_dVn = " << dMirrp_dVn << endl
-      << "\tdP_dVp = " << dP_dVp << endl
-      << "\tdP_dVn = " << dP_dVn << endl;
+    Xyce::dout() << "\tdMirrp_dVp = " << dMirrp_dVp << std::endl
+      << "\tdMirrp_dVn = " << dMirrp_dVn << std::endl
+      << "\tdP_dVp = " << dP_dVp << std::endl
+      << "\tdP_dVn = " << dP_dVn << std::endl;
   }
 #endif
 
@@ -1352,9 +1205,9 @@ bool Instance::updateIntermediateVars ()
 //-----------------------------------------------------------------------------
 void Instance::updateInductanceMatrix()
 {
-  vector< InductorInstanceData* >::iterator
+  std::vector< InductorInstanceData* >::iterator
     currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator
+  std::vector< InductorInstanceData* >::iterator
     endInductor = instanceData.end();
 
   // collec the inductances
@@ -1396,8 +1249,8 @@ bool Instance::updatePrimaryState ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Instance::updatePrimaryState---------------" << endl
-         << "\tname = " << getName() << endl;
+    Xyce::dout() << "Instance::updatePrimaryState---------------" << std::endl
+         << "\tname = " << getName() << std::endl;
   }
 #endif
 
@@ -1408,33 +1261,6 @@ bool Instance::updatePrimaryState ()
   N_LAS_Vector & stoVector = *(extData.nextStoVectorPtr);
   double mVarScaling = model_.mVarScaling;
   double rVarScaling = model_.rVarScaling;
-
-  /*
-  vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
-  int i = 0;
-  while( currentInductor != endInductor )
-  {
-    double current = solVector[ ( (*currentInductor)->li_Branch) ];
-    //inductorCurrents[ i ] = current;
-    if( (getSolverState().dcopFlag) && ((*currentInductor)->ICGiven) )
-    {
-      current = (*currentInductor)->IC;
-    }
-
-#ifdef Xyce_DEBUG_DEVICE
-    if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
-    {
-      cout << "  Inductor \"" << (*currentInductor)->name
-           << "\" \tcurrent = " << current << endl;
-    }
-#endif
-    // place this value for the charge in the state vector.
-    staVector[((*currentInductor)->li_currentState)] = current;
-    currentInductor++;
-    i++;
-  }
-  */
 
   // place current values of mag, H and R in state vector
   // must unscale them as the rest of the class assumes
@@ -1470,37 +1296,13 @@ bool Instance::updateSecondaryState ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Instance::updateSecondaryState-------------" << endl
-         << "\tname = " << getName() << endl;
+    Xyce::dout() << "Instance::updateSecondaryState-------------" << std::endl
+         << "\tname = " << getName() << std::endl;
   }
 #endif
 
   N_LAS_Vector & staVector = *(extData.nextStaVectorPtr);
   N_LAS_Vector & staDerivVec = *(extData.nextStaDerivVectorPtr);
-
-  // Now that the state vector for is up-to-date, get the derivative
-  // with respect to time of the flux, to obtain the best estimate for the
-  // voltage drop accross the inductor
-  //if( !getSolverState().newDaeFlag )
-  {
-    /*
-    vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-    vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
-    int i=0;
-    while( currentInductor != endInductor )
-    {
-      // obtain d/dt of current accross the inductor
-      double v0 = staDerivVec[ ((*currentInductor)->li_currentState)];
-      //inductorCurrents[ i ] = v0;
-
-      // place the value for the voltage drop into the state vector.
-      staVector[((*currentInductor)->li_voltageState)] = v0;
-
-      i++;
-      currentInductor++;
-    }
-    */
-  }
 
   // copy derivitive of Mag from result vector into state vector
   staVector[ li_MagVarDerivState ] = staDerivVec[ li_MagVarState ];
@@ -1534,8 +1336,8 @@ bool Instance::loadDAEQVector ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Instance::loadDAEQVector------------------------" << endl
-         << "\tname = " << getName() << endl;
+    Xyce::dout() << "Instance::loadDAEQVector------------------------" << std::endl
+         << "\tname = " << getName() << std::endl;
   }
 #endif
 
@@ -1552,8 +1354,8 @@ bool Instance::loadDAEQVector ()
   //          mutualCup * sqrt(L[1]*L[2])*I[2]) + ...
   //          mutualCup * sqrt(L[1]*L[n])*I[n])
 
-  vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
+  std::vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
+  std::vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
   int i = 0;
   while( currentInductor != endInductor )
   {
@@ -1632,8 +1434,8 @@ bool Instance::loadDAEFVector ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Instance::loadDAEFVector------------------------" << endl
-         << "\tname = " << getName() << endl;
+    Xyce::dout() << "Instance::loadDAEFVector------------------------" << std::endl
+         << "\tname = " << getName() << std::endl;
   }
 #endif
 
@@ -1655,7 +1457,8 @@ bool Instance::loadDAEFVector ()
   // for the M equation
 
   fVec[li_MagVar] -= mEqScaling *  P * latestR / (model_.Path);
-    // if |P| is near zero, then the M equation becomes dM/dt = 0, or M is
+
+  // if |P| is near zero, then the M equation becomes dM/dt = 0, or M is
   // constant.  In this case we'll add a diagonal element for M so that
   // sole dM/dt element in dQ/dX doesn't cause a time step too small error
   // Since P is normally very large, we'll test for |P| <= 1.0.
@@ -1680,8 +1483,8 @@ bool Instance::loadDAEFVector ()
   }
 
   // loop over each inductor and load it's F vector components
-  vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
+  std::vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
+  std::vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
   int i=0;
   while( currentInductor != endInductor )
   {
@@ -1700,13 +1503,13 @@ bool Instance::loadDAEFVector ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "  Inductor = " << (*currentInductor)->name
+      Xyce::dout() << "  Inductor = " << (*currentInductor)->name
            << " li_Pos = " << (*currentInductor)->li_Pos
            << " li_Neg = " << (*currentInductor)->li_Neg
            << " li_Branch = " << (*currentInductor)->li_Branch
            << "\tPos/Neg current*windings = " << scalingRHS*current*windings
            << "\tBranch = " << ((vNodePos - vNodeNeg)/mid)
-           << endl;
+           << std::endl;
     }
 #endif
     currentInductor++;
@@ -1739,8 +1542,8 @@ bool Instance::loadDAEdQdx ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Instance::loadDAEdQdx-----------------------" << endl
-         << "\tname = " << getName() << endl;
+    Xyce::dout() << "Instance::loadDAEdQdx-----------------------" << std::endl
+         << "\tname = " << getName() << std::endl;
   }
 #endif
 
@@ -1762,8 +1565,8 @@ bool Instance::loadDAEdQdx ()
 
 
   // loop over each inductor and load it's Q vector components
-  vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
+  std::vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
+  std::vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
   i = 0;
   while( currentInductor != endInductor )
   {
@@ -1804,8 +1607,8 @@ bool Instance::loadDAEdFdx ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Instance::loadDAEdFdx----------------------" << endl
-         << "\tname = " << getName() << endl;
+    Xyce::dout() << "Instance::loadDAEdFdx----------------------" << std::endl
+         << "\tname = " << getName() << std::endl;
   }
 #endif
 
@@ -1878,8 +1681,8 @@ bool Instance::loadDAEdFdx ()
     mid = 1.0 + (1.0 - ((model_.Gap) / (model_.Path)))*P;
   }
 
-  vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
+  std::vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
+  std::vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
   while( currentInductor != endInductor )
   {
     // do the normal work for an inductor
@@ -1895,18 +1698,18 @@ bool Instance::loadDAEdFdx ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout
-       << "(*currentInductor)->li_Pos = " << (*currentInductor)->li_Pos << endl
-       << "(*currentInductor)->li_Neg = " << (*currentInductor)->li_Neg << endl
-       << "(*currentInductor)->li_Branch = " << (*currentInductor)->li_Branch << endl
-       << "(*currentInductor)->APosEquBraVarOffset = " << (*currentInductor)->APosEquBraVarOffset << endl
-       << "(*currentInductor)->ANegEquBraVarOffset = " << (*currentInductor)->ANegEquBraVarOffset << endl
-       << "(*currentInductor)->ABraEquPosNodeOffset = " << (*currentInductor)->ABraEquPosNodeOffset << endl
-       << "(*currentInductor)->ABraEquNegNodeOffset = " << (*currentInductor)->ABraEquNegNodeOffset << endl
-       << "(*dFdxMatPtr)["<<((*currentInductor)->li_Pos)<<"]   ["<<((*currentInductor)->APosEquBraVarOffset)<<"] =  " << scalingRHS << endl
-       << "(*dFdxMatPtr)["<<((*currentInductor)->li_Neg)<<"]   ["<<((*currentInductor)->ANegEquBraVarOffset)<<"]  =  " << -scalingRHS << endl
-       << "(*dFdxMatPtr)["<<((*currentInductor)->li_Branch)<<"]["<<((*currentInductor)->ABraEquPosNodeOffset)<<"] = " << -1/mid << endl
-       << "(*dFdxMatPtr)["<<((*currentInductor)->li_Branch)<<"]["<<((*currentInductor)->ABraEquNegNodeOffset)<<"] = " << 1/mid << endl;
+      Xyce::dout()
+       << "(*currentInductor)->li_Pos = " << (*currentInductor)->li_Pos << std::endl
+       << "(*currentInductor)->li_Neg = " << (*currentInductor)->li_Neg << std::endl
+       << "(*currentInductor)->li_Branch = " << (*currentInductor)->li_Branch << std::endl
+       << "(*currentInductor)->APosEquBraVarOffset = " << (*currentInductor)->APosEquBraVarOffset << std::endl
+       << "(*currentInductor)->ANegEquBraVarOffset = " << (*currentInductor)->ANegEquBraVarOffset << std::endl
+       << "(*currentInductor)->ABraEquPosNodeOffset = " << (*currentInductor)->ABraEquPosNodeOffset << std::endl
+       << "(*currentInductor)->ABraEquNegNodeOffset = " << (*currentInductor)->ABraEquNegNodeOffset << std::endl
+       << "(*dFdxMatPtr)["<<((*currentInductor)->li_Pos)<<"]   ["<<((*currentInductor)->APosEquBraVarOffset)<<"] =  " << scalingRHS << std::endl
+       << "(*dFdxMatPtr)["<<((*currentInductor)->li_Neg)<<"]   ["<<((*currentInductor)->ANegEquBraVarOffset)<<"]  =  " << -scalingRHS << std::endl
+       << "(*dFdxMatPtr)["<<((*currentInductor)->li_Branch)<<"]["<<((*currentInductor)->ABraEquPosNodeOffset)<<"] = " << -1/mid << std::endl
+       << "(*dFdxMatPtr)["<<((*currentInductor)->li_Branch)<<"]["<<((*currentInductor)->ABraEquNegNodeOffset)<<"] = " << 1/mid << std::endl;
     }
 #endif
 
@@ -1921,7 +1724,7 @@ bool Instance::loadDAEdFdx ()
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
         {
-          cout << "(*dFdxMatPtr)[((*currentInductor)->li_Branch)][(*currentInductor)->inductorCurrentOffsets[j]] =  " << delV * (1 - (Gap/Path)) * dP_dI[j]/(mid*mid) << endl;
+          Xyce::dout() << "(*dFdxMatPtr)[((*currentInductor)->li_Branch)][(*currentInductor)->inductorCurrentOffsets[j]] =  " << delV * (1 - (Gap/Path)) * dP_dI[j]/(mid*mid) << std::endl;
         }
 #endif
     }
@@ -1935,9 +1738,9 @@ bool Instance::loadDAEdFdx ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "(*dFdxMatPtr)[(*currentInductor)->li_Branch][(*currentInductor)->magOffset] =  " << delV * (1 - (Gap/Path)) * dP_dM/(mid*mid) << endl
-       << "(*dFdxMatPtr)[(*currentInductor)->li_Branch][(*currentInductor)->vPosOffset]  =  " << delV * (1 - (Gap/Path)) * dP_dVp/(mid*mid) << endl
-       << "(*dFdxMatPtr)[(*currentInductor)->li_Branch][(*currentInductor)->vNegOffset] = " << delV * (1 - (Gap/Path)) * dP_dVn/(mid*mid) << endl;
+      Xyce::dout() << "(*dFdxMatPtr)[(*currentInductor)->li_Branch][(*currentInductor)->magOffset] =  " << delV * (1 - (Gap/Path)) * dP_dM/(mid*mid) << std::endl
+       << "(*dFdxMatPtr)[(*currentInductor)->li_Branch][(*currentInductor)->vPosOffset]  =  " << delV * (1 - (Gap/Path)) * dP_dVp/(mid*mid) << std::endl
+       << "(*dFdxMatPtr)[(*currentInductor)->li_Branch][(*currentInductor)->vNegOffset] = " << delV * (1 - (Gap/Path)) * dP_dVn/(mid*mid) << std::endl;
     }
 #endif
     currentInductor++;
@@ -2013,7 +1816,7 @@ bool Instance::setIC ()
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-void Instance::varTypes( vector<char> & varTypeVec )
+void Instance::varTypes( std::vector<char> & varTypeVec )
 {
   varTypeVec.resize(numInductors+2);
   for(int i=0; i<numInductors; i++)
@@ -2033,7 +1836,7 @@ void Instance::varTypes( vector<char> & varTypeVec )
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   return true;
 }
@@ -2046,11 +1849,11 @@ bool Model::processParams (string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 03/23/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -2068,29 +1871,30 @@ bool Model::processInstanceParams(string param)
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-                                                SolverState & ss1,
-                                                DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
     A(0.0),
     Alpha(0.0),
     Area(0.0),
     BetaH(0.0),
     BetaM(0.0),
     C(0.0),
-    DeltaV(0.0),
+    DeltaVScaling(0.0),
     Gap(0.0),
     Kirr(0.0),
     Ms(0.0),
     Path(0.0),
-    Vinf(0.0),
     tempCoeff1(0.0),
     tempCoeff2(0.0),
     outputStateVars(0),
     factorMS(0),
     BCgsFactor( 10000.0 ),
     HCgsFactor( 0.012566370614359 ),  // 4 pi / 1000
-    tnom(do1.tnom)
+    UseConstantDeltaVScaling( true ),
+    tnom(getDeviceOptions().tnom)
 {
   setLevel(1);
 
@@ -2147,9 +1951,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -2169,27 +1973,48 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i, isize;
   isize = instanceContainer.size();
 
-  os << endl;
-  os << "Number of MutIndNonLin instances: " << isize << endl;
-  os << "    name=\t\tmodelName\tParameters" << endl;
+  os << std::endl;
+  os << "Number of MutIndNonLin instances: " << isize << std::endl;
+  os << "    name=\t\tmodelName\tParameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 //-----------------------------------------------------------------------------
 // Function      : Master::updateState
@@ -2204,7 +2029,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
   bool bsuccess = true;
   bool tmpBool = true;
 
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     tmpBool = (*it)->updatePrimaryState ();
     bsuccess = bsuccess && tmpBool;
@@ -2226,7 +2051,7 @@ bool Master::updateSecondaryState (double * staDerivVec, double * stoVec)
   bool bsuccess = true;
   bool tmpBool = true;
 
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     tmpBool = (*it)->updateSecondaryState ();
     bsuccess = bsuccess && tmpBool;
@@ -2248,7 +2073,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
   bool bsuccess = true;
   bool tmpBool = true;
 
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     tmpBool = (*it)->loadDAEFVector();
     bsuccess = bsuccess && tmpBool;
@@ -2272,7 +2097,7 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
   bool bsuccess = true;
   bool tmpBool = true;
 
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     tmpBool = (*it)->loadDAEdFdx ();
     bsuccess = bsuccess && tmpBool;
@@ -2282,6 +2107,21 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 
   return bsuccess;
 }
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("min", 1)
+    .registerModelType("min", 1)
+    .registerModelType("core", 1);
+}
+
 } // namespace MutIndNonLin
 } // namespace Device
 } // namespace Xyce

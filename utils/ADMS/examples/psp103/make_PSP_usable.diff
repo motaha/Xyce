@@ -1,23 +1,5 @@
 --- N_DEV_ADMSPSP103VA.C	2013-04-24 13:01:40.859640381 -0600
 +++ /Net/Proj/Xyce/people/tvrusso/nightly_builds/Xyce/src/DeviceModelPKG/ADMS/src/N_DEV_ADMSPSP103VA.C	2013-04-24 12:51:56.654340342 -0600
-@@ -71,14 +70,15 @@
-   // Set up configuration constants:
-   // This assumes NO optional nodes on the instance line.  Might need that
-   // fixed?
--  setNumNodes(numExtVars);
-+  setNumNodes(4);
-   setNumOptionalNodes(0);
-   setNumFillNodes(0);
-   setModelRequired(1);
- 
-   // we're going to have to come up with a way of generating the addModelType
-   // deal
--  //  FIXME!    addModelType("WTF");
-+  addModelType("NMOS");
-+  addModelType("PMOS");
- 
- 
-   // Set up each parameter directly, using the up-cased variable name
 @@ -8882,911 +8882,8 @@
  // Creation Date :
  //-----------------------------------------------------------------------------

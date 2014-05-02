@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.22.4.2 $
+// Revision Number: $Revision: 1.33 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -51,6 +51,7 @@
 // ----------   Xyce Includes   ----------
 
 #include <N_UTL_Misc.h>
+#include <N_UTL_fwd.h>
 
 #include <N_LAS_BlockMatrix.h>
 #include <N_LAS_BlockVector.h>
@@ -58,6 +59,7 @@
 // ----------   Other Includes -----------
 
 #include <Epetra_Map.h>
+#include <Epetra_Comm.h>
 #include <Epetra_CrsGraph.h>
 #include <Epetra_CrsMatrix.h>
 #include <Epetra_MultiVector.h>
@@ -71,74 +73,93 @@
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 03/13/04
 //-----------------------------------------------------------------------------
-N_LAS_BlockMatrix::N_LAS_BlockMatrix( int Size,
-                                      const vector< vector<int> > & BlockColumns,
-                                      const Epetra_CrsGraph & Graph,
-                                      const Epetra_CrsGraph & BaseGraph,
-                                      int AugmentCount )
-: N_LAS_Matrix( &(const_cast<Epetra_CrsGraph&>(Graph)),
-                &(const_cast<Epetra_CrsGraph&>(Graph)) ),
-  BlockSize_( BaseGraph.NumMyRows() ),
-  NumBlockRows_( Size ),
-  AugmentCount_( AugmentCount ),
-  Cols_( BlockColumns ),
-  Blocks_( Size )
+N_LAS_BlockMatrix::N_LAS_BlockMatrix( int size,
+                                      int offset,
+                                      const std::vector< std::vector<int> > & blockColumns,
+                                      const Epetra_CrsGraph & globalGraph,
+                                      const Epetra_CrsGraph & subBlockGraph,
+                                      int augmentCount )
+: N_LAS_Matrix( &(const_cast<Epetra_CrsGraph&>(globalGraph)),
+                &(const_cast<Epetra_CrsGraph&>(globalGraph)) ),
+  blocksViewGlobalMat_(true),
+  blockSize_( subBlockGraph.NumMyRows() ),
+  offset_( offset ),
+  numBlockRows_( size ),
+  augmentCount_( augmentCount ),
+  cols_( blockColumns ),
+  blocks_( size )
 {
-  vector<int> BaseNumCols( BlockSize_ );
-  vector< int* > BaseIndices( BlockSize_ );
-  for( int i = 0; i < BlockSize_; ++i )
-    BaseGraph.ExtractMyRowView( i, BaseNumCols[i], BaseIndices[i] );
-
-  vector< double* > Values( BlockSize_ );
-  int NumEntries;
-
-  Epetra_CrsMatrix & Mat = this->epetraObj();
-
-  for( int i = 0; i < Size; ++i )
+  // Individual blocks cannot be a view of the global matrix because of graph ordering and communication
+  if ( globalGraph.Comm().NumProc() > 1 )
   {
-    int NumCols = Cols_[i].size();
-    Blocks_[i].resize( NumCols );
+    blocksViewGlobalMat_ = false;
 
-    for( int j = 0; j < BlockSize_; ++j )
-      Mat.ExtractMyRowView( j+BlockSize_*i, NumEntries, Values[j] );
-
-    for( int j = 0; j < NumCols; ++j )
+    for( int i = 0; i < numBlockRows_; ++i )
     {
-      Epetra_CrsMatrix * bMat = new Epetra_CrsMatrix( View, BaseGraph );
+      int numCols = cols_[i].size();
+      blocks_[i].resize( numCols );
+      for( int j = 0; j < numCols; ++j )
+      {
+        Epetra_CrsMatrix * bMat = new Epetra_CrsMatrix( Copy, subBlockGraph );
+        blocks_[i][j] = Teuchos::rcp( new N_LAS_Matrix( bMat ) );
+      }
+    }
 
-      for( int k = 0; k < BlockSize_; ++k )
-        bMat->InsertMyValues( k, BaseNumCols[k], Values[k]+j*BaseNumCols[k], BaseIndices[k] );
+    // Get the local indices for the sub block so assembling is easier
+    baseNumCols_.resize( blockSize_ );
+    baseIndices_.resize( subBlockGraph.NumMyNonzeros() );
+    int ptr = 0;
+    for( int i = 0; i < blockSize_; ++i )
+    {
+      subBlockGraph.ExtractMyRowCopy( i, subBlockGraph.NumMyNonzeros()-ptr, baseNumCols_[i], &baseIndices_[ptr] );
+      ptr += baseNumCols_[i];
+    }
+  }
+  else
+  {
+    std::vector<int> baseNumCols( blockSize_ );
+    std::vector< int* > baseIndices( blockSize_ );
+    for( int i = 0; i < blockSize_; ++i )
+      subBlockGraph.ExtractMyRowView( i, baseNumCols[i], baseIndices[i] );
 
-      Blocks_[i][j] = new N_LAS_Matrix( bMat );
+    std::vector< double* > Values( blockSize_ );
+    int NumEntries;
+
+    for( int i = 0; i < numBlockRows_; ++i )
+    {
+      int numCols = cols_[i].size();
+      blocks_[i].resize( numCols );
+
+      for( int j = 0; j < blockSize_; ++j )
+        aDCRSMatrix_->ExtractMyRowView( j+blockSize_*i, NumEntries, Values[j] );
+
+      for( int j = 0; j < numCols; ++j )
+      {
+        Epetra_CrsMatrix * bMat = new Epetra_CrsMatrix( View, subBlockGraph );
+
+        for( int k = 0; k < blockSize_; ++k )
+          bMat->InsertMyValues( k, baseNumCols[k], Values[k]+j*baseNumCols[k], baseIndices[k] );
+
+        blocks_[i][j] = Teuchos::rcp( new N_LAS_Matrix( bMat ) );
+      }
     }
   }
 
-  if( AugmentCount_ )
+  // Generate the augmented GIDs list.
+  if( augmentCount_ )
   {
-    AugmentGIDs_.resize(AugmentCount_);
-    int AugStart = BlockSize_ * Size;
-    for( int i = 0; i < AugmentCount_; ++i )
+    augmentGIDs_.resize(augmentCount_);
+    int augStart = blockSize_ * size;
+    for( int i = 0; i < augmentCount_; ++i )
     {
-      AugmentGIDs_[i] = Graph.RowMap().GID(AugStart+i);
-      assert( AugmentGIDs_[i] != -1 );
+      augmentGIDs_[i] = globalGraph.RowMap().GID(augStart+i);
     }
   }
-}
 
-//-----------------------------------------------------------------------------
-// Function      : N_LAS_BlockMatrix::~N_LAS_BlockMatrix
-// Purpose       : Destructor
-// Special Notes :
-// Scope         : Public
-// Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 03/13/04
-//-----------------------------------------------------------------------------
-N_LAS_BlockMatrix::~N_LAS_BlockMatrix()
-{
-  for( int i = 0; i < (int)(Blocks_.size()); ++i )
-    for( int j = 0; j < (int)(Blocks_[i].size()); ++j )
-      if( Blocks_[i][j] ) delete Blocks_[i][j];
-  Blocks_.clear();
+  // Communicate the augmented GIDs to all processors.
+  // All other processors other than the one that owns the augmented GID will have -1.
+  std::vector<int> tmpAugmentGIDs = augmentGIDs_;
+  globalGraph.Comm().MaxAll( &tmpAugmentGIDs[0], &augmentGIDs_[0], augmentCount_ );
 }
 
 //-----------------------------------------------------------------------------
@@ -151,62 +172,153 @@ N_LAS_BlockMatrix::~N_LAS_BlockMatrix()
 //-----------------------------------------------------------------------------
 N_LAS_Matrix & N_LAS_BlockMatrix::block( int row, int col )
 {
-  for( int i = 0; i < (int)(Cols_[row].size()); ++i )
-    if( Cols_[row][i] == col )
-      return *Blocks_[row][i];
+  for( int i = 0; i < (int)(cols_[row].size()); ++i )
+    if( cols_[row][i] == col )
+      return *blocks_[row][i];
 
   TEUCHOS_TEST_FOR_EXCEPTION( true, std::logic_error,
       "Error!  N_LAS_BlockMatrix::block("<<row<<","<<col<<"):  This block does not exist!"
       );
-  //abort(); //Row,Col Not Found
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_LAS_BlockMatrix::print
+// Function      : N_LAS_BlockMatrix::put
+// Purpose       : Put function for the sparse-matrix.
+// Special Notes :
+// Scope         : Public
+// Creator       : Scott A. Hutchinson, SNL, Parallel Computational Sciences
+// Creation Date : 06/04/00
+//-----------------------------------------------------------------------------
+void N_LAS_BlockMatrix::put( double s )
+{
+  aDCRSMatrix_->PutScalar(s);
+
+  if (!blocksViewGlobalMat_)
+  {
+    for( int i = 0; i < numBlockRows_; ++i )
+    {
+      int numCols = cols_[i].size();
+      for ( int j = 0; j < numCols; ++j )
+      {
+        blocks_[i][j]->put( s );
+      }
+    }
+  }
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_LAS_BlockMatrix::fillComplete
+// Purpose       :
+// Special Notes :
+// Scope         : Public
+// Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
+// Creation Date : 08/29/03
+//-----------------------------------------------------------------------------
+void N_LAS_BlockMatrix::fillComplete()
+{
+  // Call fillComplete on all the individual N_LAS_Matrix blocks, 
+  // then assemble the global matrix.
+  for( int i = 0; i < numBlockRows_; ++i )
+  {
+    int numCols = cols_[i].size();
+    for ( int j = 0; j < numCols; ++j )
+    {
+      blocks_[i][j]->fillComplete();
+    }
+  }
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_LAS_BlockMatrix::assembleGlobalMatrix
+// Purpose       : Fills global N_LAS_Matrix with the values in each block.
+// Special Notes :
+// Scope         : Public
+// Creator       : Heidi Thornquist, SNL
+// Creation Date : 10/03/13
+//-----------------------------------------------------------------------------
+void N_LAS_BlockMatrix::assembleGlobalMatrix()
+{
+  if (!blocksViewGlobalMat_)
+  {
+    for( int i = 0; i < numBlockRows_; ++i )
+    {
+      int numCols = cols_[i].size();
+
+      for( int k = 0; k < blockSize_; ++k )
+      {
+        // Create memory for all the entries for one whole row.
+        int length = numCols*baseNumCols_[k];
+        std::vector<int> Indices( length );
+        std::vector<double> Values( length );
+
+        // For each block column extract the current values from the subblock and correct the column indices.
+        // NOTE:  All extractions and insertions are done using global ids, it seems easier that way.
+        int ptr = 0;
+        for( int j = 0; j < numCols; ++j )
+        {
+          int numIndices = 0;
+          int col = cols_[i][j];
+          int globalRow = (blocks_[i][j])->epetraObj().Graph().GRID(k);
+          (*blocks_[i][j]).getRowCopy(globalRow, length-ptr, numIndices, &Values[ptr], &Indices[ptr]);
+        
+          // Correct the column indices for this subblock. 
+          for (int idx = 0; idx < numIndices; idx++)
+          {
+            Indices[ptr+idx] += offset_*col;
+          }
+          ptr += numIndices;
+        }
+       
+        // Insert the values for all the global columns at the same time.
+        aDCRSMatrix_->ReplaceGlobalValues(aDCRSMatrix_->Graph().GRID(k + i*blockSize_), length, &Values[0], &Indices[0]); 
+      }
+    }
+  }
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_LAS_BlockMatrix::printPetraObject
 // Purpose       : Output
 // Special Notes :
 // Scope         : Public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 03/19/04
 //-----------------------------------------------------------------------------
-void N_LAS_BlockMatrix::printPetraObject() const
+void N_LAS_BlockMatrix::printPetraObject(std::ostream &os) const
 {
-  cout << "N_LAS_BlockMatrix Object (Size=" << NumBlockRows_ << ")\n";
-  cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n";
-  for( int i = 0; i < NumBlockRows_; ++i )
+  os << "N_LAS_BlockMatrix Object (Size=" << numBlockRows_ << ", View =" << blocksViewGlobalMat_ << ")" << std::endl;
+  os << "+++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+  for( int i = 0; i < numBlockRows_; ++i )
   {
-    int NumCols = Cols_[i].size();
-    for( int j = 0; j < NumCols; ++j )
+    int numCols = cols_[i].size();
+    for( int j = 0; j < numCols; ++j )
     {
-      cout << "Block[" << i << "][" << Cols_[i][j] << "]\n";
-      Blocks_[i][j]->printPetraObject();
+      os << "Block[" << i << "][" << cols_[i][j] << "]\n";
+      blocks_[i][j]->printPetraObject(os);
     }
   }
-  cout << "Base Object\n";
-  cout << *oDCRSMatrix_;
-  cout << *aDCRSMatrix_;
-  cout << "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n";
+  os << "Base Object\n";
+  os << *aDCRSMatrix_;
+  os << "+++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_LAS_BlockMatrix::insertIntoAugmentedColumn
-// Purpose       : Augment matrix with block vector
-// Special Notes : Zero based indexing for augmentedColumn
+// Function      : N_LAS_BlockMatrix::replaceAugmentedColumn
+// Purpose       : Replace augmented column of matrix with block vector
+// Special Notes : This places values directly in the base object.
+//               : This should NOT be used to replace values that are within blocks.
 // Scope         : Public
 // Creator       : Todd Coffey, SNL, 1414
 // Creation Date : 08/12/05
 //-----------------------------------------------------------------------------
-void N_LAS_BlockMatrix::replaceAugmentedColumn(int augmentedColumn, const N_LAS_BlockVector & vec)
+void N_LAS_BlockMatrix::replaceAugmentedColumn(int colGID, const N_LAS_BlockVector & vec)
 {
   const Epetra_BlockMap & RowMap = const_cast<N_LAS_BlockVector&>(vec).epetraObj().Map();
   int NumRows = RowMap.NumMyElements();
 
-  assert( AugmentGIDs_.size() != 0 );
-  int Col = AugmentGIDs_[augmentedColumn];
-  int lCol = aDCRSMatrix_->Graph().LCID(Col);
+  int lCol = aDCRSMatrix_->Graph().LCID(colGID);
   for( int i = 0; i < NumRows; ++i )
   {
-    //int Row = RowMap.LID(i);
     int Row = i;
     double Val = vec[i];
     aDCRSMatrix_->ReplaceMyValues( Row, 1, &Val, &lCol );
@@ -214,66 +326,19 @@ void N_LAS_BlockMatrix::replaceAugmentedColumn(int augmentedColumn, const N_LAS_
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_LAS_blockMatrix
-// Purpose       : Nonmember constructor that does not require a full sized
-// block graph since it can be (and indeed must be) constructed from the
-// BlockColumns and the BaseGraph.
-// Special Notes : 
+// Function      : N_LAS_BlockMatrix::replaceAugmentedRow
+// Purpose       : Replace augmented row values
+// Special Notes : This places values directly in the base object.
+//               : This should NOT be used to replace values that are within blocks.
 // Scope         : Public
-// Creator       : Todd Coffey, SNL, 1414
-// Creation Date : 06/08/09
+// Creator       : Heidi Thornquist, SNL
+// Creation Date : 11/12/13
 //-----------------------------------------------------------------------------
-RCP<N_LAS_BlockMatrix> N_LAS_blockMatrix( 
-    const vector< vector<int> > & BlockColumns,
-    Epetra_Map & BlockMap, // Defines the GIDs of the elements in the blocks
-    const Epetra_CrsGraph & BaseGraph,
-    int AugmentCount
-    )
+void N_LAS_BlockMatrix::replaceAugmentedRow(int rowGID, int length, double * coeffs, int * colIndices)
 {
-  // Create BlockGraph consistent with BaseGraph and BlockColumns
-  int NumElements = BaseGraph.NumGlobalRows();
-  int NumBlocks = BlockColumns.size();
-  int numIndicesPerRow = 0;
-  RCP<Epetra_CrsGraph> blockGraph = rcp(new Epetra_CrsGraph(
-        Copy,
-        dynamic_cast<Epetra_BlockMap&>(BlockMap),
-        numIndicesPerRow
-        )
-      );
-  blockGraph.release(); // This will leak memory
-  for (int bi=0; bi<NumBlocks ; ++bi) { 
-    // Loop over blocks by row
-    for (int bj=0 ; bj<(int)(BlockColumns[bi].size()) ; ++bj) { 
-      // Loop over blocks by column
-      std::vector<int> Indices(NumElements*NumBlocks);
-      for (int i=0 ; i<NumElements ; ++i) {
-        int NumIndices = 0;
-        // Loop over individual block by rows
-        int GlobalRow = BlockMap.GID(bi*NumElements+i);
-        std::vector<int> localIndices(NumElements);
-        int localNumIndices;
-        BaseGraph.ExtractGlobalRowCopy(BaseGraph.GRID(i), NumElements, localNumIndices, &localIndices[0]);
-        for (int j=0 ; j<localNumIndices ; ++j) {
-          // Loop over individual block by column
-          Indices[NumIndices] = BlockMap.GID(BlockColumns[bi][bj]*NumElements+localIndices[j]);
-          NumIndices++;
-        }
-        blockGraph->InsertGlobalIndices(GlobalRow,NumIndices,&Indices[0]);
-      }
-    }
+  if ( aDCRSMatrix_->Graph().LRID( rowGID ) >= 0 )
+  {
+    aDCRSMatrix_->ReplaceGlobalValues( rowGID, length, coeffs, colIndices );
   }
-  //std::cout << "-----------------------------------------------------------" << std::endl;
-  //std::cout << " N_LAS_blockMatrix:  blockGraph = " << std::endl;
-  //blockGraph->Print(std::cout);
-  //std::cout << "-----------------------------------------------------------" << std::endl;
-  blockGraph->FillComplete();
-  RCP<N_LAS_BlockMatrix> matrix = rcp(new N_LAS_BlockMatrix(
-        NumBlocks,
-        BlockColumns,
-        *blockGraph,
-        BaseGraph,
-        AugmentCount
-        )
-      );
-  return matrix;
 }
+

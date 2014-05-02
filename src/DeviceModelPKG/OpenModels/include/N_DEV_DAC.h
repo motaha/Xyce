@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -38,7 +38,7 @@
 //
 // Revision Number: $Revsion$
 //
-// Revsion Date   : $Date: 2013/10/03 17:23:36 $
+// Revsion Date   : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //----------------------------------------------------------------------------
@@ -47,7 +47,8 @@
 #define Xyce_N_DEV_DAC_h
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_DeviceTemplate.h>
+#include <N_DEV_Configuration.h>
+#include <N_DEV_DeviceMaster.h>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceInstance.h>
 #include <N_DEV_DeviceModel.h>
@@ -62,6 +63,19 @@ namespace Device {
 namespace DAC{
 
 class Model;
+class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance>
+{
+  static const char *name() {return "DAC";}
+  static const char *deviceTypeName() {return "YDAC level 1 (Digital to Analog Interface)";};
+  static const int numNodes() {return 2;}
+  static const bool isLinearDevice() {return true;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //----------------------------------------------------------------------------
 // Class          : Instance
@@ -74,117 +88,112 @@ class Model;
 //----------------------------------------------------------------------------
 class Instance : public DeviceInstance
 {
-    friend class ParametricData<Instance>;
-    friend class Model;
-    friend class Master;
+  friend class ParametricData<Instance>;
+  friend class Model;
+  friend class Traits;friend class Master;
 
-  public:
-    static ParametricData<Instance> &getParametricData();
+public:
 
-    virtual const ParametricData<void> &getMyParametricData() const {
-      return getParametricData();
-    }
-
-    Instance(InstanceBlock & IB,
-             Model & DACiter,
-             MatrixLoadData & mlData1,
-             SolverState &ss1,
-             ExternData  &ed1,
-             DeviceOptions & do1);
+  Instance(
+     const Configuration &       configuration,
+     const InstanceBlock &     IB,
+     Model &                   DACiter,
+     const FactoryBlock &      factory_block);
 
 
-    ~Instance();
+  ~Instance();
 
-  private:
-    Instance(const Instance &);
-    Instance &operator=(const Instance &);
+private:
+  Instance(const Instance &);
+  Instance &operator=(const Instance &);
 
-  public:
-    // Additional Public Declarations
-    void registerLIDs( const vector<int> & intLIDVecRef,
-                       const vector<int> & extLIDVecRef );
-    void registerStateLIDs( const vector<int> & staLIDVecRef );
-    map<int,string> & getIntNameMap ();
+public:
+  // Additional Public Declarations
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
+  void registerStateLIDs( const std::vector<int> & staLIDVecRef );
+  std::map<int,std::string> & getIntNameMap ();
 
-    const vector< vector<int> > & jacobianStamp() const;
-    void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-    bool processParams (string param = "");
+  bool processParams ();
 
-    bool updateIntermediateVars ();
-    bool updatePrimaryState ();
-    bool updateSecondaryState ();
+  bool updateIntermediateVars ();
+  bool updatePrimaryState ();
+  bool updateSecondaryState ();
 
-    bool updateTVVEC ( vector< pair<double, double> > const & newPairs );
-    bool getInstanceBreakPoints (vector<N_UTL_BreakPoint> &breakPointTimes);
+  bool updateTVVEC ( std::vector< std::pair<double, double> > const & newPairs );
+  bool getInstanceBreakPoints (std::vector<N_UTL_BreakPoint> &breakPointTimes);
 
-    DeviceState * getInternalState();
-    bool setInternalState( const DeviceState & state );
+  DeviceState * getInternalState();
+  bool setInternalState( const DeviceState & state );
 
-    // iterator reference to the model which owns this instance.
-    // Getters and setters
-    Model &getModel() {
-      return model_;
-    }
+  // iterator reference to the model which owns this instance.
+  // Getters and setters
+  Model &getModel() 
+  {
+    return model_;
+  }
 
-  public:
+public:
 
-    bool loadDAEQVector () {return true;};
-    bool loadDAEFVector ();
+  bool loadDAEQVector () {return true;};
+  bool loadDAEFVector ();
 
-    bool loadDAEdQdx () {return true;};
-    bool loadDAEdFdx ();
+  bool loadDAEdQdx () {return true;};
+  bool loadDAEdFdx ();
 
-    void varTypes( vector<char> & varTypeVec );
+  void varTypes( std::vector<char> & varTypeVec );
 
-  private:
+private:
 
-    bool updateVoltage(double);
+  bool updateVoltage(double);
 
-  private:
-    static vector< vector<int> > jacStamp;
+private:
+  static std::vector< std::vector<int> > jacStamp;
 
-    Model &       model_;         //< Owning model
+  Model &       model_;         //< Owning model
 
-    // user-specified parameters:
-    string file;    // User specified file containing DAC data as time and
-    //voltage pairs.
+  // user-specified parameters:
+  std::string file;    // User specified file containing DAC data as time and
+  //voltage pairs.
 
-    vector< pair<double, double> > TVVEC; // vector of (time, voltage) pairs
-    // read in from "file".
+  std::vector< std::pair<double, double> > TVVEC; // vector of (time, voltage) pairs
+  // read in from "file".
 
-    // state variables:
+  // state variables:
 
-    // other variables:
-    int numTVpairs_;  // number of (time, voltage) pairs in TVVEC
-    double v_pos;
-    double v_neg;
-    double i_bra;
-    double vDrop;
-    double voltage_;
-    int loc_;
+  // other variables:
+  int numTVpairs_;  // number of (time, voltage) pairs in TVVEC
+  double v_pos;
+  double v_neg;
+  double i_bra;
+  double vDrop;
+  double voltage_;
+  int loc_;
 
-    // Indices into the state vector:
+  // Indices into the state vector:
 
 
 
-    //local indices (offsets)
-    int li_Pos;
-    int li_Neg;
-    int li_Bra;
+  //local indices (offsets)
+  int li_Pos;
+  int li_Neg;
+  int li_Bra;
 
-    //Locally indexed offsets for jacobian
-    int ABraEquPosNodeOffset; // Offset, pos. node voltage contribution,
-    // branch current equ.
+  //Locally indexed offsets for jacobian
+  int ABraEquPosNodeOffset; // Offset, pos. node voltage contribution,
+  // branch current equ.
 
-    int ABraEquNegNodeOffset; // Offset, neg. node voltage contribution,
-    // branch current equ.
+  int ABraEquNegNodeOffset; // Offset, neg. node voltage contribution,
+  // branch current equ.
 
-    int APosEquBraVarOffset;  // Offset, branch current variable
-    // contribution, KCL equation of the pos node
+  int APosEquBraVarOffset;  // Offset, branch current variable
+  // contribution, KCL equation of the pos node
 
-    int ANegEquBraVarOffset;  // Offset, branch current variable
-    // contribution, KCL equation of the neg node
+  int ANegEquBraVarOffset;  // Offset, branch current variable
+  // contribution, KCL equation of the neg node
 };
 
 //----------------------------------------------------------------------------
@@ -196,57 +205,61 @@ class Instance : public DeviceInstance
 //----------------------------------------------------------------------------
 class Model : public DeviceModel
 {
-    typedef std::vector<Instance *> InstanceVector;
+  typedef std::vector<Instance *> InstanceVector;
 
-    friend class ParametricData<Model>;
-    friend class Instance;
-    friend class Master;
+  friend class ParametricData<Model>;
+  friend class Instance;
+  friend class Traits;friend class Master;
 
-  public:
-    static ParametricData<Model> &getParametricData();
+public:
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &        MB,
+     const FactoryBlock &      factory_block);
+  ~Model();
 
-    virtual const ParametricData<void> &getMyParametricData() const {
-      return getParametricData();
-    }
+private:
+  Model();
+  Model(const Model &);
+  Model &operator=(const Model &);
 
-    Model(const ModelBlock & MB,
-          SolverState & ss1,
-          DeviceOptions & do1);
-    ~Model();
+public:
+  bool processParams ();
+  bool processInstanceParams ();
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
 
-  private:
-    Model();
-    Model(const Model &);
-    Model &operator=(const Model &);
+  virtual std::ostream &printOutInstances(std::ostream &os) const;
 
-  public:
-    bool processParams (string param = "");
-    bool processInstanceParams (string param = "");
-    virtual std::ostream &printOutInstances(std::ostream &os) const;
+private:
 
-  private:
+  // Model Parameters
+  double riseTime;
+  double fallTime;
+  double R;
+  double L;
+  double C;
+  bool includeTransitionBP_;
 
-    // Model Parameters
-    double riseTime;
-    double fallTime;
-    double R;
-    double L;
-    double C;
-    bool includeTransitionBP_;
+  // Data Members for Associations
 
-    // Data Members for Associations
+public:
+  void addInstance(Instance *instance) 
+  {
+    instanceContainer.push_back(instance);
+  }
 
-  public:
-    InstanceVector &getInstanceVector() {
-      return instanceContainer;
-    }
+  InstanceVector &getInstanceVector() 
+  {
+    return instanceContainer;
+  }
 
-    const InstanceVector &getInstanceVector() const {
-      return instanceContainer;
-    }
+  const InstanceVector &getInstanceVector() const 
+  {
+    return instanceContainer;
+  }
 
-  private:
-    vector<Instance*> instanceContainer;
+private:
+  std::vector<Instance*> instanceContainer;
 };
 
 //-----------------------------------------------------------------------------
@@ -256,34 +269,32 @@ class Model : public DeviceModel
 // Creator       : Richard Schiek, Electrical and Microsystems modeling
 // Creation Date : 02/25/2009
 //-----------------------------------------------------------------------------
-class Master : public Xyce::Device::DeviceTemplate<Model, Instance>
+class Master : public DeviceMaster<Traits>
 {
-  public:
-    Master (
-      const std::string &dn,
-      const std::string &cn,
-      const std::string &dmName,
-      LinearDevice linearDev,
-      SolverState & ss1,
-      DeviceOptions & do1)
-      : Xyce::Device::DeviceTemplate<Model, Instance>(
-        dn, cn, dmName, linearDev, ss1, do1)
-    {
+  friend class Instance;
+  friend class Model;
+  friend class Traits;
 
-    }
+public:
+  Master(
+     const Configuration &       configuration,
+     const FactoryBlock &      factory_block,
+     const SolverState & ss1,
+     const DeviceOptions & do1)
+    : DeviceMaster<Traits>(configuration, factory_block, ss1, do1)
+  {}
 
-    virtual bool updateState (double * solVec, double * staVec, double * stoVec);
-    virtual bool updateSecondaryState (double * staDeriv, double * stoVec);
+  virtual bool updateState (double * solVec, double * staVec, double * stoVec);
+  virtual bool updateSecondaryState (double * staDeriv, double * stoVec);
 
-    // load functions:
-    virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
-    virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
+  // load functions:
+  virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
+  virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
 
-    bool getDACDeviceNames ( std::vector<std::string> & dacNames);
-
-    friend class Instance;
-    friend class Model;
+  bool getDACDeviceNames ( std::vector<std::string> & dacNames);
 };
+
+void registerDevice();
 
 } // namespace DAC
 } // namespace Device

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -54,9 +54,9 @@
 // Revision Information:
 // ----------------------
 //
-// Revision Number: $Revision: 1.8.2.2 $
+// Revision Number: $Revision: 1.13 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:47 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author $
 //-------------------------------------------------------------------------
@@ -64,15 +64,9 @@
 #ifndef Xyce_N_NLS_ReturnCodes_h
 #define Xyce_N_NLS_ReturnCodes_h
 
-// ----------   Standard Includes   ----------
-#include <iostream>
+#include <iosfwd>
 
-// ----------   Xyce Includes   ----------
 #include <N_UTL_Xyce.h>
-
-// ----------   Forward Declarations ----------
-
-// ----------   Enumerated Types ----------
 
 //-----------------------------------------------------------------------------
 // Class         : N_NLS_ReturnCodes
@@ -116,36 +110,7 @@ public:
   int innerSolveFailed;    // default = -5;
 };
 
-
-//-----------------------------------------------------------------------------
-// Function      : N_NLS_ReturnCodes::operator<<
-// Purpose       : "<<" operator
-// Special Notes :
-// Scope         : public
-// Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 7/02/03
-//-----------------------------------------------------------------------------
-inline std::ostream & operator<<(std::ostream & os, const N_NLS_ReturnCodes & rc)
-{
-  os << "\n\n-----------------------------------------\n";
-  os << "\tNonlinear Solver Return Codes:\n";
-
-  os << "\t\tnormTooSmall      = " << rc.normTooSmall << "\n";
-  os << "\t\tnormalConvergence = " << rc.normalConvergence << "\n";
-  os << "\t\tnearConvergence   = " << rc.nearConvergence << "\n";
-  os << "\t\tsmallUpdate       = " << rc.smallUpdate << "\n";
-  os << "\t\tnanFail           = " << rc.nanFail << "\n" ;
-  os << "\t\ttooManySteps      = " << rc.tooManySteps << "\n";
-  os << "\t\ttooManyTranSteps  = " << rc.tooManyTranSteps << "\n";
-  os << "\t\tupdateTooBig      = " << rc.updateTooBig << "\n";
-  os << "\t\tstalled           = " << rc.stalled << "\n";
-  os << "\t\twrmsExactZero     = " << rc.wrmsExactZero << "\n";
-  os << "-----------------------------------------\n";
-  os << endl;
-
-  return os;
-}
-
+std::ostream & operator<<(std::ostream & os, const N_NLS_ReturnCodes & rc);
 
 #endif // Xyce_N_NLS_ReturnCodes_h
 

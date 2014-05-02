@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.2.2.3 $
+// Revision Number: $Revision: 1.7 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/02/24 23:49:15 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -69,7 +69,7 @@ namespace Xyce {
 namespace Device {
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::SimpleRateCalculator::SimpleRateCalculator
+// Function      : SimpleRateCalculator::SimpleRateCalculator
 // Purpose       : constructor for "simple" reaction rate calculator
 //                 This is one that has no temperature dependence, and scales
 //                 as concentration*time
@@ -86,7 +86,7 @@ namespace Device {
   }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::SimpleRateCalculator::SimpleRateCalculator
+// Function      : SimpleRateCalculator::SimpleRateCalculator
 // Purpose       : Copy constructor for "simple" reaction rate calculator
 // Special Notes :
 // Scope         : public
@@ -100,7 +100,7 @@ namespace Device {
   }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::SimpleRateCalculator::Clone
+// Function      : SimpleRateCalculator::Clone
 // Purpose       : Copy self operation for "simple" reaction rate calculator
 // Special Notes :
 // Scope         : public
@@ -113,7 +113,7 @@ namespace Device {
   }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::SimpleRateCalculator::computeRateConstant
+// Function      : SimpleRateCalculator::computeRateConstant
 // Purpose       : returns rate constant for simple rate style
 // Special Notes :
 // Scope         : public
@@ -126,7 +126,7 @@ namespace Device {
   }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::SimpleRateCalculator::rateConstantScaleFactor
+// Function      : SimpleRateCalculator::rateConstantScaleFactor
 // Purpose       : returns rate scaling factor for simple rate style
 // Special Notes :
 // Scope         : public
@@ -140,7 +140,7 @@ namespace Device {
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::CaptureRateCalculator::CaptureRateCalculator
+// Function      : CaptureRateCalculator::CaptureRateCalculator
 // Purpose       : constructor for capture reaction rate calculator
 //                 This is one that models electron or hole capture reactions.
 // Special Notes :
@@ -157,7 +157,7 @@ namespace Device {
   }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::CaptureRateCalculator::CaptureRateCalculator
+// Function      : CaptureRateCalculator::CaptureRateCalculator
 // Purpose       : Copy constructor for "capture" reaction rate calculator
 // Special Notes :
 // Scope         : public
@@ -170,7 +170,7 @@ namespace Device {
   {
   }
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::CaptureRateCalculator::Clone
+// Function      : CaptureRateCalculator::Clone
 // Purpose       : Copy self operation for "capture" reaction rate calculator
 // Special Notes :
 // Scope         : public
@@ -183,7 +183,7 @@ namespace Device {
   }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::CaptureRateCalculator::computeRateConstant
+// Function      : CaptureRateCalculator::computeRateConstant
 // Purpose       : returns rate constant for capture rate style
 // Special Notes :
 // Scope         : public
@@ -196,7 +196,7 @@ namespace Device {
   }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::CaptureRateCalculator::rateConstantScaleFactor
+// Function      : CaptureRateCalculator::rateConstantScaleFactor
 // Purpose       : returns rate scaling factor for capture rate style
 // Special Notes :
 // Scope         : public
@@ -209,7 +209,7 @@ namespace Device {
   }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::EmissionRateCalculator::EmissionRateCalculator
+// Function      : EmissionRateCalculator::EmissionRateCalculator
 // Purpose       : constructor for emission reaction rate calculator
 //                 This is one that models electron or hole emission reactions.
 // Special Notes :
@@ -228,7 +228,7 @@ namespace Device {
   }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::EmissionRateCalculator::EmissionRateCalculator
+// Function      : EmissionRateCalculator::EmissionRateCalculator
 // Purpose       : Copy constructor for "emission" reaction rate calculator
 // Special Notes :
 // Scope         : public
@@ -243,7 +243,7 @@ namespace Device {
   }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::EmissionRateCalculator::Clone
+// Function      : EmissionRateCalculator::Clone
 // Purpose       : Copy self operation for "emission" reaction rate calculator
 // Special Notes :
 // Scope         : public
@@ -255,7 +255,7 @@ namespace Device {
     return new EmissionRateCalculator(*this);
   }
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::EmissionRateCalculator::computeRateConstant
+// Function      : EmissionRateCalculator::computeRateConstant
 // Purpose       : returns rate constant for emission rate style
 // Special Notes :
 // Scope         : public
@@ -269,7 +269,7 @@ namespace Device {
   }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::EmissionRateCalculator::rateConstantScaleFactor
+// Function      : EmissionRateCalculator::rateConstantScaleFactor
 // Purpose       : returns rate scaling factor for emission rate style
 // Special Notes :
 // Scope         : public
@@ -283,7 +283,7 @@ namespace Device {
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::ComplexRateCalculator::ComplexRateCalculator
+// Function      : ComplexRateCalculator::ComplexRateCalculator
 // Purpose       : constructor for "complex" reaction rate calculator
 //                 This is one that models two discrete species forming a
 //                 complex, e.g.:
@@ -297,8 +297,8 @@ namespace Device {
 // Creation Date : 7/31/06
 //-----------------------------------------------------------------------------
   ComplexRateCalculator::ComplexRateCalculator(
-    vector<N_DEV::Specie> &VariableSpecies, vector<N_DEV::Specie> &ConstantSpecies,
-     vector< pair<int,double> > &Reactants,
+    std::vector<Specie> &VariableSpecies, std::vector<Specie> &ConstantSpecies,
+     std::vector< std::pair<int,double> > &Reactants,
      double C0, double t0, double x0)
   {
     int ij;
@@ -308,8 +308,8 @@ namespace Device {
             (Reactants.size() == 2 && Reactants[0].second == 1.0 &&
              Reactants[1].second == 1.0)))
     {
-      string msg;
-      msg = "N_DEV::ComplexRateCalculator: Invalid attempt to use complex rate method.";
+      std::string msg;
+      msg = "ComplexRateCalculator: Invalid attempt to use complex rate method.";
       msg = "  This method is only valid for binary complexing reactions:\n";
       if (Reactants.size() == 1)
       {
@@ -367,7 +367,7 @@ namespace Device {
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::ComplexRateCalculator::ComplexRateCalculator
+// Function      : ComplexRateCalculator::ComplexRateCalculator
 // Purpose       : Copy constructor for "complex" reaction rate calculator
 // Special Notes :
 // Scope         : public
@@ -384,7 +384,7 @@ namespace Device {
   }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::ComplexRateCalculator::Clone
+// Function      : ComplexRateCalculator::Clone
 // Purpose       : Copy self operation for "complex" reaction rate calculator
 // Special Notes :
 // Scope         : public
@@ -397,7 +397,7 @@ namespace Device {
   }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::ComplexRateCalculator::computeRateConstant
+// Function      : ComplexRateCalculator::computeRateConstant
 // Purpose       : returns rate constant for complex rate style
 // Special Notes :
 // Scope         : public
@@ -416,7 +416,7 @@ namespace Device {
   }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::ComplexRateCalculator::rateConstantScaleFactor
+// Function      : ComplexRateCalculator::rateConstantScaleFactor
 // Purpose       : returns rate scaling factor for complex rate style
 // Special Notes :
 // Scope         : public
@@ -433,7 +433,7 @@ namespace Device {
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::DecomplexRateCalculator::DecomplexRateCalculator
+// Function      : DecomplexRateCalculator::DecomplexRateCalculator
 // Purpose       : constructor for "complex" reaction rate calculator
 //                 This is one that models two discrete species decomposing from
 //                 a complex, e.g.:
@@ -447,9 +447,9 @@ namespace Device {
 // Creation Date : 5/04/09
 //-----------------------------------------------------------------------------
   DecomplexRateCalculator::DecomplexRateCalculator(
-     vector<N_DEV::Specie> &VariableSpecies, vector<N_DEV::Specie> &ConstantSpecies,
-     vector< pair<int,double> > &Reactants,
-     vector< pair<int,double> > &Products,
+     std::vector<Specie> &VariableSpecies, std::vector<Specie> &ConstantSpecies,
+     std::vector< std::pair<int,double> > &Reactants,
+     std::vector< std::pair<int,double> > &Products,
      double bindingEnergy, double degenAB, double degenA, double degenB,
      double siliconConcentration,
      double C0, double t0, double x0)
@@ -467,8 +467,8 @@ namespace Device {
             (Products.size() == 2 && Products[0].second == 1.0 &&
              Products[1].second == 1.0)))
     {
-      string msg;
-      msg = "N_DEV::DeomplexRateCalculator: Invalid attempt to use decomplex rate method.";
+      std::string msg;
+      msg = "DeomplexRateCalculator: Invalid attempt to use decomplex rate method.";
       msg = "  This method is only valid for decomplexing reactions with two products:\n";
       if (Products.size() == 1)
       {
@@ -526,7 +526,7 @@ namespace Device {
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::DecomplexRateCalculator::DecomplexRateCalculator
+// Function      : DecomplexRateCalculator::DecomplexRateCalculator
 // Purpose       : Copy constructor for "decomplex" reaction rate calculator
 // Special Notes :
 // Scope         : public
@@ -549,7 +549,7 @@ namespace Device {
   }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::DecomplexRateCalculator::Clone
+// Function      : DecomplexRateCalculator::Clone
 // Purpose       : Copy self operation for "decomplex" reaction rate calculator
 // Special Notes :
 // Scope         : public
@@ -563,7 +563,7 @@ namespace Device {
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::DecomplexRateCalculator::computeRateConstant
+// Function      : DecomplexRateCalculator::computeRateConstant
 // Purpose       : returns rate constant for decomplex rate style
 // Special Notes :
 // Scope         : public
@@ -588,7 +588,7 @@ namespace Device {
   }
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV::DecomplexRateCalculator::rateConstantScaleFactor
+// Function      : DecomplexRateCalculator::rateConstantScaleFactor
 // Purpose       : returns rate scaling factor for decomplex rate style
 // Special Notes :
 // Scope         : public
@@ -600,5 +600,5 @@ namespace Device {
    return (rk0);
   }
 
-} // namespace Resistor
 } // namespace Device
+} // namespace Xyce

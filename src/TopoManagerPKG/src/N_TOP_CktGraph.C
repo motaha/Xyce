@@ -1,12 +1,12 @@
 //-----------------------------------------------------------------------------
 // Copyright Notice
 //
-// Copyright (c) 2002-2013, Sandia Corporation, Albuquerque, NM, USA.
-// Under the terms of Contract DE-AC04-94AL85000, the U.S.  Government
-// retains certain rights in this software.
+//   Copyright 2002 Sandia Corporation. Under the terms
+//   of Contract DE-AC04-94AL85000 with Sandia Corporation, the U.S.
+//   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,18 +36,19 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.5.6.2 $
+// Revision Number: $Revision: 1.10 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-
 #include <N_TOP_CktGraph.h>
+
+namespace Xyce {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
 // Function      : operator<<
@@ -57,8 +58,11 @@
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-ostream& operator<< (ostream& os, const N_TOP_CktGraph& cg)
+std::ostream &operator<<(std::ostream& os, const CktGraph& cg)
 {
   return cg.put(os);
 }
+
+} // namespace Topo
+} // namespace Xyce
 

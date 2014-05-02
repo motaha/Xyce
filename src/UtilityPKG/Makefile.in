@@ -14,6 +14,7 @@
 
 @SET_MAKE@
 
+
 VPATH = @srcdir@
 am__is_gnu_make = test -n '$(MAKEFILE_LIST)' && test -n '$(MAKELEVEL)'
 am__make_running_with_option = \
@@ -79,6 +80,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
+noinst_PROGRAMS = ThreadTest$(EXEEXT)
 subdir = src/UtilityPKG
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/config/depcomp
@@ -90,15 +92,14 @@ am__aclocal_m4_deps = $(top_srcdir)/config/libtool.m4 \
 	$(top_srcdir)/config/lt~obsolete.m4 \
 	$(top_srcdir)/config/xyce_check_bison.m4 \
 	$(top_srcdir)/config/xyce_check_braindamaged_random_shuffle.m4 \
-	$(top_srcdir)/config/xyce_check_flexible_insert.m4 \
 	$(top_srcdir)/config/xyce_check_iota.m4 \
-	$(top_srcdir)/config/xyce_check_stl_member_templates.m4 \
 	$(top_srcdir)/config/xyce_debug_option.m4 \
 	$(top_srcdir)/config/xyce_finite_number_check.m4 \
 	$(top_srcdir)/config/xyce_library_include.m4 \
 	$(top_srcdir)/config/xyce_library_option.m4 \
 	$(top_srcdir)/config/xyce_test_using_dec_cxx.m4 \
 	$(top_srcdir)/config/xyce_test_using_icclt11_cxx.m4 \
+	$(top_srcdir)/config/xyce_trilinos_library_option.m4 \
 	$(top_srcdir)/acinclude.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -119,10 +120,18 @@ am__libUtility_la_SOURCES_DIST =  \
 	$(srcdir)/src/N_UTL_ExpressionData.C \
 	$(srcdir)/src/N_UTL_ExpressionInternals.C \
 	$(srcdir)/src/N_UTL_FFTInterface.C \
-	$(srcdir)/src/N_UTL_LogStream.C $(srcdir)/src/N_UTL_Misc.C \
+	$(srcdir)/src/N_UTL_LogStream.C \
+	$(srcdir)/src/N_UTL_ReportHandler.C \
+	$(srcdir)/src/N_UTL_Marshal.C \
+	$(srcdir)/src/N_UTL_ByThreadStreambuf.C \
+	$(srcdir)/src/N_UTL_Misc.C \
+	$(srcdir)/src/N_UTL_NetlistLocation.C \
 	$(srcdir)/src/N_UTL_OptionBlock.C $(srcdir)/src/N_UTL_Param.C \
 	$(srcdir)/src/N_UTL_Registry.C $(srcdir)/src/N_UTL_Timer.C \
-	$(srcdir)/src/N_UTL_Version.C \
+	$(srcdir)/src/N_UTL_Version.C $(srcdir)/src/N_UTL_Algorithm.C \
+	$(srcdir)/src/N_UTL_NameLevelKey.C \
+	$(srcdir)/include/N_UTL_TypeIndex.h \
+	$(srcdir)/include/N_UTL_NameLevelKey.h \
 	$(srcdir)/include/N_UTL_Interface_Enum_Types.h \
 	$(srcdir)/include/N_UTL_Expression.h \
 	$(srcdir)/include/N_UTL_ExpressionInternals.h \
@@ -131,12 +140,19 @@ am__libUtility_la_SOURCES_DIST =  \
 	$(srcdir)/include/N_UTL_Registry.h \
 	$(srcdir)/include/N_UTL_Demangle.h \
 	$(srcdir)/include/N_UTL_IndentStreamBuf.h \
+	$(srcdir)/include/N_UTL_TeeStreamBuf.h \
+	$(srcdir)/include/N_UTL_PThread.h \
+	$(srcdir)/include/N_UTL_ByThreadStreambuf.h \
 	$(srcdir)/include/N_UTL_LogStream.h \
+	$(srcdir)/include/N_UTL_ReportHandler.h \
+	$(srcdir)/include/N_UTL_Marshal.h $(srcdir)/include/N_UTL_Op.h \
 	$(srcdir)/include/N_UTL_FFTInterfaceDecl.hpp \
 	$(srcdir)/include/N_UTL_FixedQueue.h \
 	$(srcdir)/include/N_UTL_Functors.h \
 	$(srcdir)/include/N_UTL_MachDepParams.h \
 	$(srcdir)/include/N_UTL_Misc.h \
+	$(srcdir)/include/N_UTL_NetlistLocation.h \
+	$(srcdir)/include/N_UTL_SaveIOSState.h \
 	$(srcdir)/include/N_UTL_BreakPoint.h \
 	$(srcdir)/include/N_UTL_Factory.h \
 	$(srcdir)/include/N_UTL_OptionBlock.h \
@@ -145,7 +161,8 @@ am__libUtility_la_SOURCES_DIST =  \
 	$(srcdir)/include/N_UTL_Timer.h \
 	$(srcdir)/include/N_UTL_Graph.h $(srcdir)/include/N_UTL_Xyce.h \
 	$(srcdir)/include/N_UTL_NoCase.h \
-	$(srcdir)/include/N_UTL_Version.h
+	$(srcdir)/include/N_UTL_Version.h \
+	$(srcdir)/include/N_UTL_Algorithm.h
 @BUILD_INTEL_FFT_SUPPORT_TRUE@am__objects_1 =  \
 @BUILD_INTEL_FFT_SUPPORT_TRUE@	N_UTL_IntelFFT_Interface.lo
 @BUILD_FFTW_SUPPORT_TRUE@am__objects_2 = N_UTL_FFTW_Interface.lo
@@ -153,14 +170,23 @@ am_libUtility_la_OBJECTS = $(am__objects_1) $(am__objects_2) \
 	N_UTL_BreakPoint.lo N_UTL_Demangle.lo N_UTL_NoCase.lo \
 	N_UTL_Expression.lo N_UTL_ExpressionData.lo \
 	N_UTL_ExpressionInternals.lo N_UTL_FFTInterface.lo \
-	N_UTL_LogStream.lo N_UTL_Misc.lo N_UTL_OptionBlock.lo \
-	N_UTL_Param.lo N_UTL_Registry.lo N_UTL_Timer.lo \
-	N_UTL_Version.lo
+	N_UTL_LogStream.lo N_UTL_ReportHandler.lo N_UTL_Marshal.lo \
+	N_UTL_ByThreadStreambuf.lo N_UTL_Misc.lo \
+	N_UTL_NetlistLocation.lo N_UTL_OptionBlock.lo N_UTL_Param.lo \
+	N_UTL_Registry.lo N_UTL_Timer.lo N_UTL_Version.lo \
+	N_UTL_Algorithm.lo N_UTL_NameLevelKey.lo
 libUtility_la_OBJECTS = $(am_libUtility_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
+PROGRAMS = $(noinst_PROGRAMS)
+am_ThreadTest_OBJECTS = ThreadTest.$(OBJEXT)
+ThreadTest_OBJECTS = $(am_ThreadTest_OBJECTS)
+ThreadTest_DEPENDENCIES = libUtility.la
+ThreadTest_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CXXLD) $(AM_CXXFLAGS) \
+	$(CXXFLAGS) $(ThreadTest_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -213,8 +239,8 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libUtility_la_SOURCES)
-DIST_SOURCES = $(am__libUtility_la_SOURCES_DIST)
+SOURCES = $(libUtility_la_SOURCES) $(ThreadTest_SOURCES)
+DIST_SOURCES = $(am__libUtility_la_SOURCES_DIST) $(ThreadTest_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -305,6 +331,7 @@ MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MAYBE_NONFREE = @MAYBE_NONFREE@
+MAYBE_PLUGIN = @MAYBE_PLUGIN@
 MAYBE_RAD = @MAYBE_RAD@
 MKDIR_P = @MKDIR_P@
 NM = @NM@
@@ -407,6 +434,10 @@ noinst_LTLIBRARIES = libUtility.la
 @BUILD_FFTW_SUPPORT_TRUE@  $(srcdir)/src/N_UTL_FFTW_Interface.C \
 @BUILD_FFTW_SUPPORT_TRUE@  $(srcdir)/include/N_UTL_FFTW_Interface.hpp
 
+@THREADS_FALSE@threads_LIB = 
+@THREADS_TRUE@threads_LIB = -lpthread 
+@THREADS_FALSE@threads_CFLAGS = 
+@THREADS_TRUE@threads_CFLAGS = -pthread 
 libUtility_la_SOURCES = \
   $(intelfft_SOURCES) \
   $(fftw_SOURCES) \
@@ -418,12 +449,20 @@ libUtility_la_SOURCES = \
   $(srcdir)/src/N_UTL_ExpressionInternals.C \
   $(srcdir)/src/N_UTL_FFTInterface.C \
   $(srcdir)/src/N_UTL_LogStream.C \
+  $(srcdir)/src/N_UTL_ReportHandler.C \
+  $(srcdir)/src/N_UTL_Marshal.C \
+  $(srcdir)/src/N_UTL_ByThreadStreambuf.C \
   $(srcdir)/src/N_UTL_Misc.C \
+  $(srcdir)/src/N_UTL_NetlistLocation.C \
   $(srcdir)/src/N_UTL_OptionBlock.C \
   $(srcdir)/src/N_UTL_Param.C \
   $(srcdir)/src/N_UTL_Registry.C \
   $(srcdir)/src/N_UTL_Timer.C \
   $(srcdir)/src/N_UTL_Version.C \
+  $(srcdir)/src/N_UTL_Algorithm.C \
+  $(srcdir)/src/N_UTL_NameLevelKey.C \
+  $(srcdir)/include/N_UTL_TypeIndex.h \
+  $(srcdir)/include/N_UTL_NameLevelKey.h \
   $(srcdir)/include/N_UTL_Interface_Enum_Types.h \
   $(srcdir)/include/N_UTL_Expression.h \
   $(srcdir)/include/N_UTL_ExpressionInternals.h \
@@ -432,12 +471,20 @@ libUtility_la_SOURCES = \
   $(srcdir)/include/N_UTL_Registry.h \
   $(srcdir)/include/N_UTL_Demangle.h \
   $(srcdir)/include/N_UTL_IndentStreamBuf.h \
+  $(srcdir)/include/N_UTL_TeeStreamBuf.h \
+  $(srcdir)/include/N_UTL_PThread.h \
+  $(srcdir)/include/N_UTL_ByThreadStreambuf.h \
   $(srcdir)/include/N_UTL_LogStream.h \
+  $(srcdir)/include/N_UTL_ReportHandler.h \
+  $(srcdir)/include/N_UTL_Marshal.h \
+  $(srcdir)/include/N_UTL_Op.h \
   $(srcdir)/include/N_UTL_FFTInterfaceDecl.hpp \
   $(srcdir)/include/N_UTL_FixedQueue.h \
   $(srcdir)/include/N_UTL_Functors.h \
   $(srcdir)/include/N_UTL_MachDepParams.h \
   $(srcdir)/include/N_UTL_Misc.h \
+  $(srcdir)/include/N_UTL_NetlistLocation.h \
+  $(srcdir)/include/N_UTL_SaveIOSState.h \
   $(srcdir)/include/N_UTL_BreakPoint.h \
   $(srcdir)/include/N_UTL_Factory.h \
   $(srcdir)/include/N_UTL_OptionBlock.h \
@@ -448,10 +495,15 @@ libUtility_la_SOURCES = \
   $(srcdir)/include/N_UTL_Xyce.h \
   $(srcdir)/include/N_UTL_IndentStreamBuf.h \
   $(srcdir)/include/N_UTL_NoCase.h \
-  $(srcdir)/include/N_UTL_Version.h
+  $(srcdir)/include/N_UTL_Version.h \
+  $(srcdir)/include/N_UTL_Algorithm.h
 
 BUILT_SOURCES = timestamp-generator
 CLEANFILES = timestamp.h
+ThreadTest_SOURCES = $(srcdir)/unit_test/ThreadTest.C
+ThreadTest_CFLAGS = $(threads_CFLAGS)
+ThreadTest_LDADD = libUtility.la
+ThreadTest_LDFLAGS = $(AM_LDFLAGS) $(threads_LIB) 
 all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -502,13 +554,28 @@ clean-noinstLTLIBRARIES:
 libUtility.la: $(libUtility_la_OBJECTS) $(libUtility_la_DEPENDENCIES) $(EXTRA_libUtility_la_DEPENDENCIES) 
 	$(AM_V_CXXLD)$(CXXLINK)  $(libUtility_la_OBJECTS) $(libUtility_la_LIBADD) $(LIBS)
 
+clean-noinstPROGRAMS:
+	@list='$(noinst_PROGRAMS)'; test -n "$$list" || exit 0; \
+	echo " rm -f" $$list; \
+	rm -f $$list || exit $$?; \
+	test -n "$(EXEEXT)" || exit 0; \
+	list=`for p in $$list; do echo "$$p"; done | sed 's/$(EXEEXT)$$//'`; \
+	echo " rm -f" $$list; \
+	rm -f $$list
+
+ThreadTest$(EXEEXT): $(ThreadTest_OBJECTS) $(ThreadTest_DEPENDENCIES) $(EXTRA_ThreadTest_DEPENDENCIES) 
+	@rm -f ThreadTest$(EXEEXT)
+	$(AM_V_CXXLD)$(ThreadTest_LINK) $(ThreadTest_OBJECTS) $(ThreadTest_LDADD) $(LIBS)
+
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_Algorithm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_BreakPoint.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_ByThreadStreambuf.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_Demangle.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_Expression.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_ExpressionData.Plo@am__quote@
@@ -517,13 +584,18 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_FFTW_Interface.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_IntelFFT_Interface.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_LogStream.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_Marshal.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_Misc.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_NameLevelKey.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_NetlistLocation.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_NoCase.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_OptionBlock.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_Param.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_Registry.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_ReportHandler.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_Timer.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_UTL_Version.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ThreadTest.Po@am__quote@
 
 .C.o:
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -616,12 +688,40 @@ N_UTL_LogStream.lo: $(srcdir)/src/N_UTL_LogStream.C
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_UTL_LogStream.lo `test -f '$(srcdir)/src/N_UTL_LogStream.C' || echo '$(srcdir)/'`$(srcdir)/src/N_UTL_LogStream.C
 
+N_UTL_ReportHandler.lo: $(srcdir)/src/N_UTL_ReportHandler.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_UTL_ReportHandler.lo -MD -MP -MF $(DEPDIR)/N_UTL_ReportHandler.Tpo -c -o N_UTL_ReportHandler.lo `test -f '$(srcdir)/src/N_UTL_ReportHandler.C' || echo '$(srcdir)/'`$(srcdir)/src/N_UTL_ReportHandler.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_UTL_ReportHandler.Tpo $(DEPDIR)/N_UTL_ReportHandler.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_UTL_ReportHandler.C' object='N_UTL_ReportHandler.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_UTL_ReportHandler.lo `test -f '$(srcdir)/src/N_UTL_ReportHandler.C' || echo '$(srcdir)/'`$(srcdir)/src/N_UTL_ReportHandler.C
+
+N_UTL_Marshal.lo: $(srcdir)/src/N_UTL_Marshal.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_UTL_Marshal.lo -MD -MP -MF $(DEPDIR)/N_UTL_Marshal.Tpo -c -o N_UTL_Marshal.lo `test -f '$(srcdir)/src/N_UTL_Marshal.C' || echo '$(srcdir)/'`$(srcdir)/src/N_UTL_Marshal.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_UTL_Marshal.Tpo $(DEPDIR)/N_UTL_Marshal.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_UTL_Marshal.C' object='N_UTL_Marshal.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_UTL_Marshal.lo `test -f '$(srcdir)/src/N_UTL_Marshal.C' || echo '$(srcdir)/'`$(srcdir)/src/N_UTL_Marshal.C
+
+N_UTL_ByThreadStreambuf.lo: $(srcdir)/src/N_UTL_ByThreadStreambuf.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_UTL_ByThreadStreambuf.lo -MD -MP -MF $(DEPDIR)/N_UTL_ByThreadStreambuf.Tpo -c -o N_UTL_ByThreadStreambuf.lo `test -f '$(srcdir)/src/N_UTL_ByThreadStreambuf.C' || echo '$(srcdir)/'`$(srcdir)/src/N_UTL_ByThreadStreambuf.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_UTL_ByThreadStreambuf.Tpo $(DEPDIR)/N_UTL_ByThreadStreambuf.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_UTL_ByThreadStreambuf.C' object='N_UTL_ByThreadStreambuf.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_UTL_ByThreadStreambuf.lo `test -f '$(srcdir)/src/N_UTL_ByThreadStreambuf.C' || echo '$(srcdir)/'`$(srcdir)/src/N_UTL_ByThreadStreambuf.C
+
 N_UTL_Misc.lo: $(srcdir)/src/N_UTL_Misc.C
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_UTL_Misc.lo -MD -MP -MF $(DEPDIR)/N_UTL_Misc.Tpo -c -o N_UTL_Misc.lo `test -f '$(srcdir)/src/N_UTL_Misc.C' || echo '$(srcdir)/'`$(srcdir)/src/N_UTL_Misc.C
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_UTL_Misc.Tpo $(DEPDIR)/N_UTL_Misc.Plo
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_UTL_Misc.C' object='N_UTL_Misc.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_UTL_Misc.lo `test -f '$(srcdir)/src/N_UTL_Misc.C' || echo '$(srcdir)/'`$(srcdir)/src/N_UTL_Misc.C
+
+N_UTL_NetlistLocation.lo: $(srcdir)/src/N_UTL_NetlistLocation.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_UTL_NetlistLocation.lo -MD -MP -MF $(DEPDIR)/N_UTL_NetlistLocation.Tpo -c -o N_UTL_NetlistLocation.lo `test -f '$(srcdir)/src/N_UTL_NetlistLocation.C' || echo '$(srcdir)/'`$(srcdir)/src/N_UTL_NetlistLocation.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_UTL_NetlistLocation.Tpo $(DEPDIR)/N_UTL_NetlistLocation.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_UTL_NetlistLocation.C' object='N_UTL_NetlistLocation.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_UTL_NetlistLocation.lo `test -f '$(srcdir)/src/N_UTL_NetlistLocation.C' || echo '$(srcdir)/'`$(srcdir)/src/N_UTL_NetlistLocation.C
 
 N_UTL_OptionBlock.lo: $(srcdir)/src/N_UTL_OptionBlock.C
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_UTL_OptionBlock.lo -MD -MP -MF $(DEPDIR)/N_UTL_OptionBlock.Tpo -c -o N_UTL_OptionBlock.lo `test -f '$(srcdir)/src/N_UTL_OptionBlock.C' || echo '$(srcdir)/'`$(srcdir)/src/N_UTL_OptionBlock.C
@@ -657,6 +757,34 @@ N_UTL_Version.lo: $(srcdir)/src/N_UTL_Version.C
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_UTL_Version.C' object='N_UTL_Version.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_UTL_Version.lo `test -f '$(srcdir)/src/N_UTL_Version.C' || echo '$(srcdir)/'`$(srcdir)/src/N_UTL_Version.C
+
+N_UTL_Algorithm.lo: $(srcdir)/src/N_UTL_Algorithm.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_UTL_Algorithm.lo -MD -MP -MF $(DEPDIR)/N_UTL_Algorithm.Tpo -c -o N_UTL_Algorithm.lo `test -f '$(srcdir)/src/N_UTL_Algorithm.C' || echo '$(srcdir)/'`$(srcdir)/src/N_UTL_Algorithm.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_UTL_Algorithm.Tpo $(DEPDIR)/N_UTL_Algorithm.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_UTL_Algorithm.C' object='N_UTL_Algorithm.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_UTL_Algorithm.lo `test -f '$(srcdir)/src/N_UTL_Algorithm.C' || echo '$(srcdir)/'`$(srcdir)/src/N_UTL_Algorithm.C
+
+N_UTL_NameLevelKey.lo: $(srcdir)/src/N_UTL_NameLevelKey.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_UTL_NameLevelKey.lo -MD -MP -MF $(DEPDIR)/N_UTL_NameLevelKey.Tpo -c -o N_UTL_NameLevelKey.lo `test -f '$(srcdir)/src/N_UTL_NameLevelKey.C' || echo '$(srcdir)/'`$(srcdir)/src/N_UTL_NameLevelKey.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_UTL_NameLevelKey.Tpo $(DEPDIR)/N_UTL_NameLevelKey.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_UTL_NameLevelKey.C' object='N_UTL_NameLevelKey.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_UTL_NameLevelKey.lo `test -f '$(srcdir)/src/N_UTL_NameLevelKey.C' || echo '$(srcdir)/'`$(srcdir)/src/N_UTL_NameLevelKey.C
+
+ThreadTest.o: $(srcdir)/unit_test/ThreadTest.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT ThreadTest.o -MD -MP -MF $(DEPDIR)/ThreadTest.Tpo -c -o ThreadTest.o `test -f '$(srcdir)/unit_test/ThreadTest.C' || echo '$(srcdir)/'`$(srcdir)/unit_test/ThreadTest.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/ThreadTest.Tpo $(DEPDIR)/ThreadTest.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/unit_test/ThreadTest.C' object='ThreadTest.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o ThreadTest.o `test -f '$(srcdir)/unit_test/ThreadTest.C' || echo '$(srcdir)/'`$(srcdir)/unit_test/ThreadTest.C
+
+ThreadTest.obj: $(srcdir)/unit_test/ThreadTest.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT ThreadTest.obj -MD -MP -MF $(DEPDIR)/ThreadTest.Tpo -c -o ThreadTest.obj `if test -f '$(srcdir)/unit_test/ThreadTest.C'; then $(CYGPATH_W) '$(srcdir)/unit_test/ThreadTest.C'; else $(CYGPATH_W) '$(srcdir)/$(srcdir)/unit_test/ThreadTest.C'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/ThreadTest.Tpo $(DEPDIR)/ThreadTest.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/unit_test/ThreadTest.C' object='ThreadTest.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o ThreadTest.obj `if test -f '$(srcdir)/unit_test/ThreadTest.C'; then $(CYGPATH_W) '$(srcdir)/unit_test/ThreadTest.C'; else $(CYGPATH_W) '$(srcdir)/$(srcdir)/unit_test/ThreadTest.C'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -749,7 +877,7 @@ distdir: $(DISTFILES)
 check-am: all-am
 check: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) check-am
-all-am: Makefile $(LTLIBRARIES)
+all-am: Makefile $(LTLIBRARIES) $(PROGRAMS)
 installdirs:
 install: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) install-am
@@ -787,7 +915,7 @@ maintainer-clean-generic:
 clean: clean-am
 
 clean-am: clean-generic clean-libtool clean-noinstLTLIBRARIES \
-	mostlyclean-am
+	clean-noinstPROGRAMS mostlyclean-am
 
 distclean: distclean-am
 	-rm -rf ./$(DEPDIR)
@@ -858,19 +986,21 @@ uninstall-am:
 .MAKE: all check install install-am install-strip
 
 .PHONY: CTAGS GTAGS TAGS all all-am check check-am clean clean-generic \
-	clean-libtool clean-noinstLTLIBRARIES cscopelist-am ctags \
-	ctags-am distclean distclean-compile distclean-generic \
-	distclean-libtool distclean-tags distdir dvi dvi-am html \
-	html-am info info-am install install-am install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-html install-html-am install-info \
-	install-info-am install-man install-pdf install-pdf-am \
-	install-ps install-ps-am install-strip installcheck \
-	installcheck-am installdirs maintainer-clean \
+	clean-libtool clean-noinstLTLIBRARIES clean-noinstPROGRAMS \
+	cscopelist-am ctags ctags-am distclean distclean-compile \
+	distclean-generic distclean-libtool distclean-tags distdir dvi \
+	dvi-am html html-am info info-am install install-am \
+	install-data install-data-am install-dvi install-dvi-am \
+	install-exec install-exec-am install-html install-html-am \
+	install-info install-info-am install-man install-pdf \
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-compile \
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
 	tags tags-am uninstall uninstall-am
 
+
+timestamp.h: timestamp-generator
 
 timestamp-generator:
 	echo "/* TIMESTAMP APPLIED */" > timestamp.h

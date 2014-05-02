@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -24,15 +24,15 @@
 
 //-----------------------------------------------------------------------------
 // Filename      : $RCSfile: N_LOA_HBLoader.C,v $
-// Purpose       : 
+// Purpose       :
 // Special Notes :
-// Creator       : 
-// Creation Date : 
+// Creator       :
+// Creation Date :
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.4.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:46 $
+// Revision Number: $Revision: 1.21 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
@@ -48,6 +48,7 @@
 #include <N_MPDE_Discretization.h>
 #include <N_ERH_ErrorMgr.h>
 
+#include <N_LAS_Builder.h>
 #include <N_LAS_HBBuilder.h>
 #include <N_LAS_BlockVector.h>
 #include <N_LAS_BlockMatrix.h>
@@ -56,44 +57,81 @@
 //#include <N_LAS_Vector.h>
 #include <N_UTL_FFTInterface.hpp>
 #include <N_UTL_Misc.h>
+#include <N_UTL_fwd.h>
 
 #include <N_PDS_ParMap.h>
 #include <N_DEV_DeviceInterface.h>
 
 #include <Epetra_MultiVector.h>
+#include <Epetra_BlockMap.h>
 
+using Teuchos::rcp;
+using Teuchos::RCP;
+using Teuchos::rcp_dynamic_cast;
 
 //-----------------------------------------------------------------------------
-// Function      : N_LOA_HBLoader::~N_LOA_HBLoader
-// Purpose       : Destructor
+// Function      : N_LOA_HBLoader::registerHBBuilder
+// Purpose       : Registration method for the HB builder
 // Special Notes :
 // Scope         : public
-// Creator       : 
-// Creation Date : 
+// Creator       : Heidi Thornquist, Sandia Labs
+// Creation Date : 11/08/13
 //-----------------------------------------------------------------------------
-N_LOA_HBLoader::~N_LOA_HBLoader()
+void N_LOA_HBLoader::registerHBBuilder( Teuchos::RCP<N_LAS_HBBuilder> hbBuilderPtr )
 {
+  hbBuilderPtr_ = hbBuilderPtr; 
+
+  // Now initialize all the frequency domain working vectors.
+  bXtPtr_ = hbBuilderPtr_->createTimeDomainBlockVector();
+  bVtPtr_ = hbBuilderPtr_->createTimeDomainBlockVector();
+  bmdQdxPtr_ = rcp_dynamic_cast<N_LAS_BlockMatrix>(rcp(hbBuilderPtr_->createMatrix()));
+  bmdFdxPtr_ = rcp_dynamic_cast<N_LAS_BlockMatrix>(rcp(hbBuilderPtr_->createMatrix()));
+
+  bStoreVecFreqPtr_ = hbBuilderPtr_->createExpandedRealFormTransposeStoreBlockVector();
+  bStoreLeadCurrQCompVecFreqPtr_ = hbBuilderPtr_->createExpandedRealFormTransposeStoreBlockVector(); 
 }
+
+//-----------------------------------------------------------------------------
+// Function      : N_LOA_HBLoader::registerAppBuilder
+// Purpose       : Registration method for the application builder
+// Special Notes :
+// Scope         : public
+// Creator       : Heidi Thornquist, Sandia Labs
+// Creation Date : 11/08/13
+//-----------------------------------------------------------------------------
+void N_LOA_HBLoader::registerAppBuilder( Teuchos::RCP<N_LAS_Builder> appBuilderPtr )
+{
+  appBuilderPtr_ = appBuilderPtr;
+
+  // Now initialize all the time domain working vectors.
+  appVecPtr_ = rcp(appBuilderPtr_->createVector());
+  appNextStaVecPtr_ = rcp(appBuilderPtr_->createStateVector());
+  appCurrStaVecPtr_ = rcp(appBuilderPtr_->createStateVector());
+  appLastStaVecPtr_ = rcp(appBuilderPtr_->createStateVector());
+
+  appdQdxPtr_ = rcp(appBuilderPtr_->createMatrix());
+  appdFdxPtr_ = rcp(appBuilderPtr_->createMatrix());
+
+  appNextStoVecPtr_ = rcp(appBuilderPtr_->createStoreVector());
+  appCurrStoVecPtr_ = rcp(appBuilderPtr_->createStoreVector());
+  appLastStoVecPtr_ = rcp(appBuilderPtr_->createStoreVector());
+  appStoLeadCurrQCompVecPtr_ = rcp(appBuilderPtr_->createStoreVector()); 
+}
+
 
 //-----------------------------------------------------------------------------
 // Function      : N_LOA_HBLoader::setFastTimes
 // Purpose       : Assign times for fast time scale
 // Special Notes :
 // Scope         : public
-// Creator       : 
+// Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_LOA_HBLoader::setFastTimes( const vector<double> & times )
+void N_LOA_HBLoader::setFastTimes( const std::vector<double> & times )
 {
   times_ = times;
   constructPeriodicTimes();
 }
-
-void N_LOA_HBLoader::setPeriodFlags( const vector<bool> & periodicFlags )
-{ 
-  nonPeriodic_ = periodicFlags;
-}
-
 
 //-----------------------------------------------------------------------------
 // Function      : N_LOA_HBLoader::constructPeriodicTimes
@@ -102,14 +140,14 @@ void N_LOA_HBLoader::setPeriodFlags( const vector<bool> & periodicFlags )
 //                 of derivatives easier around the periodicy condition
 // Special Notes :
 // Scope         : public
-// Creator       : 
-// Creation Date : 
+// Creator       :
+// Creation Date :
 //-----------------------------------------------------------------------------
 void N_LOA_HBLoader::constructPeriodicTimes()
 {
   // we will pad our array of times with 2 times the width, one
   // at the top and one at the bottom of the array
-  periodicTimesOffset_ = fastTimeDiscRCPtr_->Width();
+  periodicTimesOffset_ = fastTimeDiscPtr_->Width();
   int timesSize = times_.size();
   period_ = times_[timesSize - 1];
   periodicTimes_.resize( timesSize + 2*periodicTimesOffset_ );
@@ -125,15 +163,15 @@ void N_LOA_HBLoader::constructPeriodicTimes()
   {
     periodicTimes_[i] = times_[i - timesSize - 1] + period_;
   }
-  
+
 }
 //-----------------------------------------------------------------------------
 // Function      : N_LOA_HBLoader::loadDAEMatrices
-// Purpose       : 
+// Purpose       :
 // Special Notes :
 // Scope         : public
-// Creator       : 
-// Creation Date : 
+// Creator       :
+// Creation Date :
 //-----------------------------------------------------------------------------
 bool N_LOA_HBLoader::loadDAEMatrices( N_LAS_Vector * X,
                                      N_LAS_Vector * S,
@@ -143,30 +181,25 @@ bool N_LOA_HBLoader::loadDAEMatrices( N_LAS_Vector * X,
                                      N_LAS_Matrix * dFdx)
 {
 #ifdef Xyce_DEBUG_HB
-  const string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
 #endif // Xyce_DEBUG_HB
-  if ( matrixFreeFlag_ ) 
+  if ( matrixFreeFlag_ )
   {
 #ifdef Xyce_DEBUG_HB
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           "  N_LOA_HBLoader::loadDAEMatrices:  matrixFree case");
+    Xyce::dout() << std::endl
+           << Xyce::section_divider << std::endl
+           << "  N_LOA_HBLoader::loadDAEMatrices:  matrixFree case" << std::endl;
 #endif // Xyce_DEBUG_HB
     dQdx->put(0.0);
     dFdx->put(0.0);
     // Do nothing in the Matrix Free Case.
     return(true);
-  } 
-  else 
+  }
+  else
   {
 #ifdef Xyce_DEBUG_HB
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           "  N_LOA_HBLoader::loadDAEMatrices: Time dependent with matrix case");
+    Xyce::dout() << std::endl
+           << Xyce::section_divider << std::endl
+           << "  N_LOA_HBLoader::loadDAEMatrices: Time dependent with matrix case" << std::endl;
 #endif // Xyce_DEBUG_HB
 
     return(loadTimeDepDAEMatrices(X,S,dSdt, Store, dQdx,dFdx));
@@ -176,7 +209,7 @@ bool N_LOA_HBLoader::loadDAEMatrices( N_LAS_Vector * X,
 
 //-----------------------------------------------------------------------------
 // Function      : N_LOA_HBLoader::loadTimeDepDAEMatrices
-// Purpose       : 
+// Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, 1414
@@ -190,13 +223,9 @@ bool N_LOA_HBLoader::loadTimeDepDAEMatrices( N_LAS_Vector * X,
                                      N_LAS_Matrix * dFdx)
 {
 #ifdef Xyce_DEBUG_HB
-  const string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "  N_LOA_HBLoader::loadTimeDepDAEMatrices");
+  Xyce::dout() << std::endl
+         << Xyce::section_divider << std::endl
+         << "  N_LOA_HBLoader::loadTimeDepDAEMatrices" << std::endl;
 #endif // Xyce_DEBUG_HB
   //Zero out matrices
   dQdx->put(0.0);
@@ -212,12 +241,12 @@ bool N_LOA_HBLoader::loadTimeDepDAEMatrices( N_LAS_Vector * X,
   N_LAS_BlockVector & bdSdt = *dynamic_cast<N_LAS_BlockVector*>(dSdt);
   N_LAS_BlockVector & bStore = *dynamic_cast<N_LAS_BlockVector*>(Store);
 #endif // Xyce_FLEXIBLE_DAE_LOADS
-  
+
   int BlockCount = bX.blockCount();
   for( int i = 0; i < BlockCount; ++i )
   {
 #ifdef Xyce_DEBUG_HB
-    std::cout << "Processing diagonal matrix block " << i << " of " << BlockCount-1 << std::endl;
+    Xyce::dout() << "Processing diagonal matrix block " << i << " of " << BlockCount-1 << std::endl;
 #endif // Xyce_DEBUG_HB
 #ifdef Xyce_FLEXIBLE_DAE_LOADS
     //Set Time for fast time scale somewhere
@@ -246,29 +275,29 @@ bool N_LOA_HBLoader::loadTimeDepDAEMatrices( N_LAS_Vector * X,
   }
 
   // Fast Time scale discretization terms:
-  // These are d(dQ/dt1)/dx terms, but go into bdFdx.  
+  // These are d(dQ/dt1)/dx terms, but go into bdFdx.
   // For this procedure, need to re-use the app matrix, appdQdx.
   N_LAS_Matrix & dQdxdt = *appdQdxPtr_;
 
-  int Start = fastTimeDiscRCPtr_->Start();
-  int Width = fastTimeDiscRCPtr_->Width();
-  
-  const vector<double> & Coeffs = fastTimeDiscRCPtr_->Coeffs();
-  
+  int Start = fastTimeDiscPtr_->Start();
+  int Width = fastTimeDiscPtr_->Width();
+
+  const std::vector<double> & Coeffs = fastTimeDiscPtr_->Coeffs();
+
   for( int i = 0; i < BlockCount; ++i )
   {
 #ifdef Xyce_DEBUG_HB
-    std::cout << "Processing off diagonal matrix blocks on row " << i << " of " << BlockCount-1 << std::endl;
+    Xyce::dout() << "Processing off diagonal matrix blocks on row " << i << " of " << BlockCount-1 << std::endl;
 #endif // Xyce_DEBUG_HB
     int Loc;
     int indexT1 = i + Start + periodicTimesOffset_;
     int indexT2 = indexT1 + Width - 1;
     double invh2 = 1.0 / (periodicTimes_[indexT2] - periodicTimes_[indexT1]);
-    
+
     for( int j = 0; j < Width; ++j )
     {
       Loc = i + (j+Start);
-      
+
       if( Loc < 0 )
       {
         Loc += BlockCount;
@@ -277,7 +306,7 @@ bool N_LOA_HBLoader::loadTimeDepDAEMatrices( N_LAS_Vector * X,
       {
         Loc -= BlockCount;
       }
-      
+
       dQdxdt.put(0.0);
       dQdxdt.add( bdQdx.block(Loc,Loc) );
       dQdxdt.scale( Coeffs[j]*invh2 );
@@ -287,35 +316,35 @@ bool N_LOA_HBLoader::loadTimeDepDAEMatrices( N_LAS_Vector * X,
 
   dQdx->fillComplete();
   dFdx->fillComplete();
-   
+
 #ifdef Xyce_DEBUG_HB
-  std::cout << "HB bX:" << std::endl;
-  bX.printPetraObject();
-  std::cout << "HB bdQdx:" << std::endl;
-  bdQdx.printPetraObject();
-  std::cout << "HB bdFdx:" << std::endl;
-  bdFdx.printPetraObject();
+  Xyce::dout() << "HB bX:" << std::endl;
+  bX.printPetraObject(std::cout);
+  Xyce::dout() << "HB bdQdx:" << std::endl;
+  bdQdx.printPetraObject(std::cout);
+  Xyce::dout() << "HB bdFdx:" << std::endl;
+  bdFdx.printPetraObject(std::cout);
 #ifdef Xyce_FLEXIBLE_DAE_LOADS
-  std::cout << "HB bS:" << std::endl;
-  bS.printPetraObject();
-  std::cout << "HB dSdt:" << std::endl;
-  bdSdt.printPetraObject();
-  std::cout << "HB bStore:" << std::endl;
-  bStore.printPetraObject();
+  Xyce::dout() << "HB bS:" << std::endl;
+  bS.printPetraObject(std::cout);
+  Xyce::dout() << "HB dSdt:" << std::endl;
+  bdSdt.printPetraObject(std::cout);
+  Xyce::dout() << "HB bStore:" << std::endl;
+  bStore.printPetraObject(std::cout);
 #endif // Xyce_FLEXIBLE_DAE_LOADS
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+  Xyce::dout() << Xyce::section_divider << std::endl;
 #endif // Xyce_DEBUG_HB
   return true;
 }
 
 //-----------------------------------------------------------------------------
 // Function      : N_LOA_HBLoader::applyDAEMatrices
-// Purpose       : 
+// Purpose       :
 // Special Notes :
 // Scope         : public
-// Creator       : 
-// Creation Date : 
+// Creator       :
+// Creation Date :
 //-----------------------------------------------------------------------------
 bool N_LOA_HBLoader::applyDAEMatrices( N_LAS_Vector * Xf,
                                      N_LAS_Vector * S,
@@ -327,147 +356,113 @@ bool N_LOA_HBLoader::applyDAEMatrices( N_LAS_Vector * Xf,
 {
   if ( !matrixFreeFlag_ )
   {
-    string msg="N_LOA_HBLoader::applyDAEMatrices.  This function should only be called in the matrix free case.";
+    std::string msg="N_LOA_HBLoader::applyDAEMatrices.  This function should only be called in the matrix free case.";
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg);
   }
 #ifdef Xyce_DEBUG_HB
-  const string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "  N_LOA_HBLoader::applyDAEMatrices");
+  Xyce::dout() << std::endl
+         << Xyce::section_divider << std::endl
+         << "  N_LOA_HBLoader::applyDAEMatrices" << std::endl;
 #endif // Xyce_DEBUG_HB
   //Zero out matvec vectors
   dQdxV->putScalar(0.0); // This is dQdx * V on output (only used in HB-env simulation)
   dFdxV->putScalar(0.0); // This is dFdx * V on output (This is main output for HB)
 
-  N_LAS_Vector appdSdt( *appNextStaVecPtr_ );
-    
   bXtPtr_->putScalar(0.0);
   bVtPtr_->putScalar(0.0);
 
-  N_LAS_BlockVector & bXf = *dynamic_cast<N_LAS_BlockVector*>(Xf);  
+  N_LAS_BlockVector & bXf = *dynamic_cast<N_LAS_BlockVector*>(Xf);
   // We have to do something special with Vf because AztecOO (or Belos)
   // probably used the Epetra_LinearProblem's Epetra_Maps to create the input
   // vector here.  In this case, Vf is just an N_LAS_Vector and not an
   // N_LAS_BlockVector.
-  const Epetra_Map& subBlockMap = *hbBuilderRCPtr_->getHBExpandedRealFormMap();
-  const N_LAS_BlockVector bVf(Vf,subBlockMap,bXf.blockCount());
-  
+  const N_LAS_BlockVector bVf(Vf, bXf.blockSize());
+
   permutedIFT(bXf, &*bXtPtr_);
   permutedIFT(bVf, &*bVtPtr_);
-  
+
   N_LAS_BlockVector & bX = *bXtPtr_;
-  
+
   N_LAS_BlockVector * bdQdxV = dynamic_cast<N_LAS_BlockVector*>(dQdxV);
   N_LAS_BlockVector * bdFdxV = dynamic_cast<N_LAS_BlockVector*>(dFdxV);
-  N_LAS_BlockVector & bS = *dynamic_cast<N_LAS_BlockVector*>(S);
-  N_LAS_BlockVector & bdSdt = *dynamic_cast<N_LAS_BlockVector*>(dSdt);
- 
-  N_LAS_BlockVector & bStore = *dynamic_cast<N_LAS_BlockVector*>(Store);
 
-  N_LAS_BlockVector  bdQdxVt = *bVtPtr_;
-  N_LAS_BlockVector  bdFdxVt = *bVtPtr_;
-   
-  bdQdxVt.putScalar(0.0);
-  bdFdxVt.putScalar(0.0);
-  
+  Teuchos::RCP<N_LAS_BlockVector>  bdQdxVt = hbBuilderPtr_->createTimeDomainBlockVector();
+  Teuchos::RCP<N_LAS_BlockVector>  bdFdxVt = hbBuilderPtr_->createTimeDomainBlockVector();
+
   int BlockCount = bX.blockCount();
   for( int i = 0; i < BlockCount; ++i )
   {
 #ifdef Xyce_DEBUG_HB
-    std::cout << "Processing diagonal matrix block " << i << " of " << BlockCount-1 << std::endl;
+    Xyce::dout() << "Processing diagonal matrix block " << i << " of " << BlockCount-1 << std::endl;
 #endif // Xyce_DEBUG_HB
 
-    //Set Time for fast time scale somewhere
-    state_.fastTime = times_[i];
-    devInterfacePtr_->setFastTime( times_[i] );
-    //Update the sources
-    appLoaderPtr_->updateSources();
-    *appVecPtr_ = bX.block(i);
-    *appNextStaVecPtr_ = bS.block(i);
-    appdSdt = bdSdt.block(i);
-    
-    *appNextStoVecPtr_ = bStore.block(i);
-    
-    appdQdxPtr_->put(0.0);
-    appdFdxPtr_->put(0.0); 
-
-    appLoaderPtr_->loadDAEMatrices( &*appVecPtr_, &*appNextStaVecPtr_, &appdSdt, &*appNextStoVecPtr_, &*appdQdxPtr_,  &*appdFdxPtr_); 
+    // Get the already stored time-domain Jacobian matrices
+    appdQdxPtr_ = vecAppdQdxPtr_[i];
+    appdFdxPtr_ = vecAppdFdxPtr_[i];
 
 #ifdef Xyce_DEBUG_HB
-    std::cout << "bVtPtr block i= " << i << "vals = " << std::endl;
-    bVtPtr_->block(i).printPetraObject();
-      
-    std::cout << "appdQdxPtr_ = " << i << "vals = " <<  std::endl;
-    appdQdxPtr_->printPetraObject();
-      
-    std::cout << "appdFdxPtr_ = " << i << "vals = " <<  std::endl;
-    appdFdxPtr_->printPetraObject();
+    Xyce::dout() << "bVtPtr block i = " << i << " : " << std::endl;
+    bVtPtr_->block(i).printPetraObject(std::cout);
+
+    Xyce::dout() << "appdQdxPtr_ = " << i << " : " <<  std::endl;
+    appdQdxPtr_->printPetraObject(std::cout);
+
+    Xyce::dout() << "appdFdxPtr_ = " << i << " : " <<  std::endl;
+    appdFdxPtr_->printPetraObject(std::cout);
 #endif // Xyce_DEBUG_HB
-      
-    appdQdxPtr_->matvec(false, bVtPtr_->block(i), bdQdxVt.block(i));
-    appdFdxPtr_->matvec(false, bVtPtr_->block(i), bdFdxVt.block(i));
-      
+
+    appdQdxPtr_->matvec(false, bVtPtr_->block(i), bdQdxVt->block(i));
+    appdFdxPtr_->matvec(false, bVtPtr_->block(i), bdFdxVt->block(i));
+
 #ifdef Xyce_DEBUG_HB
-    std::cout << "bdQdxVt block i= " << i << "vals = " << std::endl;
-    bdQdxVt.block(i).printPetraObject();
-      
-    std::cout << "bdFdxVt block i= " << i << "vals = " << std::endl;
-    bdFdxVt.block(i).printPetraObject();
+    Xyce::dout() << "bdQdxVt block i = " << i << " : " << std::endl;
+    bdQdxVt->block(i).printPetraObject(std::cout);
+
+    Xyce::dout() << "bdFdxVt block i = " << i << " : " << std::endl;
+    bdFdxVt->block(i).printPetraObject(std::cout);
 #endif // Xyce_DEBUG_HB
   }
 
-  double omega = 1.0;
+  permutedFFT(*bdQdxVt, bdQdxV);
+  permutedFFT(*bdFdxVt, bdFdxV);
 
   int blockCount = bXf.blockCount();
   int blockSize = bXf.block(0).globalLength();
+  double omega = 2.0 * M_PI/ period_;
 
-  permutedFFT(bdQdxVt, bdQdxV);
-  permutedFFT(bdFdxVt, bdFdxV);
-
-  omega = 2.0 * M_PI/ period_;
- 
-  N_LAS_Vector QVec(bXf.block(0)); 
-
-  for( int i = 0; i <  blockCount; ++i )
+  for( int i = 0; i < blockCount; ++i )
   {
-    QVec.putScalar(0.0);
+    N_LAS_Vector QVec(bXf.block(i));
     N_LAS_Vector freqVec = bdQdxV->block(i);
-    QVec[0] = -freqVec[1]*0.0*omega;
-    QVec[1] = freqVec[0]*0.0*omega;
-    
-    for (int j=1; j < (blockSize/2+1)/2; ++j)
-    {
-      QVec[2*j] = -freqVec[2*j+1]*j*omega;
-      QVec[2*(blockSize/2-j)] = -freqVec[2*j+1]*j*omega;
 
-      QVec[2*j+1] = freqVec[2*j]*j*omega; 
-      QVec[2*(blockSize/2-j)+1] = -freqVec[2*j]*j*omega;
+    // Only one processor owns each block of the frequency-domain vector
+    if (freqVec.localLength() > 0)
+    {
+      QVec[0] = -freqVec[1]*0.0*omega;
+      QVec[1] = freqVec[0]*0.0*omega;
+
+      for (int j=1; j < (blockSize/2+1)/2; ++j)
+      {
+        QVec[2*j] = -freqVec[2*j+1]*j*omega;
+        QVec[2*(blockSize/2-j)] = -freqVec[2*j+1]*j*omega;
+
+        QVec[2*j+1] = freqVec[2*j]*j*omega;
+        QVec[2*(blockSize/2-j)+1] = -freqVec[2*j]*j*omega;
+      }
     }
- 
+
     bdFdxV->block(i).update(1.0, QVec , 1.0);
   }
 
 #ifdef Xyce_DEBUG_HB
-  std::cout << "HB bX:" << std::endl;
-  bX.printPetraObject();
-  //cout << "HB bdQdx:" << std::endl;
-  //bdQdx.printPetraObject();
-  //cout << "HB bdFdx:" << std::endl;
-  //bdFdx.printPetraObject();
-#ifdef Xyce_FLEXIBLE_DAE_LOADS
-  std::cout << "HB bS:" << std::endl;
-  bS.printPetraObject();
-  std::cout << "HB dSdt:" << std::endl;
-  bdSdt.printPetraObject();
-  std::cout << "HB bStore:" << std::endl;
-  bStore.printPetraObject();
-#endif // Xyce_FLEXIBLE_DAE_LOADS
+  Xyce::dout() << "HB bX:" << std::endl;
+  bX.printPetraObject(std::cout);
+  Xyce::dout() << "HB bdQdxV:" << std::endl;
+  bdQdxV->printPetraObject(std::cout);
+  Xyce::dout() << "HB bdFdxV:" << std::endl;
+  bdFdxV->printPetraObject(std::cout);
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+  Xyce::dout() << Xyce::section_divider << std::endl;
 #endif // Xyce_DEBUG_HB
   return true;
 }
@@ -477,7 +472,7 @@ bool N_LOA_HBLoader::applyDAEMatrices( N_LAS_Vector * Xf,
 // Purpose       :
 // Special Notes : ERK.  This function needs to be a no-op.  The reason
 //                 is that the state information needs to be the same
-//                 at the time of updateState, loadDAEVectors and 
+//                 at the time of updateState, loadDAEVectors and
 //                 loadDAEMatrices.  Thus, they have to all happen inside
 //                 of the same "fast time" loop.  So, this functionality
 //                 has been moved up into loadDAEVectors.
@@ -489,8 +484,8 @@ bool N_LOA_HBLoader::applyDAEMatrices( N_LAS_Vector * Xf,
 // Creator       : Todd Coffey, 1414
 // Creation Date : 01/17/07
 //-----------------------------------------------------------------------------
-bool N_LOA_HBLoader::updateState      
- (N_LAS_Vector * nextSolVectorPtr, 
+bool N_LOA_HBLoader::updateState
+ (N_LAS_Vector * nextSolVectorPtr,
   N_LAS_Vector * currSolVectorPtr,
   N_LAS_Vector * lastSolVectorPtr,
   N_LAS_Vector * nextStaVectorPtr,
@@ -510,11 +505,11 @@ bool N_LOA_HBLoader::updateState
 
 //-----------------------------------------------------------------------------
 // Function      : N_LOA_HBLoader::loadDAEVectors
-// Purpose       : 
+// Purpose       :
 // Special Notes :
 // Scope         : public
-// Creator       : 
-// Creation Date : 
+// Creator       :
+// Creation Date :
 //-----------------------------------------------------------------------------
 bool N_LOA_HBLoader::loadDAEVectors( N_LAS_Vector * Xf,
                                   N_LAS_Vector * currX,
@@ -534,13 +529,9 @@ bool N_LOA_HBLoader::loadDAEVectors( N_LAS_Vector * Xf,
 {
 
 #ifdef Xyce_DEBUG_HB
-  const string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "  N_LOA_HBLoader::loadDAEVectors");
+  Xyce::dout() << std::endl
+         << Xyce::section_divider << std::endl
+         << "  N_LOA_HBLoader::loadDAEVectors" << std::endl;
 #endif // Xyce_DEBUG_HB
 
   //Zero out vectors
@@ -560,16 +551,16 @@ bool N_LOA_HBLoader::loadDAEVectors( N_LAS_Vector * Xf,
 
   N_LAS_Vector appdFdxdVp( *appVecPtr_ );
   N_LAS_Vector appdQdxdVp( *appVecPtr_ );
-  
+
   // This is a temporary load storage vector.
-  N_LAS_Vector dQdt2( *appVecPtr_ ); 
+  N_LAS_Vector dQdt2( *appVecPtr_ );
 
   bXtPtr_->putScalar(0.0);
 
   N_LAS_BlockVector & bXf = *dynamic_cast<N_LAS_BlockVector*>(Xf);
 
-  permutedIFT(bXf, &*bXtPtr_); 
-  
+  permutedIFT(bXf, &*bXtPtr_);
+
   // 12/8/06 tscoffe:   Note:  "b" at beginning of variable name means N_LAS_BlockVector
   N_LAS_BlockVector & bX = *bXtPtr_;
   N_LAS_BlockVector & bS = *dynamic_cast<N_LAS_BlockVector*>(S);
@@ -581,31 +572,55 @@ bool N_LOA_HBLoader::loadDAEVectors( N_LAS_Vector * Xf,
   N_LAS_BlockVector & blastStore = *dynamic_cast<N_LAS_BlockVector*>(lastStore);
   N_LAS_BlockVector * bQ = dynamic_cast<N_LAS_BlockVector*>(Q);
   N_LAS_BlockVector * bF = dynamic_cast<N_LAS_BlockVector*>(F);
-  
-  N_LAS_BlockVector & bdFdxdVp = *dynamic_cast<N_LAS_BlockVector*>(dFdxdVp);
-  N_LAS_BlockVector & bdQdxdVp = *dynamic_cast<N_LAS_BlockVector*>(dQdxdVp);
-  
+
+  N_LAS_BlockVector * bdFdxdVp = dynamic_cast<N_LAS_BlockVector*>(dFdxdVp);
+  N_LAS_BlockVector * bdQdxdVp = dynamic_cast<N_LAS_BlockVector*>(dQdxdVp);
+
+
+//  N_LAS_Vector * storeLeadCurrQComp,
+
+  N_LAS_BlockVector & bstoreLeadCurrQComp = *dynamic_cast<N_LAS_BlockVector*>(storeLeadCurrQComp);
+
   N_LAS_BlockVector  bQt(*bXtPtr_);
-  N_LAS_BlockVector  bFt(*bXtPtr_); 
-  
+  N_LAS_BlockVector  bFt(*bXtPtr_);
+
+  N_LAS_BlockVector  bdQdxdVpt(*bXtPtr_);
+  N_LAS_BlockVector  bdFdxdVpt(*bXtPtr_);
+
+
+//  N_LAS_BlockVector  bstoreLeadCurrQCompt(*bXtPt  );
+
 #ifndef Xyce_FLEXIBLE_DAE_LOADS
   bmdQdxPtr_->put(0.0);
   bmdFdxPtr_->put(0.0);
 #endif
-  
+
   int BlockCount = bX.blockCount();
 
+  // We are storing the time domain Jacobians, initialize the memory here 
+  if ((int)vecAppdQdxPtr_.size()!=BlockCount)
+  {
+    vecAppdQdxPtr_.resize( BlockCount );
+    vecAppdFdxPtr_.resize( BlockCount );
+    for ( int i=0; i < BlockCount; ++i )
+    {
+      vecAppdQdxPtr_[i] = rcp(appBuilderPtr_->createMatrix());
+      vecAppdFdxPtr_[i] = rcp(appBuilderPtr_->createMatrix());
+    }
+  }
+
+  // Now perform implicit application of frequency domain Jacobian. 
   for( int i = 0; i < BlockCount; ++i )
   {
 #ifdef Xyce_DEBUG_HB
-    std::cout << "Processing vectors for block " << i << " of " << BlockCount-1 << std::endl;
+    Xyce::dout() << "Processing vectors for block " << i << " of " << BlockCount-1 << std::endl;
 #endif // Xyce_DEBUG_HB
     //Set Time for fast time scale somewhere
     state_.fastTime = times_[i];
     devInterfacePtr_->setFastTime( times_[i] );
-    
+
 #ifdef Xyce_DEBUG_HB
-    std::cout << "Calling updateSources on the appLoader" << std::endl;
+    Xyce::dout() << "Calling updateSources on the appLoader" << std::endl;
 #endif // Xyce_DEBUG_HB
     //Update the sources
     appLoaderPtr_->updateSources();  // this is here to handle "fast" sources.
@@ -618,21 +633,23 @@ bool N_LOA_HBLoader::loadDAEVectors( N_LAS_Vector * Xf,
     *appNextStoVecPtr_ = bStore.block(i);
     *appCurrStoVecPtr_ = bcurrStore.block(i);
     *appLastStoVecPtr_ = blastStore.block(i);
-    *appStoLeadCurrQCompVecPtr_ = blastStore.block(i); // Need to update to correct block!
+    *appStoLeadCurrQCompVecPtr_ = bstoreLeadCurrQComp.block(i);
+
+//blastStore.block(i); // Need to update to correct block!
 
 #ifdef Xyce_DEBUG_HB
-    std::cout << "Updating State for block " << i << " of " << BlockCount-1 << std::endl;
+    Xyce::dout() << "Updating State for block " << i << " of " << BlockCount-1 << std::endl;
 #endif // Xyce_DEBUG_HB
 
-    // Note: This updateState call is here (instead of in the 
+    // Note: This updateState call is here (instead of in the
     // N_LOA_HBLoader::updateState function) because it has to be called
     // for the same fast time point.
-    appLoaderPtr_->updateState 
-      ( &*appVecPtr_, 
+    appLoaderPtr_->updateState
+      ( &*appVecPtr_,
         &*appVecPtr_,  // note, this is a placeholder! ERK
         &*appVecPtr_,  // note, this is a placeholder! ERK
         &*appNextStaVecPtr_, &*appCurrStaVecPtr_ , &*appLastStaVecPtr_,
-        &*appNextStoVecPtr_, &*appCurrStoVecPtr_ , &*appLastStoVecPtr_ 
+        &*appNextStoVecPtr_, &*appCurrStoVecPtr_ , &*appLastStoVecPtr_
         );
 
     bS.block(i) = *appNextStaVecPtr_;
@@ -643,7 +660,7 @@ bool N_LOA_HBLoader::loadDAEVectors( N_LAS_Vector * Xf,
     blastStore.block(i) = *appLastStoVecPtr_;
 
 #ifdef Xyce_DEBUG_HB
-    std::cout << "Calling loadDAEVectors on the appLoader" << std::endl;
+    Xyce::dout() << "Calling loadDAEVectors on the appLoader" << std::endl;
 #endif // Xyce_DEBUG_HB
 
     // This has to be done because the app loader does NOT zero these vectors out.
@@ -653,197 +670,318 @@ bool N_LOA_HBLoader::loadDAEVectors( N_LAS_Vector * Xf,
     appdQdxdVp.putScalar(0.0);
 
     appLoaderPtr_->loadDAEVectors
-      ( &*appVecPtr_, 
+      ( &*appVecPtr_,
         &*appVecPtr_,  // note, this is a placeholder! ERK
         &*appVecPtr_,  // note, this is a placeholder! ERK
         &*appNextStaVecPtr_, &*appCurrStaVecPtr_, &*appLastStaVecPtr_, &appdSdt,
-        &*appNextStoVecPtr_, &*appCurrStoVecPtr_, &*appLastStoVecPtr_, &*appStoLeadCurrQCompVecPtr_, 
+        &*appNextStoVecPtr_, &*appCurrStoVecPtr_, &*appLastStoVecPtr_, &*appStoLeadCurrQCompVecPtr_,
         &appQ, &appF, &appdFdxdVp, &appdQdxdVp );
 
     bQt.block(i) = appQ;
-    bFt.block(i) = appF;    
+    bFt.block(i) = appF;
 
+    bdQdxdVpt.block(i) = appdQdxdVp;
+    bdFdxdVpt.block(i) = appdFdxdVp;
+
+    bstoreLeadCurrQComp.block(i) = *appStoLeadCurrQCompVecPtr_;
+
+    bStore.block(i) = *appNextStoVecPtr_;  //lead current get loaded during loadDAEVectors
+
+//    Xyce::dout() << "HB Loader Store Vector TD" << std::endl;
+//    bStore.printPetraObject(std::cout);
+
+//    Xyce::dout() << "HB Loader Store  Q Vector TD" << std::endl;
+//    bstoreLeadCurrQComp.printPetraObject(std::cout);
+
+    // Store the time domain Jacobian for future use.
+    vecAppdQdxPtr_[i]->put(0.0);
+    vecAppdFdxPtr_[i]->put(0.0);
+
+    // Load dQdx and dFdx into the storage location for this time point.
+    appLoaderPtr_->loadDAEMatrices( &*appVecPtr_, &*appNextStaVecPtr_, &appdSdt, &*appNextStoVecPtr_, &*vecAppdQdxPtr_[i],  &*vecAppdFdxPtr_[i]);
   }
-    
-  double omega = 1.0;
 
-  //  tscoffe/tmei 08/04/05:  Add omega equation to end of f:
+  permutedFFT(bQt, bQ);
+
+  permutedFFT(bFt, bF);
+
+  permutedFFT(bdQdxdVpt, bdQdxdVp);
+
+  permutedFFT(bdFdxdVpt, bdFdxdVp);
+
+  bStoreVecFreqPtr_->putScalar(0.0);
+  bStoreLeadCurrQCompVecFreqPtr_->putScalar(0.0);
+
+  permutedFFT(bStore, &*bStoreVecFreqPtr_);
+  permutedFFT(bstoreLeadCurrQComp, &*bStoreLeadCurrQCompVecFreqPtr_);  
+
+//  Xyce::dout() << "HB Store Vector FD" << std::endl;
+//  bStoreVecFreqPtr_->printPetraObject(std::cout);
+//  bStoreLeadCurrQCompVecFreqPtr_->printPetraObject(std::cout);
+
   int blockCount = bXf.blockCount();
   int blockSize = bXf.block(0).globalLength();
-  
-  permutedFFT(bQt, bQ);
-  
-  permutedFFT(bFt, bF);
- 
-  omega = 2.0 * M_PI/ period_;
-  
-  N_LAS_Vector QVec(bQ->block(0)); 
-  
+  double omega = 2.0 * M_PI/ period_;
+
   for( int i = 0; i < blockCount; ++i )
   {
-    QVec.putScalar(0.0);
+    // Create work vectors from the current frequency block vector
+    // NOTE:  This needs to be done for each block to make sure that the
+    //        map is the same as the bF block.
+    N_LAS_Vector QVec(bQ->block(i));
     N_LAS_Vector freqVec = bQ->block(i);
-    QVec[0] = -freqVec[1]*0.0*omega;
-    QVec[1] = freqVec[0]*0.0*omega;
-    
-    for (int j=1; j < (blockSize/2+1)/2; ++j)
-    {
-      QVec[2*j] = -freqVec[2*j+1]*j*omega;
-      QVec[2*(blockSize/2-j)] = -freqVec[2*j+1]*j*omega;
 
-      QVec[2*j+1] = freqVec[2*j]*j*omega;
-      QVec[2*(blockSize/2-j)+1] = -freqVec[2*j]*j*omega;
+    N_LAS_Vector dQdxdVpVec(bdQdxdVp->block(i));
+    N_LAS_Vector freqVec1 = bdQdxdVp->block(i);
+
+    // Only one processor owns each block of the frequency-domain vector
+    if (freqVec.localLength() > 0)
+    {
+      QVec[0] = -freqVec[1]*0.0*omega;
+      QVec[1] = freqVec[0]*0.0*omega;
+
+      dQdxdVpVec[0] = -freqVec1[1]*0.0*omega;
+      dQdxdVpVec[1] = freqVec1[0]*0.0*omega;
+
+      for (int j=1; j < (blockSize/2+1)/2; ++j)
+      {
+        QVec[2*j] = -freqVec[2*j+1]*j*omega;
+        QVec[2*(blockSize/2-j)] = -freqVec[2*j+1]*j*omega;
+
+        QVec[2*j+1] = freqVec[2*j]*j*omega;
+        QVec[2*(blockSize/2-j)+1] = -freqVec[2*j]*j*omega;
+
+        dQdxdVpVec[2*j] = -freqVec1[2*j+1]*j*omega;
+        dQdxdVpVec[2*(blockSize/2-j)] = -freqVec1[2*j+1]*j*omega;
+
+        dQdxdVpVec[2*j+1] = freqVec1[2*j]*j*omega;
+        dQdxdVpVec[2*(blockSize/2-j)+1] = -freqVec1[2*j]*j*omega;
+
+      }
     }
-    
+
     bF->block(i).update(1.0, QVec , 1.0);
+
+    bdFdxdVp->block(i).update(1.0, dQdxdVpVec, 1.0);
+
   }
 
+
+  blockCount = bStoreVecFreqPtr_->blockCount();
+  blockSize =  bStoreVecFreqPtr_->blockSize();
+
+  for( int i = 0; i < blockCount; ++i )
+  {
+    // Create work vectors from the current frequency block vector
+    // NOTE:  This needs to be done for each block to make sure that the
+    //        map is the same as the bF block.
+
+    N_LAS_Vector stoLeadCurrdQdtVec(bStoreLeadCurrQCompVecFreqPtr_->block(i));
+    N_LAS_Vector stoLeadCurrQVec = bStoreLeadCurrQCompVecFreqPtr_->block(i);
+
+
+    // Only one processor owns each block of the frequency-domain vector
+    if (stoLeadCurrQVec.localLength() > 0)
+    {
+
+      stoLeadCurrdQdtVec[0] = stoLeadCurrQVec[1]*0.0*omega;
+      stoLeadCurrdQdtVec[1] = stoLeadCurrQVec[0]*0.0*omega;
+
+      for (int j=1; j < (blockSize/2+1)/2; ++j)
+      {
+
+        stoLeadCurrdQdtVec[2*j] = -stoLeadCurrQVec[2*j+1]*j*omega;
+        stoLeadCurrdQdtVec[2*(blockSize/2-j)] = -stoLeadCurrQVec[2*j+1]*j*omega;
+
+        stoLeadCurrdQdtVec[2*j+1] = stoLeadCurrQVec[2*j]*j*omega;
+        stoLeadCurrdQdtVec[2*(blockSize/2-j)+1] = -stoLeadCurrQVec[2*j]*j*omega;
+      }
+    }
+
+    bStoreVecFreqPtr_->block(i).update(1.0, stoLeadCurrdQdtVec, 1.0);
+
+//    Xyce::dout() << "HB Store Vector  dqdt + f(x) FD" << std::endl;
+//    bStoreVecFreqPtr_->printPetraObject(std:: cout);
+  }
+//  permutedIFT(*bStoreVecFreqPtr_, &bStore);
 #ifdef Xyce_DEBUG_HB
-  std::cout << "HB X Vector" << std::endl;
-  bX.printPetraObject();
-  std::cout << "HB S Vector" << std::endl;
-  bS.printPetraObject();
-  std::cout << "HB dSdt Vector" << std::endl;
-  bdSdt.printPetraObject();
-  std::cout << "HB Store Vector" << std::endl;
-  bStore.printPetraObject();
-  //cout << "HB Q Vector" << std::endl;
-  //bQ.printPetraObject();
-  //cout << "HB F Vector" << std::endl;
-  //bF.printPetraObject();
+  Xyce::dout() << "HB X Vector" << std::endl;
+  bX.printPetraObject(std::cout);
+ //  Xyce::dout() << "HB S Vector" << std::endl;
+ //  bS.printPetraObject(Xyce::dout());
+ //  Xyce::dout() << "HB dSdt Vector" << std::endl;
+ //  bdSdt.printPetraObject(Xyce::dout());
+  Xyce::dout() << "HB Store Vector" << std::endl;
+  bStore.printPetraObject(std::cout);
+  Xyce::dout() << "HB Q Vector" << std::endl;
+  bQ->printPetraObject(std::cout);
+  Xyce::dout() << "HB F Vector" << std::endl;
+  bF->printPetraObject(std::cout);
+  Xyce::dout() << "HB bdFdxdVp Vector" << std::endl;
+  bdFdxdVp->printPetraObject(std::cout);
+  Xyce::dout() << "HB bdQdxdVp Vector" << std::endl;
+  bdQdxdVp->printPetraObject(std::cout);
 
 #ifndef Xyce_FLEXIBLE_DAE_LOADS
-  std::cout << "HB bmdQdx_" << std::endl;
-  bmdQdxPtr_->printPetraObject();
-  std::cout << "HB bmdFdx_" << std::endl;
-  bmdFdxPtr_->printPetraObject();
+  Xyce::dout() << "HB bmdQdx_" << std::endl;
+  bmdQdxPtr_->printPetraObject(std::cout);
+  Xyce::dout() << "HB bmdFdx_" << std::endl;
+  bmdFdxPtr_->printPetraObject(std::cout);
 #endif // Xyce_FLEXIBLE_DAE_LOADS
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+  Xyce::dout() << Xyce::section_divider << std::endl;
 #endif // Xyce_DEBUG_HB
-//*/
+
   return true;
 }
 
 //-----------------------------------------------------------------------------
 // Function      : N_LOA_HBLoader::permutedFFT
-// Purpose       : 
+// Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Ting Mei
 // Creation Date : 09/05/08
 //---------------------------------------------------------------------------
-void N_LOA_HBLoader::permutedFFT(const N_LAS_BlockVector & xt, N_LAS_BlockVector * xf) 
+void N_LOA_HBLoader::permutedFFT(const N_LAS_BlockVector & xt, N_LAS_BlockVector * xf)
 {
   int blockCount = xt.blockCount();
-  int N = xt.block(0).localLength();
+  int N = xt.block(0).globalLength();
+
+  // It's necessary to get the blockmap from Epetra because the N_PDS_ParMap is not always guaranteed to be valid.
+  Epetra_BlockMap blockMap = xt.block(0).epetraObj().Map();
 
   N_UTL_FFTInterface<std::vector<double> > HBTransform(blockCount);
 
-  // Register vectors with the FFT interface. 
+  // Register vectors with the FFT interface.
   std::vector<double> inputSignal(blockCount, 0.0);
   std::vector<double> outputSignal((blockCount+1), 0.0);
   std::vector<double> temp(0);  // Dummy vector, not needed since we only compute FFT.
   HBTransform.registerVectors( inputSignal, &outputSignal, temp, &temp );
-    
+
+  // Loop through all the solution variables and compute the FFT of each variable.
   for (int j=0; j<N; j++)
   {
+    // Get the local id for this variable.
+    int lid = blockMap.LID(j);
+
+    N_LAS_Vector& freqVecRef = xf->block(j);
+
+#ifdef Xyce_DEBUG_HB
+    std::cout << "Xf block(" << j << ") before = " << std::endl;
+    freqVecRef.printPetraObject(std::cout);
+#endif // Xyce_DEBUG_HB
+
     for (int i=0; i<blockCount; ++i)
     {
       N_LAS_Vector& timeVecRef = xt.block(i);
-  
-      inputSignal[i] = timeVecRef[j];
+
+      if (lid >= 0)
+      {
+        inputSignal[i] = timeVecRef[lid];
 #ifdef Xyce_DEBUG_HB
-      std::cout << "inputSignal ("<<i<<") = " << inputSignal[i] << std::endl;
+        std::cout << "Block " << j << ": inputSignal ("<<i<<") = " << inputSignal[i] << std::endl;
 #endif // Xyce_DEBUG_HB
+      }
     }
 
-    // Calculate the FFT for the inputSignal.
-    HBTransform.calculateFFT();
-   
-    N_LAS_Vector& freqVecRef = xf->block(j);
-    
-    freqVecRef[0] =  outputSignal[0]/blockCount;
-    freqVecRef[1] =  outputSignal[1]/blockCount;
-
-    for (int i=1; i<(blockCount+1)/2; ++i)
+    // Only perform the FFT on the processor that owns the solution variable.
+    if (lid >= 0)
     {
- //     N_LAS_Vector& freqVecRef = xf->block(i);
-      freqVecRef[2*i] =  outputSignal[2*i]/blockCount;
-      freqVecRef[2*(blockCount-i)] =  outputSignal[2*i]/blockCount;
-
-      freqVecRef[2*i+1] =  outputSignal[2*i+1]/blockCount;
-      freqVecRef[2*(blockCount-i)+1] = -outputSignal[2*i+1]/blockCount;
+      // Calculate the FFT for the inputSignal.
+      HBTransform.calculateFFT();
 
 #ifdef Xyce_DEBUG_HB
-      std::cout << "outputsignal (" << i << ") = " <<  freqVecRef[i] << std::endl;
+      for (int i=0; i<blockCount+1; ++i)
+      {
+        std::cout << "Block " << j << ": outputSignal ("<<i<<") = " << outputSignal[i] << std::endl;
+      }
 #endif // Xyce_DEBUG_HB
+
+      freqVecRef[0] =  outputSignal[0]/blockCount;
+      freqVecRef[1] =  outputSignal[1]/blockCount;
+
+      for (int i=1; i<(blockCount+1)/2; ++i)
+      {
+        freqVecRef[2*i] =  outputSignal[2*i]/blockCount;
+        freqVecRef[2*(blockCount-i)] =  outputSignal[2*i]/blockCount;
+
+        freqVecRef[2*i+1] =  outputSignal[2*i+1]/blockCount;
+        freqVecRef[2*(blockCount-i)+1] = -outputSignal[2*i+1]/blockCount;
+      }
     }
-    
+
 #ifdef Xyce_DEBUG_HB
-    std::cout << "Xf block(" << j << ") = " << std::endl;
-    (xf->block(j)).printPetraObject();
+    std::cout << "Xf block(" << j << ") after = " << std::endl;
+    freqVecRef.printPetraObject(std::cout);
 #endif // Xyce_DEBUG_HB
 
   }
-  
+
 }
 
 //-----------------------------------------------------------------------------
 // Function      : N_LOA_HBLoader::permutedIFT
-// Purpose       : 
+// Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Ting Mei
 // Creation Date : 09/05/08
 //---------------------------------------------------------------------------
-void  N_LOA_HBLoader::permutedIFT(const N_LAS_BlockVector &  xf, N_LAS_BlockVector * xt) 
+void  N_LOA_HBLoader::permutedIFT(const N_LAS_BlockVector & xf, N_LAS_BlockVector * xt)
 {
   int blockCount = xf.blockCount();
   int N = xf.block(0).globalLength();
 
+  // It's necessary to get the blockmap from Epetra because the N_PDS_ParMap is not always guaranteed to be valid.
+  Epetra_BlockMap blockMap = (xt->block(0)).epetraObj().Map();
+
 #ifdef Xyce_DEBUG_HB
-  std::cout << "FD blockCount= " << blockCount   << ", N =" << N <<  std::endl;
+  std::cout << "FD blockCount= " << blockCount   << ", fN =" << N <<  std::endl;
 
   int tmpblockCount = xt->blockCount();
   int tmpN = xt->block(0).globalLength();
-  std::cout << "TD blockCount= " << tmpblockCount   << ", N =" << tmpN <<  std::endl; 
+  std::cout << "TD blockCount= " << tmpblockCount   << ", tN =" << tmpN <<  std::endl;
 #endif // Xyce_DEBUG_HB
-  
+
   N_UTL_FFTInterface<std::vector<double> > HBTransform((N/2));
- 
-  // Register input and output signals for the IFT. 
+
+  // Register input and output signals for the IFT.
   std::vector<double> inputSignal((N/2+1), 0.0);
   std::vector<double> outputSignal((N/2), 0.0);
   std::vector<double> temp(0);  // Dummy vector, not needed since we only compute IFT.
   HBTransform.registerVectors( temp, &temp, inputSignal, &outputSignal );
-   
+
   for (int j=0; j<blockCount; j++)
   {
     N_LAS_Vector& freqVecRef = xf.block(j);
 
-    for (int i=0; i<(N/2+1); ++i)
+    if (freqVecRef.localLength() > 0)
     {
-      inputSignal[i] = freqVecRef[i];
-      
+      for (int i=0; i<(N/2+1); ++i)
+      {
+        inputSignal[i] = freqVecRef[i];
+
 #ifdef Xyce_DEBUG_HB
-      std::cout << "inputSignal i= " << i << ", input= " << inputSignal[i] << std::endl;  
+        std::cout << "Block " << j << ": inputSignal i= " << i << ", input= " << inputSignal[i] << std::endl;
 #endif // Xyce_DEBUG_HB
+      }
+
+      // Calculate the inverse FFT.
+      HBTransform.calculateIFT();
     }
 
-    // Calculate the inverse FFT.
-    HBTransform.calculateIFT();
-   
     for (int i=0; i<(N/2); ++i)
     {
       N_LAS_Vector& timeVecRef = xt->block(i);
-      timeVecRef[j] =  outputSignal[i]*(N/2);
-
+      if (freqVecRef.localLength() > 0)
+      {
+        timeVecRef[blockMap.LID(j)] =  outputSignal[i]*(N/2);
 #ifdef Xyce_DEBUG_HB
-      std::cout << "outputSignal i= " << i << ", output= " << timeVecRef[j] << std::endl;
+        std::cout << "Block " << j << ": outputSignal i= " << i << ", output= " << timeVecRef[blockMap.LID(j)] << std::endl;
 #endif // Xyce_DEBUG_HB
-
-    } 
+      }
+    }
   }
-  
+
 }
 

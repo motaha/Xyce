@@ -1,12 +1,12 @@
 //-----------------------------------------------------------------------------
 // Copyright Notice
-//
+// 
 //   Copyright 2002 Sandia Corporation. Under the terms
 //   of Contract DE-AC04-94AL85000 with Sandia Corporation, the U.S.
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,11 +36,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.31.2.4 $
+// Revision Number: $Revision: 1.50.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/03/11 21:07:51 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: rlschie $
 //-------------------------------------------------------------------------
 #include <Xyce_config.h>
 #include <N_UTL_Misc.h>
@@ -67,6 +67,7 @@
 #include <sstream>
 // ----------   Xyce Includes   ----------
 #include <N_UTL_Xyce.h>
+#include <N_UTL_fwd.h>
 #include <N_ERH_ErrorMgr.h>
 
 #include <time.h>
@@ -74,8 +75,10 @@
 #include <N_UTL_ExpressionInternals.h>
 #include <N_ERH_ErrorMgr.h>
 
-// Operator precedence table:
+namespace Xyce {
+namespace Util {
 
+// Operator precedence table:
 enum
 {
   G=1,      // Greater
@@ -121,14 +124,11 @@ static char prectable[22][22] = {
 /* ,  */ { G, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, E, L, E }
 } ;
 
-#ifdef Xyce_DEBUG_EXPRESSION
 static const char *op_name[22] = {"$","|","^","&","==","!=",">",">=","<","<=","+",
                             "-","*","/","%","**","~","u-","(",")","v",","};
-#endif // Xyce_DEBUG_EXPRESSION
 
 static const char *specials = {"{}()+-*/%, <>=!&|^~"};
 
-#ifdef Xyce_DEBUG_EXPRESSION
 const char *toks[25] = {"END", "OR", "XOR", "AND", "EQUAL",
          "NOTEQ", "GREAT", "GREATEQ", "LESS", "LESSEQ",
          "PLUS", "MINUS", "TIMES", "DIVIDE", "REMAINDER",
@@ -140,7 +140,6 @@ const  char *expr_ops[22] = {"PLACEHOLDER", "OR", "XOR", "AND", "EQUAL",
          "PLUS", "MINUS", "TIMES", "DIVIDE", "REMAINDER",
          "POWER", "FUNCTION", "CONSTANT", "VAR", "ARGUMENT",
          "TOAST"};
-#endif // Xyce_DEBUG_EXPRESSION
 
 // Binary operation table:
 
@@ -190,7 +189,7 @@ static long seed = -1;
 
 static struct func
 {
-  string name;
+  std::string name;
   int number;
   int num_args;
   double (*funcptr)(double);
@@ -243,19 +242,19 @@ static struct constant {
 #define NUM_CONSTANTS (sizeof (constants) / sizeof (struct constant))
 
 #define numSpecSigs 2
-static string specSigs[numSpecSigs] = {"TIME", "TEMP"};
+static std::string specSigs[numSpecSigs] = {"TIME", "TEMP"};
 static double Epsilon = 1.e-12;
 
 // static error number for evaluate:
 static int EXPRerrno;
 
-static string msg;
+static std::string msg;
 
 static double tentative_accepted_time, accepted_time;
 static int numDDT;
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::N_UTL_N_UTL_ExpressionInternals
+// Function      : ExpressionInternals::ExpressionInternals
 // Purpose       : Constructor
 // Special Notes :
 // Scope         :
@@ -263,8 +262,9 @@ static int numDDT;
 // Creation Date : 06/07/01
 //-----------------------------------------------------------------------------
 
-N_UTL_ExpressionInternals::N_UTL_ExpressionInternals( const string & exp )
-  : differentiated_   ( false ),
+ExpressionInternals::ExpressionInternals( const std::string & exp )
+  : parsed_           (false),
+    differentiated_   ( false ),
     ddxProcessed_     (false),
     num_N_            ( 0 ),
     num_I_            ( 0 ),
@@ -281,19 +281,19 @@ N_UTL_ExpressionInternals::N_UTL_ExpressionInternals( const string & exp )
 {
   Input_ = "";
   if (!exp.empty())
-    set(exp);
+    parsed_ = set(exp);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::N_UTL_ExpressionInternals
+// Function      : ExpressionInternals::ExpressionInternals
 // Purpose       : Copy Constructor
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 11/05/04
 //-----------------------------------------------------------------------------
-N_UTL_ExpressionInternals::N_UTL_ExpressionInternals(
-  const N_UTL_ExpressionInternals & right)
+ExpressionInternals::ExpressionInternals(
+  const ExpressionInternals & right)
   : Input_             (right.Input_),
     differentiated_    (false),
     ddxProcessed_      (right.ddxProcessed_),
@@ -315,7 +315,7 @@ N_UTL_ExpressionInternals::N_UTL_ExpressionInternals(
     var_vals_          (right.var_vals_),
     curr_magic_        (right.curr_magic_)
 {
-  vector <ExpressionNode *>::iterator free_i;
+  std::vector<ExpressionNode *>::iterator free_i;
 
   done_list_.clear();
   ee_list_.clear();
@@ -332,13 +332,13 @@ N_UTL_ExpressionInternals::N_UTL_ExpressionInternals(
 
   PThead_ = tree_;
   done_list_.clear();
-#ifdef Xyce_DEBUG_EXPRESSION
-  cout << "Calling PTcheck_ from copy constructor" << endl;
-#endif
+
+  if (DEBUG_EXPRESSION)
+    Xyce::dout() << "Calling PTcheck_ from copy constructor" << std::endl;
+
   if (tree_ != PTcheck_ (PThead_))
   {
-      msg ="N_UTL_ExpressionInternals::N_UTL_ExpressionInternals: Internal error in copy constructor";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+    Report::DevelFatal().in("ExpressionInternals::ExpressionInternals") << "ExpressionInternals::ExpressionInternals: Internal error in copy constructor";
   }
   for (free_i = done_list_.begin() ; free_i != done_list_.end() ; ++free_i)
     deleteExpressionNode_(*free_i);
@@ -351,16 +351,16 @@ N_UTL_ExpressionInternals::N_UTL_ExpressionInternals(
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::~N_UTL_ExpressionInternals
+// Function      : ExpressionInternals::~ExpressionInternals
 // Purpose       : Destructor
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/07/01
 //-----------------------------------------------------------------------------
-N_UTL_ExpressionInternals::~N_UTL_ExpressionInternals ()
+ExpressionInternals::~ExpressionInternals ()
 {
-  vector <ExpressionNode *>::iterator free_i;
+  std::vector<ExpressionNode *>::iterator free_i;
 
   for (free_i = free_list_.begin() ; free_i != free_list_.end() ; ++free_i)
   {
@@ -371,7 +371,7 @@ N_UTL_ExpressionInternals::~N_UTL_ExpressionInternals ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::set
+// Function      : ExpressionInternals::set
 // Purpose       : Set the value of the expression to a string
 // Special Notes : A lot of this routine is in fact based directly on the
 //                 stuff done by the SPICE 3F5 routine "inpptree."  That
@@ -384,29 +384,28 @@ N_UTL_ExpressionInternals::~N_UTL_ExpressionInternals ()
 // Creation Date : 03/10/05
 //-----------------------------------------------------------------------------
 
-bool N_UTL_ExpressionInternals::set ( const string & exp )
+bool ExpressionInternals::set ( const std::string & exp )
 {
-  string line, compact_line, val_string;
+  std::string line, compact_line, val_string;
   int last_token, len, i;
-  string::size_type j, k;
-  string token;
+  std::string::size_type j, k;
+  std::string token;
   ExpressionElement *el, *next, *top;
-  vector <ExpressionElement *>::iterator ee_i;
-  list <ExpressionElement *> tok;
-  list <ExpressionElement *>::iterator tok_i, tok_j;
-  vector <ExpressionNode *>::iterator free_i;
-  vector <ExpressionElement *> stack;
-  vector <ExpressionNode *> node_list;
+  std::vector<ExpressionElement *>::iterator ee_i;
+  std::list<ExpressionElement *> tok;
+  std::list<ExpressionElement *>::iterator tok_i, tok_j;
+  std::vector<ExpressionNode *>::iterator free_i;
+  std::vector<ExpressionElement *> stack;
+  std::vector<ExpressionNode *> node_list;
   ExpressionNode *pn, *lpn, *rpn;
   int sp, st, num_nodes;
 
-#ifdef Xyce_DEBUG_EXPRESSION
-  cout << "Original input expression: " << exp << endl;
-#endif // Xyce_DEBUG_EXPRESSION
+  if (DEBUG_EXPRESSION)
+    Xyce::dout() << "Original input expression: " << exp << std::endl;
 
   if (!Input_.empty())
   {
-    vector <ExpressionNode *>::iterator free_i;
+    std::vector<ExpressionNode *>::iterator free_i;
 
     for (free_i = free_list_.begin() ; free_i != free_list_.end() ; ++free_i)
       delete *free_i;
@@ -446,9 +445,8 @@ bool N_UTL_ExpressionInternals::set ( const string & exp )
 
   compactLine_(line,compact_line);
 
-#ifdef Xyce_DEBUG_EXPRESSION
-  cout << "Compact input line is: \'" << compact_line << "\'" << endl;
-#endif // Xyce_DEBUG_EXPRESSION
+  if (DEBUG_EXPRESSION) 
+    Xyce::dout() << "Compact input line is: \'" << compact_line << "\'" << std::endl;
 
 // Second step is to do the actual parsing into ExpressionElement structures
 // which describe the type of each token and the value, if applicable
@@ -462,31 +460,31 @@ bool N_UTL_ExpressionInternals::set ( const string & exp )
 // rather than tokenize on the fly as SPICE does, we do it all up front first.
   tokenize_(compact_line, tok);
 
-#ifdef Xyce_DEBUG_EXPRESSION
-  cout << endl << "Token List:\n";
-  for (tok_i = tok.begin() ; tok_i != tok.end() ; ++tok_i)
-  {
-    cout << "Token: " << toks[(*tok_i)->token];
-    if ((*tok_i)->token == TOK_VALUE)
+  if (DEBUG_EXPRESSION) {
+    Xyce::dout() << std::endl << "Token List:\n";
+    for (tok_i = tok.begin() ; tok_i != tok.end() ; ++tok_i)
     {
-      cout << ": ";
-      switch ((*tok_i)->type)
+      Xyce::dout() << "Token: " << toks[(*tok_i)->token];
+      if ((*tok_i)->token == TOK_VALUE)
       {
-        case TYP_NUM:
-          cout << (*tok_i)->number;
-          break;
-        case TYP_STRING:
-          cout << "\"" << ((*tok_i)->name) << "\"";
-          break;
-        case TYP_PNODE:
-          cout << "Pointer to node";
-          break;
+        Xyce::dout() << ": ";
+        switch ((*tok_i)->type)
+        {
+          case TYP_NUM:
+            Xyce::dout() << (*tok_i)->number;
+            break;
+          case TYP_STRING:
+            Xyce::dout() << "\"" << ((*tok_i)->name) << "\"";
+            break;
+          case TYP_PNODE:
+            Xyce::dout() << "Pointer to node";
+            break;
+        }
       }
+      Xyce::dout() << std::endl;
     }
-    cout << endl;
   }
-#endif // Xyce_DEBUG_EXPRESSION
-
+  
   // Now that we've already tokenized the entire string, we process the
   // tokenized version further.
 
@@ -542,7 +540,7 @@ bool N_UTL_ExpressionInternals::set ( const string & exp )
   {
     if (((*tok_i)->type == TYP_STRING) && ((*tok_i)->name == "YPDE"))
     {
-      std::cout << "Erasing 1" << (*tok_i)->name << endl;
+      Xyce::dout() << "Erasing 1" << (*tok_i)->name << std::endl;
       // safe to erase this token
       tok_i = tok.erase(tok_i);
     }
@@ -553,16 +551,16 @@ bool N_UTL_ExpressionInternals::set ( const string & exp )
         // found a "Y" and at least enough room on the tok list that there could be '%' "PDE" '%'
         // so check for that.
         tok_j=tok_i;  // remember position of "Y" 
-        list<ExpressionElement *>::iterator tok_j_plus_1 = ++tok_i;
-        list<ExpressionElement *>::iterator tok_j_plus_2 = ++tok_i;
-        list<ExpressionElement *>::iterator tok_j_plus_3 = ++tok_i;        
+        std::list<ExpressionElement *>::iterator tok_j_plus_1 = ++tok_i;
+        std::list<ExpressionElement *>::iterator tok_j_plus_2 = ++tok_i;
+        std::list<ExpressionElement *>::iterator tok_j_plus_3 = ++tok_i;        
         if( ((*tok_j_plus_1)->token == TOK_REMAINDER) &&
             (((*tok_j_plus_2)->type == TYP_STRING) && ( (*tok_j_plus_2)->name == "PDE" )) &&
             ((*tok_j_plus_3)->token == TOK_REMAINDER) )
         {
           // safe to erase both tokens 
-          std::cout << "Erasing 2" << (*tok_j)->name << endl;
-          std::cout << "Erasing 3" << (*tok_j_plus_3)->name << endl;
+          Xyce::dout() << "Erasing 2" << (*tok_j)->name << std::endl;
+          Xyce::dout() << "Erasing 3" << (*tok_j_plus_3)->name << std::endl;
           tok_i++;
           tok_i = tok.erase(tok_j, tok_i);
         }
@@ -571,33 +569,31 @@ bool N_UTL_ExpressionInternals::set ( const string & exp )
     }
     tokCount++;
   }
-  
-  
 
-#ifdef Xyce_DEBUG_EXPRESSION
-  cout << endl << "After Table/Schedule/Poly, Token List:\n";
-  for (tok_i = tok.begin() ; tok_i != tok.end() ; ++tok_i)
-  {
-    cout << "Token: " << toks[(*tok_i)->token];
-    if ((*tok_i)->token == TOK_VALUE)
+  if (DEBUG_EXPRESSION) {
+    Xyce::dout() << std::endl << "After Table/Schedule/Poly, Token List:\n";
+    for (tok_i = tok.begin() ; tok_i != tok.end() ; ++tok_i)
     {
-      cout << ": ";
-      switch ((*tok_i)->type)
+      Xyce::dout() << "Token: " << toks[(*tok_i)->token];
+      if ((*tok_i)->token == TOK_VALUE)
       {
-        case TYP_NUM:
-          cout << (*tok_i)->number;
-          break;
-        case TYP_STRING:
-          cout << "\"" << ((*tok_i)->name) << "\"";
-          break;
-        case TYP_PNODE:
-          cout << "Pointer to node";
-          break;
+        Xyce::dout() << ": ";
+        switch ((*tok_i)->type)
+        {
+          case TYP_NUM:
+            Xyce::dout() << (*tok_i)->number;
+            break;
+          case TYP_STRING:
+            Xyce::dout() << "\"" << ((*tok_i)->name) << "\"";
+            break;
+          case TYP_PNODE:
+            Xyce::dout() << "Pointer to node";
+            break;
+        }
       }
+      Xyce::dout() << std::endl;
     }
-    cout << endl;
   }
-#endif // Xyce_DEBUG_EXPRESSION
 
   // Now the tokenizing of the expression is completed, and the various
   // obscure and complex formats have been massaged down to much simpler
@@ -609,9 +605,8 @@ bool N_UTL_ExpressionInternals::set ( const string & exp )
 // We read from left to right and create a stack of symbols until the next
 // symbol has greater precedence than what we have at the top.  At that point,
 // the stack is reduced by searching backward
-#ifdef Xyce_DEBUG_EXPRESSION
-  cout << " Forming parse tree." << endl;
-#endif
+  if (DEBUG_EXPRESSION) 
+    Xyce::dout() << " Forming parse tree." << std::endl;
 
   el = newExpressionElement_();
   el->token = TOK_END;
@@ -623,9 +618,8 @@ bool N_UTL_ExpressionInternals::set ( const string & exp )
 
   while (sp > 1 || next->token != TOK_END)
   {
-#ifdef Xyce_DEBUG_EXPRESSION
-    cout << "  In while loop, sp is " << sp << endl;
-#endif
+    if (DEBUG_EXPRESSION)
+      Xyce::dout() << "  In while loop, sp is " << sp << std::endl;
 
     stack.resize(sp+1);
     i = sp;
@@ -634,28 +628,29 @@ bool N_UTL_ExpressionInternals::set ( const string & exp )
       top = stack[i--];
 
     } while (top->token == TOK_VALUE);
-#ifdef Xyce_DEBUG_EXPRESSION
-    cout << " Top has been popped: " << endl;
-    cout << "Token: " << toks[top->token];
-    if (top->token == TOK_VALUE)
-    {
-      cout << ": ";
-      switch (top->type)
+
+    if (DEBUG_EXPRESSION) {
+      Xyce::dout() << " Top has been popped: " << std::endl;
+      Xyce::dout() << "Token: " << toks[top->token];
+      if (top->token == TOK_VALUE)
       {
-        case TYP_NUM:
-          cout << top->number;
-          break;
-        case TYP_STRING:
-          cout << "\"" << (top->name) << "\"";
-          break;
-        case TYP_PNODE:
-          cout << "Pointer to node";
-          break;
+        Xyce::dout() << ": ";
+        switch (top->type)
+        {
+          case TYP_NUM:
+            Xyce::dout() << top->number;
+            break;
+          case TYP_STRING:
+            Xyce::dout() << "\"" << (top->name) << "\"";
+            break;
+          case TYP_PNODE:
+            Xyce::dout() << "Pointer to node";
+            break;
+        }
       }
+      Xyce::dout() << std::endl;
+      Xyce::dout() << " Precedence between " << toks[top->token] << " and " << toks[next->token] << " is " << prectable[top->token][next->token] << std::endl;
     }
-    cout << endl;
-    cout << " Precedence between " << toks[top->token] << " and " << toks[next->token] << " is " << prectable[top->token][next->token] << endl;
-#endif
 
     switch (prectable[top->token][next->token])
     {
@@ -668,10 +663,7 @@ bool N_UTL_ExpressionInternals::set ( const string & exp )
         continue;
 
       case R:
-        msg = "N_UTL_ExpressionInternals::N_UTL_ExpressionInternals: Uninteligible syntax in:\n";
-        msg += Input_;
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
-        break;     // never called
+        goto err;
 
       case G:
         // TVR note:  The helpful comment below
@@ -690,32 +682,32 @@ bool N_UTL_ExpressionInternals::set ( const string & exp )
         // string to a single value, even though that value is
         // represented by a parse tree fragment.
 
-#ifdef Xyce_DEBUG_EXPRESSION
-        cout << "\nFull stack so far:\n";
-        for (j=0 ; j<=sp ; ++j)
-        {
-          if (stack[j]->token == TOK_VALUE)
+        if (DEBUG_EXPRESSION) {
+          Xyce::dout() << "\nFull stack so far:\n";
+          for (j=0 ; j<=sp ; ++j)
           {
-            if (stack[j]->type == TYP_NUM)
+            if (stack[j]->token == TOK_VALUE)
             {
-              cout << "Numeric element: " << stack[j]->number << endl;
+              if (stack[j]->type == TYP_NUM)
+              {
+                Xyce::dout() << "Numeric element: " << stack[j]->number << std::endl;
+              }
+              if (stack[j]->type == TYP_STRING)
+              {
+                Xyce::dout() << "String element: '" << stack[j]->name << "'" << std::endl;
+              }
+              if (stack[j]->type == TYP_PNODE)
+              {
+                Xyce::dout() << "parsenode, type = " << expr_ops[stack[j]->node->type]
+                             << std::endl;
+              }
             }
-            if (stack[j]->type == TYP_STRING)
+            else
             {
-              cout << "String element: '" << stack[j]->name << "'" << endl;
+              Xyce::dout() << "Token: " << op_name[stack[j]->token] << std::endl;
             }
-            if (stack[j]->type == TYP_PNODE)
-            {
-              cout << "parsenode, type = " << expr_ops[stack[j]->node->type]
-                   << endl;
-            }
-          }
-          else
-          {
-            cout << "Token: " << op_name[stack[j]->token] << endl;
           }
         }
-#endif // Xyce_DEBUG_EXPRESSION
 
         // Figure out what fragment we're supposed to reduce.  Search backward
         // from the end of the stack.  If the thing under "sp" and the thing
@@ -738,7 +730,7 @@ bool N_UTL_ExpressionInternals::set ( const string & exp )
           else
             sp = sp - i;
         }
-        if (stack[sp - 1]->token == TOK_VALUE)
+        if ((sp>0) && (stack[sp - 1]->token == TOK_VALUE))
           sp--;
 
         // everything between sp and st is to be reduced.
@@ -751,34 +743,34 @@ bool N_UTL_ExpressionInternals::set ( const string & exp )
 //              func ( node, node, node, ... )
 //              node
 
-#ifdef Xyce_DEBUG_EXPRESSION
-        cout << "\nProcessing stack chunk:\n";
-        for (j=sp ; j<=st ; ++j)
-        {
-          if (stack[j]->token == TOK_VALUE)
+        if (DEBUG_EXPRESSION) {
+          Xyce::dout() << "\nProcessing stack chunk:\n";
+          for (j=sp ; j<=st ; ++j)
           {
-            if (stack[j]->type == TYP_NUM)
+            if (stack[j]->token == TOK_VALUE)
             {
-              cout << "Numeric element: " << stack[j]->number << endl;
+              if (stack[j]->type == TYP_NUM)
+              {
+                Xyce::dout() << "Numeric element: " << stack[j]->number << std::endl;
+              }
+              if (stack[j]->type == TYP_STRING)
+              {
+                Xyce::dout() << "String element: '" << stack[j]->name << "'" << std::endl;
+              }
+              if (stack[j]->type == TYP_PNODE)
+              {
+                Xyce::dout() << "parsenode, type = " << expr_ops[stack[j]->node->type]
+                             << std::endl;
+              }
             }
-            if (stack[j]->type == TYP_STRING)
+            else
             {
-              cout << "String element: '" << stack[j]->name << "'" << endl;
-            }
-            if (stack[j]->type == TYP_PNODE)
-            {
-              cout << "parsenode, type = " << expr_ops[stack[j]->node->type]
-                   << endl;
+              Xyce::dout() << "Token: " << op_name[stack[j]->token] << std::endl;
             }
           }
-          else
-          {
-            cout << "Token: " << op_name[stack[j]->token] << endl;
-          }
-        }
 
-        cout << " reducing to a pnode..." << endl;
-#endif // Xyce_DEBUG_EXPRESSION
+          Xyce::dout() << " reducing to a pnode..." << std::endl;
+        }
 
         if (st == sp)
         {
@@ -863,11 +855,11 @@ bool N_UTL_ExpressionInternals::set ( const string & exp )
         stack[sp]->type = TYP_PNODE;
         stack[sp]->node = pn;
 
-#ifdef Xyce_DEBUG_EXPRESSION
-          cout << " The stack element was replaced by a pnode whose tree is:"
-               << endl;
+        if (DEBUG_EXPRESSION) {
+          Xyce::dout() << " The stack element was replaced by a pnode whose tree is:"
+                       << std::endl;
           dumpParseTree_(pn);
-#endif
+        }
         continue;
     }
   }
@@ -877,44 +869,45 @@ bool N_UTL_ExpressionInternals::set ( const string & exp )
   // which case the makepnode_ method will just return the pointer to
   // the tree stored in element.
 
-#ifdef Xyce_DEBUG_EXPRESSION
-    cout << " Attempting to form tree from stack[1], which is: " << endl;
+  if (DEBUG_EXPRESSION) {
+    Xyce::dout() << " Attempting to form tree from stack[1], which is: " << std::endl;
     if (stack[1])
     {
-      cout << "Token: " << toks[stack[1]->token];
+      Xyce::dout() << "Token: " << toks[stack[1]->token];
       if (stack[1]->token == TOK_VALUE)
       {
-        cout << ": ";
+        Xyce::dout() << ": ";
         switch (stack[1]->type)
         {
-        case TYP_NUM:
-          cout << stack[1]->number;
-          break;
-        case TYP_STRING:
-          cout << "\"" << (stack[1]->name) << "\"";
-          break;
-        case TYP_PNODE:
-          cout << "Pointer to node";
-          break;
+          case TYP_NUM:
+            Xyce::dout() << stack[1]->number;
+            break;
+          case TYP_STRING:
+            Xyce::dout() << "\"" << (stack[1]->name) << "\"";
+            break;
+          case TYP_PNODE:
+            Xyce::dout() << "Pointer to node";
+            break;
         }
       }
       else
       {
-        cout << " NULL" << endl;
+        Xyce::dout() << " NULL" << std::endl;
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
     }
-#endif
+  }
+  
   tree_ = makepnode_(stack[1]);
   if (tree_ == NULL)
   {
     goto err;
   }
 
-#ifdef Xyce_DEBUG_EXPRESSION
-  cout << " Tree is made. Before PTcheck_:" << endl;
-  dumpParseTree_(tree_);
-#endif
+  if (DEBUG_EXPRESSION) {
+    Xyce::dout() << " Tree is made. Before PTcheck_:" << std::endl;
+    dumpParseTree_(tree_);
+  }
 
 // Fifth step, resolve any remaining placeholder and find and use any
 // common subexpressions.  This is tricky because the subexpression
@@ -925,18 +918,20 @@ bool N_UTL_ExpressionInternals::set ( const string & exp )
 
   PThead_ = tree_;
   done_list_.clear();
-#ifdef Xyce_DEBUG_EXPRESSION
-  cout << "Calling PTcheck_" << endl;
-#endif
+
+  if (DEBUG_EXPRESSION)
+    Xyce::dout() << "Calling PTcheck_" << std::endl;
+
   if (tree_ != PTcheck_ (PThead_))
     goto err;
   for (free_i = done_list_.begin() ; free_i != done_list_.end() ; ++free_i)
     deleteExpressionNode_(*free_i);
 
-#ifdef Xyce_DEBUG_EXPRESSION
-  cout << " After PTcheck_:" << endl;
-  dumpParseTree_(tree_);
-#endif
+  if (DEBUG_EXPRESSION) {
+    Xyce::dout() << " After PTcheck_:" << std::endl;
+    dumpParseTree_(tree_);
+  }
+
 // Sixth step, differentiate any ddx() functions and replace the functions
 // with the differentiated expression
 
@@ -961,22 +956,20 @@ bool N_UTL_ExpressionInternals::set ( const string & exp )
   return true;
 
 err:
-  msg = "N_UTL_ExpressionInternals::N_UTL_ExpressionInternals: Uninteligible syntax in:\n";
-  msg += Input_;
-  N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+  Report::UserError() << "Unintelligible syntax in: " << Input_;
   return false;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::get_names
+// Function      : ExpressionInternals::get_names
 // Purpose       : Returns the names of input quantities by type
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/07/01
 //-----------------------------------------------------------------------------
-void N_UTL_ExpressionInternals::get_names(int const & type,
-                                          vector<string> & names )
+void ExpressionInternals::get_names(int const & type,
+                                          std::vector<std::string> & names )
 {
   names.clear();
 
@@ -994,12 +987,16 @@ void N_UTL_ExpressionInternals::get_names(int const & type,
           if (type == XEXP_NODE)
             names.push_back(varValues_[i]);
           break;
+        case EXPR_T_NODAL_COMPUTATION:
+          if (type == XEXP_NODAL_COMPUTATION)
+            names.push_back(varValues_[i]);
+          break;
         case EXPR_T_INSTANCE:
           if (leadDesignator_[i] == ' ')
           {
-            string s = varValues_[i];
+            std::string s = varValues_[i];
             std::string::size_type pos = s.find_last_of(":");
-            if( pos == string::npos )
+            if( pos == std::string::npos )
               pos = 0;
             else
               ++pos;
@@ -1014,7 +1011,7 @@ void N_UTL_ExpressionInternals::get_names(int const & type,
           {
             if (type == XEXP_LEAD)
             {
-              string lead = varValues_[i] + "{" + leadDesignator_[i] + "}";
+              std::string lead = varValues_[i] + "{" + leadDesignator_[i] + "}";
               names.push_back(lead);
             }
           }
@@ -1045,14 +1042,14 @@ void N_UTL_ExpressionInternals::get_names(int const & type,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::get_type
+// Function      : ExpressionInternals::get_type
 // Purpose       : Finds the type of an input quantity name
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/07/01
 //-----------------------------------------------------------------------------
-int N_UTL_ExpressionInternals::get_type ( const string & var )
+int ExpressionInternals::get_type ( const std::string & var )
 {
   int index;
   int var_type=-1;
@@ -1061,6 +1058,9 @@ int N_UTL_ExpressionInternals::get_type ( const string & var )
   {
     switch (varTypes_[index])
     {
+      case EXPR_T_NODAL_COMPUTATION:
+        var_type = XEXP_NODAL_COMPUTATION;
+        break;
       case EXPR_T_NODE:
         var_type = XEXP_NODE;
         break;
@@ -1070,9 +1070,9 @@ int N_UTL_ExpressionInternals::get_type ( const string & var )
       case EXPR_T_INSTANCE:
         if (leadDesignator_[index] == ' ')
         {
-          string s = varValues_[index];
+          std::string s = varValues_[index];
           std::string::size_type pos = s.find_last_of(":");
-          if( pos == string::npos )
+          if( pos == std::string::npos )
             pos = 0;
           else
             ++pos;
@@ -1100,14 +1100,14 @@ int N_UTL_ExpressionInternals::get_type ( const string & var )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::get_type
+// Function      : ExpressionInternals::get_type
 // Purpose       : Finds the type of an input quantity name
 // Special Notes :
 // Scope         :
 // Creator       : Rich Schiek, Electrical Systems Modeling, Sandia National Lab
 // Creation Date : 01/15/13
 //-----------------------------------------------------------------------------
-char N_UTL_ExpressionInternals::get_lead_designator ( const string & var )
+char ExpressionInternals::get_lead_designator ( const std::string & var )
 {
   int index;
   int var_type;
@@ -1120,14 +1120,14 @@ char N_UTL_ExpressionInternals::get_lead_designator ( const string & var )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::make_constant
+// Function      : ExpressionInternals::make_constant
 // Purpose       : Convert a 'string' placeholder into a constant
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/07/01
 //-----------------------------------------------------------------------------
-bool N_UTL_ExpressionInternals::make_constant (const string & var,
+bool ExpressionInternals::make_constant (const std::string & var,
                                       const double & val)
 {
   int index;
@@ -1149,14 +1149,14 @@ bool N_UTL_ExpressionInternals::make_constant (const string & var,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::make_var
+// Function      : ExpressionInternals::make_var
 // Purpose       : Convert a 'string' placeholder into a variable
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/07/01
 //-----------------------------------------------------------------------------
-bool N_UTL_ExpressionInternals::make_var (string const & var)
+bool ExpressionInternals::make_var (std::string const & var)
 {
   int index;
   bool retval = false;
@@ -1185,14 +1185,14 @@ bool N_UTL_ExpressionInternals::make_var (string const & var)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::differentiate
+// Function      : ExpressionInternals::differentiate
 // Purpose       : Form the analytic derivative tree_s for all variables
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/07/01
 //-----------------------------------------------------------------------------
-int N_UTL_ExpressionInternals::differentiate ()
+int ExpressionInternals::differentiate ()
 {
   int i;
 
@@ -1209,22 +1209,25 @@ int N_UTL_ExpressionInternals::differentiate ()
     }
     simplify_ (*tree_);
     derivs_.resize(numVars_);
-#ifdef Xyce_DEBUG_EXPRESSION
-      cout << endl;
-#endif // Xyce_DEBUG_EXPRESSION
+
+    if (DEBUG_EXPRESSION)
+      Xyce::dout() << std::endl;
+
     for (i=0 ; i<numVars_ ; ++i)
     {
-#ifdef Xyce_DEBUG_EXPRESSION
-      cout << "Differentiating with respect to: " << varStr_(i) << ":\n" <<
-                get_expression() << endl;
-#endif // Xyce_DEBUG_EXPRESSION
+
+      if (DEBUG_EXPRESSION)
+        Xyce::dout() << "Differentiating with respect to: " << varStr_(i) << ":\n" <<
+          get_expression() << std::endl;
+
       derivs_[i] = Differentiate_ (tree_, i);
-#ifdef Xyce_DEBUG_EXPRESSION
-      ostringstream s("");
-      s << setprecision(PRECISION);
-      RpTree_ (derivs_[i], s);
-      cout << "Derivative:\n" << s.str() << endl << endl;
-#endif // Xyce_DEBUG_EXPRESSION
+
+      if (DEBUG_EXPRESSION) {
+        std::ostringstream s("");
+        s << std::setprecision(PRECISION);
+        RpTree_ (derivs_[i], s);
+        Xyce::dout() << "Derivative:\n" << s.str() << std::endl << std::endl;
+      }
     }
     differentiated_ = true;
     return numVars_;
@@ -1234,17 +1237,20 @@ int N_UTL_ExpressionInternals::differentiate ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::set_var
+// Function      : ExpressionInternals::set_var
 // Purpose       : Sets the value of an input quantity
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/07/01
 //-----------------------------------------------------------------------------
-bool N_UTL_ExpressionInternals::set_var ( const string & var,
+bool ExpressionInternals::set_var ( const std::string & var,
                                  const double & val)
 {
   int ind;
+
+  if (DEBUG_EXPRESSION) 
+    Xyce::dout() << "ExpressionInternals::set_var(" << var << " , " << val << ")" << std::endl;
 
   if ( ( ind = find_num_( var ) ) >= 0 )
   {
@@ -1265,48 +1271,42 @@ bool N_UTL_ExpressionInternals::set_var ( const string & var,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::set_vars
+// Function      : ExpressionInternals::set_vars
 // Purpose       : Sets the values of all input quantities
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/07/01
 //-----------------------------------------------------------------------------
-bool N_UTL_ExpressionInternals::set_vars ( const vector<double> & vals )
+bool ExpressionInternals::set_vars ( const std::vector<double> & vals )
 {
-  if ( num_string_ > 0 || num_func_ > 0 )
-      return false;
-
   int jLimit = vals.size();
   for (int i=0, j=0 ; i<numVars_ ; ++i)
   {
-    if ( varTypes_[i] != EXPR_T_SPECIAL )
+    if (var_vals_[i] != vals[j])
     {
-      if (var_vals_[i] != vals[j])
-      {
-        values_changed_ = true;
-        var_vals_[i] = vals[j];
-      }
-      if(++j >= jLimit)
-        break;
+      values_changed_ = true;
+      var_vals_[i] = vals[j];
     }
+    if(++j >= jLimit)
+      break;
   }
 
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::get_expression
+// Function      : ExpressionInternals::get_expression
 // Purpose       : Returns a string of the expression
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/07/01
 //-----------------------------------------------------------------------------
-string N_UTL_ExpressionInternals::get_expression ()
+std::string ExpressionInternals::get_expression ()
 {
-  ostringstream s("");
-  s << setprecision(PRECISION);
+  std::ostringstream s("");
+  s << std::setprecision(PRECISION);
   if (tree_ != NULL)
     RpTree_ (tree_, s);
 
@@ -1314,14 +1314,14 @@ string N_UTL_ExpressionInternals::get_expression ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::get_derivative
+// Function      : ExpressionInternals::get_derivative
 // Purpose       : Returns a string of a derivative
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/07/01
 //-----------------------------------------------------------------------------
-string N_UTL_ExpressionInternals::get_derivative ( string const & var )
+std::string ExpressionInternals::get_derivative ( std::string const & var )
 {
   int index;
 
@@ -1332,14 +1332,12 @@ string N_UTL_ExpressionInternals::get_derivative ( string const & var )
     {
       if (differentiate() < 0)
       {
-        msg ="N_UTL_ExpressionInternals::get_derivative: ";
-        msg += "Unable to differentiate:\n";
-        msg += get_expression();
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+        Report::UserError() << "Unable to differentiate: " << get_expression();
+        return NULL;
       }
     }
-    ostringstream s("");
-    s << setprecision(PRECISION);
+    std::ostringstream s("");
+    s << std::setprecision(PRECISION);
     RpTree_ (derivs_[index], s);
     return s.str();
   }
@@ -1348,14 +1346,14 @@ string N_UTL_ExpressionInternals::get_derivative ( string const & var )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::get_num
+// Function      : ExpressionInternals::get_num
 // Purpose       : Returns the number of input quantities of a requested type
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 07/12/01
 //-----------------------------------------------------------------------------
-int N_UTL_ExpressionInternals::get_num(int const & type)
+int ExpressionInternals::get_num(int const & type)
 {
   switch (type)
   {
@@ -1380,23 +1378,23 @@ int N_UTL_ExpressionInternals::get_num(int const & type)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::evaluate
+// Function      : ExpressionInternals::evaluate
 // Purpose       : Evaluate expression and derivatives using provided input values
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/07/01
 //-----------------------------------------------------------------------------
-int N_UTL_ExpressionInternals::evaluate ( double & exp_r,
-                                 vector<double> & deriv_r,
-                                 vector<double> & vals )
+int ExpressionInternals::evaluate ( double & exp_r,
+                                 std::vector<double> & deriv_r,
+                                 std::vector<double> & vals )
 {
   set_vars(vals);
   return evaluate ( exp_r, deriv_r );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::evaluateFunction
+// Function      : ExpressionInternals::evaluateFunction
 // Purpose       : Evaluate expression using provided input values.
 // Special Notes : This is for cases in which the user does not need
 //                 the derivatives.
@@ -1404,32 +1402,31 @@ int N_UTL_ExpressionInternals::evaluate ( double & exp_r,
 // Creator       : Eric Keiter, SNL
 // Creation Date : 04/14/08
 //-----------------------------------------------------------------------------
-int N_UTL_ExpressionInternals::evaluateFunction ( double & exp_r,
-                                                  vector<double> & vals )
+int ExpressionInternals::evaluateFunction ( double & exp_r,
+                                                  std::vector<double> & vals )
 {
   set_vars(vals);
   return evaluateFunction ( exp_r );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::evaluate
+// Function      : ExpressionInternals::evaluate
 // Purpose       : Evaluate expression and derivatives using stored input values
 // Special Notes :
 // Scope         : private
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/07/01
 //-----------------------------------------------------------------------------
-int N_UTL_ExpressionInternals::evaluate ( double & exp_r,
-                                 vector<double> & deriv_r)
+int ExpressionInternals::evaluate ( double & exp_r,
+                                 std::vector<double> & deriv_r)
 {
   if (!differentiated_)
   {
     if (differentiate() < 0)
     {
-      msg ="N_UTL_ExpressionInternals::evaluate: ";
-      msg += "Unable to differentiate:\n";
-      msg += get_expression();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+      Report::UserError() << "Unable to differentiate: " << get_expression();
+      EXPR_ERROR (EXPR_NODERIV_FATAL);
+      return EXPRerrno;
     }
   }
 
@@ -1459,14 +1456,14 @@ int N_UTL_ExpressionInternals::evaluate ( double & exp_r,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::evaluateFunction
+// Function      : ExpressionInternals::evaluateFunction
 // Purpose       : Evaluate expression using stored input values
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/07/01
 //-----------------------------------------------------------------------------
-int N_UTL_ExpressionInternals::evaluateFunction ( double & exp_r )
+int ExpressionInternals::evaluateFunction ( double & exp_r )
 {
   int i;
 
@@ -1486,34 +1483,34 @@ int N_UTL_ExpressionInternals::evaluateFunction ( double & exp_r )
     }
     curr_num_ = 1;
   }
-#ifdef Xyce_DEBUG_EXPRESSION
-  cout << "In evaluateFunction with curr_num_ = " << curr_num_ << endl;
-  cout << " evaluating expression " << get_expression() << endl;
-#endif
+  if (DEBUG_EXPRESSION)
+    Xyce::dout() << "In evaluateFunction with curr_num_ = " << curr_num_ << std::endl
+                 << " evaluating expression " << get_expression() << std::endl;
+
   EXPReval_( *tree_, exp_r, var_vals_ );
-#ifdef Xyce_DEBUG_EXPRESSION
-  cout << "Evaluated value = " << exp_r << endl;
-#endif // Xyce_DEBUG_EXPRESSION
+
+  if (DEBUG_EXPRESSION)
+    Xyce::dout() << "Evaluated value = " << exp_r << std::endl;
 
   return EXPRerrno;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::set_sim_time
+// Function      : ExpressionInternals::set_sim_time
 // Purpose       : Set 'time' special variable in expression
 // Special Notes :
 // Scope         : public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 07/12/01
 //-----------------------------------------------------------------------------
-bool N_UTL_ExpressionInternals::set_sim_time(double const & time)
+bool ExpressionInternals::set_sim_time(double const & time)
 {
   if ( time != sim_time_ )
   {
     values_changed_ = true;
   }
 
-  if (set_var(string("TIME"), time))
+  if (set_var(std::string("TIME"), time))
   {
     values_changed_ = true;
   }
@@ -1524,27 +1521,27 @@ bool N_UTL_ExpressionInternals::set_sim_time(double const & time)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::set_temp
+// Function      : ExpressionInternals::set_temp
 // Purpose       : Set 'temp' special variable in expression
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/11/06
 //-----------------------------------------------------------------------------
-bool N_UTL_ExpressionInternals::set_temp(double const & tempIn)
+bool ExpressionInternals::set_temp(double const & tempIn)
 {
-  return set_var(string("TEMP"), tempIn-CONSTCtoK);
+  return set_var(std::string("TEMP"), tempIn-CONSTCtoK);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::set_accepted_time
+// Function      : ExpressionInternals::set_accepted_time
 // Purpose       : Set accepted time for converged soltion
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 04/26/05
 //-----------------------------------------------------------------------------
-void N_UTL_ExpressionInternals::set_accepted_time()
+void ExpressionInternals::set_accepted_time()
 {
   if (accepted_time != tentative_accepted_time)
   {
@@ -1556,7 +1553,7 @@ void N_UTL_ExpressionInternals::set_accepted_time()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::get_break_time
+// Function      : ExpressionInternals::get_break_time
 // Purpose       : Returns next breakpoint time
 //
 // Special Notes : ERK.  The usage of "set_sim_time" is very odd in
@@ -1568,21 +1565,19 @@ void N_UTL_ExpressionInternals::set_accepted_time()
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 07/12/01
 //-----------------------------------------------------------------------------
-double N_UTL_ExpressionInternals::get_break_time_i()
+double ExpressionInternals::get_break_time_i()
 {
   double bp, bp2, rval, rval_old, delta;
   double old_time, val, t_limit;
   int i;
-  vector <ExpressionNode *>::iterator break_i, best_break_i;
+  std::vector<ExpressionNode *>::iterator break_i, best_break_i;
 
   if (!breakpointed_)
   {
     if (num_string_ > 0 || num_func_ > 0)
     {
-      msg ="N_UTL_ExpressionInternals::get_break_time: failed to obtain breakpoint in:\n";
-      msg += Input_;
-      msg += "\nExpression is not fully resolved";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING, msg );
+      Report::UserWarning() << "Failed to obtain breakpoint in: " << Input_ << std::endl
+                            << "Expression is not fully resolved";
       return 0;
     }
     if (time_index == -1)
@@ -1599,21 +1594,22 @@ double N_UTL_ExpressionInternals::get_break_time_i()
     breaks_.clear();
     get_breaks_ (*tree_);
     breakpointed_ = true;
-#ifdef Xyce_DEBUG_EXPRESSION
-    cout << "Generated " << breaks_.size() << " breakpoint expression";
-    if (breaks_.size() != 1)
-      cout << "s";
-    if (breaks_.size() > 0)
-      cout << ":";
-    cout << endl;
-    for (break_i = breaks_.begin() ; break_i != breaks_.end() ; ++break_i)
-    {
-      ostringstream s("");
-      s << setprecision(5);
-      RpTree_ (*break_i, s);
-      cout << s.str() << endl;
+
+    if (DEBUG_EXPRESSION) {
+      Xyce::dout() << "Generated " << breaks_.size() << " breakpoint expression";
+      if (breaks_.size() != 1)
+        Xyce::dout() << "s";
+      if (breaks_.size() > 0)
+        Xyce::dout() << ":";
+      Xyce::dout() << std::endl;
+      for (break_i = breaks_.begin() ; break_i != breaks_.end() ; ++break_i)
+      {
+        std::ostringstream s("");
+        s << std::setprecision(5);
+        RpTree_ (*break_i, s);
+        Xyce::dout() << s.str() << std::endl;
+      }
     }
-#endif // Xyce_DEBUG_EXPRESSION
   }
 // Now, theoretically we have a list of expressions that will
 // provide linear approximations of the breakpoints, based on the
@@ -1627,7 +1623,7 @@ double N_UTL_ExpressionInternals::get_break_time_i()
     delta = Epsilon;
   else
     delta = old_time*Epsilon;
-//    cout << setprecision(15);
+//    Xyce::dout() << std::setprecision(15);
 
   for (break_i = breaks_.begin(), i=0 ; break_i != breaks_.end() ;
         ++break_i, ++i)
@@ -1664,15 +1660,15 @@ double N_UTL_ExpressionInternals::get_break_time_i()
   rval += delta;
   bp = 1;
   i = 0;
-#ifdef Xyce_DEBUG_EXPRESSION
-    cout << "Before refinement, breakpoint = " << rval << " at time = "
-         << old_time << endl;
-#endif
+  if (DEBUG_EXPRESSION) 
+    Xyce::dout() << "Before refinement, breakpoint = " << rval << " at time = "
+                 << old_time << std::endl;
+
   sim_time_ -= delta;
   set_sim_time(sim_time_);
   (void) evaluateFunction(val);
   EXPReval_ (**best_break_i, bp, var_vals_);
-//    cout << "del = " << fabs(sim_time_+bp - (old_time + rval)) << endl;
+//    Xyce::dout() << "del = " << fabs(sim_time_+bp - (old_time + rval)) << std::endl;
   if (fabs(sim_time_+bp - (old_time + rval)) >= delta)
   {
     while (fabs(bp) > Epsilon && i<20)
@@ -1680,7 +1676,7 @@ double N_UTL_ExpressionInternals::get_break_time_i()
       set_sim_time(sim_time_);
       (void) evaluateFunction(val);
       EXPReval_ (**best_break_i, bp, var_vals_);
-//        cout << "time = " << sim_time_ << "  bp = " << bp << endl;
+//        Xyce::dout() << "time = " << sim_time_ << "  bp = " << bp << std::endl;
       sim_time_ += bp;
       ++i;
     }
@@ -1694,28 +1690,27 @@ double N_UTL_ExpressionInternals::get_break_time_i()
     sim_time_ = rval;
     set_sim_time(sim_time_);
   }
-#ifdef Xyce_DEBUG_EXPRESSION
-  cout << "After refinement, breakpoint = " << rval << endl;
-#endif
+  if (DEBUG_EXPRESSION)
+    Xyce::dout() << "After refinement, breakpoint = " << rval << std::endl;
 
   return rval;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::get_input
+// Function      : ExpressionInternals::get_input
 // Purpose       : Return expression input string
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/07/01
 //-----------------------------------------------------------------------------
-const string & N_UTL_ExpressionInternals::get_input ()
+const std::string & ExpressionInternals::get_input ()
 {
   return (Input_);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::order_names
+// Function      : ExpressionInternals::order_names
 // Purpose       : Put input quantity names in a particular order (used for
 //                 replace_func which requires identical ordering for expression
 //                 and user defined function
@@ -1724,33 +1719,34 @@ const string & N_UTL_ExpressionInternals::get_input ()
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 07/12/01
 //-----------------------------------------------------------------------------
-int N_UTL_ExpressionInternals::order_names(vector<string> const & new_names)
+int ExpressionInternals::order_names(std::vector<std::string> const & new_names)
 {
-  vector<string>::iterator old_i;
-  vector<string>::const_iterator new_i;
-  string dum;
+  std::vector<std::string>::iterator old_i;
+  std::vector<std::string>::const_iterator new_i;
+  std::string dum;
   int i, j, k, found;
   int istat, n_args;
-  vector<int> Vmap;
+  std::vector<int> Vmap;
 
-  vector <int> t_varTypes_;
-  vector <string> t_varValues_;
-  string t_leadDesignator_;
-  vector <double> t_var_vals_;
-  vector <ExpressionNode *> t_derivs_;
-  vector<int> nmap;
+  std::vector<int> t_varTypes_;
+  std::vector<std::string> t_varValues_;
+  std::string t_leadDesignator_;
+  std::vector<double> t_var_vals_;
+  std::vector<ExpressionNode *> t_derivs_;
+  std::vector<int> nmap;
 
 
-#ifdef Xyce_DEBUG_EXPRESSION
-  vector<string>::const_iterator n_i, n_end;
-  n_i = new_names.begin();
-  n_end = new_names.end();
-  cout << "At start of order_names with name list:" << endl;
-  for ( ; n_i != n_end ; ++n_i)
-    cout << *n_i << endl;
-  cout << "Initial expression:" << endl;
-  cout << get_expression() << endl;
-#endif
+  if (DEBUG_EXPRESSION) {
+    std::vector<std::string>::const_iterator n_i, n_end;
+    n_i = new_names.begin();
+    n_end = new_names.end();
+    Xyce::dout() << "At start of order_names with name list:" << std::endl;
+    for ( ; n_i != n_end ; ++n_i)
+      Xyce::dout() << *n_i << std::endl;
+    Xyce::dout() << "Initial expression:" << std::endl
+                 << get_expression() << std::endl;
+  }
+  
   values_changed_ = true;
   n_args = new_names.size();
 
@@ -1783,7 +1779,7 @@ int N_UTL_ExpressionInternals::order_names(vector<string> const & new_names)
     }
     if (found == j)
     {
-      ostringstream s("");
+      std::ostringstream s("");
       s << "__EXPRdummyString_ForUserFuncArg::";
       s << j;
       dum = s.str();
@@ -1795,7 +1791,7 @@ int N_UTL_ExpressionInternals::order_names(vector<string> const & new_names)
   // Vmap now contains a map of where new names are to be placed into varValues_
   if (numVars_ > n_args)
   {
-    vector<bool> mapped(numVars_, false);
+    std::vector<bool> mapped(numVars_, false);
     for (i=0 ; i<n_args ; ++i)
       mapped[Vmap[i]] = true;
     for (i=0 ; i<numVars_ ; ++i)
@@ -1857,23 +1853,23 @@ int N_UTL_ExpressionInternals::order_names(vector<string> const & new_names)
     }
   }
 
-#ifdef Xyce_DEBUG_EXPRESSION
-  cout << "Final expression:" << endl;
-  cout << get_expression() << endl;
-#endif
+  if (DEBUG_EXPRESSION)
+    Xyce::dout() << "Final expression:" << std::endl
+                 << get_expression() << std::endl;
+
   return 0;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::replace_func
+// Function      : ExpressionInternals::replace_func
 // Purpose       : Replace user defined function with its definition in expression
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 07/12/01
 //-----------------------------------------------------------------------------
-int N_UTL_ExpressionInternals::replace_func (string const & func_name,
-                                   N_UTL_ExpressionInternals & func_def,
+int ExpressionInternals::replace_func (std::string const & func_name,
+                                   ExpressionInternals & func_def,
                                    int numArgs)
 {
 // This initiates the insertion of a previously parsed function into
@@ -1885,10 +1881,9 @@ int N_UTL_ExpressionInternals::replace_func (string const & func_name,
 
   if (differentiated_)
   {
-    msg = "N_UTL_ExpressionInternals::replace_func: Attempt to do replacement";
-    msg += " in differentiated expression: ";
-    msg + get_expression();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg );
+    Report::UserError() << "Attempt to do replacement in differentiated expression: " << get_expression();
+    Ferrno = -1;
+    return Ferrno;
   }
 
   values_changed_ = true;
@@ -1928,7 +1923,7 @@ int N_UTL_ExpressionInternals::replace_func (string const & func_name,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::replace_var
+// Function      : ExpressionInternals::replace_var
 // Purpose       : Replace a variable with a previously parsed subexpression
 // Special Notes : This is primarily needed to handle a case where a subcircuit
 //                 parameter is given a definition in terms of a global param,
@@ -1937,8 +1932,8 @@ int N_UTL_ExpressionInternals::replace_func (string const & func_name,
 // Creator       : Tom Russo, SNL
 // Creation Date : 08/10/2010
 //-----------------------------------------------------------------------------
-int N_UTL_ExpressionInternals::replace_var (string const & varName,
-                                            N_UTL_ExpressionInternals & subexpr)
+int ExpressionInternals::replace_var (std::string const & varName,
+                                            ExpressionInternals & subexpr)
 {
 // This initiates the insertion of a previously parsed function into
 // an expression.  The routine Vreplace_ will search for
@@ -1949,10 +1944,9 @@ int N_UTL_ExpressionInternals::replace_var (string const & varName,
 
   if (differentiated_)
   {
-    msg = "N_UTL_ExpressionInternals::replace_func: Attempt to do replacement";
-    msg += " in differentiated expression: ";
-    msg + get_expression();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg );
+    Report::UserError() << "Attempt to do replacement in differentiated expression: " << get_expression();
+    Ferrno = -1;
+    return Ferrno;
   }
 
   values_changed_ = true;
@@ -1993,15 +1987,15 @@ int N_UTL_ExpressionInternals::replace_var (string const & varName,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::replace_name
+// Function      : ExpressionInternals::replace_name
 // Purpose       : Change the name of an input quantity
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 08/28/01
 //-----------------------------------------------------------------------------
-bool N_UTL_ExpressionInternals::replace_name ( const string & old_name,
-                                      const string & new_name)
+bool ExpressionInternals::replace_name ( const std::string & old_name,
+                                      const std::string & new_name)
 {
   int ind;
 
@@ -2019,14 +2013,14 @@ bool N_UTL_ExpressionInternals::replace_name ( const string & old_name,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::getNumDdt
+// Function      : ExpressionInternals::getNumDdt
 // Purpose       : Return the number of ddt() calls in the expression
 // Special Notes :
 // Scope         : Public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 12/16/05
 //-----------------------------------------------------------------------------
-int N_UTL_ExpressionInternals::getNumDdt ( )
+int ExpressionInternals::getNumDdt ( )
 {
   numDDT = 0;
   RcountDDT_ (*tree_);
@@ -2034,14 +2028,14 @@ int N_UTL_ExpressionInternals::getNumDdt ( )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::getDdtVals
+// Function      : ExpressionInternals::getDdtVals
 // Purpose       : Return the most recent arguments of ddt() in the expression
 // Special Notes :
 // Scope         : Public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 12/16/05
 //-----------------------------------------------------------------------------
-void N_UTL_ExpressionInternals::getDdtVals ( vector<double> & vals )
+void ExpressionInternals::getDdtVals ( std::vector<double> & vals )
 {
   double val;
   numDDT = 0;
@@ -2050,13 +2044,12 @@ void N_UTL_ExpressionInternals::getDdtVals ( vector<double> & vals )
   RgetDDT_ (*tree_, vals);
   if (numDDT != vals.size())
   {
-    msg = "N_UTL_ExpressionInternals::getDdtDerivs: length of return vector inconsistent";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg );
+    Report::DevelFatal().in("ExpressionInternals::getDdtVals") << "Length of return vector inconsistent";
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::setDdtDerivs
+// Function      : ExpressionInternals::setDdtDerivs
 // Purpose       : Set the evaluated value of the ddt functions
 // Special Notes : This is normally done with derivative values from the
 //                 time integration package
@@ -2064,7 +2057,7 @@ void N_UTL_ExpressionInternals::getDdtVals ( vector<double> & vals )
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 12/16/05
 //-----------------------------------------------------------------------------
-void N_UTL_ExpressionInternals::setDdtDerivs ( vector<double> & vals )
+void ExpressionInternals::setDdtDerivs ( std::vector<double> & vals )
 {
   int curr_num_old;
 
@@ -2079,23 +2072,22 @@ void N_UTL_ExpressionInternals::setDdtDerivs ( vector<double> & vals )
 
   if (numDDT != vals.size())
   {
-    msg = "N_UTL_ExpressionInternals::setDdtDerivs: length of return vector inconsistent";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg );
+    Report::DevelFatal().in("ExpressionInternals::setDdtVals") << "Length of return vector inconsistent";
   }
 }
 // Private methods:
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::find_num_
+// Function      : ExpressionInternals::find_num_
 // Purpose       : Find the index of an input quantity
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/07/01
 //-----------------------------------------------------------------------------
-int N_UTL_ExpressionInternals::find_num_( const string & var )
+int ExpressionInternals::find_num_( const std::string & var )
 {
-  for( int ind = 0; ind < numVars_; ++ind )
+  for( int ind                       = 0; ind < numVars_; ++ind )
   {
     if( varValues_[ind] == var )
     {
@@ -2107,18 +2099,18 @@ int N_UTL_ExpressionInternals::find_num_( const string & var )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::set_nums_
+// Function      : ExpressionInternals::set_nums_
 // Purpose       : Set tally of input quantity types
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 07/12/01
 //-----------------------------------------------------------------------------
-void N_UTL_ExpressionInternals::set_nums_()
+void ExpressionInternals::set_nums_()
 {
-  num_N_ = num_I_ = num_lead_ = num_string_ = num_special_ = num_var_ = num_func_ = 0;
+  num_N_                             = num_I_ = num_lead_ = num_string_ = num_special_ = num_var_ = num_func_ = num_node_computation_ = 0;
 
-  for (int i=0 ; i<numVars_ ; ++i)
+  for (int i                         = 0 ; i<numVars_ ; ++i)
   {
     switch (varTypes_[i])
     {
@@ -2128,10 +2120,10 @@ void N_UTL_ExpressionInternals::set_nums_()
       case EXPR_T_INSTANCE:
         if (leadDesignator_[i] == ' ')
         {
-          string s = varValues_[i];
-          string::size_type pos = s.find_last_of(":");
-          if( pos == string::npos )
-            pos = 0;
+          std::string s              = varValues_[i];
+          std::string::size_type pos = s.find_last_of(":");
+          if( pos == std::string::npos )
+            pos                      = 0;
           else
             ++pos;
           if (s[pos] == 'V')
@@ -2153,23 +2145,25 @@ void N_UTL_ExpressionInternals::set_nums_()
       case EXPR_T_FUNCTION:
         ++num_func_;
         break;
+      case EXPR_T_NODAL_COMPUTATION:
+        ++num_node_computation_;
+        break;
       default:
-        msg ="N_UTL_ExpressionInternals::set_nums_: ";
-        msg += "Bad variable type found in Xyce_expression constructor";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+        Report::DevelFatal().in("ExpressionInternals::set_nums_") << "Bad variable type found in expression";
+        break;
     }
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::create_vars_
+// Function      : ExpressionInternals::create_vars_
 // Purpose       : Create vector for input quantity values
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/07/01
 //-----------------------------------------------------------------------------
-void N_UTL_ExpressionInternals::create_vars_ ()
+void ExpressionInternals::create_vars_ ()
 {
   var_vals_.resize( numVars_ );
 
@@ -2179,7 +2173,7 @@ void N_UTL_ExpressionInternals::create_vars_ ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::copy_elements_
+// Function      : ExpressionInternals::copy_elements_
 // Purpose       : Copy a list of ExpressionElements
 // Special Notes :
 // Scope         :
@@ -2187,11 +2181,11 @@ void N_UTL_ExpressionInternals::create_vars_ ()
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::copy_elements_ (list <ExpressionElement *> &to,
-                                      list <ExpressionElement *> *from)
+void ExpressionInternals::copy_elements_ (std::list<ExpressionElement *> &to,
+                                      std::list<ExpressionElement *> *from)
 {
   ExpressionElement *el;
-  list <ExpressionElement *>::iterator exp_i;
+  std::list<ExpressionElement *>::iterator exp_i;
 
   for (exp_i = from->begin() ; exp_i != from->end() ; ++exp_i)
   {
@@ -2204,7 +2198,7 @@ void N_UTL_ExpressionInternals::copy_elements_ (list <ExpressionElement *> &to,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::copy_element_
+// Function      : ExpressionInternals::copy_element_
 // Purpose       : Copy a single ExpressionElement
 // Special Notes :
 // Scope         :
@@ -2212,7 +2206,7 @@ void N_UTL_ExpressionInternals::copy_elements_ (list <ExpressionElement *> &to,
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::copy_element_ (ExpressionElement *to, ExpressionElement *from)
+void ExpressionInternals::copy_element_ (ExpressionElement *to, ExpressionElement *from)
 {
   to->token = from->token;
   if (from->token == TOK_VALUE)
@@ -2234,7 +2228,7 @@ void N_UTL_ExpressionInternals::copy_element_ (ExpressionElement *to, Expression
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::makepnode_
+// Function      : ExpressionInternals::makepnode_
 // Purpose       : Create a ExpressionNode from a ExpressionElement
 // Special Notes :
 // Scope         :
@@ -2242,7 +2236,7 @@ void N_UTL_ExpressionInternals::copy_element_ (ExpressionElement *to, Expression
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-ExpressionNode * N_UTL_ExpressionInternals::makepnode_ (ExpressionElement *elem)
+ExpressionNode * ExpressionInternals::makepnode_ (ExpressionElement *elem)
 {
   if (elem->token != TOK_VALUE)
     return (NULL);
@@ -2259,14 +2253,13 @@ ExpressionNode * N_UTL_ExpressionInternals::makepnode_ (ExpressionElement *elem)
       return (elem->node);
 
     default:
-      msg ="N_UTL_ExpressionInternals::makepnode_: Internal error, unknown type";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
-      return (NULL);   // never gets here
+      Report::DevelFatal().in("ExpressionInternals::makepnode_") << "Internal error, unknown type";
+      return 0;
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::mkfnode_
+// Function      : ExpressionInternals::mkfnode_
 // Purpose       : Create a function ExpressionNode from a function name and args
 // Special Notes :
 // Scope         :
@@ -2274,12 +2267,12 @@ ExpressionNode * N_UTL_ExpressionInternals::makepnode_ (ExpressionElement *elem)
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-ExpressionNode * N_UTL_ExpressionInternals::mkfnode_ (const string & fname, int num_args,
-                                        vector <ExpressionNode *> args)      // Function node
+ExpressionNode * ExpressionInternals::mkfnode_ (const std::string & fname, int num_args,
+                                        std::vector<ExpressionNode *> args)      // Function node
 {
   int i;
   ExpressionNode *p, *expp, *sinpp;
-  string name;
+  std::string name;
   ExpressionNode *arg1, *e1, *e2;
   ExpressionNode *newp, *newp2, *newp_if, *newp_if1, *newp_if2;
 
@@ -2393,23 +2386,23 @@ ExpressionNode * N_UTL_ExpressionInternals::mkfnode_ (const string & fname, int 
 //         PER = period
     if (num_args < 5)
     {
-      msg ="N_UTL_ExpressionInternals::mkfnode_: Fewer than 5 args in pulse function in:\n";
-      msg += Input_;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+      Report::UserError() << "Fewer than 5 args in pulse function: " << Input_;
+      newp = mkcon_(0);
+      return newp;
     }
     if (num_args > 7)
     {
-      msg ="N_UTL_ExpressionInternals::mkfnode_: more than 7 args in pulse function in:\n";
-      msg += Input_;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+      Report::UserError() << "More than 7 args in pulse function: " << Input_;
+      newp = mkcon_(0);
+      return newp;
     }
 // periodic pulse case, include remainder in first argument of table
 // if(time >= TD, TABLE((time - TD) % PER, t*, v*), V1)
     if (num_args == 7)
-      newp = mkf_(EXPR_F_TABLE, mkb_(EXPR_REMAINDER, mkb_(EXPR_MINUS, mksnode_(string("TIME")),
+      newp = mkf_(EXPR_F_TABLE, mkb_(EXPR_REMAINDER, mkb_(EXPR_MINUS, mksnode_(std::string("TIME")),
                   args[2]), args[6]));
     else
-      newp = mkf_(EXPR_F_TABLE, mkb_(EXPR_MINUS, mksnode_(string("TIME")), args[2]));
+      newp = mkf_(EXPR_F_TABLE, mkb_(EXPR_MINUS, mksnode_(std::string("TIME")), args[2]));
 
     newp->operands[1] = mkcon_(0);                           //  0, V1
     newp->operands[2] = args[0];
@@ -2436,15 +2429,15 @@ ExpressionNode * N_UTL_ExpressionInternals::mkfnode_ (const string & fname, int 
 //         THETA = damping factor
     if (num_args < 3)
     {
-      msg ="N_UTL_ExpressionInternals::mkfnode_: Fewer than 3 args in sin function in:\n";
-      msg += Input_;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+      Report::UserError() << "Fewer than 3 args in sin function: " << Input_;
+      newp = mkcon_(0);
+      return newp;
     }
     if (num_args > 5)
     {
-      msg ="N_UTL_ExpressionInternals::mkfnode_: more than 5 args in sin function in:\n";
-      msg += Input_;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+      Report::UserError() << "More than 5 args in sin function: " << Input_;
+      newp = mkcon_(0);
+      return newp;
     }
     if (num_args < 5)
     {
@@ -2452,19 +2445,19 @@ ExpressionNode * N_UTL_ExpressionInternals::mkfnode_ (const string & fname, int 
     }
     else
     {
-      expp = mkf_ (EXPR_F_EXP, mkb_(EXPR_TIMES, mkb_ (EXPR_MINUS, args[3], mksnode_(string("TIME"))), args[4]));
+      expp = mkf_ (EXPR_F_EXP, mkb_(EXPR_TIMES, mkb_ (EXPR_MINUS, args[3], mksnode_(std::string("TIME"))), args[4]));
     }
     if (num_args < 4)
     {
       sinpp = mkf_ (EXPR_F_SIN, mkb_ (EXPR_TIMES, mkb_ (EXPR_TIMES, mkcon_(2*M_PI), args[2]),
-                mksnode_(string("TIME"))));
+                mksnode_(std::string("TIME"))));
     }
     else
     {
       sinpp = mkf_ (EXPR_F_SIN, mkb_ (EXPR_TIMES, mkb_ (EXPR_TIMES, mkcon_(2*M_PI), args[2]),
-                mkb_ (EXPR_MINUS, mksnode_(string("TIME")), args[3]) ));
+                mkb_ (EXPR_MINUS, mksnode_(std::string("TIME")), args[3]) ));
     }
-    newp_if = mkf_(EXPR_F_IF, mkb_(EXPR_GREATEQ, mksnode_(string("TIME")), args[3]));
+    newp_if = mkf_(EXPR_F_IF, mkb_(EXPR_GREATEQ, mksnode_(std::string("TIME")), args[3]));
     newp_if->operands[1] = mkb_(EXPR_TIMES, args[1], mkb_(EXPR_TIMES, expp, sinpp));
     newp_if->operands[2] = mkcon_(0.);
     newp = mkb_ (EXPR_PLUS, args[0], newp_if);
@@ -2482,22 +2475,22 @@ ExpressionNode * N_UTL_ExpressionInternals::mkfnode_ (const string & fname, int 
 //         TAU2 = fall time constant
     if (num_args < 6)
     {
-      msg ="N_UTL_ExpressionInternals::mkfnode_: Fewer than 6 args in exp function in:\n";
-      msg += Input_;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+      Report::UserError() << "Fewer than 6 args in exp function: " << Input_;
+      newp = mkcon_(0);
+      return newp;
     }
     if (num_args > 6)
     {
-      msg ="N_UTL_ExpressionInternals::mkfnode_: more than 6 args in exp function in:\n";
-      msg += Input_;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+      Report::UserError() << "More than 6 args in exp function: " << Input_;
+      newp = mkcon_(0);
+      return newp;
     }
-    e1 = mkf_ (EXPR_F_EXP, mkb_(EXPR_DIVIDE, mkb_(EXPR_MINUS, args[2], mksnode_(string("TIME"))), args[3]));
-    e2 = mkf_ (EXPR_F_EXP, mkb_(EXPR_DIVIDE, mkb_(EXPR_MINUS, args[4], mksnode_(string("TIME"))), args[5]));
-    newp_if2 = mkf_(EXPR_F_IF, mkb_(EXPR_GREATEQ, mksnode_(string("TIME")), args[4]));
+    e1 = mkf_ (EXPR_F_EXP, mkb_(EXPR_DIVIDE, mkb_(EXPR_MINUS, args[2], mksnode_(std::string("TIME"))), args[3]));
+    e2 = mkf_ (EXPR_F_EXP, mkb_(EXPR_DIVIDE, mkb_(EXPR_MINUS, args[4], mksnode_(std::string("TIME"))), args[5]));
+    newp_if2 = mkf_(EXPR_F_IF, mkb_(EXPR_GREATEQ, mksnode_(std::string("TIME")), args[4]));
     newp_if2->operands[1] = mkb_(EXPR_MINUS, e2, e1);
     newp_if2->operands[2] = mkb_(EXPR_MINUS, mkcon_(1), e1);
-    newp_if1 = mkf_(EXPR_F_IF, mkb_(EXPR_GREATEQ, mksnode_(string("TIME")), args[2]));
+    newp_if1 = mkf_(EXPR_F_IF, mkb_(EXPR_GREATEQ, mksnode_(std::string("TIME")), args[2]));
     newp_if1->operands[1] = mkb_(EXPR_TIMES, mkb_(EXPR_MINUS, args[1], args[0]), newp_if2);
     newp_if1->operands[2] = mkcon_(0);
     newp = mkb_(EXPR_PLUS, args[0], newp_if1);
@@ -2514,21 +2507,21 @@ ExpressionNode * N_UTL_ExpressionInternals::mkfnode_ (const string & fname, int 
 //         FS = signal frequency
     if (num_args < 5)
     {
-      msg ="N_UTL_ExpressionInternals::mkfnode_: Fewer than 5 args in sffm function in:\n";
-      msg += Input_;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+      Report::UserError() << "Fewer than 5 args in sffm function: " << Input_;
+      newp = mkcon_(0);
+      return newp;
     }
     if (num_args > 5)
     {
-      msg ="N_UTL_ExpressionInternals::mkfnode_: more than 5 args in sffm function in:\n";
-      msg += Input_;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+      Report::UserError() << "More than 5 args in sffm function: " << Input_;
+      newp = mkcon_(0);
+      return newp;
     }
     newp = mkb_(EXPR_PLUS, args[0], mkb_(EXPR_TIMES, args[1], mkf_(EXPR_F_SIN,
               mkb_(EXPR_PLUS, mkb_(EXPR_TIMES, mkcon_(2*M_PI), mkb_(EXPR_TIMES,
-                args[2], mksnode_(string("TIME")))),mkb_(EXPR_TIMES, args[3], mkf_(EXPR_F_SIN,
+                args[2], mksnode_(std::string("TIME")))),mkb_(EXPR_TIMES, args[3], mkf_(EXPR_F_SIN,
                   mkb_(EXPR_TIMES, mkcon_(2*M_PI), mkb_(EXPR_TIMES, args[4],
-                    mksnode_(string("TIME"))))))))));
+                    mksnode_(std::string("TIME"))))))))));
     return newp;
   }
 
@@ -2537,8 +2530,10 @@ ExpressionNode * N_UTL_ExpressionInternals::mkfnode_ (const string & fname, int 
   for (i=0 ; i<num_args ; ++i)
     p->operands[i] = args[i];
 
+
   if (fname == "V")
   {
+    // Handle V(A) and V(A,B)
     name = "";
     if (args[0]->type == EXPR_PLACEHOLDER)
     {
@@ -2546,14 +2541,14 @@ ExpressionNode * N_UTL_ExpressionInternals::mkfnode_ (const string & fname, int 
     }
     else
     {
-      msg ="N_UTL_ExpressionInternals::mkfnode_: Internal: Badly formed node voltage in:\n";
-      msg += Input_;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+      Report::UserError() << "Badly formed node voltage: " << Input_;
+      newp = mkcon_(0);
+      return newp;
     }
-
     if (num_args == 2)
+
     {
-// Change v(a,b) into v(a) - v(b)
+      // Change v(a,b) into v(a) - v(b)
       arg1 = mkfnode_(fname, 1, args);
       p = mkb_(EXPR_MINUS, arg1, mkfnode_(fname, 1, args[1]));
     }
@@ -2597,13 +2592,13 @@ ExpressionNode * N_UTL_ExpressionInternals::mkfnode_ (const string & fname, int 
     }
     else
     {
-      msg ="N_UTL_ExpressionInternals::mkfnode_: Internal: Badly formed branch current in:\n";
-      msg += Input_;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+      Report::UserError() << "Badly formed branch current: " << Input_;
+      newp = mkcon_(0);
+      return newp;
     }
-#ifdef Xyce_DEBUG_EXPRESSION
-    cout << "getting a device called: " << name << endl;
-#endif
+    if (DEBUG_EXPRESSION)
+      Xyce::dout() << "getting a device called: " << name << std::endl;
+
     for (i = 0; i < numVars_; ++i)
     {
       if (varTypes_[i] == EXPR_T_INSTANCE && varValues_[i] == name &&
@@ -2623,6 +2618,60 @@ ExpressionNode * N_UTL_ExpressionInternals::mkfnode_ (const string & fname, int 
         leadDesignator_[i] = fname[1];
       else
         leadDesignator_[i] = ' ';
+      var_vals_[i] = 0;
+      ++numVars_;
+    }
+    p->valueIndex = i;
+    p->type = EXPR_VAR;
+  }
+  else if (fname == "VR" || fname == "VI" || fname == "VM" || fname == "VP" || fname == "VDB")
+  {
+    // Handle the special frequency-domain output types.
+    // In initial implementation, this will ONLY be accessible from 
+    // the .print line, these won't work in device expressions!
+
+    // We will simply construct the "pretty" name of the request, and let
+    // the consumer of this expression take care of setting it up.
+
+    if (DEBUG_EXPRESSION) {     
+      Xyce::dout() << "processing function node: " << fname << Util::push 
+                   << std::endl;
+      Xyce::dout() << "args:" << Util::push << std::endl;
+      for (i=0; i<num_args; i++)
+      {
+        Xyce::dout()<< args[i]->funcname << std::endl;
+      }
+      Xyce::dout() << Util::pop << std::endl;
+    }
+
+    name = fname + "(";
+    for (i=0; i<num_args; i++)
+    {
+      if (i>0) 
+        name += ",";
+      name += args[i]->funcname;
+    }
+    name += ")";
+
+    if (DEBUG_EXPRESSION)       
+      Xyce::dout() << "Pretty name: " << name << std::endl
+                   << Util::pop << std::endl;
+
+    for (i = 0; i < numVars_; ++i)
+    {
+      if (varTypes_[i] == EXPR_T_NODAL_COMPUTATION && varValues_[i] == name)
+        break;
+    }
+    if (i == numVars_)
+    {
+      varValues_.resize (numVars_ + 1);
+      varTypes_.resize (numVars_ + 1);
+      leadDesignator_.resize (numVars_ + 1);
+      var_vals_.resize (numVars_ + 1);
+      
+      varValues_[i] = name;
+      varTypes_[i] = EXPR_T_NODAL_COMPUTATION;
+      leadDesignator_[i] = ' ';
       var_vals_[i] = 0;
       ++numVars_;
     }
@@ -2672,7 +2721,7 @@ ExpressionNode * N_UTL_ExpressionInternals::mkfnode_ (const string & fname, int 
         p->operands.resize(num_args);
         if (num_args%2 == 0)
         {
-          msg ="N_UTL_ExpressionInternals::mkfnode_: Internal: Even number of args in table function in:\n";
+          msg ="ExpressionInternals::mkfnode_: Internal: Even number of args in table function in:\n";
           msg += Input_;
           N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
         }
@@ -2685,7 +2734,7 @@ ExpressionNode * N_UTL_ExpressionInternals::mkfnode_ (const string & fname, int 
         {
           // we've added an implicit argument "TIME", so if the total is now even, then the user
           // didn't give us a good list of pairs.  Issue a error
-          msg ="N_UTL_ExpressionInternals::mkfnode_: Internal: Odd number of args in schedule function in:\n";
+          msg ="ExpressionInternals::mkfnode_: Internal: Odd number of args in schedule function in:\n";
           msg += Input_;
           N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
         }
@@ -2694,14 +2743,14 @@ ExpressionNode * N_UTL_ExpressionInternals::mkfnode_ (const string & fname, int 
       {
         if (num_args != funcs[i].num_args)
         {
-          ostringstream s("");
-          s << "N_UTL_ExpressionInternals::mkfnode_: number of arguments " << num_args
+          std::ostringstream s("");
+          s << "ExpressionInternals::mkfnode_: number of arguments " << num_args
             << " not correct for function: ";
 
           s << funcs[i].name;
           s <<  "\nin expression: ";
-          s <<  Input_ << endl;
-          s << " Required number is " << funcs[i].num_args << endl;
+          s <<  Input_ << std::endl;
+          s << " Required number is " << funcs[i].num_args << std::endl;
           N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, s.str() );
         }
       }
@@ -2718,7 +2767,7 @@ ExpressionNode * N_UTL_ExpressionInternals::mkfnode_ (const string & fname, int 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::mkfnode_
+// Function      : ExpressionInternals::mkfnode_
 // Purpose       : Make a function ExpressionNode from a single ExpressionNode *
 // Special Notes :
 // Scope         :
@@ -2726,9 +2775,9 @@ ExpressionNode * N_UTL_ExpressionInternals::mkfnode_ (const string & fname, int 
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-ExpressionNode * N_UTL_ExpressionInternals::mkfnode_ (const string & fname, int num_args, ExpressionNode *n)
+ExpressionNode * ExpressionInternals::mkfnode_ (const std::string & fname, int num_args, ExpressionNode *n)
 {
-  vector <ExpressionNode *> args;
+  std::vector<ExpressionNode *> args;
 
   args.clear();
   args.push_back(n);
@@ -2736,7 +2785,7 @@ ExpressionNode * N_UTL_ExpressionInternals::mkfnode_ (const string & fname, int 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::mksnode_
+// Function      : ExpressionInternals::mksnode_
 // Purpose       : Make a string ExpressionNode
 // Special Notes :
 // Scope         : private
@@ -2744,7 +2793,7 @@ ExpressionNode * N_UTL_ExpressionInternals::mkfnode_ (const string & fname, int 
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-ExpressionNode * N_UTL_ExpressionInternals::mksnode_ (const string & name)   // String node
+ExpressionNode * ExpressionInternals::mksnode_ (const std::string & name)   // String node
 {
   int i, j;
   ExpressionNode *p;
@@ -2822,7 +2871,7 @@ ExpressionNode * N_UTL_ExpressionInternals::mksnode_ (const string & name)   // 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::mkcon_
+// Function      : ExpressionInternals::mkcon_
 // Purpose       : Make a constant ExpressionNode
 // Special Notes :
 // Scope         :
@@ -2830,7 +2879,7 @@ ExpressionNode * N_UTL_ExpressionInternals::mksnode_ (const string & name)   // 
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-ExpressionNode * N_UTL_ExpressionInternals::mkcon_ (double value)
+ExpressionNode * ExpressionInternals::mkcon_ (double value)
 {
   ExpressionNode *p;
 
@@ -2843,7 +2892,7 @@ ExpressionNode * N_UTL_ExpressionInternals::mkcon_ (double value)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::mkb_
+// Function      : ExpressionInternals::mkb_
 // Purpose       : Make a binary op ExpressionNode with simplification of
 //                 constant subexpressions
 // Special Notes :
@@ -2852,7 +2901,7 @@ ExpressionNode * N_UTL_ExpressionInternals::mkcon_ (double value)
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-ExpressionNode * N_UTL_ExpressionInternals::mkb_ (int type, ExpressionNode *left, ExpressionNode *right)
+ExpressionNode * ExpressionInternals::mkb_ (int type, ExpressionNode *left, ExpressionNode *right)
 {
   ExpressionNode *p;
   int i, num_op;
@@ -2869,7 +2918,7 @@ ExpressionNode * N_UTL_ExpressionInternals::mkb_ (int type, ExpressionNode *left
     }
   if (num_op == -1)
   {
-    msg ="N_UTL_ExpressionInternals::mkb_: Internal: bad type";
+    msg ="ExpressionInternals::mkb_: Internal: bad type";
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
   }
 
@@ -2880,14 +2929,14 @@ ExpressionNode * N_UTL_ExpressionInternals::mkb_ (int type, ExpressionNode *left
 
     if (EXPRerrno >= EXPR_FATAL)
     {
-      msg ="N_UTL_ExpressionInternals::mkb_: error in evaluation of constant in '";
+      msg ="ExpressionInternals::mkb_: error in evaluation of constant in '";
       msg += ops[num_op].name;
       msg += "' in expression: " + Input_;
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
     }
     else if (EXPRerrno >= EXPR_WARNING)
     {
-      msg ="N_UTL_ExpressionInternals::mkb_: error in evaluation of constant in '";
+      msg ="ExpressionInternals::mkb_: error in evaluation of constant in '";
       msg += ops[num_op].name;
       msg += "' in expression: " + Input_;
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING, msg );
@@ -2957,7 +3006,7 @@ ExpressionNode * N_UTL_ExpressionInternals::mkb_ (int type, ExpressionNode *left
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::mkf_
+// Function      : ExpressionInternals::mkf_
 // Purpose       : Create a single argument function ExpressionNode of a given
 //                 type.  Note: only connects first argument.  Additional args
 //                 must be filled in by caller, if needed.
@@ -2967,7 +3016,7 @@ ExpressionNode * N_UTL_ExpressionInternals::mkb_ (int type, ExpressionNode *left
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-ExpressionNode * N_UTL_ExpressionInternals::mkf_(int type, ExpressionNode *arg)
+ExpressionNode * ExpressionInternals::mkf_(int type, ExpressionNode *arg)
 {
   ExpressionNode *p;
   int i;
@@ -2980,7 +3029,7 @@ ExpressionNode * N_UTL_ExpressionInternals::mkf_(int type, ExpressionNode *arg)
       break;
   if (i == NUM_FUNCS)
   {
-    msg ="N_UTL_ExpressionInternals::mkf_: Internal: unknown function type in:\n";
+    msg ="ExpressionInternals::mkf_: Internal: unknown function type in:\n";
     msg += Input_;
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
   }
@@ -3007,7 +3056,7 @@ ExpressionNode * N_UTL_ExpressionInternals::mkf_(int type, ExpressionNode *arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::newExpressionNode_
+// Function      : ExpressionInternals::newExpressionNode_
 // Purpose       : Allocate a new ExpressionNode
 // Special Notes :
 // Scope         :
@@ -3015,7 +3064,7 @@ ExpressionNode * N_UTL_ExpressionInternals::mkf_(int type, ExpressionNode *arg)
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-ExpressionNode * N_UTL_ExpressionInternals::newExpressionNode_ ()
+ExpressionNode * ExpressionInternals::newExpressionNode_ ()
 {
   ExpressionNode *p;
 
@@ -3026,7 +3075,7 @@ ExpressionNode * N_UTL_ExpressionInternals::newExpressionNode_ ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::deleteExpressionNode_
+// Function      : ExpressionInternals::deleteExpressionNode_
 // Purpose       : Deletes a ExpressionNode
 // Special Notes :
 // Scope         :
@@ -3034,9 +3083,9 @@ ExpressionNode * N_UTL_ExpressionInternals::newExpressionNode_ ()
 // Creation Date : 09/28/04
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::deleteExpressionNode_ (ExpressionNode *p)
+void ExpressionInternals::deleteExpressionNode_ (ExpressionNode *p)
 {
-  vector<ExpressionNode *>::iterator free_i;
+  std::vector<ExpressionNode *>::iterator free_i;
 
   if (p == NULL)
     return;
@@ -3056,7 +3105,7 @@ void N_UTL_ExpressionInternals::deleteExpressionNode_ (ExpressionNode *p)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::newExpressionElement_ ()
+// Function      : ExpressionInternals::newExpressionElement_ ()
 // Purpose       : Allocate a new ExpressionElement
 // Special Notes :
 // Scope         :
@@ -3064,7 +3113,7 @@ void N_UTL_ExpressionInternals::deleteExpressionNode_ (ExpressionNode *p)
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-ExpressionElement * N_UTL_ExpressionInternals::newExpressionElement_ ()
+ExpressionElement * ExpressionInternals::newExpressionElement_ ()
 {
   ExpressionElement *p;
 
@@ -3075,7 +3124,7 @@ ExpressionElement * N_UTL_ExpressionInternals::newExpressionElement_ ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::RpTree_
+// Function      : ExpressionInternals::RpTree_
 // Purpose       : Recursive method to add string translation of ExpressionNode
 // Special Notes :
 // Scope         :
@@ -3083,7 +3132,7 @@ ExpressionElement * N_UTL_ExpressionInternals::newExpressionElement_ ()
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::RpTree_ (ExpressionNode *pt, ostringstream & s)
+void ExpressionInternals::RpTree_ (ExpressionNode *pt, std::ostringstream & s)
 {
   int i;
 
@@ -3154,7 +3203,7 @@ void N_UTL_ExpressionInternals::RpTree_ (ExpressionNode *pt, ostringstream & s)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::varStr_
+// Function      : ExpressionInternals::varStr_
 // Purpose       : Return string for an input quantity
 // Special Notes :
 // Scope         :
@@ -3162,14 +3211,18 @@ void N_UTL_ExpressionInternals::RpTree_ (ExpressionNode *pt, ostringstream & s)
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-string N_UTL_ExpressionInternals::varStr_(int i)
+std::string ExpressionInternals::varStr_(int i)
 {
-  ostringstream s("");
-  s << setprecision(PRECISION);
+  std::ostringstream s("");
+  s << std::setprecision(PRECISION);
 
   if (varTypes_[i] == EXPR_T_NODE)
   {
     s << "V(" << varValues_[i] << ")";
+  }
+  else if (varTypes_[i] == EXPR_T_NODAL_COMPUTATION)
+  {
+    s << varValues_[i];
   }
   else if (varTypes_[i] == EXPR_T_INSTANCE)
   {
@@ -3192,7 +3245,7 @@ string N_UTL_ExpressionInternals::varStr_(int i)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::PTcheck_
+// Function      : ExpressionInternals::PTcheck_
 // Purpose       :
 // Special Notes :
 // Scope         :
@@ -3200,14 +3253,14 @@ string N_UTL_ExpressionInternals::varStr_(int i)
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-ExpressionNode * N_UTL_ExpressionInternals::PTcheck_(ExpressionNode *p)
+ExpressionNode * ExpressionInternals::PTcheck_(ExpressionNode *p)
 {
   int i;
   ExpressionNode *arg0, *arg1, *rval;
 
   if (p == NULL)
   {
-    msg ="N_UTL_ExpressionInternals::PTcheck_: Null pointer";
+    msg ="ExpressionInternals::PTcheck_: Null pointer";
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
   }
 
@@ -3263,34 +3316,35 @@ ExpressionNode * N_UTL_ExpressionInternals::PTcheck_(ExpressionNode *p)
       break;
 
     default:
-      msg ="N_UTL_ExpressionInternals::PTcheck_: Internal: bad node type";
+      msg ="ExpressionInternals::PTcheck_: Internal: bad node type";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
   }
-#ifdef Xyce_DEBUG_EXPRESSION
-  cout << "Calling com_expr_ from PTcheck_" << endl;
-#endif
+  if (DEBUG_EXPRESSION)
+    Xyce::dout() << "Calling com_expr_ from PTcheck_" << std::endl;
+
   rval = com_expr_ (PThead_, p);
   if (rval != p)
   {
-#ifdef Xyce_DEBUG_EXPRESSION
-    ostringstream s("");
-    s << setprecision(PRECISION);
-    if (tree_ != NULL)
-      RpTree_ (p, s);
-    cout << "Replacing:\n" << s.str() << endl;
-    ostringstream t("");
-    t << setprecision(PRECISION);
-    if (tree_ != NULL)
-      RpTree_ (rval, t);
-    cout << "With:\n" << t.str() << endl;
-#endif // Xyce_DEBUG_EXPRESSION
-      done_list_.push_back(p);
+    if (DEBUG_EXPRESSION) {
+      std::ostringstream s("");
+      s << std::setprecision(PRECISION);
+      if (tree_ != NULL)
+        RpTree_ (p, s);
+      Xyce::dout() << "Replacing:\n" << s.str() << std::endl;
+      std::ostringstream t("");
+      t << std::setprecision(PRECISION);
+      if (tree_ != NULL)
+        RpTree_ (rval, t);
+      Xyce::dout() << "With:\n" << t.str() << std::endl;
+    }
+
+    done_list_.push_back(p);
   }
   return rval;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::diffDDX_
+// Function      : ExpressionInternals::diffDDX_
 // Purpose       : Differentiate ddx() in expression tree_
 // Special Notes :
 // Scope         :
@@ -3298,7 +3352,7 @@ ExpressionNode * N_UTL_ExpressionInternals::PTcheck_(ExpressionNode *p)
 // Creation Date : 09/12/07
 //-----------------------------------------------------------------------------
 
-ExpressionNode * N_UTL_ExpressionInternals::diffDDX_(ExpressionNode *p)
+ExpressionNode * ExpressionInternals::diffDDX_(ExpressionNode *p)
 {
   ExpressionNode * rval;
   rval = PTdiffDDX_(p);
@@ -3306,7 +3360,7 @@ ExpressionNode * N_UTL_ExpressionInternals::diffDDX_(ExpressionNode *p)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::PTdiffDDX_
+// Function      : ExpressionInternals::PTdiffDDX_
 // Purpose       : Recursive method to differentiate ddx()
 // Special Notes :
 // Scope         :
@@ -3314,14 +3368,14 @@ ExpressionNode * N_UTL_ExpressionInternals::diffDDX_(ExpressionNode *p)
 // Creation Date : 07/13/07
 //-----------------------------------------------------------------------------
 
-ExpressionNode * N_UTL_ExpressionInternals::PTdiffDDX_(ExpressionNode *p)
+ExpressionNode * ExpressionInternals::PTdiffDDX_(ExpressionNode *p)
 {
   int i;
   ExpressionNode *rval;
 
   if (p == NULL)
   {
-    msg ="N_UTL_ExpressionInternals::PTdiffDDX_: Null pointer";
+    msg ="ExpressionInternals::PTdiffDDX_: Null pointer";
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
   }
   ddxProcessed_ = true;
@@ -3340,7 +3394,7 @@ ExpressionNode * N_UTL_ExpressionInternals::PTdiffDDX_(ExpressionNode *p)
       {
         if (p->operands[1]->type != EXPR_VAR)
         {
-          msg ="N_UTL_ExpressionInternals::Differentiate: Attempt to ";
+          msg ="ExpressionInternals::Differentiate: Attempt to ";
           msg += "differentiate by non-variable in ddx()";
           N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
         }
@@ -3368,7 +3422,7 @@ ExpressionNode * N_UTL_ExpressionInternals::PTdiffDDX_(ExpressionNode *p)
       break;
 
     default:
-      msg ="N_UTL_ExpressionInternals::PTdiffDDX_: Internal: bad node type";
+      msg ="ExpressionInternals::PTdiffDDX_: Internal: bad node type";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
   }
 
@@ -3376,7 +3430,7 @@ ExpressionNode * N_UTL_ExpressionInternals::PTdiffDDX_(ExpressionNode *p)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::com_expr_
+// Function      : ExpressionInternals::com_expr_
 // Purpose       : Recursive method to locate and fix common subexpressions
 // Special Notes :
 // Scope         :
@@ -3384,14 +3438,14 @@ ExpressionNode * N_UTL_ExpressionInternals::PTdiffDDX_(ExpressionNode *p)
 // Creation Date : 09/28/04
 //-----------------------------------------------------------------------------
 
-ExpressionNode * N_UTL_ExpressionInternals::com_expr_ (ExpressionNode *c, ExpressionNode *p)
+ExpressionNode * ExpressionInternals::com_expr_ (ExpressionNode *c, ExpressionNode *p)
 {
   int i;
   ExpressionNode *arg0, *arg1;
 
   if (c == NULL || p == NULL)
   {
-    msg ="N_UTL_ExpressionInternals::com_expr_: Null pointer";
+    msg ="ExpressionInternals::com_expr_: Null pointer";
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
   }
   if (c == p)
@@ -3456,11 +3510,11 @@ ExpressionNode * N_UTL_ExpressionInternals::com_expr_ (ExpressionNode *c, Expres
       break;
 
     case EXPR_PLACEHOLDER:
-      msg ="N_UTL_ExpressionInternals::PTcheck_: placeholder found";
+      msg ="ExpressionInternals::PTcheck_: placeholder found";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
 
     default:
-      msg ="N_UTL_ExpressionInternals::PTcheck_: Internal: bad node type";
+      msg ="ExpressionInternals::PTcheck_: Internal: bad node type";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
   }
 
@@ -3468,7 +3522,7 @@ ExpressionNode * N_UTL_ExpressionInternals::com_expr_ (ExpressionNode *c, Expres
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::Differentiate_
+// Function      : ExpressionInternals::Differentiate_
 // Purpose       : Recursive method to differentiate an ExpressionNode and children
 // Special Notes :
 // Scope         :
@@ -3476,7 +3530,7 @@ ExpressionNode * N_UTL_ExpressionInternals::com_expr_ (ExpressionNode *c, Expres
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-ExpressionNode * N_UTL_ExpressionInternals::Differentiate_ (ExpressionNode *arg, int varnum)
+ExpressionNode * ExpressionInternals::Differentiate_ (ExpressionNode *arg, int varnum)
 {
   ExpressionNode *arg1(NULL), *arg2(NULL), *newp(NULL);
   int i;
@@ -3789,7 +3843,7 @@ ExpressionNode * N_UTL_ExpressionInternals::Differentiate_ (ExpressionNode *arg,
             break;
 
           default:
-            msg ="N_UTL_ExpressionInternals::Differentiate: Internal: bad function";
+            msg ="ExpressionInternals::Differentiate: Internal: bad function";
             N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
             newp = NULL;
             break;
@@ -3802,7 +3856,7 @@ ExpressionNode * N_UTL_ExpressionInternals::Differentiate_ (ExpressionNode *arg,
       break;
 
     default:
-      msg ="N_UTL_ExpressionInternals::Differentiate: Internal: bad node type";
+      msg ="ExpressionInternals::Differentiate: Internal: bad node type";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
 
       newp = NULL;
@@ -3813,7 +3867,7 @@ ExpressionNode * N_UTL_ExpressionInternals::Differentiate_ (ExpressionNode *arg,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::Rconvert_
+// Function      : ExpressionInternals::Rconvert_
 // Purpose       : Recursive method to convert ExpressionNode subtree_ to replace
 //                 a placeholder with a constant or variable
 // Special Notes :
@@ -3822,7 +3876,7 @@ ExpressionNode * N_UTL_ExpressionInternals::Differentiate_ (ExpressionNode *arg,
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::Rconvert_ (ExpressionNode & node)
+void ExpressionInternals::Rconvert_ (ExpressionNode & node)
 {
   int i;
 
@@ -3862,7 +3916,7 @@ void N_UTL_ExpressionInternals::Rconvert_ (ExpressionNode & node)
                 varTypes_[node.valueIndex] == EXPR_T_FUNCTION) && node.funcname != Rstring_) ||
                 (varTypes_[node.valueIndex] == EXPR_T_INSTANCE && varValues_[node.valueIndex] != Rstring_))
           {
-            msg = "N_UTL_ExpressionInternals::Rconvert_: function name inconsistency";
+            msg = "ExpressionInternals::Rconvert_: function name inconsistency";
             N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
           }
           if (Rmode_ == 0)
@@ -3892,11 +3946,11 @@ void N_UTL_ExpressionInternals::Rconvert_ (ExpressionNode & node)
       break;
 
     case EXPR_PLACEHOLDER:
-      msg = "N_UTL_ExpressionInternals::Rconvert_: placeholder found";
+      msg = "ExpressionInternals::Rconvert_: placeholder found";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
 
     default:
-      msg = "N_UTL_ExpressionInternals::Rconvert_: Unknown node type";
+      msg = "ExpressionInternals::Rconvert_: Unknown node type";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
       break;
   }
@@ -3905,7 +3959,7 @@ void N_UTL_ExpressionInternals::Rconvert_ (ExpressionNode & node)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::RcountDDT_
+// Function      : ExpressionInternals::RcountDDT_
 // Purpose       : Recursive method to count number of ddt function calls in the
 //                 expression.
 // Special Notes :
@@ -3914,7 +3968,7 @@ void N_UTL_ExpressionInternals::Rconvert_ (ExpressionNode & node)
 // Creation Date : 12/16/05
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::RcountDDT_ (ExpressionNode & node)
+void ExpressionInternals::RcountDDT_ (ExpressionNode & node)
 {
   switch (node.type)
   {
@@ -3956,11 +4010,11 @@ void N_UTL_ExpressionInternals::RcountDDT_ (ExpressionNode & node)
       break;
 
     case EXPR_PLACEHOLDER:
-      msg = "N_UTL_ExpressionInternals::RcountDDT_: placeholder found";
+      msg = "ExpressionInternals::RcountDDT_: placeholder found";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
 
     default:
-      msg = "N_UTL_ExpressionInternals::RcountDDT_: Unknown node type";
+      msg = "ExpressionInternals::RcountDDT_: Unknown node type";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
   }
 
@@ -3968,7 +4022,7 @@ void N_UTL_ExpressionInternals::RcountDDT_ (ExpressionNode & node)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::RgetDDT_
+// Function      : ExpressionInternals::RgetDDT_
 // Purpose       : Recursive method to get arguments of ddt function calls in the
 //                 expression.
 // Special Notes :
@@ -3977,7 +4031,7 @@ void N_UTL_ExpressionInternals::RcountDDT_ (ExpressionNode & node)
 // Creation Date : 12/16/05
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::RgetDDT_ (ExpressionNode & node, vector<double> & vals)
+void ExpressionInternals::RgetDDT_ (ExpressionNode & node, std::vector<double> & vals)
 {
   switch (node.type)
   {
@@ -4020,11 +4074,11 @@ void N_UTL_ExpressionInternals::RgetDDT_ (ExpressionNode & node, vector<double> 
       break;
 
     case EXPR_PLACEHOLDER:
-      msg = "N_UTL_ExpressionInternals::RgetDDT: placeholder found";
+      msg = "ExpressionInternals::RgetDDT: placeholder found";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
 
     default:
-      msg = "N_UTL_ExpressionInternals::RgetDDT: Unknown node type";
+      msg = "ExpressionInternals::RgetDDT: Unknown node type";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
   }
 
@@ -4032,7 +4086,7 @@ void N_UTL_ExpressionInternals::RgetDDT_ (ExpressionNode & node, vector<double> 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::RsetDDT_
+// Function      : ExpressionInternals::RsetDDT_
 // Purpose       : Recursive method to set the evaluated values of ddt function
 //                 calls in the expression.
 // Special Notes :
@@ -4041,7 +4095,7 @@ void N_UTL_ExpressionInternals::RgetDDT_ (ExpressionNode & node, vector<double> 
 // Creation Date : 12/16/05
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::RsetDDT_ (ExpressionNode & node, vector<double> & vals)
+void ExpressionInternals::RsetDDT_ (ExpressionNode & node, std::vector<double> & vals)
 {
   switch (node.type)
   {
@@ -4085,11 +4139,11 @@ void N_UTL_ExpressionInternals::RsetDDT_ (ExpressionNode & node, vector<double> 
       break;
 
     case EXPR_PLACEHOLDER:
-      msg = "N_UTL_ExpressionInternals::RsetDDT_: placeholder found";
+      msg = "ExpressionInternals::RsetDDT_: placeholder found";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
 
     default:
-      msg = "N_UTL_ExpressionInternals::RsetDDT_: Unknown node type";
+      msg = "ExpressionInternals::RsetDDT_: Unknown node type";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
   }
 
@@ -4097,7 +4151,7 @@ void N_UTL_ExpressionInternals::RsetDDT_ (ExpressionNode & node, vector<double> 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::convert_to_constant_
+// Function      : ExpressionInternals::convert_to_constant_
 // Purpose       : Resolve a placeholder or variable into a constant
 // Special Notes :
 // Scope         :
@@ -4105,7 +4159,7 @@ void N_UTL_ExpressionInternals::RsetDDT_ (ExpressionNode & node, vector<double> 
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::convert_to_constant_ (int i, double c_value)
+void ExpressionInternals::convert_to_constant_ (int i, double c_value)
 {
   values_changed_ = true;
   Rcval_ = c_value;
@@ -4124,7 +4178,7 @@ void N_UTL_ExpressionInternals::convert_to_constant_ (int i, double c_value)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::convert_to_variable_
+// Function      : ExpressionInternals::convert_to_variable_
 // Purpose       : Resolve a placeholder into a variable
 // Special Notes :
 // Scope         :
@@ -4132,7 +4186,7 @@ void N_UTL_ExpressionInternals::convert_to_constant_ (int i, double c_value)
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::convert_to_variable_ (int i)
+void ExpressionInternals::convert_to_variable_ (int i)
 {
   values_changed_ = true;
   Rmode_ = 1;
@@ -4146,7 +4200,7 @@ void N_UTL_ExpressionInternals::convert_to_variable_ (int i)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::copy_exprNode_
+// Function      : ExpressionInternals::copy_exprNode_
 // Purpose       : Recursive method to copy an expression node and subnodes
 // Special Notes :
 // Scope         :
@@ -4154,7 +4208,7 @@ void N_UTL_ExpressionInternals::convert_to_variable_ (int i)
 // Creation Date : 11/05/04
 //-----------------------------------------------------------------------------
 
-ExpressionNode * N_UTL_ExpressionInternals::copy_exprNode_ (ExpressionNode *n)
+ExpressionNode * ExpressionInternals::copy_exprNode_ (ExpressionNode *n)
 {
   int i;
   ExpressionNode *e;
@@ -4177,7 +4231,7 @@ ExpressionNode * N_UTL_ExpressionInternals::copy_exprNode_ (ExpressionNode *n)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::simplify_
+// Function      : ExpressionInternals::simplify_
 // Purpose       : Recursive method to condense any constant subexpressions
 // Special Notes :
 // Scope         :
@@ -4185,7 +4239,7 @@ ExpressionNode * N_UTL_ExpressionInternals::copy_exprNode_ (ExpressionNode *n)
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::simplify_ (ExpressionNode & node)
+void ExpressionInternals::simplify_ (ExpressionNode & node)
 {
   int i;
 
@@ -4230,11 +4284,11 @@ void N_UTL_ExpressionInternals::simplify_ (ExpressionNode & node)
       break;
 
     case EXPR_PLACEHOLDER:
-      msg = "N_UTL_ExpressionInternals::simplify_: placeholder found";
+      msg = "ExpressionInternals::simplify_: placeholder found";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
 
     default:
-      msg = "N_UTL_ExpressionInternals::simplify_: Unknown node type";
+      msg = "ExpressionInternals::simplify_: Unknown node type";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
       break;
   }
@@ -4243,17 +4297,34 @@ void N_UTL_ExpressionInternals::simplify_ (ExpressionNode & node)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::get_breaks_
+// Function      : ExpressionInternals::get_breaks_
 // Purpose       : Recursive method to generate breakpoint expressions.  These
 //                 are expressions which will generate the next breakpoint after
 //                 the current simulation time, like table segment boundaries.
-// Special Notes :
+//
+// Special Notes : Note added by Tom Russo on 11 Feb 2014, while investigating
+//                 bug 1827 on Charleston:
+// 
+//                 The "Purpose" above is a misstatement of what this method
+//                 actually does.
+//
+//                 The expressions generated here do *not* generate the next
+//                 breakpoint at all, they are effectively used in a Newton's
+//                 method to approximate the solution of the problem:
+//                 ThisExpression(time)-(value of expression when break occurs)=0
+//
+//                 This is *ripe* for refactoring, especially when the current
+//                 expression should have a closed-form solution for 
+//                 breakpoints (e.g. pulse or PWL expressions, which are
+//                 currently reduced to a general TABLE function at the
+//                 input parser level before we even see it).
+//
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::get_breaks_ (ExpressionNode & node)
+void ExpressionInternals::get_breaks_ (ExpressionNode & node)
 {
   int i;
   ExpressionNode *p, *t, *t1, *t2, *b;
@@ -4276,6 +4347,12 @@ void N_UTL_ExpressionInternals::get_breaks_ (ExpressionNode & node)
       get_breaks_ ( *(node.operands[1]));
       break;
 
+      // TVR 11 Feb 2014:  This case makes it most obvious what this
+      // method is really doing.  The expression pushed back into "breaks_"
+      // when the current expression is "F(t)>=A" is in fact 
+      //  -(F(t)-A)/F'(t) --- exactly the expression that represents the
+      // next iteration of a Newton's root finding method for finding the
+      // value of "t" at which F(t)=A.  
     case EXPR_EQUAL:
     case EXPR_NOTEQ:
     case EXPR_GREAT:
@@ -4348,11 +4425,11 @@ void N_UTL_ExpressionInternals::get_breaks_ (ExpressionNode & node)
       break;
 
     case EXPR_PLACEHOLDER:
-      msg = "N_UTL_ExpressionInternals::get_breaks_: placeholder found";
+      msg = "ExpressionInternals::get_breaks_: placeholder found";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
 
     default:
-      msg = "N_UTL_ExpressionInternals::get_breaks_: Unknown node type";
+      msg = "ExpressionInternals::get_breaks_: Unknown node type";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
       break;
   }
@@ -4361,7 +4438,7 @@ void N_UTL_ExpressionInternals::get_breaks_ (ExpressionNode & node)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::dependent_
+// Function      : ExpressionInternals::dependent_
 // Purpose       : Recursive method to determine if a subexpression is dependent
 //                 on a particular variable, of valueIndex = ind
 // Special Notes :
@@ -4370,7 +4447,7 @@ void N_UTL_ExpressionInternals::get_breaks_ (ExpressionNode & node)
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-bool N_UTL_ExpressionInternals::dependent_ (ExpressionNode & node, int ind)
+bool ExpressionInternals::dependent_ (ExpressionNode & node, int ind)
 {
   int i;
 
@@ -4414,11 +4491,11 @@ bool N_UTL_ExpressionInternals::dependent_ (ExpressionNode & node, int ind)
       break;
 
     case EXPR_PLACEHOLDER:
-      msg = "N_UTL_ExpressionInternals::dependent_: placeholder found";
+      msg = "ExpressionInternals::dependent_: placeholder found";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
 
     default:
-      msg = "N_UTL_ExpressionInternals::dependent_: Unknown node type";
+      msg = "ExpressionInternals::dependent_: Unknown node type";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
       break;
   }
@@ -4427,7 +4504,7 @@ bool N_UTL_ExpressionInternals::dependent_ (ExpressionNode & node, int ind)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::dependent_other_
+// Function      : ExpressionInternals::dependent_other_
 // Purpose       : Recursive method to determine if a subexpression is
 //                 dependent_ on any variable other than
 //                 a particular variable, of valueIndex = ind
@@ -4437,7 +4514,7 @@ bool N_UTL_ExpressionInternals::dependent_ (ExpressionNode & node, int ind)
 // Creation Date : 03/11/05
 //-----------------------------------------------------------------------------
 
-bool N_UTL_ExpressionInternals::dependent_other_ (ExpressionNode & node, int ind)
+bool ExpressionInternals::dependent_other_ (ExpressionNode & node, int ind)
 {
   int i;
 
@@ -4481,11 +4558,11 @@ bool N_UTL_ExpressionInternals::dependent_other_ (ExpressionNode & node, int ind
       break;
 
     case EXPR_PLACEHOLDER:
-      msg = "N_UTL_ExpressionInternals::dependent_other_: placeholder found";
+      msg = "ExpressionInternals::dependent_other_: placeholder found";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
 
     default:
-      msg = "N_UTL_ExpressionInternals::dependent_other_: Unknown node type";
+      msg = "ExpressionInternals::dependent_other_: Unknown node type";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
       break;
   }
@@ -4494,7 +4571,7 @@ bool N_UTL_ExpressionInternals::dependent_other_ (ExpressionNode & node, int ind
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::arithmatic_
+// Function      : ExpressionInternals::arithmatic_
 // Purpose       : Recursive method to determine if a subexpression is arithmatic_
 // Special Notes :
 // Scope         :
@@ -4502,7 +4579,7 @@ bool N_UTL_ExpressionInternals::dependent_other_ (ExpressionNode & node, int ind
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-bool N_UTL_ExpressionInternals::arithmatic_ (ExpressionNode & node)
+bool ExpressionInternals::arithmatic_ (ExpressionNode & node)
 {
   int i;
 
@@ -4544,11 +4621,11 @@ bool N_UTL_ExpressionInternals::arithmatic_ (ExpressionNode & node)
       return false;
 
     case EXPR_PLACEHOLDER:
-      msg = "N_UTL_ExpressionInternals::arithmatic_: placeholder found";
+      msg = "ExpressionInternals::arithmatic_: placeholder found";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
 
     default:
-      msg = "N_UTL_ExpressionInternals::arithmatic_: Unknown node type";
+      msg = "ExpressionInternals::arithmatic_: Unknown node type";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
       break;
   }
@@ -4557,7 +4634,7 @@ bool N_UTL_ExpressionInternals::arithmatic_ (ExpressionNode & node)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::Rmap_
+// Function      : ExpressionInternals::Rmap_
 // Purpose       : Recursive method to fix indexing in a subtree_ for order_names
 // Special Notes :
 // Scope         :
@@ -4565,8 +4642,8 @@ bool N_UTL_ExpressionInternals::arithmatic_ (ExpressionNode & node)
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::Rmap_ (ExpressionNode & node, int mode,
-                                       vector<int> & nmap)
+void ExpressionInternals::Rmap_ (ExpressionNode & node, int mode,
+                                       std::vector<int> & nmap)
 {
   int i;
 
@@ -4625,11 +4702,11 @@ void N_UTL_ExpressionInternals::Rmap_ (ExpressionNode & node, int mode,
       break;
 
     case EXPR_PLACEHOLDER:
-      msg ="N_UTL_ExpressionInternals::Rmap_: placeholder found";
+      msg ="ExpressionInternals::Rmap_: placeholder found";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
 
     default:
-      msg ="N_UTL_ExpressionInternals::Rmap_: Unknown node type";
+      msg ="ExpressionInternals::Rmap_: Unknown node type";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
   }
 
@@ -4637,7 +4714,7 @@ void N_UTL_ExpressionInternals::Rmap_ (ExpressionNode & node, int mode,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::EXPRaddDummyString_
+// Function      : ExpressionInternals::EXPRaddDummyString_
 // Purpose       : Add a dummy input quantity entry to a function definition
 // Special Notes : Used when a function definition has fewer inputs than the
 //                 prototype (e.g.: f(x,y) = y*2)
@@ -4646,7 +4723,7 @@ void N_UTL_ExpressionInternals::Rmap_ (ExpressionNode & node, int mode,
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-int N_UTL_ExpressionInternals::EXPRaddDummyString_ (string & dummy)
+int ExpressionInternals::EXPRaddDummyString_ (std::string & dummy)
 {
   varTypes_.resize(numVars_+1);
   varValues_.resize(numVars_+1);
@@ -4671,7 +4748,7 @@ int N_UTL_ExpressionInternals::EXPRaddDummyString_ (string & dummy)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::addNode_
+// Function      : ExpressionInternals::addNode_
 // Purpose       : Recursive method to add a node during user function resolution
 // Special Notes : very complex operation, recursive with Nreplace_
 //                 This method *assumes* that the names in the symbol table
@@ -4682,11 +4759,11 @@ int N_UTL_ExpressionInternals::EXPRaddDummyString_ (string & dummy)
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::addNode_ (ExpressionNode *n, int ind,
+void ExpressionInternals::addNode_ (ExpressionNode *n, int ind,
                                           ExpressionNode *f,
-                                          N_UTL_ExpressionInternals & func_expr,
+                                          ExpressionInternals & func_expr,
                                           int na_func,
-                                          vector<ExpressionNode *> operands)
+                                          std::vector<ExpressionNode *> operands)
 {
 
 // This is called from Nreplace_ when there is a (prospective) node to
@@ -4727,7 +4804,7 @@ void N_UTL_ExpressionInternals::addNode_ (ExpressionNode *n, int ind,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::Nreplace_
+// Function      : ExpressionInternals::Nreplace_
 // Purpose       : Recursive method to do work of resolving a user defined function
 // Special Notes : very complex operation, recursive with addNode_
 //                 What it appears this method is doing is to copy the tree
@@ -4740,11 +4817,11 @@ void N_UTL_ExpressionInternals::addNode_ (ExpressionNode *n, int ind,
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::Nreplace_ (ExpressionNode *n,
+void ExpressionInternals::Nreplace_ (ExpressionNode *n,
                                            ExpressionNode *f,
-                                           N_UTL_ExpressionInternals &func_expr,
+                                           ExpressionInternals &func_expr,
                                            int na_func,
-                                           vector<ExpressionNode *> operands)
+                                           std::vector<ExpressionNode *> operands)
 {
 
 // This is the (recursive) routine that traverses the function that is
@@ -4875,12 +4952,11 @@ void N_UTL_ExpressionInternals::Nreplace_ (ExpressionNode *n,
       break;
 
     case EXPR_PLACEHOLDER:
-      msg ="N_UTL_ExpressionInternals::Nreplace_: placeholder found";
+      msg ="ExpressionInternals::Nreplace_: placeholder found";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
 
     default:
-      msg ="N_UTL_ExpressionInternals::Nreplace_: Unknown node type: ";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING, msg, n->type );
+      Report::UserWarning() << "Unknown node type " << n->type;
       break;    // If an unknown type is encountered just return
   }
 
@@ -4888,7 +4964,7 @@ void N_UTL_ExpressionInternals::Nreplace_ (ExpressionNode *n,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::Freplace_
+// Function      : ExpressionInternals::Freplace_
 // Purpose       : Recursive method to find instances of a user defined function
 //                 that needs to be replaced
 //                 func_name is name of function to be replaced
@@ -4902,9 +4978,9 @@ void N_UTL_ExpressionInternals::Nreplace_ (ExpressionNode *n,
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-int N_UTL_ExpressionInternals::Freplace_ (ExpressionNode *n,
-                                          string const & func_name,
-                                          N_UTL_ExpressionInternals & func_expr,
+int ExpressionInternals::Freplace_ (ExpressionNode *n,
+                                          std::string const & func_name,
+                                          ExpressionInternals & func_expr,
                                           int na_func)
 {
 
@@ -4967,12 +5043,11 @@ int N_UTL_ExpressionInternals::Freplace_ (ExpressionNode *n,
       break;
 
     case EXPR_PLACEHOLDER:
-      msg ="N_UTL_ExpressionInternals::Freplace_: placeholder found";
+      msg ="ExpressionInternals::Freplace_: placeholder found";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
 
     default:
-      msg ="N_UTL_ExpressionInternals::Freplace_: Unknown node type: ";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING, msg, n->type );
+      Report::UserWarning() << "Unknown node type " << n->type;
       break;    // If an unknown type is encountered just return
   }
 
@@ -4980,7 +5055,7 @@ int N_UTL_ExpressionInternals::Freplace_ (ExpressionNode *n,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::Vreplace_
+// Function      : ExpressionInternals::Vreplace_
 // Purpose       : Recursive method to find instances of a variable
 //                 that needs to be replaced with a previously parsed expression
 //                 varName is name of variable/string to be replaced
@@ -4992,13 +5067,13 @@ int N_UTL_ExpressionInternals::Freplace_ (ExpressionNode *n,
 //                 global params.
 //                 It is very similar to, but slightly simpler than, Freplace_
 // Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 09/24/04
+// Creator       : Tom Russo
+// Creation Date : 8/10/2010
 //-----------------------------------------------------------------------------
 
-int N_UTL_ExpressionInternals::Vreplace_ (ExpressionNode *n,
-                                          string const & varName,
-                                          N_UTL_ExpressionInternals & subexpr)
+int ExpressionInternals::Vreplace_ (ExpressionNode *n,
+                                          std::string const & varName,
+                                          ExpressionInternals & subexpr)
 {
 
 // This recursive routine traverses the expression tree_ looking for
@@ -5010,7 +5085,7 @@ int N_UTL_ExpressionInternals::Vreplace_ (ExpressionNode *n,
 // method, which expects it.  But that method only uses operands if its
 // fourth argument is non-zero.
 
-  vector<ExpressionNode *> operands;
+  std::vector<ExpressionNode *> operands;
   operands.clear();
 
   int i;
@@ -5059,12 +5134,11 @@ int N_UTL_ExpressionInternals::Vreplace_ (ExpressionNode *n,
       break;
 
     case EXPR_PLACEHOLDER:
-      msg ="N_UTL_ExpressionInternals::Freplace_: placeholder found";
+      msg ="ExpressionInternals::Freplace_: placeholder found";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
 
     default:
-      msg ="N_UTL_ExpressionInternals::Freplace_: Unknown node type: ";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING, msg, n->type );
+      Report::UserWarning() << "Unknown node type " << n->type;
       break;    // If an unknown type is encountered just return
   }
 
@@ -5072,7 +5146,7 @@ int N_UTL_ExpressionInternals::Vreplace_ (ExpressionNode *n,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::RemoveFentry_
+// Function      : ExpressionInternals::RemoveFentry_
 // Purpose       : Recursive method to fix indexing associated with resolution
 //                 of a user defined function.  Once we've replaced a function
 //                 using Freplace, that name is no longer needed in the
@@ -5083,7 +5157,7 @@ int N_UTL_ExpressionInternals::Vreplace_ (ExpressionNode *n,
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::RemoveFentry_ (ExpressionNode *n, int new_ind, int old_ind)
+void ExpressionInternals::RemoveFentry_ (ExpressionNode *n, int new_ind, int old_ind)
 {
 
 // This recursive routine traverses the expression tree_ and modifies
@@ -5131,12 +5205,11 @@ void N_UTL_ExpressionInternals::RemoveFentry_ (ExpressionNode *n, int new_ind, i
       break;
 
     case EXPR_PLACEHOLDER:
-      msg ="N_UTL_ExpressionInternals::RemoveFentry_: placeholder found";
+      msg ="ExpressionInternals::RemoveFentry_: placeholder found";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
 
     default:
-      msg ="N_UTL_ExpressionInternals::RemoveFentry_: Unknown node type: ";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING, msg, n->type );
+      Report::UserWarning() << "Unknown node type " << n->type;
       break;    // If an unknown type is encountered just return
   }
 
@@ -5144,7 +5217,7 @@ void N_UTL_ExpressionInternals::RemoveFentry_ (ExpressionNode *n, int new_ind, i
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::EXPReval_
+// Function      : ExpressionInternals::EXPReval_
 // Purpose       : Recursive method to perform expression evaluation
 // Special Notes :
 // Scope         :
@@ -5152,7 +5225,7 @@ void N_UTL_ExpressionInternals::RemoveFentry_ (ExpressionNode *n, int new_ind, i
 // Creation Date : 09/24/04
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::EXPReval_ (ExpressionNode & node, double & res, vector<double> &vals)
+void ExpressionInternals::EXPReval_ (ExpressionNode & node, double & res, std::vector<double> &vals)
 {
 
   double r1, r2, x1, x2, y1, y2, frac, condition, raw_value, result;
@@ -5174,7 +5247,7 @@ void N_UTL_ExpressionInternals::EXPReval_ (ExpressionNode & node, double & res, 
     case EXPR_VAR:
       if (node.valueIndex == -1)
       {
-        msg ="N_UTL_ExpressionInternals::EXPReval_: Internal Error: node.valueIndex == -1";
+        msg ="ExpressionInternals::EXPReval_: Internal Error: node.valueIndex == -1";
         N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
       }
       else
@@ -5600,8 +5673,8 @@ void N_UTL_ExpressionInternals::EXPReval_ (ExpressionNode & node, double & res, 
           }
           node.valueIndex = i;
           // dubugging output
-          //std::cout << "Leaving schedule eval (x1, y1), (x2, y2), (r1, res): (" << x1 << ", "
-          //  << y1 << "), (" << x2 << ", " << y2 << "), (" << r1 << ", " << res << ")" << std::endl;
+          //Xyce::dout() << "Leaving schedule eval (x1, y1), (x2, y2), (r1, res): (" << x1 << ", "
+          //  << y1 << "), (" << x2 << ", " << y2 << "), (" << r1 << ", " << res << ")" << std::std::endl;
         }
         else
         {
@@ -5639,11 +5712,11 @@ void N_UTL_ExpressionInternals::EXPReval_ (ExpressionNode & node, double & res, 
       break;
 
     case EXPR_PLACEHOLDER:
-      msg = "N_UTL_ExpressionInternals::EXPReval_: placeholder found";
+      msg = "ExpressionInternals::EXPReval_: placeholder found";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
 
     default:
-      msg ="N_UTL_ExpressionInternals::EXPReval_: Internal Error: bad node type";
+      msg ="ExpressionInternals::EXPReval_: Internal Error: bad node type";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
   }
   node.eval_value = res;
@@ -5653,7 +5726,7 @@ void N_UTL_ExpressionInternals::EXPReval_ (ExpressionNode & node, double & res, 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::clear_eval_num_
+// Function      : ExpressionInternals::clear_eval_num_
 // Purpose       : Recursive method to set eval_num = 0 in a tree_
 // Special Notes :
 // Scope         : private
@@ -5661,7 +5734,7 @@ void N_UTL_ExpressionInternals::EXPReval_ (ExpressionNode & node, double & res, 
 // Creation Date : 09/29/04
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::clear_eval_num_ (ExpressionNode *n)
+void ExpressionInternals::clear_eval_num_ (ExpressionNode *n)
 {
   int i;
 
@@ -5699,11 +5772,11 @@ void N_UTL_ExpressionInternals::clear_eval_num_ (ExpressionNode *n)
       break;
 
     case EXPR_PLACEHOLDER:
-      msg ="N_UTL_ExpressionInternals::clear_eval_num_: placeholder found";
+      msg ="ExpressionInternals::clear_eval_num_: placeholder found";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
 
     default:
-      msg = "N_UTL_ExpressionInternals::clear_eval_num_: Unknown node type";
+      msg = "ExpressionInternals::clear_eval_num_: Unknown node type";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
       break;
   }
@@ -5712,7 +5785,7 @@ void N_UTL_ExpressionInternals::clear_eval_num_ (ExpressionNode *n)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::compactLine_
+// Function      : ExpressionInternals::compactLine_
 // Purpose       : This routine is cut out of the original "set" routine.
 //                 It takes an input line and squeezes out multiple white space,
 //                 extraneous braces/parens, and checks parenthesis matching.
@@ -5720,11 +5793,11 @@ void N_UTL_ExpressionInternals::clear_eval_num_ (ExpressionNode *n)
 // Creation Date : 08/03/10
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::compactLine_(string & inputLine,
-                                             string & compactedLine)
+void ExpressionInternals::compactLine_(std::string & inputLine,
+                                             std::string & compactedLine)
 {
   int brace_depth, paren_depth, start_depth, end_depth;
-  string::iterator line_i;
+  std::string::iterator line_i;
   char thisChar;
   bool space;
 
@@ -5745,7 +5818,7 @@ void N_UTL_ExpressionInternals::compactLine_(string & inputLine,
       paren_depth--;
     if (brace_depth < 0 || paren_depth < 0)
     {
-      msg = "N_UTL_ExpressionInternals::N_UTL_ExpressionInternals: incorrect braces/parentheses found in expression:\n";
+      msg = "ExpressionInternals::ExpressionInternals: incorrect braces/parentheses found in expression:\n";
       msg += Input_;
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
     }
@@ -5799,22 +5872,22 @@ void N_UTL_ExpressionInternals::compactLine_(string & inputLine,
   }
   if (brace_depth != 0 || paren_depth != 0 || start_depth != end_depth)
   {
-    msg = "N_UTL_ExpressionInternals::N_UTL_ExpressionInternals: unmatched parentheses found in expression:\n";
+    msg = "ExpressionInternals::ExpressionInternals: unmatched parentheses found in expression:\n";
     msg += Input_;
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::tokenize_
+// Function      : ExpressionInternals::tokenize_
 // Purpose       : Lexical Analysis:  Given an input string (which should have
 //                 been compacted by compactLine_ before calling this method),
 //                 create a token list representing the input.
 // Creator       : Tom Russo
 // Creation Date : 08/0310
 //-----------------------------------------------------------------------------
-void N_UTL_ExpressionInternals::tokenize_(string &inputLine,
-                                          list<ExpressionElement *> & tokenList)
+void ExpressionInternals::tokenize_(std::string &inputLine,
+                                          std::list<ExpressionElement *> & tokenList)
 {
   int last_token, len;
   ExpressionElement *el;
@@ -5822,7 +5895,7 @@ void N_UTL_ExpressionInternals::tokenize_(string &inputLine,
   bool new_element;
   int name_len;
   double val;
-  string::size_type j, k;
+  std::string::size_type j, k;
 
   last_token = -1;
   len = inputLine.size();
@@ -5830,9 +5903,9 @@ void N_UTL_ExpressionInternals::tokenize_(string &inputLine,
   inIVname = 0;
   for (int i=0 ; i<len ; ++i)
   {
-#ifdef Xyce_DEBUG_EXPRESSION
-    cout << "Processing character: " << i << " = '" << inputLine[i] << "'\n";
-#endif // Xyce_DEBUG_EXPRESSION
+    if (DEBUG_EXPRESSION)       
+      Xyce::dout() << "Processing character: " << i << " = '" << inputLine[i] << "'\n";
+
     new_element = false;
     switch (inputLine[i])
     {
@@ -5928,7 +6001,7 @@ void N_UTL_ExpressionInternals::tokenize_(string &inputLine,
         }
         else
         {
-          msg = "N_UTL_ExpressionInternals::N_UTL_ExpressionInternals: Exclamation point found in expression:\n";
+          msg = "ExpressionInternals::ExpressionInternals: Exclamation point found in expression:\n";
           msg += Input_ + "\n";
           msg += "Not equal operator is '!='";
           N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
@@ -6012,7 +6085,7 @@ void N_UTL_ExpressionInternals::tokenize_(string &inputLine,
         if (inIVname == 0)
         {
           j = inputLine.find_first_not_of (".0123456789", i);
-          if (j == string::npos)
+          if (j == std::string::npos)
             j = len-1;
           if (inputLine[j] == 'E')
           {
@@ -6022,7 +6095,7 @@ void N_UTL_ExpressionInternals::tokenize_(string &inputLine,
             j = inputLine.find_first_not_of ("0123456789", j);
           }
           k = inputLine.find_first_of (specials, j);
-          if (k == string::npos)
+          if (k == std::string::npos)
             k = inputLine.length()-1;
           else
             k = k-1;
@@ -6047,14 +6120,18 @@ void N_UTL_ExpressionInternals::tokenize_(string &inputLine,
         }
       default:
         j = inputLine.find_first_of (specials, i);
-        if (j == string::npos)
+        if (j == std::string::npos)
           j = len;
         el->token = TOK_VALUE;
         el->type = TYP_STRING;
         el->name = "";
         name_len = j-i;
         el->name = inputLine.substr(i, name_len);
-        if (name_len == 1)
+	if (el->name == "VR" || el->name == "VI" || el->name == "VM" || el->name == "VP" || el->name == "VDB" )
+        {
+          inIVname = 2;
+	} 
+	else if (name_len == 1)
         {
           if (inputLine[i] == 'V' || inputLine[i] == 'I')
             inIVname = 2;
@@ -6081,7 +6158,7 @@ void N_UTL_ExpressionInternals::tokenize_(string &inputLine,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::convertPolyToExpr_
+// Function      : ExpressionInternals::convertPolyToExpr_
 // Purpose       : This method massages the awkward "POLY" format into
 //                 a normal polynomial expression.
 // Special Notes : This implementation works on the tokenized output of the
@@ -6092,16 +6169,15 @@ void N_UTL_ExpressionInternals::tokenize_(string &inputLine,
 // Creation Date : 08/04/10
 //-----------------------------------------------------------------------------
 
-void N_UTL_ExpressionInternals::convertPolyToExpr_(list<ExpressionElement *> & tokenList)
+bool ExpressionInternals::convertPolyToExpr_(std::list<ExpressionElement *> & tokenList)
 {
-
-  vector <list <ExpressionElement *> *> tok2;
-  list <ExpressionElement *>::iterator tok_i, tok_j;
+  std::vector<std::list<ExpressionElement *> *> tok2;
+  std::list<ExpressionElement *>::iterator tok_i, tok_j;
   ExpressionElement *el;
   int n_nodes, n_space, pos;
-  vector <int> node_count;
-  vector <int>::iterator node_i;
-  list <ExpressionElement *>  *e_list;
+  std::vector<int> node_count;
+  std::vector<int>::iterator node_i;
+  std::list<ExpressionElement *>  *e_list;
   int i,ii;
 
   tok_i = tokenList.begin();
@@ -6127,9 +6203,8 @@ void N_UTL_ExpressionInternals::convertPolyToExpr_(list<ExpressionElement *> & t
     }
     if (n_nodes <= 0)
     {
-      msg = "N_UTL_ExpressionInternals::N_UTL_ExpressionInternals: Syntax error in number of nodes in expression:\n";
-      msg += Input_;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+      Report::UserError0() << "Syntax error in number of nodes in expression: " << Input_;
+      return false;
     }
     if (el->token == TOK_SPACE)
       ++tok_i;
@@ -6138,7 +6213,7 @@ void N_UTL_ExpressionInternals::convertPolyToExpr_(list<ExpressionElement *> & t
     tok2.clear();
     while (el->token != TOK_END)
     {
-      e_list = new list <ExpressionElement *>;
+      e_list = new std::list<ExpressionElement *>;
       if (true || n_space < n_nodes)
       {
         el = newExpressionElement_();
@@ -6167,7 +6242,7 @@ void N_UTL_ExpressionInternals::convertPolyToExpr_(list<ExpressionElement *> & t
     }
     if (n_space <= n_nodes)
     {
-      msg = "N_UTL_ExpressionInternals::N_UTL_ExpressionInternals: Apparently no coefficients in expression:\n";
+      msg = "ExpressionInternals::ExpressionInternals: Apparently no coefficients in expression:\n";
       msg += Input_;
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
     }
@@ -6227,20 +6302,20 @@ void N_UTL_ExpressionInternals::convertPolyToExpr_(list<ExpressionElement *> & t
   }
   // Here endeth POLY handling.  If we had POLY, then now we have an actual
   // polynomial instead.
-
+  return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::standardizeTable_
+// Function      : ExpressionInternals::standardizeTable_
 // Purpose       : Put all TABLE input into a clean, standard, function-like
 //                 format.  There are alternate inputs thanks to PSPICE
 //                 compatibility.
 // Creator       : Tom Russo
 // Creation Date : 07/28/10
 //-----------------------------------------------------------------------------
-void N_UTL_ExpressionInternals::standardizeTable_(list<ExpressionElement *> &tokenList)
+void ExpressionInternals::standardizeTable_(std::list<ExpressionElement *> &tokenList)
 {
-  list <ExpressionElement *>::iterator tok_i;
+  std::list<ExpressionElement *>::iterator tok_i;
   ExpressionElement *el;
 
   // The next section makes sure that what we end up with is a tokenized
@@ -6284,7 +6359,7 @@ void N_UTL_ExpressionInternals::standardizeTable_(list<ExpressionElement *> &tok
     // TOK_LPAREN
     if (el->name=="SCHEDULE")
     {
-      list <ExpressionElement *>::iterator tokenIteratorCopy( tok_i );
+      std::list<ExpressionElement *>::iterator tokenIteratorCopy( tok_i );
       tokenIteratorCopy++;  // this points us to LPAREN
       tokenIteratorCopy++;  // this is the value after LPAREN
       ExpressionElement * newExpressionElement = newExpressionElement_();
@@ -6317,7 +6392,7 @@ void N_UTL_ExpressionInternals::standardizeTable_(list<ExpressionElement *> &tok
       }
       else
       {
-        msg = "N_UTL_ExpressionInternals::N_UTL_ExpressionInternals: Right brace not found in table expression:\n";
+        msg = "ExpressionInternals::ExpressionInternals: Right brace not found in table expression:\n";
         msg += Input_;
         N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
       }
@@ -6334,7 +6409,7 @@ void N_UTL_ExpressionInternals::standardizeTable_(list<ExpressionElement *> &tok
       int i = 0;
       if ((*tok_i)->token != TOK_LPAREN)
       {
-        msg = "N_UTL_ExpressionInternals::N_UTL_ExpressionInternals: Left parenthesis missing in:\n";
+        msg = "ExpressionInternals::ExpressionInternals: Left parenthesis missing in:\n";
         msg += Input_;
         N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
       }
@@ -6351,8 +6426,8 @@ void N_UTL_ExpressionInternals::standardizeTable_(list<ExpressionElement *> &tok
         }
         else
         {
-          ostringstream err("");
-          err << "N_UTL_ExpressionInternals::N_UTL_ExpressionInternals: Left parenthesis not found in pair # ";
+          std::ostringstream err("");
+          err << "ExpressionInternals::ExpressionInternals: Left parenthesis not found in pair # ";
           err << i;
           err << " of expression:\n";
           err << Input_;
@@ -6363,8 +6438,8 @@ void N_UTL_ExpressionInternals::standardizeTable_(list<ExpressionElement *> &tok
           ++tok_i;
         if ((*tok_i)->token != TOK_VALUE)
         {
-          ostringstream err("");
-          err << "N_UTL_ExpressionInternals::N_UTL_ExpressionInternals: Syntax error in first value of pair # ";
+          std::ostringstream err("");
+          err << "ExpressionInternals::ExpressionInternals: Syntax error in first value of pair # ";
           err << i;
           err << " of expression:\n";
           err << Input_;
@@ -6373,8 +6448,8 @@ void N_UTL_ExpressionInternals::standardizeTable_(list<ExpressionElement *> &tok
         }
         if ((*++tok_i)->token != TOK_COMMA)
         {
-          ostringstream err("");
-          err << "N_UTL_ExpressionInternals::N_UTL_ExpressionInternals: Comma not found in pair # ";
+          std::ostringstream err("");
+          err << "ExpressionInternals::ExpressionInternals: Comma not found in pair # ";
           err << i;
           err << " of expression:\n";
           err << Input_;
@@ -6385,8 +6460,8 @@ void N_UTL_ExpressionInternals::standardizeTable_(list<ExpressionElement *> &tok
           ++tok_i;
         if ((*tok_i)->token != TOK_VALUE)
         {
-          ostringstream err("");
-          err << "N_UTL_ExpressionInternals::N_UTL_ExpressionInternals: Syntax error in second value of pair # ";
+          std::ostringstream err("");
+          err << "ExpressionInternals::ExpressionInternals: Syntax error in second value of pair # ";
           err << i;
           err << " of expression:\n";
           err << Input_;
@@ -6395,8 +6470,8 @@ void N_UTL_ExpressionInternals::standardizeTable_(list<ExpressionElement *> &tok
         }
         if ((*++tok_i)->token != TOK_RPAREN)
         {
-          ostringstream err("");
-          err << "N_UTL_ExpressionInternals::N_UTL_ExpressionInternals: Syntax error in first value of pair # ";
+          std::ostringstream err("");
+          err << "ExpressionInternals::ExpressionInternals: Syntax error in first value of pair # ";
           err << i;
           err << " of expression:\n";
           err << Input_;
@@ -6410,72 +6485,69 @@ void N_UTL_ExpressionInternals::standardizeTable_(list<ExpressionElement *> &tok
     }
   }
 }
-#ifdef Xyce_DEBUG_EXPRESSION
-void N_UTL_ExpressionInternals::dumpParseTree()
+
+void ExpressionInternals::dumpParseTree()
 {
   dumpParseTree_(tree_);
 }
 
 // These methods only for debugging and exploring the package behavior
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::dumpParseTree_
+// Function      : ExpressionInternals::dumpParseTree_
 // Purpose       : Make a formatted dump of a parse tree.  This is a recursive
 //                 method.
 // Creator       : Tom Russo
 // Creation Date : 07/28/10
 //-----------------------------------------------------------------------------
-void N_UTL_ExpressionInternals::dumpParseTree_(ExpressionNode *tree,
-                                               int indentLevel)
+void ExpressionInternals::dumpParseTree_(ExpressionNode *tree, int indentLevel)
 {
-  string varTypesStrings[]={"NODE","STRING","INSTANCE","SPECIAL","VARIABLE","FUNCTION"};
+  std::string varTypesStrings[]={"NODE","STRING","INSTANCE","SPECIAL","VARIABLE","FUNCTION","NODAL_COMPUTATION"};
 
   if (indentLevel == 0)
   {
-    cout << " Dumping parse tree: " << endl;
+    Xyce::dout() << " Dumping parse tree: " << std::endl;
   }
 
-  indentWithDashes_(indentLevel);   cout << expr_ops[tree->type] << endl;
+  indentWithDashes_(indentLevel);   Xyce::dout() << expr_ops[tree->type] << std::endl;
 
   if (tree->type == EXPR_CONSTANT)
   {
-    indentWithDashes_(indentLevel);   cout << " Value : "
-                                        << tree->constant << endl;
+    indentWithDashes_(indentLevel);   Xyce::dout() << " Value : "
+                                        << tree->constant << std::endl;
   }
   else if (tree->type == EXPR_VAR)
   {
-    indentWithDashes_(indentLevel);  cout << " Variable:  " << tree->valueIndex
+    indentWithDashes_(indentLevel);  Xyce::dout() << " Variable:  " << tree->valueIndex
                                           << " Name: "
                                           << varValues_[tree->valueIndex]
                                           << " Type: "
                                           << varTypesStrings[varTypes_[tree->valueIndex]-10]
                                           << " and node constant is "
                                           << tree->constant
-                                          << endl;
+                                          << std::endl;
   }
   else
   {
-    indentWithDashes_(indentLevel);   cout << " Number of operands: "
-                                          << tree->operands.size() << endl;
+    indentWithDashes_(indentLevel);   Xyce::dout() << " Number of operands: "
+                                          << tree->operands.size() << std::endl;
   }
 
   int nOps=tree->operands.size();
   for (int i=0; i< nOps; i++)
     dumpParseTree_(tree->operands[i],indentLevel+1);
-
 }
 
-void N_UTL_ExpressionInternals::indentWithDashes_(int indentLevel)
+void ExpressionInternals::indentWithDashes_(int indentLevel)
 {
   for (int i=0;i<indentLevel;i++)
-    cout << "-";
+    Xyce::dout() << "-";
 }
-#endif
 
 // basic functions pointed to by function pointers in the expression tree.
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::EXPRor
+// Function      : ExpressionInternals::EXPRor
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6489,7 +6561,7 @@ double EXPRor(double arg1, double arg2)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6497,14 +6569,14 @@ double EXPRxor(double arg1, double arg2)
 {
   LOGIC(arg1, EXPR_XOR_WARNING);
   LOGIC(arg2, EXPR_XOR_WARNING);
-  if (arg1 > 0 && arg2 <= 0 ||
-      arg1 <= 0 && arg2 > 0)
+  if ( (arg1 > 0 && arg2 <= 0) ||
+       (arg1 <= 0 && arg2 > 0) )
     return 1.;
   return 0.;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6518,7 +6590,7 @@ double EXPRand(double arg1, double arg2)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6530,7 +6602,7 @@ double EXPRequal(double arg1, double arg2)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6542,7 +6614,7 @@ double EXPRnoteq(double arg1, double arg2)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6554,7 +6626,7 @@ double EXPRgreat(double arg1, double arg2)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6566,7 +6638,7 @@ double EXPRgreateq(double arg1, double arg2)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6578,7 +6650,7 @@ double EXPRless(double arg1, double arg2)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6590,7 +6662,7 @@ double EXPRlesseq(double arg1, double arg2)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6605,7 +6677,7 @@ double EXPRplus(double arg1, double arg2)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6620,7 +6692,7 @@ double EXPRminus(double arg1, double arg2)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6635,7 +6707,7 @@ double EXPRtimes(double arg1, double arg2)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6655,7 +6727,7 @@ double EXPRdivide(double arg1, double arg2)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6701,7 +6773,7 @@ double EXPRremainder(double arg1, double arg2)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6741,11 +6813,7 @@ double EXPRpower(double arg1, double arg2)
   {
     if (arg1 < 0)
     {
-      x = -arg1;
-    }
-    else
-    {
-      x = arg1;
+      x *= -1.0;
     }
 
     rval = pow(x, y);
@@ -6765,7 +6833,7 @@ double EXPRpower(double arg1, double arg2)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6775,7 +6843,7 @@ double EXPRabs (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6785,7 +6853,7 @@ double EXPRacos (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6797,7 +6865,7 @@ double EXPRacosh (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6807,7 +6875,7 @@ double EXPRasin (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6817,7 +6885,7 @@ double EXPRasinh (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Keith Santarelli, 01437
 // Creation Date : 06/25/08
 //-----------------------------------------------------------------------------
@@ -6832,7 +6900,7 @@ double EXPRint (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6842,7 +6910,7 @@ double EXPRatan (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6856,7 +6924,7 @@ double EXPRatanh (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6866,7 +6934,7 @@ double EXPRcos (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6881,7 +6949,7 @@ double EXPRcosh (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6894,7 +6962,7 @@ double EXPRexp (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6909,7 +6977,7 @@ double EXPRln (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6924,7 +6992,7 @@ double EXPRlog (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6937,7 +7005,7 @@ double EXPRnot (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6948,7 +7016,7 @@ double EXPRsgn (double arg)
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6958,7 +7026,7 @@ double EXPRsin (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6973,7 +7041,7 @@ double EXPRsinh (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6988,7 +7056,7 @@ double EXPRsqrt (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -6998,7 +7066,7 @@ double EXPRtan (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -7012,7 +7080,7 @@ double EXPRtanh (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -7022,7 +7090,7 @@ double EXPRuminus (double arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionInternals::
+// Function      : ExpressionInternals::
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/04
 //-----------------------------------------------------------------------------
@@ -7034,4 +7102,5 @@ double EXPRuramp (double arg)
     return arg;
 }
 
-
+} // namespace Util
+} // namespace Xyce

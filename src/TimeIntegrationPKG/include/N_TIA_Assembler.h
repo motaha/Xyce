@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.9.6.2 $
+// Revision Number: $Revision: 1.14 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,12 +46,10 @@
 #ifndef Xyce_N_ASSEMBER_H
 #define Xyce_N_ASSEMBER_H
 
-// ---------- Standard Includes ----------
-
-// ----------   Xyce Includes   ----------
-
 #include <N_UTL_Misc.h>
 #include <N_UTL_Xyce.h>
+#include <N_ANP_fwd.h>
+#include <N_UTL_fwd.h>
 
 // ---------- Forward Declarations ----------
 class N_LOA_Loader;
@@ -61,8 +59,6 @@ class N_TIA_WorkingIntegrationMethod;
 class N_LAS_Vector;
                        
 class N_PDS_Manager;
-
-class N_UTL_Timer;
 
 //-----------------------------------------------------------------------------
 // Class         : N_TIA_Assembler
@@ -106,7 +102,7 @@ protected:
 
   N_PDS_Manager & pdsMgr;
   
-  friend class N_ANP_AnalysisInterface;
+    friend class Xyce::Analysis::AnalysisInterface;
 };
 
 //-----------------------------------------------------------------------------
@@ -137,7 +133,7 @@ public:
   virtual bool loadJacobian ();
   virtual bool applyJacobian (const N_LAS_Vector& input, N_LAS_Vector& result);
 
-  friend class N_ANP_AnalysisInterface;
+    friend class Xyce::Analysis::AnalysisInterface;
 
 };
 

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ----------------------
 //
-// Revision Number: $Revision: 1.9.6.2 $
+// Revision Number: $Revision: 1.14 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:47 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author $
 //-------------------------------------------------------------------------
@@ -46,14 +46,12 @@
 #ifndef Xyce_N_NLS_ParamMgr_h
 #define Xyce_N_NLS_ParamMgr_h
 
-// ----------   Standard Includes   ----------
 #include <vector>
 
-// ----------   Xyce Includes   ----------
+#include <N_IO_fwd.h>
+
 #include <N_NLS_NLParams.h>
 
-// ---------- Forward Declarations ----------
-class N_IO_CmdParse;
 
 //-----------------------------------------------------------------------------
 // Class         : N_NLS_ParamMgr
@@ -93,7 +91,7 @@ public:
 protected:
 
 private:
-  vector<N_NLS_NLParams> paramVector_;
+  std::vector<N_NLS_NLParams> paramVector_;
   AnalysisMode   currentMode_;
 
   bool modeToggled_;

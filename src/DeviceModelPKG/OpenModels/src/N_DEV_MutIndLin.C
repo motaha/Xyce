@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.100.2.4 $
+// Revision Number: $Revision: 1.124.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -57,12 +57,14 @@
 #include <set>
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_MutIndLin.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_DeviceMaster.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
-#include <N_DEV_OutputPars.h>
+#include <N_DEV_MutIndLin.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
 
 #include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
@@ -72,51 +74,6 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<MutIndLin::Instance>::ParametricData()
-{
-    setNumNodes(2);
-    setNumOptionalNodes(0);
-    setNumFillNodes(0);
-    setModelRequired(0);
-    setPrimaryParameter("COUP_VAL");
-
-    // Set up double precision variables:
-    addPar ("COUP_VAL",   1.0, false,   ParameterType::NO_DEP,
-        &MutIndLin::Instance::mutualCup,
-        &MutIndLin::Instance::mutualCupGiven,
-        U_NONE, CAT_NONE, "Coupling value");
-
-    // Set up exceptions (ie variables that are not doubles):
-    addPar ("COUPLEDMutIndLin", std::vector<std::string>(), false, ParameterType::NO_DEP,
-            &MutIndLin::Instance::inductorNames, NULL, U_NONE, CAT_NONE, "");
-    addPar ("COUPLEDINDUCTANCE", std::vector<double>(), false, ParameterType::NO_DEP,
-            &MutIndLin::Instance::inductorInductances, NULL, U_NONE, CAT_NONE, "");
-    addPar ("NODE1", std::vector<std::string>(), false, ParameterType::NO_DEP,
-            &MutIndLin::Instance::inductorsNode1, NULL, U_NONE, CAT_NONE, "");
-    addPar ("NODE2", std::vector<std::string>(), false, ParameterType::NO_DEP,
-            &MutIndLin::Instance::inductorsNode2, NULL, U_NONE, CAT_NONE, "");
-    addPar ("COUPLING", std::vector<double>(), false, ParameterType::SOLN_DEP,
-            &MutIndLin::Instance::couplingCoefficient, NULL, U_NONE, CAT_NONE, "Coupling coefficient");
-    addPar ("COUPLEDINDUCTOR", std::vector<std::string>(), false, ParameterType::NO_DEP,
-            &MutIndLin::Instance::couplingInductor, NULL, U_NONE, CAT_NONE, "");
-}
-
-template<>
-ParametricData<MutIndLin::Model>::ParametricData()
-{
-    addPar ("TNOM",   27.0,      false,   ParameterType::NO_DEP,
-        &MutIndLin::Model::tnom,
-        NULL, U_DEGC, CAT_MATERIAL, "Reference temperature");
-
-    addPar ("TC1",     0.0,      false,   ParameterType::NO_DEP,
-        &MutIndLin::Model::tempCoeff1,
-        NULL, U_NONE, CAT_MATERIAL, "First order temperature coeff.");
-
-    addPar ("TC2",     0.0,      false,   ParameterType::NO_DEP,
-        &MutIndLin::Model::tempCoeff2,
-        NULL, U_NONE, CAT_MATERIAL, "Second order temperature coeff.");
-}
 
 //-----------------------------------------------------------------------------
 // Function      : InductorInstanceData::InductorInstanceData
@@ -173,17 +130,45 @@ InductorInstanceData::InductorInstanceData():
 
 namespace MutIndLin {
 
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
 
-  return parMap;
+void Traits::loadInstanceParameters(ParametricData<MutIndLin::Instance> &p)
+{
+// Set up double precision variables:
+    p.addPar ("COUP_VAL",   1.0, false,   ParameterType::NO_DEP,
+        &MutIndLin::Instance::mutualCup,
+        &MutIndLin::Instance::mutualCupGiven,
+        U_NONE, CAT_NONE, "Coupling value");
+
+    // Set up exceptions (ie variables that are not doubles):
+    p.addPar ("COUPLEDMutIndLin", std::vector<std::string>(), false, ParameterType::NO_DEP,
+            &MutIndLin::Instance::inductorNames, NULL, U_NONE, CAT_NONE, "");
+    p.addPar ("COUPLEDINDUCTANCE", std::vector<double>(), false, ParameterType::NO_DEP,
+            &MutIndLin::Instance::inductorInductances, NULL, U_NONE, CAT_NONE, "");
+    p.addPar ("NODE1", std::vector<std::string>(), false, ParameterType::NO_DEP,
+            &MutIndLin::Instance::inductorsNode1, NULL, U_NONE, CAT_NONE, "");
+    p.addPar ("NODE2", std::vector<std::string>(), false, ParameterType::NO_DEP,
+            &MutIndLin::Instance::inductorsNode2, NULL, U_NONE, CAT_NONE, "");
+    p.addPar ("COUPLING", std::vector<double>(), false, ParameterType::SOLN_DEP,
+            &MutIndLin::Instance::couplingCoefficient, NULL, U_NONE, CAT_NONE, "Coupling coefficient");
+    p.addPar ("COUPLEDINDUCTOR", std::vector<std::string>(), false, ParameterType::NO_DEP,
+            &MutIndLin::Instance::couplingInductor, NULL, U_NONE, CAT_NONE, "");
 }
 
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
+void Traits::loadModelParameters(ParametricData<MutIndLin::Model> &p)
+{
+    p.addPar ("TNOM",   27.0,      false,   ParameterType::NO_DEP,
+        &MutIndLin::Model::tnom,
+        NULL, U_DEGC, CAT_MATERIAL, "Reference temperature");
 
-  return parMap;
+    p.addPar ("TC1",     0.0,      false,   ParameterType::NO_DEP,
+        &MutIndLin::Model::tempCoeff1,
+        NULL, U_NONE, CAT_MATERIAL, "First order temperature coeff.");
+
+    p.addPar ("TC2",     0.0,      false,   ParameterType::NO_DEP,
+        &MutIndLin::Model::tempCoeff2,
+        NULL, U_NONE, CAT_MATERIAL, "Second order temperature coeff.");
 }
+
 
 //-----------------------------------------------------------------------------
 // Function      : Instance::Instance
@@ -193,19 +178,18 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-Instance::Instance(InstanceBlock & IB,
-                                Model & Iiter,
-                                MatrixLoadData & mlData1,
-                                SolverState & ss1,
-                                ExternData  & ed1,
-                                DeviceOptions & do1)
-  : DeviceInstance (IB, mlData1, ss1, ed1, do1),
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock &         IB,
+  Model &                       Iiter,
+  const FactoryBlock &          factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(Iiter),
     numInductors(0),
     mutualCup(0.0),
     mutualCupGiven(false),
     scalingRHS(1.0),
-    temp(getDeviceOptions().temp.dVal()),
+    temp(getDeviceOptions().temp.getImmutableValue<double>()),
     tempGiven(false)
 {
   scalingRHS = 1.0;
@@ -215,24 +199,11 @@ Instance::Instance(InstanceBlock & IB,
   numIntVars   = 1;
   numStateVars = 0;
 
-  setName(IB.getName());
-  setModelName(model_.getName());
-
-
   // Set params to constant default values:
   setDefaultParams ();
 
   // Set params according to instance line and constant defaults from metadata:
   setParams (IB.params);
-
-#ifdef Xyce_DEBUG_DEVICE
-  //if (getDeviceOptions().debugLevel > 0)
-  //{
-    //cout << "\n\nInstance Params:\n";
-    //outputParams(*this, OutputMode::DEFAULT);
-  //}
-#endif
-
 
   // now load the instance data vector
   for( int i=0; i<inductorNames.size(); ++i )
@@ -304,18 +275,18 @@ Instance::Instance(InstanceBlock & IB,
     // Save the indices for later
     indexPairs[i/2].first = indexInductorOne;
     indexPairs[i/2].second = indexInductorTwo;
-      
+
     // with the indices at hand, assign the value.
-    // note that couplingCoefficient can be of length 1 if all coefficients were the 
-    // same.  Catch that case here. 
+    // note that couplingCoefficient can be of length 1 if all coefficients were the
+    // same.  Catch that case here.
     if( (i/2) < couplingCoefficient.size() )
     {
-      mutualCouplingCoef[ indexInductorOne ][ indexInductorTwo ] = 
+      mutualCouplingCoef[ indexInductorOne ][ indexInductorTwo ] =
         mutualCouplingCoef[ indexInductorTwo ][ indexInductorOne ] = couplingCoefficient[ (i / 2) ];
     }
     else
     {
-      mutualCouplingCoef[ indexInductorOne ][ indexInductorTwo ] = 
+      mutualCouplingCoef[ indexInductorOne ][ indexInductorTwo ] =
         mutualCouplingCoef[ indexInductorTwo ][ indexInductorOne ] = couplingCoefficient[ 0 ];
     }
   }
@@ -323,14 +294,14 @@ Instance::Instance(InstanceBlock & IB,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "mutualCouplingCoef:  " << endl;
+    Xyce::dout() << "mutualCouplingCoef:  " << std::endl;
     for( int i=0; i<numInductors; ++i )
     {
       for( int j=0; j<numInductors; ++j )
       {
-        cout << mutualCouplingCoef[i][j] << "  ";
+        Xyce::dout() << mutualCouplingCoef[i][j] << "  ";
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
     }
   }
 #endif
@@ -408,9 +379,9 @@ Instance::Instance(InstanceBlock & IB,
   // We need to bump up the jacstamp for all the dependencies on
   // the coupling vars that are expressions.  We also need to keep track of
   // how many variables each inductor depends on.
-  vector<sDepend>::iterator d;
-  vector<sDepend>::iterator begin=dependentParams.begin();
-  vector<sDepend>::iterator end=dependentParams.end();
+  std::vector<sDepend>::iterator d;
+  std::vector<sDepend>::iterator begin=dependentParams.begin();
+  std::vector<sDepend>::iterator end=dependentParams.end();
 
   for (d=begin; d != end; ++d)
   {
@@ -454,15 +425,15 @@ Instance::Instance(InstanceBlock & IB,
           // mutualCoupling that are just copies of the one-dimensonal
           // arrays like couplingCoefficient.
           instanceData[indexInductorOne]->depVarPairs.push_back(
-             pair<int,int>(d->vectorIndex,i));
+             std::pair<int,int>(d->vectorIndex,i));
           instanceData[indexInductorTwo]->depVarPairs.push_back(
-             pair<int,int>(d->vectorIndex,i));
+             std::pair<int,int>(d->vectorIndex,i));
         }
       }
     }
     else
     {
-      string msg="Error in mutual inductor constructor for ";
+      std::string msg="Error in mutual inductor constructor for ";
       msg += getName();
       msg += ": Found a dependent parameter that fails sanity check.";
       msg += "Name:" + d->name + " ";
@@ -482,24 +453,24 @@ Instance::Instance(InstanceBlock & IB,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "Instance::Instance-----------------" << endl;
-    cout << "numExtVars = " << numExtVars << endl
-      << "numIntVars = " << numIntVars << endl
-      << "numStateVars = " << numStateVars << endl
-      << "numInductors = " << numInductors << endl
-      << "jacStamp = " << endl;
+    Xyce::dout() << "Instance::Instance-----------------" << std::endl;
+    Xyce::dout() << "numExtVars = " << numExtVars << std::endl
+      << "numIntVars = " << numIntVars << std::endl
+      << "numStateVars = " << numStateVars << std::endl
+      << "numInductors = " << numInductors << std::endl
+      << "jacStamp = " << std::endl;
     for( int i = 0; i<jacStamp.size(); ++i )
     {
-      cout << "jacStamp[ " << i << " ] = { ";
+      Xyce::dout() << "jacStamp[ " << i << " ] = { ";
       for( int j=0; j<jacStamp[i].size(); ++j)
       {
-        cout << jacStamp[i][j];
+        Xyce::dout() << jacStamp[i][j];
         if( j != ( jacStamp[i].size() -1 ) )
         {
-          cout << ", ";
+          Xyce::dout() << ", ";
         }
       }
-      cout << " }" << endl;
+      Xyce::dout() << " }" << std::endl;
     }
   }
 #endif
@@ -516,8 +487,8 @@ Instance::Instance(InstanceBlock & IB,
 //-----------------------------------------------------------------------------
 Instance::~Instance()
 {
-  vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
+  std::vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
+  std::vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
   for ( ; currentInductor != endInductor ; ++currentInductor)
   {
     delete *currentInductor;
@@ -532,32 +503,13 @@ Instance::~Instance()
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs(const vector<int> & intLIDVecRef,
-                                          const vector<int> & extLIDVecRef)
+void Instance::registerLIDs(const std::vector<int> & intLIDVecRef,
+                                          const std::vector<int> & extLIDVecRef)
 {
-  string msg;
-  string tmpstr;
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  // copy over the global ID lists.
+// copy over the global ID lists.
   intLIDVec = intLIDVecRef;
   extLIDVec = extLIDVecRef;
 
@@ -565,8 +517,8 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
   // linear algebra entities.  This assumes an order.
   // For the matrix  indices, first do the rows.
   // get the current values of the inductances and currentOffsets
-  vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
+  std::vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
+  std::vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
   int i = 0;
   int j = 0;
   while( currentInductor != endInductor )
@@ -580,15 +532,15 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "Instance::registerLIDs----------------------------" << endl;
+    Xyce::dout() << "Instance::registerLIDs----------------------------" << std::endl;
     currentInductor = instanceData.begin();
     i=0;
     while( currentInductor != endInductor )
     {
-      cout << "Inductor [ " << i++ << " ] "
+      Xyce::dout() << "Inductor [ " << i++ << " ] "
            << "   li_Pos = " << (*currentInductor)->li_Pos
            << "   li_Neg = " << (*currentInductor)->li_Neg
-           << "   li_Branch = " << (*currentInductor)->li_Branch << endl;
+           << "   li_Branch = " << (*currentInductor)->li_Branch << std::endl;
       ++currentInductor;
     }
   }
@@ -603,12 +555,12 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 04/26/06
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
-    string tmpstr;
+    std::string tmpstr;
     for( int i=0; i<instanceData.size() ; ++i)
     {
       tmpstr = getName() + "_" + instanceData[i]->name + "_branch";
@@ -628,20 +580,9 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
   // copy over the global ID lists.
   staLIDVec = staLIDVecRef;
@@ -655,7 +596,7 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 06/06/01
 //-----------------------------------------------------------------------------
-const vector<string> & Instance::getDepSolnVars()
+const std::vector<std::string> & Instance::getDepSolnVars()
 {
   return DeviceInstance::getDepSolnVars();
 }
@@ -668,7 +609,7 @@ const vector<string> & Instance::getDepSolnVars()
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -681,17 +622,17 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "Instance::registerJacLIDs ----------------------------" << endl;
+    Xyce::dout() << "Instance::registerJacLIDs ----------------------------" << std::endl;
   }
 #endif
-  vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
+  std::vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
+  std::vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
   int i = 0;
   while( currentInductor != endInductor )
   {
@@ -722,23 +663,23 @@ void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "Instance::registerJacLIDs--------------------------" << endl;
+    Xyce::dout() << "Instance::registerJacLIDs--------------------------" << std::endl;
     currentInductor = instanceData.begin();
     i=0;
     while( currentInductor != endInductor )
     {
-      cout << "Inductor [ " << i << " ] " << (*currentInductor)->name
+      Xyce::dout() << "Inductor [ " << i << " ] " << (*currentInductor)->name
            << "   APosEquBraVarOffset = " << (*currentInductor)->APosEquBraVarOffset
            << "   ANegEquBraVarOffset = " << (*currentInductor)->ANegEquBraVarOffset
            << "   ABraEquPosNodeOffset = " << (*currentInductor)->ABraEquPosNodeOffset
            << "   ABraEquNegNodeOffset = " << (*currentInductor)->ABraEquNegNodeOffset
-           << "   ABraEquBraVarOffset = " << (*currentInductor)->ABraEquBraVarOffset << endl;
-      cout << "\tInductor branch offsets = { ";
+           << "   ABraEquBraVarOffset = " << (*currentInductor)->ABraEquBraVarOffset << std::endl;
+      Xyce::dout() << "\tInductor branch offsets = { ";
       for( int j=0; j<numInductors ; ++j )
       {
-        cout << (*currentInductor)->inductorCurrentOffsets[ j ] << ", ";
+        Xyce::dout() << (*currentInductor)->inductorCurrentOffsets[ j ] << ", ";
       }
-      cout << "} " << endl;
+      Xyce::dout() << "} " << std::endl;
       ++i;
       ++currentInductor;
     }
@@ -760,8 +701,8 @@ void Instance::setupPointers ()
   N_LAS_Matrix & dFdx = *(extData.dFdxMatrixPtr);
   N_LAS_Matrix & dQdx = *(extData.dQdxMatrixPtr);
 
-  vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
+  std::vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
+  std::vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
   int i = 0;
   while( currentInductor != endInductor )
   {
@@ -852,7 +793,7 @@ void Instance::setupPointers ()
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-bool Instance::processParams(string param)
+bool Instance::processParams()
 {
   int i, j;
 
@@ -861,9 +802,9 @@ bool Instance::processParams(string param)
   // the couplingCoefficient matrix.
   j = indexPairs.size();
   for( i=0; i<j ; ++i )
-  {      
-    // note that couplingCoefficient can be of length 1 if all coefficients were the 
-    // same.  Catch that case here. 
+  {
+    // note that couplingCoefficient can be of length 1 if all coefficients were the
+    // same.  Catch that case here.
     if( i < couplingCoefficient.size() )
     {
       mutualCouplingCoef[ indexPairs[i].first ][ indexPairs[i].second ] =
@@ -878,14 +819,14 @@ bool Instance::processParams(string param)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0  && getSolverState().debugTimeFlag)
   {
-    cout << "processParams: mutualCouplingCoef:  " << endl;
+    Xyce::dout() << "processParams: mutualCouplingCoef:  " << std::endl;
     for( int i=0; i<numInductors; ++i )
     {
       for( int j=0; j<numInductors; ++j )
       {
-        cout << mutualCouplingCoef[i][j] << "  ";
+        Xyce::dout() << mutualCouplingCoef[i][j] << "  ";
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
     }
   }
 #endif
@@ -911,7 +852,7 @@ bool Instance::updateTemperature ( const double & temp)
   // current temp difference from reference temp.
   double difference = temp - model_.tnom;
 
-  vector< InductorInstanceData* >::iterator currentData = instanceData.begin();
+  std::vector< InductorInstanceData* >::iterator currentData = instanceData.begin();
   while( currentData != instanceData.end() )
   {
     double factor = 1.0 + (model_.tempCoeff1)*difference +
@@ -957,9 +898,9 @@ bool Instance::updateIntermediateVars ()
 //-----------------------------------------------------------------------------
 void Instance::updateInductanceMatrix()
 {
-  vector< InductorInstanceData* >::iterator
+  std::vector< InductorInstanceData* >::iterator
     currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator
+  std::vector< InductorInstanceData* >::iterator
     endInductor = instanceData.end();
 
   // collec the inductances
@@ -997,8 +938,8 @@ bool Instance::updatePrimaryState()
 #ifdef  Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Instance::updatePrimaryState------------------" << endl
-         << "\tname = " << getName() << endl;
+    Xyce::dout() << "Instance::updatePrimaryState------------------" << std::endl
+         << "\tname = " << getName() << std::endl;
   }
 #endif
 
@@ -1017,9 +958,9 @@ bool Instance::updatePrimaryState()
   }
 
   // get the currents in each inductor
-  vector< InductorInstanceData* >::iterator
+  std::vector< InductorInstanceData* >::iterator
   currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator
+  std::vector< InductorInstanceData* >::iterator
   endInductor = instanceData.end();
   int i = 0;
   while( currentInductor != endInductor )
@@ -1058,8 +999,8 @@ bool Instance::loadDeviceMask ()
 #ifndef Xyce_NO_MUTINDLIN_MASK
   N_LAS_Vector * maskVectorPtr = extData.deviceMaskVectorPtr;
 
-  vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
+  std::vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
+  std::vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
   while( currentInductor != endInductor )
   {
     (*maskVectorPtr)[((*currentInductor)->li_Branch)] = 0.0;
@@ -1090,8 +1031,8 @@ bool Instance::loadDAEQVector ()
 #ifdef  Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Instance::loadDAEQVector---------------------------" << endl
-         << "\tname = " << getName() << endl;
+    Xyce::dout() << "Instance::loadDAEQVector---------------------------" << std::endl
+         << "\tname = " << getName() << std::endl;
   }
 #endif
   double * qVec = extData.daeQVectorRawPtr;
@@ -1115,8 +1056,8 @@ bool Instance::loadDAEQVector ()
   }
 
   // loop over each inductor and load it's Q vector components
-  vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
+  std::vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
+  std::vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
   int i=0;
   while( currentInductor != endInductor )
   {
@@ -1145,8 +1086,8 @@ bool Instance::loadDAEFVector ()
 #ifdef  Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Instance::loadDAEFVector---------------------------" << endl
-         << "\tname = " << getName() << endl;
+    Xyce::dout() << "Instance::loadDAEFVector---------------------------" << std::endl
+         << "\tname = " << getName() << std::endl;
   }
 #endif
 
@@ -1154,8 +1095,8 @@ bool Instance::loadDAEFVector ()
   double * solVec = extData.nextSolVectorRawPtr;
 
   // loop over each inductor and load it's F vector components
-  vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
+  std::vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
+  std::vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
   int i = 0;
 
   while( currentInductor != endInductor )
@@ -1170,11 +1111,11 @@ bool Instance::loadDAEFVector ()
 #ifdef  Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "  Inductor = " << (*currentInductor)->name
+      Xyce::dout() << "  Inductor = " << (*currentInductor)->name
            << "\tcurrent = " << current
            << "\tvNodePos = " << vNodePos
            << "\tvNodeNeg = " << vNodeNeg
-           << endl;
+           << std::endl;
     }
 #endif
 
@@ -1199,8 +1140,8 @@ bool Instance::loadDAEdQdx ()
 #ifdef  Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Instance::loadDAEdQdx--------------------------" << endl
-         << "\tname = " << getName() << endl;
+    Xyce::dout() << "Instance::loadDAEdQdx--------------------------" << std::endl
+         << "\tname = " << getName() << std::endl;
   }
 #endif
 
@@ -1211,8 +1152,8 @@ bool Instance::loadDAEdQdx ()
     N_LAS_Matrix & dQdx = *(extData.dQdxMatrixPtr);
 
     // loop over each inductor and load it's Q vector components
-    vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-    vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
+    std::vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
+    std::vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
     int i=0;
     while( currentInductor != endInductor )
     {
@@ -1269,8 +1210,8 @@ bool Instance::loadDAEdFdx ()
   N_LAS_Matrix & dFdx = *(extData.dFdxMatrixPtr);
 
   // loop over each inductor and load it's dFdx components
-  vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
-  vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
+  std::vector< InductorInstanceData* >::iterator currentInductor = instanceData.begin();
+  std::vector< InductorInstanceData* >::iterator endInductor = instanceData.end();
   while( currentInductor != endInductor )
   {
     dFdx[((*currentInductor)->li_Pos)]   [((*currentInductor)->APosEquBraVarOffset)]  +=  scalingRHS;
@@ -1309,7 +1250,7 @@ bool Instance::setIC ()
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-void Instance::varTypes( vector<char> & varTypeVec )
+void Instance::varTypes( std::vector<char> & varTypeVec )
 {
   varTypeVec.resize(numInductors);
   for(int i=0; i<numInductors; i++)
@@ -1326,7 +1267,7 @@ void Instance::varTypes( vector<char> & varTypeVec )
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   return true;
 }
@@ -1339,11 +1280,11 @@ bool Model::processParams (string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 03/23/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1361,13 +1302,14 @@ bool Model::processInstanceParams(string param)
 // Creator       : Rich Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 03/21/2005
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-                                                SolverState & ss1,
-                                                DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
     tempCoeff1(0.0),
     tempCoeff2(0.0),
-    tnom(do1.tnom)
+    tnom(getDeviceOptions().tnom)
 {
 
   // Set params to constant default values:
@@ -1379,14 +1321,6 @@ Model::Model (const ModelBlock & MB,
   // Set any non-constant parameter defaults:
   if (!given("TNOM"))
     tnom = getDeviceOptions().tnom;
-
-#ifdef Xyce_DEBUG_DEVICE
-  //if (getDeviceOptions().debugLevel > 0)
-  //{
-    //cout << "\n\nModel Params:\n";
-    //outputParams(*this, OutputMode::DEFAULT);
-  //}
-#endif
 
   // Calculate any parameters specified as expressions:
   updateDependentParameters();
@@ -1405,9 +1339,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1428,27 +1362,48 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i, isize;
   isize = instanceContainer.size();
 
-  os << endl;
-  os << "Number of MutIndLin instances: " << isize << endl;
-  os << "    name=\t\tmodelName\tParameters" << endl;
+  os << std::endl;
+  os << "Number of MutIndLin instances: " << isize << std::endl;
+  os << "    name=\t\tmodelName\tParameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 // MutIndLin Master functions:
 
@@ -1462,7 +1417,7 @@ std::ostream &Model::printOutInstances(std::ostream &os) const
 //-----------------------------------------------------------------------------
 bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
      Instance & inst = *(*it);
 
@@ -1479,9 +1434,9 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
     }
 
     // get the currents in each inductor
-    vector< InductorInstanceData* >::iterator
+    std::vector< InductorInstanceData* >::iterator
     currentInductor = inst.instanceData.begin();
-    vector< InductorInstanceData* >::iterator
+    std::vector< InductorInstanceData* >::iterator
     endInductor = inst.instanceData.end();
     {
     int i = 0;
@@ -1514,14 +1469,14 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 //-----------------------------------------------------------------------------
 bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  double * storeLeadF, double * storeLeadQ)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & inst = *(*it);
 
     // F-vector:
     // loop over each inductor and load it's F vector components
-    vector< InductorInstanceData* >::iterator currentInductor = inst.instanceData.begin();
-    vector< InductorInstanceData* >::iterator endInductor = inst.instanceData.end();
+    std::vector< InductorInstanceData* >::iterator currentInductor = inst.instanceData.begin();
+    std::vector< InductorInstanceData* >::iterator endInductor = inst.instanceData.end();
 
     while( currentInductor != endInductor )
     {
@@ -1580,12 +1535,12 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
 //-----------------------------------------------------------------------------
 bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & inst = *(*it);
     // loop over each inductor and load it's dFdx components
-    vector< InductorInstanceData* >::iterator currentInductor = inst.instanceData.begin();
-    vector< InductorInstanceData* >::iterator endInductor = inst.instanceData.end();
+    std::vector< InductorInstanceData* >::iterator currentInductor = inst.instanceData.begin();
+    std::vector< InductorInstanceData* >::iterator endInductor = inst.instanceData.end();
     while( currentInductor != endInductor )
     {
       *((*currentInductor)->f_PosEquBraVarPtr)  +=  inst.scalingRHS;
@@ -1658,8 +1613,8 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
   {
     Instance & inst = *(instanceContainer_.at(i));
     // loop over each inductor and load it's dFdx components
-    vector< InductorInstanceData* >::iterator currentInductor = inst.instanceData.begin();
-    vector< InductorInstanceData* >::iterator endInductor = inst.instanceData.end();
+    std::vector< InductorInstanceData* >::iterator currentInductor = inst.instanceData.begin();
+    std::vector< InductorInstanceData* >::iterator endInductor = inst.instanceData.end();
     while( currentInductor != endInductor )
     {
       dFdx[((*currentInductor)->li_Pos)]   [((*currentInductor)->APosEquBraVarOffset)]  +=  inst.scalingRHS;
@@ -1716,6 +1671,19 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
   return true;
 }
 #endif
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("mil", 1)
+    .registerModelType("mil", 1);
+}
 
 } // namespace MutIndLin
 } // namespace Device

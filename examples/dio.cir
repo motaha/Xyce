@@ -1,0 +1,37 @@
+*-------------------------------------------------------------------------
+* Copyright Notice
+*
+* Copyright (c) 2000, Sandia Corporation, Albuquerque, NM.
+*-------------------------------------------------------------------------
+*
+*-------------------------------------------------------------------------
+* Filename       : $RCSfile: dio.cir,v $
+*
+* Purpose        : Diode test circuit 
+*
+* Special Notes  : 
+*
+* Creator        : Eric R. Keiter, 9233, Computational Sciences
+*
+* Creation Date  : 10/26/00
+*
+* Revision Information:
+* ---------------------
+*
+* Revision Number: $Revision: 1.1 $
+*
+* Revision Date  : $Date: 2000/10/26 23:21:19 $
+*
+* Current Owner  : $Author: erkeite $
+*-------------------------------------------------------------------------
+VP 1 0 PULSE(1 5 0.0 6.0e-5 0.0 1.0e+20 0.0)
+R1 1 2 1k
+D1 2 0 DIODE
+.MODEL DIODE D (is=880.5e-18  rs=0.25 ikf=0 n=1 
++ xti=3 eg=1.11 cjo=175p m=0.5516 vj=0.75  fc=0.5
++ isr=1.859n nr=2 bv=4.7 ibv=20.245m)
+.TRAN 1.0e-5 1.0e-1 
+.options NONLIN maxstep=100
+.options TIMEINT reltol=1.0e-3 abstol=1.0e-6 
+.print tran v(1) v(2) 
+.END

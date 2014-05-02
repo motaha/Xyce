@@ -18,7 +18,6 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
-using namespace std;
 #include <cstdlib>
 #include <string>
 #include <map>
@@ -28,39 +27,43 @@ using namespace std;
 #include <N_ERH_ErrorMgr.h>
 #include <N_DEV_Specie.h>
 #include <N_DEV_ReactionNetwork.h>
-class N_DEV_ReactionLexer;
+
+namespace Xyce {
+namespace Device {
+class ReactionLexer;
+}}
 %}
 
 %skeleton "lalr1.cc"
-%parse-param {N_DEV_ReactionLexer *theLexer}
-%parse-param {map<string,int> &theSpeciesIDs}
-%parse-param {N_DEV_ReactionNetwork &theReactionNetwork}
-%lex-param {N_DEV_ReactionLexer *theLexer}
-%lex-param {map<string,int> &theSpeciesIDs}
+%parse-param {Xyce::Device::ReactionLexer *theLexer}
+%parse-param {std::map<std::string, int> &theSpeciesIDs}
+%parse-param {Xyce::Device::ReactionNetwork &theReactionNetwork}
+%lex-param {ReactionLexer *theLexer}
+%lex-param {std::map<std::string, int> &theSpeciesIDs}
 
-%define "parser_class_name" "N_DEV_ReactionParser"
+%define "parser_class_name" "ReactionParser"
 %locations
 %defines
 
-%name-prefix="N_DEV"
+%name-prefix="XyceDevice"
 
 %union
 {
   int ival;
   double dval;
   std::string *sval;
-  N_DEV::Specie *specievalp;
-  pair<string,double> *spe_p;  
-  vector<pair<string,double> > *spev_p;  
+  Xyce::Device::Specie *specievalp;
+  std::pair<std::string,double> *spe_p;  
+  std::vector<std::pair<std::string,double> > *spev_p;  
 };
 
 %{
 #undef yyFlexLexer
   /* CAREFUL watch continuations! */
 #define YY_DECL \
-int N_DEV_ReactionLexer::getToken(N_DEV::N_DEV_ReactionParser::semantic_type *lvalp,  \
-                                       N_DEV::location *llocp, \
-                                       map<string,int> &theSpeciesIDs)
+int ReactionLexer::getToken(ReactionParser::semantic_type *lvalp,  \
+                            location *llocp, \
+                            std::map<std::string, int> &theSpeciesIDs)
 
   // YECH!  Work around very stupid way that multiple parsers/lexers are 
   // handled.
@@ -73,11 +76,11 @@ int N_DEV_ReactionLexer::getToken(N_DEV::N_DEV_ReactionParser::semantic_type *lv
 #include <N_DEV_ReactionLexer.h>
   // undo that kludge.  Note that because of this stupidity, if the 
   // "%name-prefix" is changed, this line needs to be changed, too.
-#define yylex N_DEVlex
+#define yylex XyceDevicelex
 
 
-int N_DEVlex(N_DEV::N_DEV_ReactionParser::semantic_type *lvalp, N_DEV::location *locp,
-          N_DEV_ReactionLexer *theLexer, map<string,int> &theSpeciesIDs);
+int XyceDevicelex(XyceDevice::ReactionParser::semantic_type *lvalp, XyceDevice::location *locp,
+             Xyce::Device::ReactionLexer *theLexer, std::map<std::string, int> &theSpeciesIDs);
 
 %}
 %token <ival> RXN_INT
@@ -133,7 +136,7 @@ species_list: /* EMPTY */
               | species_list specie_spec
               | species_list error
                     {
-                      cerr << "Invalid specie specification " << endl;
+                      std::cerr << "Invalid specie specification " << std::endl;
                     }
               ;
 
@@ -159,7 +162,7 @@ simple_specie_spec: SPECIE RXN_FLOAT RXN_FLOAT RXN_INT
                                 /* diffusion prefactor, E, and charge state */
              {
                theSpeciesIDs[*($1)]=theSpeciesIDs.size();
-               $$ = new N_DEV::Specie(*($1),$2,$3,$4);
+               $$ = new Xyce::Device::Specie(*($1),$2,$3,$4);
                delete $1;
              }
              ;
@@ -218,14 +221,14 @@ reaction_spec: reaction "simple" '(' RXN_FLOAT ')'
                }
            | reaction IDENTIFIER '(' num_list ')' 
              { 
-               cerr << "Invalid rate type " << $2 << endl;
+               error(yylloc, std::string("Invalid rate type \"")+ *$2 +"\"");
                delete $1;
                delete $2;
                YYERROR;
              }
            | reaction error  
              {
-               cerr << "Invalid rate spec " << endl;
+               std::cerr << "Invalid rate spec " << std::endl;
                delete $1;
              }
         
@@ -233,7 +236,7 @@ reaction_spec: reaction "simple" '(' RXN_FLOAT ')'
 
 reaction: species_expr "->" species_expr ';'
         { 
-          ostringstream ost;
+          std::ostringstream ost;
           bool electron_react=false;
           bool electron_prod=false;
           bool hole_react=false;
@@ -320,11 +323,11 @@ num: RXN_FLOAT|RXN_INT
 
 species_expr: /* EMPTY */ 
                 {
-                  $$ = new vector< pair<string,double> >;
+                  $$ = new std::vector< std::pair<std::string,double> >;
                 }
               | specie_expr 
                 { 
-                  $$ = new vector< pair<string,double> >;
+                  $$ = new std::vector< std::pair<std::string,double> >;
                   $$->push_back(*($1));
                   delete $1;
                 }
@@ -337,24 +340,24 @@ species_expr: /* EMPTY */
                }
               | species_expr IDENTIFIER
                {
-                 error(yyloc,string("Unrecognized species \"") + *$2 + "\"");
+                 error(yylloc,std::string("Unrecognized species \"") + *$2 + "\"");
                  YYERROR;
                }
               | species_expr error
              { 
-               cerr << " Invalid species expression " << endl;
+               std::cerr << " Invalid species expression " << std::endl;
                $$=$1;
              }
               ;
 
 specie_expr: SPECIE
               {
-                $$ = new pair<string,double>(*($1),1.0);
+                $$ = new std::pair<std::string,double>(*($1),1.0);
                 delete $1;
               }
              | RXN_INT SPECIE
               { 
-                $$ = new pair<string,double>(*($2),(double)$1);
+                $$ = new std::pair<std::string,double>(*($2),(double)$1);
                 delete $2;
               }
 
@@ -376,16 +379,20 @@ source_expr:SPECIE XYCE_EXPRESSION
                            }
             | IDENTIFIER XYCE_EXPRESSION
                        { 
-                         cerr << "Unknown specie in source specification.\n" 
-                              << endl;
+                         error(yylloc,std::string("Unrecognized species \"") + *$1 + "\" in source specification");
                          delete $1;
                          delete $2;
                          YYERROR;
                        }
             | SPECIE error
                        { 
-                         cerr << "Invalid expression -- missing braces?\n" 
-                              << endl;
+                         std::cerr << "Invalid expression in source specification --- missing braces?" << std::endl;
+                         delete $1;
+                         YYERROR;
+                       }
+            | IDENTIFIER error
+                       { 
+                         std::cerr << "Invalid expression and unrecognized specie (" << *$1 << ") in source specification?" << std::endl;
                          delete $1;
                          YYERROR;
                        }
@@ -405,18 +412,25 @@ ics_expr: SPECIE RXN_FLOAT
               theReactionNetwork.addInitialCondition(*$1,$2);
               delete $1;
           }
+          | IDENTIFIER RXN_FLOAT
+          { 
+              error(yylloc,std::string("Unrecognized species \"") + *$1 + "\" in initial condition specification");
+              delete $1;
+              YYERROR;
+          }
+
           ;
 %%
 
 
-int N_DEVlex(N_DEV::N_DEV_ReactionParser::semantic_type *lvalp, N_DEV::location *locp, 
-                   N_DEV_ReactionLexer *theLexer, 
-                   map<string,int> &theSpeciesIDs)
+int XyceDevicelex(XyceDevice::ReactionParser::semantic_type *lvalp, XyceDevice::location *locp, 
+                  Xyce::Device::ReactionLexer *theLexer, 
+                  std::map<std::string, int> &theSpeciesIDs)
 {
         return(theLexer->getToken(lvalp,locp,theSpeciesIDs));
 }
 
-void N_DEV::N_DEV_ReactionParser::error(const N_DEV::N_DEV_ReactionParser::location_type& l, const string& m)
+void XyceDevice::ReactionParser::error(const XyceDevice::ReactionParser::location_type& l, const std::string& m)
 {
-  cerr <<" at line " << l  << ": " << m << endl;
+  std::cerr <<" at line " << l  << ": " << m << std::endl;
 }

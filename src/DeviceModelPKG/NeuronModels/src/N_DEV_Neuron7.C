@@ -36,28 +36,28 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.11.2.1 $
+// Revision Number: $Revision: 1.29.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:33 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
 #include <N_UTL_Misc.h>
 
-// ----------   Xyce Includes   ----------
+#include <N_DEV_DeviceOptions.h>
+#include <N_DEV_DeviceMaster.h>
+#include <N_DEV_ExternData.h>
+#include <N_DEV_MatrixLoadData.h>
 #include <N_DEV_Neuron7.h>
 #include <N_DEV_Neuron_CommonEquations.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_DeviceMgr.h>
 #include <N_DEV_SolverState.h>
-#include <N_DEV_DeviceOptions.h>
-#include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
+
+#include <N_DEV_Neuron.h>
 
 #include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
@@ -65,150 +65,133 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<Neuron7::Instance>::ParametricData()
-{
-  setNumNodes(1);
-  setNumOptionalNodes(0);
-  setNumFillNodes(0);
-  setModelRequired(1);
-  setPrimaryParameter("");
-  addModelType("NEURON");
 
-  // Set up map for normal (double) param variables:
-  addPar ("MEMC", 0.0, false, ParameterType::NO_DEP,
+namespace Neuron7 {
+
+
+void Traits::loadInstanceParameters(ParametricData<Neuron7::Instance> &p)
+{
+// Set up map for normal (double) param variables:
+  p.addPar ("MEMC", 0.0, false, ParameterType::NO_DEP,
           &Neuron7::Instance::memCap,
           &Neuron7::Instance::memCapGiven,
           U_FARAD, CAT_NONE, "Membrane capacitance");
 
-  addPar ("VT", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("VT", 0.0, false, ParameterType::NO_DEP,
           &Neuron7::Instance::Vt,
           &Neuron7::Instance::VtGiven,
           U_VOLT, CAT_NONE, "Instantaneous threshold voltage");
 
-  addPar ("VR", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("VR", 0.0, false, ParameterType::NO_DEP,
           &Neuron7::Instance::Vr,
           &Neuron7::Instance::VrGiven,
           U_VOLT, CAT_NONE, "Resting membrane potential");
 
-  addPar ("VP", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("VP", 0.0, false, ParameterType::NO_DEP,
           &Neuron7::Instance::Vpeak,
           &Neuron7::Instance::VpeakGiven,
           U_VOLT, CAT_NONE, "Peak voltage");
 
-  addPar ("K", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("K", 0.0, false, ParameterType::NO_DEP,
           &Neuron7::Instance::k,
           &Neuron7::Instance::kGiven,
           U_NONE, CAT_NONE, "instanceing parameter");
 
-  addPar ("A", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("A", 0.0, false, ParameterType::NO_DEP,
           &Neuron7::Instance::a,
           &Neuron7::Instance::aGiven,
           U_NONE, CAT_NONE, "instanceing parameter");
 
-  addPar ("B", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("B", 0.0, false, ParameterType::NO_DEP,
           &Neuron7::Instance::b,
           &Neuron7::Instance::bGiven,
           U_NONE, CAT_NONE, "instanceing parameter");
 
-  addPar ("C", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("C", 0.0, false, ParameterType::NO_DEP,
           &Neuron7::Instance::c,
           &Neuron7::Instance::cGiven,
           U_NONE, CAT_NONE, "instanceing parameter");
 
-  addPar ("D", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("D", 0.0, false, ParameterType::NO_DEP,
           &Neuron7::Instance::d,
           &Neuron7::Instance::dGiven,
           U_NONE, CAT_NONE, "instanceing parameter");
 
-  addPar ("USCALE", 1.0e-9, false, ParameterType::NO_DEP,
+  p.addPar ("USCALE", 1.0e-9, false, ParameterType::NO_DEP,
           &Neuron7::Instance::uscale,
           &Neuron7::Instance::uscaleGiven,
           U_NONE, CAT_NONE, "scaling for u variable");
 
-  addPar ("FALLRATE", 1.0e3, false, ParameterType::NO_DEP,
+  p.addPar ("FALLRATE", 1.0e3, false, ParameterType::NO_DEP,
           &Neuron7::Instance::fallRate,
           &Neuron7::Instance::fallRateGiven,
           U_NONE, CAT_NONE, "recovery rate");
 }
 
-template<>
-ParametricData<Neuron7::Model>::ParametricData()
+void Traits::loadModelParameters(ParametricData<Neuron7::Model> &p)
 {
-  addPar ("MEMC", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("MEMC", 0.0, false, ParameterType::NO_DEP,
           &Neuron7::Model::memCap,
           &Neuron7::Model::memCapGiven,
           U_FARAD, CAT_NONE, "Membrane capacitance");
 
-  addPar ("VT", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("VT", 0.0, false, ParameterType::NO_DEP,
           &Neuron7::Model::Vt,
           &Neuron7::Model::VtGiven,
           U_VOLT, CAT_NONE, "Instantaneous threshold voltage");
 
-  addPar ("VR", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("VR", 0.0, false, ParameterType::NO_DEP,
           &Neuron7::Model::Vr,
           &Neuron7::Model::VrGiven,
           U_VOLT, CAT_NONE, "Resting membrane potential");
 
-  addPar ("VP", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("VP", 0.0, false, ParameterType::NO_DEP,
           &Neuron7::Model::Vpeak,
           &Neuron7::Model::VpeakGiven,
           U_VOLT, CAT_NONE, "Peak voltage");
 
-  addPar ("K", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("K", 0.0, false, ParameterType::NO_DEP,
           &Neuron7::Model::k,
           &Neuron7::Model::kGiven,
           U_NONE, CAT_NONE, "Neuron7::Modeling parameter");
 
-  addPar ("A", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("A", 0.0, false, ParameterType::NO_DEP,
           &Neuron7::Model::a,
           &Neuron7::Model::aGiven,
           U_NONE, CAT_NONE, "Neuron7::Modeling parameter");
 
-  addPar ("B", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("B", 0.0, false, ParameterType::NO_DEP,
           &Neuron7::Model::b,
           &Neuron7::Model::bGiven,
           U_NONE, CAT_NONE, "Neuron7::Modeling parameter");
 
-  addPar ("C", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("C", 0.0, false, ParameterType::NO_DEP,
           &Neuron7::Model::c,
           &Neuron7::Model::cGiven,
           U_NONE, CAT_NONE, "Neuron7::Modeling parameter");
 
-  addPar ("D", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("D", 0.0, false, ParameterType::NO_DEP,
           &Neuron7::Model::d,
           &Neuron7::Model::dGiven,
           U_NONE, CAT_NONE, "Neuron7::Modeling parameter");
 
-  addPar ("USCALE", 1.0e-9, false, ParameterType::NO_DEP,
+  p.addPar ("USCALE", 1.0e-9, false, ParameterType::NO_DEP,
           &Neuron7::Model::uscale,
           &Neuron7::Model::uscaleGiven,
           U_NONE, CAT_NONE, "scaling for u variable");
 
-  addPar ("FALLRATE", 1.0e3, false, ParameterType::NO_DEP,
+  p.addPar ("FALLRATE", 1.0e3, false, ParameterType::NO_DEP,
           &Neuron7::Model::fallRate,
           &Neuron7::Model::fallRateGiven,
           U_NONE, CAT_NONE, "recovery rate");
 }
 
-namespace Neuron7 {
+
 
 //
 // static class member inits
 //
-vector< vector<int> > Instance::jacStamp;
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
-}
-
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
+std::vector< std::vector<int> > Instance::jacStamp;
 
 // Class Instance
 
@@ -220,13 +203,12 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-Instance::Instance(InstanceBlock & IB,
-                   Model & Miter,
-                   MatrixLoadData & mlData1,
-                   SolverState &ss1,
-                   ExternData  &ed1,
-                   DeviceOptions & do1)
-  : DeviceInstance (IB, mlData1, ss1, ed1, do1),
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock &         IB,
+  Model &                       Miter,
+  const FactoryBlock &          factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(Miter),
     memCap(0.0),
     Vt(0.0),
@@ -269,9 +251,6 @@ Instance::Instance(InstanceBlock & IB,
     uEquVOffset(-1),
     uEquUOffset(-1)
 {
-  setName(IB.getName());
-  setModelName(model_.getName());
-
   numExtVars = 1;  // membrane voltage
 
   // Set params to constant default values:
@@ -349,7 +328,7 @@ Instance::Instance(InstanceBlock & IB,
   }
 
   /*
-    std::cout << "Instance::Instance" << std::endl
+    Xyce::dout() << "Instance::Instance" << std::endl
     << "memC  = " << memCap << std::endl
     << "Vt    = " << Vt << std::endl
     << "Vr    = " << Vr << std::endl
@@ -404,19 +383,19 @@ Instance::Instance(InstanceBlock & IB,
 
   /*
   // print out jacStamp
-  std::cout << "jacStamp for Neuron6" << std::endl;
+  Xyce::dout() << "jacStamp for Neuron6" << std::endl;
   int numRows = jacStamp.size();
   for( int i=0; i< numRows; i++ )
   {
   int numCol = jacStamp[i].size();
-  std::cout << "jacStamp[ " << i << " ] = { ";
+  Xyce::dout() << "jacStamp[ " << i << " ] = { ";
   for(int j=0; j<numCol; j++)
   {
-  std::cout << jacStamp[i][j] << "  ";
+  Xyce::dout() << jacStamp[i][j] << "  ";
   }
-  std::cout << " } " <<  std::endl;
+  Xyce::dout() << " } " <<  std::endl;
   }
-  std::cout << std::endl;
+  Xyce::dout() << std::endl;
   */
 
 }
@@ -441,7 +420,7 @@ Instance::~Instance()
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-bool Instance::processParams(string param)
+bool Instance::processParams()
 {
   // If there are any time dependent parameters, set their values at for
   // the current time.
@@ -474,41 +453,20 @@ bool Instance::updateTemperature ( const double & temp)
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs(const vector<int> & intLIDVecRef,
-                            const vector<int> & extLIDVecRef)
+void Instance::registerLIDs(const std::vector<int> & intLIDVecRef,
+                            const std::vector<int> & extLIDVecRef)
 {
-  string msg;
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "-------------------------------------------------------------------------"
-    "----";
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl << dashedline << endl;
-    cout << "  Instance::registerLIDs" << endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "  Instance::registerLIDs" << std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -520,8 +478,8 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << "  li_V = " << li_V << endl
-         << "  li_U = " << li_U << endl;
+    Xyce::dout() << "  li_V = " << li_V << std::endl
+         << "  li_U = " << li_U << std::endl;
 
   }
 #endif
@@ -529,7 +487,7 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -543,12 +501,12 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
-    string tmpstr;
+    std::string tmpstr;
     tmpstr = getName() + "_" + "U" ;
     spiceInternalName (tmpstr);
     intNameMap[ li_U ] = tmpstr;
@@ -565,9 +523,9 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-  // no state vars so this is a no op
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 }
 
 //-----------------------------------------------------------------------------
@@ -602,7 +560,7 @@ bool Instance::loadDeviceMask ()
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -615,7 +573,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
 
@@ -688,7 +646,7 @@ bool Instance::updateIntermediateVars()
     {
       //extData.devMgrPtr->declareCurrentStepAsBreakpoint();
 #if 0
-      std::cout << "In resetting section uPeak + d = " << (uPeak+d*uscale) << " u - (uP +d) = " << (uVal - (uPeak + d*uscale)) << std::endl;
+      Xyce::dout() << "In resetting section uPeak + d = " << (uPeak+d*uscale) << " u - (uP +d) = " << (uVal - (uPeak + d*uscale)) << std::endl;
       // in this case vVal - c = 0 and uVal = uVal + d
       vEquFvalue = vVal - c;
       vEquQvalue = 0.0;
@@ -708,7 +666,7 @@ bool Instance::updateIntermediateVars()
 #endif
 //#if 0
 
-      //std::cout << "In resetting section. (uPeak*uscale + d) = " << (uPeak + d/uscale) << std::endl;
+      //Xyce::dout() << "In resetting section. (uPeak*uscale + d) = " << (uPeak + d/uscale) << std::endl;
       vEquFvalue = -fallRate*(vVal - c) - uVal*uscale;
       vEquQvalue = -memCap* vVal;
       vEqudFdv   = -fallRate;
@@ -725,7 +683,7 @@ bool Instance::updateIntermediateVars()
     }
     else
     {
-      //std::cout << "In normal section." << std::endl;
+      //Xyce::dout() << "In normal section." << std::endl;
       vEquFvalue = k * (vVal - Vr) * (vVal - Vt) - uVal*uscale;
       vEquQvalue = - memCap * vVal;
       vEqudFdv   = k * ( 2*vVal - Vt - Vr);
@@ -743,7 +701,7 @@ bool Instance::updateIntermediateVars()
   }
 
   /*
-    std::cout << "Instance::updateIntermediateVars()" << std::endl
+    Xyce::dout() << "Instance::updateIntermediateVars()" << std::endl
     << "vEquFvalue = " <<  vEquFvalue << std::endl
     << "vEquQvalue = " << vEquQvalue << std::endl
     << "vEqudFdv   = " << vEqudFdv << std::endl
@@ -772,7 +730,7 @@ bool Instance::updateIntermediateVars()
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
 bool Instance::getInstanceBreakPoints(
-vector<N_UTL_BreakPoint> &breakPointTimes)
+std::vector<N_UTL_BreakPoint> &breakPointTimes)
 {
 breakPointTimes.push_back(breakPoint);
 return true;
@@ -934,7 +892,7 @@ bool Instance::setIC ()
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-void Instance::varTypes( vector<char> & varTypeVec )
+void Instance::varTypes( std::vector<char> & varTypeVec )
 {
   //varTypeVec.resize(1);
   //varTypeVec[0] = 'I';
@@ -949,10 +907,11 @@ void Instance::varTypes( vector<char> & varTypeVec )
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-              SolverState & ss1,
-              DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
     memCap(0.0),
     Vt(0.0),
     Vr(0.0),
@@ -978,7 +937,7 @@ Model::Model (const ModelBlock & MB,
 {
 
   /*
-    std::cout << "Model::Model" << std::endl
+    Xyce::dout() << "Model::Model" << std::endl
     << "memC  = " << memCap << std::endl
     << "Vt    = " << Vt << std::endl
     << "Vr    = " << Vr << std::endl
@@ -1021,9 +980,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1041,7 +1000,7 @@ Model::~Model ()
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   return true;
 }
@@ -1054,12 +1013,12 @@ bool Model::processParams (string param)
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1078,24 +1037,59 @@ bool Model::processInstanceParams(string param)
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i, isize;
   isize = instanceContainer.size();
 
-  os << endl;
-  os << "Number of Neuron instances: " << isize << endl;
-  os << "    name=\t\tmodelName\tParameters" << endl;
+  os << std::endl;
+  os << "Number of Neuron instances: " << isize << std::endl;
+  os << "    name=\t\tmodelName\tParameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
+  return os;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new DeviceMaster<Traits>(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("neuron", 7)
+    .registerModelType("neuron", 7);
 }
 
 } // namespace Neuron2

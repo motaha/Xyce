@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,41 +36,18 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.53.2.3 $
+// Revision Number: $Revision: 1.69 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:43 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-//------- Std Includes -----------
-
-#include <N_UTL_Misc.h>
-
 #include <sstream>
-
 #include <fstream>
-
-#ifdef HAVE_ALGORITHM
 #include <algorithm>
-#else
-#ifdef HAVE_ALGO_H
-#include <algo.h>
-#else
-error Must have either <algorithm> or <algo.h>!
-#endif
-#endif
-
-#ifdef HAVE_CSTDIO
-#include <cstdio>
-#else
-#include <stdio.h>
-#endif
-
-//------- Xyce Includes ----------
 
 #include <N_IO_RestartMgr.h>
 #include <N_IO_RestartNode.h>
@@ -93,31 +70,32 @@ error Must have either <algorithm> or <algo.h>!
 
 #include <N_IO_CmdParse.h>
 
-//------ Misc Includes --------
+namespace Xyce {
+namespace IO {
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_RestartMgr::factory
+// Function      : RestartMgr::factory
 // Purpose       : singleton access
 // Special Notes : static
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 7/19/01
 //-----------------------------------------------------------------------------
-N_IO_RestartMgr * N_IO_RestartMgr::factory(N_IO_CmdParse & cl)
+RestartMgr * RestartMgr::factory(N_IO_CmdParse & cl)
 {
-  N_IO_RestartMgr * rmPtr = new N_IO_RestartMgr(cl);
+  RestartMgr * rmPtr = new RestartMgr(cl);
   return rmPtr;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_RestartMgr::N_IO_RestartMgr
+// Function      : RestartMgr::RestartMgr
 // Purpose       : constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 7/19/01
 //-----------------------------------------------------------------------------
-N_IO_RestartMgr::N_IO_RestartMgr(N_IO_CmdParse & cl)
+RestartMgr::RestartMgr(N_IO_CmdParse & cl)
 : pdsMgrPtr_(0),
   topMgrPtr_(0),
   devIntPtr_(0),
@@ -132,37 +110,37 @@ N_IO_RestartMgr::N_IO_RestartMgr(N_IO_CmdParse & cl)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_RestartMgr::registerPkgOptionsMgr
+// Function      : RestartMgr::registerPkgOptionsMgr
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, 1437
 // Creation Date : 10/21/08
 //-----------------------------------------------------------------------------
-bool N_IO_RestartMgr::registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr )
+bool RestartMgr::registerPkgOptionsMgr( N_IO_PkgOptionsMgr *pkgOptPtr )
 {
   pkgOptMgrPtr_ = pkgOptPtr;
-  string netListFile("");
+  std::string netListFile("");
   if (commandLine_.getArgumentValue("netlist") != "")
   {
     netListFile = commandLine_.getArgumentValue("netlist");
   }
   pkgOptMgrPtr_->submitRegistration( "RESTART", netListFile,
-                                  new N_IO_RestartMgr_OptionsReg( this ) );
+                                  new RestartMgr_OptionsReg( this ) );
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_RestartMgr::registerRestartOptions
+// Function      : RestartMgr::registerRestartOptions
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 7/19/01
 //-----------------------------------------------------------------------------
-bool N_IO_RestartMgr::registerRestartOptions(const N_UTL_OptionBlock & OB)
+bool RestartMgr::registerRestartOptions(const Util::OptionBlock & OB)
 {
-  list<N_UTL_Param>::const_iterator iterPL = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator iterPL = OB.getParams().begin();
   bool done = false;
 
   //For windoze/mingw, packed restart data blows chunks, so we always turn it off
@@ -170,7 +148,7 @@ bool N_IO_RestartMgr::registerRestartOptions(const N_UTL_OptionBlock & OB)
   pack_ = false;
 #endif
 
-      ostringstream ost;
+  std::ostringstream ost;
 
   while( iterPL != OB.getParams().end() )
   {
@@ -179,20 +157,20 @@ bool N_IO_RestartMgr::registerRestartOptions(const N_UTL_OptionBlock & OB)
 
     if( currTag == "TIME" )
     {
-      double t = iterPL->dVal();
+      double t = iterPL->getImmutableValue<double>();
       ++iterPL;
       if( iterPL == OB.getParams().end() )
       {
         N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,
          ".OPTIONS Restart: Badly formed INITIAL_INTERVAL\n" );
       }
-      double iv = iterPL->dVal();
-      saveIntervalPairs_.push_back( pair<double,double>(t,iv) );
+      double iv = iterPL->getImmutableValue<double>();
+      saveIntervalPairs_.push_back( std::pair<double,double>(t,iv) );
     }
 
     if( currTag == "PACK" )
     {
-      pack_ = iterPL->iVal();
+      pack_ = iterPL->getImmutableValue<int>();
 
 #ifdef Xyce_PARALLEL_MPI
       if (!pack_ && !(pdsMgrPtr_->getPDSComm()->isSerial()))
@@ -205,23 +183,23 @@ bool N_IO_RestartMgr::registerRestartOptions(const N_UTL_OptionBlock & OB)
 
     if( currTag == "INITIAL_INTERVAL" )
     {
-      initialSaveInterval_ = iterPL->dVal();
+      initialSaveInterval_ = iterPL->getImmutableValue<double>();
     }
 
     if( currTag == "FILE" )
     {
-      restartFileName_ = iterPL->sVal();
+      restartFileName_ = iterPL->stringValue();
       restartFlag_ = true;
     }
 
     if( currTag == "JOB" )
     {
-      restartJobName_ = iterPL->sVal();
+      restartJobName_ = iterPL->stringValue();
     }
 
     if( currTag == "START_TIME" )
     {
-      double t = iterPL->dVal();
+      double t = iterPL->getImmutableValue<double>();
       ost << t;
       restartFlag_ = true;
     }
@@ -256,23 +234,23 @@ bool N_IO_RestartMgr::registerRestartOptions(const N_UTL_OptionBlock & OB)
   N_PDS_Comm * comm = pdsMgrPtr_->getPDSComm();
   if( comm->procID() == 0 )
   {
-    string netListFile("");
+    std::string netListFile("");
     if (commandLine_.getArgumentValue("netlist") != "")
     {
       netListFile = commandLine_.getArgumentValue("netlist");
     }
 
-    cout << "RESTART OPTIONS SETUP: ";
-    cout << netListFile << endl;
-    cout << "-----------------------\n";
-    cout << "restartFileName: " << restartFileName_ << endl;
-    cout << "restartJobName: " << restartJobName_ << endl;
-    cout << "isRestart: " << restartFlag_ << endl;
-    cout << "initial Interval: " << initialSaveInterval_ << endl;
-    cout << "pack data: " << pack_ << endl;
+    Xyce::dout() << Xyce::subsection_divider << std::endl
+                 << "RESTART OPTIONS SETUP: " << netListFile << std::endl
+                 << "restartFileName: " << restartFileName_ << std::endl
+                 << "restartJobName: " << restartJobName_ << std::endl
+                 << "isRestart: " << restartFlag_ << std::endl
+                 << "initial Interval: " << initialSaveInterval_ << std::endl
+                 << "pack data: " << pack_ << std::endl;
+    
     for( int i = 0; i < saveIntervalPairs_.size(); ++i )
-      cout << saveIntervalPairs_[i].first << " " << saveIntervalPairs_[i].second << endl;
-    cout << "-----------------------\n";
+      Xyce::dout() << saveIntervalPairs_[i].first << " " << saveIntervalPairs_[i].second << std::endl;
+    Xyce::dout() << Xyce::subsection_divider << std::endl;
   }
 #endif
 
@@ -280,15 +258,15 @@ bool N_IO_RestartMgr::registerRestartOptions(const N_UTL_OptionBlock & OB)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_RestartMgr::getRestartIntervals
+// Function      : RestartMgr::getRestartIntervals
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 7/19/01
 //-----------------------------------------------------------------------------
-bool N_IO_RestartMgr::getRestartIntervals(double & initialInterval,
-                                 vector< pair<double,double> > & intervalPairs)
+bool RestartMgr::getRestartIntervals(double & initialInterval,
+                                 std::vector< std::pair<double,double> > & intervalPairs)
 {
   initialInterval = initialSaveInterval_;
   intervalPairs = saveIntervalPairs_;
@@ -297,18 +275,18 @@ bool N_IO_RestartMgr::getRestartIntervals(double & initialInterval,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_RestartMgr::dumpRestartData
+// Function      : RestartMgr::dumpRestartData
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 7/19/01
 //-----------------------------------------------------------------------------
-bool N_IO_RestartMgr::dumpRestartData(const double & time)
+bool RestartMgr::dumpRestartData(const double & time)
 {
   if( pdsMgrPtr_ == 0 || topMgrPtr_ == 0 || devIntPtr_ == 0 || anaIntPtr_ == 0 )
     N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL,
-      " ERROR: Restart Manager cannot access a package manager\n" );
+      "Restart Manager cannot access a package manager\n" );
 
   N_PDS_Comm * comm = pdsMgrPtr_->getPDSComm();
 
@@ -320,7 +298,7 @@ bool N_IO_RestartMgr::dumpRestartData(const double & time)
   //Get Restart Node Data and setup buffers
   //---------------------------------------
   int dataSize = sizeof(int);
-  vector<N_IO_RestartNode*> nodeVec;
+  std::vector<N_IO_RestartNode*> nodeVec;
 
   topMgrPtr_->getRestartNodes( nodeVec );
 
@@ -362,14 +340,14 @@ bool N_IO_RestartMgr::dumpRestartData(const double & time)
   // for all processes rather than making one dynamically for proc=0
   // however, gcc 4.0 optimized the destruction improperly when it's
   // done dynamiclly.
-  ofstream * outStream = NULL;
-  ofstream outStreamSt;
-  string outName;
+  std::ofstream * outStream = NULL;
+  std::ofstream outStreamSt;
+  std::string outName;
 
   int proc = 0;
   if( procID == 0 )
   {
-    ostringstream ost;
+    std::ostringstream ost;
     ost << restartJobName_ << time;
     outName.assign(ost.str());
     outStreamSt.open( outName.c_str() );
@@ -377,17 +355,18 @@ bool N_IO_RestartMgr::dumpRestartData(const double & time)
 
     if( !outStream->is_open() )
     {
-      N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_WARNING_0, "Cannot Open CheckPoint File: " + outName + "\n" );
+      Report::UserWarning0() << "Cannot Open CheckPoint File: " << outName;
+      
       return false;
     }
 
 #ifdef Xyce_DEBUG_RESTART
-    cout << "DUMPING RESTART: " << outName << endl;
-    cout << "----------------\n";
-    cout << "numProcs: " << numProcs << " maxSize: " << maxSize << endl;
-    cout << "proc: " << proc << " dataSize: " << dataSize << endl;
-    cout << "nodeCount: " << nodeCount << endl;
-    cout << "pack: " << pack_ << endl;
+    Xyce::dout() << Xyce::subsection_divider << std::endl
+                 << "DUMPING RESTART: " << outName << std::endl
+                 << "numProcs: " << numProcs << " maxSize: " << maxSize << std::endl
+                 << "proc: " << proc << " dataSize: " << dataSize << std::endl
+                 << "nodeCount: " << nodeCount << std::endl
+                 << "pack: " << pack_ << std::endl;
 #endif
 
     int packed = pack_?1:0;
@@ -462,7 +441,7 @@ bool N_IO_RestartMgr::dumpRestartData(const double & time)
     }
 
 #ifdef Xyce_DEBUG_RESTART
-    cout << "before tia RESTART dump: maxSize = " << maxSize << endl;
+    Xyce::dout() << "before tia RESTART dump: maxSize = " << maxSize << std::endl;
 #endif
     int pos = 0;
     success &= anaIntPtr_->dumpRestartData( buf, bsize, pos, comm, pack_ );
@@ -476,7 +455,7 @@ bool N_IO_RestartMgr::dumpRestartData(const double & time)
 #endif
 
 #ifdef Xyce_DEBUG_RESTART
-  if (procID == 0) cout << "---------------------------\n";
+  if (procID == 0) Xyce::dout() << Xyce::subsection_divider << std::endl;
 #endif
 
   //Add Device Mgr stuff from proc 0
@@ -495,7 +474,7 @@ bool N_IO_RestartMgr::dumpRestartData(const double & time)
     }
 
 #ifdef Xyce_DEBUG_RESTART
-    cout << "before dev RESTART dump: maxSize = " << maxSize << endl;
+    Xyce::dout() << "before dev RESTART dump: maxSize = " << maxSize << std::endl;
 #endif
     int pos = 0;
     success &= devIntPtr_->dumpRestartData( buf, bsize, pos, comm, pack_ );
@@ -509,7 +488,7 @@ bool N_IO_RestartMgr::dumpRestartData(const double & time)
 #endif
 
 #ifdef Xyce_DEBUG_RESTART
-  if (procID == 0) cout << "---------------------------\n";
+  if (procID == 0) Xyce::dout() << Xyce::subsection_divider << std::endl;
 #endif
 
   if( (procID == 0) && outStreamSt.is_open() )
@@ -528,18 +507,18 @@ bool N_IO_RestartMgr::dumpRestartData(const double & time)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_RestartMgr::restoreRestartData
+// Function      : RestartMgr::restoreRestartData
 // Purpose       :
 // Special Notes : version used with distributed parser
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 7/19/01
 //-----------------------------------------------------------------------------
-bool N_IO_RestartMgr::restoreRestartData()
+bool RestartMgr::restoreRestartData()
 {
   if( pdsMgrPtr_ == 0 || topMgrPtr_ == 0 || devIntPtr_ == 0 || anaIntPtr_ == 0 )
     N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL,
-      " ERROR: Restart Manager cannot access a package manager\n" );
+      "Restart Manager cannot access a package manager\n" );
 
   N_PDS_Comm * comm = pdsMgrPtr_->getPDSComm();
 
@@ -554,18 +533,18 @@ bool N_IO_RestartMgr::restoreRestartData()
   int bsize = 0;
   int fProcID;
 
-  ifstream * inStream;
+  std::ifstream * inStream;
 
   int nodeCount;
   int oldNumProcs, maxSize;
 
   //Table of restart nodes used by all procs
-  vector<N_IO_RestartNode*> nodeTable;
+  std::vector<N_IO_RestartNode*> nodeTable;
 
   //1. Proc 0 reads in data pushing NumDevices/NumProcs to every processor
   if (procID == 0)
   {
-    inStream = new ifstream( restartFileName_.c_str());
+    inStream = new std::ifstream( restartFileName_.c_str());
 
     if (!inStream->is_open())
       N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,
@@ -582,12 +561,12 @@ bool N_IO_RestartMgr::restoreRestartData()
     int    pos1   = 0;
 
 #ifdef Xyce_DEBUG_RESTART
-    cout << "RESTORING RESTART DATA\n";
-    cout << "------------------------\n";
-    cout << "oldNumProcs: " << oldNumProcs << endl;
-    cout << "maxSize: " << maxSize << endl;
-    cout << "packed: " << pack_ << endl;
-    cout << "TotNumDevs: " << TotNumDevs << endl;
+    Xyce::dout() << Xyce::subsection_divider << std::endl
+                 << "RESTORING RESTART DATA" << std::endl
+                 << "oldNumProcs: " << oldNumProcs << std::endl
+                 << "maxSize: " << maxSize << std::endl
+                 << "packed: " << pack_ << std::endl
+                 << "TotNumDevs: " << TotNumDevs << std::endl;
 #endif
 
     int DevsPerProc = TotNumDevs/numProcs + 1;
@@ -603,8 +582,8 @@ bool N_IO_RestartMgr::restoreRestartData()
         inStream->read( &dummy, 1 );
 
 #ifdef Xyce_DEBUG_RESTART
-        cout << "fProcID: " << fProcID << endl;
-        cout << "dataSize: " << dataSize << endl;
+        Xyce::dout() << "fProcID: " << fProcID << std::endl;
+        Xyce::dout() << "dataSize: " << dataSize << std::endl;
 #endif
 
         bsize = dataSize;
@@ -619,7 +598,7 @@ bool N_IO_RestartMgr::restoreRestartData()
         (*inStream) >> nodeCount;
 
 #ifdef Xyce_DEBUG_RESTART
-      cout << "nodeCount: " << nodeCount << endl;
+      Xyce::dout() << "nodeCount: " << nodeCount << std::endl;
 #endif
 
       for( int i = 0; i < nodeCount; ++i )
@@ -633,7 +612,8 @@ bool N_IO_RestartMgr::restoreRestartData()
 
         nodeTable.push_back( nodeP );
 
-        if( ((nodeTable.size()==DevsPerProc) || (i==nodeCount-1)&&(oldProc==oldNumProcs-1)) )
+        if( (nodeTable.size()==DevsPerProc) || 
+             ( (i==nodeCount-1) && (oldProc==oldNumProcs-1) ) )
         {
           //Pack up data and send to CurrProc
           int Size = 0;
@@ -681,7 +661,7 @@ bool N_IO_RestartMgr::restoreRestartData()
     comm->recv( buf, bsize, 0 );
   }
 #ifdef Xyce_DEBUG_RESTART
-  cout << "Finished ReadIn of Restart Node Data on Proc: " << procID << endl;
+  Xyce::dout() << "Finished ReadIn of Restart Node Data on Proc: " << procID << std::endl;
 #endif
 
   comm->barrier();
@@ -701,7 +681,7 @@ bool N_IO_RestartMgr::restoreRestartData()
   bsize = bsize2;
   buf = new char[bsize];
 
-  swap( buf, buf2 );
+  std::swap( buf, buf2 );
 #endif
 
   //Check devices in your buffer, then push around ring
@@ -712,7 +692,7 @@ bool N_IO_RestartMgr::restoreRestartData()
     nodeTable.resize(nodeCount);
 
 #ifdef Xyce_DEBUG_RESTART
-    if( !procID ) cout << "Restart Ring Stage: " << i << " " << nodeCount << endl;
+    if( !procID ) Xyce::dout() << "Restart Ring Stage: " << i << " " << nodeCount << std::endl;
 #endif
 
     for( int j = 0; j < nodeCount; ++j )
@@ -744,7 +724,7 @@ bool N_IO_RestartMgr::restoreRestartData()
     }
 
 #ifdef Xyce_DEBUG_RESTART
-    cout << "NumSends: " << NumSends << endl;
+    Xyce::dout() << "NumSends: " << NumSends << std::endl;
 #endif
 
     for( int j = 0; j < NumSends; ++j )
@@ -760,7 +740,7 @@ bool N_IO_RestartMgr::restoreRestartData()
       comm->waitAll();
     }
 
-    swap( buf, buf2 );
+    std::swap( buf, buf2 );
 #endif
   }
 
@@ -779,9 +759,10 @@ bool N_IO_RestartMgr::restoreRestartData()
     inStream->read( &dummy, 1 );
 
 #ifdef Xyce_DEBUG_RESTART
-    cout << "RESTORING TIME INT STUFF\n";
-    cout << "dataSize: " << dataSize << endl;
-    cout << "-----------------------\n";
+    Xyce::dout() << Xyce::subsection_divider << std::endl
+                 << "RESTORING TIME INT STUFF\n" << std::endl
+                 << "dataSize: " << dataSize << std::endl
+                 << Xyce::subsection_divider << std::endl;
 #endif
 
     if( dataSize > maxSize )
@@ -822,9 +803,10 @@ bool N_IO_RestartMgr::restoreRestartData()
     inStream->read( &dummy, 1 );
 
 #ifdef Xyce_DEBUG_RESTART
-    cout << "RESTORING DEV MGR STUFF\n";
-    cout << "dataSize: " << dataSize << endl;
-    cout << "-----------------------\n";
+    Xyce::dout() << Xyce::subsection_divider << std::endl
+                 << "RESTORING DEV MGR STUFF" << std::endl
+                 << "dataSize: " << dataSize << std::endl
+                 << Xyce::subsection_divider << std::endl;
 #endif
 
     if( dataSize > maxSize )
@@ -864,18 +846,18 @@ bool N_IO_RestartMgr::restoreRestartData()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_RestartMgr::restartDataSize
+// Function      : RestartMgr::restartDataSize
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 7/19/01
 //-----------------------------------------------------------------------------
-int N_IO_RestartMgr::restartDataSize()
+int RestartMgr::restartDataSize()
 {
   if( pdsMgrPtr_ == 0 || topMgrPtr_ == 0 || devIntPtr_ == 0 || anaIntPtr_ == 0 )
     N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL,
-      " ERROR: Restart Manager cannot access a package manager\n" );
+      "Restart Manager cannot access a package manager\n" );
 
   int devSize = devIntPtr_->restartDataSize( pack_ );
   int anaSize = anaIntPtr_->restartDataSize( pack_ );
@@ -883,3 +865,6 @@ int N_IO_RestartMgr::restartDataSize()
 
   return size;
 }
+
+} // namespace IO
+} // namespace Xyce

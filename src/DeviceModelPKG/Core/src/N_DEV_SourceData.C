@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -38,9 +38,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.112.2.2 $
+// Revision Number: $Revision: 1.124 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/02/24 23:49:15 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -77,8 +77,8 @@ namespace Device {
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 4/24/00
 //-----------------------------------------------------------------------------
-SourceData::SourceData(SolverState & ss1,
-                                   DeviceOptions & do1)
+SourceData::SourceData(const SolverState & ss1,
+                       const DeviceOptions & do1)
   : SourceValue(0.0),
     initializeFlag_(false),
     resetFlag_(true),
@@ -153,7 +153,7 @@ bool SourceData::initializeSource ()
 //-----------------------------------------------------------------------------
 bool SourceData::updateSource ()
 {
-  string msg;
+  std::string msg;
 
   msg = "SourceData::updateSource:\n";
   msg += "\tAttempted to update the source for a source type that is not";
@@ -184,7 +184,7 @@ double SourceData::returnSource()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 4/24/00
 //-----------------------------------------------------------------------------
-string SourceData::getSourceTypeName()
+std::string SourceData::getSourceTypeName()
 {
   return typeName_;
 }
@@ -242,12 +242,12 @@ double   SourceData::getTime_()
 //#ifdef Xyce_MPDE
   if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
   {
-    cout << "SourceData::getTime.  time = ";
-    cout << tmpTime << endl;
-    cout << "SourceData::getTime.  currFastTime = ";
-    cout << solState_.currFastTime<< endl;
-    cout << "SourceData::getTime.  currTime = ";
-    cout << solState_.currTime << endl;
+    Xyce::dout() << "SourceData::getTime.  time = ";
+    Xyce::dout() << tmpTime << std::endl;
+    Xyce::dout() << "SourceData::getTime.  currFastTime = ";
+    Xyce::dout() << solState_.currFastTime<< std::endl;
+    Xyce::dout() << "SourceData::getTime.  currTime = ";
+    Xyce::dout() << solState_.currTime << std::endl;
   }
 //#endif // Xyce_MPDE
 #endif
@@ -299,9 +299,9 @@ SinData::SinData(const SinData & right)
     (*(here->VSRCcoeffs+2)):(1/ckt->CKTfinalTime))
 #endif
 
-SinData::SinData( const vector<Param> & paramRef,
-                             SolverState   & ss1,
-                             DeviceOptions & do1)
+SinData::SinData( const std::vector<Param> & paramRef,
+                  const SolverState   & ss1,
+                  const DeviceOptions & do1)
   : SourceData(ss1,do1),
     V0(0.0),
     VA(0.0),
@@ -316,20 +316,20 @@ SinData::SinData( const vector<Param> & paramRef,
     THETAgiven(false),
     PHASEgiven(false)
 {
-  vector <Param>::const_iterator iter = paramRef.begin();
-  vector <Param>::const_iterator last = paramRef.end();
+  std::vector<Param>::const_iterator iter = paramRef.begin();
+  std::vector<Param>::const_iterator last = paramRef.end();
 
   for ( ; iter != last; ++iter)
   {
-    const string & tmpname = iter->tag();
+    const std::string & tmpname = iter->tag();
 
-    if (tmpname == "V0")    { V0    = iter->dVal(); V0given = iter->given();}
-    if (tmpname == "VA")    { VA    = iter->dVal(); VAgiven = iter->given();}
-    if (tmpname == "FREQ")  { FREQ  = iter->dVal(); FREQgiven = iter->given();}
-    if (tmpname == "TD")    { TD    = iter->dVal(); TDgiven = iter->given();}
-    if (tmpname == "THETA") { THETA = iter->dVal(); THETAgiven =
+    if (tmpname == "V0")    { V0    = iter->getImmutableValue<double>(); V0given = iter->given();}
+    if (tmpname == "VA")    { VA    = iter->getImmutableValue<double>(); VAgiven = iter->given();}
+    if (tmpname == "FREQ")  { FREQ  = iter->getImmutableValue<double>(); FREQgiven = iter->given();}
+    if (tmpname == "TD")    { TD    = iter->getImmutableValue<double>(); TDgiven = iter->given();}
+    if (tmpname == "THETA") { THETA = iter->getImmutableValue<double>(); THETAgiven =
                                                       iter->given();}
-    if (tmpname == "PHASE") { PHASE = iter->dVal();
+    if (tmpname == "PHASE") { PHASE = iter->getImmutableValue<double>();
     PHASEgiven = iter->given();}
   }
 
@@ -386,13 +386,13 @@ SinData::~SinData()
 void SinData::printOutParams()
 
 {
-  cout << "SinData:\n";
-  cout << "V0 = "    << V0 << endl;
-  cout << "VA = "    << VA << endl;
-  cout << "FREQ = "  << FREQ << endl;
-  cout << "TD = "    << TD << endl;
-  cout << "THETA = " << THETA << endl;
-  cout << "PHASE = " << PHASE << endl;
+  Xyce::dout() << "SinData:\n";
+  Xyce::dout() << "V0 = "    << V0 << std::endl;
+  Xyce::dout() << "VA = "    << VA << std::endl;
+  Xyce::dout() << "FREQ = "  << FREQ << std::endl;
+  Xyce::dout() << "TD = "    << TD << std::endl;
+  Xyce::dout() << "THETA = " << THETA << std::endl;
+  Xyce::dout() << "PHASE = " << PHASE << std::endl;
 }
 #endif
 
@@ -552,9 +552,9 @@ ExpData::ExpData(const ExpData &right)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
-ExpData::ExpData(const vector<Param> & paramRef,
-                             SolverState   & ss1,
-                             DeviceOptions & do1)
+ExpData::ExpData(const std::vector<Param> & paramRef,
+                 const SolverState   & ss1,
+                 const DeviceOptions & do1)
   : SourceData(ss1,do1),
     V1   (0.0),
     V2   (0.0),
@@ -570,19 +570,19 @@ ExpData::ExpData(const vector<Param> & paramRef,
     TAU2given (false)
 {
   // Set the user-defined params:
-  vector <Param>::const_iterator iter = paramRef.begin();
-  vector <Param>::const_iterator last = paramRef.end();
+  std::vector<Param>::const_iterator iter = paramRef.begin();
+  std::vector<Param>::const_iterator last = paramRef.end();
 
   for ( ; iter != last; ++iter)
   {
-    const string & tmpname = iter->tag();
+    const std::string & tmpname = iter->tag();
 
-    if (tmpname == "V1")    { V1    = iter->dVal(); V1given   = iter->given();}
-    if (tmpname == "V2")    { V2    = iter->dVal(); V2given   = iter->given();}
-    if (tmpname == "TD1")   { TD1   = iter->dVal(); TD1given  = iter->given();}
-    if (tmpname == "TAU1")  { TAU1  = iter->dVal(); TAU1given = iter->given();}
-    if (tmpname == "TD2")   { TD2   = iter->dVal(); TD2given  = iter->given();}
-    if (tmpname == "TAU2")  { TAU2  = iter->dVal(); TAU2given = iter->given();}
+    if (tmpname == "V1")    { V1    = iter->getImmutableValue<double>(); V1given   = iter->given();}
+    if (tmpname == "V2")    { V2    = iter->getImmutableValue<double>(); V2given   = iter->given();}
+    if (tmpname == "TD1")   { TD1   = iter->getImmutableValue<double>(); TD1given  = iter->given();}
+    if (tmpname == "TAU1")  { TAU1  = iter->getImmutableValue<double>(); TAU1given = iter->given();}
+    if (tmpname == "TD2")   { TD2   = iter->getImmutableValue<double>(); TD2given  = iter->given();}
+    if (tmpname == "TAU2")  { TAU2  = iter->getImmutableValue<double>(); TAU2given = iter->given();}
   }
 
   typeName_ = "EXP";
@@ -615,16 +615,16 @@ ExpData::~ExpData()
 //-----------------------------------------------------------------------------
 void ExpData::printOutParams()
 {
-  cout << "ExpData:\n";
+  Xyce::dout() << "ExpData:\n";
 
-  cout << "V1 = " << V1 << endl;
-  cout << "V2 = " << V2 << endl;
+  Xyce::dout() << "V1 = " << V1 << std::endl;
+  Xyce::dout() << "V2 = " << V2 << std::endl;
 
-  cout << "TD1 = " << TD1 << endl;
-  cout << "TAU1 = " << TAU1 << endl;
+  Xyce::dout() << "TD1 = " << TD1 << std::endl;
+  Xyce::dout() << "TAU1 = " << TAU1 << std::endl;
 
-  cout << "TD2 = " << TD2 << endl;
-  cout << "TAU2 = " << TAU2 << endl;
+  Xyce::dout() << "TD2 = " << TD2 << std::endl;
+  Xyce::dout() << "TAU2 = " << TAU2 << std::endl;
 
 }
 #endif
@@ -809,9 +809,9 @@ PulseData::PulseData(const PulseData &right)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
-PulseData::PulseData( const vector<Param> & paramRef,
-                                 SolverState   & ss1,
-                                 DeviceOptions & do1)
+PulseData::PulseData( const std::vector<Param> & paramRef,
+                      const SolverState   & ss1,
+                      const DeviceOptions & do1)
   : SourceData (ss1,do1),
     V1  (0.0),
     V2  (0.0),
@@ -830,20 +830,20 @@ PulseData::PulseData( const vector<Param> & paramRef,
 {
 
   // Get the user-defined values:
-  vector <Param>::const_iterator iter = paramRef.begin();
-  vector <Param>::const_iterator last = paramRef.end();
+  std::vector<Param>::const_iterator iter = paramRef.begin();
+  std::vector<Param>::const_iterator last = paramRef.end();
 
   for ( ; iter != last; ++iter)
   {
-    const string & tmpname = iter->tag();
+    const std::string & tmpname = iter->tag();
 
-    if (tmpname == "V1")  { V1    = iter->dVal(); V1given = iter->given();}
-    if (tmpname == "V2")  { V2    = iter->dVal(); V2given = iter->given();}
-    if (tmpname == "TD")  { TD    = iter->dVal(); TDgiven = iter->given();}
-    if (tmpname == "TR")  { TR    = iter->dVal(); TRgiven = iter->given();}
-    if (tmpname == "TF")  { TF    = iter->dVal(); TFgiven = iter->given();}
-    if (tmpname == "PW")  { PW    = iter->dVal(); PWgiven = iter->given();}
-    if (tmpname == "PER") { PER   = iter->dVal(); PERgiven = iter->given();}
+    if (tmpname == "V1")  { V1    = iter->getImmutableValue<double>(); V1given = iter->given();}
+    if (tmpname == "V2")  { V2    = iter->getImmutableValue<double>(); V2given = iter->given();}
+    if (tmpname == "TD")  { TD    = iter->getImmutableValue<double>(); TDgiven = iter->given();}
+    if (tmpname == "TR")  { TR    = iter->getImmutableValue<double>(); TRgiven = iter->given();}
+    if (tmpname == "TF")  { TF    = iter->getImmutableValue<double>(); TFgiven = iter->given();}
+    if (tmpname == "PW")  { PW    = iter->getImmutableValue<double>(); PWgiven = iter->given();}
+    if (tmpname == "PER") { PER   = iter->getImmutableValue<double>(); PERgiven = iter->given();}
   }
 
   typeName_ = "PULSE";
@@ -876,17 +876,17 @@ PulseData::~PulseData()
 //-----------------------------------------------------------------------------
 void PulseData::printOutParams()
 {
-  cout << endl;
-  cout << "  PulseData::printOutParams\n";
-  cout << "  V1  = "    << V1 << endl;
-  cout << "  V2  = "    << V2 << endl;
+  Xyce::dout() << std::endl;
+  Xyce::dout() << "  PulseData::printOutParams\n";
+  Xyce::dout() << "  V1  = "    << V1 << std::endl;
+  Xyce::dout() << "  V2  = "    << V2 << std::endl;
 
-  cout << "  TD  = "    << TD << endl;
-  cout << "  TR  = "    << TR << endl;
-  cout << "  TF  = "    << TF << endl;
-  cout << "  PW  = "    << PW << endl;
-  cout << "  PER = "    << PER << endl;
-  cout << endl;
+  Xyce::dout() << "  TD  = "    << TD << std::endl;
+  Xyce::dout() << "  TR  = "    << TR << std::endl;
+  Xyce::dout() << "  TF  = "    << TF << std::endl;
+  Xyce::dout() << "  PW  = "    << PW << std::endl;
+  Xyce::dout() << "  PER = "    << PER << std::endl;
+  Xyce::dout() << std::endl;
 
 }
 #endif
@@ -939,7 +939,7 @@ bool PulseData::updateSource()
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
   {
-    cout << "  PulseData::updateSources\n";
+    Xyce::dout() << "  PulseData::updateSources\n";
     printOutParams();
   }
 #endif
@@ -953,7 +953,7 @@ bool PulseData::updateSource()
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
   {
-    cout << "  Time = " << time << endl;
+    Xyce::dout() << "  Time = " << time << std::endl;
   }
 #endif
 
@@ -1011,7 +1011,7 @@ bool PulseData::updateSource()
 #ifdef  Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
   {
-    cout << "  SourceValue = " << SourceValue << endl;
+    Xyce::dout() << "  SourceValue = " << SourceValue << std::endl;
   }
 #endif
 
@@ -1112,7 +1112,7 @@ void PulseData::setParams(double *params)
 // Creation Date : 06/08/01
 //-----------------------------------------------------------------------------
 bool PulseData::getBreakPoints
-  (vector<N_UTL_BreakPoint> & breakPointTimes )
+  (std::vector<N_UTL_BreakPoint> & breakPointTimes )
 {
   bool bsuccess = true;
 
@@ -1134,11 +1134,11 @@ bool PulseData::getBreakPoints
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
   {
-    cout << endl;
-    cout << "  In PulseData::getBreakPoints\n";
-    cout << "  time = " << time << endl;
-    cout << "  TD   = " << TD  <<endl;
-    cout << "  PER  = " << PER <<endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "  In PulseData::getBreakPoints\n";
+    Xyce::dout() << "  time = " << time << std::endl;
+    Xyce::dout() << "  TD   = " << TD  << std::endl;
+    Xyce::dout() << "  PER  = " << PER << std::endl;
   }
 #endif
 
@@ -1156,10 +1156,10 @@ bool PulseData::getBreakPoints
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
   {
-    cout << "  time            = " << time << endl;
-    cout << " basetime         = " << basetime << endl;
-    cout << "  currPeriodIndex = " << currPeriodIndex << endl;
-    cout << endl;
+    Xyce::dout() << "  time            = " << time << std::endl;
+    Xyce::dout() << " basetime         = " << basetime << std::endl;
+    Xyce::dout() << "  currPeriodIndex = " << currPeriodIndex << std::endl;
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -1212,10 +1212,10 @@ double PulseData::getMaxTimeStepSize ()
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
   {
-    cout << "\nIn PulseData::getMaxTimeStepSize.  ";
-    cout << " maxTimeStep = "<< maxTimeStep;
-    cout << "  TD = " << TD << "  PER = " <<PER;
-    cout << "  time = "<< time << endl;
+    Xyce::dout() << "\nIn PulseData::getMaxTimeStepSize.  ";
+    Xyce::dout() << " maxTimeStep = "<< maxTimeStep;
+    Xyce::dout() << "  TD = " << TD << "  PER = " <<PER;
+    Xyce::dout() << "  time = "<< time << std::endl;
   }
 #endif
 
@@ -1252,9 +1252,9 @@ PWLinData::PWLinData(const PWLinData &right)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
-PWLinData::PWLinData( const vector<Param> & paramRef,
-                                 SolverState & ss1,
-                                 DeviceOptions & do1)
+PWLinData::PWLinData( const std::vector<Param> & paramRef,
+                      const SolverState & ss1,
+                      const DeviceOptions & do1)
   : SourceData(ss1,do1),
     NUM(0),
     REPEAT(false),
@@ -1263,24 +1263,24 @@ PWLinData::PWLinData( const vector<Param> & paramRef,
     loc_(0),
     starttime_(0.0)
 {
-  vector <Param>::const_iterator iter = paramRef.begin();
-  vector <Param>::const_iterator last = paramRef.end();
+  std::vector<Param>::const_iterator iter = paramRef.begin();
+  std::vector<Param>::const_iterator last = paramRef.end();
 
   for ( ; iter != last; ++iter)
   {
-    const string & tmpname = iter->tag();
+    const std::string & tmpname = iter->tag();
 
-    if (tmpname == "NUM")        NUM        = iter->iVal();
-    if (tmpname == "REPEAT")     if( iter->iVal() ) REPEAT = true;
-    if (tmpname == "REPEATTIME") REPEATTIME = iter->dVal();
-    if (tmpname == "TD")         TD         = iter->dVal();
+    if (tmpname == "NUM")        NUM        = iter->getImmutableValue<int>();
+    if (tmpname == "REPEAT")     REPEAT     = iter->getImmutableValue<bool>();
+    if (tmpname == "REPEATTIME") REPEATTIME = iter->getImmutableValue<double>();
+    if (tmpname == "TD")         TD         = iter->getImmutableValue<double>();
 
     if ( tmpname == "T" && iter->given() )
     {
-      time = iter->dVal();
+      time = iter->getImmutableValue<double>();
       ++iter;
 
-      TVVEC.push_back(pair<double,double>(time, iter->dVal()));
+      TVVEC.push_back(std::pair<double,double>(time, iter->getImmutableValue<double>()));
     }
   }
 
@@ -1310,19 +1310,19 @@ PWLinData::~PWLinData()
 //-----------------------------------------------------------------------------
 void PWLinData::printOutParams()
 {
-  cout << endl;
-  cout << "  NUM  = "    << NUM << endl;
-  cout << "  REPEAT  = "    << REPEAT << endl;
-  cout << "  REPEATTIME  = "    << REPEATTIME << endl;
-  cout << "  TD  = "    << TD << endl;
-  cout << "  loc_  = "    << loc_ << endl;
-  cout << "  starttime_  = "    << starttime_ << endl;
+  Xyce::dout() << std::endl;
+  Xyce::dout() << "  NUM  = "    << NUM << std::endl;
+  Xyce::dout() << "  REPEAT  = "    << REPEAT << std::endl;
+  Xyce::dout() << "  REPEATTIME  = "    << REPEATTIME << std::endl;
+  Xyce::dout() << "  TD  = "    << TD << std::endl;
+  Xyce::dout() << "  loc_  = "    << loc_ << std::endl;
+  Xyce::dout() << "  starttime_  = "    << starttime_ << std::endl;
 
-  cout << "  Time    Voltage" << endl;
+  Xyce::dout() << "  Time    Voltage" << std::endl;
   for( int i = 0; i < NUM; ++i )
-    cout << " " << TVVEC[i].first << "  " << TVVEC[i].second << endl;
+    Xyce::dout() << " " << TVVEC[i].first << "  " << TVVEC[i].second << std::endl;
 
-  cout << endl;
+  Xyce::dout() << std::endl;
 }
 #endif
 
@@ -1346,8 +1346,8 @@ bool PWLinData::updateSource()
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
   {
-    cout << endl;
-    cout << "  PWLinData::updateSource\n";
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "  PWLinData::updateSource\n";
     printOutParams();
   }
 #endif
@@ -1361,8 +1361,8 @@ bool PWLinData::updateSource()
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
   {
-    cout << "-------------------------------" << endl;
-    cout << "  Time = " << time << endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() << "  Time = " << time << std::endl;
   }
 #endif
 
@@ -1402,28 +1402,36 @@ bool PWLinData::updateSource()
       double looptime = TVVEC[NUM-1].first - REPEATTIME;
 
       time -= TVVEC[NUM-1].first;
-      int itmp = (static_cast<int> (time / looptime));
-      double di = itmp;
-      time -= looptime * di;
+      time -= looptime * floor(time / looptime);
       time += REPEATTIME;
+
 
       for( int i = 0; i < NUM; ++i )
       {
         if( time < TVVEC[i].first ) {loc_ = i;break;}
       }
 
-      if( loc_ == 0 )
+      if (time == REPEATTIME)
       {
-        time1 = REPEATTIME;
-        voltage1 = TVVEC[NUM-1].second;
+        time1 = 0.0;
+        time2 = 1.0;
+        voltage1 = voltage2 = TVVEC[NUM-1].second;
       }
       else
       {
-        time1 = TVVEC[loc_-1].first;
-        voltage1 = TVVEC[loc_-1].second;
+        if( loc_ == 0 )
+        {
+          time1 = REPEATTIME;
+          voltage1 = TVVEC[NUM-1].second;
+        }
+        else
+        {
+          time1 = TVVEC[loc_-1].first;
+          voltage1 = TVVEC[loc_-1].second;
+        }
+        time2 = TVVEC[loc_].first;
+        voltage2 = TVVEC[loc_].second;
       }
-      time2 = TVVEC[loc_].first;
-      voltage2 = TVVEC[loc_].second;
 
     }
 
@@ -1439,13 +1447,13 @@ bool PWLinData::updateSource()
 #ifdef Xyce_DEBUG_DEVICE
    if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
    {
-      cout << "time: " << time << endl;
-      cout << "time1: " << time1 << endl;
-      cout << "time2: " << time2 << endl;
-      cout << "voltage1: " << voltage1 << endl;
-      cout << "voltage2: " << voltage2 << endl;
-      cout << "Src: " << SourceValue << endl;
-      cout << "------------------------------------" << endl;
+      Xyce::dout() << "time: " << time << std::endl;
+      Xyce::dout() << "time1: " << time1 << std::endl;
+      Xyce::dout() << "time2: " << time2 << std::endl;
+      Xyce::dout() << "voltage1: " << voltage1 << std::endl;
+      Xyce::dout() << "voltage2: " << voltage2 << std::endl;
+      Xyce::dout() << "Src: " << SourceValue << std::endl;
+      Xyce::dout() << Xyce::section_divider << std::endl;
     }
 #endif
 
@@ -1470,44 +1478,70 @@ bool PWLinData::updateSource()
 // Creation Date : 06/08/01
 //-----------------------------------------------------------------------------
 bool PWLinData::getBreakPoints
-  (vector<N_UTL_BreakPoint> & breakPointTimes )
+  (std::vector<N_UTL_BreakPoint> & breakPointTimes )
 {
   bool bsuccess = true;
 
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
   {
-    cout << "  In PWLinData::getBreakPoints\n";
+    Xyce::dout() << "  In PWLinData::getBreakPoints\n";
   }
 #endif
 
   if (!initializeFlag_) bsuccess = initializeSource ();
 
-#if 0
-  // subtract out the delay.
-  time = solState_.currTime - TD;
+  time = solState_.currTime;
 
-  double basetime = 0;
+  time -= TD;
 
-  // repeating signal - figure out where we are in period
-  // Not done yet.  This stuff is wrong.
-  if(time >= REPEATTIME)
+  // if it's a repeating signal, figure out what period we are in
+  if (REPEAT && time >= TVVEC[NUM - 1].first)
   {
-    if (REPEATTIME != 0.0)
+    double loopBaseTime = 0.0;
+    double bp_time;
+
+    double looptime = TVVEC[NUM-1].first - REPEATTIME;
+    loopBaseTime = looptime * (1.0 + floor((time - TVVEC[NUM - 1].first) / looptime));
+#ifdef Xyce_DEBUG_DEVICE
+    if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
     {
-      basetime = REPEATTIME * floor(time/REPEATTIME);
-      time -= basetime;
+      Xyce::dout() << "loopBaseTime: " << loopBaseTime << std::endl;
+      Xyce::dout() << "floor function: " << floor((time - TVVEC[NUM - 1].first) / (TVVEC[NUM - 1].first - REPEATTIME)) << std::endl;
+    }
+#endif
+    
+    for (int i = 0; i < NUM; ++i)
+    {
+      bp_time = TVVEC[i].first;
+      if (bp_time >= REPEATTIME)
+      {
+        breakPointTimes.push_back(bp_time + loopBaseTime);
+#ifdef Xyce_DEBUG_DEVICE
+        if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
+        {
+          Xyce::dout() << "bp_time + loopBaseTime: " << bp_time + loopBaseTime << std::endl;
+        }
+#endif
+      }
     }
   }
-#endif
-
-  // Note that this function doesn't yet work for REPEAT=true.
-  // current period:
-  for (int i=0;i<NUM;++i)
+  else
   {
-    double bp_time = TVVEC[i].first;
-    breakPointTimes.push_back(bp_time);
+    for (int i = 0; i < NUM; ++i)
+    {
+      double bp_time = TVVEC[i].first;
+      breakPointTimes.push_back(bp_time);
+#ifdef Xyce_DEBUG_DEVICE
+      if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
+      {
+        Xyce::dout() << "bp_time: " << bp_time << std::endl;
+      }
+#endif
+    }
   }
+  // now that we know which period this is, push_back all breakpoints
+  // in this period and the next.
 
   return bsuccess;
 }
@@ -1548,9 +1582,9 @@ SFFMData::SFFMData(const SFFMData &right)
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
 
-SFFMData::SFFMData( const vector<Param> & paramRef,
-                               SolverState   & ss1,
-                               DeviceOptions & do1)
+SFFMData::SFFMData( const std::vector<Param> & paramRef,
+                    const SolverState   & ss1,
+                    const DeviceOptions & do1)
   : SourceData(ss1,do1),
     V0  (0.0),
     VA  (0.0),
@@ -1564,18 +1598,18 @@ SFFMData::SFFMData( const vector<Param> & paramRef,
     FSgiven  (false)
 
 {
-  vector <Param>::const_iterator iter = paramRef.begin();
-  vector <Param>::const_iterator last = paramRef.end();
+  std::vector<Param>::const_iterator iter = paramRef.begin();
+  std::vector<Param>::const_iterator last = paramRef.end();
 
   for ( ; iter != last; ++iter)
   {
-    const string & tmpname = iter->tag();
+    const std::string & tmpname = iter->tag();
 
-    if (tmpname == "V0")  { V0    = iter->dVal(); V0given = iter->given(); }
-    if (tmpname == "VA")  { VA    = iter->dVal(); VAgiven = iter->given(); }
-    if (tmpname == "FC")  { FC    = iter->dVal(); FCgiven = iter->given(); }
-    if (tmpname == "MDI") { MDI   = iter->dVal(); MDIgiven = iter->given(); }
-    if (tmpname == "FS")  { FS    = iter->dVal(); FSgiven = iter->given(); }
+    if (tmpname == "V0")  { V0    = iter->getImmutableValue<double>(); V0given = iter->given(); }
+    if (tmpname == "VA")  { VA    = iter->getImmutableValue<double>(); VAgiven = iter->given(); }
+    if (tmpname == "FC")  { FC    = iter->getImmutableValue<double>(); FCgiven = iter->given(); }
+    if (tmpname == "MDI") { MDI   = iter->getImmutableValue<double>(); MDIgiven = iter->given(); }
+    if (tmpname == "FS")  { FS    = iter->getImmutableValue<double>(); FSgiven = iter->given(); }
   }
 
   typeName_ = "SFFM";
@@ -1609,12 +1643,12 @@ SFFMData::~SFFMData()
 
 void SFFMData::printOutParams()
 {
-  cout << "SFFMData:\n";
-  cout << "V0 = " << V0 << endl;
-  cout << "VA = " << VA << endl;
-  cout << "FC = " << FC << endl;
-  cout << "MDI = " << MDI << endl;
-  cout << "FS = " << FS << endl;
+  Xyce::dout() << "SFFMData:\n";
+  Xyce::dout() << "V0 = " << V0 << std::endl;
+  Xyce::dout() << "VA = " << VA << std::endl;
+  Xyce::dout() << "FC = " << FC << std::endl;
+  Xyce::dout() << "MDI = " << MDI << std::endl;
+  Xyce::dout() << "FS = " << FS << std::endl;
 }
 #endif
 
@@ -1770,24 +1804,24 @@ ACData::ACData(const ACData & right)
 // Creation Date :
 //-----------------------------------------------------------------------------
 
-ACData::ACData( const vector<Param> & paramRef,
-                             SolverState   & ss1,
-                             DeviceOptions & do1)
+ACData::ACData( const std::vector<Param> & paramRef,
+                const SolverState   & ss1,
+                const DeviceOptions & do1)
   : SourceData(ss1,do1),
     ACMAG(1.0),
     ACPHASE(0.0),
     ACMAGgiven(false),
     ACPHASEgiven(false)
 {
-  vector <Param>::const_iterator iter = paramRef.begin();
-  vector <Param>::const_iterator last = paramRef.end();
+  std::vector<Param>::const_iterator iter = paramRef.begin();
+  std::vector<Param>::const_iterator last = paramRef.end();
 
   for ( ; iter != last; ++iter)
   {
-    const string & tmpname = iter->tag();
+    const std::string & tmpname = iter->tag();
 
-    if (tmpname == "ACMAG")    { ACMAG    = iter->dVal(); ACMAGgiven = iter->given();}
-    if (tmpname == "ACPHASE") { ACPHASE = iter->dVal(); ACPHASEgiven = iter->given();}
+    if (tmpname == "ACMAG")    { ACMAG    = iter->getImmutableValue<double>(); ACMAGgiven = iter->given();}
+    if (tmpname == "ACPHASE") { ACPHASE = iter->getImmutableValue<double>(); ACPHASEgiven = iter->given();}
   }
 
   typeName_ = "AC";
@@ -1821,9 +1855,9 @@ ACData::~ACData()
 void ACData::printOutParams()
 
 {
-  cout << "ACData:\n";
-  cout << "ACMAG = " << ACMAG << endl;
-  cout << "ACPHASE = " << ACPHASE << endl;
+  Xyce::dout() << "ACData:\n";
+  Xyce::dout() << "ACMAG = " << ACMAG << std::endl;
+  Xyce::dout() << "ACPHASE = " << ACPHASE << std::endl;
 }
 #endif
 
@@ -1857,7 +1891,7 @@ bool ACData::updateSource()
 #ifdef  Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0)
   {
-    cout << "  SourceValue = " << SourceValue << endl;
+    Xyce::dout() << "  SourceValue = " << SourceValue << std::endl;
   }
 #endif
 
@@ -1936,21 +1970,21 @@ ConstData::ConstData(const ConstData & right)
 // Creation Date : 10/5/00
 //-----------------------------------------------------------------------------
 
-ConstData::ConstData( const vector<Param> & paramRef,
-                                 SolverState   & ss1,
-                                 DeviceOptions & do1)
+ConstData::ConstData( const std::vector<Param> & paramRef,
+                      const SolverState   & ss1,
+                      const DeviceOptions & do1)
   : SourceData(ss1,do1),
     V0(0.0)
 {
-  vector <Param>::const_iterator iter = paramRef.begin();
-  vector <Param>::const_iterator last = paramRef.end();
+  std::vector<Param>::const_iterator iter = paramRef.begin();
+  std::vector<Param>::const_iterator last = paramRef.end();
 
   for ( ; iter != last; ++iter)
   {
-    const string & tmpname = iter->tag();
+    const std::string & tmpname = iter->tag();
     if (tmpname == "DCV0")
     {
-      V0 = iter->dVal();
+      V0 = iter->getImmutableValue<double>();
     }
   }
 
@@ -1985,8 +2019,8 @@ ConstData::~ConstData()
 void ConstData::printOutParams()
 
 {
-  cout << "ConstData:\n";
-  cout << "V0: " << V0 << endl;
+  Xyce::dout() << "ConstData:\n";
+  Xyce::dout() << "V0: " << V0 << std::endl;
 }
 #endif
 
@@ -2098,9 +2132,9 @@ SmoothPulseData::SmoothPulseData(const SmoothPulseData &right)
 // Creation Date : 04/13/11
 //-----------------------------------------------------------------------------
 
-SmoothPulseData::SmoothPulseData( const vector<Param> & paramRef,
-                                 SolverState   & ss1,
-                                 DeviceOptions & do1)
+SmoothPulseData::SmoothPulseData( const std::vector<Param> & paramRef,
+                                  const SolverState   & ss1,
+                                  const DeviceOptions & do1)
   : SourceData (ss1,do1),
     V1  (0.0),
     V2  (0.0),
@@ -2123,21 +2157,21 @@ SmoothPulseData::SmoothPulseData( const vector<Param> & paramRef,
 {
 
   // Get the user-defined values:
-  vector <Param>::const_iterator iter = paramRef.begin();
-  vector <Param>::const_iterator last = paramRef.end();
+  std::vector<Param>::const_iterator iter = paramRef.begin();
+  std::vector<Param>::const_iterator last = paramRef.end();
 
   for ( ; iter != last; ++iter)
   {
-    const string & tmpname = iter->tag();
+    const std::string & tmpname = iter->tag();
 
-    if (tmpname == "V1")  { V1    = iter->dVal(); V1given = iter->given();}
-    if (tmpname == "V2")  { V2    = iter->dVal(); V2given = iter->given();}
-    if (tmpname == "TD")  { TD    = iter->dVal(); TDgiven = iter->given();}
-    if (tmpname == "TR")  { TR    = iter->dVal(); TRgiven = iter->given();}
-    if (tmpname == "TF")  { TF    = iter->dVal(); TFgiven = iter->given();}
-    if (tmpname == "PW")  { PW    = iter->dVal(); PWgiven = iter->given();}
-    if (tmpname == "PER") { PER   = iter->dVal(); PERgiven = iter->given();}
-    if (tmpname == "SF")  { functionScaleFactor_ = iter->dVal(); functionScaleFactorGiven_ = iter->given();}
+    if (tmpname == "V1")  { V1    = iter->getImmutableValue<double>(); V1given = iter->given();}
+    if (tmpname == "V2")  { V2    = iter->getImmutableValue<double>(); V2given = iter->given();}
+    if (tmpname == "TD")  { TD    = iter->getImmutableValue<double>(); TDgiven = iter->given();}
+    if (tmpname == "TR")  { TR    = iter->getImmutableValue<double>(); TRgiven = iter->given();}
+    if (tmpname == "TF")  { TF    = iter->getImmutableValue<double>(); TFgiven = iter->given();}
+    if (tmpname == "PW")  { PW    = iter->getImmutableValue<double>(); PWgiven = iter->given();}
+    if (tmpname == "PER") { PER   = iter->getImmutableValue<double>(); PERgiven = iter->given();}
+    if (tmpname == "SF")  { functionScaleFactor_ = iter->getImmutableValue<double>(); functionScaleFactorGiven_ = iter->given();}
   }
 
   typeName_ = "SMOOTHPULSE";
@@ -2173,18 +2207,18 @@ SmoothPulseData::~SmoothPulseData()
 void SmoothPulseData::printOutParams()
 {
 
-  cout << endl;
-  cout << "  SmoothPulseData::printOutParams\n";
-  cout << "  V1  = "    << V1 << endl;
-  cout << "  V2  = "    << V2 << endl;
+  Xyce::dout() << std::endl;
+  Xyce::dout() << "  SmoothPulseData::printOutParams\n";
+  Xyce::dout() << "  V1  = "    << V1 << std::endl;
+  Xyce::dout() << "  V2  = "    << V2 << std::endl;
 
-  cout << "  TD  = "    << TD << endl;
-  cout << "  TR  = "    << TR << endl;
-  cout << "  TF  = "    << TF << endl;
-  cout << "  PW  = "    << PW << endl;
-  cout << "  PER = "    << PER << endl;
-  cout << "  SF  = "    << functionScaleFactor_ << endl;
-  cout << endl;
+  Xyce::dout() << "  TD  = "    << TD << std::endl;
+  Xyce::dout() << "  TR  = "    << TR << std::endl;
+  Xyce::dout() << "  TF  = "    << TF << std::endl;
+  Xyce::dout() << "  PW  = "    << PW << std::endl;
+  Xyce::dout() << "  PER = "    << PER << std::endl;
+  Xyce::dout() << "  SF  = "    << functionScaleFactor_ << std::endl;
+  Xyce::dout() << std::endl;
 
 }
 #endif
@@ -2241,7 +2275,7 @@ bool SmoothPulseData::updateSource()
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
   {
-    cout << "  SmoothPulseData::updateSources\n";
+    Xyce::dout() << "  SmoothPulseData::updateSources\n";
     printOutParams();
   }
 #endif
@@ -2251,7 +2285,7 @@ bool SmoothPulseData::updateSource()
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
   {
-    cout << "  Time = " << time << endl;
+    Xyce::dout() << "  Time = " << time << std::endl;
   }
 #endif
 
@@ -2303,7 +2337,7 @@ bool SmoothPulseData::updateSource()
 #ifdef  Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
   {
-    cout << "  SourceValue = " << SourceValue << endl;
+    Xyce::dout() << "  SourceValue = " << SourceValue << std::endl;
   }
 #endif
 
@@ -2402,7 +2436,7 @@ void SmoothPulseData::setParams(double *params)
 // Creation Date : 04/13/11
 //-----------------------------------------------------------------------------
 bool SmoothPulseData::getBreakPoints
-  (vector<N_UTL_BreakPoint> & breakPointTimes )
+  (std::vector<N_UTL_BreakPoint> & breakPointTimes )
 {
   bool bsuccess = true;
 
@@ -2432,10 +2466,10 @@ double SmoothPulseData::getMaxTimeStepSize ()
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
   {
-    cout << "\nIn SmoothPulseData::getMaxTimeStepSize.  ";
-    cout << " maxTimeStep = "<< maxTimeStep;
-    cout << "  TD = " << TD << "  PER = " <<PER;
-    cout << "  time = "<< time << endl;
+    Xyce::dout() << "\nIn SmoothPulseData::getMaxTimeStepSize.  ";
+    Xyce::dout() << " maxTimeStep = "<< maxTimeStep;
+    Xyce::dout() << "  TD = " << TD << "  PER = " <<PER;
+    Xyce::dout() << "  time = "<< time << std::endl;
   }
 #endif
 

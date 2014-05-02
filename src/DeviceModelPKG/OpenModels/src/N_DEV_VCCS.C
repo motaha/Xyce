@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.110.2.2 $
+// Revision Number: $Revision: 1.129.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:39 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -52,56 +52,35 @@
 #endif
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_VCCS.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_VCCS.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
 
 #include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
 
 namespace Xyce {
 namespace Device {
-template<>
-ParametricData<VCCS::Instance>::ParametricData()
-{
-    setNumNodes(4);
-    setNumOptionalNodes(0);
-    setNumFillNodes(0);
-    setModelRequired(0);
-    setPrimaryParameter("T");
-
-    // Set up double precision variables:
-    addPar ("T", 0.0, false, ParameterType::NO_DEP,
-            &VCCS::Instance::Transconductance,
-        NULL,U_NONE,CAT_NONE,"Transconductance");
-}
-
-template<>
-ParametricData<VCCS::Model>::ParametricData()
-{
-}
 
 namespace VCCS {
 
+
+void Traits::loadInstanceParameters(ParametricData<VCCS::Instance> &p)
+{
+  p.addPar ("T", 0.0, &VCCS::Instance::Transconductance)
+    .setDescription("Transconductance");
+}
+
+void Traits::loadModelParameters(ParametricData<VCCS::Model> &p)
+{
+}
+
 // static member components
-vector< vector<int> > Instance::jacStamp;
-
-
-
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
-}
-
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
+std::vector< std::vector<int> > Instance::jacStamp;
 
 //-----------------------------------------------------------------------------
 // Function      : ::
@@ -111,17 +90,13 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 12/20/00
 //-----------------------------------------------------------------------------
-Instance::Instance (
-  InstanceBlock & IBref,
-    Model & Viter,
-    MatrixLoadData & mlData1,
-    SolverState &ss1,
-    ExternData  &ed1,
-    DeviceOptions & do1)
-
-  : DeviceInstance(IBref, mlData1, ss1, ed1, do1),
-    IB(IBref),
-    model_(Viter),
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock & instance_block,
+  Model &               model,
+  const FactoryBlock &  factory_block)
+  : DeviceInstance(instance_block, configuration.getInstanceParameters(), factory_block),
+    model_(model),
     Transconductance(1.0),
     li_Pos(-1),
     li_Neg(-1),
@@ -153,22 +128,17 @@ Instance::Instance (
     jacStamp[1][1]=3;
   }
 
-
   // Set params to constant default values:
-  setDefaultParams ();
+  setDefaultParams();
 
   // Set params according to instance line and constant defaults from metadata:
-  setParams (IB.params);
+  setParams(instance_block.params);
 
   // Set any non-constant parameter defaults:
   if (!given("T"))
   {
-    string msg = "Could not find Transconductance parameter in instance.";
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Could not find Transconductance parameter in instance.";
   }
-
 }
 
 //-----------------------------------------------------------------------------
@@ -192,41 +162,21 @@ Instance::~Instance ()
 // Creator       : Robert Hoekstra, SNL, Component Information and Models
 // Creation Date : 6/21/01
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-	                               const vector<int> & extLIDVecRef )
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+	                               const std::vector<int> & extLIDVecRef )
 {
-  string msg;
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-      "-----------------------------------------------------------------------------";
 
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl << dashedline << endl;
-    cout << "  VCCSInstance::registerLIDs" << endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "  VCCSInstance::registerLIDs" << std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -244,12 +194,12 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "  li_Pos = " << li_Pos << endl;
-    cout << "  li_Neg = " << li_Neg << endl;
-    cout << "  li_ContPos = " << li_ContPos << endl;
-    cout << "  li_ContNeg = " << li_ContNeg << endl;
+    Xyce::dout() << "  li_Pos = " << li_Pos << std::endl;
+    Xyce::dout() << "  li_Neg = " << li_Neg << std::endl;
+    Xyce::dout() << "  li_ContPos = " << li_ContPos << std::endl;
+    Xyce::dout() << "  li_ContNeg = " << li_ContNeg << std::endl;
 
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 }
@@ -262,21 +212,9 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Robert Hoektra, SNL, Parallel Computational Sciences
 // Creation Date : 6/21/02
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef)
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef)
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSTa != numStateVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 }
 
 
@@ -288,15 +226,9 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef)
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 4/23/2013
 //-----------------------------------------------------------------------------
-void Instance::registerStoreLIDs( const vector<int> & stoLIDVecRef )
+void Instance::registerStoreLIDs( const std::vector<int> & stoLIDVecRef )
 {
-  int numSto = stoLIDVecRef.size();
-  if (numSto != getNumStoreVars())
-  {
-    string msg = "Instance::registerStoreLIDs:";
-    msg += "numSto != numStoreVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
+  AssertLIDs(stoLIDVecRef.size() == getNumStoreVars());
 
   // Copy over the global ID lists:
   stoLIDVec = stoLIDVecRef;
@@ -315,16 +247,16 @@ void Instance::registerStoreLIDs( const vector<int> & stoLIDVecRef )
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 4/23/2013
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getStoreNameMap ()
+std::map<int,std::string> & Instance::getStoreNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if( loadLeadCurrent && storeNameMap.empty ())
   {
     // change subcircuitname:devicetype_deviceName to
     // devicetype:subcircuitName:deviceName
-    string modName(getName());
+    std::string modName(getName());
     spiceInternalName(modName);
-    string tmpstr;
+    std::string tmpstr;
     tmpstr = modName+":DEV_I";
     storeNameMap[ li_store_dev_i ] = tmpstr;
   }
@@ -339,7 +271,7 @@ map<int,string> & Instance::getStoreNameMap ()
 // Creator       : Robert Hoektra, SNL, Parallel Computational Sciences
 // Creation Date : 9/2/02
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -352,7 +284,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Robert Hoektra, SNL, Parallel Computational Sciences
 // Creation Date : 9/2/02
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
 
@@ -460,10 +392,11 @@ bool Instance::loadDAEdFdx ()
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 12/21/00
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-                                         SolverState & ss1,
-                                         DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1)
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block)
 {
 }
 
@@ -477,9 +410,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -497,24 +430,45 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i;
-  os << endl;
-  os << "    name     getModelName()  Parameters" << endl;
+  os << std::endl;
+  os << "    name     model name  Parameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "      ";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 // VCCS Master functions:
 
@@ -541,7 +495,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 //-----------------------------------------------------------------------------
 bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  double * storeLeadF, double * storeLeadQ)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & vi = *(*it);
     double v_cont_pos = solVec[vi.li_ContPos];
@@ -569,7 +523,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
 //-----------------------------------------------------------------------------
 bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & vi = *(*it);
 
@@ -588,6 +542,18 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
   }
 
   return true;
+}
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("g", 1);
 }
 
 } // namespace VCCS

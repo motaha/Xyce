@@ -1,0 +1,37 @@
+\form#0:$\sigma$
+\form#1:$\sigma \times v$
+\form#2:$K_f*exp(E/K_bT)$
+\form#3:$K_f=\sigma*v*N$
+\form#4:$ij$
+\form#5:$ij > 0$
+\form#6:$ij == 0$
+\form#7:$\frac{4\pi\times 5\times10^{-8}}{D_1D_2}$
+\form#8:$D_n$
+\form#9:$n$
+\form#10:$ij < 0$
+\form#11:$\frac{4\pi\times 5\times10^{-8}}{TD_1D_2}$
+\form#12:$q_0$
+\form#13:$C(V_+-V_-)$
+\form#14:$d(q_0)/dt$
+\form#15:$-d(q0)/dt$
+\form#16:$-q_0$
+\form#17:\[ \left[\begin{array}{cc} C & -C \\ -C & C \end{array} \right] \]
+\form#18:$(V_+-V_-)-V_{ic}$
+\form#19:\[ \left[ \begin{array}{ccc} 0 & 0 & 1 \\ 0 & 0 & -1 \\ 1 & -1 & 0 \end{array}\right] \]
+\form#20:\[ \left[ \begin{array}{ccc} C & -C & 0 \\ -C & C & 0 \\ 0 & 0 & 0 \end{array}\right] \]
+\form#21:\[ \left[ \begin{array}{ccc} 0 & 0 & 0 \\ 0 & 0 & 0 \\ 0 & 0 & 1 \end{array}\right] \]
+\form#22:$q_0=CV$
+\form#23:$F(x)+dQ(x)/dt=0$
+\form#24:$(V_+-V_-)*G$
+\form#25:$-(V_+-V_-)*G$
+\form#26:\[ \left[\begin{array}{cc} G& -G\\ -G& G \end{array} \right] \]
+\form#27:$\Delta s_{new}$
+\form#28:\[ \Delta s_{new} = \Delta s_{old}\left(1 + a\left(\frac{N_{max} - N}{N_{max}}\right)^2\right) \]
+\form#29:$a\in[0,1]$
+\form#30:$N$
+\form#31:$N_{max}$
+\form#32:$a$
+\form#33:$ n $
+\form#34:$ k $
+\form#35:$ \eta $
+\form#36:\[ \eta = \frac{\| F_k \|}{\| F_{k-1} \|} \]

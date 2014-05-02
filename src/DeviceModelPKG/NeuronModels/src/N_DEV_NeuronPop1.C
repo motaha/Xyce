@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -22,7 +22,6 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //-----------------------------------------------------------------------------
 
-
 //-------------------------------------------------------------------------
 // Filename       : $RCSfile: N_DEV_NeuronPop1.C,v $
 //
@@ -37,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.19.2.1 $
+// Revision Number: $Revision: 1.41.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:33 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -54,16 +53,19 @@
 #include <N_UTL_Misc.h>
 
 // ----------   Xyce Includes   ----------
+#include <N_DEV_DeviceOptions.h>
+#include <N_DEV_DeviceMaster.h>
+#include <N_DEV_ExternData.h>
+#include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_MembraneCS.h>
+#include <N_DEV_MembraneHH.h>
+#include <N_DEV_MembranePassive.h>
+#include <N_DEV_MembraneUserDefined.h>
 #include <N_DEV_NeuronPop1.h>
 #include <N_DEV_Neuron_CommonEquations.h>
-#include <N_DEV_MembranePassive.h>
-#include <N_DEV_MembraneHH.h>
-#include <N_DEV_MembraneCS.h>
-#include <N_DEV_MembraneUserDefined.h>
-#include <N_DEV_ExternData.h>
 #include <N_DEV_SolverState.h>
-#include <N_DEV_DeviceOptions.h>
-#include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
 
 #include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
@@ -72,69 +74,47 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<NeuronPop1::Instance>::ParametricData()
-{
-  setNumNodes(2);
-  setNumOptionalNodes(0);
-  setNumFillNodes(0);
-  setModelRequired(1);
-  setPrimaryParameter("");
-  addModelType("NEURONPOP");
 
-  // Set up map so parser knows how to set instance values
-  addPar ("CTP", vector<string>(), false, ParameterType::NO_DEP,
+namespace NeuronPop1 {
+
+
+void Traits::loadInstanceParameters(ParametricData<NeuronPop1::Instance> &p)
+{
+// Set up map so parser knows how to set instance values
+  p.addPar ("CTP", std::vector<std::string>(), false, ParameterType::NO_DEP,
           &NeuronPop1::Instance::connectionTargetPopulation,
           &NeuronPop1::Instance::connectionTargetPopulationGiven,
           U_NONE, CAT_NONE, "Connected Target Population list");
 }
 
-template<>
-ParametricData<NeuronPop1::Model>::ParametricData()
+void Traits::loadModelParameters(ParametricData<NeuronPop1::Model> &p)
 {
-  addPar ("NEURONS_MAX", 10, false, ParameterType::NO_DEP,
-          &NeuronPop1::Model::neuronsMax,
-          &NeuronPop1::Model::neuronsMaxGiven,
-          U_NONE, CAT_NONE, "Maximum number of neurons in the device");
-  addPar ("IC_MAX", 2, false, ParameterType::NO_DEP,
-          &NeuronPop1::Model::internalMaxConnections,
-          &NeuronPop1::Model::internalMaxConnectionsGiven,
-          U_NONE, CAT_NONE, "Maximum number of internal connections in the device");
-  addPar ("EC_MAX", 2, false, ParameterType::NO_DEP,
-          &NeuronPop1::Model::externalMaxConnections,
-          &NeuronPop1::Model::externalMaxConnectionsGiven,
-          U_NONE, CAT_NONE, "Maximum number of external connections in the device");
-  addPar ("NEUROGENESIS_RATE", 0.0, false, ParameterType::NO_DEP,
-          &NeuronPop1::Model::populationNeurogenesisRate,
-          &NeuronPop1::Model::populationNeurogenesisRateGiven,
-          U_SECOND, CAT_NONE, "Rate in days of GC neurogenesis in the population");
-  addPar ("UPDATE_PERIOD", 1.0, false, ParameterType::NO_DEP,
-          &NeuronPop1::Model::populationUpdatePeriod,
-          &NeuronPop1::Model::populationUpdatePeriodGiven,
-          U_SECOND, CAT_NONE, "Time in days for population updates");
-  addPar ("OUTPUTPOPULATIONVARS", 0, false, ParameterType::NO_DEP,
-          &NeuronPop1::Model::outputPopulationVars,
-          NULL, U_NONE, CAT_NONE, "Flag to save population variables" );
+  p.addPar ("NEURONS_MAX", 10, &NeuronPop1::Model::neuronsMax)
+    .setGivenMember(&NeuronPop1::Model::neuronsMaxGiven)
+    .setDescription("Maximum number of neurons in the device");
+  p.addPar ("IC_MAX", 2, &NeuronPop1::Model::internalMaxConnections)
+    .setGivenMember(&NeuronPop1::Model::internalMaxConnectionsGiven)
+    .setDescription("Maximum number of internal connections in the device");
+  p.addPar ("EC_MAX", 2, &NeuronPop1::Model::externalMaxConnections)
+    .setGivenMember(&NeuronPop1::Model::externalMaxConnectionsGiven)
+    .setDescription("Maximum number of external connections in the device");
+  p.addPar ("NEUROGENESIS_RATE", 0.0, &NeuronPop1::Model::populationNeurogenesisRate)
+    .setGivenMember(&NeuronPop1::Model::populationNeurogenesisRateGiven)
+    .setUnit(U_SECOND)
+    .setDescription("Rate in days of GC neurogenesis in the population");
+  p.addPar ("UPDATE_PERIOD", 1.0, &NeuronPop1::Model::populationUpdatePeriod)
+    .setGivenMember(&NeuronPop1::Model::populationUpdatePeriodGiven)
+    .setUnit(U_SECOND)
+    .setDescription("Time in days for population updates");
+  p.addPar ("OUTPUTPOPULATIONVARS", 0, &NeuronPop1::Model::outputPopulationVars)
+    .setDescription("Flag to save population variables" );
 }
 
-namespace NeuronPop1 {
+
 
 //
 // static class member inits
 //
-
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
-}
-
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
 
 //-----------------------------------------------------------------------------
 // Function      : Instance::Instance
@@ -144,13 +124,12 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-Instance::Instance(InstanceBlock & IB,
-                   Model & Miter,
-                   MatrixLoadData & mlData1,
-                   SolverState &ss1,
-                   ExternData  &ed1,
-                   DeviceOptions & do1)
-  : DeviceInstance (IB, mlData1, ss1, ed1, do1),
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock &         IB,
+  Model &                       Miter,
+  const FactoryBlock &          factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(Miter),
     liNodeIn(-1),
     liNodeOut(-1),
@@ -165,10 +144,6 @@ Instance::Instance(InstanceBlock & IB,
     outputPopulationVarsFlag(false),
     newStateToOutput(false)
 {
-  setName(IB.getName());
-  setModelName(model_.getName());
-
-
   // Set up the number of internal, external and state vars
   numExtVars   = 2;  // input and output voltage
   // numIntVars number of internal vars
@@ -187,19 +162,19 @@ Instance::Instance(InstanceBlock & IB,
   /*
     if( connectionTargetPopulation.size() > 0 )
     {
-    std::cout << name << " connectionTargetPopulation = { ";
+    Xyce::dout() << name << " connectionTargetPopulation = { ";
     for(int i=0; i<connectionTargetPopulation.size(); i++ )
     {
-    std::cout << connectionTargetPopulation[i];
+    Xyce::dout() << connectionTargetPopulation[i];
     if( i < (connectionTargetPopulation.size() - 1))
     {
-    std::cout << ", ";
+    Xyce::dout() << ", ";
     }
     }
     }
     else
     {
-    std::cout << name << " connectionTargetPopulationGiven == false" << std::endl;
+    Xyce::dout() << name << " connectionTargetPopulationGiven == false" << std::endl;
     }
   */
 
@@ -243,19 +218,19 @@ Instance::Instance(InstanceBlock & IB,
 
   /*
   // print out jacStamp
-  std::cout << "jacStamp for NeuronPop1" << std::endl;
+  Xyce::dout() << "jacStamp for NeuronPop1" << std::endl;
   int numRows = jacStamp.size();
   for( int i=0; i< numRows; i++ )
   {
   int numCol = jacStamp[i].size();
-  std::cout << "jacStamp[ " << i << " ] = { ";
+  Xyce::dout() << "jacStamp[ " << i << " ] = { ";
   for(int j=0; j<numCol; j++)
   {
-  std::cout << jacStamp[i][j] << "  ";
+  Xyce::dout() << jacStamp[i][j] << "  ";
   }
-  std::cout << " } " <<  std::endl;
+  Xyce::dout() << " } " <<  std::endl;
   }
-  std::cout << std::endl;
+  Xyce::dout() << std::endl;
   */
   // if the user has requested output of the state variables M, H and R
   // then open a file for that output.
@@ -269,15 +244,15 @@ Instance::Instance(InstanceBlock & IB,
     replace( filename.begin(), filename.end(), '%', '_' );
     replace( filename.begin(), filename.end(), ':', '_' );
 
-    outputFileStreamPtr = rcp( new ofstream() );
+    outputFileStreamPtr = rcp( new std::ofstream() );
     outputFileStreamPtr->open( filename.c_str() );
     if( !(*outputFileStreamPtr) )
     {
-      string msg("Instance constructor.\n");
+      std::string msg("Instance constructor.\n");
       msg += "\tCould not open file for output of population variables. name =" + getName();
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
     }
-    (*outputFileStreamPtr).setf(ios::scientific, ios::floatfield );
+    (*outputFileStreamPtr).setf(std::ios::scientific, std::ios::floatfield );
     (*outputFileStreamPtr).width(20);
     (*outputFileStreamPtr).precision(12);
   }
@@ -304,7 +279,7 @@ Instance::~Instance()
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-bool Instance::processParams(string param)
+bool Instance::processParams()
 {
   // If there are any time dependent parameters, set their values at for
   // the current time.
@@ -337,41 +312,20 @@ bool Instance::updateTemperature ( const double & temp)
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs(const vector<int> & intLIDVecRef,
-                            const vector<int> & extLIDVecRef)
+void Instance::registerLIDs(const std::vector<int> & intLIDVecRef,
+                            const std::vector<int> & extLIDVecRef)
 {
-  string msg;
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "-------------------------------------------------------------------------"
-    "----";
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl << dashedline << endl;
-    cout << "  Instance::registerLIDs" << endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "  Instance::registerLIDs" << std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -390,16 +344,16 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
 
 #if 0
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
-    ostringstream segNumber;
+    std::ostringstream segNumber;
     segNumber << i;
-    string segNumStr = segNumber.str();
+    std::string segNumStr = segNumber.str();
 
     tmpstr = name + "_" + "V" + segNumStr;
     spiceInternalName (tmpstr);
@@ -418,27 +372,16 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
   // copy over the global ID lists.
   staLIDVec = staLIDVecRef;
   // this resize won't be true when we store more data in the state
   // vector. (i.e. not just voltages, but connectivities firing state)
-  liNeuronPopState.resize( numSta );
-  for( int i=0; i<numSta; i++ )
+  liNeuronPopState.resize( numStateVars );
+  for( int i=0; i<numStateVars; i++ )
   {
     liNeuronPopState[i] = staLIDVec[i];
   }
@@ -474,7 +417,7 @@ bool Instance::loadDeviceMask ()
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -487,7 +430,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
 
@@ -528,7 +471,7 @@ void Instance::initializePopulation()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    std::cout << "Instance::initializePopulation "
+    Xyce::dout() << "Instance::initializePopulation "
               << "neuronsMax = " << model_.neuronsMax
               << " neuronPopSize = " << neuronPopSize
               << std::endl;
@@ -598,7 +541,7 @@ void Instance::updatePopulation()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    std::cout << "Instance::updatePopulation "
+    Xyce::dout() << "Instance::updatePopulation "
               << "time = " << getSolverState().currTime
               << std::endl;
   }
@@ -633,7 +576,7 @@ void Instance::updatePopulation()
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 03/22/2011
 //-----------------------------------------------------------------------------
-bool Instance::getInstanceBreakPoints (vector<N_UTL_BreakPoint> &breakPointTimes)
+bool Instance::getInstanceBreakPoints (std::vector<N_UTL_BreakPoint> &breakPointTimes)
 {
   // push on to the vector the next two update times
   breakPointTimes.push_back((numberOfUpdatesDone+1) * model_.populationUpdatePeriod);
@@ -676,7 +619,7 @@ bool Instance::updateIntermediateVars()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "  Instance::updateIntermediateVars\n";
+      Xyce::dout() << "  Instance::updateIntermediateVars\n";
     }
 #endif
 
@@ -685,7 +628,7 @@ bool Instance::updateIntermediateVars()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "  Time = " << time << endl;
+      Xyce::dout() << "  Time = " << time << std::endl;
     }
 #endif
     // subtract off any delay time
@@ -922,7 +865,7 @@ bool Instance::setIC ()
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-void Instance::varTypes( vector<char> & varTypeVec )
+void Instance::varTypes( std::vector<char> & varTypeVec )
 {
   //varTypeVec.resize(1);
   //varTypeVec[0] = 'I';
@@ -937,10 +880,11 @@ void Instance::varTypes( vector<char> & varTypeVec )
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-              SolverState & ss1,
-              DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
     neuronsMax(0),
     neuronsMaxGiven(false),
     internalMaxConnections(0),
@@ -984,9 +928,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1004,7 +948,7 @@ Model::~Model ()
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   return true;
 }
@@ -1017,12 +961,12 @@ bool Model::processParams (string param)
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 06/10/09
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1041,24 +985,59 @@ bool Model::processInstanceParams(string param)
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i, isize;
   isize = instanceContainer.size();
 
-  os << endl;
-  os << "Number of Neuron instances: " << isize << endl;
-  os << "    name=\t\tmodelName\tParameters" << endl;
+  os << std::endl;
+  os << "Number of Neuron instances: " << isize << std::endl;
+  os << "    name=\t\tmodelName\tParameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
+  return os;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new DeviceMaster<Traits>(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("neuronpop", 1)
+    .registerModelType("neuronpop", 1);
 }
 
 } // namespace NeuronPop1

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.1.2.2 $
+// Revision Number: $Revision: 1.7 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:44 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -60,7 +60,6 @@
 class N_LAS_Problem;
 class N_LAS_System;
 class N_LAS_MultiVector;
-class N_LOA_Loader;
 class Epetra_Operator;
 class Epetra_CrsGraph;
 class Epetra_CrsMatrix;
@@ -68,7 +67,6 @@ class Epetra_MultiVector;
 class Epetra_Map;
 class Epetra_LinearProblem;
 class Amesos_BaseSolver;
-class N_MPDE_State;
 class N_LAS_HBBuilder;
 class N_LOA_HBLoader;
 class N_LAS_Builder;
@@ -93,7 +91,7 @@ public:
   // Set the preconditioner options
   bool setOptions(const N_UTL_OptionBlock & OB);
   bool setDefaultOptions();
-  bool setDefaultOption( const string & option );
+  bool setDefaultOption( const std::string & option );
 
   // Set individual preconditioner options
   bool setParam( const N_UTL_Param & param );
@@ -101,14 +99,6 @@ public:
   // Set the fast times being used in the HB analysis.
   void setFastTimes( const std::vector<double> & times )
     { times_ = times; }
-
-  // Register MPDE state
-  void registerMPDEState( const Teuchos::RCP<N_MPDE_State>& mpdeState )
-    { state_ = mpdeState; }
-
-  // Register the application system loader
-  void registerAppLoader( const Teuchos::RCP<N_LOA_Loader> & appLoaderPtr )
-    { appLoaderPtr_ = appLoaderPtr; }
 
   // Register the application system builder
   void registerAppBuilder( const Teuchos::RCP<N_LAS_Builder>& appBuilderPtr )
@@ -155,15 +145,9 @@ private:
   // Fast times.
   std::vector<double> times_;
 
-  // MPDE state.
-  Teuchos::RCP<N_MPDE_State> state_;
-
   // Device interface.
   Teuchos::RCP<N_DEV_DeviceInterface> devInterfacePtr_;
 
-  // Application loader used to create the block Jacobi preconditioner.
-  Teuchos::RCP<N_LOA_Loader> appLoaderPtr_;
-  
   // Harmonic Balance loader.
   Teuchos::RCP<N_LOA_HBLoader> hbLoaderPtr_;
 
@@ -188,8 +172,8 @@ private:
   // Epetra_CrsMatrix storage for each matrix.
   std::vector<Teuchos::RCP<Epetra_CrsMatrix> > epetraMatrix_;
 
-  // Epetra_MultiVector storage for each matrix.
-  std::vector<Teuchos::RCP<Epetra_MultiVector> > epetraRHS_, epetraSoln_;
+  // Epetra_MultiVector storage, can be reused for each linear system. 
+  Teuchos::RCP<Epetra_MultiVector> epetraRHS_, epetraSoln_;
                                                
   // Current problems being preconditioned.
   std::vector<Teuchos::RCP<Epetra_LinearProblem> > epetraProblem_;

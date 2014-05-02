@@ -5,10 +5,10 @@
 
 
 # DEBUG - OSX for Dakota 4 explicity link and path required for this object
-if ( CMAKE_HOST_APPLE AND Xyce_Dakota AND NOT Xyce_Dakota50 )
-  message ( WARNING "forcing CParam.o object to link..." )
-  set ( DAKOTA_OBJS ${Xyce_ARCHDIR}/dakota/lib/Cparam.o )
-endif ( CMAKE_HOST_APPLE AND Xyce_Dakota AND NOT Xyce_Dakota50 )
+# if ( CMAKE_HOST_APPLE AND Xyce_Dakota AND NOT Xyce_Dakota50 )
+#  message ( WARNING "forcing CParam.o object to link..." )
+#  set ( DAKOTA_OBJS ${Xyce_ARCHDIR}/dakota/lib/Cparam.o )
+#endif ( CMAKE_HOST_APPLE AND Xyce_Dakota AND NOT Xyce_Dakota50 )
 
 
 # -- process subdirectories --------------------------------------------------
@@ -16,6 +16,5 @@ endif ( CMAKE_HOST_APPLE AND Xyce_Dakota AND NOT Xyce_Dakota50 )
 add_subdirectory ( FFTInterface )
 add_subdirectory ( LinearAlgebraTest )
 add_subdirectory ( XyceAsLibrary )
-add_subdirectory ( XyceUnitTest )
 add_subdirectory ( XygraTestHarnesses )
 

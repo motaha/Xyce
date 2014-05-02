@@ -49,6 +49,8 @@ set ( LinearAlgebraServices_SOURCES
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_LAS_Builder.C 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_LAS_HBBlockJacobiPrecond.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_LAS_HBBlockJacobiEpetraOperator.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_LAS_HBFDJacobianPrecond.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_LAS_HBFDJacobianEpetraOperator.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_LAS_HBBuilder.C 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_LAS_HBPrecondFactory.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_LAS_IfpackPrecond.C 

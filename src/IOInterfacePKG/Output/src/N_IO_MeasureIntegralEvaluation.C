@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,32 +31,30 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.6.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Number: $Revision: 1.13 $
+// Revision Date  : $Date: 2014/02/24 23:49:20 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
-
-// ----------   Xyce Includes   ----------
 #include <N_IO_MeasureIntegralEvaluation.h>
 #include <N_ERH_ErrorMgr.h>
 
+namespace Xyce {
+namespace IO {
+namespace Measure {
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureIntegralEvaluation::N_IO_MeasureIntegralEvaluation()
+// Function      : IntegralEvaluation::IntegralEvaluation()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-N_IO_MeasureIntegralEvaluation::N_IO_MeasureIntegralEvaluation( const N_UTL_OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr ):
-  N_IO_MeasureBase(measureBlock, outputMgr),
+IntegralEvaluation::IntegralEvaluation( const Util::OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr ):
+  Base(measureBlock, outputMgr),
   integralValue_(0.0),
   lastTimeValue_(0.0),
   lastSignalValue_(0.0),
@@ -65,44 +63,39 @@ N_IO_MeasureIntegralEvaluation::N_IO_MeasureIntegralEvaluation( const N_UTL_Opti
 {
   // indicate that this measure type is supported and should be processed in simulation
   typeSupported_ = true;
+}
 
+
+void IntegralEvaluation::prepareOutputVariables()
+{
+  outVarValues_.resize( outputVars_.size(), 0.0 );
+  
   // this measurement should have only one dependent variable.
-  // Error for now if it doesn't
-  numOutVars_ = depSolVarIterVector_.size();
-
-  if ( numOutVars_ > 1 )
-  {
-    string msg = "Too many dependent variables for statistical measure, \"" + name_ + "\" Exiting.";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL, msg);
-  }
-
-  outVarValues_.resize( numOutVars_ );
-  for( int i=0; i< numOutVars_; i++ )
-  {
-    outVarValues_[i] = 0.0;
-  }
+  if (outVarValues_.size() > 1 )
+    Xyce::Report::UserError0() << "Too many dependent variables for statistical measure, \"" << name_ << "\"";
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureIntegralEvaluation::updateTran()
+// Function      : IntegralEvaluation::updateTran()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-void N_IO_MeasureIntegralEvaluation::updateTran( const double circuitTime, RCP< N_LAS_Vector > solnVecRCP)
+void IntegralEvaluation::updateTran( const double circuitTime, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec)
 {
+  
   if( !calculationDone_ && withinFromToWindow( circuitTime ) )
   {
     // we're in the transient window, now we need to calculate the value of this
     // measure and see if it triggers any specified rise, fall, cross windowing.
 
     // update our outVarValues_ vector
-    for( int i=0; i< numOutVars_; i++ )
+    for( int i = 0; i < outVarValues_.size(); i++ )
     {
-      outVarValues_[i] = getOutputValue(depSolVarIterVector_[i], solnVecRCP);
+      outVarValues_[i] = getOutputValue(outputVars_[i], solnVec, stateVec, storeVec, 0);
     }
 
     if( initialized_  )
@@ -120,32 +113,36 @@ void N_IO_MeasureIntegralEvaluation::updateTran( const double circuitTime, RCP< 
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureIntegralEvaluation::updateMeasures()
+// Function      : IntegralEvaluation::updateMeasures()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-void N_IO_MeasureIntegralEvaluation::updateDC( const vector<N_ANP_SweepParam> & dcParamsVec, RCP< N_LAS_Vector > solnVecRCP)
+void IntegralEvaluation::updateDC( const std::vector<N_ANP_SweepParam> & dcParamsVec, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec)
 {
 
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureIntegralEvaluation::getMeasureResult()
+// Function      : IntegralEvaluation::getMeasureResult()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-double N_IO_MeasureIntegralEvaluation::getMeasureResult()
+double IntegralEvaluation::getMeasureResult()
 {
   if( initialized_ )
   {
     calculationResult_ =  integralValue_;
   }
   return calculationResult_;
-};
+}
+
+} // namespace Measure
+} // namespace IO
+} // namespace Xyce

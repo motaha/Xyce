@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,8 +31,8 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.6.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:47 $
+// Revision Number: $Revision: 1.10 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
@@ -114,7 +114,7 @@ void N_MPDE_DeviceInterface::registerNonlinearSolver (RefCountPtr<N_NLS_Manager>
 // Creator       : Rich Schiek
 // Creation Date : 07/21/2008
 //-----------------------------------------------------------------------------
-vector<double> N_MPDE_DeviceInterface::getFastSourcePeriod (vector<string>& sourceNames)
+std::vector<double> N_MPDE_DeviceInterface::getFastSourcePeriod (std::vector<std::string>& sourceNames)
 {
   return devInterfacePtr_->getFastSourcePeriod (sourceNames);
 }
@@ -127,7 +127,7 @@ vector<double> N_MPDE_DeviceInterface::getFastSourcePeriod (vector<string>& sour
 // Creator       : Rich Schiek
 // Creation Date : 07/21/2008
 //-----------------------------------------------------------------------------
-vector<double> N_MPDE_DeviceInterface::registerFastSources(vector<string>& sourceNames)
+std::vector<double> N_MPDE_DeviceInterface::registerFastSources(std::vector<std::string>& sourceNames)
 {
   return devInterfacePtr_->registerFastSources (sourceNames);
 }

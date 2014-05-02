@@ -80,6 +80,8 @@ libLinearAlgebraServices_la_SOURCES = \
   $(srcdir)/src/N_LAS_IfpackPrecond.C \
   $(srcdir)/src/N_LAS_HBBlockJacobiPrecond.C \
   $(srcdir)/src/N_LAS_HBBlockJacobiEpetraOperator.C \
+  $(srcdir)/src/N_LAS_HBFDJacobianPrecond.C \
+  $(srcdir)/src/N_LAS_HBFDJacobianEpetraOperator.C \
   $(srcdir)/src/N_LAS_HBPrecondFactory.C \
   $(srcdir)/src/N_LAS_TrilinosPrecondFactory.C \
   $(srcdir)/include/N_LAS_SimpleSolver.h \
@@ -106,6 +108,8 @@ libLinearAlgebraServices_la_SOURCES = \
   $(srcdir)/include/N_LAS_IfpackPrecond.h \
   $(srcdir)/include/N_LAS_HBBlockJacobiPrecond.h \
   $(srcdir)/include/N_LAS_HBBlockJacobiEpetraOperator.h \
+  $(srcdir)/include/N_LAS_HBFDJacobianPrecond.h \
+  $(srcdir)/include/N_LAS_HBFDJacobianEpetraOperator.h \
   $(srcdir)/include/N_LAS_PrecondFactory.h \
   $(srcdir)/include/N_LAS_HBPrecondFactory.h \
   $(srcdir)/include/N_LAS_TrilinosPrecondFactory.h \

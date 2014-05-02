@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.136.2.2 $
+// Revision Number: $Revision: 1.145 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -48,8 +48,6 @@
 
 
 // ---------- Standard Includes ----------
-#include <N_UTL_Misc.h>
-
 #include <iostream>
 
 #ifdef HAVE_CMATH
@@ -63,6 +61,9 @@
 #else
 #include <stdio.h>
 #endif
+
+#include <N_UTL_Misc.h>
+#include <N_UTL_fwd.h>
 
 // ----------   Xyce Includes   ----------
 
@@ -154,7 +155,7 @@ N_TIA_DataStore::N_TIA_DataStore(N_TIA_TIAParams * tiaPtr, N_LAS_System * lsPtr)
   newtonCorrectionPtr(0),
   deviceMaskPtr(0),
   indexVecsInitialized(false),
- 
+
   qErrWtVecPtr(0),
   daeQVectorPtr(0),
   daeFVectorPtr(0),
@@ -217,7 +218,7 @@ N_TIA_DataStore::N_TIA_DataStore(N_TIA_TIAParams * tiaPtr, N_LAS_System * lsPtr)
   currStateDerivPtr = lasSysPtr->builder().createStateVector();
   lastStateDerivPtr = lasSysPtr->builder().createStateVector();
   nextStateDerivPtr = lasSysPtr->builder().createStateVector();
-  
+
   // store derivative vec for lead currents.
   currStoreLeadCurrQCompDerivPtr = lasSysPtr->builder().createStoreVector();
   lastStoreLeadCurrQCompDerivPtr = lasSysPtr->builder().createStoreVector();
@@ -249,7 +250,7 @@ N_TIA_DataStore::N_TIA_DataStore(N_TIA_TIAParams * tiaPtr, N_LAS_System * lsPtr)
 
   // nonlinear solution vectors:
   newtonCorrectionPtr = lasSysPtr->builder().createVector();
-  
+
   // new-DAE stuff:
   // Error Vectors
   qErrWtVecPtr      = lasSysPtr->builder().createVector();
@@ -265,9 +266,9 @@ N_TIA_DataStore::N_TIA_DataStore(N_TIA_TIAParams * tiaPtr, N_LAS_System * lsPtr)
   dQdxVecVectorPtr = lasSysPtr->builder().createVector();
   dFdxVecVectorPtr = lasSysPtr->builder().createVector();
 
-  // History arrays 
+  // History arrays
 
-//  if tiaParamsPtr_->method == 7 
+//  if tiaParamsPtr_->method == 7
   int sizeOfHistory = tiaParamsPtr_->maxOrder+1;
 //  else
 //    int sizeOfHistory = 3;
@@ -401,26 +402,26 @@ N_TIA_DataStore::~N_TIA_DataStore()
   if (dQdxVecVectorPtr) { delete dQdxVecVectorPtr; dQdxVecVectorPtr=0; }
   if (dFdxVecVectorPtr) { delete dFdxVecVectorPtr; dFdxVecVectorPtr=0; }
 
-  // History arrays are STL containers of N_LAS_Vector 
-  // so they'll take care of themselves.  NO!  they're containers of            
-  // N_LAS_Vector *pointers*, so they need to be deleted by hand.               
-  if (xHistory.size() != 0) 
-  { 
-    int sizeOfHistory=xHistory.size(); 
-    for (int i=0;i<sizeOfHistory;++i) 
-    { 
-      if (xHistory[i]) {delete xHistory[i]; } 
-      if (qHistory[i]) {delete qHistory[i]; } 
-      if (sHistory[i]) {delete sHistory[i]; } 
+  // History arrays are STL containers of N_LAS_Vector
+  // so they'll take care of themselves.  NO!  they're containers of
+  // N_LAS_Vector *pointers*, so they need to be deleted by hand.
+  if (xHistory.size() != 0)
+  {
+    int sizeOfHistory=xHistory.size();
+    for (int i=0;i<sizeOfHistory;++i)
+    {
+      if (xHistory[i]) {delete xHistory[i]; }
+      if (qHistory[i]) {delete qHistory[i]; }
+      if (sHistory[i]) {delete sHistory[i]; }
       if (stoHistory[i]) {delete stoHistory[i]; }
       if (stoLeadCurrQCompHistory[i]) {delete stoLeadCurrQCompHistory[i];}
-    } 
-    xHistory.clear(); 
-    qHistory.clear(); 
-    sHistory.clear(); 
+    }
+    xHistory.clear();
+    qHistory.clear();
+    sHistory.clear();
     stoHistory.clear();
     stoLeadCurrQCompHistory.clear();
-  } 
+  }
 
   if (qn0Ptr)  { delete qn0Ptr; qn0Ptr=0; }
   if (qn0Ptr)  { delete qn0Ptr; qn0Ptr=0; }
@@ -431,13 +432,13 @@ N_TIA_DataStore::~N_TIA_DataStore()
   if (stopn0Ptr) { delete stopn0Ptr; stopn0Ptr=0; }
   if (stoQCn0Ptr)  { delete stoQCn0Ptr; stoQCn0Ptr=0; }
   if (stoQCpn0Ptr) { delete stoQCpn0Ptr; stoQCpn0Ptr=0; }
-  
+
   // Nonlinear solution vector:
   if (qNewtonCorrectionPtr) { delete qNewtonCorrectionPtr; qNewtonCorrectionPtr=0; }
   if (sNewtonCorrectionPtr) { delete sNewtonCorrectionPtr; sNewtonCorrectionPtr=0; }
   if (stoNewtonCorrectionPtr) { delete stoNewtonCorrectionPtr; stoNewtonCorrectionPtr=0; }
   if (stoLeadCurrQCompNewtonCorrectionPtr) { delete stoLeadCurrQCompNewtonCorrectionPtr; stoLeadCurrQCompNewtonCorrectionPtr=0; }
-  
+
   // Step-size selection temporary vectors
   if (delta_x) { delete delta_x; delta_x=0; }
   if (delta_q) { delete delta_q; delta_q=0; }
@@ -448,7 +449,7 @@ N_TIA_DataStore::~N_TIA_DataStore()
 
   // Delete data in the fast time storage for HB and MPDE
   resetFastTimeData();
-  
+
   return ;
 }
 
@@ -467,10 +468,10 @@ N_TIA_DataStore::~N_TIA_DataStore()
 
 void N_TIA_DataStore::printOutPointers()
 {
-  cout << "olde ptr = " << oldeSolutionPtr << endl;
-  cout << "last ptr = " << lastSolutionPtr << endl;
-  cout << "curr ptr = " << currSolutionPtr << endl;
-  cout << "next ptr = " << nextSolutionPtr << endl;
+  Xyce::dout() << "olde ptr = " << oldeSolutionPtr << std::endl;
+  Xyce::dout() << "last ptr = " << lastSolutionPtr << std::endl;
+  Xyce::dout() << "curr ptr = " << currSolutionPtr << std::endl;
+  Xyce::dout() << "next ptr = " << nextSolutionPtr << std::endl;
 }
 
 //-----------------------------------------------------------------------------
@@ -488,7 +489,7 @@ void N_TIA_DataStore::printOutPointers()
 void N_TIA_DataStore::setConstantHistory()
 {
 #ifdef Xyce_DEBUG_TIME
-  cout << "\nN_TIA_DataStore::setConstantHistory" << endl;
+  Xyce::dout() << "\nN_TIA_DataStore::setConstantHistory" << std::endl;
 #endif
 
   // Solutions:
@@ -510,18 +511,18 @@ void N_TIA_DataStore::setConstantHistory()
   // Stores:
   *(lastStorePtr) = *(nextStorePtr);
   *(currStorePtr) = *(nextStorePtr);
-   
+
   *(lastStoreLeadCurrQCompPtr) = *(nextStoreLeadCurrQCompPtr);
   *(currStoreLeadCurrQCompPtr) = *(nextStoreLeadCurrQCompPtr);
-  
+
   // Derivative of States:
   *(lastStateDerivPtr) = *(nextStateDerivPtr);
   *(currStateDerivPtr) = *(nextStateDerivPtr);
-  
-  // lead current derivative info in store 
+
+  // lead current derivative info in store
   *(lastStoreLeadCurrQCompDerivPtr) = *(nextStoreLeadCurrQCompDerivPtr);
   *(currStoreLeadCurrQCompDerivPtr) = *(nextStoreLeadCurrQCompDerivPtr);
-  
+
   // Scaled Divided Differences of states:
   *(lastStateDivDiffPtr) = *(nextStateDivDiffPtr);
   *(currStateDivDiffPtr) = *(nextStateDivDiffPtr);
@@ -537,14 +538,14 @@ void N_TIA_DataStore::setConstantHistory()
 // Special Notes : This function was needed for HB.
 //
 // Scope         : public
-// Creator       : T. Mei, SNL 
+// Creator       : T. Mei, SNL
 // Creation Date : 02/26/09
 //-----------------------------------------------------------------------------
 bool N_TIA_DataStore::resetAll ()
 {
   absErrTolPtr->putScalar(tiaParamsPtr_->absErrorTol);
   relErrTolPtr->putScalar(tiaParamsPtr_->relErrorTol);
-      
+
   return true;
 }
 
@@ -557,7 +558,7 @@ bool N_TIA_DataStore::resetAll ()
 // Special Notes : This function was needed for HB.
 //
 // Scope         : public
-// Creator       : Heidi Thornquist, SNL 
+// Creator       : Heidi Thornquist, SNL
 // Creation Date : 06/05/13
 //-----------------------------------------------------------------------------
 bool N_TIA_DataStore::resetFastTimeData()
@@ -574,8 +575,8 @@ bool N_TIA_DataStore::resetFastTimeData()
     delete *currVecPtr;
     currVecPtr++;
   }
-  fastTimeSolutionVec.clear(); 
- 
+  fastTimeSolutionVec.clear();
+
   currVecPtr = fastTimeStateVec.begin();
   endVecPtr = fastTimeStateVec.end();
   while( currVecPtr != endVecPtr )
@@ -583,8 +584,8 @@ bool N_TIA_DataStore::resetFastTimeData()
     delete *currVecPtr;
     currVecPtr++;
   }
-  fastTimeStateVec.clear(); 
-  
+  fastTimeStateVec.clear();
+
   currVecPtr = fastTimeQVec.begin();
   endVecPtr = fastTimeQVec.end();
   while( currVecPtr != endVecPtr )
@@ -592,7 +593,7 @@ bool N_TIA_DataStore::resetFastTimeData()
     delete *currVecPtr;
     currVecPtr++;
   }
-  fastTimeQVec.clear(); 
+  fastTimeQVec.clear();
 
   currVecPtr = fastTimeStoreVec.begin();
   endVecPtr = fastTimeStoreVec.end();
@@ -601,8 +602,8 @@ bool N_TIA_DataStore::resetFastTimeData()
     delete *currVecPtr;
     currVecPtr++;
   }
-  fastTimeStoreVec.clear(); 
-      
+  fastTimeStoreVec.clear();
+
   return true;
 }
 
@@ -623,7 +624,7 @@ void N_TIA_DataStore::updateSolDataArrays()
 #ifdef Xyce_DEBUG_TIME
   if (tiaParamsPtr_->debugLevel > 1)
   {
-    cout << "\nN_TIA_DataStore::updateSolDataArrays " << endl;
+    Xyce::dout() << "\nN_TIA_DataStore::updateSolDataArrays " << std::endl;
   }
 #endif
 
@@ -670,8 +671,8 @@ void N_TIA_DataStore::updateSolDataArrays()
   lastStateDerivPtr = currStateDerivPtr;
   currStateDerivPtr = nextStateDerivPtr;
   nextStateDerivPtr = oldeStateDerivPtr;
-  
-  // lead curent component of store 
+
+  // lead curent component of store
   oldStoreLeadCurrQCompDerivPtr = lastStoreLeadCurrQCompDerivPtr;
   lastStoreLeadCurrQCompDerivPtr = currStoreLeadCurrQCompDerivPtr;
   currStoreLeadCurrQCompDerivPtr = nextStoreLeadCurrQCompDerivPtr;
@@ -683,9 +684,9 @@ void N_TIA_DataStore::updateSolDataArrays()
   currStateDivDiffPtr = nextStateDivDiffPtr;
   nextStateDivDiffPtr = oldeStateDivDiffPtr;
 
-  // copy contents of "curr" into "next".  This is to insure 
-  // that at a minimum, the initial guess for the Newton solve 
-  // will at least be the results of the previous Newton solve. 
+  // copy contents of "curr" into "next".  This is to insure
+  // that at a minimum, the initial guess for the Newton solve
+  // will at least be the results of the previous Newton solve.
   *(nextSolutionPtr) = *(currSolutionPtr);
   *(nextStatePtr)    = *(currStatePtr);
   *(nextStorePtr)    = *(currStorePtr);
@@ -697,17 +698,17 @@ void N_TIA_DataStore::updateSolDataArrays()
 // Function      : N_TIA_DataStore::updateStateDataArrays
 //
 //
-// Purpose       : Same as updateSolDataArrays, but this function only 
-//                 advances the state vector, and leaves the 
+// Purpose       : Same as updateSolDataArrays, but this function only
+//                 advances the state vector, and leaves the
 //                 solution alone.
 //
-// Special Notes : The main usage of this function is LOCA.  
-//                 After each continuation step, LOCA needs to call 
-//                 this function.  LOCA keeps track of solution vectors 
+// Special Notes : The main usage of this function is LOCA.
+//                 After each continuation step, LOCA needs to call
+//                 this function.  LOCA keeps track of solution vectors
 //                 on its own, which is why updateSolDataArrays
 //                 is inappropriate for LOCA.
 //
-//                 This is necessary for voltage limiting to be 
+//                 This is necessary for voltage limiting to be
 //                 consistent with LOCA.
 //
 // Scope         : public
@@ -718,7 +719,7 @@ void N_TIA_DataStore::updateSolDataArrays()
 bool N_TIA_DataStore::updateStateDataArrays()
 {
 #ifdef Xyce_DEBUG_TIME
-  cout << "\nN_TIA_DataStore::updateStateDataArrays " << endl;
+  Xyce::dout() << "\nN_TIA_DataStore::updateStateDataArrays " << std::endl;
 #endif
   // States:
   oldeStatePtr = lastStatePtr;
@@ -731,13 +732,13 @@ bool N_TIA_DataStore::updateStateDataArrays()
   lastStorePtr = currStorePtr;
   currStorePtr = nextStorePtr;
   nextStorePtr = oldeStorePtr;
-  
-  // q component of lead current 
+
+  // q component of lead current
   oldStoreLeadCurrQCompPtr = lastStoreLeadCurrQCompPtr;
   lastStoreLeadCurrQCompPtr = currStoreLeadCurrQCompPtr;
   currStoreLeadCurrQCompPtr = nextStoreLeadCurrQCompPtr;
   nextStoreLeadCurrQCompPtr = oldStoreLeadCurrQCompPtr;
-  
+
   // Derivative of States:
   oldeStateDerivPtr = lastStateDerivPtr;
   lastStateDerivPtr = currStateDerivPtr;
@@ -751,7 +752,7 @@ bool N_TIA_DataStore::updateStateDataArrays()
   nextStateDivDiffPtr = oldeStateDivDiffPtr;
 
 
-  // Now, make the "next" stuff the same as the "curr" stuff.  
+  // Now, make the "next" stuff the same as the "curr" stuff.
   // This is done because at the end of the tranop, but before
   // the transient phase starts, the function setConstantHistory
   // will be called.  When it is called, the most recent values
@@ -759,16 +760,13 @@ bool N_TIA_DataStore::updateStateDataArrays()
   //
   // As long as LOCA solves are never used for transient, and only
   // for DC and tranop solves, this is OK.  This is, of course,
-  // a bit of a kludge.  
+  // a bit of a kludge.
   *(nextStatePtr) = *(currStatePtr);
   *(nextStorePtr) = *(currStorePtr);
 
   return true;
 }
 
-
-
-#ifdef Xyce_DEBUG_TIME
 #ifndef OLD_PLOT
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_DataStore::outputSolDataArrays
@@ -779,34 +777,20 @@ bool N_TIA_DataStore::updateStateDataArrays()
 // Creation Date : 6/29/00
 //-----------------------------------------------------------------------------
 
-void N_TIA_DataStore::outputSolDataArrays()
-
+void N_TIA_DataStore::outputSolDataArrays(std::ostream &os)
 {
   char tmp[256];
-  static string dashedline =
-"----------------------------------------------------------------------------";
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
- "  Solution Vectors:\n          Current               Last               Olde               Error");
-
+  os << std::endl
+     << Xyce::section_divider << std::endl
+     << std::endl
+     << "  Solution Vectors:\n          Current               Last               Olde               Error" << std::endl;
 
   for (unsigned int k = 0; k < solutionSize; ++k)
   {
-    sprintf(tmp,"%19.6e%19.6e%19.6e%19.6e",
-      (*(currSolutionPtr))[k],
-      (*(lastSolutionPtr))[k],
-      (*(oldeSolutionPtr))[k],
-      (*(newtonCorrectionPtr))[k]);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmp);
+    os << (*(currSolutionPtr))[k] << (*(lastSolutionPtr))[k] << (*(oldeSolutionPtr))[k] << (*(newtonCorrectionPtr))[k] << std::endl;
   }
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  return;
+  os << Xyce::section_divider << std::endl;
 }
 
 #else
@@ -820,20 +804,16 @@ void N_TIA_DataStore::outputSolDataArrays()
 // Creation Date : 6/29/00
 //-----------------------------------------------------------------------------
 
-void N_TIA_DataStore::outputSolDataArrays()
+void N_TIA_DataStore::outputSolDataArrays(std::ostream &os)
 {
-  char tmp[128];
-
   for (unsigned int k = 0; k < solutionSize; ++k)
   {
-    sprintf(tmp,"\t%14.6e", (*(currSolutionPtr))[0][k]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmp);
+    os << "\t" <<  (*(currSolutionPtr))[0][k] << std::endl;
   }
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
+  os << std::endl;
 }
 
 #endif
-#endif // Xyce_DEBUG_TIME
 
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_DataStore::enableOrderOneStart
@@ -869,7 +849,7 @@ void N_TIA_DataStore::enableOrderOneStart()
   *(oldStoreLeadCurrQCompPtr)= *(currStoreLeadCurrQCompPtr);
   nextStoreLeadCurrQCompDerivPtr->putScalar(0.0);
   currStoreLeadCurrQCompDerivPtr->putScalar(0.0);
-  
+
   return;
 }
 
@@ -881,25 +861,19 @@ void N_TIA_DataStore::enableOrderOneStart()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/27/00
 //-----------------------------------------------------------------------------
-#ifdef Xyce_DEBUG_TIME
-void N_TIA_DataStore::outputPredictedSolution()
-
+void N_TIA_DataStore::outputPredictedSolution(std::ostream &os)
 {
-  char tmp[128];
-  static string dashedline2 = "---------------------";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,dashedline2);
+  os << Xyce::subsection_divider << std::endl;
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,"  Predicted Solution:");
+  os << "  Predicted Solution:" << std::endl;
 
   for (unsigned int k = 0; k< solutionSize; ++k)
   {
-    sprintf(tmp,"%14.6e", (*(nextSolutionPtr))[k]);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,tmp);
+    os << (*(nextSolutionPtr))[k] << std::endl;
   }
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,dashedline2);
+  os << Xyce::subsection_divider << std::endl;
 }
-#endif
 
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_DataStore::outputPredictedDerivative
@@ -909,35 +883,29 @@ void N_TIA_DataStore::outputPredictedSolution()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/27/00
 //-----------------------------------------------------------------------------
-#ifdef Xyce_DEBUG_TIME
-void N_TIA_DataStore::outputPredictedDerivative()
+void N_TIA_DataStore::outputPredictedDerivative(std::ostream &os)
 {
-  char tmp[128];
-  static string dashedline2 = "---------------------";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,dashedline2);
+  os << Xyce::subsection_divider << std::endl;
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,"  Predicted Derivative:");
-
+  os << "  Predicted Derivative:" << std::endl;
 
   for (unsigned int k = 0; k < solutionSize; ++k)
   {
-    sprintf(tmp,"%14.6e", (*(nextSolutionDerivPtr))[k] );
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,tmp);
+    os << (*(nextSolutionDerivPtr))[k] << std::endl;
   }
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,dashedline2);
+  os << Xyce::subsection_divider << std::endl;
 }
-#endif
 
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_DataStore::partialErrorNormSum
 // Purpose       : Needed by 2-level solves.
 //
 // Special Notes : A weighted RMS norm is this:
-// 
+//
 //                  norm = sqrt ( 1/n * sum (x/w)^2 )
 //
-//                  What this function returns is: sum (x/w)^2 
+//                  What this function returns is: sum (x/w)^2
 //
 //                  It will later be summed with other patial sums
 //                  to get the complete WRMS value.
@@ -961,7 +929,7 @@ double N_TIA_DataStore::partialErrorNormSum ()
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_DataStore::globalLength
 // Purpose       : Needed by 2-level solves.
-// Special Notes : 
+// Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 03/15/06
@@ -1005,8 +973,8 @@ void N_TIA_DataStore::computeDividedDifferences()
 // Creation Date : 01/10/01
 //-----------------------------------------------------------------------------
 void N_TIA_DataStore::computeDivDiffsBlock (
-         const list<index_pair> & solGIDList,
-         const list<index_pair> & staGIDList)
+         const std::list<index_pair> & solGIDList,
+         const std::list<index_pair> & staGIDList)
 {
 
 #if 0
@@ -1102,7 +1070,7 @@ bool N_TIA_DataStore::setNextSolVectorPtr (N_LAS_Vector * solVecPtr)
 //                 Basically, if we've been running with NOX, then the next
 //                 solution vector ptr has probably been switched out at least
 //                 once.  We need to maintain the history, so we make a
-//                 copy of this switched solution vector, and the 
+//                 copy of this switched solution vector, and the
 //                 restore the old pointer.
 //
 //                 This is kludgy, but will have to do for now.
@@ -1128,7 +1096,7 @@ bool N_TIA_DataStore::unsetNextSolVectorPtr ()
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_DataStore::setZeroHistory
 // Purpose       : Sets everything to zero.
-// Special Notes : 
+// Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 1/24/07
@@ -1136,7 +1104,7 @@ bool N_TIA_DataStore::unsetNextSolVectorPtr ()
 void N_TIA_DataStore::setZeroHistory()
 {
 #ifdef Xyce_DEBUG_TIME
-  cout << "\nN_TIA_DataStore::setZeroHistory" << endl;
+  Xyce::dout() << "\nN_TIA_DataStore::setZeroHistory" << std::endl;
 #endif
   // Solutions:
   nextSolutionPtr->putScalar(0.0);
@@ -1214,9 +1182,9 @@ void N_TIA_DataStore::setErrorWtVector()
     numVVars = 0;
     numIVars = 0;
     numMaskedVars = 0;
-    
+
     bool nTDMF=lasSysPtr->getNonTrivialDeviceMaskFlag();
-    
+
     // first count how many of each type we have
     for (int k = 0; k < solutionSize; ++k)
     {
@@ -1231,10 +1199,10 @@ void N_TIA_DataStore::setErrorWtVector()
       }
       else
       {
-        numVVars++;   
+        numVVars++;
       }
     }
-    
+
     // set up our storage
     indexVVars.resize(numVVars);
     indexIVars.resize(numIVars);
@@ -1259,68 +1227,53 @@ void N_TIA_DataStore::setErrorWtVector()
         currV++;
       }
     }
-    
+
     indexVecsInitialized = true;
   }
 
 #ifdef Xyce_DEBUG_TIME
-  static string dashedline =
-"----------------------------------------------------------------------------";
   char tmp[256];
 
   if (tiaParamsPtr_->debugLevel > 1)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "N_TIA_DataStore::setErrorWtVector");
-
-    sprintf(tmp,
-    "\n   errorWtVector    currSolution     relErrorTol    absErrorTol");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmp);
-
-    sprintf(tmp,
-    "   --------------  --------------  --------------  --------------");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmp);
+    Xyce::dout() << Xyce::section_divider << std::endl
+                 << "N_TIA_DataStore::setErrorWtVector" << std::endl << std::endl
+                 << "   errorWtVector    currSolution     relErrorTol    absErrorTol" << std::endl
+                 << "   --------------  --------------  --------------  --------------" << std::endl;
   }
 #endif
 
   if (tiaParamsPtr_->newLte == true)
 //  if (tiaParamsPtr_->integrationMethod == 7 && tiaParamsPtr_->newLte == true)
-  { 
+  {
     double currMaxValue = 0.0;
     currSolutionPtr->infNorm(&currMaxValue);
- 
+
     errWtVecPtr->putScalar(currMaxValue);
 
-#ifdef Xyce_DEBUG_TIME 
+#ifdef Xyce_DEBUG_TIME
     if (tiaParamsPtr_->debugLevel > 0)
-      {
-        std::vector<int> index(1, -1);
-        currSolutionPtr->infNormIndex( &index[0] );
-        std::string outMessage = "currMaxValue = " + Teuchos::Utils::toString( currMaxValue )
-                                 + ", currMaxValueIndex = " + Teuchos::Utils::toString( index[0] );
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, outMessage);
-      }
-#endif // Xyce_DEBUG_TIME 
+    {
+      std::vector<int> index(1, -1);
+      currSolutionPtr->infNormIndex( &index[0] );
+      Xyce::dout() << "currMaxValue = " << currMaxValue << ", currMaxValueIndex = " << index[0] << std::endl;
+    }
+#endif // Xyce_DEBUG_TIME
   }
   else
   {
     errWtVecPtr->absValue(*currSolutionPtr);
 
-#ifdef Xyce_DEBUG_TIME 
+#ifdef Xyce_DEBUG_TIME
     if (tiaParamsPtr_->debugLevel > 0)
       {
         double currMaxValue = 0.0;
         currSolutionPtr->infNorm(&currMaxValue);
         std::vector<int> index(1, -1);
         currSolutionPtr->infNormIndex( &index[0] );
-        std::string outMessage = "currMaxValueoldLte = " + Teuchos::Utils::toString( currMaxValue )
-                                 + ", currMaxValueIndex = " + Teuchos::Utils::toString( index[0] );
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, outMessage);
+        Xyce::dout() << "currMaxValueoldLte = " << currMaxValue << ", currMaxValueIndex = " << index[0]  << std::endl;
       }
 #endif
-    
   }
 
   qErrWtVecPtr->absValue(*daeQVectorPtr);
@@ -1332,24 +1285,24 @@ void N_TIA_DataStore::setErrorWtVector()
     {
 //      errWtVecPtr->putScalar(currMaxValue);
       if( (*(errWtVecPtr))[indexVVars[k]] < tiaParamsPtr_->voltZeroTol )
-      { 
+      {
         (*(errWtVecPtr))[indexVVars[k]] = N_UTL_MachineDependentParams::MachineBig();
         (*(qErrWtVecPtr))[indexVVars[k]] = N_UTL_MachineDependentParams::MachineBig();
       }
       else
       {
-        (*(errWtVecPtr))[indexVVars[k]] = (*(relErrTolPtr))[indexVVars[k]] * (*(errWtVecPtr))[indexVVars[k]] + (*(absErrTolPtr))[indexVVars[k]];  
+        (*(errWtVecPtr))[indexVVars[k]] = (*(relErrTolPtr))[indexVVars[k]] * (*(errWtVecPtr))[indexVVars[k]] + (*(absErrTolPtr))[indexVVars[k]];
         (*(qErrWtVecPtr))[indexVVars[k]] = (*(relErrTolPtr))[indexVVars[k]] * (*(qErrWtVecPtr))[indexVVars[k]] + (*(absErrTolPtr))[indexVVars[k]];
       }
     }
-    
-    
+
+
     // Current variables
     for (int k = 0; k < numIVars; ++k)
     {
 //      errWtVecPtr->absValue(*currSolutionPtr);
       if( (*(errWtVecPtr))[indexIVars[k]] < tiaParamsPtr_->currZeroTol )
-      { 
+      {
         (*(errWtVecPtr))[indexIVars[k]] = N_UTL_MachineDependentParams::MachineBig();
         (*(qErrWtVecPtr))[indexIVars[k]] = N_UTL_MachineDependentParams::MachineBig();
       }
@@ -1359,7 +1312,7 @@ void N_TIA_DataStore::setErrorWtVector()
         (*(qErrWtVecPtr))[indexIVars[k]] = (*(qErrWtVecPtr))[indexIVars[k]] + (*(absErrTolPtr))[indexIVars[k]];
       }
     }
-    
+
     // Masked variables
     for (int k = 0; k < numMaskedVars; ++k)
     {
@@ -1372,19 +1325,19 @@ void N_TIA_DataStore::setErrorWtVector()
     for (int k = 0; k < numVVars; ++k)
     {
 //      errWtVecPtr->putScalar(currMaxValue);
-      (*(errWtVecPtr))[indexVVars[k]] = (*(relErrTolPtr))[indexVVars[k]] * (*(errWtVecPtr))[indexVVars[k]] + (*(absErrTolPtr))[indexVVars[k]];  
+      (*(errWtVecPtr))[indexVVars[k]] = (*(relErrTolPtr))[indexVVars[k]] * (*(errWtVecPtr))[indexVVars[k]] + (*(absErrTolPtr))[indexVVars[k]];
       (*(qErrWtVecPtr))[indexVVars[k]] = (*(relErrTolPtr))[indexVVars[k]] * (*(qErrWtVecPtr))[indexVVars[k]] + (*(absErrTolPtr))[indexVVars[k]];
     }
-    
+
     // Current variables
     // if fastTests == false, then I vars are treated with V vars above.
-    
+
     // Masked variables
     for (int k = 0; k < numMaskedVars; ++k)
     {
       (*(errWtVecPtr))[indexMaskedVars[k]] = (*(qErrWtVecPtr))[indexMaskedVars[k]] = N_UTL_MachineDependentParams::MachineBig();
     }
- 
+
   }
 
 #ifdef Xyce_DEBUG_TIME
@@ -1398,7 +1351,7 @@ void N_TIA_DataStore::setErrorWtVector()
               (*(relErrTolPtr))    [k],
               (*(absErrTolPtr))    [k]);
 
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmp);
+      Xyce::dout() << tmp << std::endl;
     }
   }
 #endif
@@ -1406,8 +1359,8 @@ void N_TIA_DataStore::setErrorWtVector()
 #ifdef Xyce_DEBUG_TIME
   if (tiaParamsPtr_->debugLevel > 1)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "" );
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+    Xyce::dout() << ""  << std::endl
+                 << Xyce::section_divider << std::endl;
   }
 #endif
   return;
@@ -1431,8 +1384,8 @@ double N_TIA_DataStore::WRMS_errorNorm()
 #ifdef Xyce_DEBUG_TIME
   if (tiaParamsPtr_->debugLevel > 1)
   {
-    cout << "N_TIA_DataStore::errorNorm = " << errorNorm << endl;
-    cout << "N_TIA_DataStore::qErrorNorm = " << qErrorNorm << endl;
+    Xyce::dout() << "N_TIA_DataStore::errorNorm = " << errorNorm << std::endl;
+    Xyce::dout() << "N_TIA_DataStore::qErrorNorm = " << qErrorNorm << std::endl;
   }
 #endif
 
@@ -1456,9 +1409,9 @@ double N_TIA_DataStore::WRMS_errorNorm()
       double innerSize = innerErrorInfoVec[i].innerSize;
 
 #ifdef Xyce_DEBUG_TIME
-      cout << "DSdae:innerSum["<<i<<"] = " << innerSum <<endl;
-      cout << "DSdae:innerQSum["<<i<<"] = " << innerQSum <<endl;
-      cout << "DSdae:innerSize["<<i<<"] = " << innerSize <<endl;
+      Xyce::dout() << "DSdae:innerSum["<<i<<"] = " << innerSum <<std::endl;
+      Xyce::dout() << "DSdae:innerQSum["<<i<<"] = " << innerQSum <<std::endl;
+      Xyce::dout() << "DSdae:innerSize["<<i<<"] = " << innerSize <<std::endl;
 #endif
 
       totalSize += innerSize;
@@ -1471,12 +1424,12 @@ double N_TIA_DataStore::WRMS_errorNorm()
     qErrorNorm = sqrt(recip*totalQSum);
 
 #ifdef Xyce_DEBUG_TIME
-    cout << "DSdae:upperSize = " << upperSize << endl;
-    cout << "DSdae:totalSum = " << totalSum << endl;
-    cout << "DSdae:totalQSum = " << totalQSum << endl;
-    cout << "DSdae:totalSize = " << totalSize << endl;
-    cout << "DSdae:2-level errorNorm = " << errorNorm << endl;
-    cout << "DSdae:2-level qErrorNorm = " << qErrorNorm << endl;
+    Xyce::dout() << "DSdae:upperSize = " << upperSize << std::endl;
+    Xyce::dout() << "DSdae:totalSum = " << totalSum << std::endl;
+    Xyce::dout() << "DSdae:totalQSum = " << totalQSum << std::endl;
+    Xyce::dout() << "DSdae:totalSize = " << totalSize << std::endl;
+    Xyce::dout() << "DSdae:2-level errorNorm = " << errorNorm << std::endl;
+    Xyce::dout() << "DSdae:2-level qErrorNorm = " << qErrorNorm << std::endl;
 #endif
   }
 #endif
@@ -1495,10 +1448,10 @@ double N_TIA_DataStore::WRMS_errorNorm()
 //                 of this function.
 //
 // Special Notes : A weighted RMS norm is this:
-// 
+//
 //                  norm = sqrt ( 1/n * sum (x/w)^2 )
 //
-//                  What this function returns is: sum (x/w)^2 
+//                  What this function returns is: sum (x/w)^2
 //
 //                  It will later be summed with other patial sums
 //                  to get the complete WRMS value.
@@ -1523,10 +1476,10 @@ double N_TIA_DataStore::partialQErrorNormSum ()
 // Purpose       : Needed by 2-level solves.
 //
 // Special Notes : A weighted RMS norm is this:
-// 
+//
 //                  norm = sqrt ( 1/n * sum (x/w)^2 )
 //
-//                  What this function returns is: sum (x/w)^2 
+//                  What this function returns is: sum (x/w)^2
 //
 //                  It will later be summed with other patial sums
 //                  to get the complete WRMS value.
@@ -1557,10 +1510,10 @@ double N_TIA_DataStore::partialSum_m1 (int currentOrder)
 // Purpose       : Needed by 2-level solves.
 //
 // Special Notes : A weighted RMS norm is this:
-// 
+//
 //                  norm = sqrt ( 1/n * sum (x/w)^2 )
 //
-//                  What this function returns is: sum (x/w)^2 
+//                  What this function returns is: sum (x/w)^2
 //
 //                  It will later be summed with other patial sums
 //                  to get the complete WRMS value.
@@ -1592,10 +1545,10 @@ double N_TIA_DataStore::partialSum_m2 (int currentOrder)
 // Purpose       : Needed by 2-level solves.
 //
 // Special Notes : A weighted RMS norm is this:
-// 
+//
 //                  norm = sqrt ( 1/n * sum (x/w)^2 )
 //
-//                  What this function returns is: sum (x/w)^2 
+//                  What this function returns is: sum (x/w)^2
 //
 //                  It will later be summed with other patial sums
 //                  to get the complete WRMS value.
@@ -1626,10 +1579,10 @@ double N_TIA_DataStore::partialSum_p1 (int currentOrder, int maxOrder)
 // Purpose       : Needed by 2-level solves.
 //
 // Special Notes : A weighted RMS norm is this:
-// 
+//
 //                  norm = sqrt ( 1/n * sum (x/w)^2 )
 //
-//                  What this function returns is: sum (x/w)^2 
+//                  What this function returns is: sum (x/w)^2
 //
 //                  It will later be summed with other patial sums
 //                  to get the complete WRMS value.
@@ -1654,7 +1607,7 @@ double N_TIA_DataStore::partialSum_q1 ()
 
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_DataStore::delta_x_errorNorm_m1
-// Purpose       : 
+// Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter
@@ -1695,7 +1648,7 @@ double N_TIA_DataStore::delta_x_errorNorm_m1()
 
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_DataStore::delta_x_errorNorm_m2
-// Purpose       : 
+// Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter
@@ -1736,7 +1689,7 @@ double N_TIA_DataStore::delta_x_errorNorm_m2()
 
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_DataStore::delta_x_errorNorm_p1
-// Purpose       : 
+// Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter
@@ -1777,7 +1730,7 @@ double N_TIA_DataStore::delta_x_errorNorm_p1()
 
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_DataStore::delta_x_errorNorm_q1
-// Purpose       : 
+// Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter
@@ -1832,14 +1785,14 @@ void N_TIA_DataStore::stepLinearCombo()
   // available from NOX, but for now I'm going to do the difference anyway.
   newtonCorrectionPtr->linearCombo (1.0,*nextSolutionPtr,-1.0,*xn0Ptr);
 
-  // We need to compute the correction in Q here 
+  // We need to compute the correction in Q here
   // I'm assuming dsDaePtr_->daeQVectorPtr will be fresh from the end of the
   // nonlinear solve.
   qNewtonCorrectionPtr->linearCombo (1.0,*daeQVectorPtr,-1.0,*qn0Ptr);
 
   // We also need a State correction between the time steps
   sNewtonCorrectionPtr->linearCombo (1.0,*nextStatePtr,-1.0,*sn0Ptr);
-  
+
   // We also need a Store correction between the time steps
   stoNewtonCorrectionPtr->linearCombo (1.0,*nextStorePtr,-1.0,*ston0Ptr);
   stoLeadCurrQCompNewtonCorrectionPtr->linearCombo (1.0, *nextStoreLeadCurrQCompPtr, -1.0, *stoQCn0Ptr);
@@ -1847,14 +1800,14 @@ void N_TIA_DataStore::stepLinearCombo()
 #ifdef Xyce_DEBUG_TIME
   if (tiaParamsPtr_->debugLevel > 1)
   {
-    cout << "\n newtonCorrection: \n" << endl;
-    newtonCorrectionPtr->printPetraObject();
-    cout << endl;
-    cout << "\n qNewtonCorrection: \n" << endl;
-    qNewtonCorrectionPtr->printPetraObject();
-    cout << "\n sNewtonCorrection: \n" << endl;
-    sNewtonCorrectionPtr->printPetraObject();
-    cout << endl;
+    Xyce::dout() << "\n newtonCorrection: \n" << std::endl;
+    newtonCorrectionPtr->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "\n qNewtonCorrection: \n" << std::endl;
+    qNewtonCorrectionPtr->printPetraObject(Xyce::dout());
+    Xyce::dout() << "\n sNewtonCorrection: \n" << std::endl;
+    sNewtonCorrectionPtr->printPetraObject(Xyce::dout());
+    Xyce::dout() << std::endl;
   }
 #endif // Xyce_DEBUG_TIME
 
@@ -1870,7 +1823,7 @@ void N_TIA_DataStore::stepLinearCombo()
 // Creation Date : 7/27/06
 //-----------------------------------------------------------------------------
 bool N_TIA_DataStore::getSolnVarData( const int & gid,
-				      vector<double> & varData )
+				      std::vector<double> & varData )
 {
   varData.resize(22);
   int i=0;
@@ -1908,7 +1861,7 @@ bool N_TIA_DataStore::getSolnVarData( const int & gid,
 // Creation Date : 7/27/06
 //-----------------------------------------------------------------------------
 bool N_TIA_DataStore::getStateVarData( const int & gid,
-			 	       vector<double> & varData )
+			 	       std::vector<double> & varData )
 {
   int i=0;
   varData.resize( 14 );
@@ -1936,10 +1889,10 @@ bool N_TIA_DataStore::getStateVarData( const int & gid,
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 
+// Creation Date :
 //-----------------------------------------------------------------------------
 bool N_TIA_DataStore::getStoreVarData( const int & gid,
-			 	       vector<double> & varData )
+			 	       std::vector<double> & varData )
 {
   int i=0;
   varData.resize( 6 );
@@ -1961,7 +1914,7 @@ bool N_TIA_DataStore::getStoreVarData( const int & gid,
 // Creation Date : 7/27/06
 //-----------------------------------------------------------------------------
 bool N_TIA_DataStore::setSolnVarData( const int & gid,
-				      const vector<double> & varData )
+				      const std::vector<double> & varData )
 {
   int i=0;
   tmpSolVectorPtr->setElementByGlobalIndex       ( gid, varData[i++] );
@@ -1998,7 +1951,7 @@ bool N_TIA_DataStore::setSolnVarData( const int & gid,
 // Creation Date : 7/27/06
 //-----------------------------------------------------------------------------
 bool N_TIA_DataStore::setStateVarData( const int & gid,
-			 	       const vector<double> & varData )
+			 	       const std::vector<double> & varData )
 {
   int i=0;
   tmpStaVectorPtr->setElementByGlobalIndex    ( gid, varData[i++] );
@@ -2028,7 +1981,7 @@ bool N_TIA_DataStore::setStateVarData( const int & gid,
 // Creation Date : 7/27/06
 //-----------------------------------------------------------------------------
 bool N_TIA_DataStore::setStoreVarData( const int & gid,
-			 	       const vector<double> & varData )
+			 	       const std::vector<double> & varData )
 {
   int i=0;
   tmpStoVectorPtr->setElementByGlobalIndex    ( gid, varData[i++] );

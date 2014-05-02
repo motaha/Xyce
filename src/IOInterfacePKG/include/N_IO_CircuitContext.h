@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -38,14 +38,13 @@
 //
 // Revision Number: $Revsion$
 //
-// Revsion Date   : $Date: 2013/10/03 17:23:42 $
+// Revsion Date   : $Date: 2014/02/26 20:42:38 $
 //
 // Current Owner  : $Author: tvrusso $
 //----------------------------------------------------------------------------
 
 #ifndef N_IO_CIRCUITCONTEXT_H
 #define N_IO_CIRCUITCONTEXT_H
-
 
 // ---------- Standard Includes ----------
 #include <list>
@@ -65,478 +64,480 @@
 
 #include <N_UTL_Misc.h>
 #include <N_UTL_Param.h>
+#include <N_UTL_NoCase.h>
 
 #include <N_UTL_Packable.h>
+#include <N_ERH_Message.h>
 
-// ---------- Forward Declarations ----------
-class N_IO_ParameterBlock;
-class N_IO_DeviceBlock;
+namespace Xyce {
+namespace IO {
 
 //----------------------------------------------------------------------------
-// Class          : N_IO_CircuitContext
+// Class          : CircuitContext
 // Purpose        :
 // Special Notes  :
 // Creator        : Lon Waters
 // Creation Date  : 01/21/2003
 //----------------------------------------------------------------------------
 
-class N_IO_CircuitContext : public Packable
+class CircuitContext : public Packable
 {
-  public:
+public:
+  typedef std::map<std::string, N_IO_ParameterBlock *, LessNoCase> ModelMap;
 
-    struct MutualInductance : public Packable
-    {
-      map<string,double> inductors;
-      string coupling;
-      string model;
-      string firstInductor;
+  struct MutualInductance : public Packable
+  {
+    std::map<std::string,double> inductors;
+    std::string coupling;
+    std::string model;
+    std::string firstInductor;
 
-      // set of inductor names and associated terminals
-      map< string, vector< string > > terminals;
+    // set of inductor names and associated terminals
+    std::map< std::string, std::vector< std::string > > terminals;
 
-      // MI name
-      string name;
+    // MI name
+    std::string name;
 
-      // sharedInductorTable and fastLookupTable key
-      int sharedKey;
+    // sharedInductorTable and fastLookupTable key
+    int sharedKey;
 
-      MutualInductance() {}
+    MutualInductance() {}
 
-      MutualInductance( N_IO_DeviceBlock & device );
-
-      // Packing functionality.
-      Packable * instance() const
-      { return new MutualInductance; }
-
-      // Counts bytes needed to pack block.
-      int packedByteCount() const;
-
-      // Packs into char buffer using MPI_PACK.
-      void pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) const;
-
-      // Unpacks from char buffer using MPI_UNPACK.
-      void unpack(char * pB, int bsize, int & pos, N_PDS_Comm * comm);
-
-    }; // end of MutualIndutance struct
-
-    // Constructors.
-    N_IO_CircuitContext(N_IO_CircuitMetadata & md,
-                        list<N_IO_CircuitContext*> & cL,
-                        N_IO_CircuitContext*& ccPtr);
-
-    // Destructor.
-    ~N_IO_CircuitContext();
-
-    N_IO_CircuitContext & operator=( const N_IO_CircuitContext & rhs );
-
-    // Begin a subcircuit to context.
-    // Note: the current subcircuit context will remain active until
-    // an endSubcircuitContext is issued.
-    void beginSubcircuitContext(
-        string const& netlistFileName,
-        vector<N_IO_SpiceSeparatedFieldTool::StringToken> & subcircuitLine);
-
-    // End the current context, push it onto the previous contexts
-    // list of contexts, and reset the currentContext_ pointer to the
-    // previous context.
-    void endSubcircuitContext();
-
-    // Add a model to the current context. Note, the circuit context
-    // will assume responsibility for model pointers.
-    void addModel(N_IO_ParameterBlock * modelPtr);
-
-    // Add a set of .PARAM parameters to the current context.
-    void addParams(N_IO_OptionBlock const& param);
-
-    // Do early resolution of quoted parameters
-    void resolveQuote (N_UTL_Param & parameter);
-
-    // Add a set of .GLOBAL_PARAM parameters to the current context.
-    void addGlobalParams(N_IO_OptionBlock const& param);
-
-    // Add a global node
-    void addGlobalNode (string &gnode);
-
-    // Add a .FUNC function to the current context.
-    void addFunction(N_IO_FunctionBlock const& function);
-
-    // Setters and getters.
-    void setName(string const& name);
-    const string& getName() const;
-    const string& getCurrentContextName() const;
-    void setPrefix(string const& prefix);
-    const string& getPrefix() const;
-    map<string, string>* getNodeMapPtr() const;
-    void setParentContextPtr( N_IO_CircuitContext * const ptr );
-    const N_IO_CircuitContext * getParentContextPtr() const;
-    N_IO_CircuitContext * getCurrentContextPtr() const;
-
-    // Get the node list for the current context.
-    vector<string> const& getNodeList() const;
-
-    // Increment the device count in the current context.
-    void incrementDeviceCount();
-
-    // Add an subcircuit name to the instance list. The instance list
-    // will be needed to get a total device count.
-    void addInstance(string const& subcircuitName,
-                     int const& lineNumber,
-                     string const& fileName);
-
-    // Resolve the parameters and functions in the curren context. Since this
-    // operation is dependent on a given subcircuit instance, the resolution
-    // for a given context may occur repeatedly.
-    bool resolve(vector<N_DEV_Param> const& subcircuitInstanceParams);
-
-    // Set the current context to that corresponding to the given subcircuit
-    // name. Save the previous context on the stack for later retrieval.
-    // If there is no context corresponding to the subcircuit name, recursively
-    // search parent contexts. Return true if found, false otherwise.
-    bool setContext(string const& subcircuitName,
-                    string const& subcircuitPrefix = "",
-                    list<string> const& instanceNodes = list<string>(),
-                    N_IO_CircuitContext* previousContext = NULL);
-    void setContext(N_IO_CircuitContext* context);
-
-    // Reset the context the context prior to the last invocation of
-    // setContext.
-    void restorePreviousContext();
-    bool globalNode (const string &nodeName);
-
-    // If the input paramter has an expression value, replace replace the
-    // parameters and functions in the expression with their actual values.
-    bool resolveParameter(N_UTL_Param& parameter,
-                          vector<string> exceptionStrings = vector<string>());
-
-    // Determine if expressionString has any unresolved strings and
-    // resolve appropriately. Return true if all strings are resolved
-    // otherwise return false.
-    bool resolveStrings(N_UTL_Expression & expression,
-                          vector<string> exceptionStrings = vector<string>());
-
-    // Determine if expressionString has any unresolved functions and
-    // resolve appropriately. Return true if all functions are resolved
-    // otherwise return false.
-    bool resolveFunctions(N_UTL_Expression & expression);
-
-    // Look for a parameter with tag parameterName in resolvedParams_.
-    // Check current context and recursively check parent
-    // contexts. Return the parameter if it is found, set the
-    // parameter value to the empty string if it is not found.
-    bool getResolvedParameter(N_UTL_Param & parameter);
-
-    // Look for a parameter with tag parameterName in resolvedGlobalParams_.
-    // Check current context and recursively check parent
-    // contexts. Return the parameter if it is found, set the
-    // parameter value to the empty string if it is not found.
-    bool getResolvedGlobalParameter(N_UTL_Param & parameter);
-
-    // Look for a function with tag functionName in resolvedFunctions_.
-    // Check current context and recursively check parent
-    // contexts. Return the function (as an N_UTL_Param) if it is found,
-    // set the N_UTL_Param value to the empty string if it is not found.
-    bool getResolvedFunction(N_UTL_Param & parameter);
-
-    void addMutualInductance( N_IO_DeviceBlock & device )
-    {
-      currentContextPtr_->mutualInductances_.push_back( MutualInductance( device ) );
-    }
-
-    vector<MutualInductance> & getMutualInductances()
-    {
-      return currentContextPtr_->mutualInductances_;
-    }
-
-    vector< set< string > > & getSharedInductorTable()
-    {
-      return currentContextPtr_->sharedInductorTable_;
-    }
-
-    set< string > & getAllCoupledInductors()
-    {
-      return currentContextPtr_->allCoupledInductors_;
-    }
-
-    vector< vector< int > > & getAllIndexedMIs()
-    {
-      return currentContextPtr_->allIndexedMIs_;
-    }
-
-    int getNumMILines()
-    {
-      return currentContextPtr_->kLines_.size();
-    }
-
-    // Convert all MIs into tokenized device lines
-    void bundleMIs();
-
-    // Retrieve one tokenized device line
-    vector< N_IO_SpiceSeparatedFieldTool::StringToken > & getMILine( int i );
-
-    bool haveMutualInductances()
-    {
-      return !( currentContextPtr_->mutualInductances_.empty() );
-    }
-
-    int totalMutualInductanceCount();
-
-    // Search the models in the current context for the model of the
-    // given name. If it is not found, recursively search each parent
-    // context. Return a pointer to the parameterBlock for the model
-    // if it is found, otherwise return NULL. Also, if the model is found,
-    // construct the appropriate model prefix.
-    bool findModel(string const& modelName,
-        N_IO_ParameterBlock* & modelPtr,
-        string& modelPrefix);
-
-    bool findModel(string const& modelName, N_IO_ParameterBlock* & modelPtr);
-
-    // Check whether a subcircuit context is dependent on subcircuit parameters.
-    // These are parameters on the .subckt line identified by "params:"
-    // keyword. The result should be true if either the current subcircuit
-    // context or any subcircuit context in the hierarchy containing the
-    // current subcircuit context has subcircuit parameters.
-    bool hasSubcircuitParams();
-
-    // Calculate the total number of devices starting at current context
-    // and including all subcircuit instances.
-    int getTotalDeviceCount();
-
-    // Correct total number of devices after processing K-devices:
-    void augmentTotalDeviceCount(int kLineCount, int coupledICount, int YDeviceCount);
+    MutualInductance( N_IO_DeviceBlock & device );
 
     // Packing functionality.
-    Packable * instance() const;
+    Packable * instance() const
+    { return new MutualInductance; }
 
     // Counts bytes needed to pack block.
     int packedByteCount() const;
 
-    // Packs OptionBlock into char buffer using MPI_PACK.
+    // Packs into char buffer using MPI_PACK.
     void pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) const;
 
-    // Unpacks OptionBlock from char buffer using MPI_UNPACK.
+    // Unpacks from char buffer using MPI_UNPACK.
     void unpack(char * pB, int bsize, int & pos, N_PDS_Comm * comm);
 
-    map<string,int> devMap;
-    map<string,N_IO_ParameterBlock *> modMap;
+  }; // end of MutualIndutance struct
 
-    N_IO_OptionBlock *getGlobals() {return &resolvedGlobalParams_;}
+  // Constructors.
+  CircuitContext(CircuitMetadata & md,
+                 std::list<CircuitContext*> & cL,
+                 CircuitContext*& ccPtr);
 
-  private:
-    N_IO_CircuitContext();
+  // Destructor.
+  ~CircuitContext();
 
-    // Reference to a Pointer to the current context;
-    // ERK.  This was once static data, but is now non-static, and ultimately
-    // owned by the IO_NetlistImportTool class.  For that reason, it is a
-    // reference to a pointer, as it still needs to act static.
-    N_IO_CircuitContext*& currentContextPtr_;
+  CircuitContext & operator=( const CircuitContext & rhs );
 
-    N_IO_CircuitContext* parentContextPtr_;
+  // Begin a subcircuit to context.
+  // Note: the current subcircuit context will remain active until
+  // an endSubcircuitContext is issued.
+  bool beginSubcircuitContext(
+     std::string const& netlistFileName,
+     std::vector<N_IO_SpiceSeparatedFieldTool::StringToken> & subcircuitLine);
 
-    // Stack of contexts to track context changes.
-    list<N_IO_CircuitContext*> & contextList_;
+  // End the current context, push it onto the previous contexts
+  // list of contexts, and reset the currentContext_ pointer to the
+  // previous context.
+  void endSubcircuitContext();
 
-    // Context name, corresponds to subcircuit names.
-    string name_;
+  // Add a model to the current context. Note, the circuit context
+  // will assume responsibility for model pointers.
+  void addModel(N_IO_ParameterBlock * modelPtr);
 
-    int deviceCount_;
-    list<string> instanceList_;
-    map< string, pair<int, string> > instanceErrorInfo_; // This data can
-                                                         // be dropped at
-                                                         // serialization time.
+  // Add a set of .PARAM parameters to the current context.
+  void addParams(N_IO_OptionBlock const& param);
 
-    vector<string> nodeList_;
-    vector<N_UTL_Param> subcircuitParameters_;
+  // Do early resolution of quoted parameters
+  void resolveQuote (Util::Param & parameter);
 
-    map< string, N_IO_CircuitContext* > circuitContextTable_;
+  // Add a set of .GLOBAL_PARAM parameters to the current context.
+  void addGlobalParams(N_IO_OptionBlock const& param);
 
-    map<string, N_IO_ParameterBlock*> models_;
+  // Add a global node
+  void addGlobalNode (std::string &gnode);
 
-    vector<N_UTL_Param> unresolvedParams_;
-    set<string> globalNodes_;
-    vector<N_UTL_Param> unresolvedGlobalParams_;
-    vector<N_IO_FunctionBlock> unresolvedFunctions_;
+  // Add a .FUNC function to the current context.
+  void addFunction(N_IO_FunctionBlock const& function);
 
-    vector<MutualInductance> mutualInductances_;
+  // Setters and getters.
+  void setName(std::string const& name);
+  const std::string& getName() const;
+  const std::string& getCurrentContextName() const;
+  void setPrefix(std::string const& prefix);
+  const std::string& getPrefix() const;
+  std::map<std::string, std::string>* getNodeMapPtr() const;
+  void setParentContextPtr( CircuitContext * const ptr );
+  const CircuitContext * getParentContextPtr() const;
+  CircuitContext * getCurrentContextPtr() const;
 
-    // lookup tables used to create semiPackedMIs_
-    vector< set< string > > sharedInductorTable_;
-    set< string > allCoupledInductors_;
-    vector< vector< int > > allIndexedMIs_;
+  // Get the node list for the current context.
+  std::vector<std::string> const& getNodeList() const;
 
-    // tokenized MIs
-    vector< vector< N_IO_SpiceSeparatedFieldTool::StringToken > >kLines_;
+  // Increment the device count in the current context.
+  void incrementDeviceCount();
 
-    // Each of the following attributes is not set until pass 2, so they
-    // do not need to be serialized.
-    string subcircuitPrefix_;
-    map<string, string> nodeMap_; // note: does not need to be serialized.
-    bool resolved_;
-    N_IO_OptionBlock resolvedParams_;
-    N_IO_OptionBlock resolvedGlobalParams_;
-    map<string, N_UTL_Param> resolvedFunctions_;
+  // Add an subcircuit name to the instance list. The instance list
+  // will be needed to get a total device count.
+  void addInstance(std::string const& subcircuitName,
+                   std::string const& fileName, 
+                   int const& lineNumber);
 
-    N_IO_CircuitMetadata & metadata_;
+  // Resolve the parameters and functions in the curren context. Since this
+  // operation is dependent on a given subcircuit instance, the resolution
+  // for a given context may occur repeatedly.
+  bool resolve(std::vector<Device::Param> const& subcircuitInstanceParams);
+
+  // Set the current context to that corresponding to the given subcircuit
+  // name. Save the previous context on the stack for later retrieval.
+  // If there is no context corresponding to the subcircuit name, recursively
+  // search parent contexts. Return true if found, false otherwise.
+  bool setContext(std::string const& subcircuitName,
+                  std::string const& subcircuitPrefix = "",
+                  std::list<std::string> const& instanceNodes = std::list<std::string>(),
+                  CircuitContext* previousContext = NULL) const;
+  void setContext(CircuitContext* context) const;
+
+  // Reset the context the context prior to the last invocation of
+  // setContext.
+  void restorePreviousContext() const;
+  bool globalNode (const std::string &nodeName) const;
+
+  // If the input paramter has an expression value, replace replace the
+  // parameters and functions in the expression with their actual values.
+  bool resolveParameter(Util::Param& parameter,
+                        std::vector<std::string> exceptionStrings = std::vector<std::string>());
+
+  // Determine if expressionString has any unresolved strings and
+  // resolve appropriately. Return true if all strings are resolved
+  // otherwise return false.
+  bool resolveStrings(Util::Expression & expression,
+                      std::vector<std::string> exceptionStrings = std::vector<std::string>());
+
+  // Determine if expressionString has any unresolved functions and
+  // resolve appropriately. Return true if all functions are resolved
+  // otherwise return false.
+  bool resolveFunctions(Util::Expression & expression);
+
+  // Look for a parameter with tag parameterName in resolvedParams_.
+  // Check current context and recursively check parent
+  // contexts. Return the parameter if it is found, set the
+  // parameter value to the empty string if it is not found.
+  bool getResolvedParameter(Util::Param & parameter);
+
+  // Look for a parameter with tag parameterName in resolvedGlobalParams_.
+  // Check current context and recursively check parent
+  // contexts. Return the parameter if it is found, set the
+  // parameter value to the empty string if it is not found.
+  bool getResolvedGlobalParameter(Util::Param & parameter);
+
+  // Look for a function with tag functionName in resolvedFunctions_.
+  // Check current context and recursively check parent
+  // contexts. Return the function (as an Util::Param) if it is found,
+  // set the Util::Param value to the empty string if it is not found.
+  bool getResolvedFunction(Util::Param & parameter);
+
+  void addMutualInductance( N_IO_DeviceBlock & device )
+  {
+    currentContextPtr_->mutualInductances_.push_back( MutualInductance( device ) );
+  }
+
+  std::vector<MutualInductance> & getMutualInductances()
+  {
+    return currentContextPtr_->mutualInductances_;
+  }
+
+  std::vector< std::set< std::string > > & getSharedInductorTable()
+  {
+    return currentContextPtr_->sharedInductorTable_;
+  }
+
+  std::set< std::string > & getAllCoupledInductors()
+  {
+    return currentContextPtr_->allCoupledInductors_;
+  }
+
+  std::vector< std::vector< int > > & getAllIndexedMIs()
+  {
+    return currentContextPtr_->allIndexedMIs_;
+  }
+
+  int getNumMILines()
+  {
+    return currentContextPtr_->kLines_.size();
+  }
+
+  // Convert all MIs into tokenized device lines
+  void bundleMIs();
+
+  // Retrieve one tokenized device line
+  std::vector< N_IO_SpiceSeparatedFieldTool::StringToken > & getMILine( int i );
+
+  bool haveMutualInductances()
+  {
+    return !( currentContextPtr_->mutualInductances_.empty() );
+  }
+
+  int totalMutualInductanceCount();
+
+  // Search the models in the current context for the model of the
+  // given name. If it is not found, recursively search each parent
+  // context. Return a pointer to the parameterBlock for the model
+  // if it is found, otherwise return NULL. Also, if the model is found,
+  // construct the appropriate model prefix.
+  bool findModel(std::string const& modelName,
+                 N_IO_ParameterBlock* & modelPtr,
+                 std::string& modelPrefix) const;
+
+  bool findModel(std::string const& modelName, N_IO_ParameterBlock* & modelPtr) const;
+
+  // Check whether a subcircuit context is dependent on subcircuit parameters.
+  // These are parameters on the .subckt line identified by "params:"
+  // keyword. The result should be true if either the current subcircuit
+  // context or any subcircuit context in the hierarchy containing the
+  // current subcircuit context has subcircuit parameters.
+  bool hasSubcircuitParams();
+
+  // Calculate the total number of devices starting at current context
+  // and including all subcircuit instances.
+  int getTotalDeviceCount();
+
+  // Correct total number of devices after processing K-devices:
+  void augmentTotalDeviceCount(int kLineCount, int coupledICount, int YDeviceCount);
+
+  // Packing functionality.
+  Packable * instance() const;
+
+  // Counts bytes needed to pack block.
+  int packedByteCount() const;
+
+  // Packs OptionBlock into char buffer using MPI_PACK.
+  void pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) const;
+
+  // Unpacks OptionBlock from char buffer using MPI_UNPACK.
+  void unpack(char * pB, int bsize, int & pos, N_PDS_Comm * comm);
+
+  std::map<std::string,int> devMap;
+  ModelMap modMap;
+
+  N_IO_OptionBlock *getGlobals() {return &resolvedGlobalParams_;}
+
+private:
+  CircuitContext();
+
+  // Reference to a Pointer to the current context;
+  // ERK.  This was once static data, but is now non-static, and ultimately
+  // owned by the IO_NetlistImportTool class.  For that reason, it is a
+  // reference to a pointer, as it still needs to act static.
+  CircuitContext*& currentContextPtr_;
+
+  mutable CircuitContext* parentContextPtr_;
+
+  // Stack of contexts to track context changes.
+  std::list<CircuitContext*> & contextList_;
+
+  // Context name, corresponds to subcircuit names.
+  std::string name_;
+
+  int deviceCount_;
+  std::list<std::string> instanceList_;
+  std::map< std::string, NetlistLocation> instanceErrorInfo_; // This data can
+  // be dropped at
+  // serialization time.
+
+  std::vector<std::string> nodeList_;
+  std::vector<N_UTL_Param> subcircuitParameters_;
+
+  std::map< std::string, CircuitContext* > circuitContextTable_;
+
+  ModelMap models_;
+
+  std::vector<N_UTL_Param> unresolvedParams_;
+  std::set<std::string> globalNodes_;
+  std::vector<N_UTL_Param> unresolvedGlobalParams_;
+  std::vector<N_IO_FunctionBlock> unresolvedFunctions_;
+
+  std::vector<MutualInductance> mutualInductances_;
+
+  // lookup tables used to create semiPackedMIs_
+  std::vector< std::set< std::string > > sharedInductorTable_;
+  std::set< std::string > allCoupledInductors_;
+  std::vector< std::vector< int > > allIndexedMIs_;
+
+  // tokenized MIs
+  std::vector< std::vector< N_IO_SpiceSeparatedFieldTool::StringToken > >kLines_;
+
+  // Each of the following attributes is not set until pass 2, so they
+  // do not need to be serialized.
+  std::string subcircuitPrefix_;
+  std::map<std::string, std::string> nodeMap_; // note: does not need to be serialized.
+  bool resolved_;
+  N_IO_OptionBlock resolvedParams_;
+  N_IO_OptionBlock resolvedGlobalParams_;
+  std::map<std::string, Util::Param> resolvedFunctions_;
+
+  CircuitMetadata & metadata_;
 };
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::setName
+// Function       : CircuitContext::setName
 // Purpose        :
 // Special Notes  :
 // Scope          : public
 // Creator        : Lon Waters
 // Creation Date  : 01/24/2003
 //----------------------------------------------------------------------------
-inline void N_IO_CircuitContext::setName(string const& name)
+inline void CircuitContext::setName(std::string const& name)
 {
   name_ = name;
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::getName
+// Function       : CircuitContext::getName
 // Purpose        :
 // Special Notes  :
 // Scope          : public
 // Creator        : Lon Waters
 // Creation Date  : 01/24/2003
 //----------------------------------------------------------------------------
-inline const string& N_IO_CircuitContext::getName() const
+inline const std::string& CircuitContext::getName() const
 {
   return name_;
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::setPrefix
+// Function       : CircuitContext::setPrefix
 // Purpose        :
 // Special Notes  :
 // Scope          : public
 // Creator        : Lon Waters
 // Creation Date  : 08/05/2003
 //----------------------------------------------------------------------------
-inline void N_IO_CircuitContext::setPrefix(string const& prefix)
+inline void CircuitContext::setPrefix(std::string const& prefix)
 {
   currentContextPtr_->subcircuitPrefix_ = prefix;
 }
 
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::getPrefix
+// Function       : CircuitContext::getPrefix
 // Purpose        :
 // Special Notes  :
 // Scope          : public
 // Creator        : Lon Waters
 // Creation Date  : 08/05/2003
 //----------------------------------------------------------------------------
-inline const string& N_IO_CircuitContext::getPrefix() const
+inline const std::string& CircuitContext::getPrefix() const
 {
   return currentContextPtr_->subcircuitPrefix_;
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::getNodeMapPtr
+// Function       : CircuitContext::getNodeMapPtr
 // Purpose        :
 // Special Notes  :
 // Scope          : public
 // Creator        : Lon Waters
 // Creation Date  : 08/05/2003
 //----------------------------------------------------------------------------
-inline map<string, string> * N_IO_CircuitContext::getNodeMapPtr() const
+inline std::map<std::string, std::string> * CircuitContext::getNodeMapPtr() const
 {
   return &(currentContextPtr_->nodeMap_);
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::getCurrentContextName
+// Function       : CircuitContext::getCurrentContextName
 // Purpose        :
 // Special Notes  :
 // Scope          : public
 // Creator        : Lon Waters
 // Creation Date  : 01/24/2003
 //----------------------------------------------------------------------------
-inline const string& N_IO_CircuitContext::getCurrentContextName() const
+inline const std::string& CircuitContext::getCurrentContextName() const
 {
   return currentContextPtr_->name_;
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::getNodeList
+// Function       : CircuitContext::getNodeList
 // Purpose        :
 // Special Notes  :
 // Scope          : public
 // Creator        : Lon Waters
 // Creation Date  : 02/07/2003
 //----------------------------------------------------------------------------
-inline vector<string> const& N_IO_CircuitContext::getNodeList() const
+inline std::vector<std::string> const& CircuitContext::getNodeList() const
 {
   return currentContextPtr_->nodeList_;
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::incrementDeviceCount
+// Function       : CircuitContext::incrementDeviceCount
 // Purpose        :
 // Special Notes  :
 // Scope          : public
 // Creator        : Lon Waters
 // Creation Date  : 02/13/2003
 //----------------------------------------------------------------------------
-inline void N_IO_CircuitContext::incrementDeviceCount()
+inline void CircuitContext::incrementDeviceCount()
 {
   currentContextPtr_->deviceCount_++;
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::addInstance
+// Function       : CircuitContext::addInstance
 // Purpose        :
 // Special Notes  :
 // Scope          : public
 // Creator        : Lon Waters
 // Creation Date  : 02/13/2003
 //----------------------------------------------------------------------------
-inline void N_IO_CircuitContext::addInstance(string const& subcircuitName,
-    int const& lineNumber, string const& fileName)
+inline void CircuitContext::addInstance(std::string const& subcircuitName, std::string const& fileName, int const& lineNumber)
 {
-  string subcircuitNameUpper(ExtendedString(subcircuitName).toUpper());
+  std::string subcircuitNameUpper(ExtendedString(subcircuitName).toUpper());
 
-  currentContextPtr_->instanceList_.push_back(
-      subcircuitNameUpper);
-
-  currentContextPtr_->instanceErrorInfo_[subcircuitNameUpper] =
-    pair<int, string>(lineNumber, fileName);
+  currentContextPtr_->instanceList_.push_back(subcircuitNameUpper);
+  currentContextPtr_->instanceErrorInfo_[subcircuitNameUpper] = NetlistLocation(fileName, lineNumber);
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::setParentContextPtr
+// Function       : CircuitContext::setParentContextPtr
 // Purpose        : accessor
 // Special Notes  :
 // Scope          : public
 // Creator        :
 // Creation Date  :
 //----------------------------------------------------------------------------
-inline void N_IO_CircuitContext::setParentContextPtr(
- N_IO_CircuitContext * const ptr )
+inline void CircuitContext::setParentContextPtr(
+   CircuitContext * const ptr )
 {
   parentContextPtr_ = ptr;
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_CircuitContext::getParentContextPtr
+// Function       : CircuitContext::getParentContextPtr
 // Purpose        : accessor
 // Special Notes  :
 // Scope          : public
 // Creator        :
 // Creation Date  :
 //----------------------------------------------------------------------------
-inline const N_IO_CircuitContext * N_IO_CircuitContext::getParentContextPtr()
- const
+inline const CircuitContext * CircuitContext::getParentContextPtr()
+  const
 {
   return parentContextPtr_;
 }
 
-inline N_IO_CircuitContext * N_IO_CircuitContext::getCurrentContextPtr()
- const
+inline CircuitContext * CircuitContext::getCurrentContextPtr()
+  const
 {
   return currentContextPtr_;
 }
 
+} // namespace IO
+} // namespace Xyce
+
+typedef Xyce::IO::CircuitContext CircuitContext;
 
 #endif

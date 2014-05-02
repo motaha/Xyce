@@ -1,0 +1,10 @@
+<map id="N_DEV_Resistor.h" name="N_DEV_Resistor.h">
+<area shape="rect" id="node2" href="$N__DEV__DeviceMgr_8C.html" title="N_DEV_DeviceMgr.C" alt="" coords="5,155,163,181"/>
+<area shape="rect" id="node3" href="$N__DEV__Resistor3_8h.html" title="N_DEV_Resistor3.h" alt="" coords="263,80,409,107"/>
+<area shape="rect" id="node4" href="$OpenModels_2src_2N__DEV__RegisterDevices_8C.html" title="N_DEV_RegisterDevices.C" alt="" coords="187,155,379,181"/>
+<area shape="rect" id="node5" href="$N__DEV__RegisterOpenDevices_8C.html" title="N_DEV_RegisterOpenDevices.C" alt="" coords="403,155,629,181"/>
+<area shape="rect" id="node6" href="$N__DEV__Resistor3_8C.html" title="N_DEV_Resistor3.C" alt="" coords="653,155,801,181"/>
+<area shape="rect" id="node7" href="$N__DEV__ThermalResistor_8h.html" title="N_DEV_ThermalResistor.h" alt="" coords="434,80,624,107"/>
+<area shape="rect" id="node8" href="$N__DEV__ThermalResistor_8C.html" title="N_DEV_ThermalResistor.C" alt="" coords="827,155,1020,181"/>
+<area shape="rect" id="node9" href="$N__DEV__Resistor_8C.html" title="N_DEV_Resistor.C" alt="" coords="801,80,941,107"/>
+</map>

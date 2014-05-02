@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.106.2.3 $
+// Revision Number: $Revision: 1.123.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -47,7 +47,8 @@
 #define Xyce_N_DEV_Diode_h
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_DeviceTemplate.h>
+#include <N_DEV_Configuration.h>
+#include <N_DEV_DeviceMaster.h>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceInstance.h>
 #include <N_DEV_DeviceModel.h>
@@ -60,6 +61,19 @@ namespace Diode {
 
 class Model;
 class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance>
+{
+  static const char *name() {return "Diode";}
+  static const char *deviceTypeName() {return "D level 1,2";}
+  static const int numNodes() {return 2;}
+  static const bool modelRequired() {return true;}
+  static const bool isLinearDevice() {return false;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : Instance
@@ -80,172 +94,166 @@ class Instance;
 //-----------------------------------------------------------------------------
 class Instance : public DeviceInstance
 {
-    friend class ParametricData<Instance>;
-    friend class Model;
-    friend class Master;
+  friend class ParametricData<Instance>;
+  friend class Model;
+  friend class Traits;friend class Master;
 
-  public:
-    static ParametricData<Instance> &getParametricData();
+public:
+  Instance(
+     const Configuration &     configuration,
+     const InstanceBlock &     instance_block,
+     Model &                   model,
+     const FactoryBlock &      factory_block);
 
-    virtual const ParametricData<void> &getMyParametricData() const {
-      return getParametricData();
-    }
+  ~Instance();
 
-    Instance(InstanceBlock & IB,
-             Model & Miter,
-             MatrixLoadData & mlData1,
-             SolverState &ss1,
-             ExternData  &ed1,
-             DeviceOptions & do1);
+private:
+  Instance(const Instance &);
+  Instance &operator=(const Instance &);
 
-    ~Instance();
+public:
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
+  void registerStateLIDs( const std::vector<int> & staLIDVecRef );
+  void registerStoreLIDs( const std::vector<int> & stoLIDVecRef);
 
-  private:
-    Instance(const Instance &);
-    Instance &operator=(const Instance &);
+  std::map<int,std::string> & getIntNameMap ();
+  std::map<int, std::string> & getStoreNameMap ();
 
-  public:
-    void registerLIDs( const vector<int> & intLIDVecRef,
-                       const vector<int> & extLIDVecRef );
-    void registerStateLIDs( const vector<int> & staLIDVecRef );
-    void registerStoreLIDs( const vector<int> & stoLIDVecRef);
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-    map<int,string> & getIntNameMap ();
-    std::map<int, std::string> & getStoreNameMap ();
+  bool processParams ();
+  bool updateTemperature ( const double & temp = -999.0 );
+  bool lambertWCurrent (double Isat, double Vte, double RS);
+  bool lambertWBreakdownCurrent (double Isat, double Vte, double RS);
+  bool lambertWLinearReverseBias (double Isat, double Vte, double RS);
 
-    const vector< vector<int> > & jacobianStamp() const;
-    void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  bool updateIntermediateVars ();
+  bool updatePrimaryState ();
 
-    bool processParams (string param = "");
-    bool updateTemperature ( const double & temp = -999.0 );
-    bool lambertWCurrent (double Isat, double Vte, double RS);
-    bool lambertWBreakdownCurrent (double Isat, double Vte, double RS);
-    bool lambertWLinearReverseBias (double Isat, double Vte, double RS);
+  // load functions, residual:
+  bool loadDAEQVector ();
+  bool loadDAEFVector ();
 
-    bool updateIntermediateVars ();
-    bool updatePrimaryState ();
+  // load functions, Jacobian:
+  bool loadDAEdQdx ();
+  bool loadDAEdFdx ();
 
-    // load functions, residual:
-    bool loadDAEQVector ();
-    bool loadDAEFVector ();
+  void setupPointers();
 
-    // load functions, Jacobian:
-    bool loadDAEdQdx ();
-    bool loadDAEdFdx ();
+public:
+  // iterator reference to the diode model which owns this instance.
+  // Getters and setters
+  Model &getModel() 
+  {
+    return model_;
+  }
 
-    void setupPointers();
+private:
+  static std::vector< std::vector<int> > jacStamp_RS;
+  static std::vector< std::vector<int> > jacStamp;
 
-  public:
-    // iterator reference to the diode model which owns this instance.
-    // Getters and setters
-    Model &getModel() {
-      return model_;
-    }
+  static std::vector<int> jacMap_RS;
+  static std::vector<int> jacMap;
 
-  private:
-    static vector< vector<int> > jacStamp_RS;
-    static vector< vector<int> > jacStamp;
-
-    static vector<int> jacMap_RS;
-    static vector<int> jacMap;
-
-    static vector< vector<int> > jacMap2_RS;
-    static vector< vector<int> > jacMap2;
+  static std::vector< std::vector<int> > jacMap2_RS;
+  static std::vector< std::vector<int> > jacMap2;
 
 
-    Model &       model_;         //< Owning model
+  Model &       model_;         //< Owning model
 
-    int  off;
-    double Area;
-    double InitCond;
-    double Temp;
-    int lambertWFlag;
-    bool InitCondGiven;
+  int  off;
+  double Area;
+  double InitCond;
+  double Temp;
+  int lambertWFlag;
+  bool InitCondGiven;
 
-    double tJctPot;
-    double tJctCap;
-    double tDepCap;
-    double tSatCur;
-    double tVcrit;
-    double tF1;
-    double tBrkdwnV;
-    double tSatCurR;
-    double tIKF;
-    double tRS;
-    double tCOND;
-    double tIRF;
+  double tJctPot;
+  double tJctCap;
+  double tDepCap;
+  double tSatCur;
+  double tVcrit;
+  double tF1;
+  double tBrkdwnV;
+  double tSatCurR;
+  double tIKF;
+  double tRS;
+  double tCOND;
+  double tIRF;
 
-    double Id;     //diode current
-    double Gd;     //diode conductivity
-    double Cd;     //depletion capacitance
-    double Gcd;    //dep cap conductivity
-    double Qd;     //capacitor charge
-    double Icd;    //capacitor current
-    double Gspr;
-    //double LeadCurrent;
+  double Id;     //diode current
+  double Gd;     //diode conductivity
+  double Cd;     //depletion capacitance
+  double Gcd;    //dep cap conductivity
+  double Qd;     //capacitor charge
+  double Icd;    //capacitor current
+  double Gspr;
+  //double LeadCurrent;
 
-    double Vpp;
-    double Vp;
-    double Vn;
-    double Vc;
+  double Vpp;
+  double Vp;
+  double Vn;
+  double Vc;
 
-    double Vd;
-    double Vd_old;
-    double Vd_orig;
+  double Vd;
+  double Vd_old;
+  double Vd_orig;
 
-    int newtonIterOld;
+  int newtonIterOld;
 
-    // end of intermediate variables
+  // end of intermediate variables
 
-    // state variables:
-    double q0;  // charge in the capacitor
-    double i0;  // current throught the capacitor
+  // state variables:
+  double q0;  // charge in the capacitor
+  double i0;  // current throught the capacitor
 
-    //local indices (offsets)
-    // int li_QState;
+  //local indices (offsets)
+  // int li_QState;
 
-    // for voltage limiting
-    int li_storevd;
+  // for voltage limiting
+  int li_storevd;
 
-    // for lead current
-    int li_store_dev_i;
+  // for lead current
+  int li_store_dev_i;
 
-    int li_Pos;
-    int li_Neg;
-    int li_Pri;
+  int li_Pos;
+  int li_Neg;
+  int li_Pri;
 
-    // Matrix equation local offset variables
-    int APosEquPosNodeOffset;
-    int APosEquPriNodeOffset;
-    int ANegEquNegNodeOffset;
-    int ANegEquPriNodeOffset;
-    int APriEquPosNodeOffset;
-    int APriEquNegNodeOffset;
-    int APriEquPriNodeOffset;
+  // Matrix equation local offset variables
+  int APosEquPosNodeOffset;
+  int APosEquPriNodeOffset;
+  int ANegEquNegNodeOffset;
+  int ANegEquPriNodeOffset;
+  int APriEquPosNodeOffset;
+  int APriEquNegNodeOffset;
+  int APriEquPriNodeOffset;
 
 #ifndef Xyce_NONPOINTER_MATRIX_LOAD
-    // Matrix equation local pointer variables
-    double * fPosEquPosNodePtr;
-    double * fPosEquPriNodePtr;
-    double * fNegEquNegNodePtr;
-    double * fNegEquPriNodePtr;
-    double * fPriEquPosNodePtr;
-    double * fPriEquNegNodePtr;
-    double * fPriEquPriNodePtr;
+  // Matrix equation local pointer variables
+  double * fPosEquPosNodePtr;
+  double * fPosEquPriNodePtr;
+  double * fNegEquNegNodePtr;
+  double * fNegEquPriNodePtr;
+  double * fPriEquPosNodePtr;
+  double * fPriEquNegNodePtr;
+  double * fPriEquPriNodePtr;
 
-    double * qPosEquPosNodePtr;
-    double * qPosEquPriNodePtr;
-    double * qNegEquNegNodePtr;
-    double * qNegEquPriNodePtr;
-    double * qPriEquPosNodePtr;
-    double * qPriEquNegNodePtr;
-    double * qPriEquPriNodePtr;
+  double * qPosEquPosNodePtr;
+  double * qPosEquPriNodePtr;
+  double * qNegEquNegNodePtr;
+  double * qNegEquPriNodePtr;
+  double * qPriEquPosNodePtr;
+  double * qPriEquNegNodePtr;
+  double * qPriEquPriNodePtr;
 #endif
 
 
-    // Flags
-    bool TEMP_GIVEN;
-    bool AREA_GIVEN;
+  // Flags
+  bool TEMP_GIVEN;
+  bool AREA_GIVEN;
 };
 
 //-----------------------------------------------------------------------------
@@ -257,85 +265,89 @@ class Instance : public DeviceInstance
 //-----------------------------------------------------------------------------
 class Model : public DeviceModel
 {
-    typedef std::vector<Instance *> InstanceVector;
+  typedef std::vector<Instance *> InstanceVector;
 
-    friend class ParametricData<Model>;
-    friend class Instance;
-    friend class Master;
+  friend class ParametricData<Model>;
+  friend class Instance;
+  friend class Traits;friend class Master;
 
-  public:
-    static ParametricData<Model> &getParametricData();
+public:
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &        MB,
+     const FactoryBlock &      factory_block);
+  ~Model();
 
-    virtual const ParametricData<void> &getMyParametricData() const {
-      return getParametricData();
-    }
+private:
+  Model();
+  Model(const Model &);
+  Model &operator=(const Model &);
 
-    Model(const ModelBlock &MB,
-          SolverState & ss1,
-          DeviceOptions & do1);
-    ~Model();
+public:
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
 
-  private:
-    Model();
-    Model(const Model &);
-    Model &operator=(const Model &);
-
-  public:
-    virtual std::ostream &printOutInstances(std::ostream &os) const;
-    bool processParams (string param = "");
-    bool processInstanceParams (string param = "");
+  virtual std::ostream &printOutInstances(std::ostream &os) const;
+  bool processParams ();
+  bool processInstanceParams ();
 
 
-  public:
-    InstanceVector &getInstanceVector() {
-      return instanceContainer;
-    }
+public:
+  void addInstance(Instance *instance) 
+  {
+    instanceContainer.push_back(instance);
+  }
 
-    const InstanceVector &getInstanceVector() const {
-      return instanceContainer;
-    }
+  InstanceVector &getInstanceVector() 
+  {
+    return instanceContainer;
+  }
 
-  private:
-    vector<Instance*> instanceContainer;
+  const InstanceVector &getInstanceVector() const 
+  {
+    return instanceContainer;
+  }
 
-  private:
+private:
+  std::vector<Instance*> instanceContainer;
 
-    double IS;   // saturation current (A)
-    double RS;   // ohmic resistance (ohms)
-    double COND; // corresponding conductance
-    double N;    // emission coefficient
-    double ISR;  // recombination saturation current (A)
-    double NR;   // emission coefficient for ISR
-    double IKF;  // high-injection knee current (A)
-    double TT;   // transit time (sec)
-    double CJO;  // zero-bias junction capacitance (F)
-    double VJ;   // built-in junction potential (V)
-    double M;    // grading coefficient
-    double EG;   // activation  energy (eV).
-    //    For Si, EG = 1.11
-    //        Ge, EG = 0.67
-    //        Sbd, EG = 0.69
-    double XTI;  // isaturation-current temp. exp
-    double TIKF; // IKF temperature coeff.
-    double TBV1; // BV linear temperature coeff.
-    double TBV2; // BV quadratic temperature coeff.
-    double TRS1; // RS linear temperature coeff.
-    double TRS2; // RS quadratic temperature coeff.
-    double FC;   // coefficient for forward-bias depletion capacitance
-    // formula
-    double BV;   // reverse breakdown voltage
-    double IBV;  // current at  breakdown voltage (A)
-    double IRF;  // adjustment for linear portion of reverse current
-    double NBV;  // reverse breakdown ideality factor
-    double IBVL; // low-level current at  breakdown voltage (A)
-    double NBVL; // low-level reverse breakdown ideality factor
-    double F2;
-    double F3;
-    double TNOM; // parameter measurement temperature (C)
-    double KF;   // flicker noise coefficient
-    double AF;   // flicker noise exponent
+private:
 
-    bool BVGiven;
+  double IS;   // saturation current (A)
+  double RS;   // ohmic resistance (ohms)
+  double COND; // corresponding conductance
+  double N;    // emission coefficient
+  double ISR;  // recombination saturation current (A)
+  double NR;   // emission coefficient for ISR
+  double IKF;  // high-injection knee current (A)
+  double TT;   // transit time (sec)
+  double CJO;  // zero-bias junction capacitance (F)
+  double VJ;   // built-in junction potential (V)
+  double M;    // grading coefficient
+  double EG;   // activation  energy (eV).
+  //    For Si, EG = 1.11
+  //        Ge, EG = 0.67
+  //        Sbd, EG = 0.69
+  double XTI;  // isaturation-current temp. exp
+  double TIKF; // IKF temperature coeff.
+  double TBV1; // BV linear temperature coeff.
+  double TBV2; // BV quadratic temperature coeff.
+  double TRS1; // RS linear temperature coeff.
+  double TRS2; // RS quadratic temperature coeff.
+  double FC;   // coefficient for forward-bias depletion capacitance
+  // formula
+  double BV;   // reverse breakdown voltage
+  double IBV;  // current at  breakdown voltage (A)
+  double IRF;  // adjustment for linear portion of reverse current
+  double NBV;  // reverse breakdown ideality factor
+  double IBVL; // low-level current at  breakdown voltage (A)
+  double NBVL; // low-level reverse breakdown ideality factor
+  double F2;
+  double F3;
+  double TNOM; // parameter measurement temperature (C)
+  double KF;   // flicker noise coefficient
+  double AF;   // flicker noise exponent
+
+  bool BVGiven;
 };
 
 //-----------------------------------------------------------------------------
@@ -345,34 +357,31 @@ class Model : public DeviceModel
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 11/26/08
 //-----------------------------------------------------------------------------
-class Master : public Xyce::Device::DeviceTemplate<Model, Instance>
+class Master : public DeviceMaster<Traits>
 {
-  public:
-    Master (
-      const std::string &dn,
-      const std::string &cn,
-      const std::string &dmName,
-      LinearDevice linearDev,
-      SolverState & ss1,
-      DeviceOptions & do1)
-      : Xyce::Device::DeviceTemplate<Model, Instance>(
-        dn, cn, dmName, linearDev, ss1, do1)
-    {
+  friend class Instance;
+  friend class Model;
 
-    }
+public:
+  Master(
+     const Configuration &       configuration,
+     const FactoryBlock &      factory_block,
+     const SolverState & ss1,
+     const DeviceOptions & do1)
+    : DeviceMaster<Traits>(configuration, factory_block, ss1, do1)
+  {}
 
-    virtual bool updateState (double * solVec, double * staVec, double * stoVec);
+  virtual bool updateState (double * solVec, double * staVec, double * stoVec);
 
-    // new DAE stuff:
-    // new DAE load functions, residual:
-    virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
+  // new DAE stuff:
+  // new DAE load functions, residual:
+  virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
 
-    // new DAE load functions, Jacobian:
-    virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
-
-    friend class Instance;
-    friend class Model;
+  // new DAE load functions, Jacobian:
+  virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
 };
+
+void registerDevice();
 
 } // namespace Diode
 } // namespace Device

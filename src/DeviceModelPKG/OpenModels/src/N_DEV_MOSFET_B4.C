@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.76.2.3 $
+// Revision Number: $Revision: 1.100.2.3 $
 //
 //
 // Current Owner  : $Author: tvrusso $
@@ -65,11 +65,15 @@
 // ----------   Xyce Includes   ----------
 #include <N_DEV_Const.h>
 
-#include <N_DEV_MOSFET_B4.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_ExternData.h>
+#include <N_DEV_MOSFET_B4.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
+
+#include <N_DEV_MOSFET1.h>
 
 #include <N_LAS_Matrix.h>
 #include <N_LAS_Vector.h>
@@ -135,3496 +139,3476 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<MOSFET_B4::Instance>::ParametricData()
+
+namespace MOSFET_B4 {
+
+
+void Traits::loadInstanceParameters(ParametricData<MOSFET_B4::Instance> &p)
 {
-    setNumNodes(4);
-    setNumOptionalNodes(0);
-    setNumFillNodes(0);
-    setModelRequired(1);
-    addModelType("NMOS");
-    addModelType("PMOS");
-
-    // Set up double precision variables:
-    addPar ("TEMP", 0.0, false, ParameterType::TIME_DEP,
+// Set up double precision variables:
+    p.addPar ("TEMP", 0.0, false, ParameterType::TIME_DEP,
       &MOSFET_B4::Instance::temp,
-      NULL, STANDARD, CAT_NONE, "");
+      NULL, STANDARD, CAT_NONE, "Device temperature");
 
-    addPar ("L", 5.0e-6, false, ParameterType::NO_DEP,
+    p.addPar ("L", 5.0e-6, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::l,
       NULL, U_NONE, CAT_NONE, "Length");
 
-    addPar ("W", 5.0e-6, false, ParameterType::NO_DEP,
+    p.addPar ("W", 5.0e-6, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::w,
       NULL, U_NONE, CAT_NONE, "Width");
 
-    addPar ("NF", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("NF", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::nf,
       NULL, U_NONE, CAT_NONE, "Number of fingers");
 
-    addPar ("SA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("SA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::sa,
       NULL, U_NONE, CAT_NONE, "distance between  OD edge to poly of one side ");
 
-    addPar ("SB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("SB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::sb,
       NULL, U_NONE, CAT_NONE, "distance between  OD edge to poly of the other side");
 
-    addPar ("SD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("SD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::sd,
       NULL, U_NONE, CAT_NONE, "distance between neighbour fingers");
 
-    addPar ("SCA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("SCA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::sca,
       &MOSFET_B4::Instance::scaGiven,
       U_NONE, CAT_NONE, "Integral of the first distribution function for scattered well dopant");
 
-    addPar ("SCB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("SCB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::scb,
       &MOSFET_B4::Instance::scbGiven,
       U_NONE, CAT_NONE, "Integral of the second distribution function for scattered well dopant");
 
-    addPar ("SCC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("SCC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::scc,
       &MOSFET_B4::Instance::sccGiven,
       U_NONE, CAT_NONE, "Integral of the third distribution function for scattered well dopant");
 
-    addPar ("SC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("SC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::sc,
       &MOSFET_B4::Instance::scGiven,
       U_NONE, CAT_NONE, "Distance to a single well edge ");
 
 
-    addPar ("AD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("AD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::drainArea,
       &MOSFET_B4::Instance::drainAreaGiven,
       U_NONE, CAT_NONE, "Drain area");
 
-    addPar ("AS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("AS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::sourceArea,
       &MOSFET_B4::Instance::sourceAreaGiven,
       U_NONE, CAT_NONE, "Source area");
 
-    addPar ("PD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::drainPerimeter,
       &MOSFET_B4::Instance::drainPerimeterGiven,
       U_NONE, CAT_NONE, "Drain perimeter");
 
 
-    addPar ("PS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::sourcePerimeter,
       &MOSFET_B4::Instance::sourcePerimeterGiven,
       U_NONE, CAT_NONE, "Source perimeter");
 
-    addPar ("NRD", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("NRD", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::drainSquares,
       &MOSFET_B4::Instance::drainSquaresGiven,
       U_NONE, CAT_ASYMRDS, "Number of squares in drain");
 
-    addPar ("NRS", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("NRS", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::sourceSquares,
       &MOSFET_B4::Instance::sourceSquaresGiven,
       U_NONE, CAT_ASYMRDS, "Number of squares in source");
 
 
-    addPar ("RBDB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBDB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::rbdb,
       NULL, U_NONE, CAT_NONE, "Body resistance");
 
-    addPar ("RBSB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBSB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::rbsb,
       NULL, U_NONE, CAT_NONE, "Body resistance");
 
-    addPar ("RBPB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::rbpb,
       NULL, U_NONE, CAT_NONE, "Body resistance");
 
-    addPar ("RBPS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::rbps,
       NULL, U_NONE, CAT_NONE, "Body resistance");
 
-    addPar ("RBPD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::rbpd,
       NULL, U_NONE, CAT_NONE, "Body resistance");
 
-    addPar ("DELVTO", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("DELVTO", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::delvto,
       NULL, U_VOLT, CAT_BASIC, "Zero bias threshold voltage variation");
 
-    addPar ("XGW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("XGW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::xgw,
       NULL, U_NONE, CAT_NONE, "Distance from gate contact center to device edge");
 
-    addPar ("NGCON", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("NGCON", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::ngcon,
       NULL, U_NONE, CAT_NONE, "Number of gate contacts");
 
-    addPar ("M", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("M", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::numberParallel,
       NULL, U_NONE, CAT_NONE, "Number of parallel copies");
 
-    addPar ("IC1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("IC1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::icVDS,
       &MOSFET_B4::Instance::icVDSGiven,
       U_VOLT, CAT_VOLT, "Vector of initial values: Vds, Vgs, Vbs");
 
-    addPar ("IC2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("IC2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::icVGS,
       &MOSFET_B4::Instance::icVGSGiven,
       U_NONE, CAT_NONE, "");
 
-    addPar ("IC3", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("IC3", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Instance::icVBS,
       &MOSFET_B4::Instance::icVBSGiven,
       U_NONE, CAT_NONE, "");
 
     // Set up non-double precision variables:
-    addPar ("TRNQSMOD", 0,    false,   ParameterType::NO_DEP,
+    p.addPar ("TRNQSMOD", 0,    false,   ParameterType::NO_DEP,
       &MOSFET_B4::Instance::trnqsMod, NULL,
       U_NONE, CAT_CONTROL,	"Transient NQS model selector");
 
-    addPar ("ACNQSMOD", 0,    false,   ParameterType::NO_DEP,
+    p.addPar ("ACNQSMOD", 0,    false,   ParameterType::NO_DEP,
       &MOSFET_B4::Instance::acnqsMod, NULL,
       U_NONE, CAT_CONTROL,	"AC NQS model selector");
 
-    addPar ("RBODYMOD", 0,    false,   ParameterType::NO_DEP,
+    p.addPar ("RBODYMOD", 0,    false,   ParameterType::NO_DEP,
       &MOSFET_B4::Instance::rbodyMod, NULL,
       U_NONE, CAT_CONTROL,	"Distributed body R model selector");
 
-    addPar ("RGATEMOD", 0,    false,   ParameterType::NO_DEP,
+    p.addPar ("RGATEMOD", 0,    false,   ParameterType::NO_DEP,
       &MOSFET_B4::Instance::rgateMod, NULL,
       U_NONE, CAT_CONTROL,	"Gate resistance model selector");
 
-    addPar ("GEOMOD",   0,    false,   ParameterType::NO_DEP,
+    p.addPar ("GEOMOD",   0,    false,   ParameterType::NO_DEP,
       &MOSFET_B4::Instance::geoMod,   NULL,
       U_NONE, CAT_CONTROL,	"Geometry dependent parasitics model selector");
 
-    addPar ("RGEOMOD",  0,    false,   ParameterType::NO_DEP,
+    p.addPar ("RGEOMOD",  0,    false,   ParameterType::NO_DEP,
       &MOSFET_B4::Instance::rgeoMod,  NULL,
       U_NONE, CAT_CONTROL,	"S/D resistance and contact model selector");
 
-    addPar ("MIN",      0,    false,   ParameterType::NO_DEP,
+    p.addPar ("MIN",      0,    false,   ParameterType::NO_DEP,
       &MOSFET_B4::Instance::min,     NULL,
       U_NONE, CAT_NONE,	"Minimize either D or S");
 
-    addPar ("OFF",      false,   false,   ParameterType::NO_DEP,
+    p.addPar ("OFF",      false,   false,   ParameterType::NO_DEP,
       &MOSFET_B4::Instance::OFF,      NULL,
       U_NONE, CAT_NONE,	"Device is initially off");
 
     // This tells the parser that IC1, IC2, and IC3 are to be input as a vector of "IC"
-    makeVector ("IC", 3);
+    p.makeVector ("IC", 3);
 }
 
-template<>
-ParametricData<MOSFET_B4::Model>::ParametricData()
+void Traits::loadModelParameters(ParametricData<MOSFET_B4::Model> &p)
 {
-    addPar ("EOT", 15.0e-10, false, ParameterType::NO_DEP,
+    p.addPar ("EOT", 15.0e-10, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::eot,
       NULL, U_METER, CAT_PROCESS, "Equivalent gate oxide thickness in meters");
 
-    addPar ("VDDEOT", 1.5, false, ParameterType::NO_DEP,
+    p.addPar ("VDDEOT", 1.5, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::vddeot,
       NULL, U_VOLT, CAT_BASIC, "Voltage for extraction of equivalent gate oxide thickness");
 
-    addPar ("ADOS", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("ADOS", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ados,
       NULL, U_NONE, CAT_BASIC, "Charge centroid parameter");
 
-    addPar ("BDOS", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("BDOS", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::bdos,
       NULL, U_NONE, CAT_BASIC, "Charge centroid parameter");
 
-    addPar ("TOXE", 30.0e-10, false, ParameterType::NO_DEP,
+    p.addPar ("TOXE", 30.0e-10, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::toxe,
       &MOSFET_B4::Model::toxeGiven, U_METER, CAT_PROCESS, "Electrical gate oxide thickness in meters");
 
-    addPar ("TOXP", 30.0e-10, false, ParameterType::NO_DEP,
+    p.addPar ("TOXP", 30.0e-10, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::toxp,
       &MOSFET_B4::Model::toxpGiven, U_METER, CAT_PROCESS, "Physical gate oxide thickness in meters");
 
-    addPar ("TOXM", 30.0e-10, false, ParameterType::NO_DEP,
+    p.addPar ("TOXM", 30.0e-10, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::toxm,
       NULL, U_METER, CAT_PROCESS, "Gate oxide thickness at which parameters are extracted");
 
-    addPar ("TOXREF",30.0e-10, false, ParameterType::NO_DEP,
+    p.addPar ("TOXREF",30.0e-10, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::toxref,
       NULL, U_METER, CAT_TUNNEL, "Target tox value");
 
-    addPar ("DTOX", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("DTOX", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dtox,
       &MOSFET_B4::Model::dtoxGiven,
     U_METER, CAT_PROCESS, "Defined as (toxe - toxp) ");
 
-    addPar ("EPSROX",3.9, false, ParameterType::NO_DEP,
+    p.addPar ("EPSROX",3.9, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::epsrox,
       NULL, U_NONE, CAT_PROCESS, "Dielectric constant of the gate oxide relative to vacuum");
 
 
-    addPar ("CDSC", 2.4e-4, false, ParameterType::NO_DEP,
+    p.addPar ("CDSC", 2.4e-4, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cdsc,
       NULL, U_FARADMM2, CAT_BASIC, "Drain/Source and channel coupling capacitance");
 
-    addPar ("CDSCB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CDSCB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cdscb,
       NULL, U_FVM1MM2, CAT_BASIC, "Body-bias dependence of cdsc");
 
-    addPar ("CDSCD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CDSCD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cdscd,
       NULL, U_FVM1MM2, CAT_BASIC, "Drain-bias dependence of cdsc");
 
-    addPar ("CIT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CIT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cit,
       NULL, U_FARADMM2, CAT_BASIC, "Interface state capacitance");
 
-    addPar ("NFACTOR", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("NFACTOR", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::nfactor,
       NULL, U_NONE, CAT_BASIC, "Subthreshold swing Coefficient");
 
-    addPar ("XJ", 0.15e-6,false, ParameterType::NO_DEP,
+    p.addPar ("XJ", 0.15e-6,false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::xj,
       NULL, U_METER, CAT_PROCESS, "Junction depth in meters");
 
-    addPar ("VSAT", 8.0e4, false, ParameterType::NO_DEP,
+    p.addPar ("VSAT", 8.0e4, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::vsat,
       NULL, U_MSM1, CAT_BASIC, "Saturation velocity at tnom");
 
-    addPar ("AT", 3.3e4, false, ParameterType::NO_DEP,
+    p.addPar ("AT", 3.3e4, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::at,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient of vsat");
 
-    addPar ("A0", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("A0", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::a0,
       NULL, U_NONE, CAT_BASIC, "Non-uniform depletion width effect coefficient.");
 
-    addPar ("AGS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("AGS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ags,
       NULL, U_VOLTM1, CAT_BASIC, "Gate bias  coefficient of Abulk.");
 
-    addPar ("A1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("A1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::a1,
       NULL, U_VOLTM1, CAT_BASIC, "Non-saturation effect coefficient");
 
-    addPar ("A2", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("A2", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::a2,
       NULL, U_NONE, CAT_BASIC, "Non-saturation effect coefficient");
 
-    addPar ("KETA", -0.047, false, ParameterType::NO_DEP,
+    p.addPar ("KETA", -0.047, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::keta,
       NULL, U_VOLTM1, CAT_BASIC, "Body-bias coefficient of non-uniform depletion width effect.");
 
-    addPar ("PHIG", 4.05, false, ParameterType::NO_DEP,
+    p.addPar ("PHIG", 4.05, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::phig,
       &MOSFET_B4::Model::phigGiven,
     U_NONE, CAT_NONE, "Work Function of gate");
 
-    addPar ("EPSRGATE", 11.7, false, ParameterType::NO_DEP,
+    p.addPar ("EPSRGATE", 11.7, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::epsrgate,
       NULL,
     U_NONE, CAT_NONE, "Dielectric constant of gate relative to vacuum");
 
-    addPar ("EASUB", 4.05, false, ParameterType::NO_DEP,
+    p.addPar ("EASUB", 4.05, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::easub,
       NULL,
     U_VOLT, CAT_BASIC, "Electron affinity of substrate");
 
-    addPar ("EPSRSUB", 11.7, false, ParameterType::NO_DEP,
+    p.addPar ("EPSRSUB", 11.7, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::epsrsub,
       NULL,
     U_NONE, CAT_BASIC, "Dielectric constant of substrate relative to vacuum");
 
-    addPar ("NI0SUB", 1.45e10, false, ParameterType::NO_DEP,
+    p.addPar ("NI0SUB", 1.45e10, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ni0sub,
       NULL,
     U_CMM3, CAT_BASIC, "Intrinsic carrier concentration of substrate at 300.15K");
 
-    addPar ("BG0SUB", 1.16, false, ParameterType::NO_DEP,
+    p.addPar ("BG0SUB", 1.16, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::bg0sub,
       NULL,
     U_EV, CAT_BASIC, "Band-gap of substrate at T=0K");
 
-    addPar ("TBGASUB", 7.02e-4, false, ParameterType::NO_DEP,
+    p.addPar ("TBGASUB", 7.02e-4, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tbgasub,
       NULL,
     U_EVDEGKM1, CAT_BASIC, "First parameter of band-gap change due to temperature");
 
 
-    addPar ("TBGBSUB", 1108.0, false, ParameterType::NO_DEP,
+    p.addPar ("TBGBSUB", 1108.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tbgbsub,
       NULL,
     U_DEGK, CAT_BASIC, "Second parameter of band-gap change due to temperature");
 
-    addPar ("NSUB", 6.0e16, false, ParameterType::NO_DEP,
+    p.addPar ("NSUB", 6.0e16, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::nsub,
       &MOSFET_B4::Model::nsubGiven,
     U_CMM3, CAT_PROCESS, "Substrate doping concentration");
 
-    addPar ("NDEP", 1.7e17, false, ParameterType::NO_DEP,
+    p.addPar ("NDEP", 1.7e17, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ndep,
       &MOSFET_B4::Model::ndepGiven,
     U_CMM3, CAT_PROCESS, "Channel doping concentration at the depletion edge");
 
-    addPar ("NSD", 1.0e20, false, ParameterType::NO_DEP,
+    p.addPar ("NSD", 1.0e20, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::nsd,
       NULL, U_CMM3, CAT_PROCESS, "S/D doping concentration");
 
-    addPar ("PHIN", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PHIN", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::phin,
       NULL, U_VOLT, CAT_BASIC, "Adjusting parameter for surface potential due to non-uniform vertical doping");
 
-    addPar ("NGATE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("NGATE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ngate,
       NULL, U_CMM3, CAT_PROCESS, "Poly-gate doping concentration");
 
-    addPar ("GAMMA1",0.0, false, ParameterType::NO_DEP,
+    p.addPar ("GAMMA1",0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::gamma1,
       &MOSFET_B4::Model::gamma1Given,
     U_VOLTH, CAT_PROCESS, "Vth body coefficient");
 
-    addPar ("GAMMA2",0.0, false, ParameterType::NO_DEP,
+    p.addPar ("GAMMA2",0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::gamma2,
       &MOSFET_B4::Model::gamma2Given,
     U_VOLTH, CAT_PROCESS, "Vth body coefficient");
 
-    addPar ("VBX", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("VBX", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::vbx,
       &MOSFET_B4::Model::vbxGiven,
     U_VOLT, CAT_PROCESS, "Vth transition body Voltage");
 
-    addPar ("VBM", -3.0, false, ParameterType::NO_DEP,
+    p.addPar ("VBM", -3.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::vbm,
       NULL, U_VOLT, CAT_BASIC, "Maximum body voltage");
 
-    addPar ("XT", 1.55e-7,false, ParameterType::NO_DEP,
+    p.addPar ("XT", 1.55e-7,false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::xt,
       &MOSFET_B4::Model::xtGiven,
     U_METER, CAT_PROCESS, "Doping depth");
 
-    addPar ("K1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("K1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::k1,
       &MOSFET_B4::Model::k1Given,
     U_VOLTMH, CAT_BASIC, "Bulk effect coefficient 1");
 
-    addPar ("KT1", -0.11, false, ParameterType::NO_DEP,
+    p.addPar ("KT1", -0.11, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::kt1,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient of Vth");
 
-    addPar ("KT1L", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("KT1L", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::kt1l,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient of Vth");
 
-    addPar ("KT2", 0.022, false, ParameterType::NO_DEP,
+    p.addPar ("KT2", 0.022, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::kt2,
       NULL, U_NONE, CAT_NONE, "Body-coefficient of kt1");
 
-    addPar ("K2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("K2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::k2,
       &MOSFET_B4::Model::k2Given,
     U_NONE, CAT_BASIC, "Bulk effect coefficient 2");
 
-    addPar ("K3", 80.0, false, ParameterType::NO_DEP,
+    p.addPar ("K3", 80.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::k3,
       NULL, U_NONE, CAT_BASIC, "Narrow width effect coefficient");
 
-    addPar ("K3B", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("K3B", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::k3b,
       NULL, U_NONE, CAT_NONE, "Body effect coefficient of k3");
 
-    addPar ("W0", 2.5e-6, false, ParameterType::NO_DEP,
+    p.addPar ("W0", 2.5e-6, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::w0,
       NULL, U_METER, CAT_BASIC, "Narrow width effect parameter");
 
-    addPar ("DVTP0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("DVTP0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dvtp0,
       NULL, U_METER, CAT_BASIC, "First parameter for Vth shift due to pocket");
 
-    addPar ("DVTP1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("DVTP1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dvtp1,
       NULL, U_VOLTM1, CAT_BASIC, "Second parameter for Vth shift due to pocket");
 
-    addPar ("LPE0", 1.74e-7,false, ParameterType::NO_DEP,
+    p.addPar ("LPE0", 1.74e-7,false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lpe0,
       NULL, U_METER, CAT_BASIC, "Equivalent length of pocket region at zero bias");
 
-    addPar ("LPEB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LPEB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lpeb,
       NULL, U_METER, CAT_BASIC, "Equivalent length of pocket region accounting for body bias");
 
 
-    addPar ("DVT0", 2.2, false, ParameterType::NO_DEP,
+    p.addPar ("DVT0", 2.2, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dvt0,
       NULL, U_NONE, CAT_BASIC, "Short channel effect coeff. 0");
 
-    addPar ("DVT1", 0.53, false, ParameterType::NO_DEP,
+    p.addPar ("DVT1", 0.53, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dvt1,
       NULL, U_NONE, CAT_BASIC, "Short channel effect coeff. 1");
 
-    addPar ("DVT2", -0.032, false, ParameterType::NO_DEP,
+    p.addPar ("DVT2", -0.032, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dvt2,
       NULL, U_VOLTM1, CAT_BASIC, "Short channel effect coeff. 2");
 
-    addPar ("DVT0W", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("DVT0W", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dvt0w,
       NULL, U_NONE, CAT_BASIC, "Narrow Width coeff. 0");
 
-    addPar ("DVT1W", 5.3e6, false, ParameterType::NO_DEP,
+    p.addPar ("DVT1W", 5.3e6, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dvt1w,
       NULL, U_METERM1, CAT_BASIC, "Narrow Width effect coeff. 1");
 
-    addPar ("DVT2W",-0.032, false, ParameterType::NO_DEP,
+    p.addPar ("DVT2W",-0.032, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dvt2w,
       NULL, U_VOLTM1, CAT_BASIC, "Narrow Width effect coeff. 2");
 
-    addPar ("DROUT", 0.56, false, ParameterType::NO_DEP,
+    p.addPar ("DROUT", 0.56, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::drout,
       NULL, U_NONE, CAT_BASIC, "DIBL coefficient of output resistance");
 
-    addPar ("DSUB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("DSUB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dsub,
       NULL, U_NONE, CAT_BASIC, "DIBL coefficient in the subthreshold region");
 
-    addPar ("VTH0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("VTH0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::vth0,
       &MOSFET_B4::Model::vth0Given, U_VOLT, CAT_BASIC, "");
 
-    addPar ("UA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("UA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ua,
       NULL, U_MVM1, CAT_BASIC, "Linear gate dependence of mobility");
 
-    addPar ("UA1", 1.0e-9, false, ParameterType::NO_DEP,
+    p.addPar ("UA1", 1.0e-9, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ua1,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient of ua");
 
-    addPar ("UB", 1.0e-19,false, ParameterType::NO_DEP,
+    p.addPar ("UB", 1.0e-19,false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ub,
       NULL, U_M2VM2, CAT_BASIC, "Quadratic gate dependence of mobility");
 
-    addPar ("UB1", -1.0e-18,false, ParameterType::NO_DEP,
+    p.addPar ("UB1", -1.0e-18,false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ub1,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient of ub");
 
-    addPar ("UC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("UC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::uc,
       NULL, U_VOLTM1, CAT_BASIC, "Body-bias dependence of mobility");
 
-    addPar ("UC1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("UC1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::uc1,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient of uc");
 
-    addPar ("UD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("UD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ud,
       NULL, U_METERM2, CAT_BASIC, "Coulomb scattering factor of mobility");
 
-    addPar ("UD1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("UD1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ud1,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient of ud");
 
-    addPar ("UP", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("UP", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::up,
       NULL, U_METERM2, CAT_BASIC, "Channel length linear factor of mobility");
 
-    addPar ("LP", 1.0e-8, false, ParameterType::NO_DEP,
+    p.addPar ("LP", 1.0e-8, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lp,
       NULL, U_METER, CAT_BASIC, "Channel length exponential factor of mobility");
 
-    addPar ("U0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("U0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::u0,
       NULL, U_M2VM1SM1, CAT_BASIC, "Low-field mobility at Tnom");
 
-    addPar ("EU", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("EU", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::eu,
       NULL, U_NONE, CAT_BASIC, "Mobility exponent");
 
-    addPar ("UTE", -1.5, false, ParameterType::NO_DEP,
+    p.addPar ("UTE", -1.5, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ute,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient of mobility");
 
-    addPar ("VOFF", -0.08, false, ParameterType::NO_DEP,
+    p.addPar ("VOFF", -0.08, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::voff,
       NULL, U_VOLT, CAT_BASIC, "Threshold voltage offset");
 
-    addPar ("MINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("MINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::minv,
       NULL, U_NONE, CAT_BASIC, "Fitting parameter for moderate inversion in Vgsteff");
 
-    addPar ("MINVCV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("MINVCV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::minvcv,
       NULL, U_NONE, CAT_CAP, "Fitting parameter for moderate inversion in Vgsteffcv");
 
-    addPar ("VOFFL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("VOFFL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::voffl,
       NULL, U_VOLT, CAT_BASIC, "Length dependence parameter for Vth offset");
 
-    addPar ("VOFFCVL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("VOFFCVL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::voffcvl,
       NULL, U_NONE, CAT_CAP, "Length dependence parameter for Vth offset in CV");
 
-    addPar ("TNOM", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TNOM", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tnom,
       NULL, U_NONE, CAT_NONE, "Parameter measurement temperature");
 
-    addPar ("CGSO", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CGSO", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cgso,
       &MOSFET_B4::Model::cgsoGiven,
     U_FARADMM1, CAT_CAP, "Gate-source overlap capacitance per width");
 
-    addPar ("CGDO", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CGDO", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cgdo,
       &MOSFET_B4::Model::cgdoGiven,
     U_FARADMM1, CAT_CAP, "Gate-drain overlap capacitance per width");
 
-    addPar ("CGBO", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CGBO", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cgbo,
       &MOSFET_B4::Model::cgboGiven,
     U_NONE, CAT_CAP, "Gate-bulk overlap capacitance per length");
 
-    addPar ("XPART", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("XPART", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::xpart,
       NULL, U_FARADMM1, CAT_CAP, "Channel charge partitioning");
 
-    addPar ("DELTA", 0.01, false, ParameterType::NO_DEP,
+    p.addPar ("DELTA", 0.01, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::delta,
       NULL, U_VOLT, CAT_BASIC, "Effective Vds parameter");
 
-    addPar ("RSH", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RSH", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::sheetResistance,
       NULL, U_OSQM1, CAT_PROCESS, "Source-drain sheet resistance");
 
 
-    addPar ("RDSW", 200.0, false, ParameterType::NO_DEP,
+    p.addPar ("RDSW", 200.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rdsw,
       NULL, U_OHMMICRON, CAT_ASYMRDS, "Source-drain resistance per width");
 
-    addPar ("RDSWMIN", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RDSWMIN", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rdswmin,
       NULL, U_OHMMICRON, CAT_ASYMRDS, "Source-drain resistance per width at high Vg");
 
-    addPar ("RSW", 100.0, false, ParameterType::NO_DEP,
+    p.addPar ("RSW", 100.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rsw,
       NULL, U_OHMMICRON, CAT_ASYMRDS, "Source resistance per width");
 
-    addPar ("RDW", 100.0, false, ParameterType::NO_DEP,
+    p.addPar ("RDW", 100.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rdw,
       NULL, U_OHMMICRON, CAT_ASYMRDS, "Drain resistance per width");
 
-    addPar ("RDWMIN", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RDWMIN", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rdwmin,
       NULL, U_OHMMICRON, CAT_ASYMRDS, "Drain resistance per width at high Vg");
 
-    addPar ("RSWMIN", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RSWMIN", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rswmin,
       NULL, U_OHMMICRON, CAT_ASYMRDS, "Source resistance per width at high Vg");
 
-    addPar ("PRWG", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("PRWG", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::prwg,
       NULL, U_VOLTM1, CAT_ASYMRDS, "Gate-bias effect on parasitic resistance ");
 
-    addPar ("PRWB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PRWB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::prwb,
       NULL, U_VOLTM1, CAT_ASYMRDS, "Body-effect on parasitic resistance ");
 
-    addPar ("PRT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PRT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::prt,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient of parasitic resistance ");
 
-    addPar ("ETA0", 0.08, false, ParameterType::NO_DEP,
+    p.addPar ("ETA0", 0.08, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::eta0,
       NULL, U_NONE, CAT_BASIC, "Subthreshold region DIBL coefficient");
 
-    addPar ("ETAB", -0.07, false, ParameterType::NO_DEP,
+    p.addPar ("ETAB", -0.07, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::etab,
       NULL, U_VOLTM1, CAT_BASIC, "Subthreshold region DIBL coefficient");
 
-    addPar ("PCLM", 1.3, false, ParameterType::NO_DEP,
+    p.addPar ("PCLM", 1.3, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pclm,
       NULL, U_NONE, CAT_BASIC, "Channel length modulation Coefficient");
 
 
     // check these:  are they PDIBL1, etc?
-    addPar ("PDIBLC1", 0.39, false, ParameterType::NO_DEP,
+    p.addPar ("PDIBLC1", 0.39, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pdibl1,
       NULL, U_NONE, CAT_BASIC, "Drain-induced barrier lowering coefficient");
 
-    addPar ("PDIBLC2", 0.0086, false, ParameterType::NO_DEP,
+    p.addPar ("PDIBLC2", 0.0086, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pdibl2,
       NULL, U_NONE, CAT_BASIC, "Drain-induced barrier lowering coefficient");
 
-    addPar ("PDIBLCB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PDIBLCB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pdiblb,
       NULL, U_VOLTM1, CAT_BASIC, "Body-effect on drain-induced barrier lowering");
 
 
-    addPar ("FPROUT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("FPROUT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::fprout,
       NULL, U_VMMH, CAT_BASIC, "Rout degradation coefficient for pocket devices");
 
-    addPar ("PDITS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PDITS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pdits,
       NULL, U_VOLTM1, CAT_BASIC, "Coefficient for drain-induced Vth shifts");
 
-    addPar ("PDITSL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PDITSL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pditsl,
       NULL, U_METERM1, CAT_BASIC, "Length dependence of drain-induced Vth shifts");
 
-    addPar ("PDITSD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PDITSD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pditsd,
       NULL, U_VOLTM1, CAT_BASIC, "Vds dependence of drain-induced Vth shifts");
 
 
-    addPar ("PSCBE1", 4.24e8, false, ParameterType::NO_DEP,
+    p.addPar ("PSCBE1", 4.24e8, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pscbe1,
       NULL, U_VMM1, CAT_BASIC, "Substrate current body-effect coefficient");
 
-    addPar ("PSCBE2", 1.0e-5, false, ParameterType::NO_DEP,
+    p.addPar ("PSCBE2", 1.0e-5, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pscbe2,
       NULL, U_MVM1, CAT_BASIC, "Substrate current body-effect coefficient");
 
 
-    addPar ("PVAG", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PVAG", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pvag,
       NULL, U_NONE, CAT_NONE, "Gate dependence of output resistance parameter");
 
-    addPar ("JSS", 1e-4, false, ParameterType::NO_DEP,
+    p.addPar ("JSS", 1e-4, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::SjctSatCurDensity,
       NULL, U_NONE, CAT_NONE, "Bottom source junction reverse saturation current density");
 
-    addPar ("JSWS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("JSWS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::SjctSidewallSatCurDensity,
       NULL, U_NONE, CAT_NONE, "Isolation edge sidewall source junction reverse saturation current density");
 
-    addPar ("JSWGS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("JSWGS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::SjctGateSidewallSatCurDensity,
       NULL, U_NONE, CAT_NONE, "Gate edge source junction reverse saturation current density");
 
-    addPar ("PBS", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("PBS", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::SbulkJctPotential,
       NULL, U_NONE, CAT_NONE, "Source junction built-in potential");
 
-    addPar ("NJS", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("NJS", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::SjctEmissionCoeff,
       NULL, U_NONE, CAT_NONE, "Source junction emission coefficient");
 
-    addPar ("XTIS", 3.0, false, ParameterType::NO_DEP,
+    p.addPar ("XTIS", 3.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::SjctTempExponent,
       NULL, U_NONE, CAT_NONE, "Source junction current temperature exponent");
 
-    addPar ("MJS", 0.5, false, ParameterType::NO_DEP,
+    p.addPar ("MJS", 0.5, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::SbulkJctBotGradingCoeff,
       NULL, U_NONE, CAT_NONE, "Source bottom junction capacitance grading coefficient");
 
-    addPar ("PBSWS", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("PBSWS", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::SsidewallJctPotential,
       NULL, U_NONE, CAT_NONE, "Source sidewall junction capacitance built in potential");
 
-    addPar ("MJSWS", 0.33, false, ParameterType::NO_DEP,
+    p.addPar ("MJSWS", 0.33, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::SbulkJctSideGradingCoeff,
       NULL, U_NONE, CAT_NONE, "Source sidewall junction capacitance grading coefficient");
 
 
-    addPar ("PBSWGS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PBSWGS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::SGatesidewallJctPotential,
       NULL, U_NONE, CAT_NONE, "Source (gate side) sidewall junction capacitance built in potential");
 
-    addPar ("MJSWGS", 0.33, false, ParameterType::NO_DEP,
+    p.addPar ("MJSWGS", 0.33, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::SbulkJctGateSideGradingCoeff,
       NULL, U_NONE, CAT_NONE, "Source (gate side) sidewall junction capacitance grading coefficient");
 
-    addPar ("CJS", 5e-4, false, ParameterType::NO_DEP,
+    p.addPar ("CJS", 5e-4, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::SunitAreaJctCap,
       NULL, U_NONE, CAT_NONE, "Source bottom junction capacitance per unit area");
 
-    addPar ("CJSWS", 5e-10, false, ParameterType::NO_DEP,
+    p.addPar ("CJSWS", 5e-10, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::SunitLengthSidewallJctCap,
       NULL, U_NONE, CAT_NONE, "Source sidewall junction capacitance per unit periphery");
 
-    addPar ("CJSWGS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CJSWGS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::SunitLengthGateSidewallJctCap,
       NULL, U_NONE, CAT_NONE, "Source (gate side) sidewall junction capacitance per unit width");
 
-    addPar ("JSD", 1e-4, false, ParameterType::NO_DEP,
+    p.addPar ("JSD", 1e-4, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::DjctSatCurDensity,
       NULL, U_NONE, CAT_NONE, "Bottom drain junction reverse saturation current density");
 
-    addPar ("JSWD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("JSWD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::DjctSidewallSatCurDensity,
       NULL, U_NONE, CAT_NONE, "Isolation edge sidewall drain junction reverse saturation current density");
 
-    addPar ("JSWGD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("JSWGD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::DjctGateSidewallSatCurDensity,
       NULL, U_NONE, CAT_NONE, "Gate edge drain junction reverse saturation current density");
 
-    addPar ("PBD", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("PBD", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::DbulkJctPotential,
       NULL, U_NONE, CAT_NONE, "Drain junction built-in potential");
 
-    addPar ("NJD", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("NJD", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::DjctEmissionCoeff,
       NULL, U_NONE, CAT_NONE, "Drain junction emission coefficient");
 
-    addPar ("XTID", 3.0, false, ParameterType::NO_DEP,
+    p.addPar ("XTID", 3.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::DjctTempExponent,
       NULL, U_NONE, CAT_NONE, "Drainjunction current temperature exponent");
 
-    addPar ("MJD", 0.5, false, ParameterType::NO_DEP,
+    p.addPar ("MJD", 0.5, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::DbulkJctBotGradingCoeff,
       NULL, U_NONE, CAT_NONE, "Drain bottom junction capacitance grading coefficient");
 
-    addPar ("PBSWD", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("PBSWD", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::DsidewallJctPotential ,
       NULL, U_NONE, CAT_NONE, "Drain sidewall junction capacitance built in potential");
 
-    addPar ("MJSWD", 0.33, false, ParameterType::NO_DEP,
+    p.addPar ("MJSWD", 0.33, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::DbulkJctSideGradingCoeff,
       NULL, U_NONE, CAT_NONE, "Drain sidewall junction capacitance grading coefficient");
 
-    addPar ("PBSWGD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PBSWGD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::DGatesidewallJctPotential,
       NULL, U_NONE, CAT_NONE, "Drain (gate side) sidewall junction capacitance built in potential");
 
-    addPar ("MJSWGD", 0.33, false, ParameterType::NO_DEP,
+    p.addPar ("MJSWGD", 0.33, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::DbulkJctGateSideGradingCoeff,
       NULL, U_NONE, CAT_NONE, "Drain (gate side) sidewall junction capacitance grading coefficient");
 
-    addPar ("CJD", 5e-4, false, ParameterType::NO_DEP,
+    p.addPar ("CJD", 5e-4, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::DunitAreaJctCap,
       NULL, U_NONE, CAT_NONE, "Drain bottom junction capacitance per unit area");
 
-    addPar ("CJSWD", 5e-10, false, ParameterType::NO_DEP,
+    p.addPar ("CJSWD", 5e-10, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::DunitLengthSidewallJctCap,
       NULL, U_NONE, CAT_NONE, "Drain sidewall junction capacitance per unit periphery");
 
-    addPar ("CJSWGD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CJSWGD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::DunitLengthGateSidewallJctCap,
       NULL, U_NONE, CAT_NONE, "Drain (gate side) sidewall junction capacitance per unit width");
 
-    addPar ("VFBCV", -1.0, false, ParameterType::NO_DEP,
+    p.addPar ("VFBCV", -1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::vfbcv,
       NULL, U_VOLT, CAT_CAP, "Flat Band Voltage parameter for capmod=0 only");
 
-    addPar ("VFB", -1.0, false, ParameterType::NO_DEP,
+    p.addPar ("VFB", -1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::vfb,
       &MOSFET_B4::Model::vfbGiven, U_VOLT, CAT_BASIC, "Flat Band Voltage");
 
-    addPar ("TPB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TPB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tpb,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient of pb");
 
-    addPar ("TCJ", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TCJ", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tcj,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient of cj");
 
-    addPar ("TPBSW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TPBSW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tpbsw,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient of pbsw");
 
-    addPar ("TCJSW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TCJSW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tcjsw,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient of cjsw");
 
-    addPar ("TPBSWG", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TPBSWG", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tpbswg,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient of pbswg");
 
-    addPar ("TCJSWG", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TCJSWG", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tcjswg,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient of cjswg");
 
-    addPar ("ACDE", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("ACDE", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::acde,
       NULL, U_MVM1, CAT_CAP, "Exponential coefficient for finite charge thickness");
 
-    addPar ("MOIN", 15.0, false, ParameterType::NO_DEP,
+    p.addPar ("MOIN", 15.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::moin,
       NULL, U_NONE, CAT_CAP, "Coefficient for gate-bias dependent surface potential");
 
-    addPar ("NOFF", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("NOFF", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::noff,
       NULL, U_NONE, CAT_CAP, "C-V turn-on/off parameter");
 
-    addPar ("VOFFCV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("VOFFCV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::voffcv,
       NULL, U_VOLT, CAT_CAP, "C-V lateral-shift parameter");
 
 
-    addPar ("DMCG", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("DMCG", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dmcg,
       NULL, U_NONE, CAT_NONE, "Distance of Mid-Contact to Gate edge");
 
-    addPar ("DMCI", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("DMCI", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dmci,
       NULL, U_NONE, CAT_NONE, "Distance of Mid-Contact to Isolation");
 
 
-    addPar ("DMDG", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("DMDG", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dmdg,
       NULL, U_NONE, CAT_NONE, "Distance of Mid-Diffusion to Gate edge");
 
-    addPar ("DMCGT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("DMCGT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dmcgt,
       NULL, U_NONE, CAT_NONE, "Distance of Mid-Contact to Gate edge in Test structures");
 
-    addPar ("XGW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("XGW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::xgw,
       NULL, U_NONE, CAT_NONE, "Distance from gate contact center to device edge");
 
-    addPar ("XGL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("XGL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::xgl,
       NULL, U_NONE, CAT_NONE, "Variation in Ldrawn");
 
-    addPar ("RSHG", 0.1, false, ParameterType::NO_DEP,
+    p.addPar ("RSHG", 0.1, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rshg,
       NULL, U_OSQM1, CAT_PROCESS, "Gate sheet resistance");
 
-    addPar ("NGCON", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("NGCON", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ngcon,
       NULL, U_NONE, CAT_NONE, "Number of gate contacts");
 
-    addPar ("XRCRG1", 12.0, false, ParameterType::NO_DEP,
+    p.addPar ("XRCRG1", 12.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::xrcrg1,
       NULL, U_NONE, CAT_NONE, "First fitting parameter the bias-dependent Rg");
 
-    addPar ("XRCRG2", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("XRCRG2", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::xrcrg2,
       NULL, U_NONE, CAT_NONE, "Second fitting parameter the bias-dependent Rg");
 
 
-    addPar ("LAMBDA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LAMBDA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lambda,
       &MOSFET_B4::Model::lambdaGiven,
     U_NONE, CAT_BASIC, " Velocity overshoot parameter");
 
-    addPar ("VTL", 2.0e5, false, ParameterType::NO_DEP,
+    p.addPar ("VTL", 2.0e5, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::vtl,
       &MOSFET_B4::Model::vtlGiven,
     U_MSM1, CAT_BASIC, " thermal velocity");
 
-    addPar ("LC", 5.0e-9, false, ParameterType::NO_DEP,
+    p.addPar ("LC", 5.0e-9, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lc,
       NULL, U_METER, CAT_BASIC, " back scattering parameter");
 
-    addPar ("XN", 3.0, false, ParameterType::NO_DEP,
+    p.addPar ("XN", 3.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::xn,
       NULL, U_NONE, CAT_BASIC, " back scattering parameter");
 
-    addPar ("VFBSDOFF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("VFBSDOFF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::vfbsdoff,
       NULL, U_VOLT, CAT_TUNNEL, "S/D flatband voltage offset");
 
-    addPar ("TVFBSDOFF",0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TVFBSDOFF",0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tvfbsdoff,
       NULL, U_NONE, CAT_NONE, "Temperature parameter for vfbsdoff");
 
-    addPar ("TVOFF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TVOFF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tvoff,
       NULL, U_NONE, CAT_NONE, "Temperature parameter for voff");
 
-    addPar ("LINTNOI", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LINTNOI", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lintnoi,
       NULL, U_NONE, CAT_NONE, "lint offset for noise calculation");
 
-    addPar ("LINT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LINT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Lint,
       NULL, U_METER, CAT_BASIC, "Length reduction parameter");
 
-    addPar ("LL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Ll,
       NULL, U_NONE, CAT_NONE, "Length reduction parameter");
 
-    addPar ("LLC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LLC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Llc,
       NULL, U_NONE, CAT_NONE, "Length reduction parameter for CV");
 
-    addPar ("LLN", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("LLN", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Lln,
       NULL, U_NONE, CAT_NONE, "Length reduction parameter");
 
-    addPar ("LW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Lw,
       NULL, U_NONE, CAT_NONE, "Length reduction parameter");
 
-    addPar ("LWC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LWC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Lwc,
       NULL, U_NONE, CAT_NONE, "Length reduction parameter for CV");
 
-    addPar ("LWN", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("LWN", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Lwn,
       NULL, U_NONE, CAT_NONE, "Length reduction parameter");
 
-    addPar ("LWL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LWL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Lwl,
       NULL, U_NONE, CAT_NONE, "Length reduction parameter");
 
-    addPar ("LWLC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LWLC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Lwlc,
       NULL, U_NONE, CAT_NONE, "Length reduction parameter for CV");
 
-    addPar ("LMIN", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LMIN", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Lmin,
       NULL, U_NONE, CAT_NONE, "Minimum length for the model");
 
-    addPar ("LMAX", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("LMAX", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Lmax,
       NULL, U_NONE, CAT_NONE, "Maximum length for the model");
 
 
-    addPar ("WR", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("WR", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wr,
       NULL, U_NONE, CAT_ASYMRDS, "Width dependence of rds");
 
-    addPar ("WINT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WINT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Wint,
       NULL, U_METER, CAT_BASIC, "Width reduction parameter");
 
-    addPar ("DWG", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("DWG", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dwg,
       NULL, U_MVM1, CAT_BASIC, "Width reduction parameter");
 
-    addPar ("DWB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("DWB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dwb,
       NULL, U_MVMH, CAT_BASIC, "Width reduction parameter");
 
-    addPar ("WL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Wl,
       NULL, U_NONE, CAT_NONE, "Width reduction parameter");
 
-    addPar ("WLC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WLC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Wlc,
       NULL, U_NONE, CAT_NONE, "Width reduction parameter for CV");
 
-    addPar ("WLN", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("WLN", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Wln,
       NULL, U_NONE, CAT_NONE, "Width reduction parameter");
 
-    addPar ("WW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Ww,
       NULL, U_NONE, CAT_NONE, "Width reduction parameter");
 
-    addPar ("WWC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WWC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Wwc,
       NULL, U_NONE, CAT_NONE, "Width reduction parameter for CV");
 
-    addPar ("WWN", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("WWN", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Wwn,
       NULL, U_NONE, CAT_NONE, "Width reduction parameter");
 
-    addPar ("WWL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WWL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Wwl,
       NULL, U_NONE, CAT_NONE, "Width reduction parameter");
 
-    addPar ("WWLC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WWLC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Wwlc,
       NULL, U_NONE, CAT_NONE, "Width reduction parameter for CV");
 
-    addPar ("WMIN", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WMIN", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Wmin,
       NULL, U_NONE, CAT_NONE, "Minimum width for the model");
 
-    addPar ("WMAX", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("WMAX", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::Wmax,
       NULL, U_NONE, CAT_NONE, "Maximum width for the model");
 
-    addPar ("B0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("B0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::b0,
       NULL, U_METER, CAT_BASIC, "Abulk narrow width parameter");
 
-    addPar ("B1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("B1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::b1,
       NULL, U_METER, CAT_BASIC, "Abulk narrow width parameter");
 
-    addPar ("CGSL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CGSL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cgsl,
       NULL, U_FARADMM1, CAT_CAP, "New C-V model parameter");
 
-    addPar ("CGDL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CGDL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cgdl,
       NULL, U_FARADMM1, CAT_CAP, "New C-V model parameter");
 
 
-    addPar ("CKAPPAS", 0.6, false, ParameterType::NO_DEP,
+    p.addPar ("CKAPPAS", 0.6, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ckappas,
       NULL, U_VOLT, CAT_CAP, "S/G overlap C-V parameter ");
 
-    addPar ("CKAPPAD", 0.6, false, ParameterType::NO_DEP,
+    p.addPar ("CKAPPAD", 0.6, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ckappad,
       NULL, U_VOLT, CAT_CAP, "D/G overlap C-V parameter");
 
 
-    addPar ("CF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cf,
       NULL, U_FARADMM1, CAT_CAP, "Fringe capacitance parameter");
 
-    addPar ("CLC", 0.1e-6, false, ParameterType::NO_DEP,
+    p.addPar ("CLC", 0.1e-6, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::clc,
       NULL, U_METER, CAT_CAP, "Vdsat parameter for C-V model");
 
-    addPar ("CLE", 0.6, false, ParameterType::NO_DEP,
+    p.addPar ("CLE", 0.6, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cle,
       NULL, U_NONE, CAT_CAP, "Vdsat parameter for C-V model");
 
-    addPar ("DWC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("DWC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dwc,
       NULL, U_METER, CAT_CAP, "Delta W for C-V model");
 
-    addPar ("DLC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("DLC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dlc,
       &MOSFET_B4::Model::dlcGiven, U_METER, CAT_CAP, "Delta L for C-V model");
 
-    addPar ("XW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("XW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::xw,
       NULL, U_NONE, CAT_NONE, "W offset for channel width due to mask/etch effect");
 
-    addPar ("XL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("XL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::xl,
       NULL, U_NONE, CAT_NONE, "L offset for channel length due to mask/etch effect");
 
-    addPar ("DLCIG", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("DLCIG", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dlcig,
       NULL, U_NONE, CAT_NONE, "Delta L for Ig model");
 
-    addPar ("DLCIGD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("DLCIGD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dlcigd,
       NULL, U_METER, CAT_TUNNEL, "Delta L for Ig model drain side");
 
-    addPar ("DWJ", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("DWJ", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::dwj,
       NULL, U_NONE, CAT_NONE, "Delta W for S/D junctions");
 
-    addPar ("ALPHA0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("ALPHA0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::alpha0,
       NULL, U_MVM1, CAT_IMPACT, "substrate current model parameter");
 
-    addPar ("ALPHA1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("ALPHA1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::alpha1,
       NULL, U_VOLTM1, CAT_IMPACT, "substrate current model parameter");
 
-    addPar ("BETA0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("BETA0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::beta0,
       NULL, U_VOLTM1, CAT_IMPACT, "substrate current model parameter");
 
-    addPar ("AGIDL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("AGIDL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::agidl,
       NULL, U_OHMM1, CAT_GDLEAKAGE, "Pre-exponential constant for GIDL");
 
-    addPar ("BGIDL", 2.3e9, false, ParameterType::NO_DEP,
+    p.addPar ("BGIDL", 2.3e9, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::bgidl,
       NULL, U_VMM1, CAT_GDLEAKAGE, "Exponential constant for GIDL");
 
-    addPar ("CGIDL", 0.5, false, ParameterType::NO_DEP,
+    p.addPar ("CGIDL", 0.5, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cgidl,
       NULL, U_VOLT3, CAT_GDLEAKAGE, "Parameter for body-bias dependence of GIDL");
 
-    addPar ("EGIDL", 0.8, false, ParameterType::NO_DEP,
+    p.addPar ("EGIDL", 0.8, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::egidl,
       NULL, U_VOLT, CAT_GDLEAKAGE, "Fitting parameter for Bandbending");
 
-    addPar ("AGISL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("AGISL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::agisl,
       NULL, U_OHMM1, CAT_GDLEAKAGE, "Pre-exponential constant for GISL");
 
-    addPar ("BGISL", 2.3e-9, false, ParameterType::NO_DEP,
+    p.addPar ("BGISL", 2.3e-9, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::bgisl,
       NULL, U_VMM1, CAT_GDLEAKAGE, "Exponential constant for GISL");
 
-    addPar ("CGISL", 0.5, false, ParameterType::NO_DEP,
+    p.addPar ("CGISL", 0.5, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cgisl,
       NULL, U_VOLT3, CAT_GDLEAKAGE, "Parameter for body-bias dependence of GISL");
 
-    addPar ("EGISL", 0.8, false, ParameterType::NO_DEP,
+    p.addPar ("EGISL", 0.8, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::egisl,
       NULL, U_VOLT, CAT_GDLEAKAGE, "Fitting parameter for Bandbending");
 
 
     // These are type-dependent. For the table, assuming NMOS.
-    addPar ("AIGC", 1.36e-2, false, ParameterType::NO_DEP,
+    p.addPar ("AIGC", 1.36e-2, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::aigc,
       NULL, U_FS2HGMHMM1, CAT_TUNNEL, "Parameter for Igc");
 
-    addPar ("BIGC", 1.71e-3, false, ParameterType::NO_DEP,
+    p.addPar ("BIGC", 1.71e-3, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::bigc,
       NULL, U_FS2HGMHMM1VM1, CAT_TUNNEL, "Parameter for Igc");
 
-    addPar ("CIGC", 0.075, false, ParameterType::NO_DEP,
+    p.addPar ("CIGC", 0.075, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cigc,
       NULL, U_VOLTM1, CAT_TUNNEL, "Parameter for Igc");
 
-    addPar ("AIGSD", 1.36e-2, false, ParameterType::NO_DEP,
+    p.addPar ("AIGSD", 1.36e-2, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::aigsd,
       NULL, U_NONE, CAT_NONE, "Parameter for Igs,d");
 
-    addPar ("BIGSD", 1.71e-3, false, ParameterType::NO_DEP,
+    p.addPar ("BIGSD", 1.71e-3, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::bigsd,
       NULL, U_NONE, CAT_NONE, "Parameter for Igs,d");
 
-    addPar ("CIGSD", 0.075, false, ParameterType::NO_DEP,
+    p.addPar ("CIGSD", 0.075, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cigsd,
       NULL, U_NONE, CAT_NONE, "Parameter for Igs,d");
 
-    addPar ("AIGS", 1.36e-2, false, ParameterType::NO_DEP,
+    p.addPar ("AIGS", 1.36e-2, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::aigs,
       NULL, U_FS2HGMHMM1, CAT_TUNNEL, "Parameter for Igs");
 
-    addPar ("BIGS", 1.71e-3, false, ParameterType::NO_DEP,
+    p.addPar ("BIGS", 1.71e-3, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::bigs,
       NULL, U_FS2HGMHMM1VM1, CAT_TUNNEL, "Parameter for Igs");
 
-    addPar ("CIGS", 0.075, false, ParameterType::NO_DEP,
+    p.addPar ("CIGS", 0.075, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cigs,
       NULL, U_VOLTM1, CAT_TUNNEL, "Parameter for Igs");
 
-    addPar ("AIGD", 1.36e-2, false, ParameterType::NO_DEP,
+    p.addPar ("AIGD", 1.36e-2, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::aigd,
       NULL, U_FS2HGMHMM1, CAT_TUNNEL, "Parameter for Igd");
 
-    addPar ("BIGD", 1.71e-3, false, ParameterType::NO_DEP,
+    p.addPar ("BIGD", 1.71e-3, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::bigd,
       NULL, U_FS2HGMHMM1VM1, CAT_TUNNEL, "Parameter for Igd");
 
-    addPar ("CIGD", 0.075, false, ParameterType::NO_DEP,
+    p.addPar ("CIGD", 0.075, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cigd,
       NULL, U_VOLTM1, CAT_TUNNEL, "Parameter for Igd");
 
 
 
-    addPar ("AIGBACC", 1.36e-2, false, ParameterType::NO_DEP,
+    p.addPar ("AIGBACC", 1.36e-2, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::aigbacc,
       NULL, U_FS2HGMHMM1, CAT_TUNNEL, "Parameter for Igb");
 
-    addPar ("BIGBACC", 1.71e-3, false, ParameterType::NO_DEP,
+    p.addPar ("BIGBACC", 1.71e-3, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::bigbacc,
       NULL, U_FS2HGMHMM1VM1, CAT_TUNNEL, "Parameter for Igb");
 
-    addPar ("CIGBACC", 0.075, false, ParameterType::NO_DEP,
+    p.addPar ("CIGBACC", 0.075, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cigbacc,
       NULL, U_VOLTM1, CAT_TUNNEL, "Parameter for Igb");
 
-    addPar ("AIGBINV", 1.11e-2, false, ParameterType::NO_DEP,
+    p.addPar ("AIGBINV", 1.11e-2, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::aigbinv,
       NULL, U_FS2HGMHMM1, CAT_TUNNEL, "Parameter for Igb");
 
-    addPar ("BIGBINV", 9.49e-4, false, ParameterType::NO_DEP,
+    p.addPar ("BIGBINV", 9.49e-4, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::bigbinv,
       NULL, U_FS2HGMHMM1VM1, CAT_TUNNEL, "Parameter for Igb");
 
-    addPar ("CIGBINV", 0.006, false, ParameterType::NO_DEP,
+    p.addPar ("CIGBINV", 0.006, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::cigbinv,
       NULL, U_VOLTM1, CAT_TUNNEL, "Parameter for Igb");
 
 
-    addPar ("NIGC", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("NIGC", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::nigc,
       NULL, U_NONE, CAT_TUNNEL, "Parameter for Igc slope");
 
-    addPar ("NIGBINV", 3.0, false, ParameterType::NO_DEP,
+    p.addPar ("NIGBINV", 3.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::nigbinv,
       NULL, U_NONE, CAT_TUNNEL, "Parameter for Igbinv slope");
 
-    addPar ("NIGBACC", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("NIGBACC", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::nigbacc,
       NULL, U_NONE, CAT_TUNNEL, "Parameter for Igbacc slope");
 
-    addPar ("NTOX", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("NTOX", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ntox,
       NULL, U_NONE, CAT_TUNNEL, "Exponent for Tox ratio");
 
-    addPar ("EIGBINV", 1.1, false, ParameterType::NO_DEP,
+    p.addPar ("EIGBINV", 1.1, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::eigbinv,
       NULL, U_VOLT, CAT_TUNNEL, "Parameter for the Si bandgap for Igbinv");
 
-    addPar ("PIGCD", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("PIGCD", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pigcd,
       &MOSFET_B4::Model::pigcdGiven, U_NONE, CAT_TUNNEL, "Parameter for Igc partition");
 
-    addPar ("POXEDGE", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("POXEDGE", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::poxedge,
       NULL, U_NONE, CAT_TUNNEL, "Factor for the gate edge Tox");
 
 
     // By default, the drain values are set to the source values here:
-    addPar ("IJTHDFWD", 0.1, false, ParameterType::NO_DEP,
+    p.addPar ("IJTHDFWD", 0.1, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ijthdfwd,
       NULL, U_NONE, CAT_NONE, "Forward drain diode forward limiting current");
 
-    addPar ("IJTHSFWD", 0.1, false, ParameterType::NO_DEP,
+    p.addPar ("IJTHSFWD", 0.1, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ijthsfwd,
       NULL, U_NONE, CAT_NONE, "Forward source diode forward limiting current");
 
-    addPar ("IJTHDREV", 0.1, false, ParameterType::NO_DEP,
+    p.addPar ("IJTHDREV", 0.1, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ijthdrev,
       NULL, U_NONE, CAT_NONE, "Reverse drain diode forward limiting current");
 
-    addPar ("IJTHSREV", 0.1, false, ParameterType::NO_DEP,
+    p.addPar ("IJTHSREV", 0.1, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ijthsrev,
       NULL, U_NONE, CAT_NONE, "Reverse source diode forward limiting current");
 
-    addPar ("XJBVD", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("XJBVD", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::xjbvd,
       NULL, U_NONE, CAT_NONE, "Fitting parameter for drain diode breakdown current");
 
-    addPar ("XJBVS", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("XJBVS", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::xjbvs,
       NULL, U_NONE, CAT_NONE, "Fitting parameter for source diode breakdown current");
 
-    addPar ("BVD", 10.0, false, ParameterType::NO_DEP,
+    p.addPar ("BVD", 10.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::bvd,
       NULL, U_NONE, CAT_NONE, "Drain diode breakdown voltage");
 
-    addPar ("BVS", 10.0, false, ParameterType::NO_DEP,
+    p.addPar ("BVS", 10.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::bvs,
       NULL, U_NONE, CAT_NONE, "Source diode breakdown voltage");
 
 
-    addPar ("JTSS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("JTSS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::jtss,
       NULL, U_NONE, CAT_NONE, "Source bottom trap-assisted saturation current density");
 
-    addPar ("JTSD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("JTSD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::jtsd,
       NULL, U_NONE, CAT_NONE, "Drain bottom trap-assisted saturation current density");
 
-    addPar ("JTSSWS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("JTSSWS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::jtssws,
       NULL, U_NONE, CAT_NONE, "Source STI sidewall trap-assisted saturation current density");
 
-    addPar ("JTSSWD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("JTSSWD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::jtsswd,
       NULL, U_NONE, CAT_NONE, "Drain STI sidewall trap-assisted saturation current density");
 
-    addPar ("JTSSWGS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("JTSSWGS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::jtsswgs,
       NULL, U_NONE, CAT_NONE, "Source gate-edge sidewall trap-assisted saturation current density");
 
-    addPar ("JTSSWGD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("JTSSWGD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::jtsswgd,
       NULL, U_NONE, CAT_NONE, "Drain gate-edge sidewall trap-assisted saturation current density");
 
-    addPar ("NJTS", 20.0, false, ParameterType::NO_DEP,
+    p.addPar ("NJTS", 20.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::njts,
       NULL, U_NONE, CAT_NONE, "Non-ideality factor for bottom junction");
 
-    addPar ("NJTSSW", 20.0, false, ParameterType::NO_DEP,
+    p.addPar ("NJTSSW", 20.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::njtssw,
       NULL, U_NONE, CAT_NONE, "Non-ideality factor for STI sidewall junction");
 
-    addPar ("NJTSSWG", 20.0, false, ParameterType::NO_DEP,
+    p.addPar ("NJTSSWG", 20.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::njtsswg,
       NULL, U_NONE, CAT_NONE, "Non-ideality factor for gate-edge sidewall junction");
 
 
-    addPar ("NJTSD", 20.0, false, ParameterType::NO_DEP,
+    p.addPar ("NJTSD", 20.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::njtsd,
       NULL, U_NONE, CAT_NONE, "Non-ideality factor for bottom junction drain side");
 
-    addPar ("NJTSSWD", 20.0, false, ParameterType::NO_DEP,
+    p.addPar ("NJTSSWD", 20.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::njtsswd,
       NULL, U_NONE, CAT_NONE, "Non-ideality factor for STI sidewall junction drain side");
 
-    addPar ("NJTSSWGD", 20.0, false, ParameterType::NO_DEP,
+    p.addPar ("NJTSSWGD", 20.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::njtsswgd,
       NULL,U_NONE, CAT_NONE, "Non-ideality factor for gate-edge sidewall junction drain side");
 
 
-    addPar ("XTSS", 0.02, false, ParameterType::NO_DEP,
+    p.addPar ("XTSS", 0.02, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::xtss,
       NULL, U_NONE, CAT_NONE, "Power dependence of JTSS on temperature");
 
-    addPar ("XTSD", 0.02, false, ParameterType::NO_DEP,
+    p.addPar ("XTSD", 0.02, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::xtsd,
       NULL, U_NONE, CAT_NONE, "Power dependence of JTSD on temperature");
 
-    addPar ("XTSSWS", 0.02, false, ParameterType::NO_DEP,
+    p.addPar ("XTSSWS", 0.02, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::xtssws,
       NULL, U_NONE, CAT_NONE, "Power dependence of JTSSWS on temperature");
 
-    addPar ("XTSSWD", 0.02, false, ParameterType::NO_DEP,
+    p.addPar ("XTSSWD", 0.02, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::xtsswd,
       NULL, U_NONE, CAT_NONE, "Power dependence of JTSSWD on temperature");
 
-    addPar ("XTSSWGS", 0.02, false, ParameterType::NO_DEP,
+    p.addPar ("XTSSWGS", 0.02, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::xtsswgs,
       NULL, U_NONE, CAT_NONE, "Power dependence of JTSSWGS on temperature");
 
-    addPar ("XTSSWGD", 0.02, false, ParameterType::NO_DEP,
+    p.addPar ("XTSSWGD", 0.02, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::xtsswgd,
       NULL, U_NONE, CAT_NONE, "Power dependence of JTSSWGD on temperature");
 
-    addPar ("TNJTS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TNJTS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tnjts,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient for NJTS");
 
-    addPar ("TNJTSSW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TNJTSSW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tnjtssw,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient for NJTSSW");
 
-    addPar ("TNJTSSWG", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TNJTSSWG", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tnjtsswg,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient for NJTSSWG");
 
-    addPar ("TNJTSD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TNJTSD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tnjtsd,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient for NJTSD");
 
-    addPar ("TNJTSSWD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TNJTSSWD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tnjtsswd,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient for NJTSSWD");
 
-    addPar ("TNJTSSWGD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TNJTSSWGD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tnjtsswgd,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient for NJTSSWGD");
 
 
-    addPar ("VTSS", 10.0, false, ParameterType::NO_DEP,
+    p.addPar ("VTSS", 10.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::vtss,
       NULL, U_NONE, CAT_NONE, "Source bottom trap-assisted voltage dependent parameter");
 
-    addPar ("VTSD", 10.0, false, ParameterType::NO_DEP,
+    p.addPar ("VTSD", 10.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::vtsd,
       NULL, U_NONE, CAT_NONE, "Drain bottom trap-assisted voltage dependent parameter");
 
-    addPar ("VTSSWS", 10.0, false, ParameterType::NO_DEP,
+    p.addPar ("VTSSWS", 10.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::vtssws,
       NULL, U_NONE, CAT_NONE, "Source STI sidewall trap-assisted voltage dependent parameter");
 
-    addPar ("VTSSWD", 10.0, false, ParameterType::NO_DEP,
+    p.addPar ("VTSSWD", 10.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::vtsswd,
       NULL, U_NONE, CAT_NONE, "Drain STI sidewall trap-assisted voltage dependent parameter");
 
-    addPar ("VTSSWGS", 10.0, false, ParameterType::NO_DEP,
+    p.addPar ("VTSSWGS", 10.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::vtsswgs,
       NULL, U_NONE, CAT_NONE, "Source gate-edge sidewall trap-assisted voltage dependent parameter");
 
-    addPar ("VTSSWGD", 10.0, false, ParameterType::NO_DEP,
+    p.addPar ("VTSSWGD", 10.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::vtsswgd,
       NULL, U_NONE, CAT_NONE, "Drain gate-edge sidewall trap-assisted voltage dependent parameter");
 
 
-    addPar ("GBMIN", 1.0e-12, false, ParameterType::NO_DEP,
+    p.addPar ("GBMIN", 1.0e-12, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::gbmin,
       NULL, U_OHMM1, CAT_NONE, "Minimum body conductance");
 
-    addPar ("RBDB", 50.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBDB", 50.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbdb,
       NULL, U_OHM, CAT_NONE, "Resistance between bNode and dbNode");
 
-    addPar ("RBPB", 50.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPB", 50.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbpb,
       NULL, U_OHM, CAT_NONE, "Resistance between bNodePrime and bNode");
 
-    addPar ("RBSB", 50.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBSB", 50.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbsb,
       NULL, U_OHM, CAT_NONE, "Resistance between bNode and sbNode");
 
-    addPar ("RBPS", 50.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPS", 50.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbps,
       NULL, U_OHM, CAT_NONE, "Resistance between bNodePrime and sbNode");
 
-    addPar ("RBPD", 50.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPD", 50.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbpd,
       NULL, U_OHM, CAT_NONE, "Resistance between bNodePrime and bNode");
 
 
-    addPar ("RBPS0", 50.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPS0", 50.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbps0,
       &MOSFET_B4::Model::rbps0Given, U_NONE, CAT_NONE, "Body resistance RBPS scaling");
 
-    addPar ("RBPSL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPSL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbpsl,
       NULL, U_NONE, CAT_NONE, "Body resistance RBPS L scaling");
 
-    addPar ("RBPSW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPSW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbpsw,
       NULL, U_NONE, CAT_NONE, "Body resistance RBPS W scaling");
 
-    addPar ("RBPSNF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPSNF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbpsnf,
       NULL, U_NONE, CAT_NONE, "Body resistance RBPS NF scaling");
 
 
-    addPar ("RBPD0", 50.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPD0", 50.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbpd0,
       &MOSFET_B4::Model::rbpd0Given,
     U_NONE, CAT_NONE, "Body resistance RBPD scaling");
 
-    addPar ("RBPDL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPDL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbpdl,
       NULL, U_NONE, CAT_NONE, "Body resistance RBPD L scaling");
 
-    addPar ("RBPDW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPDW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbpdw,
       NULL, U_NONE, CAT_NONE, "Body resistance RBPD W scaling");
 
-    addPar ("RBPDNF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPDNF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbpdnf,
       NULL, U_NONE, CAT_NONE, "Body resistance RBPD NF scaling");
 
 
-    addPar ("RBPBX0", 100.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPBX0", 100.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbpbx0,
       NULL, U_NONE, CAT_NONE, "Body resistance RBPBX  scaling");
 
-    addPar ("RBPBXL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPBXL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbpbxl,
       NULL, U_NONE, CAT_NONE, "Body resistance RBPBX L scaling");
 
-    addPar ("RBPBXW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPBXW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbpbxw,
       NULL, U_NONE, CAT_NONE, "Body resistance RBPBX W scaling");
 
-    addPar ("RBPBXNF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPBXNF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbpbxnf,
       NULL, U_NONE, CAT_NONE, "Body resistance RBPBX NF scaling");
 
 
-    addPar ("RBPBY0", 100.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPBY0", 100.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbpby0,
       NULL, U_NONE, CAT_NONE, "Body resistance RBPBY  scaling");
 
-    addPar ("RBPBYL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPBYL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbpbyl,
       NULL, U_NONE, CAT_NONE, "Body resistance RBPBY L scaling");
 
-    addPar ("RBPBYW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPBYW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbpbyw,
       NULL, U_NONE, CAT_NONE, "Body resistance RBPBY W scaling");
 
-    addPar ("RBPBYNF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBPBYNF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbpbynf,
       NULL, U_NONE, CAT_NONE, "Body resistance RBPBY NF scaling");
 
 
-    addPar ("RBSBX0", 100.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBSBX0", 100.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbsbx0,
       &MOSFET_B4::Model::rbsbx0Given,
     U_NONE, CAT_NONE, "Body resistance RBSBX  scaling");
 
-    addPar ("RBSBY0", 100.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBSBY0", 100.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbsby0,
       &MOSFET_B4::Model::rbsby0Given,
     U_NONE, CAT_NONE, "Body resistance RBSBY  scaling");
 
-    addPar ("RBDBX0", 100.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBDBX0", 100.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbdbx0,
       &MOSFET_B4::Model::rbdbx0Given,
     U_NONE, CAT_NONE, "Body resistance RBDBX  scaling");
 
-    addPar ("RBDBY0", 100.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBDBY0", 100.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbdby0,
       &MOSFET_B4::Model::rbdby0Given,
     U_NONE, CAT_NONE, "Body resistance RBDBY  scaling");
 
 
-    addPar ("RBSDBXL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBSDBXL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbsdbxl,
       NULL, U_NONE, CAT_NONE, "Body resistance RBSDBX L scaling");
 
-    addPar ("RBSDBXW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBSDBXW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbsdbxw,
       NULL, U_NONE, CAT_NONE, "Body resistance RBSDBX W scaling");
 
-    addPar ("RBSDBXNF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBSDBXNF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbsdbxnf,
       NULL, U_NONE, CAT_NONE, "Body resistance RBSDBX NF scaling");
 
-    addPar ("RBSDBYL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBSDBYL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbsdbyl,
       NULL, U_NONE, CAT_NONE, "Body resistance RBSDBY L scaling");
 
-    addPar ("RBSDBYW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBSDBYW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbsdbyw,
       NULL, U_NONE, CAT_NONE, "Body resistance RBSDBY W scaling");
 
-    addPar ("RBSDBYNF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RBSDBYNF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rbsdbynf,
       NULL, U_NONE, CAT_NONE, "Body resistance RBSDBY NF scaling");
 
-    addPar ("LCDSC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCDSC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lcdsc,
       NULL, U_NONE, CAT_NONE, "Length dependence of cdsc");
 
-    addPar ("LCDSCB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCDSCB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lcdscb,
       NULL, U_NONE, CAT_NONE, "Length dependence of cdscb");
 
-    addPar ("LCDSCD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCDSCD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lcdscd,
       NULL, U_NONE, CAT_NONE, "Length dependence of cdscd");
 
-    addPar ("LCIT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCIT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lcit,
       NULL, U_NONE, CAT_NONE, "Length dependence of cit");
 
-    addPar ("LNFACTOR", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LNFACTOR", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lnfactor,
       NULL, U_NONE, CAT_NONE, "Length dependence of nfactor");
 
-    addPar ("LXJ", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LXJ", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lxj,
       NULL, U_NONE, CAT_NONE, "Length dependence of xj");
 
-    addPar ("LVSAT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LVSAT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lvsat,
       NULL, U_NONE, CAT_NONE, "Length dependence of vsat");
 
-    addPar ("LAT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LAT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lat,
       NULL, U_NONE, CAT_NONE, "Length dependence of at");
 
-    addPar ("LA0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LA0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::la0,
       NULL, U_NONE, CAT_NONE, "Length dependence of a0");
 
-    addPar ("LAGS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LAGS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lags,
       NULL, U_NONE, CAT_NONE, "Length dependence of ags");
 
-    addPar ("LA1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LA1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::la1,
       NULL, U_NONE, CAT_NONE, "Length dependence of a1");
 
-    addPar ("LA2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LA2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::la2,
       NULL, U_NONE, CAT_NONE, "Length dependence of a2");
 
-    addPar ("LKETA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LKETA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lketa,
       NULL, U_NONE, CAT_NONE, "Length dependence of keta");
 
-    addPar ("LNSUB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LNSUB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lnsub,
       NULL, U_NONE, CAT_NONE, "Length dependence of nsub");
 
-    addPar ("LNDEP", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LNDEP", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lndep,
       NULL, U_NONE, CAT_NONE, "Length dependence of ndep");
 
-    addPar ("LNSD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LNSD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lnsd,
       NULL, U_NONE, CAT_NONE, "Length dependence of nsd");
 
-    addPar ("LPHIN", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LPHIN", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lphin,
       NULL, U_NONE, CAT_NONE, "Length dependence of phin");
 
-    addPar ("LNGATE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LNGATE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lngate,
       NULL, U_NONE, CAT_NONE, "Length dependence of ngate");
 
-    addPar ("LGAMMA1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LGAMMA1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lgamma1,
       NULL, U_NONE, CAT_NONE, "Length dependence of gamma1");
 
-    addPar ("LGAMMA2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LGAMMA2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lgamma2,
       NULL, U_NONE, CAT_NONE, "Length dependence of gamma2");
 
-    addPar ("LVBX", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LVBX", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lvbx,
       NULL, U_NONE, CAT_NONE, "Length dependence of vbx");
 
-    addPar ("LVBM", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LVBM", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lvbm,
       NULL, U_NONE, CAT_NONE, "Length dependence of vbm");
 
-    addPar ("LXT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LXT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lxt,
       NULL, U_NONE, CAT_NONE, "Length dependence of xt");
 
-    addPar ("LK1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LK1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lk1,
       NULL, U_NONE, CAT_NONE, "Length dependence of k1");
 
-    addPar ("LKT1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LKT1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lkt1,
       NULL, U_NONE, CAT_NONE, "Length dependence of kt1");
 
-    addPar ("LKT1L", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LKT1L", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lkt1l,
       NULL, U_NONE, CAT_NONE, "Length dependence of kt1l");
 
-    addPar ("LKT2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LKT2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lkt2,
       NULL, U_NONE, CAT_NONE, "Length dependence of kt2");
 
-    addPar ("LK2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LK2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lk2,
       NULL, U_NONE, CAT_NONE, "Length dependence of k2");
 
-    addPar ("LK3", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LK3", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lk3,
       NULL, U_NONE, CAT_NONE, "Length dependence of k3");
 
-    addPar ("LK3B", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LK3B", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lk3b,
       NULL, U_NONE, CAT_NONE, "Length dependence of k3b");
 
-    addPar ("LW0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LW0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lw0,
       NULL, U_NONE, CAT_NONE, "Length dependence of w0");
 
-    addPar ("LDVTP0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LDVTP0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ldvtp0,
       NULL, U_NONE, CAT_NONE, "Length dependence of dvtp0");
 
-    addPar ("LDVTP1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LDVTP1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ldvtp1,
       NULL, U_NONE, CAT_NONE, "Length dependence of dvtp1");
 
-    addPar ("LLPE0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LLPE0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::llpe0,
       NULL, U_NONE, CAT_NONE, "Length dependence of lpe0");
 
-    addPar ("LLPEB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LLPEB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::llpeb,
       NULL, U_NONE, CAT_NONE, "Length dependence of lpeb");
 
-    addPar ("LDVT0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LDVT0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ldvt0,
       NULL, U_NONE, CAT_NONE, "Length dependence of dvt0");
 
-    addPar ("LDVT1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LDVT1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ldvt1,
       NULL, U_NONE, CAT_NONE, "Length dependence of dvt1");
 
-    addPar ("LDVT2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LDVT2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ldvt2,
       NULL, U_NONE, CAT_NONE, "Length dependence of dvt2");
 
-    addPar ("LDVT0W", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LDVT0W", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ldvt0w,
       NULL, U_NONE, CAT_NONE, "Length dependence of dvt0w");
 
-    addPar ("LDVT1W", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LDVT1W", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ldvt1w,
       NULL, U_NONE, CAT_NONE, "Length dependence of dvt1w");
 
-    addPar ("LDVT2W", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LDVT2W", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ldvt2w,
       NULL, U_NONE, CAT_NONE, "Length dependence of dvt2w");
 
-    addPar ("LDROUT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LDROUT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ldrout,
       NULL, U_NONE, CAT_NONE, "Length dependence of drout");
 
-    addPar ("LDSUB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LDSUB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ldsub,
       NULL, U_NONE, CAT_NONE, "Length dependence of dsub");
 
-    addPar ("LVTH0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LVTH0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lvth0,
       NULL, U_NONE, CAT_NONE, "");
 
-    addPar ("LUA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LUA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lua,
       NULL, U_NONE, CAT_NONE, "Length dependence of ua");
 
-    addPar ("LUA1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LUA1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lua1,
       NULL, U_NONE, CAT_NONE, "Length dependence of ua1");
 
-    addPar ("LUB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LUB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lub,
       NULL, U_NONE, CAT_NONE, "Length dependence of ub");
 
-    addPar ("LUB1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LUB1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lub1,
       NULL, U_NONE, CAT_NONE, "Length dependence of ub1");
 
-    addPar ("LUC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LUC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::luc,
       NULL, U_NONE, CAT_NONE, "Length dependence of uc");
 
-    addPar ("LUC1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LUC1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::luc1,
       NULL, U_NONE, CAT_NONE, "Length dependence of uc1");
 
-    addPar ("LUD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LUD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lud,
       NULL, U_NONE, CAT_NONE, "Length dependence of ud");
 
-    addPar ("LUD1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LUD1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lud1,
       NULL, U_NONE, CAT_NONE, "Length dependence of ud1");
 
-    addPar ("LUP", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LUP", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lup,
       NULL, U_NONE, CAT_NONE, "Length dependence of up");
 
-    addPar ("LLP", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LLP", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::llp,
       NULL, U_NONE, CAT_NONE, "Length dependence of lp");
 
-    addPar ("LU0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LU0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lu0,
       NULL, U_NONE, CAT_NONE, "Length dependence of u0");
 
-    addPar ("LUTE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LUTE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lute,
       NULL, U_NONE, CAT_NONE, "Length dependence of ute");
 
-    addPar ("LVOFF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LVOFF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lvoff,
       NULL, U_NONE, CAT_NONE, "Length dependence of voff");
 
-    addPar ("LMINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LMINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lminv,
       NULL, U_NONE, CAT_NONE, "Length dependence of minv");
 
-    addPar ("LMINVCV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LMINVCV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lminvcv,
       NULL, U_NONE, CAT_NONE, "Length dependence of minvcv");
 
-    addPar ("LDELTA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LDELTA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ldelta,
       NULL, U_NONE, CAT_NONE, "Length dependence of delta");
 
-    addPar ("LRDSW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LRDSW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lrdsw,
       NULL, U_NONE, CAT_NONE, "Length dependence of rdsw ");
 
-    addPar ("LRSW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LRSW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lrsw,
       NULL, U_NONE, CAT_NONE, "Length dependence of rsw");
 
-    addPar ("LRDW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LRDW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lrdw,
       NULL, U_NONE, CAT_NONE, "Length dependence of rdw");
 
-    addPar ("LPRWG", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LPRWG", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lprwg,
       NULL, U_NONE, CAT_NONE, "Length dependence of prwg ");
 
-    addPar ("LPRWB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LPRWB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lprwb,
       NULL, U_NONE, CAT_NONE, "Length dependence of prwb ");
 
-    addPar ("LPRT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LPRT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lprt,
       NULL, U_NONE, CAT_NONE, "Length dependence of prt ");
 
-    addPar ("LETA0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LETA0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::leta0,
       NULL, U_NONE, CAT_NONE, "Length dependence of eta0");
 
-    addPar ("LETAB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LETAB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::letab,
       NULL, U_NONE, CAT_NONE, "Length dependence of etab");
 
-    addPar ("LPCLM", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LPCLM", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lpclm,
       NULL, U_NONE, CAT_NONE, "Length dependence of pclm");
 
-    addPar ("LPDIBLC1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LPDIBLC1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lpdibl1,
       NULL, U_NONE, CAT_NONE, "Length dependence of pdiblc1");
 
-    addPar ("LPDIBLC2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LPDIBLC2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lpdibl2,
       NULL, U_NONE, CAT_NONE, "Length dependence of pdiblc2");
 
-    addPar ("LPDIBLCB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LPDIBLCB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lpdiblb,
       NULL, U_NONE, CAT_NONE, "Length dependence of pdiblcb");
 
-    addPar ("LFPROUT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LFPROUT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lfprout,
       NULL, U_NONE, CAT_NONE, "Length dependence of pdiblcb");
 
-    addPar ("LPDITS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LPDITS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lpdits,
       NULL, U_NONE, CAT_NONE, "Length dependence of pdits");
 
-    addPar ("LPDITSD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LPDITSD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lpditsd,
       NULL, U_NONE, CAT_NONE, "Length dependence of pditsd");
 
-    addPar ("LPSCBE1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LPSCBE1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lpscbe1,
       NULL, U_NONE, CAT_NONE, "Length dependence of pscbe1");
 
-    addPar ("LPSCBE2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LPSCBE2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lpscbe2,
       NULL, U_NONE, CAT_NONE, "Length dependence of pscbe2");
 
-    addPar ("LPVAG", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LPVAG", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lpvag,
       NULL, U_NONE, CAT_NONE, "Length dependence of pvag");
 
-    addPar ("LWR", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LWR", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lwr,
       NULL, U_NONE, CAT_NONE, "Length dependence of wr");
 
-    addPar ("LDWG", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LDWG", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ldwg,
       NULL, U_NONE, CAT_NONE, "Length dependence of dwg");
 
-    addPar ("LDWB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LDWB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ldwb,
       NULL, U_NONE, CAT_NONE, "Length dependence of dwb");
 
-    addPar ("LB0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LB0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lb0,
       NULL, U_NONE, CAT_NONE, "Length dependence of b0");
 
-    addPar ("LB1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LB1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lb1,
       NULL, U_NONE, CAT_NONE, "Length dependence of b1");
 
-    addPar ("LCGSL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCGSL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lcgsl,
       NULL, U_NONE, CAT_NONE, "Length dependence of cgsl");
 
-    addPar ("LCGDL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCGDL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lcgdl,
       NULL, U_NONE, CAT_NONE, "Length dependence of cgdl");
 
-    addPar ("LCKAPPAS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCKAPPAS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lckappas,
       NULL, U_NONE, CAT_NONE, "Length dependence of ckappas");
 
-    addPar ("LCKAPPAD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCKAPPAD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lckappad,
       NULL, U_NONE, CAT_NONE, "Length dependence of ckappad");
 
-    addPar ("LCF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lcf,
       NULL, U_NONE, CAT_NONE, "Length dependence of cf");
 
-    addPar ("LCLC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCLC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lclc,
       NULL, U_NONE, CAT_NONE, "Length dependence of clc");
 
-    addPar ("LCLE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCLE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lcle,
       NULL, U_NONE, CAT_NONE, "Length dependence of cle");
 
-    addPar ("LALPHA0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LALPHA0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lalpha0,
       NULL, U_NONE, CAT_NONE, "Length dependence of alpha0");
 
-    addPar ("LALPHA1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LALPHA1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lalpha1,
       NULL, U_NONE, CAT_NONE, "Length dependence of alpha1");
 
-    addPar ("LBETA0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LBETA0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lbeta0,
       NULL, U_NONE, CAT_NONE, "Length dependence of beta0");
 
-    addPar ("LAGIDL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LAGIDL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lagidl,
       NULL, U_NONE, CAT_NONE, "Length dependence of agidl");
 
-    addPar ("LBGIDL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LBGIDL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lbgidl,
       NULL, U_NONE, CAT_NONE, "Length dependence of bgidl");
 
-    addPar ("LCGIDL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCGIDL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lcgidl,
       NULL, U_NONE, CAT_NONE, "Length dependence of cgidl");
 
-    addPar ("LEGIDL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LEGIDL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::legidl,
       NULL, U_NONE, CAT_NONE, "Length dependence of egidl");
 
-    addPar ("LAGISL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LAGISL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lagisl,
       NULL, U_NONE, CAT_NONE, "Length dependence of agisl");
 
-    addPar ("LBGISL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LBGISL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lbgisl,
       NULL, U_NONE, CAT_NONE, "Length dependence of bgisl");
 
-    addPar ("LCGISL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCGISL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lcgisl,
       NULL, U_NONE, CAT_NONE, "Length dependence of cgisl");
 
-    addPar ("LEGISL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LEGISL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::legisl,
       NULL, U_NONE, CAT_NONE, "Length dependence of egisl");
 
-    addPar ("LAIGC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LAIGC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::laigc,
       NULL, U_NONE, CAT_NONE, "Length dependence of aigc");
 
-    addPar ("LBIGC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LBIGC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lbigc,
       NULL, U_NONE, CAT_NONE, "Length dependence of bigc");
 
-    addPar ("LCIGC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCIGC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lcigc,
       NULL, U_NONE, CAT_NONE, "Length dependence of cigc");
 
-    addPar ("LAIGSD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LAIGSD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::laigsd,
       NULL, U_NONE, CAT_NONE, "Length dependence of aigsd");
 
-    addPar ("LBIGSD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LBIGSD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lbigsd,
       NULL, U_NONE, CAT_NONE, "Length dependence of bigsd");
 
-    addPar ("LCIGSD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCIGSD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lcigsd,
       NULL, U_NONE, CAT_NONE, "Length dependence of cigsd");
 
 
-    addPar ("LAIGS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LAIGS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::laigs,
       NULL, U_NONE, CAT_NONE,"Length dependence of aigs");
 
-    addPar ("LBIGS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LBIGS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lbigs,
       NULL, U_NONE, CAT_NONE, "Length dependence of bigs");
 
-    addPar ("LCIGS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCIGS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lcigs,
       NULL, U_NONE, CAT_NONE, "Length dependence of cigs");
 
-    addPar ("LAIGD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LAIGD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::laigd,
       NULL, U_NONE, CAT_NONE, "Length dependence of aigd");
 
-    addPar ("LBIGD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LBIGD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lbigd,
       NULL, U_NONE, CAT_NONE,"Length dependence of bigd");
 
-    addPar ("LCIGD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCIGD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lcigd,
       NULL, U_NONE, CAT_NONE,"Length dependence of cigd");
 
-    addPar ("LAIGBACC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LAIGBACC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::laigbacc,
       NULL, U_NONE, CAT_NONE, "Length dependence of aigbacc");
 
-    addPar ("LBIGBACC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LBIGBACC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lbigbacc,
       NULL, U_NONE, CAT_NONE, "Length dependence of bigbacc");
 
-    addPar ("LCIGBACC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCIGBACC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lcigbacc,
       NULL, U_NONE, CAT_NONE, "Length dependence of cigbacc");
 
-    addPar ("LAIGBINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LAIGBINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::laigbinv,
       NULL, U_NONE, CAT_NONE, "Length dependence of aigbinv");
 
-    addPar ("LBIGBINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LBIGBINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lbigbinv,
       NULL, U_NONE, CAT_NONE, "Length dependence of bigbinv");
 
-    addPar ("LCIGBINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LCIGBINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lcigbinv,
       NULL, U_NONE, CAT_NONE, "Length dependence of cigbinv");
 
-    addPar ("LNIGC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LNIGC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lnigc,
       NULL, U_NONE, CAT_NONE, "Length dependence of nigc");
 
-    addPar ("LNIGBINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LNIGBINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lnigbinv,
       NULL, U_NONE, CAT_NONE, "Length dependence of nigbinv");
 
-    addPar ("LNIGBACC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LNIGBACC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lnigbacc,
       NULL, U_NONE, CAT_NONE, "Length dependence of nigbacc");
 
-    addPar ("LNTOX", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LNTOX", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lntox,
       NULL, U_NONE, CAT_NONE, "Length dependence of ntox");
 
-    addPar ("LEIGBINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LEIGBINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::leigbinv,
       NULL, U_NONE, CAT_NONE, "Length dependence for eigbinv");
 
-    addPar ("LPIGCD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LPIGCD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lpigcd,
       NULL, U_NONE, CAT_NONE, "Length dependence for pigcd");
 
-    addPar ("LPOXEDGE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LPOXEDGE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lpoxedge,
       NULL, U_NONE, CAT_NONE, "Length dependence for poxedge");
 
-    addPar ("LVFBCV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LVFBCV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lvfbcv,
       NULL, U_NONE, CAT_NONE, "Length dependence of vfbcv");
 
-    addPar ("LVFB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LVFB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lvfb,
       NULL, U_NONE, CAT_NONE, "Length dependence of vfb");
 
-    addPar ("LACDE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LACDE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lacde,
       NULL, U_NONE, CAT_NONE, "Length dependence of acde");
 
-    addPar ("LMOIN", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LMOIN", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lmoin,
       NULL, U_NONE, CAT_NONE, "Length dependence of moin");
 
-    addPar ("LNOFF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LNOFF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lnoff,
       NULL, U_NONE, CAT_NONE, "Length dependence of noff");
 
-    addPar ("LVOFFCV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LVOFFCV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lvoffcv,
       NULL, U_NONE, CAT_NONE, "Length dependence of voffcv");
 
-    addPar ("LXRCRG1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LXRCRG1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lxrcrg1,
       NULL, U_NONE, CAT_NONE, "Length dependence of xrcrg1");
 
-    addPar ("LXRCRG2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LXRCRG2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lxrcrg2,
       NULL, U_NONE, CAT_NONE, "Length dependence of xrcrg2");
 
-    addPar ("LLAMBDA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LLAMBDA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::llambda,
       NULL, U_NONE, CAT_NONE, "Length dependence of lambda");
 
-    addPar ("LVTL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LVTL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lvtl,
       NULL, U_NONE, CAT_NONE, " Length dependence of vtl");
 
-    addPar ("LXN", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LXN", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lxn,
       NULL, U_NONE, CAT_NONE, " Length dependence of xn");
 
-    addPar ("LEU", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LEU", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::leu,
       NULL, U_NONE, CAT_NONE, " Length dependence of eu");
 
-    addPar ("LVFBSDOFF",0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LVFBSDOFF",0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lvfbsdoff,
       NULL, U_NONE, CAT_NONE, "Length dependence of vfbsdoff");
 
-    addPar ("LTVFBSDOFF",0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LTVFBSDOFF",0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ltvfbsdoff,
       NULL, U_NONE, CAT_NONE, "Length dependence of tvfbsdoff");
 
-    addPar ("LTVOFF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LTVOFF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ltvoff,
       NULL, U_NONE, CAT_NONE, "Length dependence of tvoff");
 
-    addPar ("WCDSC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCDSC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wcdsc,
       NULL, U_NONE, CAT_NONE, "Width dependence of cdsc");
 
-    addPar ("WCDSCB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCDSCB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wcdscb,
       NULL, U_NONE, CAT_NONE, "Width dependence of cdscb");
 
-    addPar ("WCDSCD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCDSCD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wcdscd,
       NULL, U_NONE, CAT_NONE, "Width dependence of cdscd");
 
-    addPar ("WCIT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCIT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wcit,
       NULL, U_NONE, CAT_NONE, "Width dependence of cit");
 
-    addPar ("WNFACTOR", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WNFACTOR", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wnfactor,
       NULL, U_NONE, CAT_NONE, "Width dependence of nfactor");
 
-    addPar ("WXJ", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WXJ", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wxj,
       NULL, U_NONE, CAT_NONE, "Width dependence of xj");
 
-    addPar ("WVSAT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WVSAT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wvsat,
       NULL, U_NONE, CAT_NONE, "Width dependence of vsat");
 
-    addPar ("WAT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WAT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wat,
       NULL, U_NONE, CAT_NONE, "Width dependence of at");
 
-    addPar ("WA0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WA0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wa0,
       NULL, U_NONE, CAT_NONE, "Width dependence of a0");
 
-    addPar ("WAGS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WAGS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wags,
       NULL, U_NONE, CAT_NONE, "Width dependence of ags");
 
-    addPar ("WA1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WA1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wa1,
       NULL, U_NONE, CAT_NONE, "Width dependence of a1");
 
-    addPar ("WA2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WA2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wa2,
       NULL, U_NONE, CAT_NONE, "Width dependence of a2");
 
-    addPar ("WKETA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WKETA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wketa,
       NULL, U_NONE, CAT_NONE, "Width dependence of keta");
 
-    addPar ("WNSUB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WNSUB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wnsub,
       NULL, U_NONE, CAT_NONE, "Width dependence of nsub");
 
-    addPar ("WNDEP", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WNDEP", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wndep,
       NULL, U_NONE, CAT_NONE, "Width dependence of ndep");
 
-    addPar ("WNSD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WNSD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wnsd,
       NULL, U_NONE, CAT_NONE, "Width dependence of nsd");
 
-    addPar ("WPHIN", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WPHIN", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wphin,
       NULL, U_NONE, CAT_NONE, "Width dependence of phin");
 
-    addPar ("WNGATE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WNGATE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wngate,
       NULL, U_NONE, CAT_NONE, "Width dependence of ngate");
 
-    addPar ("WGAMMA1", 0.0, false, NO_DEP,
+    p.addPar ("WGAMMA1", 0.0, false, NO_DEP,
             &MOSFET_B4::Model::wgamma1,
       NULL, U_NONE, CAT_NONE, "Width dependence of gamma1");
 
-    addPar ("WGAMMA2", 0.0, false, NO_DEP,
+    p.addPar ("WGAMMA2", 0.0, false, NO_DEP,
             &MOSFET_B4::Model::wgamma2,
       NULL, U_NONE, CAT_NONE, "Width dependence of gamma2");
 
-    addPar ("WVBX", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WVBX", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wvbx,
       NULL, U_NONE, CAT_NONE, "Width dependence of vbx");
 
-    addPar ("WVBM", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WVBM", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wvbm,
       NULL, U_NONE, CAT_NONE, "Width dependence of vbm");
 
-    addPar ("WXT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WXT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wxt,
       NULL, U_NONE, CAT_NONE, "Width dependence of xt");
 
-    addPar ("WK1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WK1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wk1,
       NULL, U_NONE, CAT_NONE, "Width dependence of k1");
 
-    addPar ("WKT1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WKT1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wkt1,
       NULL, U_NONE, CAT_NONE, "Width dependence of kt1");
 
-    addPar ("WKT1L", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WKT1L", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wkt1l,
       NULL, U_NONE, CAT_NONE, "Width dependence of kt1l");
 
-    addPar ("WKT2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WKT2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wkt2,
       NULL, U_NONE, CAT_NONE, "Width dependence of kt2");
 
-    addPar ("WK2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WK2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wk2,
       NULL, U_NONE, CAT_NONE, "Width dependence of k2");
 
-    addPar ("WK3", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WK3", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wk3,
       NULL, U_NONE, CAT_NONE, "Width dependence of k3");
 
-    addPar ("WK3B", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WK3B", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wk3b,
       NULL, U_NONE, CAT_NONE, "Width dependence of k3b");
 
-    addPar ("WW0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WW0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ww0,
       NULL, U_NONE, CAT_NONE, "Width dependence of w0");
 
-    addPar ("WDVTP0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WDVTP0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wdvtp0,
       NULL, U_NONE, CAT_NONE, "Width dependence of dvtp0");
 
-    addPar ("WDVTP1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WDVTP1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wdvtp1,
       NULL, U_NONE, CAT_NONE, "Width dependence of dvtp1");
 
-    addPar ("WLPE0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WLPE0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wlpe0,
       NULL, U_NONE, CAT_NONE, "Width dependence of lpe0");
 
-    addPar ("WLPEB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WLPEB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wlpeb,
       NULL, U_NONE, CAT_NONE, "Width dependence of lpeb");
 
-    addPar ("WDVT0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WDVT0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wdvt0,
       NULL, U_NONE, CAT_NONE, "Width dependence of dvt0");
 
-    addPar ("WDVT1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WDVT1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wdvt1,
       NULL, U_NONE, CAT_NONE, "Width dependence of dvt1");
 
-    addPar ("WDVT2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WDVT2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wdvt2,
       NULL, U_NONE, CAT_NONE, "Width dependence of dvt2");
 
-    addPar ("WDVT0W", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WDVT0W", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wdvt0w,
       NULL, U_NONE, CAT_NONE, "Width dependence of dvt0w");
 
-    addPar ("WDVT1W", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WDVT1W", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wdvt1w,
       NULL, U_NONE, CAT_NONE, "Width dependence of dvt1w");
 
-    addPar ("WDVT2W", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WDVT2W", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wdvt2w,
       NULL, U_NONE, CAT_NONE, "Width dependence of dvt2w");
 
-    addPar ("WDROUT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WDROUT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wdrout,
       NULL, U_NONE, CAT_NONE, "Width dependence of drout");
 
-    addPar ("WDSUB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WDSUB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wdsub,
       NULL, U_NONE, CAT_NONE, "Width dependence of dsub");
 
-    addPar ("WVTH0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WVTH0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wvth0,
       NULL, U_NONE, CAT_NONE, "");
 
-    addPar ("WUA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WUA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wua,
       NULL, U_NONE, CAT_NONE, "Width dependence of ua");
 
-    addPar ("WUA1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WUA1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wua1,
       NULL, U_NONE, CAT_NONE, "Width dependence of ua1");
 
-    addPar ("WUB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WUB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wub,
       NULL, U_NONE, CAT_NONE, "Width dependence of ub");
 
-    addPar ("WUB1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WUB1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wub1,
       NULL, U_NONE, CAT_NONE, "Width dependence of ub1");
 
-    addPar ("WUC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WUC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wuc,
       NULL, U_NONE, CAT_NONE, "Width dependence of uc");
 
-    addPar ("WUC1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WUC1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wuc1,
       NULL, U_NONE, CAT_NONE, "Width dependence of uc1");
 
-    addPar ("WUD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WUD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wud,
       NULL, U_NONE, CAT_NONE, "Width dependence of ud");
 
-    addPar ("WUD1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WUD1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wud1,
       NULL, U_NONE, CAT_NONE, "Width dependence of ud1");
 
-    addPar ("WUP", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WUP", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wup,
       NULL, U_NONE, CAT_NONE, "Width dependence of up");
 
-    addPar ("WLP", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WLP", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wlp,
       NULL, U_NONE, CAT_NONE, "Width dependence of lp");
 
-    addPar ("WU0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WU0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wu0,
       NULL, U_NONE, CAT_NONE, "Width dependence of u0");
 
-    addPar ("WUTE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WUTE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wute,
       NULL, U_NONE, CAT_NONE, "Width dependence of ute");
 
-    addPar ("WVOFF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WVOFF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wvoff,
       NULL, U_NONE, CAT_NONE, "Width dependence of voff");
 
-    addPar ("WMINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WMINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wminv,
       NULL, U_NONE, CAT_NONE, "Width dependence of minv");
 
-    addPar ("WMINVCV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WMINVCV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wminvcv,
       NULL, U_NONE, CAT_NONE, "Width dependence of minvcv");
 
-    addPar ("WDELTA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WDELTA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wdelta,
       NULL, U_NONE, CAT_NONE, "Width dependence of delta");
 
-    addPar ("WRDSW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WRDSW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wrdsw,
       NULL, U_NONE, CAT_NONE, "Width dependence of rdsw ");
 
-    addPar ("WRSW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WRSW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wrsw,
       NULL, U_NONE, CAT_NONE, "Width dependence of rsw");
 
-    addPar ("WRDW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WRDW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wrdw,
       NULL, U_NONE, CAT_NONE, "Width dependence of rdw");
 
-    addPar ("WPRWG", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WPRWG", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wprwg,
       NULL, U_NONE, CAT_NONE, "Width dependence of prwg ");
 
-    addPar ("WPRWB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WPRWB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wprwb,
       NULL, U_NONE, CAT_NONE, "Width dependence of prwb ");
 
-    addPar ("WPRT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WPRT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wprt,
       NULL, U_NONE, CAT_NONE, "Width dependence of prt");
 
-    addPar ("WETA0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WETA0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::weta0,
       NULL, U_NONE, CAT_NONE, "Width dependence of eta0");
 
-    addPar ("WETAB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WETAB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wetab,
       NULL, U_NONE, CAT_NONE, "Width dependence of etab");
 
-    addPar ("WPCLM", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WPCLM", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wpclm,
       NULL, U_NONE, CAT_NONE, "Width dependence of pclm");
 
-    addPar ("WPDIBLC1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WPDIBLC1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wpdibl1,
       NULL, U_NONE, CAT_NONE, "Width dependence of pdiblc1");
 
-    addPar ("WPDIBLC2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WPDIBLC2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wpdibl2,
       NULL, U_NONE, CAT_NONE, "Width dependence of pdiblc2");
 
-    addPar ("WPDIBLCB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WPDIBLCB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wpdiblb,
       NULL, U_NONE, CAT_NONE, "Width dependence of pdiblcb");
 
-    addPar ("WFPROUT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WFPROUT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wfprout,
       NULL, U_NONE, CAT_NONE, "Width dependence of pdiblcb");
 
-    addPar ("WPDITS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WPDITS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wpdits,
       NULL, U_NONE, CAT_NONE, "Width dependence of pdits");
 
-    addPar ("WPDITSD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WPDITSD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wpditsd,
       NULL, U_NONE, CAT_NONE, "Width dependence of pditsd");
 
-    addPar ("WPSCBE1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WPSCBE1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wpscbe1,
       NULL, U_NONE, CAT_NONE, "Width dependence of pscbe1");
 
-    addPar ("WPSCBE2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WPSCBE2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wpscbe2,
       NULL, U_NONE, CAT_NONE, "Width dependence of pscbe2");
 
-    addPar ("WPVAG", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WPVAG", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wpvag,
       NULL, U_NONE, CAT_NONE, "Width dependence of pvag");
 
-    addPar ("WWR", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WWR", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wwr,
       NULL, U_NONE, CAT_NONE, "Width dependence of wr");
 
-    addPar ("WDWG", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WDWG", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wdwg,
       NULL, U_NONE, CAT_NONE, "Width dependence of dwg");
 
-    addPar ("WDWB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WDWB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wdwb,
       NULL, U_NONE, CAT_NONE, "Width dependence of dwb");
 
-    addPar ("WB0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WB0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wb0,
       NULL, U_NONE, CAT_NONE, "Width dependence of b0");
 
-    addPar ("WB1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WB1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wb1,
       NULL, U_NONE, CAT_NONE, "Width dependence of b1");
 
-    addPar ("WCGSL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCGSL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wcgsl,
       NULL, U_NONE, CAT_NONE, "Width dependence of cgsl");
 
-    addPar ("WCGDL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCGDL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wcgdl,
       NULL, U_NONE, CAT_NONE, "Width dependence of cgdl");
 
-    addPar ("WCKAPPAS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCKAPPAS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wckappas,
       NULL, U_NONE, CAT_NONE, "Width dependence of ckappas");
 
-    addPar ("WCKAPPAD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCKAPPAD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wckappad,
       NULL, U_NONE, CAT_NONE, "Width dependence of ckappad");
 
-    addPar ("WCF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wcf,
       NULL, U_NONE, CAT_NONE, "Width dependence of cf");
 
-    addPar ("WCLC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCLC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wclc,
       NULL, U_NONE, CAT_NONE, "Width dependence of clc");
 
-    addPar ("WCLE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCLE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wcle,
       NULL, U_NONE, CAT_NONE, "Width dependence of cle");
 
-    addPar ("WALPHA0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WALPHA0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::walpha0,
       NULL, U_NONE, CAT_NONE, "Width dependence of alpha0");
 
-    addPar ("WALPHA1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WALPHA1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::walpha1,
       NULL, U_NONE, CAT_NONE, "Width dependence of alpha1");
 
-    addPar ("WBETA0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WBETA0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wbeta0,
       NULL, U_NONE, CAT_NONE, "Width dependence of beta0");
 
-    addPar ("WAGIDL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WAGIDL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wagidl,
       NULL, U_NONE, CAT_NONE, "Width dependence of agidl");
 
-    addPar ("WBGIDL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WBGIDL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wbgidl,
       NULL, U_NONE, CAT_NONE, "Width dependence of bgidl");
 
-    addPar ("WCGIDL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCGIDL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wcgidl,
       NULL, U_NONE, CAT_NONE, "Width dependence of cgidl");
 
-    addPar ("WEGIDL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WEGIDL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wegidl,
       NULL, U_NONE, CAT_NONE, "Width dependence of egidl");
 
-    addPar ("WAGISL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WAGISL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wagisl,
       NULL, U_NONE, CAT_NONE, "Width dependence of agisl");
 
-    addPar ("WBGISL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WBGISL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wbgisl,
       NULL, U_NONE, CAT_NONE, "Width dependence of bgisl");
 
-    addPar ("WCGISL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCGISL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wcgisl,
       NULL, U_NONE, CAT_NONE, "Width dependence of cgisl");
 
-    addPar ("WEGISL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WEGISL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wegisl,
       NULL, U_NONE, CAT_NONE, "Width dependence of egisl");
 
-    addPar ("WAIGC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WAIGC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::waigc,
       NULL, U_NONE, CAT_NONE, "Width dependence of aigc");
 
-    addPar ("WBIGC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WBIGC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wbigc,
       NULL, U_NONE, CAT_NONE, "Width dependence of bigc");
 
-    addPar ("WCIGC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCIGC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wcigc,
       NULL, U_NONE, CAT_NONE, "Width dependence of cigc");
 
-    addPar ("WAIGSD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WAIGSD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::waigsd,
       NULL, U_NONE, CAT_NONE, "Width dependence of aigsd");
 
-    addPar ("WBIGSD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WBIGSD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wbigsd,
       NULL, U_NONE, CAT_NONE, "Width dependence of bigsd");
 
-    addPar ("WCIGSD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCIGSD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wcigsd,
       NULL, U_NONE, CAT_NONE, "Width dependence of cigsd");
 
-    addPar ("WAIGS",0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WAIGS",0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::waigs ,
       NULL, U_NONE, CAT_NONE,"Width dependence of aigs");
 
-    addPar ("WBIGS",0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WBIGS",0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wbigs ,
       NULL, U_NONE, CAT_NONE,"Width dependence of bigs");
 
-    addPar ("WCIGS",0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCIGS",0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wcigs ,
       NULL, U_NONE, CAT_NONE,"Width dependence of cigs");
 
-    addPar ("WAIGD",0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WAIGD",0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::waigd ,
       NULL, U_NONE, CAT_NONE,"Width dependence of aigd");
 
-    addPar ("WBIGD",0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WBIGD",0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wbigd ,
       NULL, U_NONE, CAT_NONE,"Width dependence of bigd");
 
-    addPar ("WCIGD",0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCIGD",0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wcigd ,
       NULL, U_NONE, CAT_NONE,"Width dependence of cigd");
 
-    addPar ("WAIGBACC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WAIGBACC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::waigbacc,
       NULL, U_NONE, CAT_NONE, "Width dependence of aigbacc");
 
-    addPar ("WBIGBACC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WBIGBACC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wbigbacc,
       NULL, U_NONE, CAT_NONE, "Width dependence of bigbacc");
 
-    addPar ("WCIGBACC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCIGBACC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wcigbacc,
       NULL, U_NONE, CAT_NONE, "Width dependence of cigbacc");
 
-    addPar ("WAIGBINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WAIGBINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::waigbinv,
       NULL, U_NONE, CAT_NONE, "Width dependence of aigbinv");
 
-    addPar ("WBIGBINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WBIGBINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wbigbinv,
       NULL, U_NONE, CAT_NONE, "Width dependence of bigbinv");
 
-    addPar ("WCIGBINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WCIGBINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wcigbinv,
       NULL, U_NONE, CAT_NONE, "Width dependence of cigbinv");
 
-    addPar ("WNIGC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WNIGC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wnigc,
       NULL, U_NONE, CAT_NONE, "Width dependence of nigc");
 
-    addPar ("WNIGBINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WNIGBINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wnigbinv,
       NULL, U_NONE, CAT_NONE, "Width dependence of nigbinv");
 
-    addPar ("WNIGBACC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WNIGBACC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wnigbacc,
       NULL, U_NONE, CAT_NONE, "Width dependence of nigbacc");
 
-    addPar ("WNTOX", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WNTOX", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wntox,
       NULL, U_NONE, CAT_NONE, "Width dependence of ntox");
 
-    addPar ("WEIGBINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WEIGBINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::weigbinv,
       NULL, U_NONE, CAT_NONE, "Width dependence for eigbinv");
 
-    addPar ("WPIGCD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WPIGCD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wpigcd,
       NULL, U_NONE, CAT_NONE, "Width dependence for pigcd");
 
-    addPar ("WPOXEDGE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WPOXEDGE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wpoxedge,
       NULL, U_NONE, CAT_NONE, "Width dependence for poxedge");
 
-    addPar ("WVFBCV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WVFBCV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wvfbcv,
       NULL, U_NONE, CAT_NONE, "Width dependence of vfbcv");
 
-    addPar ("WVFB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WVFB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wvfb,
       NULL, U_NONE, CAT_NONE, "Width dependence of vfb");
 
-    addPar ("WACDE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WACDE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wacde,
       NULL, U_NONE, CAT_NONE, "Width dependence of acde");
 
-    addPar ("WMOIN", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WMOIN", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wmoin,
       NULL, U_NONE, CAT_NONE, "Width dependence of moin");
 
-    addPar ("WNOFF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WNOFF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wnoff,
       NULL, U_NONE, CAT_NONE, "Width dependence of noff");
 
-    addPar ("WVOFFCV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WVOFFCV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wvoffcv,
       NULL, U_NONE, CAT_NONE, "Width dependence of voffcv");
 
-    addPar ("WXRCRG1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WXRCRG1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wxrcrg1,
       NULL, U_NONE, CAT_NONE, "Width dependence of xrcrg1");
 
-    addPar ("WXRCRG2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WXRCRG2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wxrcrg2,
       NULL, U_NONE, CAT_NONE, "Width dependence of xrcrg2");
 
-    addPar ("WLAMBDA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WLAMBDA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wlambda,
       NULL, U_NONE, CAT_NONE, "Width dependence of lambda");
 
-    addPar ("WVTL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WVTL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wvtl,
       NULL, U_NONE, CAT_NONE, "Width dependence of vtl");
 
-    addPar ("WXN", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WXN", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wxn,
       NULL, U_NONE, CAT_NONE, "Width dependence of xn");
 
-    addPar ("WEU", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WEU", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::weu,
       NULL, U_NONE, CAT_NONE, "Width dependence of eu");
 
-    addPar ("WVFBSDOFF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WVFBSDOFF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wvfbsdoff,
       NULL, U_NONE, CAT_NONE, "Width dependence of vfbsdoff");
 
-    addPar ("WTVFBSDOFF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WTVFBSDOFF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wtvfbsdoff,
       NULL, U_NONE, CAT_NONE, "Width dependence of tvfbsdoff");
 
-    addPar ("WTVOFF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WTVOFF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wtvoff,
       NULL, U_NONE, CAT_NONE, "Width dependence of tvoff");
 
-    addPar ("PCDSC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCDSC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pcdsc,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of cdsc");
 
-    addPar ("PCDSCB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCDSCB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pcdscb,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of cdscb");
 
-    addPar ("PCDSCD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCDSCD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pcdscd,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of cdscd");
 
-    addPar ("PCIT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCIT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pcit,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of cit");
 
-    addPar ("PNFACTOR", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PNFACTOR", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pnfactor,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of nfactor");
 
-    addPar ("PXJ", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PXJ", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pxj,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of xj");
 
-    addPar ("PVSAT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PVSAT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pvsat,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of vsat");
 
-    addPar ("PAT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PAT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pat,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of at");
 
-    addPar ("PA0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PA0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pa0,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of a0");
 
-    addPar ("PAGS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PAGS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pags,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of ags");
 
-    addPar ("PA1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PA1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pa1,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of a1");
 
-    addPar ("PA2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PA2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pa2,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of a2");
 
-    addPar ("PKETA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PKETA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pketa,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of keta");
 
-    addPar ("PNSUB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PNSUB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pnsub,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of nsub");
 
-    addPar ("PNDEP", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PNDEP", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pndep,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of ndep");
 
-    addPar ("PNSD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PNSD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pnsd,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of nsd");
 
-    addPar ("PPHIN", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PPHIN", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pphin,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of phin");
 
-    addPar ("PNGATE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PNGATE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pngate,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of ngate");
 
-    addPar ("PGAMMA1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PGAMMA1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pgamma1,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of gamma1");
 
-    addPar ("PGAMMA2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PGAMMA2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pgamma2,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of gamma2");
 
-    addPar ("PVBX", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PVBX", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pvbx,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of vbx");
 
-    addPar ("PVBM", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PVBM", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pvbm,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of vbm");
 
-    addPar ("PXT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PXT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pxt,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of xt");
 
-    addPar ("PK1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PK1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pk1,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of k1");
 
-    addPar ("PKT1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PKT1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pkt1,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of kt1");
 
-    addPar ("PKT1L", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PKT1L", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pkt1l,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of kt1l");
 
-    addPar ("PKT2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PKT2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pkt2,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of kt2");
 
-    addPar ("PK2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PK2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pk2,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of k2");
 
-    addPar ("PK3", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PK3", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pk3,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of k3");
 
-    addPar ("PK3B", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PK3B", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pk3b,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of k3b");
 
-    addPar ("PW0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PW0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pw0,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of w0");
 
-    addPar ("PDVTP0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PDVTP0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pdvtp0,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of dvtp0");
 
-    addPar ("PDVTP1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PDVTP1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pdvtp1,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of dvtp1");
 
-    addPar ("PLPE0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PLPE0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::plpe0,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of lpe0");
 
-    addPar ("PLPEB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PLPEB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::plpeb,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of lpeb");
 
-    addPar ("PDVT0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PDVT0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pdvt0,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of dvt0");
 
-    addPar ("PDVT1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PDVT1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pdvt1,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of dvt1");
 
-    addPar ("PDVT2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PDVT2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pdvt2,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of dvt2");
 
-    addPar ("PDVT0W", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PDVT0W", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pdvt0w,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of dvt0w");
 
-    addPar ("PDVT1W", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PDVT1W", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pdvt1w,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of dvt1w");
 
-    addPar ("PDVT2W", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PDVT2W", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pdvt2w,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of dvt2w");
 
-    addPar ("PDROUT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PDROUT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pdrout,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of drout");
 
-    addPar ("PDSUB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PDSUB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pdsub,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of dsub");
 
-    addPar ("PVTH0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PVTH0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pvth0,
       NULL, U_NONE, CAT_NONE, "");
 
-    addPar ("PUA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PUA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pua,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of ua");
 
-    addPar ("PUA1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PUA1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pua1,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of ua1");
 
-    addPar ("PUB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PUB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pub,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of ub");
 
-    addPar ("PUB1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PUB1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pub1,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of ub1");
 
-    addPar ("PUC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PUC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::puc,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of uc");
 
-    addPar ("PUC1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PUC1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::puc1,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of uc1");
 
-    addPar ("PUD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PUD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pud,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of ud");
 
-    addPar ("PUD1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PUD1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pud1,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of ud1");
 
-    addPar ("PUP", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PUP", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pup,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of up");
 
-    addPar ("PLP", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PLP", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::plp,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of lp");
 
-    addPar ("PU0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PU0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pu0,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of u0");
 
-    addPar ("PUTE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PUTE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pute,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of ute");
 
-    addPar ("PVOFF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PVOFF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pvoff,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of voff");
 
-    addPar ("PMINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PMINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pminv,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of minv");
 
-    addPar ("PMINVCV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PMINVCV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pminvcv,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of minvcv");
 
-    addPar ("PDELTA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PDELTA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pdelta,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of delta");
 
-    addPar ("PRDSW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PRDSW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::prdsw,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of rdsw ");
 
-    addPar ("PRSW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PRSW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::prsw,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of rsw");
 
-    addPar ("PRDW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PRDW", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::prdw,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of rdw");
 
-    addPar ("PPRWG", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PPRWG", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pprwg,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of prwg ");
 
-    addPar ("PPRWB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PPRWB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pprwb,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of prwb ");
 
-    addPar ("PPRT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PPRT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pprt,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of prt ");
 
-    addPar ("PETA0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PETA0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::peta0,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of eta0");
 
-    addPar ("PETAB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PETAB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::petab,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of etab");
 
-    addPar ("PPCLM", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PPCLM", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ppclm,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of pclm");
 
-    addPar ("PPDIBLC1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PPDIBLC1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ppdibl1,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of pdiblc1");
 
-    addPar ("PPDIBLC2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PPDIBLC2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ppdibl2,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of pdiblc2");
 
-    addPar ("PPDIBLCB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PPDIBLCB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ppdiblb,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of pdiblcb");
 
-    addPar ("PFPROUT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PFPROUT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pfprout,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of pdiblcb");
 
-    addPar ("PPDITS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PPDITS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ppdits,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of pdits");
 
-    addPar ("PPDITSD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PPDITSD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ppditsd,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of pditsd");
 
-    addPar ("PPSCBE1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PPSCBE1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ppscbe1,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of pscbe1");
 
-    addPar ("PPSCBE2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PPSCBE2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ppscbe2,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of pscbe2");
 
-    addPar ("PPVAG", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PPVAG", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ppvag,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of pvag");
 
-    addPar ("PWR", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PWR", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pwr,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of wr");
 
-    addPar ("PDWG", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PDWG", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pdwg,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of dwg");
 
-    addPar ("PDWB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PDWB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pdwb,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of dwb");
 
-    addPar ("PB0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PB0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pb0,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of b0");
 
-    addPar ("PB1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PB1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pb1,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of b1");
 
-    addPar ("PCGSL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCGSL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pcgsl,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of cgsl");
 
-    addPar ("PCGDL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCGDL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pcgdl,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of cgdl");
 
-    addPar ("PCKAPPAS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCKAPPAS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pckappas,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of ckappas");
 
-    addPar ("PCKAPPAD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCKAPPAD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pckappad,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of ckappad");
 
-    addPar ("PCF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pcf,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of cf");
 
-    addPar ("PCLC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCLC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pclc,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of clc");
 
-    addPar ("PCLE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCLE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pcle,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of cle");
 
-    addPar ("PALPHA0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PALPHA0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::palpha0,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of alpha0");
 
-    addPar ("PALPHA1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PALPHA1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::palpha1,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of alpha1");
 
-    addPar ("PBETA0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PBETA0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pbeta0,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of beta0");
 
-    addPar ("PAGIDL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PAGIDL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pagidl,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of agidl");
 
-    addPar ("PBGIDL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PBGIDL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pbgidl,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of bgidl");
 
-    addPar ("PCGIDL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCGIDL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pcgidl,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of cgidl");
 
-    addPar ("PEGIDL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PEGIDL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pegidl,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of egidl");
 
-    addPar ("PAGISL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PAGISL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pagisl,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of agisl");
 
-    addPar ("PBGISL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PBGISL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pbgisl,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of bgisl");
 
-    addPar ("PCGISL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCGISL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pcgisl,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of cgisl");
 
-    addPar ("PEGISL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PEGISL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pegisl,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of egisl");
 
-    addPar ("PAIGC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PAIGC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::paigc,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of aigc");
 
-    addPar ("PBIGC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PBIGC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pbigc,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of bigc");
 
-    addPar ("PCIGC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCIGC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pcigc,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of cigc");
 
-    addPar ("PAIGSD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PAIGSD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::paigsd,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of aigsd");
 
-    addPar ("PBIGSD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PBIGSD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pbigsd,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of bigsd");
 
-    addPar ("PCIGSD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCIGSD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pcigsd,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of cigsd");
 
-    addPar ("PAIGS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PAIGS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::paigs,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of aigs");
 
-    addPar ("PBIGS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PBIGS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pbigs,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of bigs");
 
-    addPar ("PCIGS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCIGS", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pcigs,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of cigs");
 
-    addPar ("PAIGD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PAIGD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::paigd,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of aigd");
 
-    addPar ("PBIGD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PBIGD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pbigd,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of bigd");
 
-    addPar ("PCIGD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCIGD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pcigd,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of cigd");
 
-    addPar ("PAIGBACC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PAIGBACC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::paigbacc,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of aigbacc");
 
-    addPar ("PBIGBACC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PBIGBACC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pbigbacc,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of bigbacc");
 
-    addPar ("PCIGBACC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCIGBACC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pcigbacc,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of cigbacc");
 
-    addPar ("PAIGBINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PAIGBINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::paigbinv,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of aigbinv");
 
-    addPar ("PBIGBINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PBIGBINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pbigbinv,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of bigbinv");
 
-    addPar ("PCIGBINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PCIGBINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pcigbinv,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of cigbinv");
 
-    addPar ("PNIGC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PNIGC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pnigc,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of nigc");
 
-    addPar ("PNIGBINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PNIGBINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pnigbinv,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of nigbinv");
 
-    addPar ("PNIGBACC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PNIGBACC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pnigbacc,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of nigbacc");
 
-    addPar ("PNTOX", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PNTOX", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pntox,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of ntox");
 
-    addPar ("PEIGBINV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PEIGBINV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::peigbinv,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence for eigbinv");
 
-    addPar ("PPIGCD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PPIGCD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ppigcd,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence for pigcd");
 
-    addPar ("PPOXEDGE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PPOXEDGE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ppoxedge,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence for poxedge");
 
-    addPar ("PVFBCV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PVFBCV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pvfbcv,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of vfbcv");
 
-    addPar ("PVFB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PVFB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pvfb,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of vfb");
 
-    addPar ("PACDE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PACDE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pacde,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of acde");
 
-    addPar ("PMOIN", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PMOIN", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pmoin,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of moin");
 
-    addPar ("PNOFF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PNOFF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pnoff,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of noff");
 
-    addPar ("PVOFFCV", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PVOFFCV", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pvoffcv,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of voffcv");
 
-    addPar ("PXRCRG1", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PXRCRG1", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pxrcrg1,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of xrcrg1");
 
-    addPar ("PXRCRG2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PXRCRG2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pxrcrg2,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of xrcrg2");
 
-    addPar ("PLAMBDA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PLAMBDA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::plambda,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of lambda");
 
-    addPar ("PVTL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PVTL", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pvtl,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of vtl");
 
-    addPar ("PXN", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PXN", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pxn,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of xn");
 
-    addPar ("PEU", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PEU", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::peu,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of eu");
 
-    addPar ("PVFBSDOFF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PVFBSDOFF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pvfbsdoff,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of vfbsdoff");
 
-    addPar ("PTVFBSDOFF",0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PTVFBSDOFF",0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ptvfbsdoff,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of tvfbsdoff");
 
-    addPar ("PTVOFF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PTVOFF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ptvoff,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of tvoff");
 
     // stress effect
-    addPar ("SAREF", 1.0e-6, false, ParameterType::NO_DEP,
+    p.addPar ("SAREF", 1.0e-6, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::saref,
       NULL, U_NONE, CAT_NONE, "Reference distance between OD edge to poly of one side");
 
-    addPar ("SBREF", 1.0e-6, false, ParameterType::NO_DEP,
+    p.addPar ("SBREF", 1.0e-6, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::sbref,
       NULL, U_NONE, CAT_NONE, "Reference distance between OD edge to poly of the other side");
 
-    addPar ("WLOD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WLOD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wlod,
       NULL, U_NONE, CAT_NONE, "Width parameter for stress effect");
 
-    addPar ("KU0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("KU0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ku0,
       NULL, U_NONE, CAT_NONE, "Mobility degradation/enhancement coefficient for LOD");
 
-    addPar ("KVSAT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("KVSAT", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::kvsat,
       NULL, U_NONE, CAT_NONE, "Saturation velocity degradation/enhancement parameter for LOD");
 
-    addPar ("KVTH0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("KVTH0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::kvth0,
       NULL, U_NONE, CAT_NONE, "Threshold degradation/enhancement parameter for LOD");
 
-    addPar ("TKU0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TKU0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tku0,
       NULL, U_NONE, CAT_NONE, "Temperature coefficient of KU0");
 
-    addPar ("LLODKU0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LLODKU0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::llodku0,
       NULL, U_NONE, CAT_NONE, "Length parameter for u0 LOD effect");
 
-    addPar ("WLODKU0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WLODKU0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wlodku0,
       NULL, U_NONE, CAT_NONE, "Width parameter for u0 LOD effect");
 
-    addPar ("LLODVTH", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LLODVTH", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::llodvth,
       NULL, U_NONE, CAT_NONE, "Length parameter for vth LOD effect");
 
-    addPar ("WLODVTH", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WLODVTH", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wlodvth,
       NULL, U_NONE, CAT_NONE, "Width parameter for vth LOD effect");
 
-    addPar ("LKU0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LKU0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lku0,
       NULL, U_NONE, CAT_NONE, "Length dependence of ku0");
 
-    addPar ("WKU0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WKU0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wku0,
       NULL, U_NONE, CAT_NONE, "Width dependence of ku0");
 
-    addPar ("PKU0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PKU0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pku0,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of ku0");
 
-    addPar ("LKVTH0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LKVTH0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lkvth0,
       NULL, U_NONE, CAT_NONE, "Length dependence of kvth0");
 
-    addPar ("WKVTH0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WKVTH0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wkvth0,
       NULL, U_NONE, CAT_NONE, "Width dependence of kvth0");
 
-    addPar ("PKVTH0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PKVTH0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pkvth0,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of kvth0");
 
-    addPar ("STK2", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("STK2", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::stk2,
       NULL, U_NONE, CAT_NONE, "K2 shift factor related to stress effect on vth");
 
-    addPar ("LODK2", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("LODK2", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lodk2,
       NULL, U_NONE, CAT_NONE, "K2 shift modification factor for stress effect");
 
-    addPar ("STETA0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("STETA0", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::steta0,
       NULL, U_NONE, CAT_NONE, "eta0 shift factor related to stress effect on vth");
 
-    addPar ("LODETA0", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("LODETA0", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lodeta0,
       NULL, U_NONE, CAT_NONE, "eta0 shift modification factor for stress effect");
 
     // Well Proximity Effect
-    addPar ("WEB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WEB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::web,
       NULL, U_NONE, CAT_NONE, "Coefficient for SCB");
 
-    addPar ("WEC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WEC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wec,
       NULL, U_NONE, CAT_NONE, "Coefficient for SCC");
 
-    addPar ("KVTH0WE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("KVTH0WE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::kvth0we,
       NULL, U_NONE, CAT_NONE, "Threshold shift factor for well proximity effect");
 
-    addPar ("K2WE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("K2WE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::k2we,
       NULL, U_NONE, CAT_NONE, " K2 shift factor for well proximity effect ");
 
-    addPar ("KU0WE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("KU0WE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ku0we,
       NULL, U_NONE, CAT_NONE, " Mobility degradation factor for well proximity effect ");
 
-    addPar ("SCREF", 1.0e-6, false, ParameterType::NO_DEP,
+    p.addPar ("SCREF", 1.0e-6, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::scref,
       NULL, U_NONE, CAT_NONE, " Reference distance to calculate SCA, SCB and SCC");
 
-    addPar ("LKVTH0WE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LKVTH0WE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lkvth0we,
       NULL, U_NONE, CAT_NONE, "Length dependence of kvth0we");
 
-    addPar ("LK2WE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LK2WE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lk2we,
       NULL, U_NONE, CAT_NONE, " Length dependence of k2we ");
 
-    addPar ("LKU0WE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LKU0WE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::lku0we,
       NULL, U_NONE, CAT_NONE, " Length dependence of ku0we ");
 
-    addPar ("WKVTH0WE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WKVTH0WE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wkvth0we,
       NULL, U_NONE, CAT_NONE, "Width dependence of kvth0we");
 
-    addPar ("WK2WE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WK2WE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wk2we,
       NULL, U_NONE, CAT_NONE, " Width dependence of k2we ");
 
-    addPar ("WKU0WE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WKU0WE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wku0we,
       NULL, U_NONE, CAT_NONE, " Width dependence of ku0we ");
 
-    addPar ("PKVTH0WE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PKVTH0WE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pkvth0we,
       NULL, U_NONE, CAT_NONE, "Cross-term dependence of kvth0we");
 
-    addPar ("PK2WE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PK2WE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pk2we,
       NULL, U_NONE, CAT_NONE, " Cross-term dependence of k2we ");
 
-    addPar ("PKU0WE", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("PKU0WE", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::pku0we,
       NULL, U_NONE, CAT_NONE, " Cross-term dependence of ku0we ");
 
 
-    addPar ("NOIA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("NOIA", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::oxideTrapDensityA,
       NULL, U_NONE, CAT_FLICKER, "Flicker Noise parameter a");
 
-    addPar ("NOIB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("NOIB", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::oxideTrapDensityB,
       NULL, U_NONE, CAT_FLICKER, "Flicker Noise parameter b");
 
-    addPar ("NOIC", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("NOIC", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::oxideTrapDensityC,
       NULL, U_NONE, CAT_FLICKER, "Flicker Noise parameter c");
 
 
-    addPar ("TNOIA", 1.5, false, ParameterType::NO_DEP,
+    p.addPar ("TNOIA", 1.5, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tnoia,
       NULL, U_NONE, CAT_NONE, "Thermal noise parameter");
 
-    addPar ("TNOIB", 3.5, false, ParameterType::NO_DEP,
+    p.addPar ("TNOIB", 3.5, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::tnoib,
       NULL, U_NONE, CAT_NONE, "Thermal noise parameter");
 
-    addPar ("RNOIA", 0.577, false, ParameterType::NO_DEP,
+    p.addPar ("RNOIA", 0.577, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rnoia,
       NULL, U_NONE, CAT_NONE, "Thermal noise coefficient");
 
-    addPar ("RNOIB", 0.5164, false, ParameterType::NO_DEP,
+    p.addPar ("RNOIB", 0.5164, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::rnoib,
       NULL, U_NONE, CAT_NONE, "Thermal noise coefficient");
 
-    addPar ("NTNOI", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("NTNOI", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ntnoi,
       NULL, U_NONE, CAT_NONE, "Thermal noise parameter");
 
-    addPar ("EM", 4.1e7,false, ParameterType::NO_DEP,
+    p.addPar ("EM", 4.1e7,false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::em,
       NULL, U_NONE, CAT_NONE, "Flicker noise parameter");
 
-    addPar ("EF", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("EF", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::ef,
       NULL, U_NONE, CAT_NONE, "Flicker noise frequency exponent");
 
-    addPar ("AF", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("AF", 1.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::af,
       NULL, U_NONE, CAT_NONE, "Flicker noise exponent");
 
-    addPar ("KF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("KF", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::kf,
       NULL, U_NONE, CAT_NONE, "Flicker noise coefficient");
 
-    addPar ("WPEMOD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WPEMOD", 0.0, false, ParameterType::NO_DEP,
       &MOSFET_B4::Model::wpemod,
       NULL, U_NONE, CAT_NONE,	" Flag for WPE model (WPEMOD=1 to activate this model) ");
 
     // Set up non-double precision variables:
-    addPar ("CVCHARGEMOD",    0,    false,   ParameterType::NO_DEP,
+    p.addPar ("CVCHARGEMOD",    0,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::cvchargeMod, NULL,
     U_NONE, CAT_CONTROL, "Capacitance charge model selector");
 
-    addPar ("CAPMOD",    2,    false,   ParameterType::NO_DEP,
+    p.addPar ("CAPMOD",    2,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::capMod, NULL,
     U_NONE, CAT_CONTROL, "Capacitance model selector");
 
-    addPar ("DIOMOD",    1,    false,   ParameterType::NO_DEP,
+    p.addPar ("DIOMOD",    1,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::dioMod, NULL,
     U_NONE, CAT_CONTROL, "Diode IV model selector");
 
-    addPar ("RDSMOD",    0,    false,   ParameterType::NO_DEP,
+    p.addPar ("RDSMOD",    0,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::rdsMod, NULL,
     U_NONE, CAT_CONTROL, "Bias-dependent S/D resistance model selector");
 
-    addPar ("TRNQSMOD",  0,    false,   ParameterType::NO_DEP,
+    p.addPar ("TRNQSMOD",  0,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::trnqsMod, NULL,
     U_NONE, CAT_CONTROL, "Transient NQS model selector");
 
-    addPar ("ACNQSMOD",  0,    false,   ParameterType::NO_DEP,
+    p.addPar ("ACNQSMOD",  0,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::acnqsMod, NULL,
     U_NONE, CAT_CONTROL, "AC NQS model selector");
 
-    addPar ("MOBMOD",    0,    false,   ParameterType::NO_DEP,
+    p.addPar ("MOBMOD",    0,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::mobMod, NULL,
     U_NONE, CAT_CONTROL, "Mobility model selector");
 
-    addPar ("RBODYMOD",  0,    false,   ParameterType::NO_DEP,
+    p.addPar ("RBODYMOD",  0,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::rbodyMod, NULL,
     U_NONE, CAT_CONTROL, "Distributed body R model selector");
 
-    addPar ("RGATEMOD",  0,    false,   ParameterType::NO_DEP,
+    p.addPar ("RGATEMOD",  0,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::rgateMod, NULL,
     U_NONE, CAT_CONTROL, "Gate R model selector");
 
-    addPar ("PERMOD",    1,    false,   ParameterType::NO_DEP,
+    p.addPar ("PERMOD",    1,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::perMod, NULL,
     U_NONE, CAT_CONTROL, "Pd and Ps model selector");
 
-    addPar ("GEOMOD",    0,    false,   ParameterType::NO_DEP,
+    p.addPar ("GEOMOD",    0,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::geoMod, NULL,
     U_NONE, CAT_CONTROL, "Geometry dependent parasitics model selector");
 
-    addPar ("FNOIMOD",   1,    false,   ParameterType::NO_DEP,
+    p.addPar ("FNOIMOD",   1,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::fnoiMod, NULL,
     U_NONE, CAT_CONTROL, "Flicker noise model selector");
 
-    addPar ("TNOIMOD",   0,    false,   ParameterType::NO_DEP,
+    p.addPar ("TNOIMOD",   0,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::tnoiMod, NULL,
     U_NONE, CAT_CONTROL, "Thermal noise model selector");
 
-    addPar ("MTRLMOD",   0,    false,   ParameterType::NO_DEP,
+    p.addPar ("MTRLMOD",   0,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::mtrlMod, NULL,
     U_NONE, CAT_CONTROL, "parameter for nonm-silicon substrate or metal gate selector");
 
-    addPar ("IGCMOD",    0,    false,   ParameterType::NO_DEP,
+    p.addPar ("IGCMOD",    0,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::igcMod, NULL,
     U_NONE, CAT_CONTROL, "Gate-to-channel Ig model selector");
 
-    addPar ("IGBMOD",    0,    false,   ParameterType::NO_DEP,
+    p.addPar ("IGBMOD",    0,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::igbMod, NULL,
     U_NONE, CAT_CONTROL, "Gate-to-body Ig model selector");
 
-    addPar ("TEMPMOD",   0,    false,   ParameterType::NO_DEP,
+    p.addPar ("TEMPMOD",   0,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::tempMod, NULL,
     U_NONE, CAT_CONTROL, "Temperature model selector");
 
-    addPar ("PARAMCHK",  1,    false,   ParameterType::NO_DEP,
+    p.addPar ("PARAMCHK",  1,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::paramChk, NULL,
     U_NONE, CAT_CONTROL, "Model parameter checking selector");
 
-    addPar ("BINUNIT",   1,    false,   ParameterType::NO_DEP,
+    p.addPar ("BINUNIT",   1,    false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::binUnit, NULL,
     U_NONE, CAT_CONTROL, "Bin  unit  selector");
 
-    addPar ("VERSION",   string("4.6.1"),  false,   ParameterType::NO_DEP,
+    p.addPar ("VERSION",   std::string("4.6.1"),  false,   ParameterType::NO_DEP,
     &MOSFET_B4::Model::version, NULL,
     U_NONE, CAT_CONTROL, "parameter for model version");
 }
 
-namespace MOSFET_B4 {
-
-
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
-}
-
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
 
 // Class Instance
 //-----------------------------------------------------------------------------
@@ -3634,7 +3618,7 @@ ParametricData<Model> &Model::getParametricData() {
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
   double Rtot;
 
@@ -3648,8 +3632,7 @@ bool Instance::processParams (string param)
   else if ((rbodyMod != 0) && (rbodyMod != 1) && (rbodyMod != 2))
   {
     rbodyMod = model_.rbodyMod;
-    const string msg = "Warning: rbodyMod has been set to its global value: ";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg,rbodyMod);
+    UserWarning(*this) << "rbodyMod has been set to its global value: ";
   }
 
   if (!given("RGATEMOD"))
@@ -3659,8 +3642,7 @@ bool Instance::processParams (string param)
   else if ((rgateMod != 0) && (rgateMod != 1) && (rgateMod != 2) && (rgateMod != 3))
   {
     rgateMod = model_.rgateMod;
-    const string msg = "Warning: rgateMod has been set to its global value: ";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg,rgateMod);
+    UserWarning(*this) << "rgateMod has been set to its global value: ";
   }
 
   if (!given("GEOMOD"))
@@ -3678,8 +3660,7 @@ bool Instance::processParams (string param)
   else if ((trnqsMod != 0) && (trnqsMod != 1))
   {
     trnqsMod = model_.trnqsMod;
-    const string msg = "Warning: trnqsMod has been set to its global value: ";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg,trnqsMod);
+    UserWarning(*this) << "trnqsMod has been set to its global value: ";
   }
 
   if (!given("ACNQSMOD"))
@@ -3689,8 +3670,7 @@ bool Instance::processParams (string param)
   else if ((acnqsMod != 0) && (acnqsMod != 1))
   {
     acnqsMod = model_.acnqsMod;
-    const string msg = "Warning: acnqsMod has been set to its global value: ";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg,acnqsMod);
+    UserWarning(*this) << "acnqsMod has been set to its global value: ";
   }
 
   // now set the temperature related stuff.
@@ -3823,37 +3803,37 @@ bool Instance::processParams (string param)
 //-----------------------------------------------------------------------------
 void Instance::debugJacStampOutput ()
 {
-  cout << "Jacobian stamp:" << endl;
+  Xyce::dout() << "Jacobian stamp:" << std::endl;
   for( int rw=0; rw < jacStamp.size() ; ++rw  )
   {
-    cout << "jacStamp[ " << rw << "] = { " ;
+    Xyce::dout() << "jacStamp[ " << rw << "] = { " ;
     for( int cl=0; cl < jacStamp[rw].size(); ++cl )
     {
-      cout << jacStamp[rw][cl];
+      Xyce::dout() << jacStamp[rw][cl];
       if( cl != (jacStamp[rw].size()-1) )
       {
-        cout << ", ";
+        Xyce::dout() << ", ";
       }
     }
-    cout << "}" << endl;
+    Xyce::dout() << "}" << std::endl;
   }
-  cout << endl;
+  Xyce::dout() << std::endl;
 
-  cout << "And as viewed through the maps"  << endl;
+  Xyce::dout() << "And as viewed through the maps"  << std::endl;
   for( int rw=0; rw < jacMap.size() ; ++rw  )
   {
-    cout << "jacStamp[ " << rw << "] mapped to jacStamp[ " << jacMap[rw] << "] = { " ;
+    Xyce::dout() << "jacStamp[ " << rw << "] mapped to jacStamp[ " << jacMap[rw] << "] = { " ;
     for( int cl=0; cl < jacMap2[rw].size(); ++cl )
     {
-      cout << jacStamp[jacMap[rw]][jacMap2[rw][cl]];
+      Xyce::dout() << jacStamp[jacMap[rw]][jacMap2[rw][cl]];
       if( cl != (jacMap2[rw].size()-1) )
       {
-        cout << ", ";
+        Xyce::dout() << ", ";
       }
     }
-    cout << "}" << endl;
+    Xyce::dout() << "}" << std::endl;
   }
-  cout << endl;
+  Xyce::dout() << std::endl;
 }
 
 //-----------------------------------------------------------------------------
@@ -3866,13 +3846,11 @@ void Instance::debugJacStampOutput ()
 //-----------------------------------------------------------------------------
 
 Instance::Instance(
-  InstanceBlock & IB,
+  const Configuration & configuration,
+  const InstanceBlock & IB,
   Model & Miter,
-  MatrixLoadData & mlData1,
-  SolverState &ss1,
-  ExternData  &ed1,
-  DeviceOptions & do1)
-  : DeviceInstance        (IB,mlData1,ss1,ed1,do1),
+  const FactoryBlock &  factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(Miter),
     ueff  (0.0),
     thetavth  (0.0),
@@ -4083,7 +4061,7 @@ Instance::Instance(
     drainMOSFET_B4Exists(false),
     sourceMOSFET_B4Exists(false),
     ChargeComputationNeeded           (true),
-          temp                              (getDeviceOptions().temp.dVal()),
+          temp                              (getDeviceOptions().temp.getImmutableValue<double>()),
     limitedFlag(false),
     // missing stuff...
     Vd (0.0),
@@ -4597,9 +4575,6 @@ Instance::Instance(
   devConMap[2] = 1;
   devConMap[3] = 3;
 
-  setName(IB.getName());
-  setModelName(model_.getName());
-
   blockHomotopyID =
     devSupport.getGainScaleBlockID(getDeviceOptions().numGainScaleBlocks);
   randomPerturb =
@@ -4630,7 +4605,7 @@ Instance::Instance(
   if (!given("SD"))
     sd = 2.0 * model_.dmcg;
   if (!given("TEMP"))
-    temp = getDeviceOptions().temp.dVal();
+    temp = getDeviceOptions().temp.getImmutableValue<double>();
   if (!given("AD"))
     drainArea = getDeviceOptions().defad;
   if (!given("AS"))
@@ -4644,27 +4619,17 @@ Instance::Instance(
 
   if (given("TRNQSMOD"))
   {
-    string msg = "Instance::Instance";
-    msg += "  nsqMod = 1.  Not allowed yet.  Setting to 0.\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_DEBUG_0,msg);
+    UserWarning(*this) << "nsqMod = 1.  Not allowed yet.  Setting to 0";
   }
 
   if (getDeviceOptions().verboseLevel > 0 && (l > model_.Lmax || l < model_.Lmin))
   {
-    string msg = "Channel length out of range for the model ";
-    msg += getName();
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING, oss.str());
+    UserWarning(*this) << "Channel length out of range";
   }
 
   if (getDeviceOptions().verboseLevel > 0 && (w > model_.Wmax || w < model_.Wmin))
   {
-    string msg = "Channel width out of range for the model ";
-    msg += getName();
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING, oss.str());
+    UserWarning(*this) << "Channel width out of range";
   }
 
   // Note important difference from the BSIM3 --- we do NOT keep any
@@ -4892,7 +4857,7 @@ Instance::Instance(
     }
 
 #ifdef  Xyce_DEBUG_DEVICE
-    cout << "About to remap away optional nodes from the jacStamp!" << endl;
+    Xyce::dout() << "About to remap away optional nodes from the jacStamp!" << std::endl;
     debugJacStampOutput ();
 #endif
 
@@ -4900,9 +4865,9 @@ Instance::Instance(
     // jacobian stamp based on absent resistances
 
     // temporary stamps and maps
-    vector< vector<int> > tempStamp;
-    vector<int> tempMap;
-    vector< vector<int> > tempMap2;
+    std::vector< std::vector<int> > tempStamp;
+    std::vector<int> tempMap;
+    std::vector< std::vector<int> > tempMap2;
 
     int OriginalSize = jacMap.size();
 
@@ -5001,7 +4966,7 @@ Instance::Instance(
 
 
 #ifdef  Xyce_DEBUG_DEVICE
-    cout << "Done remap away optional nodes from the jacStamp!" << endl;
+    Xyce::dout() << "Done remap away optional nodes from the jacStamp!" << std::endl;
     debugJacStampOutput ();
 #endif
   }
@@ -5028,49 +4993,19 @@ Instance::~Instance ()
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 11/25/06
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                                            const vector<int> & extLIDVecRef )
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                                            const std::vector<int> & extLIDVecRef )
 {
-  string msg;
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-
-  if (getDeviceOptions().debugLevel > 0)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0)
   {
-    cout << dashedline << endl;
-    cout << "  In Instance::register LIDs\n\n";
-    cout << "  name             = " << getName() << endl;
-  }
-#endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << "  number of internal variables: " << numInt << endl;
-    cout << "  number of external variables: " << numExt << endl;
-  }
-#endif
-
-  if ( numIntVars !=  numInt )
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
+    Xyce::dout() << section_divider << std::endl
+                 << "  In Instance::register LIDs" << std::endl
+                 << "  name             = " << getName() << std::endl
+                 << "  number of internal variables: " << intLIDVecRef.size() << std::endl
+                 << "  number of external variables: " << extLIDVecRef.size() << std::endl;
   }
 
   // copy over the global ID lists.
@@ -5146,10 +5081,7 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
   {
     if( li_Body == li_Source )
     {
-       msg = "Instance::registerLIDs:";
-       msg += "Tried to specify an initial condition on V_Bulk_Source ";
-       msg += "when Bulk and Source nodes are the same node.";
-       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
+      UserError(*this) << "Tried to specify an initial condition on V_Bulk_Source when Bulk and Source nodes are the same node";
     }
     li_Ibs = intLIDVec[intLoc++];
   }
@@ -5158,10 +5090,7 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
   {
     if( li_Drain == li_Source )
     {
-       msg = "Instance::registerLIDs:";
-       msg += "Tried to specify an initial condition on V_Drain_Source ";
-       msg += "when Drain and Source nodes are the same node.";
-       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
+      UserError(*this) << "Tried to specify an initial condition on V_Drain_Source when Drain and Source nodes are the same node";
     }
     li_Ids = intLIDVec[intLoc++];
   }
@@ -5170,10 +5099,7 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
   {
     if( li_GateExt == li_Source )
     {
-       msg = "Instance::registerLIDs:";
-       msg += "Tried to specify an initial condition on V_Gate_Source ";
-       msg += "when Gate and Source nodes are the same node.";
-       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
+      UserError(*this) << "Tried to specify an initial condition on V_Gate_Source when Gate and Source nodes are the same node";
     }
    li_Igs = intLIDVec[intLoc++];
   }
@@ -5182,20 +5108,20 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "\n  local variable indices:\n";
-    cout << " li_Drain       = " << li_Drain << endl;
-    cout << " li_GateExt     = " << li_GateExt << endl;
-    cout << " li_Source      = " << li_Source << endl;
-    cout << " li_Body        = " << li_Body << endl;
-    cout << " li_DrainPrime  = " << li_DrainPrime << endl;
-    cout << " li_GatePrime   = " << li_GatePrime << endl;
-    cout << " li_GateMid     = " << li_GateMid << endl;
-    cout << " li_SourcePrime = " << li_SourcePrime << endl;
-    cout << " li_BodyPrime   = " << li_BodyPrime << endl;
-    cout << " li_DrainBody   = " << li_DrainBody << endl;
-    cout << " li_SourceBody  = " << li_SourceBody << endl;
-    cout << " li_Charge      = " << li_Charge << endl;
-    cout << dashedline << endl;
+    Xyce::dout() << "\n  local variable indices:\n";
+    Xyce::dout() << " li_Drain       = " << li_Drain << std::endl;
+    Xyce::dout() << " li_GateExt     = " << li_GateExt << std::endl;
+    Xyce::dout() << " li_Source      = " << li_Source << std::endl;
+    Xyce::dout() << " li_Body        = " << li_Body << std::endl;
+    Xyce::dout() << " li_DrainPrime  = " << li_DrainPrime << std::endl;
+    Xyce::dout() << " li_GatePrime   = " << li_GatePrime << std::endl;
+    Xyce::dout() << " li_GateMid     = " << li_GateMid << std::endl;
+    Xyce::dout() << " li_SourcePrime = " << li_SourcePrime << std::endl;
+    Xyce::dout() << " li_BodyPrime   = " << li_BodyPrime << std::endl;
+    Xyce::dout() << " li_DrainBody   = " << li_DrainBody << std::endl;
+    Xyce::dout() << " li_SourceBody  = " << li_SourceBody << std::endl;
+    Xyce::dout() << " li_Charge      = " << li_Charge << std::endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -5209,13 +5135,13 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Eric R. Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 11/25/06
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
     // set up the internal names map
-    string tmpstr;
+    std::string tmpstr;
     if (drainMOSFET_B4Exists)
     {
       tmpstr = getName()+"_drainprime";
@@ -5297,41 +5223,18 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 11/25/06
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-  string msg;
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-
-  if (getDeviceOptions().debugLevel > 0)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0)
   {
-    cout << endl;
-    cout << dashedline << endl;
-    cout << "  In Instance::registerStateLIDs\n\n";
-    cout << "  name             = " << getName() << endl;
+    Xyce::dout() << std::endl
+                 << section_divider << std::endl
+                 << "  In Instance::registerStateLIDs" << std::endl
+                 << "  name             = " << getName() << std::endl
+                 << "  Number of State LIDs: " << staLIDVecRef.size() << std::endl;
   }
-#endif
-
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << "  Number of State LIDs: " << numSta << endl;
-  }
-#endif
 
   // Copy over the global ID lists:
   staLIDVec = staLIDVecRef;
@@ -5363,17 +5266,17 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "  Local State indices:" << endl;
-    cout << endl;
-    cout << "  li_state_qb            = " << li_state_qb  << endl;
-    cout << "  li_state_qg            = " << li_state_qg << endl;
-    cout << "  li_state_qd            = " << li_state_qd << endl;
-    cout << "  li_state_qbs           = " << li_state_qbs << endl;
-    cout << "  li_state_qbd           = " << li_state_qbd << endl;
-    cout << "  li_state_qcheq         = " << li_state_qcheq << endl;
-    cout << "  li_state_qcdump        = " << li_state_qcdump << endl;
-    cout << endl;
-    cout << dashedline << endl;
+    Xyce::dout() << "  Local State indices:" << std::endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "  li_state_qb            = " << li_state_qb  << std::endl;
+    Xyce::dout() << "  li_state_qg            = " << li_state_qg << std::endl;
+    Xyce::dout() << "  li_state_qd            = " << li_state_qd << std::endl;
+    Xyce::dout() << "  li_state_qbs           = " << li_state_qbs << std::endl;
+    Xyce::dout() << "  li_state_qbd           = " << li_state_qbd << std::endl;
+    Xyce::dout() << "  li_state_qcheq         = " << li_state_qcheq << std::endl;
+    Xyce::dout() << "  li_state_qcdump        = " << li_state_qcdump << std::endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -5387,39 +5290,9 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 // Creator       : Eric Keiter, SNL
 // Creation Date : 12/9/11
 //-----------------------------------------------------------------------------
-void Instance::registerStoreLIDs( const vector<int> & stoLIDVecRef )
+void Instance::registerStoreLIDs( const std::vector<int> & stoLIDVecRef )
 {
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << endl;
-    cout << dashedline << endl;
-    cout << "  In Instance::registerStoreLIDs\n\n";
-    cout << "  name             = " << getName() << endl;
-  }
-#endif
-
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables.
-  int numSto = stoLIDVecRef.size();
-
-  if (numSto != getNumStoreVars())
-  {
-    string msg = "Instance::registerStoreLIDs:";
-    msg += "numSto != numStoreVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << "  Number of Store LIDs: " << numSto << endl;
-  }
-#endif
+  AssertLIDs(stoLIDVecRef.size() == getNumStoreVars());
 
   // Copy over the global ID lists:
   stoLIDVec = stoLIDVecRef;
@@ -5440,28 +5313,6 @@ void Instance::registerStoreLIDs( const vector<int> & stoLIDVecRef )
   li_store_vged = stoLIDVec[lid++];
   li_store_vgmd = stoLIDVec[lid++];
   li_store_von  = stoLIDVec[lid++];
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << "  Local Store indices:" << endl;
-    cout << endl;
-    cout << "  li_store_vbd  = " <<  li_store_vbd << endl;
-    cout << "  li_store_vbs  = " <<  li_store_vbs << endl;
-    cout << "  li_store_vgs  = " <<  li_store_vgs << endl;
-    cout << "  li_store_vds  = " <<  li_store_vds << endl;
-    cout << "  li_store_vges = " <<  li_store_vges << endl;
-    cout << "  li_store_vgms = " <<  li_store_vgms << endl;
-    cout << "  li_store_vdes = " <<  li_store_vdes << endl;
-    cout << "  li_store_vses = " <<  li_store_vses << endl;
-    cout << "  li_store_vdbs = " <<  li_store_vdbs << endl;
-    cout << "  li_store_vsbs = " <<  li_store_vsbs << endl;
-    cout << "  li_store_vdbd = " <<  li_store_vdbd << endl;
-    cout << "  li_store_vged = " <<  li_store_vged << endl;
-    cout << "  li_store_vgmd = " <<  li_store_vgmd << endl;
-    cout << "  li_store_von  = " <<  li_store_von <<endl;
-  }
-#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -5472,7 +5323,7 @@ void Instance::registerStoreLIDs( const vector<int> & stoLIDVecRef )
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 11/25/06
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -5485,11 +5336,11 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 11/25/06
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
-  vector<int> & map = jacMap;
-  vector< vector<int> > & map2 = jacMap2;;
+  std::vector<int> & map = jacMap;
+  std::vector< std::vector<int> > & map2 = jacMap2;;
 
   Dd   =  jacLIDVec[map[0]][map2[0][0]];
   Ddp  =  jacLIDVec[map[0]][map2[0][1]];
@@ -5814,7 +5665,7 @@ void Instance::setupPointers ()
 //-----------------------------------------------------------------------------
 bool Instance::updateTemperature (const double & temp_tmp)
 {
-  string msg="";
+  std::string msg="";
 
   double tmp(0.0), tmp1(0.0), tmp2(0.0), tmp3(0.0), Eg(0.0), Eg0(0.0), ni,epssub;
   double T0(0.0), T1(0.0);
@@ -5835,12 +5686,11 @@ bool Instance::updateTemperature (const double & temp_tmp)
   bool bsuccess = true;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << endl << dashedline2 << endl;
-    cout << "Instance::updateTemperature\n";
-    cout << "name = " << getName() << endl;
+    Xyce::dout() << std::endl << subsection_divider << std::endl;
+    Xyce::dout() << "Instance::updateTemperature\n";
+    Xyce::dout() << "name = " << getName() << std::endl;
   }
 #endif
 
@@ -5864,7 +5714,7 @@ bool Instance::updateTemperature (const double & temp_tmp)
         (model_.dtoxGiven) &&
         (model_.toxe != (model_.toxp +model_.dtox)))
     {
-      msg = "Warning: toxe, toxp and dtox all given and toxe != toxp + dtox; dtox ignored.\n";
+      UserWarning(*this) << "toxe, toxp and dtox all given and toxe != toxp + dtox; dtox ignored";
     }
     else if ((model_.toxeGiven) && (!model_.toxpGiven))
     {
@@ -6028,15 +5878,13 @@ bool Instance::updateTemperature (const double & temp_tmp)
    if (model_.SunitAreaJctCap > 0.0)
    {
      model_.SunitAreaTempJctCap = 0.0;
-     msg =  "Temperature effect has caused cjs to be negative. Cjs is clamped to zero.\n";
-     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+     UserWarning(*this) << "Temperature effect has caused cjs to be negative. Cjs is clamped to zero";
 
    }
    if (model_.DunitAreaJctCap > 0.0)
    {
      model_.DunitAreaTempJctCap = 0.0;
-     msg =  "Temperature effect has caused cjd to be negative. Cjd is clamped to zero.\n";
-     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+     UserWarning(*this) << "Temperature effect has caused cjd to be negative. Cjd is clamped to zero";
    }
   }
 
@@ -6051,14 +5899,12 @@ bool Instance::updateTemperature (const double & temp_tmp)
    if (model_.SunitLengthSidewallJctCap > 0.0)
    {
      model_.SunitLengthSidewallTempJctCap = 0.0;
-     msg =  "Temperature effect has caused cjsws to be negative. Cjsws is clamped to zero.\n";
-     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+     UserWarning(*this) << "Temperature effect has caused cjsws to be negative. Cjsws is clamped to zero";
    }
    if (model_.DunitLengthSidewallJctCap > 0.0)
    {
      model_.DunitLengthSidewallTempJctCap = 0.0;
-     msg =  "Temperature effect has caused cjswd to be negative. Cjswd is clamped to zero.\n";
-     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+     UserWarning(*this) << "Temperature effect has caused cjswd to be negative. Cjswd is clamped to zero";
    }
   }
 
@@ -6073,14 +5919,12 @@ bool Instance::updateTemperature (const double & temp_tmp)
    if (model_.SunitLengthGateSidewallJctCap > 0.0)
    {
      model_.SunitLengthGateSidewallTempJctCap = 0.0;
-     msg =  "Temperature effect has caused cjswgs to be negative. Cjswgs is clamped to zero.\n";
-     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+     UserWarning(*this) << "Temperature effect has caused cjswgs to be negative. Cjswgs is clamped to zero";
    }
    if (model_.DunitLengthGateSidewallJctCap > 0.0)
    {
      model_.DunitLengthGateSidewallTempJctCap = 0.0;
-     msg =  "Temperature effect has caused cjswgd to be negative. Cjswgd is clamped to zero.\n";
-     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+     UserWarning(*this) << "Temperature effect has caused cjswgd to be negative. Cjswgd is clamped to zero";
    }
   }
 
@@ -6089,114 +5933,98 @@ bool Instance::updateTemperature (const double & temp_tmp)
   if (model_.PhiBS < 0.01)
   {
    model_.PhiBS = 0.01;
-   msg =  "Temperature effect has caused pbs to be less than 0.01. Pbs is clamped to 0.01.\n";
-   N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+   UserWarning(*this) << "Temperature effect has caused pbs to be less than 0.01. Pbs is clamped to 0.01";
   }
 
   model_.PhiBD = model_.DbulkJctPotential - model_.tpb * delTemp;
   if (model_.PhiBD < 0.01)
   {
    model_.PhiBD = 0.01;
-   msg =  "Temperature effect has caused pbd to be less than 0.01. Pbd is clamped to 0.01.\n";
-   N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+   UserWarning(*this) << "Temperature effect has caused pbd to be less than 0.01. Pbd is clamped to 0.01";
   }
 
   model_.PhiBSWS = model_.SsidewallJctPotential - model_.tpbsw * delTemp;
   if (model_.PhiBSWS <= 0.01)
   {
    model_.PhiBSWS = 0.01;
-   msg =  "Temperature effect has caused pbsws to be less than 0.01. Pbsws is clamped to 0.01.\n";
-   N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+   UserWarning(*this) << "Temperature effect has caused pbsws to be less than 0.01. Pbsws is clamped to 0.01";
   }
 
   model_.PhiBSWD = model_.DsidewallJctPotential - model_.tpbsw * delTemp;
   if (model_.PhiBSWD <= 0.01)
   {
    model_.PhiBSWD = 0.01;
-   msg =  "Temperature effect has caused pbswd to be less than 0.01. Pbswd is clamped to 0.01.\n";
-   N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+   UserWarning(*this) << "Temperature effect has caused pbswd to be less than 0.01. Pbswd is clamped to 0.01";
   }
 
   model_.PhiBSWGS = model_.SGatesidewallJctPotential - model_.tpbswg * delTemp;
   if (model_.PhiBSWGS <= 0.01)
   {
    model_.PhiBSWGS = 0.01;
-   msg =  "Temperature effect has caused pbswgs to be less than 0.01. Pbswgs is clamped to 0.01.\n";
-   N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+   UserWarning(*this) << "Temperature effect has caused pbswgs to be less than 0.01. Pbswgs is clamped to 0.01";
   }
 
   model_.PhiBSWGD = model_.DGatesidewallJctPotential - model_.tpbswg * delTemp;
   if (model_.PhiBSWGD <= 0.01)
   {
    model_.PhiBSWGD = 0.01;
-   msg =  "Temperature effect has caused pbswgd to be less than 0.01. Pbswgd is clamped to 0.01.\n";
-   N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+   UserWarning(*this) << "Temperature effect has caused pbswgd to be less than 0.01. Pbswgd is clamped to 0.01";
   } // End of junction capacitance
 
 
   if (model_.ijthdfwd <= 0.0)
   {
    model_.ijthdfwd = 0.1;
-   msg =  "Ijthdfwd reset to ";
-   N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg, model_.ijthdfwd);
+   UserWarning(*this) << "Ijthdfwd reset to " << model_.ijthdfwd;
   }
   if (model_.ijthsfwd <= 0.0)
   {
    model_.ijthsfwd = 0.1;
-   msg =  "Ijthsfwd reset to ";
-   N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg, model_.ijthsfwd);
+   UserWarning(*this) << "Ijthsfwd reset to " << model_.ijthsfwd;
   }
   if (model_.ijthdrev <= 0.0)
   {
    model_.ijthdrev = 0.1;
-   msg =  "Ijthdrev reset to ";
-   N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg, model_.ijthdrev);
+   UserWarning(*this) << "Ijthdrev reset to " << model_.ijthdrev;
   }
   if (model_.ijthsrev <= 0.0)
   {
    model_.ijthsrev = 0.1;
-   msg =  "Ijthsrev reset to ";
-   N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg, model_.ijthsrev);
+   UserWarning(*this) << "Ijthsrev reset to " << model_.ijthsrev;
   }
 
   if ((model_.xjbvd <= 0.0) && (model_.dioMod == 2))
   {
    model_.xjbvd = 1.0;
-   msg =  "Xjbvd reset to ";
-   N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg, model_.xjbvd);
+   UserWarning(*this) << "Xjbvd reset to " << model_.xjbvd;
   }
   else if ((model_.xjbvd < 0.0) && (model_.dioMod == 0))
   {
    model_.xjbvd = 1.0;
-   msg =  "Xjbvd reset to ";
-   N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_WARNING,msg, model_.xjbvd);
+   UserWarning(*this) << "Xjbvd reset to " << model_.xjbvd;
   }
 
   if (model_.bvd <= 0.0)
   {
    model_.bvd = 10.0;
-   msg =  "BVD reset to ",
-   N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_WARNING,msg, model_.bvd);
+   UserWarning(*this) << "BVD reset to " << model_.bvd;
   }
 
   if ((model_.xjbvs <= 0.0) && (model_.dioMod == 2))
   {
    model_.xjbvs = 1.0;
-   msg =  "Xjbvs reset to ";
-   N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_WARNING,msg, model_.xjbvs);
+   UserWarning(*this) << "Xjbvs reset to " << model_.xjbvs;
   }
   else if ((model_.xjbvs < 0.0) && (model_.dioMod == 0))
   {
    model_.xjbvs = 1.0;
-   msg =  "Xjbvs reset to ";
-   N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_WARNING,msg, model_.xjbvs);
+   UserWarning(*this) << "Xjbvs reset to " << model_.xjbvs;
   }
 
   if (model_.bvs <= 0.0)
   {
    model_.bvs = 10.0;
-   msg =  "BVS reset to ";
-   N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_WARNING,msg, model_.bvs);
+   UserWarning(*this) << "BVS reset to " << model_.bvs;
   }
 
 
@@ -6213,9 +6041,9 @@ bool Instance::updateTemperature (const double & temp_tmp)
   // owned by the model.  If the values for length and width match those of
   // a previously allocated set, then use the old set.  If not, allocate a new set.
 
-  list<SizeDependParam*>::iterator it_dpL =
+  std::list<SizeDependParam*>::iterator it_dpL =
     model_.sizeDependParamList.begin();
-  list<SizeDependParam*>::iterator end_dpL =
+  std::list<SizeDependParam*>::iterator end_dpL =
     model_.sizeDependParamList.end();
 
   paramPtr = NULL;
@@ -6277,46 +6105,36 @@ bool Instance::updateTemperature (const double & temp_tmp)
 
     if (paramPtr->leff <= 0.0)
     {
-      msg = "mosfet " + getName();
-      msg += "  model " + model_.getName();
-      msg += "  Effective channel length <= 0";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL,msg);
+      UserError0(*this) << "mosfet " << getName() << " model " << model_.getName()
+                        << "  Effective channel length <= 0";
     }
 
     paramPtr->weff = Wnew - 2.0 * paramPtr->dw;
     if (paramPtr->weff <= 0.0)
     {
-      msg = "mosfet " + getName();
-      msg += "  model " + model_.getName();
-      msg += "  Effective channel width <= 0";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL,msg);
+      UserError0(*this) << "mosfet " << getName() << " model " << model_.getName()
+                        << "  Effective channel width <= 0";
     }
 
     paramPtr->leffCV = Lnew - 2.0 * paramPtr->dlc;
     if (paramPtr->leffCV <= 0.0)
     {
-      msg = "mosfet " + getName();
-      msg += "  model " + model_.getName();
-      msg += ": Effective channel length for C-V <= 0";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL,msg);
+      UserError0(*this) << "mosfet " << getName() << " model " << model_.getName()
+                        << "  Effective channel length for C-V <= 0";
     }
 
     paramPtr->weffCV = Wnew - 2.0 * paramPtr->dwc;
     if (paramPtr->weffCV <= 0.0)
     {
-      msg = "mosfet " + getName();
-      msg += "  model " + model_.getName();
-      msg += "  Effective channel width for C-V <= 0";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL,msg);
+      UserError0(*this) << "mosfet " << getName() << " model " << model_.getName()
+                        << "  Effective channel width for C-V <= 0";
     }
 
     paramPtr->weffCJ = Wnew - 2.0 * paramPtr->dwj;
     if (paramPtr->weffCJ <= 0.0)
     {
-      msg = "mosfet " + getName();
-      msg += "  model " + model_.getName();
-      msg += ": Effective channel width for S/D junctions <= 0",
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL,msg);
+      UserError0(*this) << "mosfet " << getName() << " model " << model_.getName()
+                        << "  Effective channel width for S/D junctions <= 0";
     }
 
 
@@ -6954,28 +6772,24 @@ bool Instance::updateTemperature (const double & temp_tmp)
     if (T1 < 0.0)
     {
       T1 = 0.0;
-      msg = "Warning: Rdw at current temperature is negative; set to 0.\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Rdw at current temperature is negative; set to 0";
     }
     if (T2 < 0.0)
     {
       T2 = 0.0;
-      msg = "Warning: Rdwmin at current temperature is negative; set to 0.\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Rdwmin at current temperature is negative; set to 0";
     }
     paramPtr->rd0 = T1 / PowWeffWr;
     paramPtr->rdwmin = T2 / PowWeffWr;
     if (T3 < 0.0)
     {
       T3 = 0.0;
-      msg = "Warning: Rsw at current temperature is negative; set to 0.\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Rsw at current temperature is negative; set to 0";
     }
     if (T4 < 0.0)
     {
       T4 = 0.0;
-      msg = "Warning: Rswmin at current temperature is negative; set to 0.\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Rswmin at current temperature is negative; set to 0";
     }
     paramPtr->rs0 = T3 / PowWeffWr;
     paramPtr->rswmin = T4 / PowWeffWr;
@@ -6990,8 +6804,7 @@ bool Instance::updateTemperature (const double & temp_tmp)
     if (paramPtr->eu < 0.0)
     {
       paramPtr->eu = 0.0;
-      msg = "Warning: eu has been negative; reset to 0.0.\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "eu has been negative; reset to 0.0";
     }
 
     paramPtr->vfbsdoff = paramPtr->vfbsdoff * (1.0 + paramPtr->tvfbsdoff * delTemp);
@@ -7097,40 +6910,33 @@ bool Instance::updateTemperature (const double & temp_tmp)
     {
       if (!model_.k1Given)
       {
-        msg =  "Warning: k1 should be specified with k2.\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+        UserWarning(*this) << "k1 should be specified with k2";
         paramPtr->k1 = 0.53;
       }
       if (!model_.k2Given)
       {
-        msg =  "Warning: k2 should be specified with k1.\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+        UserWarning(*this) << "k2 should be specified with k1";
         paramPtr->k2 = -0.0186;
       }
       if (model_.nsubGiven)
       {
-        msg =  "Warning: nsub is ignored because k1 or k2 is given.\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+        UserWarning(*this) << "nsub is ignored because k1 or k2 is given";
       }
       if (model_.xtGiven)
       {
-        msg =  "Warning: xt is ignored because k1 or k2 is given.\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+        UserWarning(*this) << "xt is ignored because k1 or k2 is given";
       }
       if (model_.vbxGiven)
       {
-        msg =  "Warning: vbx is ignored because k1 or k2 is given.\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+        UserWarning(*this) << "vbx is ignored because k1 or k2 is given";
       }
       if (model_.gamma1Given)
       {
-        msg =  "Warning: gamma1 is ignored because k1 or k2 is given.\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+        UserWarning(*this) << "gamma1 is ignored because k1 or k2 is given";
       }
       if (model_.gamma2Given)
       {
-        msg =  "Warning: gamma2 is ignored because k1 or k2 is given.\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+        UserWarning(*this) << "gamma2 is ignored because k1 or k2 is given";
       }
     }
     else
@@ -7284,8 +7090,7 @@ bool Instance::updateTemperature (const double & temp_tmp)
     wlod = model_.wlod;
     if (model_.wlod < 0.0)
     {
-      msg =  "Warning: WLOD =is less than 0. 0.0 is used\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "WLOD =is less than 0. 0.0 is used";
       wlod = 0.0;
     }
     T0 = pow(Lnew, model_.llodku0);
@@ -7322,14 +7127,12 @@ bool Instance::updateTemperature (const double & temp_tmp)
     kvsat = model_.kvsat;
     if (model_.kvsat < -1.0 )
     {
-      msg =  "Warning: KVSAT is too small; -1.0 is used.\n",model_.kvsat;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "KVSAT is too small; -1.0 is used";
       kvsat = -1.0;
     }
     if (model_.kvsat > 1.0)
     {
-      msg =  "Warning: KVSAT is too big; 1.0 is used.\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "KVSAT is too big; 1.0 is used";
       kvsat = 1.0;
     }
 
@@ -7390,9 +7193,7 @@ bool Instance::updateTemperature (const double & temp_tmp)
       }
       else
       {
-        msg =
-        "Warning: No WPE as none of SCA, SCB, SCC, SC is given and/or SC not positive.\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+        UserWarning(*this) << "No WPE as none of SCA, SCB, SCC, SC is given and/or SC not positive";
       }
     }
     sceff = sca + model_.web * scb
@@ -7403,9 +7204,7 @@ bool Instance::updateTemperature (const double & temp_tmp)
     if (T3 <= 0.0)
     {
       T3 = 0.0;
-      msg =
-      "Warning: ku0we = %g is negatively too high. Negative mobility! \n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "ku0we = %g is negatively too high. Negative mobility!";
     }
     u0temp *= T3;
   }
@@ -7556,8 +7355,7 @@ bool Instance::updateTemperature (const double & temp_tmp)
    grgeltd = 1.0e3; // mho
    if (rgateMod != 0)
    {
-     msg = "Warning: The gate conductance reset to 1.0e3 mho.\n";
-     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+     UserWarning(*this) << "The gate conductance reset to 1.0e3 mho";
    }
   }
 
@@ -7634,8 +7432,7 @@ bool Instance::updateTemperature (const double & temp_tmp)
     else
     {
       sourceConductance = 1.0e3; // mho
-      msg = "Warning: Source conductance reset to 1.0e3 mho.\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Source conductance reset to 1.0e3 mho";
     }
   }
   else
@@ -7668,8 +7465,7 @@ bool Instance::updateTemperature (const double & temp_tmp)
     else
     {
       drainConductance = 1.0e3; // mho
-      msg = "Warning: Drain conductance reset to 1.0e3 mho.\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Drain conductance reset to 1.0e3 mho";
     }
   }
   else
@@ -7732,8 +7528,7 @@ bool Instance::updateTemperature (const double & temp_tmp)
         if (T2 < 1.0)
         {
           T2 = 10.0;
-          msg =  "Warning: ijthsrev too small and set to 10 times IsbSat.\n";
-          N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+          UserWarning(*this) << "ijthsrev too small and set to 10 times IsbSat";
         }
         vjsmRev = -model_.bvs
                              - Nvtms * log((T2 - 1.0) / model_.xjbvs);
@@ -7743,8 +7538,7 @@ bool Instance::updateTemperature (const double & temp_tmp)
         SslpRev = -SourceSatCurrent * T1 / Nvtms;
         break;
       default:
-        msg = "Specified dioMod not matched.  dioMod = ";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL,msg, model_.dioMod);
+        UserError(*this) << "Specified dioMod not matched.  dioMod = " << model_.dioMod;
     }
   }
 
@@ -7797,8 +7591,7 @@ bool Instance::updateTemperature (const double & temp_tmp)
         if (T2 < 1.0)
         {
           T2 = 10.0;
-          msg =  "Warning: ijthdrev too small and set to 10 times IdbSat.\n";
-          N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+          UserWarning(*this) << "ijthdrev too small and set to 10 times IdbSat";
         }
         vjdmRev = -model_.bvd
                            - Nvtmd * log((T2 - 1.0) / model_.xjbvd); // bugfix
@@ -7808,8 +7601,7 @@ bool Instance::updateTemperature (const double & temp_tmp)
         DslpRev = -DrainSatCurrent * T1 / Nvtmd;
         break;
       default:
-        msg = "Specified dioMod not matched.  dioMod = ";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL,msg, model_.dioMod);
+        UserError(*this) << "Specified dioMod not matched.  dioMod = " << model_.dioMod;
     }
   }
 
@@ -8122,16 +7914,15 @@ bool Instance::updateIntermediateVars ()
   }
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "  Instance::updateIntermediateVars\n";
-    cout << "  name = " << getName();
-    cout << "  model name = " << model_.getName();
-    cout <<"   dtype is " << model_.dtype << endl;
-    cout.width(21); cout.precision(13); cout.setf(ios::scientific);
-    cout << "  " << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "  Instance::updateIntermediateVars\n";
+    Xyce::dout() << "  name = " << getName();
+    Xyce::dout() << "  model name = " << model_.getName();
+    Xyce::dout() <<"   dtype is " << model_.dtype << std::endl;
+    Xyce::dout().width(21); Xyce::dout().precision(13); Xyce::dout().setf(std::ios::scientific);
+    Xyce::dout() << "  " << std::endl;
   }
 #endif
 
@@ -8403,51 +8194,51 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout.width(21); cout.precision(13); cout.setf(ios::scientific);
-      cout << "  von_local = " << von_local << endl;
-      cout << "  CONSTvt0  = " << CONSTvt0 << endl;
-      cout << "  vcrit     = " << model_.vcrit << endl;
-      cout.width(3);
-      cout << getSolverState().newtonIter;
-      cout.width(5);cout << getName();
-      cout << " old :";
-      cout<<" vgs:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vgs_old;
-      cout<<" vds:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vds_old;
-      cout<<" vbs:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vbs_old;
-      cout<<" vbd:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vbd_old;
-      cout<<" vges:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vges_old;
-      cout<<" vgms:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vgms_old;
-      cout<<" vged:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vged_old;
-      cout<<" vgmd:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vgmd_old << endl;
-      cout.width(3);
-      cout << getSolverState().newtonIter;
-      cout.width(5);cout << getName();
-      cout << " Blim:";
-      cout<<" vgs:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vgs;
-      cout<<" vds:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vds;
-      cout<<" vbs:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vbs;
-      cout<<" vbd:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vbd;
-      cout<<" vges:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vges;
-      cout<<" vgms:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vgms;
-      cout<<" vged:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vged;
-      cout<<" vgmd:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vgmd << endl;
-      cout.width(21); cout.precision(13); cout.setf(ios::scientific);
+      Xyce::dout().width(21); Xyce::dout().precision(13); Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << "  von_local = " << von_local << std::endl;
+      Xyce::dout() << "  CONSTvt0  = " << CONSTvt0 << std::endl;
+      Xyce::dout() << "  vcrit     = " << model_.vcrit << std::endl;
+      Xyce::dout().width(3);
+      Xyce::dout() << getSolverState().newtonIter;
+      Xyce::dout().width(5);Xyce::dout() << getName();
+      Xyce::dout() << " old :";
+      Xyce::dout()<<" vgs:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vgs_old;
+      Xyce::dout()<<" vds:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vds_old;
+      Xyce::dout()<<" vbs:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vbs_old;
+      Xyce::dout()<<" vbd:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vbd_old;
+      Xyce::dout()<<" vges:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vges_old;
+      Xyce::dout()<<" vgms:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vgms_old;
+      Xyce::dout()<<" vged:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vged_old;
+      Xyce::dout()<<" vgmd:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vgmd_old << std::endl;
+      Xyce::dout().width(3);
+      Xyce::dout() << getSolverState().newtonIter;
+      Xyce::dout().width(5);Xyce::dout() << getName();
+      Xyce::dout() << " Blim:";
+      Xyce::dout()<<" vgs:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vgs;
+      Xyce::dout()<<" vds:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vds;
+      Xyce::dout()<<" vbs:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vbs;
+      Xyce::dout()<<" vbd:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vbd;
+      Xyce::dout()<<" vges:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vges;
+      Xyce::dout()<<" vgms:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vgms;
+      Xyce::dout()<<" vged:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vged;
+      Xyce::dout()<<" vgmd:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vgmd << std::endl;
+      Xyce::dout().width(21); Xyce::dout().precision(13); Xyce::dout().setf(std::ios::scientific);
     }
 #endif
 
@@ -8624,34 +8415,34 @@ bool Instance::updateIntermediateVars ()
   {
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout.width(3);
-      cout << getSolverState().newtonIter;
-      cout.width(5);cout << getName();
-      cout << " Alim:";
-      cout<<" vgs:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vgs << "(diff="<<vgs-vgs_orig<<")";
-      cout<<" vds:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vds << "(diff="<<vds-vds_orig<<")";
-      cout<<" vbs:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vbs<< "(diff="<<vbs-vbs_orig<<")";
-      cout<<" vbd:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vbd<< "(diff="<<vbd-vbd_orig<<")";
-      cout<<" vges:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vges<< "(diff="<<vges-vges_orig<<")";
-      cout<<" vgms:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vgms<< "(diff="<<vgms-vgms_orig<<")";
-      cout<<" vged:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vged<< "(diff="<<vged-vged_orig<<")";
-      cout<<" vgmd:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vgmd<< "(diff="<<vgmd-vgmd_orig<<")";
-      cout<<" vbs_jct:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vbs_jct<< "(diff="<<vbs_jct-vbs_jct_orig<<")";
-      cout<<" vbd_jct:";//cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-      cout << vbd_jct<< "(diff="<<vbd_jct-vbd_jct_orig<<")";
-      if (origFlag) cout << " SAME";
-      else          cout << " DIFF";
-      cout << endl;
-      cout.width(21); cout.precision(13); cout.setf(ios::scientific);
+      Xyce::dout().width(3);
+      Xyce::dout() << getSolverState().newtonIter;
+      Xyce::dout().width(5);Xyce::dout() << getName();
+      Xyce::dout() << " Alim:";
+      Xyce::dout()<<" vgs:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vgs << "(diff="<<vgs-vgs_orig<<")";
+      Xyce::dout()<<" vds:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vds << "(diff="<<vds-vds_orig<<")";
+      Xyce::dout()<<" vbs:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vbs<< "(diff="<<vbs-vbs_orig<<")";
+      Xyce::dout()<<" vbd:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vbd<< "(diff="<<vbd-vbd_orig<<")";
+      Xyce::dout()<<" vges:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vges<< "(diff="<<vges-vges_orig<<")";
+      Xyce::dout()<<" vgms:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vgms<< "(diff="<<vgms-vgms_orig<<")";
+      Xyce::dout()<<" vged:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vged<< "(diff="<<vged-vged_orig<<")";
+      Xyce::dout()<<" vgmd:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vgmd<< "(diff="<<vgmd-vgmd_orig<<")";
+      Xyce::dout()<<" vbs_jct:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vbs_jct<< "(diff="<<vbs_jct-vbs_jct_orig<<")";
+      Xyce::dout()<<" vbd_jct:";//Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vbd_jct<< "(diff="<<vbd_jct-vbd_jct_orig<<")";
+      if (origFlag) Xyce::dout() << " SAME";
+      else          Xyce::dout() << " DIFF";
+      Xyce::dout() << std::endl;
+      Xyce::dout().width(21); Xyce::dout().precision(13); Xyce::dout().setf(std::ios::scientific);
     }
   }
 #endif
@@ -9044,10 +8835,10 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "HOMOTOPY INFO: gainscale   = "
-     << getSolverState().gainScale[blockHomotopyID] << endl;
-    cout << "HOMOTOPY INFO: before vds  = " << Vds << endl;
-    cout << "HOMOTOPY INFO: before vgst = " << Vgs << endl;
+    Xyce::dout() << "HOMOTOPY INFO: gainscale   = "
+     << getSolverState().gainScale[blockHomotopyID] << std::endl;
+    Xyce::dout() << "HOMOTOPY INFO: before vds  = " << Vds << std::endl;
+    Xyce::dout() << "HOMOTOPY INFO: before vgst = " << Vgs << std::endl;
   }
 #endif
   if (getSolverState().artParameterFlag)
@@ -9074,8 +8865,8 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "HOMOTOPY INFO: after vds   = " << Vds << endl;
-    cout << "HOMOTOPY INFO: after vgst  = " << Vgs << endl;
+    Xyce::dout() << "HOMOTOPY INFO: after vds   = " << Vds << std::endl;
+    Xyce::dout() << "HOMOTOPY INFO: after vgst  = " << Vgs << std::endl;
   }
 #endif
   // end of mosfet continuation block.
@@ -12174,12 +11965,11 @@ bool Instance::updatePrimaryState ()
   double * staVec = extData.nextStaVectorRawPtr;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "  Begin of updatePrimaryState. \n";
-    cout << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "  Begin of updatePrimaryState. \n";
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -12308,14 +12098,13 @@ bool Instance::loadDAEQVector ()
   double * dQdxdVp = extData.dQdxdVpVectorRawPtr;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << " MOSFET BSIM4 loadDAEQVector " << endl;
-    cout << "  name             = " << getName() << endl;
-    cout.width(28); cout.precision(20); cout.setf(ios::scientific);
-    cout << "  " << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << " MOSFET BSIM4 loadDAEQVector " << std::endl;
+    Xyce::dout() << "  name             = " << getName() << std::endl;
+    Xyce::dout().width(28); Xyce::dout().precision(20); Xyce::dout().setf(std::ios::scientific);
+    Xyce::dout() << "  " << std::endl;
   }
 #endif
 
@@ -12441,7 +12230,7 @@ bool Instance::loadDAEQVector ()
 // Function      : Instance::auxChargeCalculations
 //
 // Purpose       : This function does some final "cleanup" calculations
-//                 having to do with the capacitors.  
+//                 having to do with the capacitors.
 //
 // Special Notes : About all this function really does is set up some
 //                 voltlim terms, and some unused nqs stuff.
@@ -13287,15 +13076,14 @@ bool Instance::loadDAEFVector ()
   double * dFdxdVp = extData.dFdxdVpVectorRawPtr;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << endl << dashedline2 << endl;
-    cout << "  Begin of Instance::loadDAEFVector. ";
-    cout << "  origFlag = " << origFlag << "  name = " << getName() << endl;
+    Xyce::dout() << std::endl << subsection_divider << std::endl;
+    Xyce::dout() << "  Begin of Instance::loadDAEFVector. ";
+    Xyce::dout() << "  origFlag = " << origFlag << "  name = " << getName() << std::endl;
 
-    cout.width(28); cout.precision(20); cout.setf(ios::scientific);
-    cout << "  " << endl;
+    Xyce::dout().width(28); Xyce::dout().precision(20); Xyce::dout().setf(std::ios::scientific);
+    Xyce::dout() << "  " << std::endl;
   }
 #endif
 
@@ -14103,11 +13891,10 @@ bool Instance::loadDAEdQdx ()
     N_LAS_Matrix & dQdx = *(extData.dQdxMatrixPtr);
 
 #ifdef Xyce_DEBUG_DEVICE
-    const string dashedline2 = "---------------------";
     if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
     {
-      cout << endl << dashedline2 << endl;
-      cout << "  name = " << getName() << endl;
+      Xyce::dout() << std::endl << subsection_divider << std::endl;
+      Xyce::dout() << "  name = " << getName() << std::endl;
     }
 #endif
 
@@ -14214,12 +14001,11 @@ bool Instance::loadDAEdFdx ()
   N_LAS_Matrix & dFdx = *(extData.dFdxMatrixPtr);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
   if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << endl << dashedline2 << endl;
-    cout << "Instance::loadDAEdFdx";
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << std::endl << subsection_divider << std::endl;
+    Xyce::dout() << "Instance::loadDAEdFdx";
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
 
@@ -14610,24 +14396,24 @@ int Instance::PAeffGeo
   double ADiso(0.0), ADsha(0.0), ADmer(0.0), ASiso(0.0), ASsha(0.0), ASmer(0.0);
   double PDiso(0.0), PDsha(0.0), PDmer(0.0), PSiso(0.0), PSsha(0.0), PSmer(0.0);
   double nuIntD (0.0), nuEndD (0.0), nuIntS (0.0), nuEndS (0.0);
-
-	if (geo < 9) // For geo = 9 and 10, the numbers of S/D diffusions already known
-	NumFingerDiff(nf_arg, minSD, nuIntD, nuEndD, nuIntS, nuEndS);
-
-	T0 = DMCG + DMCI;
-	T1 = DMCG + DMCG;
-	T2 = DMDG + DMDG;
-
-	PSiso = PDiso = T0 + T0 + Weffcj;
-	PSsha = PDsha = T1;
-	PSmer = PDmer = T2;
-
-	ASiso = ADiso = T0 * Weffcj;
-	ASsha = ADsha = DMCG * Weffcj;
-	ASmer = ADmer = DMDG * Weffcj;
-
-	switch(geo)
-	{
+  
+  if (geo < 9) // For geo = 9 and 10, the numbers of S/D diffusions already known
+    NumFingerDiff(nf_arg, minSD, nuIntD, nuEndD, nuIntS, nuEndS);
+  
+  T0 = DMCG + DMCI;
+  T1 = DMCG + DMCG;
+  T2 = DMDG + DMDG;
+  
+  PSiso = PDiso = T0 + T0 + Weffcj;
+  PSsha = PDsha = T1;
+  PSmer = PDmer = T2;
+  
+  ASiso = ADiso = T0 * Weffcj;
+  ASsha = ADsha = DMCG * Weffcj;
+  ASmer = ADmer = DMDG * Weffcj;
+  
+  switch(geo)
+  {
     case 0:
         Ps = nuEndS * PSiso + nuIntS * PSsha;
         Pd = nuEndD * PDiso + nuIntD * PDsha;
@@ -14695,8 +14481,9 @@ int Instance::PAeffGeo
         Ad = ADiso + (nf_arg - 1.0) * ADsha;
         break;
     default:
-    string msg = "Warning: Specified GEO not matched\n";
-	}
+      UserWarning(*this) << "Specified GEO not matched\n";
+  }
+  
   return 0;
 }
 
@@ -14715,7 +14502,7 @@ int Instance::RdseffGeo
    double Weffcj, double Rsh, double DMCG, double DMCI, double DMDG,
    int Type, double & Rtot)
 {
-  string msg="";
+  std::string msg="";
   double Rint(0.0), Rend (0.0);
   double nuIntD (0.0), nuEndD (0.0), nuIntS (0.0), nuEndS (0.0);
 
@@ -14808,7 +14595,7 @@ int Instance::RdseffGeo
         }
         break;
     default:
-        msg = "Warning: Specified GEO not matched\n";
+        UserWarning(*this) << "Specified GEO not matched\n";
   }
 
   if (Rint <= 0.0)
@@ -14820,7 +14607,7 @@ int Instance::RdseffGeo
 
   if(Rtot==0.0)
   {
-    msg = "Warning: Zero resistance returned from RdseffGeo\n";
+    UserWarning(*this) << "Zero resistance returned from RdseffGeo\n";
   }
 
   return 0;
@@ -14839,7 +14626,7 @@ int Instance::RdsEndIso
   (double Weffcj, double Rsh, double DMCG, double DMCI, double DMDG,
    double nuEnd, int rgeo, int Type, double & Rend)
 {
-  string msg="";
+  std::string msg="";
 	if (Type == 1)
 	{
     switch(rgeo)
@@ -14863,7 +14650,7 @@ int Instance::RdsEndIso
             Rend = Rsh * Weffcj / (3.0 * nuEnd * (DMCG + DMCI));
           break;
       default:
-          msg = "Warning: Specified RGEO not matched\n";
+          UserWarning(*this) << "Specified RGEO not matched\n";
     }
 	}
 	else
@@ -14889,7 +14676,7 @@ int Instance::RdsEndIso
           Rend = Rsh * Weffcj / (3.0 * nuEnd * (DMCG + DMCI));
         break;
       default:
-        msg = "Warning: Specified RGEO not matched\n";
+        UserWarning(*this) << "Specified RGEO not matched\n";
             }
 	}
   return 0;
@@ -14908,7 +14695,7 @@ int Instance::RdsEndSha
    (double Weffcj, double Rsh, double DMCG, double DMCI, double DMDG,
     int rgeo, int Type, double nuEnd, double & Rend)
 {
-  string msg = "";
+  std::string msg = "";
   if (Type == 1)
   {
     switch(rgeo)
@@ -14932,7 +14719,7 @@ int Instance::RdsEndSha
               Rend = Rsh * Weffcj / (6.0 * nuEnd * DMCG);
           break;
       default:
-          msg = "Warning: Specified RGEO not matched\n";
+          UserWarning(*this) << "Specified RGEO not matched\n";
     }
   }
   else
@@ -14958,7 +14745,7 @@ int Instance::RdsEndSha
               Rend = Rsh * Weffcj / (6.0 * nuEnd * DMCG);
           break;
       default:
-          msg = "Warning: Specified RGEO = %d not matched\n";
+          UserWarning(*this) << "Specified RGEO = %d not matched\n";
     }
   }
   return 0;
@@ -14976,40 +14763,40 @@ int Instance::RdsEndSha
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 11/25/06
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
-  string msg;
+  std::string msg;
 
   if (SbulkJctPotential < 0.1)
   {
     SbulkJctPotential = 0.1;
-    msg = "Given pbs is less than 0.1. Pbs is set to 0.1.\n";
+    UserWarning(*this) << "Given pbs is less than 0.1. Pbs is set to 0.1";
   }
   if (SsidewallJctPotential < 0.1)
   {
     SsidewallJctPotential = 0.1;
-     msg = "Given pbsws is less than 0.1. Pbsws is set to 0.1.\n";
+     UserWarning(*this) << "Given pbsws is less than 0.1. Pbsws is set to 0.1";
   }
   if (SGatesidewallJctPotential < 0.1)
   {
     SGatesidewallJctPotential = 0.1;
-     msg = "Given pbswgs is less than 0.1. Pbswgs is set to 0.1.\n";
+     UserWarning(*this) << "Given pbswgs is less than 0.1. Pbswgs is set to 0.1";
   }
 
   if (DbulkJctPotential < 0.1)
   {
     DbulkJctPotential = 0.1;
-     msg = "Given pbd is less than 0.1. Pbd is set to 0.1.\n";
+     UserWarning(*this) << "Given pbd is less than 0.1. Pbd is set to 0.1";
   }
   if (DsidewallJctPotential < 0.1)
   {
     DsidewallJctPotential = 0.1;
-     msg = "Given pbswd is less than 0.1. Pbswd is set to 0.1.\n";
+     UserWarning(*this) << "Given pbswd is less than 0.1. Pbswd is set to 0.1";
   }
   if (DGatesidewallJctPotential < 0.1)
   {
     DGatesidewallJctPotential = 0.1;
-     msg = "Given pbswgd is less than 0.1. Pbswgd is set to 0.1.\n";
+    UserWarning(*this) << "Given pbswgd is less than 0.1. Pbswgd is set to 0.1";
   }
 
   // If there are any time dependent parameters, set their values at for
@@ -15026,12 +14813,12 @@ bool Model::processParams (string param)
 // Creator       : Eric Keiter, SNL
 // Creation Date : 11/25/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -15050,10 +14837,11 @@ bool Model::processInstanceParams(string param)
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 11/25/06
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-                                                  SolverState & ss1,
-                                                  DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
     modType       (0),
     dtype         (CONSTNMOS),
     mobMod(0),
@@ -15907,11 +15695,7 @@ Model::Model (const ModelBlock & MB,
     }
     else
     {
-      string msg = "Could not recognize the type for model ";
-      msg += getName();
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+      UserError0(*this) << "Could not recognize the type for model " << getName();
     }
   }
 
@@ -16308,18 +16092,18 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  list<SizeDependParam*>::iterator it_dpL =
+  std::list<SizeDependParam*>::iterator it_dpL =
    sizeDependParamList.begin();
-  list<SizeDependParam*>::iterator end_dpL =
+  std::list<SizeDependParam*>::iterator end_dpL =
    sizeDependParamList.end();
   for( ; it_dpL != end_dpL; ++it_dpL )
     delete (*it_dpL);
 
   sizeDependParamList.clear ();
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -16338,25 +16122,46 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i;
-  os << endl;
-  os << "    name     getModelName()  Parameters" << endl;
+  os << std::endl;
+  os << "    name     model name  Parameters" << std::endl;
 
   for (i=0, iter=first; iter!=last; ++iter,++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 
 //----------------------------------------------------------------------------
@@ -16374,9 +16179,9 @@ std::ostream &Model::printOutInstances(std::ostream &os) const
 //----------------------------------------------------------------------------
 bool Model::clearTemperatureData ()
 {
-  list<SizeDependParam*>::iterator it_dpL =
+  std::list<SizeDependParam*>::iterator it_dpL =
    sizeDependParamList.begin();
-  list<SizeDependParam*>::iterator end_dpL =
+  std::list<SizeDependParam*>::iterator end_dpL =
    sizeDependParamList.end();
   for( ; it_dpL != end_dpL; ++it_dpL )
     delete (*it_dpL);
@@ -16405,7 +16210,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 #ifdef _OMP
 #pragma omp parallel for
 #endif
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & mi = *(*it);
 
@@ -16523,7 +16328,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 //-----------------------------------------------------------------------------
 bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  double * storeLeadF, double * storeLeadQ)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & mi = *(*it);
 
@@ -16797,7 +16602,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
 //-----------------------------------------------------------------------------
 bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & mi = *(*it);
 
@@ -17486,6 +17291,23 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
     }
   }
   return true;
+}
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("m", 14)
+    .registerDevice("m", 54)
+    .registerModelType("pmos", 14)
+    .registerModelType("nmos", 14)
+    .registerModelType("pmos", 54)
+    .registerModelType("nmos", 54);
 }
 
 } // namespace MOSFET_B4

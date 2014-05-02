@@ -1,0 +1,8 @@
+<map id="Xyce::Device::DevicePDEInstance" name="Xyce::Device::DevicePDEInstance">
+<area shape="rect" id="node5" href="$classXyce_1_1Device_1_1DiodePDE_1_1Instance.html" title="Xyce::Device::DiodePDE\l::Instance" alt="" coords="1032,5,1205,46"/>
+<area shape="rect" id="node6" href="$classXyce_1_1Device_1_1RxnSet_1_1Instance.html" title="Xyce::Device::RxnSet\l::Instance" alt="" coords="1041,70,1196,111"/>
+<area shape="rect" id="node7" href="$classXyce_1_1Device_1_1TwoDPDE_1_1Instance.html" title="Xyce::Device::TwoDPDE\l::Instance" alt="" coords="1032,135,1205,177"/>
+<area shape="rect" id="node2" href="$classXyce_1_1Device_1_1DeviceInstance.html" title="Xyce::Device::DeviceInstance" alt="" coords="496,77,701,104"/>
+<area shape="rect" id="node3" href="$classXyce_1_1Device_1_1DeviceEntity.html" title="Xyce::Device::DeviceEntity" alt="" coords="261,77,448,104"/>
+<area shape="rect" id="node4" href="$classXyce_1_1Device_1_1ParameterBase.html" title="Base class for all parameters." alt="" coords="6,77,213,104"/>
+</map>

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.12.2.2 $
+// Revision Number: $Revision: 1.18 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,37 +46,30 @@
 #ifndef N_TOP_NodeDevBlock_h
 #define N_TOP_NodeDevBlock_h 1
 
-//----------- Std includes ---------
-#include <N_UTL_Misc.h>
 #include <iosfwd>
 
-//----------- Xyce includes ---------
-
-
 #include <N_UTL_Packable.h>
-
 #include <N_TOP_NodeBlock.h>
 #include <N_DEV_DeviceBlock.h>
 
-//----------- Other includes ---------
-
-//----------- Fwd Declares ----------
+namespace Xyce {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Class         : N_TOP_NodeDevBlock
+// Class         : NodeDevBlock
 // Purpose       :
 // Special Notes :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 3/3/01
 //-----------------------------------------------------------------------------
-class N_TOP_NodeDevBlock : public Packable
+class NodeDevBlock : public Packable
 {
 
 public:
 
   // Constructor
-  N_TOP_NodeDevBlock( N_TOP_NodeBlock nb = N_TOP_NodeBlock(),
-  	              N_DEV_InstanceBlock ib = N_DEV_InstanceBlock() )
+  NodeDevBlock( NodeBlock nb = NodeBlock(),
+  	              Device::InstanceBlock ib = Device::InstanceBlock() )
   : id_(nb.get_id()),
     gID_(nb.get_gID()),
     nodeBlock_(nb),
@@ -84,7 +77,7 @@ public:
   {}
 
   // Copy constructor.
-  N_TOP_NodeDevBlock(const N_TOP_NodeDevBlock & right)
+  NodeDevBlock(const NodeDevBlock & right)
   : id_(right.id_),
     gID_(right.gID_),
     nodeBlock_(right.nodeBlock_),
@@ -92,37 +85,39 @@ public:
   {}
 
   // Destructor
-  ~N_TOP_NodeDevBlock()
+  ~NodeDevBlock()
   {}
 
   // Assignment operator (autogen)
-  //N_TOP_NodeDevBlock & operator = (const N_TOP_NodeDevBlock & right);
+  //NodeDevBlock & operator = (const NodeDevBlock & right);
 
   // claer data for reuse of this object
   void clear();
 
   // Equality operator
-  bool operator==( const N_TOP_NodeDevBlock & right ) const
+  bool operator==( const NodeDevBlock & right ) const
   { return id_ == right.id_; }
 
   // Non-equality operator
-  bool operator!=( const N_TOP_NodeDevBlock & right ) const
+  bool operator!=( const NodeDevBlock & right ) const
   { return id_ != right.id_; }
 
   // Accessors for private attributes.
 
   // Get the node ID.
-  const string & getID() const { return id_; }
+  const std::string & getID() const { return id_; }
   // Set the node ID.
-  void setID( const string & id ) { id_ = id; }
+  void setID( const std::string & id ) { id_ = id; }
 
   // Get the node global ID.
   const int & getGID() const { return gID_; }
   // Set the node global ID.
   void setGID( const int & gid ) { gID_ = gid; }
 
-  N_TOP_NodeBlock & getNodeBlock() { return nodeBlock_; }
-  N_DEV_InstanceBlock & getDevBlock() { return devBlock_; }
+  NodeBlock & getNodeBlock() { return nodeBlock_; }
+  const NodeBlock & getNodeBlock() const { return nodeBlock_; }
+  Device::InstanceBlock & getDevBlock() { return devBlock_; }
+  const Device::InstanceBlock & getDevBlock() const { return devBlock_; }
 
   bool isDevice() const { return devBlock_.getName() != ""; }
 
@@ -139,16 +134,21 @@ public:
 
 protected:
 
-  string id_;
+  std::string id_;
 
   // Global ID.
   int gID_;
 
-  N_TOP_NodeBlock nodeBlock_;
-  N_DEV_InstanceBlock devBlock_;
+  NodeBlock nodeBlock_;
+  Device::InstanceBlock devBlock_;
 
-  friend ostream & operator << (ostream & os, const N_TOP_NodeDevBlock & ndb);
+    friend std::ostream & operator << (std::ostream & os, const NodeDevBlock & ndb);
 
 };
+
+} // namespace Topo
+} // namespace Xyce
+
+typedef Xyce::Topo::NodeDevBlock N_TOP_NodeDevBlock;
 
 #endif

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.4.2.2 $
+// Revision Number: $Revision: 1.9 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:50 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,47 +46,47 @@
 #ifndef N_TOP_CktGraphCreatorBasic_h
 #define N_TOP_CktGraphCreatorBasic_h 1
 
-// ---------- Standard Includes ----------
-
-// ----------   Xyce Includes   ----------
-
 #include <N_TOP_CktGraphCreator.h>
 
-// ---------- Forward Declarations ----------
-
-class N_TOP_CktGraph;
+namespace Xyce {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Class         : N_DEV_CktGraphCreatorBasic
+// Class         : CktGraphCreatorBasic
 // Purpose       :
 // Special Notes :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 8/10/06
 //-----------------------------------------------------------------------------
-class N_TOP_CktGraphCreatorBasic : public N_TOP_CktGraphCreator
+class CktGraphCreatorBasic : public CktGraphCreator
 {
 
 public:
 
   // Default constructor.
-  N_TOP_CktGraphCreatorBasic(const int maxTries) { maxTries_ = maxTries; }
+  CktGraphCreatorBasic(const int maxTries) { maxTries_ = maxTries; }
 
   // Copy constructor.
-  N_TOP_CktGraphCreatorBasic(const N_TOP_CktGraphCreatorBasic & right) { maxTries_ = right.maxTries_; }
+  CktGraphCreatorBasic(const CktGraphCreatorBasic & right) { maxTries_ = right.maxTries_; }
 
   // Destructor
-  ~N_TOP_CktGraphCreatorBasic() { }
+  ~CktGraphCreatorBasic() { }
 
   // Method to create a new 'Basic' based circuit graph.
-  N_TOP_CktGraph * create(const string & cgID);
+  CktGraph * create(const std::string & cgID);
 
   // Method to create a new 'Basic' based circuit graph.
-  N_TOP_CktGraph * create(const string & cgID,
-                          const list <NodeID> & nodeList);
+  CktGraph * create(const std::string & cgID,
+                          const std::list<NodeID> & nodeList);
 
 private:
   // Max number of attempts to compute the graph center.
   int maxTries_;
 };
+
+} // namespace Topo
+} // namespace Xyce
+
+typedef Xyce::Topo::CktGraphCreatorBasic N_TOP_CktGraphCreatorBasic;
 
 #endif

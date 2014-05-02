@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.164.2.3 $
+// Revision Number: $Revision: 1.179.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,18 +46,16 @@
 #ifndef Xyce_N_DEV_DeviceInstance_h
 #define Xyce_N_DEV_DeviceInstance_h
 
-// ---------- Standard Includes ----------
 #include <list>
 #include <map>
 #include <string>
 #include <vector>
 
-// ----------   Xyce Includes   ----------
 #include <N_DEV_fwd.h>
 #include <N_DEV_DeviceEntity.h>
 #include <N_DEV_DeviceSupport.h>
+#include <N_UTL_Misc.h>
 
-// ---------- Forward Declarations ----------
 class N_LAS_Matrix;
 class N_LAS_MultiVector;
 class N_LAS_Vector;
@@ -75,340 +73,291 @@ namespace Device {
 //-----------------------------------------------------------------------------
 class DeviceInstance  : public DeviceEntity
 {
-  private:
-    DeviceInstance();
+private:
+  DeviceInstance();
 
-  public:
-    DeviceInstance(
-      InstanceBlock &     instance_block,
-      MatrixLoadData &    matrix_load_data,
-      SolverState &       solver_state,
-      ExternData &        extern_data,
-      DeviceOptions &     device_options);
+public:
+  DeviceInstance(
+     const InstanceBlock &     instance_block,
+     ParametricData<void> &    parametric_data,
+     const FactoryBlock &      factory_block);
 
-    virtual ~DeviceInstance();
+  virtual ~DeviceInstance();
 
-  private:
-    DeviceInstance(const DeviceInstance &);
-    DeviceInstance &operator=(const DeviceInstance &);
+private:
+  DeviceInstance(const DeviceInstance &);
+  DeviceInstance &operator=(const DeviceInstance &);
 
-  public:
-    // This function configures the device to request space in the store
-    // vector for lead current calculations.  It must be called soon
-    // after the constructor call before the store vector is allocated.
-    virtual void enableLeadCurrentCalc();
+public:
+  // This function configures the device to request space in the store
+  // vector for lead current calculations.  It must be called soon
+  // after the constructor call before the store vector is allocated.
+  virtual void enableLeadCurrentCalc();
 
-    virtual void registerGIDs(
-      const list<index_pair> & intGIDListRef,
-      const list<index_pair> & extGIDListRef ) {}
+  virtual void registerGIDs(
+     const std::list<index_pair> & intGIDListRef,
+     const std::list<index_pair> & extGIDListRef ) {}
 
-    virtual void registerStateGIDs(const list<index_pair> & staGIDListRef) {}
+  virtual void registerStateGIDs(const std::list<index_pair> & staGIDListRef) {}
 
-    virtual void registerStoreGIDs(const list<index_pair> & stoGIDListRef) {}
+  virtual void registerStoreGIDs(const std::list<index_pair> & stoGIDListRef) {}
 
-    virtual void registerLIDs( const std::vector<int> & intLIDVecRef,
-                               const std::vector<int> & extLIDVecRef ) {}
-    virtual void registerStateLIDs( const std::vector<int> & staLIDVecRef ) {}
+  virtual void registerLIDs( const std::vector<int> & intLIDVecRef,
+                             const std::vector<int> & extLIDVecRef ) {}
+  virtual void registerStateLIDs( const std::vector<int> & staLIDVecRef ) {}
 
-    virtual void registerStoreLIDs( const std::vector<int> & stoLIDVecRef ) {}
+  virtual void registerStoreLIDs( const std::vector<int> & stoLIDVecRef ) {}
 
-    virtual const std::vector<std::string> & getDepSolnVars();
-    virtual void registerDepSolnGIDs( const std::vector< std::vector<int> > & varList );
-    virtual const std::vector<std::string> & getDepStateVars();
-    virtual void registerDepStateGIDs( const std::vector< std::vector<int> > & varList );
-    virtual const std::vector<std::string> & getDepStoreVars();
-    virtual void registerDepStoreGIDs( const std::vector< std::vector<int> > & varList );
+  virtual const std::vector<std::string> & getDepSolnVars();
+  virtual void registerDepSolnGIDs( const std::vector< std::vector<int> > & varList );
+  virtual const std::vector<std::string> & getDepStateVars();
+  virtual void registerDepStateGIDs( const std::vector< std::vector<int> > & varList );
+  virtual const std::vector<std::string> & getDepStoreVars();
+  virtual void registerDepStoreGIDs( const std::vector< std::vector<int> > & varList );
 
-    virtual void registerDepSolnLIDs( const std::vector< std::vector<int> > & depSolnLIDVecRef );
-    virtual void registerDepStateLIDs( const std::vector< std::vector<int> > & depStaLIDVecRef ) {}
-    virtual void registerDepStoreLIDs( const std::vector< std::vector<int> > & depStoLIDVecRef ) {}
+  virtual void registerDepSolnLIDs( const std::vector< std::vector<int> > & depSolnLIDVecRef );
+  virtual void registerDepStateLIDs( const std::vector< std::vector<int> > & depStaLIDVecRef ) {}
+  virtual void registerDepStoreLIDs( const std::vector< std::vector<int> > & depStoLIDVecRef ) {}
 
-    virtual const std::vector< std::vector<int> > & jacobianStamp() const {
-      static std::vector< std::vector<int> > dummy;
-      return dummy;
-    }
+  virtual const std::vector< std::vector<int> > & jacobianStamp() const 
+  {
+    static std::vector< std::vector<int> > dummy;
+    return dummy;
+  }
 
-    virtual void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
+  virtual void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-    virtual void registerGIDData(
-      const std::vector<int> & counts,
-      const std::vector<int> & GIDs,
-      const std::vector< std::vector<int> > & jacGIDs );
+  virtual void registerGIDData(
+     const std::vector<int> & counts,
+     const std::vector<int> & GIDs,
+     const std::vector< std::vector<int> > & jacGIDs );
 
-    virtual void setupPointers () {};
+  virtual void setupPointers()
+  {}
 
-    virtual void getDepSolnGIDVec( std::vector<int> & depGIDVec );
+  virtual void getDepSolnGIDVec( std::vector<int> & depGIDVec );
 
-    virtual bool getIndexPairList(list<index_pair> & iplRef);
+  virtual bool getIndexPairList(std::list<index_pair> & iplRef);
 
-    virtual bool getInstanceBreakPoints (std::vector<N_UTL_BreakPoint> &breakPointTimes);
+  virtual bool getInstanceBreakPoints (std::vector<N_UTL_BreakPoint> &breakPointTimes);
 
-    virtual bool updateSource ();
+  virtual bool updateSource ();
 
-    virtual bool processParams (string param = "");
-    virtual bool processInstanceParams (string param = "");
+  virtual bool processParams ();
 
-    virtual bool updateTemperature(const double & temp_tmp);
+  virtual bool processInstanceParams () 
+  {
+    return true;
+  }
 
-    virtual bool isConverged();
+  virtual bool updateTemperature(const double & temp_tmp);
 
-    virtual bool testDAEMatrices (std::vector<std::string> & nameVec);
+  virtual bool isConverged();
 
-    virtual bool loadTrivialDAE_FMatrixStamp ();
-    bool trivialStampLoader (N_LAS_Matrix * matPtr);
-    bool zeroMatrixDiagonal (N_LAS_Matrix * matPtr);
+  virtual bool testDAEMatrices (std::vector<std::string> & nameVec);
 
-    virtual bool updateIntermediateVars () = 0;
-    virtual bool updatePrimaryState ();
-    virtual bool updateSecondaryState ();
-    virtual bool setIC ();
+  virtual bool loadTrivialDAE_FMatrixStamp ();
+  bool trivialStampLoader (N_LAS_Matrix * matPtr);
+  bool zeroMatrixDiagonal (N_LAS_Matrix * matPtr);
 
-    // This indicates if the device has functions that can output plot files for
-    // internal variables.
-    virtual bool plotfileFlag () {return false;}
+  virtual bool updateIntermediateVars () = 0;
+  virtual bool updatePrimaryState ();
+  virtual bool updateSecondaryState ();
+  virtual bool setIC ();
 
-    // load zeros into mask for equations that should not be used
-    // to compute error estimates.  Return true if any zeros set.
-    // Default implementation just does nothing (leaves everything 1.0)
-    virtual bool loadDeviceMask() {return false;}
+  // This indicates if the device has functions that can output plot files for
+  // internal variables.
+  virtual bool plotfileFlag () {return false;}
 
-    // tell device instance that current solution has been accepted at
-    // current time.  Most devices don't care, but the transmission line
-    // does.
-    virtual void acceptStep() {}
+  // load zeros into mask for equations that should not be used
+  // to compute error estimates.  Return true if any zeros set.
+  // Default implementation just does nothing (leaves everything 1.0)
+  virtual bool loadDeviceMask() {return false;}
 
-    // new DAE functions:
-    virtual bool loadDAEQVector ()=0;
-    virtual bool loadDAEFVector ()=0;
-
-    virtual bool loadDAEdQdx ()=0;
-    virtual bool loadDAEdFdx ()=0;
-
-    int getNumIntVars() const {
-      return numIntVars;
-    }
-
-    int getNumExtVars() const {
-      return numExtVars;
-    }
-
-    int getNumStateVars() const {
-      return numStateVars;
-    }
-
-    int getNumStoreVars() const {
-      return numStoreVars;
-    }
-
-    void setNumStoreVars(int num_store_vars) {
-      numStoreVars = num_store_vars;
-    }
-
-    virtual void getDevConMap(std::vector<int> &);
-
-    virtual bool getPDEDeviceFlag ();
-
-    virtual DeviceState * getInternalState();
-    virtual bool setInternalState( const DeviceState & state );
-
-    virtual bool loadDFDV(int iElectrode, N_LAS_Vector * dfdvPtr);
-    virtual bool calcConductance (int iElectrode, const N_LAS_Vector * dxdvPtr);
-
-    // internal name map stuff:
-    virtual std::map<int, std::string> & getIntNameMap ();
-    virtual std::map<int, std::string> & getStateNameMap ();
-    virtual std::map<int, std::string> & getStoreNameMap ();
-
-    void spiceInternalName (string & tmpname);
-
-    virtual bool outputPlotFiles () {return true;}
-
-    // two level newton and PDE-continuation
-    virtual bool enablePDEContinuation();
-    virtual bool disablePDEContinuation();
-    virtual void setPDEContinuationAlpha (double alpha);
-    virtual void setPDEContinuationBeta  (double beta );
-
-    virtual bool setInitialGuess ();
-    virtual double getMaxTimeStepSize  ();
-
-    virtual void varTypes( std::vector<char> & varTypeVec ) {}
-
-    int getNumNodes() const;
-    int getNumOptionalNodes() const;
-    int getNumFillNodes() const;
-    void getPrimaryParameter(string & primaryParameter) const;
-    void getModelTypes(std::vector<std::string> & modTypesVector) const;
-
-  protected:
-    void jacStampMap(
-      std::vector< std::vector<int> > & stamp_parent,
-      std::vector<int> & map_parent,
-      std::vector< std::vector<int> > & map2_parent,
-      std::vector< std::vector<int> > & stamp,
-      std::vector<int> & map,
-      std::vector< std::vector<int> > & map2,
-      int from, int to, int original_size);
-
-    void jacStampMap_fixOrder(
-      std::vector< std::vector<int> > & stamp_parent,
-      std::vector< std::vector<int> > & map2_parent,
-      std::vector< std::vector<int> > & stamp,
-      std::vector< std::vector<int> > & map2);
-
-    void outputJacStamp(const std::vector<std::vector<int> > & jac);
-    void outputJacMaps(const std::vector<int>  & jacMap, const std::vector<std::vector<int> > & jacMap2);
-
-  public:
-    bool getOrigFlag() const {
-      return origFlag;
-    }
-
-    void setOrigFlag(bool origFlag_local) {
-      origFlag = origFlag_local;
-    }
-
-    const std::vector<int> &getDevLIDs() const {
-      return devLIDs;
-    }
-
-    const std::vector<std::vector<int> > &getDevJacLIDs() const {
-      return devJacLIDs;
-    }
-
-    const std::vector<int> &getStaLIDVec() const {
-      return staLIDVec;
-    }
-
-    bool getMergeRowColChecked() const {
-      return mergeRowColChecked;
-    }
-    void setMergeRowColChecked(bool mergeRowColChecked_local) {
-      mergeRowColChecked = mergeRowColChecked_local;
-    }
-
-    const std::string &getModelName() const {
-      return modelName_;
-    }
-
-    void setModelName(const std::string &modelName) {
-      modelName_ = modelName;
-    }
-
-    const MatrixLoadData &getMatrixLoadData() const {
-      return mlData;
-    }
-
-    MatrixLoadData &getMatrixLoadData() {
-      return mlData;
-    }
-
-  private:
-    string                modelName_;
-    MatrixLoadData &      mlData;
-
-  protected:
-    ExternData & extData;
-    list<index_pair> intGIDList;
-    list<index_pair> extGIDList;
-    list<index_pair> indexPairList;
-
-    list<index_pair> staGIDList;
-
-    std::vector<int> intLIDVec;
-    std::vector<int> extLIDVec;
-
-    std::vector<int> staLIDVec;
-    std::vector<int> stoLIDVec;
-
-    // devLIDs is a combined LID vector, containing int, ext, and expVar ID's.
-    std::vector<int> devLIDs;
-    std::vector< std::vector<int> > devJacLIDs;
-
-    std::map<int,string> intNameMap;
-    std::map<int,string> stateNameMap;
-    std::map<int,string> storeNameMap;
-
-    // device support class: (limiter functions, etc.)
-    DeviceSupport devSupport;
-
-  private:
-    bool configuredForLeadCurrent;  // flag which indicates that numStoreVars already includes numLeadCurrentStoreVars
-
-  public:
-    std::vector<int> & cols;
-    std::vector<double> & vals;
-
-    NumericalJacobian * numJacPtr;
-
-    bool psLoaded;
-    bool ssLoaded;
-    bool rhsLoaded;
-
-    bool origFlag;
-    bool PDEDeviceFlag;
-
-    int numIntVars;
-    int numExtVars;
-    int numStateVars;
-    int numStoreVars;
-
-    int numLeadCurrentStoreVars;
-    bool loadLeadCurrent;           // flag indicating that we want to load lead current data during F & Q load
-
-    std::vector<int> devConMap;
-
-    bool mergeRowColChecked;
+  // tell device instance that current solution has been accepted at
+  // current time.  Most devices don't care, but the transmission line
+  // does.
+  virtual void acceptStep() {}
+
+  // new DAE functions:
+  virtual bool loadDAEQVector ()=0;
+  virtual bool loadDAEFVector ()=0;
+
+  virtual bool loadDAEdQdx ()=0;
+  virtual bool loadDAEdFdx ()=0;
+
+  int getNumIntVars() const 
+  {
+    return numIntVars;
+  }
+
+  int getNumExtVars() const 
+  {
+    return numExtVars;
+  }
+
+  int getNumStateVars() const 
+  {
+    return numStateVars;
+  }
+
+  int getNumStoreVars() const 
+  {
+    return numStoreVars;
+  }
+
+  void setNumStoreVars(int num_store_vars) 
+  {
+    numStoreVars = num_store_vars;
+  }
+
+  virtual void getDevConMap(std::vector<int> &);
+
+  virtual DeviceState * getInternalState();
+  virtual bool setInternalState( const DeviceState & state );
+
+  virtual bool loadDFDV(int iElectrode, N_LAS_Vector * dfdvPtr);
+  virtual bool calcConductance (int iElectrode, const N_LAS_Vector * dxdvPtr);
+
+  // internal name map stuff:
+  virtual std::map<int, std::string> & getIntNameMap ();
+  virtual std::map<int, std::string> & getStateNameMap ();
+  virtual std::map<int, std::string> & getStoreNameMap ();
+
+  void spiceInternalName (std::string & tmpname);
+
+  virtual bool outputPlotFiles () {return true;}
+
+  // two level newton and PDE-continuation
+  virtual bool enablePDEContinuation();
+  virtual bool disablePDEContinuation();
+  virtual void setPDEContinuationAlpha (double alpha);
+  virtual void setPDEContinuationBeta  (double beta );
+
+  virtual bool setInitialGuess ();
+  virtual double getMaxTimeStepSize  ();
+
+  virtual void varTypes( std::vector<char> & varTypeVec ) {}
+
+protected:
+  void jacStampMap(
+     std::vector< std::vector<int> > & stamp_parent,
+     std::vector<int> & map_parent,
+     std::vector< std::vector<int> > & map2_parent,
+     std::vector< std::vector<int> > & stamp,
+     std::vector<int> & map,
+     std::vector< std::vector<int> > & map2,
+     int from, int to, int original_size);
+
+  void jacStampMap_fixOrder(
+     std::vector< std::vector<int> > & stamp_parent,
+     std::vector< std::vector<int> > & map2_parent,
+     std::vector< std::vector<int> > & stamp,
+     std::vector< std::vector<int> > & map2);
+
+  void outputJacStamp(const std::vector<std::vector<int> > & jac);
+  void outputJacMaps(const std::vector<int>  & jacMap, const std::vector<std::vector<int> > & jacMap2);
+
+public:
+  bool getOrigFlag() const 
+  {
+    return origFlag;
+  }
+
+  void setOrigFlag(bool origFlag_local) 
+  {
+    origFlag = origFlag_local;
+  }
+
+  const std::vector<int> &getDevLIDs() const 
+  {
+    return devLIDs;
+  }
+
+  const std::vector<std::vector<int> > &getDevJacLIDs() const 
+  {
+    return devJacLIDs;
+  }
+
+  const std::vector<int> &getStaLIDVec() const 
+  {
+    return staLIDVec;
+  }
+
+  bool getMergeRowColChecked() const 
+  {
+    return mergeRowColChecked;
+  }
+  void setMergeRowColChecked(bool mergeRowColChecked_local) 
+  {
+    mergeRowColChecked = mergeRowColChecked_local;
+  }
+
+  const MatrixLoadData &getMatrixLoadData() const 
+  {
+    return mlData;
+  }
+
+  MatrixLoadData &getMatrixLoadData() 
+  {
+    return mlData;
+  }
+
+private:
+  MatrixLoadData &      mlData;
+
+protected:
+  const ExternData & extData;
+  std::list<index_pair> intGIDList;
+  std::list<index_pair> extGIDList;
+  std::list<index_pair> indexPairList;
+
+  std::list<index_pair> staGIDList;
+
+  std::vector<int> intLIDVec;
+  std::vector<int> extLIDVec;
+
+  std::vector<int> staLIDVec;
+  std::vector<int> stoLIDVec;
+
+  // devLIDs is a combined LID vector, containing int, ext, and expVar ID's.
+  std::vector<int> devLIDs;
+  std::vector< std::vector<int> > devJacLIDs;
+
+  std::map<int,std::string> intNameMap;
+  std::map<int,std::string> stateNameMap;
+  std::map<int,std::string> storeNameMap;
+
+  // device support class: (limiter functions, etc.)
+  DeviceSupport devSupport;
+
+private:
+  bool configuredForLeadCurrent;  // flag which indicates that numStoreVars already includes numLeadCurrentStoreVars
+
+public:
+  std::vector<int> & cols;
+  std::vector<double> & vals;
+
+  NumericalJacobian * numJacPtr;
+
+  bool psLoaded;
+  bool ssLoaded;
+  bool rhsLoaded;
+
+  bool origFlag;
+
+  int numIntVars;
+  int numExtVars;
+  int numStateVars;
+  int numStoreVars;
+
+  int numLeadCurrentStoreVars;
+  bool loadLeadCurrent;           // flag indicating that we want to load lead current data during F & Q load
+
+  std::vector<int> devConMap;
+
+  bool mergeRowColChecked;
 };
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceInstance::processInstanceParams
-// Purpose       :
-// Special Notes :
-// Scope         : public
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 06/03/02
-//-----------------------------------------------------------------------------
-inline bool DeviceInstance::processInstanceParams (string param)
-{
-  return true;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceInstance::updateIntermediateVars
-// Purpose       :
-// Special Notes :
-// Scope         : public
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 11/30/00
-//-----------------------------------------------------------------------------
-inline bool DeviceInstance::updateIntermediateVars ()
-{
-  string msg;
-  msg = "DeviceInstance::updateIntermediateVars does not exist";
-  msg += "  for this device: " + getName() + "\n";
-  N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-
-  return true;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceInstance::updatePrimaryState
-// Purpose       :
-// Special Notes :
-// Scope         : public
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 11/30/00
-//-----------------------------------------------------------------------------
-inline bool DeviceInstance::updatePrimaryState ()
-{
-  string msg;
-  msg = "DeviceInstance::updatePrimaryState does not exist";
-  msg += "  for this device: " + getName() + "\n";
-  N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-
-  return true;
-}
 
 //-----------------------------------------------------------------------------
 // Function      : DeviceInstance::updateSecondaryState
@@ -420,13 +369,6 @@ inline bool DeviceInstance::updatePrimaryState ()
 //-----------------------------------------------------------------------------
 inline bool DeviceInstance::updateSecondaryState ()
 {
-#if 0
-  string msg;
-  msg = "DeviceInstance::updateSecondaryState does not exist";
-  msg += "  for this device: " + getName() + "\n";
-  N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-#endif
-
   return true;
 }
 
@@ -454,24 +396,6 @@ inline bool DeviceInstance::setIC ()
 inline DeviceState * DeviceInstance::getInternalState()
 {
   return NULL;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceInstance::setInternalState
-// Purpose       :
-// Special Notes :
-// Scope         : public
-// Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 09/02/01
-//-----------------------------------------------------------------------------
-inline bool DeviceInstance::setInternalState(
-  const DeviceState & state )
-{
-  N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL,
-                          "DeviceInstance::setInternalState does not exist for this device: "
-                          + getName() + "\n" );
-
-  return false;
 }
 
 //-----------------------------------------------------------------------------
@@ -511,19 +435,6 @@ inline std::map<int, std::string> & DeviceInstance::getStateNameMap ()
 inline std::map<int, std::string> & DeviceInstance::getStoreNameMap ()
 {
   return storeNameMap;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceInstance::getPDEDeviceFlag
-// Purpose       :
-// Special Notes :
-// Scope         : public
-// Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 10/10/01
-//-----------------------------------------------------------------------------
-inline bool DeviceInstance::getPDEDeviceFlag ()
-{
-  return PDEDeviceFlag;
 }
 
 //-----------------------------------------------------------------------------
@@ -586,14 +497,6 @@ inline bool DeviceInstance::calcConductance (int iElectrode, const N_LAS_Vector 
 //-----------------------------------------------------------------------------
 inline bool DeviceInstance::isConverged()
 {
-#ifdef Xyce_DEBUG_DEVICE
-#if 0
-  if (!origFlag)
-  {
-    cout  << name << " is not converged! " << endl;
-  }
-#endif
-#endif
   return origFlag;
 }
 

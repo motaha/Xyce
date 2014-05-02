@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.7.2.2 $
+// Revision Number: $Revision: 1.14 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/24 23:49:18 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -47,36 +47,14 @@
 // ---------- Standard Includes ----------
 #include <N_UTL_Misc.h>
 
-#ifdef HAVE_CSTRING
-#include <cstring>
-#else
-#include <string.h>
-#endif
-
-#ifdef HAVE_CSTDIO
-#include <cstdio>
-#else
-#include <stdio.h>
-#endif
-
 #ifdef HAVE_CMATH
 #include <cmath>
 #else
 #include <math.h>
 #endif
 
-#include<map>
-
-#ifdef HAVE_ALGORITHM
+#include <map>
 #include <algorithm>
-#else
-#ifdef HAVE_ALGO_H
-#include <algo.h>
-#else
-#error Must have either <algorithm> or <algo.h>!
-#endif
-#endif
-
 #include <string>
 #include <iostream>
 
@@ -92,15 +70,17 @@ namespace Device {
 template<>
 ParametricData<PDE_1DElectrode>::ParametricData()
 {
-    addPar("AREA", 0.0, false, &PDE_1DElectrode::area, &PDE_1DElectrode::areaGiven);
-    addPar("LOCATION", 0.0, false, &PDE_1DElectrode::location);
+    addPar("AREA", 0.0, &PDE_1DElectrode::area)
+      .setGivenMember(&PDE_1DElectrode::areaGiven);
+    addPar("LOCATION", 0.0, &PDE_1DElectrode::location);
 
     // Set up map for non-double precision variables:
-    addPar("SIDE", "left", false, &PDE_1DElectrode::side, &PDE_1DElectrode::sideGiven);
-    addPar("NAME", "anode", false, &PDE_1DElectrode::nodeName);
-    addPar("BC", "dirichlet", false, &PDE_1DElectrode::bcName);
-    addPar("MATERIAL", "neutral", false, &PDE_1DElectrode::material);
-    addPar("OXIDEBNDRYFLAG", false, false, &PDE_1DElectrode::oxideBndryFlag);
+    addPar("SIDE", "left", &PDE_1DElectrode::side)
+      .setGivenMember(&PDE_1DElectrode::sideGiven);
+    addPar("NAME", "anode", &PDE_1DElectrode::nodeName);
+    addPar("BC", "dirichlet", &PDE_1DElectrode::bcName);
+    addPar("MATERIAL", "neutral", &PDE_1DElectrode::material);
+    addPar("OXIDEBNDRYFLAG", false, &PDE_1DElectrode::oxideBndryFlag);
 }
 
 ParametricData<PDE_1DElectrode> &PDE_1DElectrode::getParametricData() {
@@ -113,17 +93,18 @@ template<>
 ParametricData<PDE_2DElectrode>::ParametricData()
 {
     // Set up map for double precision variables:
-    addPar("START", 0.0, false, &PDE_2DElectrode::start);
-    addPar("END", 0.0, false, &PDE_2DElectrode::end);
-    addPar("OXTHICK", 0.0, false, &PDE_2DElectrode::oxthick);
-    addPar("OXCHARGE", 0.0, false, &PDE_2DElectrode::oxcharge);
+    addPar("START", 0.0, &PDE_2DElectrode::start);
+    addPar("END", 0.0, &PDE_2DElectrode::end);
+    addPar("OXTHICK", 0.0, &PDE_2DElectrode::oxthick);
+    addPar("OXCHARGE", 0.0, &PDE_2DElectrode::oxcharge);
 
     // Set up map for non-double precision variables:
-    addPar("NAME", "anode", false, &PDE_2DElectrode::nodeName);
-    addPar("BC", "dirichlet", false, &PDE_2DElectrode::bcName);
-    addPar("SIDE", "top", false, &PDE_2DElectrode::side, &PDE_2DElectrode::sideGiven);
-    addPar("MATERIAL", "neutral", false, &PDE_2DElectrode::material);
-    addPar("OXIDEBNDRYFLAG", false, false, &PDE_2DElectrode::oxideBndryFlag);
+    addPar("NAME", "anode", &PDE_2DElectrode::nodeName);
+    addPar("BC", "dirichlet", &PDE_2DElectrode::bcName);
+    addPar("SIDE", "top", &PDE_2DElectrode::side)
+      .setGivenMember(&PDE_2DElectrode::sideGiven);
+    addPar("MATERIAL", "neutral", &PDE_2DElectrode::material);
+    addPar("OXIDEBNDRYFLAG", false, &PDE_2DElectrode::oxideBndryFlag);
 }
 
 ParametricData<PDE_2DElectrode> &PDE_2DElectrode::getParametricData() {
@@ -141,19 +122,17 @@ ParametricData<PDE_2DElectrode> &PDE_2DElectrode::getParametricData() {
 // Creation Date : 05/07/05
 //-----------------------------------------------------------------------------
 PDE_2DElectrode::PDE_2DElectrode ()
-    : PDE_Electrode (),
-      iA     (0),
-      iB     (0),
-      uLabel (0),
-      start  (0.0),
-      end    (0.0),
-      startGiven  (false),
-      endGiven    (false),
-      side   ("top"),
-      sideGiven   (false)
-{
-
-}
+  : PDE_Electrode(getParametricData()),
+    iA     (0),
+    iB     (0),
+    uLabel (0),
+    start  (0.0),
+    end    (0.0),
+    startGiven  (false),
+    endGiven    (false),
+    side   ("top"),
+    sideGiven   (false)
+{}
 
 //-----------------------------------------------------------------------------
 // Function      : PDE_2DElectrode:processParams
@@ -167,8 +146,8 @@ void PDE_2DElectrode::processParams ()
 {
   // lowercase the NAME parameter:
   {
-    ParameterMap::const_iterator paramIter = (*getPMap()).find(string("NAME"));
-    const Pars &param = static_cast<const Pars &>(*(*paramIter).second);
+    ParameterMap::const_iterator paramIter = getParameterMap().find(std::string("NAME"));
+    const Descriptor &param = *(*paramIter).second;
 
     ExtendedString tmp = getValue<std::string, PDE_2DElectrode>(*this, param);
     setValue<std::string, PDE_2DElectrode>(*this, param, static_cast<std::string>(tmp.toLower()));
@@ -176,8 +155,8 @@ void PDE_2DElectrode::processParams ()
 
   // lowercase the SIDE parameter:
   {
-    ParameterMap::const_iterator paramIter = (*getPMap()).find(string("SIDE"));
-    const Pars &param = static_cast<const Pars &>(*(*paramIter).second);
+    ParameterMap::const_iterator paramIter = getParameterMap().find(std::string("SIDE"));
+    const Descriptor &param = *(*paramIter).second;
 
     ExtendedString tmp = getValue<std::string, PDE_2DElectrode>(*this, param);
     setValue<std::string, PDE_2DElectrode>(*this, param, static_cast<std::string>(tmp.toLower()));
@@ -185,8 +164,8 @@ void PDE_2DElectrode::processParams ()
 
   // lowercase the MATERIAL parameter:
   {
-    ParameterMap::const_iterator paramIter = (*getPMap()).find(string("MATERIAL"));
-    const Pars &param = static_cast<const Pars &>(*(*paramIter).second);
+    ParameterMap::const_iterator paramIter = getParameterMap().find(std::string("MATERIAL"));
+    const Descriptor &param = *(*paramIter).second;
 
     ExtendedString tmp = getValue<std::string, PDE_2DElectrode>(*this, param);
     setValue<std::string, PDE_2DElectrode>(*this, param, static_cast<std::string>(tmp.toLower()));
@@ -194,8 +173,8 @@ void PDE_2DElectrode::processParams ()
 
   // lowercase the BC parameter:
   {
-    ParameterMap::const_iterator paramIter = (*getPMap()).find(string("BC"));
-    const Pars &param = static_cast<const Pars &>(*(*paramIter).second);
+    ParameterMap::const_iterator paramIter = getParameterMap().find(std::string("BC"));
+    const Descriptor &param = *(*paramIter).second;
 
     ExtendedString tmp = getValue<std::string, PDE_2DElectrode>(*this, param);
     setValue<std::string, PDE_2DElectrode>(*this, param, static_cast<std::string>(tmp.toLower()));
@@ -211,13 +190,12 @@ void PDE_2DElectrode::processParams ()
 // Creation Date : 05/07/05
 //-----------------------------------------------------------------------------
 PDE_1DElectrode::PDE_1DElectrode ()
-  : PDE_Electrode (),
+  : PDE_Electrode (getParametricData()),
     area(1.0),
     location(0.0),
     side   ("left"),
     sideGiven (false)
-{
-}
+{}
 
 //-----------------------------------------------------------------------------
 // Function      : PDE_1DElectrode:processParams
@@ -231,8 +209,8 @@ void PDE_1DElectrode::processParams ()
 {
   // lowercase the NAME parameter:
   {
-    ParameterMap::const_iterator paramIter = (*getPMap()).find(string("NAME"));
-    const Pars &param = static_cast<const Pars &>(*(*paramIter).second);
+    ParameterMap::const_iterator paramIter = getParameterMap().find(std::string("NAME"));
+    const Descriptor &param = *(*paramIter).second;
 
     ExtendedString tmp = getValue<std::string, PDE_1DElectrode>(*this, param);
     setValue<std::string, PDE_1DElectrode>(*this, param, static_cast<std::string>(tmp.toLower()));
@@ -240,8 +218,8 @@ void PDE_1DElectrode::processParams ()
 
   // lowercase the SIDE parameter:
   {
-    ParameterMap::const_iterator paramIter = (*getPMap()).find(string("SIDE"));
-    const Pars &param = static_cast<const Pars &>(*(*paramIter).second);
+    ParameterMap::const_iterator paramIter = getParameterMap().find(std::string("SIDE"));
+    const Descriptor &param = *(*paramIter).second;
 
     ExtendedString tmp = getValue<std::string, PDE_1DElectrode>(*this, param);
     setValue<std::string, PDE_1DElectrode>(*this, param, static_cast<std::string>(tmp.toLower()));
@@ -249,8 +227,8 @@ void PDE_1DElectrode::processParams ()
 
   // lowercase the MATERIAL parameter:
   {
-    ParameterMap::const_iterator paramIter = (*getPMap()).find(string("MATERIAL"));
-    const Pars &param = static_cast<const Pars &>(*(*paramIter).second);
+    ParameterMap::const_iterator paramIter = getParameterMap().find(std::string("MATERIAL"));
+    const Descriptor &param = *(*paramIter).second;
 
     ExtendedString tmp = getValue<std::string, PDE_1DElectrode>(*this, param);
     setValue<std::string, PDE_1DElectrode>(*this, param, static_cast<std::string>(tmp.toLower()));
@@ -258,8 +236,8 @@ void PDE_1DElectrode::processParams ()
 
   // lowercase the BC parameter:
   {
-    ParameterMap::const_iterator paramIter = (*getPMap()).find(string("BC"));
-    const Pars &param = static_cast<const Pars &>(*(*paramIter).second);
+    ParameterMap::const_iterator paramIter = getParameterMap().find(std::string("BC"));
+    const Descriptor &param = *(*paramIter).second;
 
     ExtendedString tmp = getValue<std::string, PDE_1DElectrode>(*this, param);
     setValue<std::string, PDE_1DElectrode>(*this, param, static_cast<std::string>(tmp.toLower()));

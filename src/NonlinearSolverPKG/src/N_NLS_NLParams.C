@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.62.2.2 $
+// Revision Number: $Revision: 1.74 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author $
 //-------------------------------------------------------------------------
@@ -71,7 +71,7 @@
 // Creation Date : 5/09/00
 //-----------------------------------------------------------------------------
 N_NLS_NLParams::N_NLS_NLParams(AnalysisMode mode, N_IO_CmdParse & cp)
-  : commandLine_(cp),
+  : commandLine_(&cp),
     modeToggled_(true),
 #ifdef Xyce_VERBOSE_NONLINEAR
     printParamsFlag_(true),
@@ -138,7 +138,7 @@ N_NLS_NLParams::N_NLS_NLParams(AnalysisMode mode, N_IO_CmdParse & cp)
     setRHSTol(1.0e-02);
   }
 
-  if  (mode==HB)
+  if  (mode == HB_MODE)
   {
     setNLStrategy(NEWTON);
     setSearchMethod(FULL);
@@ -227,76 +227,76 @@ N_NLS_NLParams::~N_NLS_NLParams()
 
 bool N_NLS_NLParams::setOptions (const N_UTL_OptionBlock & OB)
 {
-  for (list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
+  for (std::list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
        it_tpL != OB.getParams().end(); ++ it_tpL)
   {
     if (it_tpL->uTag() == "ABSTOL")
     {
-      setAbsTol(it_tpL->dVal());
+      setAbsTol(it_tpL->getImmutableValue<double>());
     }
     else if (it_tpL->uTag() == "RELTOL")
     {
-      setRelTol(it_tpL->dVal());
+      setRelTol(it_tpL->getImmutableValue<double>());
     }
     else if (it_tpL->uTag() == "DELTAXTOL")
     {
-      setDeltaXTol(it_tpL->dVal());
+      setDeltaXTol(it_tpL->getImmutableValue<double>());
     }
     else if (it_tpL->uTag() == "SMALLUPDATETOL")
     {
-      setSmallUpdateTol(it_tpL->dVal());
+      setSmallUpdateTol(it_tpL->getImmutableValue<double>());
     }
     else if (it_tpL->uTag() == "ENFORCEDEVICECONV")
     {
-      setEnforceDeviceConvFlag(it_tpL->dVal());
+      setEnforceDeviceConvFlag(it_tpL->getImmutableValue<double>());
     }
     else if (it_tpL->uTag() == "RHSTOL")
     {
-      setRHSTol(it_tpL->dVal());
+      setRHSTol(it_tpL->getImmutableValue<double>());
     }
     else if (it_tpL->uTag() == "MAXSTEP")
     {
-      setMaxNewtonStep(it_tpL->iVal());
+      setMaxNewtonStep(it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag() == "LINOPT")
     {
-      setLinearOpt(it_tpL->iVal());
+      setLinearOpt(it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag() == "CONSTRAINTBT")
     {
-      setConstraintBT(it_tpL->iVal());
+      setConstraintBT(it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag() == "CONSTRAINTMAX")
     {
-      setGlobalBTMax(it_tpL->dVal());
+      setGlobalBTMax(it_tpL->getImmutableValue<double>());
     }
     else if (it_tpL->uTag() == "CONSTRAINTMIN")
     {
-      setGlobalBTMin(it_tpL->dVal());
+      setGlobalBTMin(it_tpL->getImmutableValue<double>());
     }
     else if (it_tpL->uTag() == "CONSTRAINTCHANGE")
     {
-      setGlobalBTChange(it_tpL->dVal());
+      setGlobalBTChange(it_tpL->getImmutableValue<double>());
     }
     else if (it_tpL->uTag() == "NLSTRATEGY")
     {
-      setNLStrategy(it_tpL->iVal());
+      setNLStrategy(it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag() == "SEARCHMETHOD")
     {
-      setSearchMethod(it_tpL->iVal());
+      setSearchMethod(it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag() == "MAXSEARCHSTEP")
     {
-      setMaxSearchStep(it_tpL->iVal());
+      setMaxSearchStep(it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag() == "IN_FORCING")
     {
-      setForcingFlag(it_tpL->iVal());
+      setForcingFlag(it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag() == "NORMLVL")
     {
-      setNormLevel(it_tpL->iVal());
+      setNormLevel(it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag() == "NOX")
     {
@@ -305,49 +305,48 @@ bool N_NLS_NLParams::setOptions (const N_UTL_OptionBlock & OB)
     else if (it_tpL->uTag() == "MATRIXMARKET")
     {
 #ifdef Xyce_DEBUG_NONLINEAR
-      setMMFormat (static_cast<bool>(it_tpL->dVal()));
+      setMMFormat (static_cast<bool>(it_tpL->getImmutableValue<double>()));
 #endif
     }
     else if (it_tpL->uTag() == "DEBUGLEVEL")
     {
 #ifdef Xyce_DEBUG_NONLINEAR
-      setDebugLevel(it_tpL->iVal());
+      setDebugLevel(it_tpL->getImmutableValue<int>());
 #endif
     }
     else if (it_tpL->uTag() == "DEBUGMINTIMESTEP")
     {
 #ifdef Xyce_DEBUG_NONLINEAR
-      setDebugMinTimeStep(it_tpL->iVal());
+      setDebugMinTimeStep(it_tpL->getImmutableValue<int>());
 #endif
     }
     else if (it_tpL->uTag() == "DEBUGMAXTIMESTEP")
     {
 #ifdef Xyce_DEBUG_NONLINEAR
-      setDebugMaxTimeStep(it_tpL->iVal());
+      setDebugMaxTimeStep(it_tpL->getImmutableValue<int>());
 #endif
     }
     else if (it_tpL->uTag() == "DEBUGMINTIME")
     {
 #ifdef Xyce_DEBUG_NONLINEAR
-      setDebugMinTime(it_tpL->dVal());
+      setDebugMinTime(it_tpL->getImmutableValue<double>());
 #endif
     }
     else if (it_tpL->uTag() == "DEBUGMAXTIME")
     {
 #ifdef Xyce_DEBUG_NONLINEAR
-      setDebugMaxTime(it_tpL->dVal());
+      setDebugMaxTime(it_tpL->getImmutableValue<double>());
 #endif
     }
     else if (it_tpL->uTag() == "SCREENOUTPUT")
     {
 #ifdef Xyce_DEBUG_NONLINEAR
-      setScreenOutputFlag (static_cast<bool>(it_tpL->dVal()));
+      setScreenOutputFlag (static_cast<bool>(it_tpL->getImmutableValue<double>()));
 #endif
     }
     else
     {
-      string tmp =
-        " ***** ERROR: " + it_tpL->uTag() +
+      std::string tmp = it_tpL->uTag() +
         " is not a recognized nonlinear solver option.\n";
       N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_FATAL_0, tmp);
     }
@@ -366,119 +365,68 @@ bool N_NLS_NLParams::setOptions (const N_UTL_OptionBlock & OB)
 // Creator       : Scott A. Hutchinson, SNL, Computational Sciences
 // Creation Date : 01/16/01
 //-----------------------------------------------------------------------------
-#ifdef Xyce_VERBOSE_NONLINEAR
-void N_NLS_NLParams::printParams()
+void N_NLS_NLParams::printParams(std::ostream &os)
 {
-
-  static string dashedline =  "------------------------------------------------"
-    "-----------------------------";
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, "\n");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0,
-                         "\n***** Nonlinear solver options:\n");
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0,
-			 "\tabsTol:\t\t\t", getAbsTol());
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0,
-			 "\trelTol:\t\t\t", getRelTol());
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0,
-                         "\tdeltaXTol (weighted):\t", getDeltaXTol());
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0,
-                         "\tRHSTol:\t\t\t", getRHSTol());
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0,
-                         "\tSmall Update Tol:\t", getSmallUpdateTol());
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0,
-			 "\tmax NL Steps:\t\t", getMaxNewtonStep());
+  os << "\n" << std::endl
+               << Xyce::section_divider << std::endl;
+  os << "\n***** Nonlinear solver options:\n" << std::endl
+               << "\tabsTol:\t\t\t" << getAbsTol()
+               << "\trelTol:\t\t\t" << getRelTol()
+               << "\tdeltaXTol (weighted):\t" << getDeltaXTol()
+               << "\tRHSTol:\t\t\t" << getRHSTol()
+               << "\tSmall Update Tol:\t" << getSmallUpdateTol()
+               << "\tmax NL Steps:\t\t" << getMaxNewtonStep();
 
   if (analysisMode_ == DC_OP)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, "\tAnalysis Mode:\t\t",
-			   analysisMode_, "\t(DC Op)");
+    os << "\tAnalysis Mode:\t\t" << analysisMode_ << "\t(DC Op)" << std::endl;
   else if (analysisMode_ == DC_SWEEP)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, "\tAnalysis Mode:\t\t",
-			   analysisMode_, "\t(DC Sweep)");
+    os << "\tAnalysis Mode:\t\t" << analysisMode_ <<  "\t(DC Sweep)" << std::endl;
   else if (analysisMode_ == TRANSIENT)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, "\tAnalysis Mode:\t\t",
-			   analysisMode_, "\t(Transient)");
+    os << "\tAnalysis Mode:\t\t" << analysisMode_ << "\t(Transient)" << std::endl;
 
   NLStrategy strategy = getNLStrategy();
   if (strategy == NEWTON)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, "\tNL Strategy:\t\t",
-			   strategy, "\t(None => Newton)");
+    os << "\tNL Strategy:\t\t" << strategy << "\t(None => Newton)" << std::endl;
   else if (strategy == GRADIENT)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, "\tNL Strategy:\t\t",
-                           strategy, "\t(Gradient)");
+    os << "\tNL Strategy:\t\t" << strategy << "\t(Gradient)" << std::endl;
   else if (strategy == NEWTON_GRADIENT)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, "\tNL Strategy:\t\t",
-                           strategy, "\t(Newton/Gradient)");
+    os << "\tNL Strategy:\t\t" << strategy << "\t(Newton/Gradient)" << std::endl;
   else if (strategy == MOD_NEWTON)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, "\tNL Strategy:\t\t",
-			   strategy, "\t(Modified-Newton)");
+    os << "\tNL Strategy:\t\t" << strategy << "\t(Modified-Newton)" << std::endl;
   else if (strategy == MOD_NEWTON_GRADIENT)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, "\tNL Strategy:\t\t",
-			   strategy, "\t(Modified-Newton/Gradient)");
+    os << "\tNL Strategy:\t\t" << strategy << "\t(Modified-Newton/Gradient)" << std::endl;
 
   LineSearchMethod searchMethod = getSearchMethod();
   if (searchMethod == FULL)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, "\tsearch method:\t\t",
-                           searchMethod, "\t(None => Full Newton Steps)");
+    os << "\tsearch method:\t\t" << searchMethod << "\t(None => Full Newton Steps)" << std::endl;
 
   else if (searchMethod == DIVIDE)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, "\tsearch method:\t\t",
-                           searchMethod, "\t(Divide)");
+    os << "\tsearch method:\t\t" << searchMethod << "\t(Divide)" << std::endl;
 
   else if (searchMethod == BACKTRACK)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, "\tsearch method:\t\t",
-                           searchMethod, "\t(Backtrack)");
+    os << "\tsearch method:\t\t" << searchMethod << "\t(Backtrack)" << std::endl;
 
   else if (searchMethod == SIMPLE_BACKTRACK)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, "\tsearch method:\t\t",
-                           searchMethod, "\t(Simple Backtrack)");
+    os << "\tsearch method:\t\t" << searchMethod << "\t(Simple Backtrack)" << std::endl;
 
   else if (searchMethod == BANK_ROSE)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, "\tsearch method:\t\t",
-                           searchMethod, "\t(Bank and Rose Algorithm)");
+    os << "\tsearch method:\t\t" << searchMethod << "\t(Bank and Rose Algorithm)" << std::endl;
 
   else if (searchMethod == DESCENT)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, "\tsearch method:\t\t",
-                           searchMethod, "\t(Line Search)");
+    os << "\tsearch method:\t\t" << searchMethod << "\t(Line Search)" << std::endl;
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, "\tmax search steps:\t",
-                         getMaxSearchStep());
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0,
-                         "\tinexact-Newton forcing:\t", getForcingFlag());
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, "\tnorm level:\t\t",
-                         getNormLevel());
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0,
-                         "\tlinear optimization:\t", getLinearOpt());
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0,
-                         "\tconstraint backtrack:\t", getConstraintBT());
-
+  os << "\tmax search steps:\t" << getMaxSearchStep()
+               << "\tinexact-Newton forcing:\t" << getForcingFlag()
+               << "\tnorm level:\t\t" << getNormLevel()
+               << "\tlinear optimization:\t" << getLinearOpt()
+               << "\tconstraint backtrack:\t" << getConstraintBT()
 #ifdef Xyce_DEBUG_NONLINEAR
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0,
-                         "\tdebugLevel:\t\t", getDebugLevel ());
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0,
-                         "\tdebugMinTimeStep:\t", getDebugMinTimeStep ());
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0,
-                         "\tdebugMaxTimeStep:\t", getDebugMaxTimeStep ());
+               << "\tdebugLevel:\t\t" << getDebugLevel ()
+               << "\tdebugMinTimeStep:\t" << getDebugMinTimeStep ()
+               << "\tdebugMaxTimeStep:\t" << getDebugMaxTimeStep ()
 #endif
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, "\n");
-
+               << Xyce::section_divider << "\n" << std::endl;
 }
-#endif
 
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_NLParams::operator=
@@ -538,9 +486,9 @@ bool N_NLS_NLParams::setCmdLineOptions ()
 {
 #ifdef Xyce_DEBUG_NONLINEAR
   // set (or override) debug levels based on command line options
-  if ( commandLine_.argExists( "-ndl" ) )
+  if ( commandLine_->argExists( "-ndl" ) )
   {
-    setDebugLevel( atoi( commandLine_.getArgumentValue( "-ndl" ).c_str() ) );
+    setDebugLevel( atoi( commandLine_->getArgumentValue( "-ndl" ).c_str() ) );
   }
 #endif
   return true;

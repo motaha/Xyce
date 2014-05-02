@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.5.2.2 $
+// Revision Number: $Revision: 1.9 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:44 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -85,8 +85,7 @@ public:
   // NOTE:  This creation type is not supported by the Trilinos factory at this time.
   Teuchos::RCP<N_LAS_Preconditioner> create( const Teuchos::RCP<N_LAS_System> & lasSystem )
   {
-    std::string msg = "N_LAS_TrilinosPrecondFactory::create() using N_LAS_System is not supported!";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_ERROR_0, msg);
+    Xyce::Report::DevelFatal0().in("N_LAS_TrilinosPrecondFactory::create()") << "using N_LAS_System is not supported!";
     return Teuchos::null;
   }
 

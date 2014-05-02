@@ -21,16 +21,23 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.3 $
+// Revision Number: $Revision: 1.8 $
 //
-// Revision Date  : $Date: 2013/04/18 18:01:39 $
+// Revision Date  : $Date: 2013/09/30 20:25:21 $
 //
 // Current Owner  : $Author: dgbaur $
 //-----------------------------------------------------------------------------
 
 
 #include <N_CIR_Xygra.h>
+#include <N_UTL_fwd.h>
 #include <N_ERH_ErrorMgr.h>
+
+namespace Xyce {
+namespace Device {
+void registerDevices();
+}}
+
 
 // Function to be called if memory runs out:
 void _new_handler (void)
@@ -50,35 +57,37 @@ int main( int iargs, char *cargs[] )
 {
   // Set divide by zero, and invalid operation handling on linux
   // Set out of memory detection on all systems
-  set_new_handler (&_new_handler);
+  std::set_new_handler (&_new_handler);
 
   Xyce::Device::registerDevices();
 
   N_CIR_Xygra * XycePtr = new N_CIR_Xygra();
 
   bool bsuccess = XycePtr->initialize(iargs, cargs);
-  vector <string> deviceNames;
-  vector <double> vN;
+  std::vector <std::string> deviceNames;
+  std::vector <double> vN;
 
   if (bsuccess)
     bsuccess = XycePtr->getDeviceNames("Y%XYGRA%DUMMY",deviceNames);
 
+  Xyce::lout() << "Starting Xyce as library test" << std::endl;
+
   if (bsuccess)
   {
-    vector<vector<int> >coilWindings;
-    vector<vector<string> >coilNames;
+    std::vector<std::vector<int> >coilWindings;
+    std::vector<std::vector<std::string> >coilNames;
     coilWindings.resize(deviceNames.size());
     coilNames.resize(deviceNames.size());
     for (int i=0; i < deviceNames.size(); ++i)
     {
       XycePtr->xygraGetCoilWindings(deviceNames[i],coilWindings[i]);
       XycePtr->xygraGetCoilNames(deviceNames[i],coilNames[i]);
-      cout << " Xygra device " << deviceNames[i] << " has "
-           << coilWindings[i].size() << " coils " << endl;
+      Xyce::dout() << " Xygra device " << deviceNames[i] << " has "
+           << coilWindings[i].size() << " coils " << std::endl;
       for (int j=0; j<coilWindings[i].size(); j++)
       {
-        cout << "    coil " << j << " is named " << coilNames[i][j] << " and has " << coilWindings[i][j]
-             << "windings" << endl;
+        Xyce::dout() << "    coil " << j << " is named " << coilNames[i][j] << " and has " << coilWindings[i][j]
+             << "windings" << std::endl;
       }
     }
 
@@ -100,17 +109,20 @@ int main( int iargs, char *cargs[] )
         if (completedTime == 0)
         {
           // set the t=0 version first
-          vector<double> sV(numWindings,0.0);
+          std::vector<double> sV(numWindings,0.0);
           XycePtr->xygraSetSources(deviceNames[i],sV,completedTime);
         }
 
         double currentValue =  .001*sin(2*3.14159265358979*10.0*(completedTime+timeStep));
-        vector<double> sV(numWindings,currentValue);
+        std::vector<double> sV(numWindings,currentValue);
         XycePtr->xygraSetSources(deviceNames[i],sV,completedTime+timeStep);
       }
 
       bsuccess = XycePtr->simulateUntil(completedTime+timeStep,completedTime);
     }
+
+    if (bsuccess)
+      bsuccess = XycePtr->finalize();
   }
 
   delete XycePtr;

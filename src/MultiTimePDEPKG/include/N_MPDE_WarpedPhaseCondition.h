@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.5.6.2 $
+// Revision Number: $Revision: 1.10 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:46 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -82,14 +82,16 @@ class N_MPDE_WarpedPhaseCondition
                                const int omegaGID,
                                const int offset,
                                const int size,
-                               const int phiGID)
+                               const int phiGID,
+                               const int augProcID)
   : warpPhase_(warpPhase),
     warpPhaseCoeff_(warpPhaseCoeff),
     warpMPDEOSCOUT_(warpMPDEOSCOUT),
     omegaGID_(omegaGID),
     offset_(offset),
     size_(size),
-    phiGID_(phiGID)
+    phiGID_(phiGID),
+    augProcID_(augProcID)
   {}
 
   // Destructor
@@ -152,15 +154,16 @@ class N_MPDE_WarpedPhaseCondition
   { return phiGID_; }
 
   // Graph and Load functions
-  Teuchos::RefCountPtr<vector<int> > getPhaseGraph();
+    Teuchos::RefCountPtr<std::vector<int> > getPhaseGraph();
   
   double getPhaseCondition(N_LAS_BlockVector* bX, std::vector<double>& fastTimes);
 
+  // The column indices returned by this method are global ids.
   void getPhaseConditionDerivative(
       N_LAS_BlockVector* bX, 
       std::vector<double>& fastTimes,
-      vector<int>* colIndicesPtr,
-      vector<double>* coeffsPtr
+      std::vector<int>* colIndicesPtr,
+      std::vector<double>* coeffsPtr
       );
 
 private:
@@ -172,7 +175,7 @@ private:
   int offset_;
   int size_;
   int phiGID_;
-
+  int augProcID_;
 };
 
 #endif // Xyce_MPDE_WARPED_PHASE_CONDITION_H

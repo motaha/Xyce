@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -22,129 +22,128 @@
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //-----------------------------------------------------------------------------
 
-/**
- *-----------------------------------------------------------------------------
- * Filename       : $RCSfile: N_DEV_BernouliSupport.h,v $
- *
- * Purpose        :  This class contains the range limit constants and
- *                   supporting functions for the
- *                   Bernoulli, Aux1 and Aux2 functions as well as their
- *                   derivatives.
- *
- *                   This is derived (somewhat) from the SG Framework
- *                   program, brkpnts.c, by Kevin M. Kramer.
- *
- *                   For more information consult "Analysis
- *                   and Simulation of Electronic Devices" by Siegfried
- *                   Selberherr pages 158 and 159.
- *
- * Special Notes  :  From the brkpnts.c program:
- *
- * This program determines how to evaluate the following functions to machine
- * precision.  The breakpoints of these functions are dependent upon the host
- * computer's floating point architecture and floating point library.
- *
- *
- *                 x
- *       B(x) = -------
- *              e^x - 1
- *
- *
- *       d      (1-x)*e^x - 1
- *       --B(x) = -------------
- *       dx       (e^x - 1)^2
- *
- *
- *                     x
- *       Aux1(x) =  -------
- *                  sinh(x)
- *
- *       d           sinh(x) - x*cosh(x)
- *       --Aux1(x) = -------------------
- *       dx             (sinh(x))^2
- *
- *                    1
- *       Aux2(x) = -------
- *                 1 + e^x
- *
- *       d             - e^x
- *       --Aux2(x) = -----------
- *       dx          (1 + e^x)^2
- *
- *
- * To achieve machine precision, the above functions should  be evaluated as
- * follows:
- *
- *
- *         /
- *        | -x                                                x <=  +0.0e+00
- *        |  x / (e^x - 1)                        +0.0e+00 <  x <   +0.0e+00
- * B(x) =<   1 - x/2*(1 - x/6*(1 - x*x/60))       +0.0e+00 <= x <= +2.7e-314
- *        |  x*e^-x / (1 - e^-x)                 +2.7e-314 <  x <   +0.0e+00
- *        |  x*e^-x                               +0.0e+00 <= x <   +0.0e+00
- *        |  0                                    +0.0e+00 <= x
- *         \
- *
- *          /
- *         | -1                                               x <= +3.7e-314
- *         |  {(1-x)*e^x - 1}                    +3.7e-314 <  x <=  -2.0e+00
- * d       |  {(1-x)*e^x - 1} / (e^x - 1)^2       -2.0e+00 <  x <  -3.1e-231
- * --B(x)=<  -1/2 + x/6*(1 - x*x/30)             -3.1e-231 <= x <= -4.3e-232
- * dx      |  {(1-x)*e^-x - e^-2x}/(1 - e^-x)^2  -4.3e-232 <  x <   +0.0e+00
- *         |  {(1-x)*e^-x - e^-2x}                +0.0e+00 <= x <   -2.0e+00
- *         |  0                                   -2.0e+00 <= x
- *          \
- *
- *          /
- *         |  x / sinh(x)                                     x <=  -8.0e-03
- * Aux1(x)=<  1 - x*x/6*(1 - 7*x*x/60)            -8.0e-03 <  x <   +8.0e-03
- *         |  x / sinh(x)                         +8.0e-03 <= x
- *          \
- *
- *            /
- * d          |  {sinh(x) - x*cosh(x)}/{sinh(x)}^2              x <=  -4.8e-03
- * --Aux1(x)=<  -x/3*(1 - 7*x*x/30)                 -4.8e-03 <  x <   +4.8e-03
- * dx         |  {sinh(x) - x*cosh(x)}/{sinh(x)}^2  +4.8e-03 <= x
- *            \
- *
- *            /
- *            |  1                                              x <=  -3.7e+01
- *  Aux2(x) =<   1 / (1 + e^x)                      -3.7e+01 <  x <   +3.7e+01
- *            |  e^-x                               +3.7e+01 <  x <   +7.5e+02
- *            |  0                                  +7.5e+02 <= x
- *            \
- *
- *            /
- *            |  0                                              x <=  -7.5e+02
- * d          |  - e^x                              -7.5e+02 <  x <   -3.7e+01
- * --Aux2(x)=<  - e^x / {1 + e^x}^2                 -3.7e+01 <= x <=  +3.7e+01
- * dx         |  - e^-x                             +3.7e+01 <  x <   +7.5e+02
- *            |  0                                  +7.5e+02 <= x
- *            \
- *
- *  Additional comment, ERK.  The auxilliary functions (aux1 and aux2) are
- *  the only functions that are actually required.  The Bernouli functions
- *  appear early in Selberherr's derivation of the electron and hole current
- *  densities, but are not used in the final expressions.
- *
- *  Calculating the numerical limits for the Bernouli functions has proved
- *  to be problematic on some platforms, so in this class only the aux1
- *  and aux2 limits will be calculated.
- *
- * Creator        : Eric R. Keiter, SNL, Parallel Computational Sciences
- *
- * Creation Date  : 08/01/04
- *
- * Revision Information:
- * ---------------------
- *
- * Revision Number: $Revision: 1.4.2.2 $
- *
- * Revision Date  : $Date: 2013/10/03 17:23:35 $
- *
- * Current Owner  : $Author: tvrusso $
- *-----------------------------------------------------------------------------
- */
+//-----------------------------------------------------------------------------
+// Filename       : $RCSfile: N_DEV_BernouliSupport.h,v $
+//
+// Purpose        :  This class contains the range limit constants and
+//                   supporting functions for the
+//                   Bernoulli, Aux1 and Aux2 functions as well as their
+//                   derivatives.
+//
+//                   This is derived (somewhat) from the SG Framework
+//                   program, brkpnts.c, by Kevin M. Kramer.
+//
+//                   For more information consult "Analysis
+//                   and Simulation of Electronic Devices" by Siegfried
+//                   Selberherr pages 158 and 159.
+//
+// Special Notes  :  From the brkpnts.c program:
+//
+// This program determines how to evaluate the following functions to machine
+// precision.  The breakpoints of these functions are dependent upon the host
+// computer's floating point architecture and floating point library.
+//
+//
+//                 x
+//       B(x) = -------
+//              e^x - 1
+//
+//
+//       d      (1-x)*e^x - 1
+//       --B(x) = -------------
+//       dx       (e^x - 1)^2
+//
+//
+//                     x
+//       Aux1(x) =  -------
+//                  sinh(x)
+//
+//       d           sinh(x) - x*cosh(x)
+//       --Aux1(x) = -------------------
+//       dx             (sinh(x))^2
+//
+//                    1
+//       Aux2(x) = -------
+//                 1 + e^x
+//
+//       d             - e^x
+//       --Aux2(x) = -----------
+//       dx          (1 + e^x)^2
+//
+//
+// To achieve machine precision, the above functions should  be evaluated as
+// follows:
+//
+//
+//         /
+//        | -x                                                x <=  +0.0e+00
+//        |  x / (e^x - 1)                        +0.0e+00 <  x <   +0.0e+00
+// B(x) =<   1 - x/2*(1 - x/6*(1 - x*x/60))       +0.0e+00 <= x <= +2.7e-314
+//        |  x*e^-x / (1 - e^-x)                 +2.7e-314 <  x <   +0.0e+00
+//        |  x*e^-x                               +0.0e+00 <= x <   +0.0e+00
+//        |  0                                    +0.0e+00 <= x
+//         \
+//
+//          /
+//         | -1                                               x <= +3.7e-314
+//         |  {(1-x)*e^x - 1}                    +3.7e-314 <  x <=  -2.0e+00
+// d       |  {(1-x)*e^x - 1} / (e^x - 1)^2       -2.0e+00 <  x <  -3.1e-231
+// --B(x)=<  -1/2 + x/6*(1 - x*x/30)             -3.1e-231 <= x <= -4.3e-232
+// dx      |  {(1-x)*e^-x - e^-2x}/(1 - e^-x)^2  -4.3e-232 <  x <   +0.0e+00
+//         |  {(1-x)*e^-x - e^-2x}                +0.0e+00 <= x <   -2.0e+00
+//         |  0                                   -2.0e+00 <= x
+//          \
+//
+//          /
+//         |  x / sinh(x)                                     x <=  -8.0e-03
+// Aux1(x)=<  1 - x*x/6*(1 - 7*x*x/60)            -8.0e-03 <  x <   +8.0e-03
+//         |  x / sinh(x)                         +8.0e-03 <= x
+//          \
+//
+//            /
+// d          |  {sinh(x) - x*cosh(x)}/{sinh(x)}^2              x <=  -4.8e-03
+// --Aux1(x)=<  -x/3*(1 - 7*x*x/30)                 -4.8e-03 <  x <   +4.8e-03
+// dx         |  {sinh(x) - x*cosh(x)}/{sinh(x)}^2  +4.8e-03 <= x
+//            \
+//
+//            /
+//            |  1                                              x <=  -3.7e+01
+//  Aux2(x) =<   1 / (1 + e^x)                      -3.7e+01 <  x <   +3.7e+01
+//            |  e^-x                               +3.7e+01 <  x <   +7.5e+02
+//            |  0                                  +7.5e+02 <= x
+//            \
+//
+//            /
+//            |  0                                              x <=  -7.5e+02
+// d          |  - e^x                              -7.5e+02 <  x <   -3.7e+01
+// --Aux2(x)=<  - e^x / {1 + e^x}^2                 -3.7e+01 <= x <=  +3.7e+01
+// dx         |  - e^-x                             +3.7e+01 <  x <   +7.5e+02
+//            |  0                                  +7.5e+02 <= x
+//            \
+//
+//  Additional comment, ERK.  The auxilliary functions (aux1 and aux2) are
+//  the only functions that are actually required.  The Bernouli functions
+//  appear early in Selberherr's derivation of the electron and hole current
+//  densities, but are not used in the final expressions.
+//
+//  Calculating the numerical limits for the Bernouli functions has proved
+//  to be problematic on some platforms, so in this class only the aux1
+//  and aux2 limits will be calculated.
+//
+// Creator        : Eric R. Keiter, SNL, Parallel Computational Sciences
+//
+// Creation Date  : 08/01/04
+//
+// Revision Information:
+// ---------------------
+//
+// Revision Number: $Revision: 1.7.2.2 $
+//
+// Revision Date  : $Date: 2014/03/12 19:00:14 $
+//
+// Current Owner  : $Author: jcverle $
+//-----------------------------------------------------------------------------
+
 #ifndef Xyce_N_DEV_BernouliSupport_h
 #define Xyce_N_DEV_BernouliSupport_h
 
@@ -170,56 +169,56 @@ typedef double (* FUNC)(double);
 //-----------------------------------------------------------------------------
 class BernouliSupport
 {
-  public:
-    BernouliSupport ();
+public:
+  BernouliSupport ();
 
-    BernouliSupport (const BernouliSupport & right);
+  BernouliSupport (const BernouliSupport & right);
 
-    virtual ~BernouliSupport ();
+  virtual ~BernouliSupport ();
 
-  protected:
+protected:
 
-  private:
-    int sign(double x);
-    double Bisection(FUNC func1, FUNC func2, double Xpos, double Xneg);
-    double Secant(FUNC func1, FUNC func2, double x1);
-    double Asymptotic(FUNC func1, FUNC func2, double x, double dx);
+private:
+  int sign(double x);
+  double Bisection(FUNC func1, FUNC func2, double Xpos, double Xneg);
+  double Secant(FUNC func1, FUNC func2, double x1);
+  double Asymptotic(FUNC func1, FUNC func2, double x, double dx);
 
-  public:
-    // Bernouli breakpoints
-    double bp0_BERN;
-    double bp1_BERN;
-    double bp2_BERN;
-    double bp3_BERN;
-    double bp4_BERN;
-    double bp0_DBERN;
-    double bp1_DBERN;
-    double bp2_DBERN;
-    double bp3_DBERN;
-    double bp4_DBERN;
-    double bp5_DBERN;
+public:
+  // Bernouli breakpoints
+  double bp0_BERN;
+  double bp1_BERN;
+  double bp2_BERN;
+  double bp3_BERN;
+  double bp4_BERN;
+  double bp0_DBERN;
+  double bp1_DBERN;
+  double bp2_DBERN;
+  double bp3_DBERN;
+  double bp4_DBERN;
+  double bp5_DBERN;
 
-    // aux1 function breakpoints
-    double bp0_AUX1;
-    double bp1_AUX1;
-    double bp0_DAUX1;
-    double bp1_DAUX1;
+  // aux1 function breakpoints
+  double bp0_AUX1;
+  double bp1_AUX1;
+  double bp0_DAUX1;
+  double bp1_DAUX1;
 
-    // aux2 function breakpoints
-    double bp0_AUX2;
-    double bp1_AUX2;
-    double bp2_AUX2;
-    double bp0_DAUX2;
-    double bp1_DAUX2;
-    double bp2_DAUX2;
-    double bp3_DAUX2;
+  // aux2 function breakpoints
+  double bp0_AUX2;
+  double bp1_AUX2;
+  double bp2_AUX2;
+  double bp0_DAUX2;
+  double bp1_DAUX2;
+  double bp2_DAUX2;
+  double bp3_DAUX2;
 
-    // Miscellaneous breakpoints
-    double bp0_MISC;
+  // Miscellaneous breakpoints
+  double bp0_MISC;
 
-  protected:
+protected:
 
-  private:
+private:
 
 };
 

@@ -90,15 +90,14 @@ am__aclocal_m4_deps = $(top_srcdir)/config/libtool.m4 \
 	$(top_srcdir)/config/lt~obsolete.m4 \
 	$(top_srcdir)/config/xyce_check_bison.m4 \
 	$(top_srcdir)/config/xyce_check_braindamaged_random_shuffle.m4 \
-	$(top_srcdir)/config/xyce_check_flexible_insert.m4 \
 	$(top_srcdir)/config/xyce_check_iota.m4 \
-	$(top_srcdir)/config/xyce_check_stl_member_templates.m4 \
 	$(top_srcdir)/config/xyce_debug_option.m4 \
 	$(top_srcdir)/config/xyce_finite_number_check.m4 \
 	$(top_srcdir)/config/xyce_library_include.m4 \
 	$(top_srcdir)/config/xyce_library_option.m4 \
 	$(top_srcdir)/config/xyce_test_using_dec_cxx.m4 \
 	$(top_srcdir)/config/xyce_test_using_icclt11_cxx.m4 \
+	$(top_srcdir)/config/xyce_trilinos_library_option.m4 \
 	$(top_srcdir)/acinclude.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -160,6 +159,8 @@ am__libLinearAlgebraServices_la_SOURCES_DIST =  \
 	$(srcdir)/src/N_LAS_IfpackPrecond.C \
 	$(srcdir)/src/N_LAS_HBBlockJacobiPrecond.C \
 	$(srcdir)/src/N_LAS_HBBlockJacobiEpetraOperator.C \
+	$(srcdir)/src/N_LAS_HBFDJacobianPrecond.C \
+	$(srcdir)/src/N_LAS_HBFDJacobianEpetraOperator.C \
 	$(srcdir)/src/N_LAS_HBPrecondFactory.C \
 	$(srcdir)/src/N_LAS_TrilinosPrecondFactory.C \
 	$(srcdir)/include/N_LAS_SimpleSolver.h \
@@ -186,6 +187,8 @@ am__libLinearAlgebraServices_la_SOURCES_DIST =  \
 	$(srcdir)/include/N_LAS_IfpackPrecond.h \
 	$(srcdir)/include/N_LAS_HBBlockJacobiPrecond.h \
 	$(srcdir)/include/N_LAS_HBBlockJacobiEpetraOperator.h \
+	$(srcdir)/include/N_LAS_HBFDJacobianPrecond.h \
+	$(srcdir)/include/N_LAS_HBFDJacobianEpetraOperator.h \
 	$(srcdir)/include/N_LAS_PrecondFactory.h \
 	$(srcdir)/include/N_LAS_HBPrecondFactory.h \
 	$(srcdir)/include/N_LAS_TrilinosPrecondFactory.h \
@@ -208,7 +211,9 @@ am_libLinearAlgebraServices_la_OBJECTS = $(am__objects_1) \
 	N_LAS_SolverFactory.lo N_LAS_BlockVector.lo \
 	N_LAS_BlockMatrix.lo N_LAS_BlockSystemHelpers.lo \
 	N_LAS_IfpackPrecond.lo N_LAS_HBBlockJacobiPrecond.lo \
-	N_LAS_HBBlockJacobiEpetraOperator.lo N_LAS_HBPrecondFactory.lo \
+	N_LAS_HBBlockJacobiEpetraOperator.lo \
+	N_LAS_HBFDJacobianPrecond.lo \
+	N_LAS_HBFDJacobianEpetraOperator.lo N_LAS_HBPrecondFactory.lo \
 	N_LAS_TrilinosPrecondFactory.lo
 libLinearAlgebraServices_la_OBJECTS =  \
 	$(am_libLinearAlgebraServices_la_OBJECTS)
@@ -360,6 +365,7 @@ MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MAYBE_NONFREE = @MAYBE_NONFREE@
+MAYBE_PLUGIN = @MAYBE_PLUGIN@
 MAYBE_RAD = @MAYBE_RAD@
 MKDIR_P = @MKDIR_P@
 NM = @NM@
@@ -521,6 +527,8 @@ libLinearAlgebraServices_la_SOURCES = \
   $(srcdir)/src/N_LAS_IfpackPrecond.C \
   $(srcdir)/src/N_LAS_HBBlockJacobiPrecond.C \
   $(srcdir)/src/N_LAS_HBBlockJacobiEpetraOperator.C \
+  $(srcdir)/src/N_LAS_HBFDJacobianPrecond.C \
+  $(srcdir)/src/N_LAS_HBFDJacobianEpetraOperator.C \
   $(srcdir)/src/N_LAS_HBPrecondFactory.C \
   $(srcdir)/src/N_LAS_TrilinosPrecondFactory.C \
   $(srcdir)/include/N_LAS_SimpleSolver.h \
@@ -547,6 +555,8 @@ libLinearAlgebraServices_la_SOURCES = \
   $(srcdir)/include/N_LAS_IfpackPrecond.h \
   $(srcdir)/include/N_LAS_HBBlockJacobiPrecond.h \
   $(srcdir)/include/N_LAS_HBBlockJacobiEpetraOperator.h \
+  $(srcdir)/include/N_LAS_HBFDJacobianPrecond.h \
+  $(srcdir)/include/N_LAS_HBFDJacobianEpetraOperator.h \
   $(srcdir)/include/N_LAS_PrecondFactory.h \
   $(srcdir)/include/N_LAS_HBPrecondFactory.h \
   $(srcdir)/include/N_LAS_TrilinosPrecondFactory.h \
@@ -618,6 +628,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_LAS_HBBlockJacobiEpetraOperator.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_LAS_HBBlockJacobiPrecond.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_LAS_HBBuilder.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_LAS_HBFDJacobianEpetraOperator.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_LAS_HBFDJacobianPrecond.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_LAS_HBPrecondFactory.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_LAS_IfpackPrecond.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_LAS_KSparseSolver.Plo@am__quote@
@@ -840,6 +852,20 @@ N_LAS_HBBlockJacobiEpetraOperator.lo: $(srcdir)/src/N_LAS_HBBlockJacobiEpetraOpe
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_LAS_HBBlockJacobiEpetraOperator.C' object='N_LAS_HBBlockJacobiEpetraOperator.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_LAS_HBBlockJacobiEpetraOperator.lo `test -f '$(srcdir)/src/N_LAS_HBBlockJacobiEpetraOperator.C' || echo '$(srcdir)/'`$(srcdir)/src/N_LAS_HBBlockJacobiEpetraOperator.C
+
+N_LAS_HBFDJacobianPrecond.lo: $(srcdir)/src/N_LAS_HBFDJacobianPrecond.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_LAS_HBFDJacobianPrecond.lo -MD -MP -MF $(DEPDIR)/N_LAS_HBFDJacobianPrecond.Tpo -c -o N_LAS_HBFDJacobianPrecond.lo `test -f '$(srcdir)/src/N_LAS_HBFDJacobianPrecond.C' || echo '$(srcdir)/'`$(srcdir)/src/N_LAS_HBFDJacobianPrecond.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_LAS_HBFDJacobianPrecond.Tpo $(DEPDIR)/N_LAS_HBFDJacobianPrecond.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_LAS_HBFDJacobianPrecond.C' object='N_LAS_HBFDJacobianPrecond.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_LAS_HBFDJacobianPrecond.lo `test -f '$(srcdir)/src/N_LAS_HBFDJacobianPrecond.C' || echo '$(srcdir)/'`$(srcdir)/src/N_LAS_HBFDJacobianPrecond.C
+
+N_LAS_HBFDJacobianEpetraOperator.lo: $(srcdir)/src/N_LAS_HBFDJacobianEpetraOperator.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_LAS_HBFDJacobianEpetraOperator.lo -MD -MP -MF $(DEPDIR)/N_LAS_HBFDJacobianEpetraOperator.Tpo -c -o N_LAS_HBFDJacobianEpetraOperator.lo `test -f '$(srcdir)/src/N_LAS_HBFDJacobianEpetraOperator.C' || echo '$(srcdir)/'`$(srcdir)/src/N_LAS_HBFDJacobianEpetraOperator.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_LAS_HBFDJacobianEpetraOperator.Tpo $(DEPDIR)/N_LAS_HBFDJacobianEpetraOperator.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_LAS_HBFDJacobianEpetraOperator.C' object='N_LAS_HBFDJacobianEpetraOperator.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_LAS_HBFDJacobianEpetraOperator.lo `test -f '$(srcdir)/src/N_LAS_HBFDJacobianEpetraOperator.C' || echo '$(srcdir)/'`$(srcdir)/src/N_LAS_HBFDJacobianEpetraOperator.C
 
 N_LAS_HBPrecondFactory.lo: $(srcdir)/src/N_LAS_HBPrecondFactory.C
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_LAS_HBPrecondFactory.lo -MD -MP -MF $(DEPDIR)/N_LAS_HBPrecondFactory.Tpo -c -o N_LAS_HBPrecondFactory.lo `test -f '$(srcdir)/src/N_LAS_HBPrecondFactory.C' || echo '$(srcdir)/'`$(srcdir)/src/N_LAS_HBPrecondFactory.C

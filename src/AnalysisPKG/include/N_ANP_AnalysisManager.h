@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,17 +36,15 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.49.2.3 $
+// Revision Number: $Revision: 1.58 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:30 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
-#ifndef Xyce_N_TIME_INTEG_ALG_H
-#define Xyce_N_TIME_INTEG_ALG_H
-
-// ---------- Standard Includes ----------
+#ifndef Xyce_N_ANP_AnalysisManager_h
+#define Xyce_N_ANP_AnalysisManager_h
 
 #include <list>
 
@@ -54,11 +52,12 @@
 using Teuchos::RefCountPtr;
 using Teuchos::rcp;
 
-// ----------   Xyce Includes   ----------
-
 #include <N_UTL_Misc.h>
 #include <N_UTL_Xyce.h>
+#include <N_ANP_fwd.h>
 #include <N_IO_fwd.h>
+#include <N_UTL_fwd.h>
+#include <N_PDS_fwd.h>
 #include <N_UTL_OptionBlock.h>
 
 #include <N_TIA_TIAParams.h>
@@ -78,9 +77,8 @@ using Teuchos::rcp;
 #include <N_LAS_Builder.h>
 #include <N_NLS_Manager.h>
 
-// ---------- Forward Declarations ----------
-
 class N_TIA_Assembler;
+class N_TIA_DAE_Assembler;
 class N_TIA_TimeIntegrationMethod;
 class N_TIA_TwoLevelError;
 class N_TIA_MPDEInterface;
@@ -91,21 +89,19 @@ class N_LAS_System;
 
 class N_LOA_Loader;
 
-class N_UTL_Timer;
-
-class N_IO_RestartMgr;
-class N_IO_CmdParse;
-
-class N_PDS_Comm;
 class N_PDS_Manager;
 
 class N_MPDE_Manager;
 
+
+namespace Xyce {
+namespace Analysis {
+
 //-----------------------------------------------------------------------------
-// Class         : N_ANP_AnalysisManager
+// Class         : AnalysisManager
 //
 // Purpose       : This class manages, allocates, and sets up the
-//                 various analysis types, such as DC, Tran, HB, etc.
+//                 various analysis types, such as DC, Trn,a HB, etc.
 //
 // Special Notes : Some of this class was once in the N_TIA_ControlAlgorithm
 //                 class, which was set up back when Xyce only did transient
@@ -117,15 +113,31 @@ class N_MPDE_Manager;
 // Creation Date : 6/01/00 (N_TIA_ControlAlgorithm, now deprecated)
 // Creation Date : 1/24/08 (for this version of the class. Date is approximate)
 //-----------------------------------------------------------------------------
-class N_ANP_AnalysisManager
+class AnalysisManager
 {
+    // Friended class for lookup and set of restart data.
+    friend class ::N_TIA_StepErrorControl;
+    friend class ::N_TIA_DAE_Assembler;
+    friend class ::N_TIA_Assembler;
+
+    friend class MOR;
+    friend class Dakota;
+    friend class AnalysisInterface;
+    friend class AnalysisBase;
+    friend class MPDE;
+    friend class AC;
+    friend class Step;
+    friend class HB;
+    friend class Transient;
+    friend class DCSweep;
+
   public:
 
     // Default constructor.
-    N_ANP_AnalysisManager(N_IO_CmdParse & cp, N_ANP_AnalysisInterface * anaIntPtr);
+    AnalysisManager(N_IO_CmdParse & cp, AnalysisInterface * anaIntPtr);
 
     // Destructor
-    ~N_ANP_AnalysisManager();
+    ~AnalysisManager();
 
     // Execution functions:
     void resetAll();
@@ -167,8 +179,8 @@ class N_ANP_AnalysisManager
 
     // updates the State vectors. This function is called from the LOCA interface.
     bool completeHomotopyStep
-      ( const vector<string> & paramNames,
-        const vector<double> & paramVals,
+      ( const std::vector<std::string> & paramNames,
+        const std::vector<double> & paramVals,
         N_LAS_Vector * solnVecPtr );
 
     bool failHomotopyStep ();
@@ -179,8 +191,8 @@ class N_ANP_AnalysisManager
     bool equateTmpVectors();
 
     // Compute an estimate of the error in the integration step.
-    bool updateDerivsBlock(const list < index_pair > & solGIDList,
-                           const list < index_pair > & staGIDList);
+    bool updateDerivsBlock(const std::list< index_pair > & solGIDList,
+                           const std::list< index_pair > & staGIDList);
 
     // Prints out time loop information.
     bool printLoopInfo(int start, int finish);
@@ -241,6 +253,10 @@ class N_ANP_AnalysisManager
     int getUsedOrder ();
     int getNscsco ();
 
+    const N_IO_CmdParse &getCommandLine() const {
+      return commandLine_;
+    }
+    
     // Returns the "current" time step size.
     double getCurrentStepSize();
 
@@ -383,22 +399,22 @@ class N_ANP_AnalysisManager
     bool restoreRestartData(char * buf, int bsize, int & pos, N_PDS_Comm * comm, bool pack );
 
     // Gets the solution variable data.
-    bool getSolnVarData(const int & gid, vector < double > & varData);
+    bool getSolnVarData(const int & gid, std::vector< double > & varData);
 
     // Gets the state variable data.
-    bool getStateVarData(const int & gid, vector < double > & varData);
+    bool getStateVarData(const int & gid, std::vector< double > & varData);
 
     // Gets the store variable data.
-    bool getStoreVarData(const int & gid, vector < double > & varData);
+    bool getStoreVarData(const int & gid, std::vector< double > & varData);
 
     // Sets the solution variable data.
-    bool setSolnVarData(const int & gid, const vector < double > & varData);
+    bool setSolnVarData(const int & gid, const std::vector< double > & varData);
 
     // Sets the state variable data.
-    bool setStateVarData(const int & gid, const vector < double > & varData);
+    bool setStateVarData(const int & gid, const std::vector< double > & varData);
 
     // Sets the store variable data.
-    bool setStoreVarData(const int & gid, const vector < double > & varData);
+    bool setStoreVarData(const int & gid, const std::vector< double > & varData);
 
     // set/get beginning integration flag
     void setBeginningIntegrationFlag(bool bif);
@@ -436,15 +452,15 @@ class N_ANP_AnalysisManager
     bool finishSolvers ();
 
     void homotopyStepSuccess
-      ( const vector<string> & paramNames,
-        const vector<double> & paramVals);
+      ( const std::vector<std::string> & paramNames,
+        const std::vector<double> & paramVals);
 
     void homotopyStepFailure ();
 
     void stepSuccess (int analysisUpper);
     void stepFailure (int analysisUpper);
     bool getInitialQnorm (N_TIA_TwoLevelError & tle);
-    bool getBreakPoints (vector<N_UTL_BreakPoint> &breakPointTimes);
+    bool getBreakPoints (std::vector<N_UTL_BreakPoint> &breakPointTimes);
     bool startTimeStep (const N_TIA_TimeIntInfo & tiInfo);
 
 
@@ -504,20 +520,23 @@ class N_ANP_AnalysisManager
 
     // Two level Newton API:
     bool calledBeforeTwoLevelTran_;
-    Teuchos::RefCountPtr<N_ANP_AnalysisBase> twoLevelAnalysisObject_;
+    Teuchos::RefCountPtr<AnalysisBase> twoLevelAnalysisObject_;
 
     // Habanero mixed-signal API:
-    Teuchos::RefCountPtr<N_ANP_AnalysisBase> mixedSignalAnalysisObject_;
+    Teuchos::RefCountPtr<AnalysisBase> mixedSignalAnalysisObject_;
 
     // Queries about output and restart times
     bool outputIntervalSpecified_();
     bool testRestartSaveTime_();
 
+  public:
     // Queries to the MPDE Manager.
     // keep there like this so we don't have to
     // expose the MPDE Manager pointer
     void setMPDEFlag( bool flagVal ) { mpdeFlag_ = flagVal; }
     bool getMPDEFlag ();    // "get" function for MPDE flag. (true if not IC)
+
+  private:
     bool getMPDEIcFlag();   // get function for MPDE initial condition flag (true if MPDE & IC)
     bool getMPDEStartupFlag();   // True if you have done an initial transient simulation before starting MPDE IC calculation
     bool getWaMPDEFlag ();  // "get" function for WaMPDE flag. (true if not IC)
@@ -537,7 +556,7 @@ class N_ANP_AnalysisManager
     N_TIA_TIAParams tiaParams;
 
     // Pointer to the ANP Analysis Interface
-    RefCountPtr<N_ANP_AnalysisInterface> anaIntPtr;
+    RefCountPtr<AnalysisInterface> anaIntPtr;
 
     // Pointer to the linear system information and containers.
     RefCountPtr<N_LAS_System> lasSysPtr;
@@ -572,7 +591,7 @@ class N_ANP_AnalysisManager
     // Pointer to the parallel services manager.
     RefCountPtr<N_PDS_Manager> pdsMgrPtr;
 
-    ANP_Analysis_Mode analysis;
+    Analysis::Analysis_Mode analysis;
 
     bool analysisParamsRegistered;
 
@@ -586,12 +605,20 @@ class N_ANP_AnalysisManager
     double startSimTime;
 
     N_MPDE_Manager * getMPDEManager() const { return &*mpdeMgrPtr_; }
-    N_TIA_DataStore * getTIADataStore() const { return &*dsPtr_; }
-    Teuchos::RefCountPtr<const N_ANP_AnalysisBase> getAnalysisObject() const { return primaryAnalysisObject_; }
+    Teuchos::RefCountPtr<N_TIA_DataStore> getTIADataStore() { 
+      return tiaDataStore_; 
+    }
+    Teuchos::RefCountPtr<const AnalysisBase> getAnalysisObject() const { 
+      return primaryAnalysisObject_; 
+    }
 
     void silenceProgress();
     void enableProgress();
 
+    void setNextOutputTime(double next_output_time) {
+      nextOutputTime_ = next_output_time;
+    }
+    
   protected:
   private:
 
@@ -608,7 +635,7 @@ class N_ANP_AnalysisManager
                                   // called once.
 
     //
-    // 05/26/09 Coffey,Schiek,Mei:  We considered the data members down to this point for moving to N_ANP_Transient
+    // 05/26/09 Coffey,Schiek,Mei:  We considered the data members down to this point for moving to Transient
     //
     double startTRANtime;
 
@@ -643,10 +670,10 @@ class N_ANP_AnalysisManager
     double solverStartTime_;
 
     // pointer to the output manager adapter
-    RefCountPtr< N_ANP_OutputMgrAdapter > outputMgrAdapterRCPtr_;
+    RefCountPtr<OutputMgrAdapter > outputMgrAdapterRCPtr_;
 
     // Pointer to the TIA data store object.
-    RefCountPtr<N_TIA_DataStore> dsPtr_;
+    RefCountPtr<N_TIA_DataStore> tiaDataStore_;
 
     // Pointer to the TIA step-error control object.
     RefCountPtr<N_TIA_StepErrorControl> secPtr_;
@@ -666,11 +693,11 @@ class N_ANP_AnalysisManager
 
     // output and restart interval info
     double initialOutputInterval_;
-    vector < pair < double, double > > outputIntervals_;
+    std::vector< std::pair < double, double > > outputIntervals_;
     double nextOutputTime_;
 
     double initialRestartInterval_;
-    vector < pair < double, double > > restartIntervals_;
+    std::vector< std::pair < double, double > > restartIntervals_;
     double nextRestartSaveTime_;
 
     // for HB, MPDE, or any other block analysis type
@@ -686,25 +713,10 @@ class N_ANP_AnalysisManager
     //string maxTimeStepExpressionAsString_;
 
     // ref counted pointers for various analyses. Not all are used in every simulation
-    Teuchos::RefCountPtr<N_ANP_AnalysisBase> analysisObject_;
-    Teuchos::RefCountPtr<N_ANP_AnalysisBase> stepAnalysisTarget_;
-    Teuchos::RefCountPtr<N_ANP_AnalysisBase> dakotaAnalysisTarget_;
-    Teuchos::RefCountPtr<N_ANP_AnalysisBase> primaryAnalysisObject_;
-
-    // Friended class for lookup and set of restart data.
-    friend class N_TIA_StepErrorControl;
-    friend class N_ANP_AnalysisInterface;
-    friend class N_TIA_DAE_Assembler;
-    friend class N_TIA_Assembler;
-    friend class N_ANP_AnalysisBase;
-    friend class N_ANP_Transient;
-    friend class N_ANP_MPDE;
-    friend class N_ANP_AC;
-    friend class N_ANP_MOR;
-    friend class N_ANP_HB;
-    friend class N_ANP_DCSweep;
-    friend class N_ANP_Step;
-    friend class N_ANP_Dakota;
+    Teuchos::RefCountPtr<AnalysisBase> analysisObject_;
+    Teuchos::RefCountPtr<AnalysisBase> stepAnalysisTarget_;
+    Teuchos::RefCountPtr<AnalysisBase> dakotaAnalysisTarget_;
+    Teuchos::RefCountPtr<AnalysisBase> primaryAnalysisObject_;
 
     // command line object
     N_IO_CmdParse & commandLine_;
@@ -722,8 +734,8 @@ class N_ANP_AnalysisManager
 
     // Different block passed in for each sweep variable, so need to have
     // these containers be vectors.
-    vector<N_UTL_OptionBlock> dcParamsBlockVec;
-    vector<N_UTL_OptionBlock> stepParamsBlockVec;
+    std::vector<N_UTL_OptionBlock> dcParamsBlockVec;
+    std::vector<N_UTL_OptionBlock> stepParamsBlockVec;
 
     N_UTL_OptionBlock mpdeParamsBlock;
     N_UTL_OptionBlock hbParamsBlock;
@@ -733,4 +745,9 @@ class N_ANP_AnalysisManager
     N_UTL_OptionBlock dakotaParamsBlock;
 };
 
-#endif
+} // namespace Analysis
+} // namespace Xyce
+
+typedef Xyce::Analysis::AnalysisManager N_ANP_AnalysisManager;
+
+#endif // Xyce_N_ANP_AnalysisManager_h

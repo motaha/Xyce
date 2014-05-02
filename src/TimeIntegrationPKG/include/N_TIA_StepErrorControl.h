@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.77.2.2 $
+// Revision Number: $Revision: 1.88 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -50,11 +50,14 @@
 // ---------- Standard Declarations ----------
 #include <iostream>
 #include <set>
+
+
+#include <N_ANP_fwd.h>
+#include <N_IO_fwd.h>
+#include <N_PDS_fwd.h>
+
 #include <N_UTL_BreakPoint.h>
 
-// ---------- Forward Declarations ----------
-
-class N_ANP_AnalysisManager;
 class N_TIA_TimeIntegrationMethod;
 class N_TIA_WorkingIntegrationMethod;
 class N_TIA_TIAParams;
@@ -62,8 +65,6 @@ class N_TIA_BackwardDifferentiation15;
 class N_TIA_OneStep;
 class N_TIA_TimeIntInfo;
 
-class N_PDS_Comm;
-class N_IO_CmdParse;
 class N_LOA_Loader;
 
 //-----------------------------------------------------------------------------
@@ -113,9 +114,7 @@ class N_TIA_StepErrorControl
     virtual void updateTwoLevelTimeInfo (const N_TIA_TimeIntInfo & tiInfo);
 
     // Print out the time-step information.
-#ifdef Xyce_VERBOSE_TIME
-    virtual void outputTimeInfo();
-#endif
+    virtual void outputTimeInfo(std::ostream &os);
 
     bool initializeBreakPoints();
 
@@ -140,11 +139,9 @@ class N_TIA_StepErrorControl
 
     void evaluateStepError ();
 
-    void integrationStepReport_
-      (bool step_attempt_status, bool sAStatus, bool testedError);
+    void integrationStepReport_(std::ostream &os, bool step_attempt_status, bool sAStatus, bool testedError);
 
-    void terseIntegrationStepReport_ 
-      (bool step_attempt_status, bool sAStatus, bool testedError);
+    void terseIntegrationStepReport_(std::ostream &os, bool step_attempt_status, bool sAStatus, bool testedError);
 
     // Gets the size of the restart data.
     virtual int restartDataSize( bool pack );
@@ -164,7 +161,7 @@ class N_TIA_StepErrorControl
     // Method which registers the TIA integration object pointer.
     bool registerWIMPtr(N_TIA_WorkingIntegrationMethod * wimPtr);
 
-    void printBreakPoints (ostream & os) const;
+    void printBreakPoints (std::ostream & os) const;
     
     double getEstOverTol() const;
 
@@ -244,8 +241,8 @@ class N_TIA_StepErrorControl
 
     N_LOA_Loader & loader_;
 
-    set < N_UTL_BreakPoint > breakPoints_;
-    set < N_UTL_BreakPoint >::iterator currentPauseBP;
+    std::set< N_UTL_BreakPoint > breakPoints_;
+    std::set< N_UTL_BreakPoint >::iterator currentPauseBP;
 
   private :
     // command line object
@@ -258,16 +255,16 @@ class N_TIA_StepErrorControl
     int maxOrder_;          // maximum order = min(5,user option maxord)
     int usedOrder_;         // order used in current step (used after currentOrder is updated)
     double alphas_;         // $\alpha_s$ fixed-leading coefficient of this BDF method
-    vector<double> alpha_;  // $\alpha_j(n)=h_n/\psi_j(n)$ coefficient used in local error test
+    std::vector<double> alpha_;  // $\alpha_j(n)=h_n/\psi_j(n)$ coefficient used in local error test
                             // note:   $h_n$ = current step size, n = current time step
     double alpha0_;         // $-\sum_{j=1}^k \alpha_j(n)$ coefficient used in local error test
     double cj_;             // $-\alpha_s/h_n$ coefficient used in local error test
     double ck_;             // local error coefficient 
-    vector<double> sigma_;  // $\sigma_j(n) = \frac{h_n^j(j-1)!}{\psi_1(n)*\cdots *\psi_j(n)}$
-    vector<double> gamma_;  // $\gamma_j(n)=\sum_{l=1}^{j-1}1/\psi_l(n)$ coefficient used to
+    std::vector<double> sigma_;  // $\sigma_j(n) = \frac{h_n^j(j-1)!}{\psi_1(n)*\cdots *\psi_j(n)}$
+    std::vector<double> gamma_;  // $\gamma_j(n)=\sum_{l=1}^{j-1}1/\psi_l(n)$ coefficient used to
                             // calculate time derivative of history array for predictor 
-    vector<double> beta_;   // coefficients used to evaluate predictor from history array
-    vector<double> psi_;    // $\psi_j(n) = t_n-t_{n-j}$ intermediary variable used to 
+    std::vector<double> beta_;   // coefficients used to evaluate predictor from history array
+    std::vector<double> psi_;    // $\psi_j(n) = t_n-t_{n-j}$ intermediary variable used to 
                             // compute $\beta_j(n)$
     int numberOfSteps_;     // number of total time integration steps taken
     int nef_;               // number of successive error failures (yes I know this is duplicated above)
@@ -350,10 +347,10 @@ inline bool N_TIA_StepErrorControl::isPauseTime()
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams_.debugLevel >0)
   {
-    cout << "N_TIA_StepErrorControl::isPauseTime\n";
-    cout << "currentPauseBP.value = " << currentPauseBP->value () << endl;
-    cout << "final Time           = " << finalTime  << endl;
-    cout << "current Time         = " << currentTime  << endl;
+    Xyce::dout() << "N_TIA_StepErrorControl::isPauseTime\n";
+    Xyce::dout() << "currentPauseBP.value = " << currentPauseBP->value () << std::endl;
+    Xyce::dout() << "final Time           = " << finalTime  << std::endl;
+    Xyce::dout() << "current Time         = " << currentTime  << std::endl;
   }
 #endif 
   return ( !(*currentPauseBP == finalTime) &&
@@ -368,34 +365,7 @@ inline bool N_TIA_StepErrorControl::isPauseTime()
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 10/17/05
 //-----------------------------------------------------------------------------
-inline ostream & operator<<(ostream & os, const N_TIA_StepErrorControl & sec)
-{
-  os << "\n\n-----------------------------------------\n";
-  os << "\tStepErrorControl:\n";
-  os << "\t\tstartingTimeStep      = " << sec.startingTimeStep << endl; 
-  os << "\t\tcurrentTimeStep       = " << sec.currentTimeStep << endl; 
-  os << "\t\tlastAttemptedTimeStep = " << sec.lastAttemptedTimeStep << endl; 
-  os << "\t\tlastTimeStep          = " << sec.lastTimeStep << endl; 
-  os << "\t\tminTimeStep           = " << sec.minTimeStep << endl; 
-  os << "\t\tmaxTimeStep           = " << sec.maxTimeStep << endl; 
-  os << "\t\tmaxTimeStepUser       = " << sec.maxTimeStepUser << endl; 
-  os << "\t\tlastTime              = " << sec.lastTime << endl; 
-  os << "\t\tcurrentTime           = " << sec.currentTime << endl; 
-  os << "\t\tnextTime              = " << sec.nextTime << endl; 
-  os << "\t\tstopTime              = " << sec.stopTime << endl; 
-  os << "\t\tinitialTime           = " << sec.initialTime << endl; 
-  os << "\t\tfinalTime             = " << sec.finalTime << endl; 
-  os << endl;
-  os << "\t\tBreak Points:" << endl;
-
-  sec.printBreakPoints (os);
-
-
-  os << "-----------------------------------------\n";
-  os << endl;
-
-  return os;
-}
+std::ostream & operator<<(std::ostream & os, const N_TIA_StepErrorControl & sec);
 
 #endif // Xyce_N_TIA_STEP_ERROR_CONTROL_H
 

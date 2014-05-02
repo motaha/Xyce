@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.287.2.4 $
+// Revision Number: $Revision: 1.318.2.4 $
 //
 //
 // Current Owner  : $Author: tvrusso $
@@ -67,11 +67,15 @@
 // ----------   Xyce Includes   ----------
 
 #include <N_DEV_Const.h>
-#include <N_DEV_MOSFET_B3SOI.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_ExternData.h>
+#include <N_DEV_MOSFET_B3SOI.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
+
+#include <N_DEV_MOSFET1.h>
 
 #include <N_LAS_Matrix.h>
 #include <N_LAS_Vector.h>
@@ -79,2681 +83,2656 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<MOSFET_B3SOI::Instance>::ParametricData()
-{
-    // Set up configuration constants:
-    setNumNodes(4);
-    setNumOptionalNodes(3);
-    setNumFillNodes(0);
-    setModelRequired(1);
-    addModelType("NMOS");
-    addModelType("PMOS");
 
-    // Set up double precision variables:
-    addPar ("L", 5.0e-6, false, NO_DEP,
+namespace MOSFET_B3SOI {
+
+
+void Traits::loadInstanceParameters(ParametricData<MOSFET_B3SOI::Instance> &p)
+{
+    p.addPar ("L", 5.0e-6, false, NO_DEP,
       &MOSFET_B3SOI::Instance::l,
       NULL, U_METER,  CAT_GEOMETRY, "Channel length");
 
-    addPar ("W", 5.0e-6, false, NO_DEP,
+    p.addPar ("W", 5.0e-6, false, NO_DEP,
       &MOSFET_B3SOI::Instance::w,
       NULL, U_METER,  CAT_GEOMETRY, "Channel width");
 
-    addPar ("AD", 0.0, false,   NO_DEP,
+    p.addPar ("AD", 0.0, false,   NO_DEP,
       &MOSFET_B3SOI::Instance::drainArea,
       NULL, U_METER2,  CAT_GEOMETRY, "Drain diffusion area");
 
-    addPar ("AS", 0.0, false,   NO_DEP,
+    p.addPar ("AS", 0.0, false,   NO_DEP,
       &MOSFET_B3SOI::Instance::sourceArea,
       NULL, U_METER2,  CAT_GEOMETRY, "Source diffusion area");
 
-    addPar ("NRD", 1.0, false,  NO_DEP,
+    p.addPar ("NRD", 1.0, false,  NO_DEP,
       &MOSFET_B3SOI::Instance::drainSquares,
       NULL, U_SQUARES, CAT_GEOMETRY, "Multiplier for RSH to yield parasitic resistance of drain");
 
-    addPar ("NRS", 1.0, false,  NO_DEP,
+    p.addPar ("NRS", 1.0, false,  NO_DEP,
       &MOSFET_B3SOI::Instance::sourceSquares,
       NULL, U_SQUARES, CAT_GEOMETRY, "Multiplier for RSH to yield parasitic resistance of source");
 
-    addPar ("PD", 0.0, false, NO_DEP,
+    p.addPar ("PD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Instance::drainPerimeter,
       NULL, U_METER, CAT_GEOMETRY, "Drain diffusion perimeter");
 
-    addPar ("PS", 0.0, false, NO_DEP,
+    p.addPar ("PS", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Instance::sourcePerimeter,
       NULL, U_METER, CAT_GEOMETRY, "Source diffusion perimeter");
 
-    addPar ("IC1", 0.0, false,NO_DEP,
+    p.addPar ("IC1", 0.0, false,NO_DEP,
       &MOSFET_B3SOI::Instance::icVDS,
       &MOSFET_B3SOI::Instance::icVDSGiven,
        U_VOLT, CAT_VOLT, "Initial condition on Vds");
 
-    addPar ("IC2", 0.0, false,NO_DEP,
+    p.addPar ("IC2", 0.0, false,NO_DEP,
       &MOSFET_B3SOI::Instance::icVGS,
       &MOSFET_B3SOI::Instance::icVGSGiven,
       U_VOLT, CAT_VOLT, "Initial condition on Vgs");
 
-    addPar ("IC3", 0.0, false,NO_DEP,
+    p.addPar ("IC3", 0.0, false,NO_DEP,
       &MOSFET_B3SOI::Instance::icVBS,
       &MOSFET_B3SOI::Instance::icVBSGiven,
        U_VOLT, CAT_VOLT, "Initial condition on Vbs");
 
-    addPar ("IC4", 0.0, false,NO_DEP,
+    p.addPar ("IC4", 0.0, false,NO_DEP,
       &MOSFET_B3SOI::Instance::icVES,
       &MOSFET_B3SOI::Instance::icVESGiven,
        U_VOLT, CAT_VOLT, "Initial condition on Ves");
 
-    addPar ("IC5", 0.0, false,NO_DEP,
+    p.addPar ("IC5", 0.0, false,NO_DEP,
       &MOSFET_B3SOI::Instance::icVPS,
       &MOSFET_B3SOI::Instance::icVPSGiven,
        U_VOLT, CAT_VOLT, "Initial condition on Vps");
 
-    addPar ("TEMP", 27.0, false,TIME_DEP,
+    p.addPar ("TEMP", 27.0, false,TIME_DEP,
       &MOSFET_B3SOI::Instance::temp,
-      NULL,   STANDARD, CAT_NONE, "");
+      NULL,   STANDARD, CAT_NONE, "Device temperature");
 
-    addPar ("RTH0", 0.0, false, NO_DEP,
+    p.addPar ("RTH0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Instance::rth0,
       NULL, U_OHM, CAT_TEMP, "normalized thermal resistance");
 
-    addPar ("CTH0", 0.0, false, NO_DEP,
+    p.addPar ("CTH0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Instance::cth0,
       NULL, U_FARAD, CAT_TEMP, "Thermal capacitance");
 
-    addPar ("NRB", 1.0, false,  NO_DEP,
+    p.addPar ("NRB", 1.0, false,  NO_DEP,
       &MOSFET_B3SOI::Instance::bodySquares,
       NULL, U_NONE, CAT_GEOMETRY, "Number of squares in body");
 
-    addPar ("FRBODY", 1.0, false,NO_DEP,
+    p.addPar ("FRBODY", 1.0, false,NO_DEP,
       &MOSFET_B3SOI::Instance::frbody,
       NULL, U_NONE, CAT_GEOMETRY, "Layout dependent body-resistance coefficient");
 
-    addPar ("NBC", 0.0, false,   NO_DEP,
+    p.addPar ("NBC", 0.0, false,   NO_DEP,
       &MOSFET_B3SOI::Instance::nbc,
       NULL, U_NONE, CAT_GEOMETRY, "Number of body contact isolation edge");
 
-    addPar ("NSEG", 1.0, false,  NO_DEP,
+    p.addPar ("NSEG", 1.0, false,  NO_DEP,
       &MOSFET_B3SOI::Instance::nseg,
       NULL, U_NONE, CAT_GEOMETRY, "Number segments for width partitioning");
 
-    addPar ("PDBCP", 0.0, false, NO_DEP,
+    p.addPar ("PDBCP", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Instance::pdbcp,
       NULL, U_METER, CAT_GEOMETRY, "Perimeter length for bc parasitics at drain side");
 
-    addPar ("PSBCP", 0.0, false, NO_DEP,
+    p.addPar ("PSBCP", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Instance::psbcp,
       NULL, U_METER, CAT_GEOMETRY, "Perimeter length for bc parasitics at source side");
 
-    addPar ("AGBCP", 0.0, false, NO_DEP,
+    p.addPar ("AGBCP", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Instance::agbcp,
       NULL, U_METER2, CAT_GEOMETRY, "Gate to body overlap area for bc parasitics");
 
-    addPar ("AEBCP", 0.0, false, NO_DEP,
+    p.addPar ("AEBCP", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Instance::aebcp,
       NULL, U_METER2, CAT_GEOMETRY, "Substrate to body overlap area for bc prasitics");
 
-    addPar ("VBSUSR", 0.0, false,NO_DEP,
+    p.addPar ("VBSUSR", 0.0, false,NO_DEP,
       &MOSFET_B3SOI::Instance::vbsusr,
       NULL, U_VOLT, CAT_DC, "Vbs specified by user");
 
-    addPar ("M", 1.0, false,   NO_DEP,
+    p.addPar ("M", 1.0, false,   NO_DEP,
       &MOSFET_B3SOI::Instance::numberParallel,
       NULL, U_NONE, CAT_CONTROL,  "Multiplier for M devices connected in parallel");
 
     // Set up non-double precision variables:
-    addPar ("OFF",false,false, NO_DEP,
+    p.addPar ("OFF",false,false, NO_DEP,
             &MOSFET_B3SOI::Instance::OFF,
             NULL, U_LOGIC, CAT_VOLT,
             "Initial condition of no voltage drops accross device");
 
-    addPar ("BJTOFF", 0, false, NO_DEP,
+    p.addPar ("BJTOFF", 0, false, NO_DEP,
             &MOSFET_B3SOI::Instance::bjtoff, NULL,
            U_LOGIC, CAT_NONE, "BJT on/off flag");
-    addPar ("DEBUG", 0, false, NO_DEP,
+    p.addPar ("DEBUG", 0, false, NO_DEP,
             &MOSFET_B3SOI::Instance::debugMod, NULL,
            U_LOGIC, CAT_NONE, "BJT on/off flag");
-    addPar ("SOIMOD", 0, false, NO_DEP,
+    p.addPar ("SOIMOD", 0, false, NO_DEP,
             &MOSFET_B3SOI::Instance::soiMod, NULL,
            U_NONE, CAT_CONTROL, "SIO model selector, SOIMOD=0: BSIMPD, SOIMOD=1: undefined model for PD and FE, SOIMOD=2: ideal FD");
-    addPar ("TNODEOUT", 0, false, NO_DEP,
+    p.addPar ("TNODEOUT", 0, false, NO_DEP,
             &MOSFET_B3SOI::Instance::tnodeout, NULL,
            U_LOGIC, CAT_NONE, "Flag indicating external temp node");
-    addPar ("RGATEMOD", 0, false, NO_DEP,
+    p.addPar ("RGATEMOD", 0, false, NO_DEP,
             &MOSFET_B3SOI::Instance::rgateMod, NULL,
            U_NONE, CAT_RF, "Gate resistance model selector");
-    addPar ("VLDEBUG", false, false, NO_DEP,
+    p.addPar ("VLDEBUG", false, false, NO_DEP,
             &MOSFET_B3SOI::Instance::vlDebug, NULL,
            U_LOGIC, CAT_NONE, "");
     // This tells the parser that IC1 - IC5 are to be input as a vector of "IC"
-    makeVector ("IC", 5);
+    p.makeVector ("IC", 5);
 }
 
-template<>
-ParametricData<MOSFET_B3SOI::Model>::ParametricData()
+void Traits::loadModelParameters(ParametricData<MOSFET_B3SOI::Model> &p)
 {
     // Set up double precision variables:
-    addPar ("TOX", 100.0e-10, false, NO_DEP,
+    p.addPar ("TOX", 100.0e-10, false, NO_DEP,
       &MOSFET_B3SOI::Model::tox,
       NULL, U_METER, CAT_GEOMETRY, "Gate oxide thickness");
 
-    addPar ("TOXM", 0.0, false, NO_DEP,
+    p.addPar ("TOXM", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::toxm,
       NULL,  U_METER, CAT_PROCESS, "Gate oxide thickness used in extraction");
 
-    addPar ("DTOXCV", 0.0, false, NO_DEP,
+    p.addPar ("DTOXCV", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::dtoxcv,
       NULL, U_METER, CAT_NONE, "Delta oxide thickness in meters in CapMod3");
 
-    addPar ("CDSC", 2.4e-4, false, NO_DEP,
+    p.addPar ("CDSC", 2.4e-4, false, NO_DEP,
       &MOSFET_B3SOI::Model::cdsc,
       NULL,  U_FARADMM2, CAT_DC, "Drain/source to channel coupling capacitance");
 
-    addPar ("CDSCB", 0.0, false, NO_DEP,
+    p.addPar ("CDSCB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::cdscb,
       NULL,  U_FVM1MM2, CAT_DC, "Body-bias sensitivity of CDSC");
 
-    addPar ("CDSCD", 0.0, false, NO_DEP,
+    p.addPar ("CDSCD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::cdscd,
       NULL,  U_FVM1MM2, CAT_DC, "Drain-bias sensitivity of CDSC");
 
-    addPar ("CIT", 0.0, false, NO_DEP,
+    p.addPar ("CIT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::cit,
       NULL,  U_FARADMM2, CAT_DC, "Interface trap capacitance");
 
-    addPar ("NFACTOR", 1.0, false, NO_DEP,
+    p.addPar ("NFACTOR", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::nfactor,
       NULL,  U_NONE, CAT_DC, "Subthreshold swing factor");
 
-    addPar ("VSAT", 8.0e4, false, NO_DEP,
+    p.addPar ("VSAT", 8.0e4, false, NO_DEP,
       &MOSFET_B3SOI::Model::vsat,
       NULL,  U_MSM1, CAT_DC, "Saturation velocity at temp = TNOM");
 
-    addPar ("AT", 3.3e4, false, NO_DEP,
+    p.addPar ("AT", 3.3e4, false, NO_DEP,
       &MOSFET_B3SOI::Model::at,
       NULL,  U_MSM1, CAT_TEMP, "Temperature coefficient for saturation velocity");
 
-    addPar ("A0", 1.0, false, NO_DEP,
+    p.addPar ("A0", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::a0,
       NULL,  U_NONE, CAT_DC, "Bulk charge effect coefficient for channel length");
 
-    addPar ("AGS", 0.0, false, NO_DEP,
+    p.addPar ("AGS", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ags,
       NULL,  U_VOLTM1, CAT_DC, "Gate-bias coefficient of abulk");
 
-    addPar ("A1", 0.0, false, NO_DEP,
+    p.addPar ("A1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::a1,
       NULL,  U_VOLTM1, CAT_DC, "First non-saturation effect parameter");
 
-    addPar ("A2", 1.0, false, NO_DEP,
+    p.addPar ("A2", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::a2,
       NULL,  U_NONE, CAT_DC, "Second non-saturation factor");
 
-    addPar ("KETA", -0.6, false, NO_DEP,
+    p.addPar ("KETA", -0.6, false, NO_DEP,
       &MOSFET_B3SOI::Model::keta,
       NULL,  U_VOLTM1, CAT_DC, "Body-bias coefficient of bulk charge effect");
 
-    addPar ("NSUB", 6.0e16, false, NO_DEP,
+    p.addPar ("NSUB", 6.0e16, false, NO_DEP,
       &MOSFET_B3SOI::Model::nsub,
       NULL, U_CMM3, CAT_DOPING, "Substrate doping density");
 
-    addPar ("NCH", 1.7e17, false, NO_DEP,
+    p.addPar ("NCH", 1.7e17, false, NO_DEP,
       &MOSFET_B3SOI::Model::npeak,
       &MOSFET_B3SOI::Model::npeakGiven,    
        U_CMM3, CAT_PROCESS, "Channel doping concentration");
 
-    addPar ("NGATE", 0.0, false, NO_DEP,
+    p.addPar ("NGATE", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ngate,
       NULL,  U_CMM3, CAT_DC, "Poly gate doping concentration");
 
-    addPar ("GAMMA1", 0.0, false, NO_DEP,
+    p.addPar ("GAMMA1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::gamma1,
       &MOSFET_B3SOI::Model::gamma1Given,
        U_VOLTH, CAT_PROCESS, "Body effect coefficient near the surface");
 
-    addPar ("GAMMA2", 0.0, false, NO_DEP,
+    p.addPar ("GAMMA2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::gamma2,
       &MOSFET_B3SOI::Model::gamma1Given,
        U_VOLTH, CAT_PROCESS, "Body effect coefficient in the bulk");
 
-    addPar ("VBX", 0.0, false, NO_DEP,
+    p.addPar ("VBX", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::vbx,
       &MOSFET_B3SOI::Model::vbxGiven,
        U_VOLT, CAT_PROCESS, "Vbs at which the depetion region = XT");
 
-    addPar ("VBM", -3.0, false, NO_DEP,
+    p.addPar ("VBM", -3.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::vbm,
       &MOSFET_B3SOI::Model::vbmGiven,
        U_VOLT, CAT_DC, "Maximum applied body-bias in threshold voltage calculation");
 
-    addPar ("XT", 1.55e-7, false, NO_DEP,
+    p.addPar ("XT", 1.55e-7, false, NO_DEP,
       &MOSFET_B3SOI::Model::xt,
       &MOSFET_B3SOI::Model::xtGiven,
        U_METER, CAT_PROCESS, "Doping depth");
 
-    addPar ("K1", 0.53, false, NO_DEP,
+    p.addPar ("K1", 0.53, false, NO_DEP,
       &MOSFET_B3SOI::Model::k1,
       &MOSFET_B3SOI::Model::k1Given,
        U_VOLTH, CAT_DC, "First-order body effect coefficient");
 
-    addPar ("KT1", -0.11, false, NO_DEP,
+    p.addPar ("KT1", -0.11, false, NO_DEP,
       &MOSFET_B3SOI::Model::kt1,
       NULL,  U_VOLT, CAT_TEMP, "Themperature coefficient for threshold voltage");
 
-    addPar ("KT1L", 0.0, false, NO_DEP,
+    p.addPar ("KT1L", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::kt1l,
       NULL,  U_VM, CAT_TEMP, "Channel length dependence of the temerature coefficient for the threshold voltage");
 
-    addPar ("KT2", 0.022, false, NO_DEP,
+    p.addPar ("KT2", 0.022, false, NO_DEP,
       &MOSFET_B3SOI::Model::kt2,
       NULL,  U_NONE, CAT_TEMP, "Body-bias coefficient fo the threshold voltage temperature effect");
 
-    addPar ("K2", -0.0186, false, NO_DEP,
+    p.addPar ("K2", -0.0186, false, NO_DEP,
       &MOSFET_B3SOI::Model::k2,
       &MOSFET_B3SOI::Model::k2Given,
        U_NONE, CAT_DC, "second-order body effect coefficient");
 
-    addPar ("K3", 0.0, false, NO_DEP,
+    p.addPar ("K3", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::k3,
       NULL,  U_NONE, CAT_DC, "Narrow width coefficient");
 
-    addPar ("K3B", 0.0, false, NO_DEP,
+    p.addPar ("K3B", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::k3b,
       NULL,  U_VOLTM1, CAT_DC, "Body effect coefficient of K3");
 
-    addPar ("W0", 2.5e-6, false, NO_DEP,
+    p.addPar ("W0", 2.5e-6, false, NO_DEP,
       &MOSFET_B3SOI::Model::w0,
       NULL,  U_METER, CAT_DC, "Narrow-width paameter");
 
-    addPar ("NLX", 1.74e-7, false, NO_DEP,
+    p.addPar ("NLX", 1.74e-7, false, NO_DEP,
       &MOSFET_B3SOI::Model::nlx,
       NULL,  U_METER, CAT_DC, "Lateral non-uniform doping parameter");
 
-    addPar ("DVT0", 2.2, false, NO_DEP,
+    p.addPar ("DVT0", 2.2, false, NO_DEP,
       &MOSFET_B3SOI::Model::dvt0,
       NULL,  U_NONE, CAT_DC, "First coefficient of short-channel effect effect on threshold voltage");
 
-    addPar ("DVT1", 0.53, false, NO_DEP,
+    p.addPar ("DVT1", 0.53, false, NO_DEP,
       &MOSFET_B3SOI::Model::dvt1,
       NULL,  	 U_NONE, CAT_DC, "Second coefficient of short-channel effect effect on threshold voltage");
 
-    addPar ("DVT2", -0.032, false, NO_DEP,
+    p.addPar ("DVT2", -0.032, false, NO_DEP,
       &MOSFET_B3SOI::Model::dvt2,
       NULL,  	 U_VOLTM1, CAT_DC, "Body-bias coefficient of short-channel effect effect on threshold voltage");
 
-    addPar ("DVT0W", 0.0, false, NO_DEP,
+    p.addPar ("DVT0W", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::dvt0w,
       NULL,  	 U_METERM1, CAT_DC, "First coefficient of narrow-width effect effect on threshold voltage for small channel length");
 
-    addPar ("DVT1W", 5.3e6, false, NO_DEP,
+    p.addPar ("DVT1W", 5.3e6, false, NO_DEP,
       &MOSFET_B3SOI::Model::dvt1w,
       NULL,  	 U_METERM1, CAT_DC, "Second coefficient of narrow-width effect effect on threshold voltage for small channel length");
 
-    addPar ("DVT2W", -0.032, false, NO_DEP,
+    p.addPar ("DVT2W", -0.032, false, NO_DEP,
       &MOSFET_B3SOI::Model::dvt2w,
       NULL,  	 U_VOLTM1, CAT_DC, "Body-bias coefficient of narrow-width effect effect on threshold voltage for small channel length");
 
-    addPar ("DROUT", 0.56, false, NO_DEP,
+    p.addPar ("DROUT", 0.56, false, NO_DEP,
       &MOSFET_B3SOI::Model::drout,
       NULL,  U_NONE, CAT_DC, "L-depedance Coefficient of the DIBL correction parameter in Rout");
 
-    addPar ("DSUB", 0.0, false, NO_DEP,
+    p.addPar ("DSUB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::dsub,
       NULL,  U_NONE, CAT_DC, "DIBL coefficient exponent in subthreshhold region");
 
-    addPar ("UA", 2.25e-9, false, NO_DEP,
+    p.addPar ("UA", 2.25e-9, false, NO_DEP,
       &MOSFET_B3SOI::Model::ua,
       NULL,  U_MVM1, CAT_DC, "First-order mobility degradation coefficient");
 
-    addPar ("UA1", 4.31e-9, false, NO_DEP,
+    p.addPar ("UA1", 4.31e-9, false, NO_DEP,
       &MOSFET_B3SOI::Model::ua1,
       NULL,  U_MVM1, CAT_TEMP, "Temperature coefficient for UA");
 
-    addPar ("UB", 5.87e-19, false, NO_DEP,
+    p.addPar ("UB", 5.87e-19, false, NO_DEP,
       &MOSFET_B3SOI::Model::ub,
       NULL,  U_M2VM2, CAT_DC, "First-order mobility degradation coefficient");
 
-    addPar ("UB1", -7.61e-18, false, NO_DEP,
+    p.addPar ("UB1", -7.61e-18, false, NO_DEP,
       &MOSFET_B3SOI::Model::ub1,
       NULL,  U_M2VM2, CAT_TEMP, "Temperature coefficient for UB");
 
-    addPar ("UC", 0.0, false, NO_DEP,
+    p.addPar ("UC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::uc,
       NULL,  U_MVM2, CAT_DC, "Body effect of mobility degridation coefficient");
 
-    addPar ("UC1", 0.0, false, NO_DEP,
+    p.addPar ("UC1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::uc1,
       NULL,  U_MVM2DEGCM1, CAT_TEMP, "Temperature coefficient for UC");
 
-    addPar ("U0", 0.0, false, NO_DEP,
+    p.addPar ("U0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::u0,
       NULL,  
        U_CMM2VM1SM1, CAT_PROCESS, "Surface mobility");
 
-    addPar ("UTE", -1.5, false, NO_DEP,
+    p.addPar ("UTE", -1.5, false, NO_DEP,
       &MOSFET_B3SOI::Model::ute,
       NULL,  U_NONE, CAT_TEMP, "Mobility temerature exponent");
 
-    addPar ("VOFF", -0.08, false, NO_DEP,
+    p.addPar ("VOFF", -0.08, false, NO_DEP,
       &MOSFET_B3SOI::Model::voff,
       NULL,  U_VOLT, CAT_DC, "Offset voltage in the subthreshold region at large W and L");
 
-    addPar ("TNOM", 0.0, false, NO_DEP,
+    p.addPar ("TNOM", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::tnom,
       NULL, STANDARD, CAT_NONE, "");
 
-    addPar ("CGSO", 0.0, false, NO_DEP,
+    p.addPar ("CGSO", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::cgso,
       NULL,  U_FARADMM1, CAT_CAP, "Non-LLD region source-gate overlap capacitance per unit channel length");
 
-    addPar ("CGDO", 0.0, false, NO_DEP,
+    p.addPar ("CGDO", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::cgdo,
       NULL,  U_FARADMM1, CAT_CAP, "Non-LLD region drain-gate overlap capacitance per unit channel length");
 
-    addPar ("XPART", 0.0, false, NO_DEP,
+    p.addPar ("XPART", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::xpart,
       NULL,  U_NONE, CAT_CAP, "Charge partitioning rate flag");
 
-    addPar ("DELTA", 0.01, false, NO_DEP,
+    p.addPar ("DELTA", 0.01, false, NO_DEP,
       &MOSFET_B3SOI::Model::delta,
       NULL,  U_VOLT, CAT_DC, "Effective Vds parameter");
 
-    addPar ("RSH", 0.0, false, MIN_RES,
+    p.addPar ("RSH", 0.0, false, MIN_RES,
       &MOSFET_B3SOI::Model::sheetResistance,
       NULL, U_OHM, CAT_RES, "Drain, source diffusion sheet resistance");
 
-    addPar ("RDSW", 100.0, false, NO_DEP,
+    p.addPar ("RDSW", 100.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::rdsw,
       NULL,  U_OHMMICRON, CAT_DC, "Parasitic resistance per unit width");
 
-    addPar ("PRWG", 0.0, false, NO_DEP,
+    p.addPar ("PRWG", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::prwg,
       NULL,  U_VOLTM1, CAT_DC, "Gate-bias effect coefficient of RDSW");
 
-    addPar ("PRWB", 0.0, false, NO_DEP,
+    p.addPar ("PRWB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::prwb,
       NULL,  U_VOLTMH, CAT_DC, "Body effect coefficient of RDSW");
 
-    addPar ("PRT", 0.0, false, NO_DEP,
+    p.addPar ("PRT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::prt,
       NULL,  U_OHMMICRON, CAT_TEMP, "Temerature coefficient for RDSW");
 
-    addPar ("ETA0", 0.08, false, NO_DEP,
+    p.addPar ("ETA0", 0.08, false, NO_DEP,
       &MOSFET_B3SOI::Model::eta0,
       NULL,  U_NONE, CAT_DC, "DIBL coefficient in subthreshold region");
 
-    addPar ("ETAB", -0.07, false, NO_DEP,
+    p.addPar ("ETAB", -0.07, false, NO_DEP,
       &MOSFET_B3SOI::Model::etab,
       NULL,  U_VOLTM1, CAT_DC, "Body-bias coefficient for the subthreshold DIBL effect");
 
-    addPar ("PCLM", 1.3, false, NO_DEP,
+    p.addPar ("PCLM", 1.3, false, NO_DEP,
       &MOSFET_B3SOI::Model::pclm,
       NULL,  U_NONE, CAT_DC, "Channel length modulation parameter");
 
-    addPar ("PDIBLC1", 0.39, false, NO_DEP,
+    p.addPar ("PDIBLC1", 0.39, false, NO_DEP,
       &MOSFET_B3SOI::Model::pdibl1,
       NULL,  U_NONE, CAT_DC, "First output resistance DIBL effect correction parameter");
 
-    addPar ("PDIBLC2", 0.0086, false, NO_DEP,
+    p.addPar ("PDIBLC2", 0.0086, false, NO_DEP,
       &MOSFET_B3SOI::Model::pdibl2,
       NULL,  U_NONE, CAT_DC, "Second output resistance DIBL effect correction parameter");
 
-    addPar ("PDIBLCB", 0.0, false, NO_DEP,
+    p.addPar ("PDIBLCB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pdiblb,
       NULL,  U_VOLTM1, CAT_DC, "Body effect coefficient of DIBL correction parameter");
 
-    addPar ("PVAG", 0.0, false, NO_DEP,
+    p.addPar ("PVAG", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pvag,
       NULL,  U_NONE, CAT_DC, "Gate dependence of early voltage");
 
-    addPar ("SHMOD", 0.0, false, NO_DEP,
+    p.addPar ("SHMOD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::shMod,
       NULL, U_NONE, CAT_CONTROL, "Flag for self-heating, 0-no self-heating, 1-self-heating");
 
-    addPar ("TBOX", 3.0e-7, false, NO_DEP,
+    p.addPar ("TBOX", 3.0e-7, false, NO_DEP,
       &MOSFET_B3SOI::Model::tbox,
       NULL, U_METER, CAT_PROCESS, "Buried oxide thickness");
 
-    addPar ("TSI", 1.0e-7, false, NO_DEP,
+    p.addPar ("TSI", 1.0e-7, false, NO_DEP,
       &MOSFET_B3SOI::Model::tsi,
       NULL, U_METER, CAT_PROCESS, "Silicon film thickness");
 
-    addPar ("XJ", 0.0, false, NO_DEP,
+    p.addPar ("XJ", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::xj,
       NULL,  U_METER, CAT_GEOMETRY, "Junction depth");
 
-    addPar ("RTH0", 0.0, false, NO_DEP,
+    p.addPar ("RTH0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::rth0,
       NULL, U_OHMMM1, CAT_TEMP, "Thermal resistance per unit width");
 
-    addPar ("CTH0", 1.0e-5, false, NO_DEP,
+    p.addPar ("CTH0", 1.0e-5, false, NO_DEP,
       &MOSFET_B3SOI::Model::cth0,
       NULL, U_FARADMM1, CAT_TEMP, "Thermal capacitance per unit width");
 
-    addPar ("NGIDL", 1.2, false, NO_DEP,
+    p.addPar ("NGIDL", 1.2, false, NO_DEP,
       &MOSFET_B3SOI::Model::ngidl,
       NULL, U_VOLT, CAT_DC, "GIDL Vds enhancement coefficient");
 
-    addPar ("AGIDL", 0.0, false, NO_DEP,
+    p.addPar ("AGIDL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::agidl,
       NULL, U_OHMM1, CAT_DC, "GIDL constant");
 
-    addPar ("BGIDL", 0.0, false, NO_DEP,
+    p.addPar ("BGIDL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::bgidl,
       NULL, U_VMM1, CAT_DC, "GIDL exponential coefficient");
 
-    addPar ("NDIODE", 1.0, false, NO_DEP,
+    p.addPar ("NDIODE", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ndiode,
       NULL, U_NONE, CAT_DC, "Diode non-ideality factor");
 
-    addPar ("XBJT", 1.0, false, NO_DEP,
+    p.addPar ("XBJT", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::xbjt,
       NULL, U_NONE, CAT_TEMP, "Power dependence of JBJT on temperature");
 
-    addPar ("XDIF", 0.0, false, NO_DEP,
+    p.addPar ("XDIF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::xdif,
       NULL, U_NONE, CAT_TEMP, "Power dependence of JDIF on temperature");
 
-    addPar ("XREC", 1.0, false, NO_DEP,
+    p.addPar ("XREC", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::xrec,
       NULL, U_NONE, CAT_TEMP, "Power dependence of JREC on temperature");
 
-    addPar ("XTUN", 0.0, false, NO_DEP,
+    p.addPar ("XTUN", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::xtun,
       NULL, U_NONE, CAT_TEMP, "Power dependence of JTUN on temperature");
 
-    addPar ("PBSWG", 0.7, false, NO_DEP,
+    p.addPar ("PBSWG", 0.7, false, NO_DEP,
       &MOSFET_B3SOI::Model::GatesidewallJctPotential,
       NULL,  U_VOLT, CAT_CAP, "Source/drain gate sidewall junction built-in potential");
 
-    addPar ("MJSWG", 0.5, false, NO_DEP,
+    p.addPar ("MJSWG", 0.5, false, NO_DEP,
       &MOSFET_B3SOI::Model::bodyJctGateSideGradingCoeff,
       NULL,  U_NONE, CAT_CAP, "Source/grain gate sidewall junction capacitance grading coeficient");
 
-    addPar ("CJSWG", 1.0e-10, false, NO_DEP,
+    p.addPar ("CJSWG", 1.0e-10, false, NO_DEP,
       &MOSFET_B3SOI::Model::unitLengthGateSidewallJctCap,
       NULL,  U_FARADMM1, CAT_CAP, "Source/grain gate sidewall junction capacitance per unit width");
 
-    addPar ("LINT", 0.0, false, NO_DEP,
+    p.addPar ("LINT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Lint,
       NULL,  U_METER, CAT_DC, "Length of offset fiting parameter from I-V without bias");
 
-    addPar ("LL", 0.0, false, NO_DEP,
+    p.addPar ("LL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Ll,
       NULL,  U_MEXPLL, CAT_GEOMETRY, "Coefficient of length dependence for length offset");
 
-    addPar ("LLC", 0.0, false, NO_DEP,
+    p.addPar ("LLC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Llc,
       NULL,  U_MEXPLL, CAT_GEOMETRY, "Coefficient of length dependence for CV channel length offset");
 
-    addPar ("LLN", 1.0, false, NO_DEP,
+    p.addPar ("LLN", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Lln,
       NULL,  U_NONE, CAT_GEOMETRY, "Power of length dependence for length offset");
 
-    addPar ("LW", 0.0, false, NO_DEP,
+    p.addPar ("LW", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Lw,
       NULL,  U_MEXPLW, CAT_GEOMETRY, "Coefficient of width dependence for length offset");
 
-    addPar ("LWC", 0.0, false, NO_DEP,
+    p.addPar ("LWC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Lwc,
       NULL,  U_MEXPLW, CAT_GEOMETRY, "Coefficient of width dependence for channel length offset");
 
-    addPar ("LWN", 1.0, false, NO_DEP,
+    p.addPar ("LWN", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Lwn,
       NULL,  U_NONE, CAT_GEOMETRY, "Power of width dependence for length offset");
 
-    addPar ("LWL", 0.0, false, NO_DEP,
+    p.addPar ("LWL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Lwl,
       NULL,  U_MEXPLLLW, CAT_GEOMETRY, "Coefficient of length and width cross term for length offset");
 
-    addPar ("LWLC", 0.0, false, NO_DEP,
+    p.addPar ("LWLC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Lwlc,
       NULL,  U_MEXPLLLW, CAT_GEOMETRY, "Coefficient of length and width dependence for CV channel length offset");
 
-    addPar ("WR", 1.0, false, NO_DEP,
+    p.addPar ("WR", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wr,
       NULL,  U_NONE, CAT_DC, "Width offset from Weff for Rds Calculation");
 
-    addPar ("WINT", 0.0, false, NO_DEP,
+    p.addPar ("WINT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Wint,
       NULL,  U_METER, CAT_DC, "Width-offset fitting parameter from I-V without bias");
 
-    addPar ("DWG", 0.0, false, NO_DEP,
+    p.addPar ("DWG", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::dwg,
       NULL,  U_MVMH, CAT_DC, "Coefficient of gate depedence of Weff");
 
-    addPar ("DWB", 0.0, false, NO_DEP,
+    p.addPar ("DWB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::dwb,
       NULL,  U_MVMH, CAT_DC, "Coefficient of substrate body bias dependence of Weff");
 
-    addPar ("WL", 0.0, false, NO_DEP,
+    p.addPar ("WL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Wl,
       NULL,  U_MEXPWL, CAT_GEOMETRY, "Coefficient of length dependence for width offset");
 
-    addPar ("WLC", 0.0, false, NO_DEP,
+    p.addPar ("WLC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Wlc,
       NULL,  U_MEXPWL, CAT_GEOMETRY, "Coefficient of length dependence for CV channel width offset");
 
-    addPar ("WLN", 1.0, false, NO_DEP,
+    p.addPar ("WLN", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Wln,
       NULL,  U_NONE, CAT_GEOMETRY, "Power of length dependece of width offset");
 
-    addPar ("WW", 0.0, false, NO_DEP,
+    p.addPar ("WW", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Ww,
       NULL,  U_MEXPWW, CAT_GEOMETRY, "Coefficient of width dependence for width offset");
 
-    addPar ("WWC", 0.0, false, NO_DEP,
+    p.addPar ("WWC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Wwc,
       NULL,  U_MEXPWW, CAT_GEOMETRY, "Coefficient of width dependence for CV channel width offset");
 
-    addPar ("WWN", 1.0, false, NO_DEP,
+    p.addPar ("WWN", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Wwn,
       NULL,  U_NONE, CAT_GEOMETRY, "Power of width dependence of width offset");
 
-    addPar ("WWL", 0.0, false, NO_DEP,
+    p.addPar ("WWL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Wwl,
       NULL,  U_MEXPWLWW, CAT_GEOMETRY, "Coefficient of length and width cross term for width offset");
 
-    addPar ("WWLC", 0.0, false, NO_DEP,
+    p.addPar ("WWLC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Wwlc,
       NULL,  U_MEXPWLWW, CAT_GEOMETRY, "Coefficient of length and width dependence for CV channel width offset");
 
-    addPar ("B0", 0.0, false, NO_DEP,
+    p.addPar ("B0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::b0,
       NULL,  U_METER, CAT_DC, "Bulk charge effect coefficient for channel width");
 
-    addPar ("B1", 0.0, false, NO_DEP,
+    p.addPar ("B1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::b1,
       NULL,  U_METER, CAT_DC, "Bulk charge effect offset");
 
-    addPar ("CGSL", 0.0, false, NO_DEP,
+    p.addPar ("CGSL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::cgsl,
       NULL,  U_FARADMM1, CAT_CAP, "Light-doped source-gate region overlap capacitance");
 
-    addPar ("CGDL", 0.0, false, NO_DEP,
+    p.addPar ("CGDL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::cgdl,
       NULL,  U_FARADMM1, CAT_CAP, "Light-doped drain-gate region overlap capacitance");
 
-    addPar ("CKAPPA", 0.6, false, NO_DEP,
+    p.addPar ("CKAPPA", 0.6, false, NO_DEP,
       &MOSFET_B3SOI::Model::ckappa,
       NULL,  U_FARADMM1, CAT_CAP, "Coefficient for lightly doped region overlap capacitance fireing field capacitance");
 
-    addPar ("CF", 0.0, false, NO_DEP,
+    p.addPar ("CF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::cf,
       NULL,  U_FARADMM1, CAT_CAP, "Firing field capacitance");
 
-    addPar ("CLC", 0.1e-7, false,NO_DEP,
+    p.addPar ("CLC", 0.1e-7, false,NO_DEP,
       &MOSFET_B3SOI::Model::clc,
       NULL,  U_METER, CAT_CAP, "Constant term for short-channel model");
 
-    addPar ("CLE", 0.0, false, NO_DEP,
+    p.addPar ("CLE", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::cle,
       NULL,  U_NONE, CAT_CAP, "Exponetial term for the short-channel model");
 
-    addPar ("DWC", 0.0, false, NO_DEP,
+    p.addPar ("DWC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::dwc,
       NULL,  U_METER, CAT_CAP, "Width offset fitting parameter from C-V");
 
-    addPar ("DLC", 0.0, false, NO_DEP,
+    p.addPar ("DLC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::dlc,
       NULL,  U_METER, CAT_CAP, "Length offset fitting parameter from C-V");
 
-    addPar ("ALPHA0", 0.0, false, NO_DEP,
+    p.addPar ("ALPHA0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::alpha0,
       NULL,  U_MVM1, CAT_DC, "First parameter of impact-ionization current");
 
-    addPar ("NOIA", 0.0, false, NO_DEP,
+    p.addPar ("NOIA", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::oxideTrapDensityA,
       NULL,  U_NONE, CAT_FLICKER, "Noise parameter a");
 
-    addPar ("NOIB", 0.0, false, NO_DEP,
+    p.addPar ("NOIB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::oxideTrapDensityB,
       NULL,  U_NONE, CAT_FLICKER, "Noise parameter b");
 
-    addPar ("NOIC", 8.75e9, false, NO_DEP,
+    p.addPar ("NOIC", 8.75e9, false, NO_DEP,
       &MOSFET_B3SOI::Model::oxideTrapDensityC,
       NULL,  U_NONE, CAT_FLICKER, "Noise parameter c");
 
-    addPar ("FNOIMOD", 1.0, false, NO_DEP,
+    p.addPar ("FNOIMOD", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::fnoiMod,
       NULL, U_NONE, CAT_NONE, "Flicker noise model selector");
 
-    addPar ("TNOIMOD", 0.0, false, NO_DEP,
+    p.addPar ("TNOIMOD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::tnoiMod,
       NULL, U_NONE, CAT_NONE, "Thermal noise model selector");
 
-    addPar ("TNOIA", 1.5, false, NO_DEP,
+    p.addPar ("TNOIA", 1.5, false, NO_DEP,
       &MOSFET_B3SOI::Model::tnoia,
       NULL, U_NONE, CAT_NONE, "Thermal noise parameter");
 
-    addPar ("TNOIB", 3.5, false, NO_DEP,
+    p.addPar ("TNOIB", 3.5, false, NO_DEP,
       &MOSFET_B3SOI::Model::tnoib,
       NULL, U_NONE, CAT_NONE, "Thermal noise parameter");
 
-    addPar ("RNOIA", 0.577, false, NO_DEP,
+    p.addPar ("RNOIA", 0.577, false, NO_DEP,
       &MOSFET_B3SOI::Model::rnoia,
       NULL, U_NONE, CAT_NONE, "Thermal noise coefficient");
 
-    addPar ("RNOIB", 0.37, false, NO_DEP,
+    p.addPar ("RNOIB", 0.37, false, NO_DEP,
       &MOSFET_B3SOI::Model::rnoib,
       NULL, U_NONE, CAT_NONE, "Thermal noise coefficient");
 
-    addPar ("NTNOI", 1.0, false, NO_DEP,
+    p.addPar ("NTNOI", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ntnoi,
       NULL, U_NONE, CAT_NONE, "Thermal noise parameter");
 
-    addPar ("EM", 4.1e7, false, NO_DEP,
+    p.addPar ("EM", 4.1e7, false, NO_DEP,
       &MOSFET_B3SOI::Model::em,
       NULL,  U_VMM1, CAT_FLICKER, "Saturation field");
 
-    addPar ("EF", 1.0, false, NO_DEP,
+    p.addPar ("EF", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ef,
       NULL,  U_NONE, CAT_FLICKER, "Flicker exponent");
 
-    addPar ("AF", 1.0, false, NO_DEP,
+    p.addPar ("AF", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::af,
       NULL, U_NONE, CAT_FLICKER, "Flicker noise exponent");
 
-    addPar ("KF", 0.0, false, NO_DEP,
+    p.addPar ("KF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::kf,
       NULL, U_NONE, CAT_FLICKER, "Flicker noise coefficient");
 
-    addPar ("NOIF", 1.0, false, NO_DEP,
+    p.addPar ("NOIF", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::noif,
       NULL, U_NONE, CAT_NONE, "Floating body excess noise ideality factor");
 
-    addPar ("K1W1", 0.0, false, NO_DEP,
+    p.addPar ("K1W1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::k1w1,
       NULL, U_METER, CAT_DC, "First body effect width depenent parameter");
 
-    addPar ("K1W2", 0.0, false, NO_DEP,
+    p.addPar ("K1W2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::k1w2,
       NULL, U_METER, CAT_DC, "Second body effect width depenent parameter");
 
-    addPar ("KETAS", 0.0, false, NO_DEP,
+    p.addPar ("KETAS", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ketas,
       NULL, U_VOLT, CAT_DC, "Surface potential adjustment for bulk charge effect");
 
-    addPar ("DWBC", 0.0, false, NO_DEP,
+    p.addPar ("DWBC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::dwbc,
       NULL, U_METER, CAT_DC, "Width offset for body contact isolation edge");
 
-    addPar ("BETA0", 0.0, false, NO_DEP,
+    p.addPar ("BETA0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::beta0,
       NULL,  U_VOLT, CAT_DC, "Second parameter of impact-ionization current");
 
-    addPar ("BETA1", 0.0, false, NO_DEP,
+    p.addPar ("BETA1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::beta1,
       NULL, U_NONE, CAT_DC, "Second Vds dependent parameter of impact ionizatin current");
 
-    addPar ("BETA2", 0.1, false, NO_DEP,
+    p.addPar ("BETA2", 0.1, false, NO_DEP,
       &MOSFET_B3SOI::Model::beta2,
       NULL, U_VOLT, CAT_DC, "Third Vds dependent parameter of impact ionizatin current");
 
-    addPar ("VDSATII0", 0.9, false, NO_DEP,
+    p.addPar ("VDSATII0", 0.9, false, NO_DEP,
       &MOSFET_B3SOI::Model::vdsatii0,
       NULL, U_VOLT, CAT_DC, "Normal drain saturatio voltage at threshold for impact ionization current");
 
-    addPar ("TII", 0.0, false, NO_DEP,
+    p.addPar ("TII", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::tii,
       NULL, U_NONE, CAT_DC, "Temperature dependent parameter for impact ionization current");
 
-    addPar ("LII", 0.0, false, NO_DEP,
+    p.addPar ("LII", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lii,
       NULL, U_NONE, CAT_DC, "Channel length dependent parameter at threshold for impact ionization current");
 
-    addPar ("SII0", 0.5, false, NO_DEP,
+    p.addPar ("SII0", 0.5, false, NO_DEP,
       &MOSFET_B3SOI::Model::sii0,
       NULL, U_VOLTM1, CAT_DC, "First Vgs dependent parameter of impact ionizatin current");
 
-    addPar ("SII1", 0.1, false, NO_DEP,
+    p.addPar ("SII1", 0.1, false, NO_DEP,
       &MOSFET_B3SOI::Model::sii1,
       NULL, U_VOLTM1, CAT_DC, "Second Vgs dependent parameter of impact ionizatin current");
 
-    addPar ("SII2", 0.0, false, NO_DEP,
+    p.addPar ("SII2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::sii2,
       NULL, U_NONE, CAT_DC, "Third Vgs dependent parameter of impact ionizatin current");
 
-    addPar ("SIID", 0.0, false, NO_DEP,
+    p.addPar ("SIID", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::siid,
       NULL, U_VOLTM1, CAT_DC, "Vds dependent parameter of drain saturation voltage for impact ionizatin current");
 
-    addPar ("FBJTII", 0.0, false, NO_DEP,
+    p.addPar ("FBJTII", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::fbjtii,
       NULL, U_NONE, CAT_DC, "Fraction of bipolar current affecting the impact ionization");
 
-    addPar ("ESATII", 1.0e7, false, NO_DEP,
+    p.addPar ("ESATII", 1.0e7, false, NO_DEP,
       &MOSFET_B3SOI::Model::esatii,
       NULL, U_VMM1, CAT_DC, "Saturation channel electric field for impact ionization current");
 
-    addPar ("NTUN", 10.0, false, NO_DEP,
+    p.addPar ("NTUN", 10.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ntun,
       NULL, U_NONE, CAT_DC, "Reverse tunneling non-ideality factor");
 
-    addPar ("NRECF0", 2.0, false, NO_DEP,
+    p.addPar ("NRECF0", 2.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::nrecf0,
       NULL, U_NONE, CAT_DC, "Recombination non-ideality factor at foward bias");
 
-    addPar ("NRECR0", 10.0, false, NO_DEP,
+    p.addPar ("NRECR0", 10.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::nrecr0,
       NULL, U_NONE, CAT_DC, "Recombination non-ideality factor at reverse bias");
 
-    addPar ("ISBJT", 1.0e-6, false, NO_DEP,
+    p.addPar ("ISBJT", 1.0e-6, false, NO_DEP,
       &MOSFET_B3SOI::Model::isbjt,
       NULL, U_AMPMM2, CAT_DC, "BJT injection saturation current");
 
-    addPar ("ISDIF", 0.0, false, NO_DEP,
+    p.addPar ("ISDIF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::isdif,
       NULL, U_AMPMM2, CAT_DC, "BOdy to source/drain injection saturation current");
 
-    addPar ("ISREC", 1.0e-5, false, NO_DEP,
+    p.addPar ("ISREC", 1.0e-5, false, NO_DEP,
       &MOSFET_B3SOI::Model::isrec,
       NULL, U_AMPMM2, CAT_DC, "Recombinatin in depletion saturation current");
 
-    addPar ("ISTUN", 0.0, false, NO_DEP,
+    p.addPar ("ISTUN", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::istun,
       NULL, U_AMPMM2, CAT_DC, "Reverse tunneling saturation current");
 
-    addPar ("LN", 2.0e-6, false, NO_DEP,
+    p.addPar ("LN", 2.0e-6, false, NO_DEP,
       &MOSFET_B3SOI::Model::ln,
       NULL, U_METER, CAT_DC, "Electron/hole diffusion length");
 
-    addPar ("VREC0", 0.0, false, NO_DEP,
+    p.addPar ("VREC0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::vrec0,
       NULL, U_VOLT, CAT_DC, "Voltage dependent parameter for recombination current");
 
-    addPar ("VTUN0", 0.0, false, NO_DEP,
+    p.addPar ("VTUN0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::vtun0,
       NULL, U_VOLT, CAT_DC, "Voltage dependent parameter for tunneling current");
 
-    addPar ("NBJT", 1.0, false, NO_DEP,
+    p.addPar ("NBJT", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::nbjt,
       NULL, U_NONE, CAT_DC, "Power coefficient of channel length");
 
-    addPar ("LBJT0", 2.0e-7, false, NO_DEP,
+    p.addPar ("LBJT0", 2.0e-7, false, NO_DEP,
       &MOSFET_B3SOI::Model::lbjt0,
       NULL, U_METER, CAT_DC, "Reference channel length for bipolar current");
 
-    addPar ("LDIF0", 1.0, false, NO_DEP,
+    p.addPar ("LDIF0", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ldif0,
       NULL, U_NONE, CAT_CAP, "Channel length dependency coefficient of diffusion capacitance");
 
-    addPar ("VABJT", 10.0, false, NO_DEP,
+    p.addPar ("VABJT", 10.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::vabjt,
       NULL, U_VOLT, CAT_DC, "Early voltage for bipolar current");
 
-    addPar ("AELY", 0.0, false, NO_DEP,
+    p.addPar ("AELY", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::aely,
       NULL, U_VMM1, CAT_DC, "Channel length dependency of early voltage for bipolar current");
 
-    addPar ("AHLI", 0.0, false, NO_DEP,
+    p.addPar ("AHLI", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ahli,
       NULL, U_NONE, CAT_DC, "High level injection parameter for bipolar current");
 
-    addPar ("RBODY", 0.0, false, NO_DEP,
+    p.addPar ("RBODY", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::rbody,
       NULL, U_OSQM1, CAT_DC, "Intrinsic body contact sheet resistance");
 
-    addPar ("RBSH", 0.0, false, NO_DEP,
+    p.addPar ("RBSH", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::rbsh,
       NULL, U_OSQM1, CAT_DC, "Intrinsic body contact sheet resistance");
 
-    addPar ("CGEO", 0.0, false, NO_DEP,
+    p.addPar ("CGEO", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::cgeo,
       NULL, U_FARADMM1, CAT_CAP, "Gate substrate overlap capacitance per unit channel length");
 
-    addPar ("TT", 1.0e-12, false, NO_DEP,
+    p.addPar ("TT", 1.0e-12, false, NO_DEP,
       &MOSFET_B3SOI::Model::tt,
       NULL, U_SECOND, CAT_CAP, "Diffusion capacitance transit time coefficient");
 
-    addPar ("NDIF", -1.0, false, NO_DEP,
+    p.addPar ("NDIF", -1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ndif,
       NULL, U_NONE, CAT_CAP, "Power coefficient of channel length dependency for diffusion capacitance");
 
-    addPar ("VSDFB", 0.0, false, NO_DEP,
+    p.addPar ("VSDFB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::vsdfb,
       &MOSFET_B3SOI::Model::vsdfbGiven,
     U_VOLT, CAT_CAP, "Sorce/Drain bottom diffusion capacitance flatband voltage");
 
-    addPar ("VSDTH", 0.0, false, NO_DEP,
+    p.addPar ("VSDTH", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::vsdth,
       &MOSFET_B3SOI::Model::vsdthGiven,
     U_VOLT, CAT_CAP, "Sorce/Drain bottom diffusion capacitance threshold voltage");
 
-    addPar ("CSDMIN", 0.0, false, NO_DEP,
+    p.addPar ("CSDMIN", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::csdmin,
       &MOSFET_B3SOI::Model::csdminGiven,
     U_VOLT, CAT_CAP, "Sorce/Drain bottom diffusion minimum capacitance");
 
-    addPar ("ASD", 0.3, false, NO_DEP,
+    p.addPar ("ASD", 0.3, false, NO_DEP,
       &MOSFET_B3SOI::Model::asd,
       NULL, U_NONE, CAT_CAP, "Sorce/Drain bottom diffusion smoothing parameter");
 
-    addPar ("CSDESW", 0.0, false, NO_DEP,
+    p.addPar ("CSDESW", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::csdesw,
       NULL, U_FARADMM1, CAT_CAP, "Sorce/Drain sidewall fringing capacitance per unit length");
 
-    addPar ("NTRECF", 0.0, false, NO_DEP,
+    p.addPar ("NTRECF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ntrecf,
       NULL, U_NONE, CAT_TEMP, "Temperature coefficient for NRECF");
 
-    addPar ("NTRECR", 0.0, false, NO_DEP,
+    p.addPar ("NTRECR", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ntrecr,
       NULL, U_NONE, CAT_TEMP, "Temperature coefficient for NRECR");
 
-    addPar ("DLCB", 0.0, false, NO_DEP,
+    p.addPar ("DLCB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::dlcb,
       NULL, U_METER, CAT_CAP, "Length offset fitting parameter for body charge");
 
-    addPar ("FBODY", 1.0, false, NO_DEP,
+    p.addPar ("FBODY", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::fbody,
       NULL, U_NONE, CAT_CAP, "Scaling factor for body charge");
 
-    addPar ("TCJSWG", 0.0, false, NO_DEP,
+    p.addPar ("TCJSWG", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::tcjswg,
       NULL,  U_KM1, CAT_TEMP, "Temperature coefficient of Cjswg");
 
-    addPar ("TPBSWG", 0.0, false, NO_DEP,
+    p.addPar ("TPBSWG", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::tpbswg,
       NULL,  U_VKM1, CAT_TEMP, "Temperature coefficient of Pbswg");
 
-    addPar ("ACDE", 1.0, false, NO_DEP,
+    p.addPar ("ACDE", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::acde,
       NULL,  U_MVM1, CAT_CAP, "Exponetial coefficient for charge thickness in capmod = 3 for accumulation and depletion regions");
 
-    addPar ("MOIN", 15.0, false, NO_DEP,
+    p.addPar ("MOIN", 15.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::moin,
       NULL,  U_NONE, CAT_CAP, "Coefficient for the gate-bias dependent surface potential");
 
-    addPar ("NOFF", 1.0, false, NO_DEP,
+    p.addPar ("NOFF", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::noff,
       NULL,  U_NONE, CAT_CAP, "CV parameter in Vgsteff, CV for weak to strong inversion");
 
-    addPar ("DELVT", 0.0, false, NO_DEP,
+    p.addPar ("DELVT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::delvt,
       NULL, U_VOLT, CAT_CAP, "Threshold voltage adjust for C-V");
 
-    addPar ("KB1", 1.0, false, NO_DEP,
+    p.addPar ("KB1", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::kb1,
       NULL, U_NONE, CAT_NONE, "Scaling factor for backgate charge");
 
-    addPar ("DLBG", 0.0, false, NO_DEP,
+    p.addPar ("DLBG", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::dlbg,
       NULL, U_METER, CAT_CAP, "Length offset fitting parameter for backgate charge");
 
-    addPar ("IGCMOD", 0.0, false, NO_DEP,
+    p.addPar ("IGCMOD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::igcMod,
       NULL, U_NONE, CAT_NONE, "Gate-channel tunneling current model selector");
 
-    addPar ("TOXQM", 0.0, false, NO_DEP,
+    p.addPar ("TOXQM", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::toxqm,
       NULL, U_METER, CAT_TUNNEL, "Oxide thickness for Igb calculation");
 
-    addPar ("WTH0", 0.0, false, NO_DEP,
+    p.addPar ("WTH0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wth0,
       NULL, U_METER, CAT_TEMP, "Minimum width for thermal resistance calculation");
 
-    addPar ("RHALO", 1.0e15, false, NO_DEP,
+    p.addPar ("RHALO", 1.0e15, false, NO_DEP,
       &MOSFET_B3SOI::Model::rhalo,
-      NULL, U_OMM1, CAT_DC, "Body halo sheet resistance");
+      NULL, U_OHMMM1, CAT_DC, "Body halo sheet resistance");
 
-    addPar ("NTOX", 1.0, false, NO_DEP,
+    p.addPar ("NTOX", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ntox,
       NULL, U_NONE, CAT_TUNNEL, "Power term of gate current");
 
-    addPar ("TOXREF", 2.5e-9, false, NO_DEP,
+    p.addPar ("TOXREF", 2.5e-9, false, NO_DEP,
       &MOSFET_B3SOI::Model::toxref,
       NULL, U_METER, CAT_TUNNEL, "Target oxide thickness");
 
-    addPar ("EBG", 1.2, false, NO_DEP,
+    p.addPar ("EBG", 1.2, false, NO_DEP,
       &MOSFET_B3SOI::Model::ebg,
       NULL, U_VOLT, CAT_TUNNEL, "Effective bandgap in gate current calculation");
 
-    addPar ("VEVB", 0.075, false, NO_DEP,
+    p.addPar ("VEVB", 0.075, false, NO_DEP,
       &MOSFET_B3SOI::Model::vevb,
       NULL, U_NONE, CAT_TUNNEL, "Vaux parameter for valence band electron tunneling");
 
-    addPar ("ALPHAGB1", 0.35, false, NO_DEP,
+    p.addPar ("ALPHAGB1", 0.35, false, NO_DEP,
       &MOSFET_B3SOI::Model::alphaGB1,
       NULL, U_VOLTM1, CAT_TUNNEL, "First Vox dependent parameter for gate current in inversion");
 
-    addPar ("BETAGB1", 0.03, false, NO_DEP,
+    p.addPar ("BETAGB1", 0.03, false, NO_DEP,
       &MOSFET_B3SOI::Model::betaGB1,
       NULL, U_VOLTM2, CAT_TUNNEL, "Second Vox dependent parameter for gate current in inversion");
 
-    addPar ("VGB1", 300.0, false, NO_DEP,
+    p.addPar ("VGB1", 300.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::vgb1,
       NULL, U_VOLT, CAT_TUNNEL, "Third Vox dependent parameter for gate current in inversion");
 
-    addPar ("VECB", 0.026, false, NO_DEP,
+    p.addPar ("VECB", 0.026, false, NO_DEP,
       &MOSFET_B3SOI::Model::vecb,
       NULL, U_NONE, CAT_TUNNEL, "Vaux parameter for conduction band electron tunneling");
 
-    addPar ("ALPHAGB2", 0.43, false, NO_DEP,
+    p.addPar ("ALPHAGB2", 0.43, false, NO_DEP,
       &MOSFET_B3SOI::Model::alphaGB2,
       NULL, U_VOLTM1, CAT_TUNNEL, "First Vox dependent parameter for gate current in accumulation");
 
-    addPar ("BETAGB2", 0.05, false, NO_DEP,
+    p.addPar ("BETAGB2", 0.05, false, NO_DEP,
       &MOSFET_B3SOI::Model::betaGB2,
       NULL, U_VOLTM2, CAT_TUNNEL, "First Vox dependent parameter for gate current in accumulation");
 
-    addPar ("VGB2", 17.0, false, NO_DEP,
+    p.addPar ("VGB2", 17.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::vgb2,
       NULL, U_VOLT, CAT_TUNNEL, "Third Vox dependent parameter for gate current in accumulation");
 
-    addPar ("VOXH", 0.0, false, NO_DEP,
+    p.addPar ("VOXH", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::voxh,
       NULL, U_NONE, CAT_NONE, "The limit of Vox in gate current calculation");
 
-    addPar ("DELTAVOX", 0.0, false, NO_DEP,
+    p.addPar ("DELTAVOX", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::deltavox,
       NULL, U_NONE, CAT_NONE, "The smoothing parameter in the Vox smoothing function");
 
-    addPar ("AIGC", 0.0, false, NO_DEP,
+    p.addPar ("AIGC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::aigc,
       NULL, U_FHGMHSMVM1, CAT_CURRENT, "Parameter for Igc");
 
-    addPar ("BIGC", 0.0, false, NO_DEP,
+    p.addPar ("BIGC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::bigc,
       NULL, U_FHGMHSMVM1, CAT_CURRENT, "Parameter for Igc");
 
-    addPar ("CIGC", 0.0, false, NO_DEP,
+    p.addPar ("CIGC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::cigc,
       NULL, U_VOLTM1, CAT_CURRENT, "Parameter for Igc");
 
-    addPar ("AIGSD", 0.0, false, NO_DEP,
+    p.addPar ("AIGSD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::aigsd,
       NULL, U_FHGMHSMVM1, CAT_CURRENT, "Parameter for Igs,d");
 
-    addPar ("BIGSD", 0.0, false, NO_DEP,
+    p.addPar ("BIGSD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::bigsd,
       NULL, U_FHGMHSMVM1, CAT_CURRENT, "Parameter for Igs,d");
 
-    addPar ("CIGSD", 0.0, false, NO_DEP,
+    p.addPar ("CIGSD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::cigsd,
       NULL, U_VOLTM1, CAT_CURRENT, "Parameter for Igs,d");
 
-    addPar ("NIGC", 1.0, false, NO_DEP,
+    p.addPar ("NIGC", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::nigc,
       NULL, U_NONE, CAT_CURRENT, "Parameter for Igc slope");
 
-    addPar ("PIGCD", 1.0, false, NO_DEP,
+    p.addPar ("PIGCD", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pigcd,
       NULL, U_NONE, CAT_CURRENT, "Parameter for Igc partition");
 
-    addPar ("POXEDGE", 1.0, false, NO_DEP,
+    p.addPar ("POXEDGE", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::poxedge,
       NULL, U_NONE, CAT_NONE, "Factor for the gate edge Tox");
 
-    addPar ("DLCIG", 0.0, false, NO_DEP,
+    p.addPar ("DLCIG", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::dlcig,
       NULL, U_VOLTM1, CAT_CURRENT, "Delta L for Ig model");
 
-    addPar ("VBS0PD", 0.0, false, NO_DEP,
+    p.addPar ("VBS0PD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::vbs0pd,
       NULL, U_NONE, CAT_NONE, "Upper bound of built-in potential lowering for FD operation");
 
-    addPar ("VBS0FD", 0.5, false, NO_DEP,
+    p.addPar ("VBS0FD", 0.5, false, NO_DEP,
       &MOSFET_B3SOI::Model::vbs0fd,
       NULL, U_VOLT, CAT_NONE, "Lower bound of built-in potential lowering for FD operation");
 
-    addPar ("VBSA", 0.0, false, NO_DEP,
+    p.addPar ("VBSA", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::vbsa,
       NULL, U_VOLT, CAT_VBI, "Offset voltage due to non-idealities");
 
-    addPar ("NOFFFD", 1.0, false, NO_DEP,
+    p.addPar ("NOFFFD", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::nofffd,
       NULL, U_NONE, CAT_VBI, "Smoothing parameter in FD module");
 
-    addPar ("VOFFFD", 0.0, false, NO_DEP,
+    p.addPar ("VOFFFD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::vofffd,
       NULL, U_VOLT, CAT_VBI, "Smoothing parameter in FD module");
 
-    addPar ("K1B", 1.0, false, NO_DEP,
+    p.addPar ("K1B", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::k1b,
       NULL, U_NONE, CAT_VBI, "First backgate body effect parameter");
 
-    addPar ("K2B", 0.0, false, NO_DEP,
+    p.addPar ("K2B", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::k2b,
       NULL, U_NONE, CAT_VBI, "Second backgate body effect parameter for short channel effect");
 
-    addPar ("DK2B", 0.0, false, NO_DEP,
+    p.addPar ("DK2B", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::dk2b,
       NULL, U_NONE, CAT_VBI, "Third backgate body effect parameter for short channel effect");
 
-    addPar ("DVBD0", 0.0, false, NO_DEP,
+    p.addPar ("DVBD0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::dvbd0,
       NULL, U_NONE, CAT_VBI, "First short channel effect parameter in FD module");
 
-    addPar ("DVBD1", 0.0, false, NO_DEP,
+    p.addPar ("DVBD1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::dvbd1,
       NULL, U_NONE, CAT_VBI, "Second short channel effect parameter in FD module");
 
-    addPar ("MOINFD", 1e3, false, NO_DEP,
+    p.addPar ("MOINFD", 1e3, false, NO_DEP,
       &MOSFET_B3SOI::Model::moinFD,
       NULL, U_NONE, CAT_VBI, "Gate bias dependance coefficient of surface potential in FD module");
 
-    addPar ("XRCRG1", 12.0, false, NO_DEP,
+    p.addPar ("XRCRG1", 12.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::xrcrg1,
       NULL, U_NONE, CAT_RF, "Parameter for distributed channel resistance effect for intrinsic input resistance");
 
-    addPar ("XRCRG2", 1.0, false, NO_DEP,
+    p.addPar ("XRCRG2", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::xrcrg2,
       NULL, U_NONE, CAT_RF, "Parameter to account for the excess channel diffusion resistance for intrinsic input resistance");
 
-    addPar ("RSHG", 0.1, false, NO_DEP,
+    p.addPar ("RSHG", 0.1, false, NO_DEP,
       &MOSFET_B3SOI::Model::rshg,
       NULL, U_NONE, CAT_NONE, "Gate sheet resistance");
 
-    addPar ("NGCON", 1.0, false, NO_DEP,
+    p.addPar ("NGCON", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ngcon,
       NULL, U_NONE, CAT_RF, "Number of gate contacts");
 
-    addPar ("XGW", 0.0, false, NO_DEP,
+    p.addPar ("XGW", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::xgw,
       NULL, U_METER, CAT_RF, "Distance from the gate contact to the channel edge");
 
-    addPar ("XGL", 0.0, false, NO_DEP,
+    p.addPar ("XGL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::xgl,
       NULL, U_METER, CAT_RF, "Offset of the gate length due to variations in patterning");
 
-    addPar ("LXJ", 0.0, false, NO_DEP,
+    p.addPar ("LXJ", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lxj,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of xj");
 
-    addPar ("LALPHAGB1", 0.0, false, NO_DEP,
+    p.addPar ("LALPHAGB1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lalphaGB1,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of ALPHAGB1");
 
-    addPar ("LBETAGB1", 0.0, false, NO_DEP,
+    p.addPar ("LBETAGB1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lbetaGB1,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of BETAGB1");
 
-    addPar ("LALPHAGB2", 0.0, false, NO_DEP,
+    p.addPar ("LALPHAGB2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lalphaGB2,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of ALPHAGB2");
 
-    addPar ("LBETAGB2", 0.0, false, NO_DEP,
+    p.addPar ("LBETAGB2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lbetaGB2,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of BETAGB2");
 
-    addPar ("LCGSL", 0.0, false, NO_DEP,
+    p.addPar ("LCGSL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lcgsl,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of CGSL");
 
-    addPar ("LCGDL", 0.0, false, NO_DEP,
+    p.addPar ("LCGDL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lcgdl,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of CGDL");
 
-    addPar ("LCKAPPA", 0.0, false, NO_DEP,
+    p.addPar ("LCKAPPA", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lckappa,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of CKAPPA");
 
-    addPar ("LNDIF", 0.0, false, NO_DEP,
+    p.addPar ("LNDIF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lndif,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of NDIF");
 
-    addPar ("LUTE", 0.0, false, NO_DEP,
+    p.addPar ("LUTE", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lute,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of UTE");
 
-    addPar ("LKT1", 0.0, false, NO_DEP,
+    p.addPar ("LKT1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lkt1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of KT1");
 
-    addPar ("LKT1L", 0.0, false, NO_DEP,
+    p.addPar ("LKT1L", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lkt1l,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of KT1L");
 
-    addPar ("LKT2", 0.0, false, NO_DEP,
+    p.addPar ("LKT2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lkt2,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of KT2");
 
-    addPar ("LUA1", 0.0, false, NO_DEP,
+    p.addPar ("LUA1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lua1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of UA1");
 
-    addPar ("LUB1", 0.0, false, NO_DEP,
+    p.addPar ("LUB1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lub1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of UB1");
 
-    addPar ("LUC1", 0.0, false, NO_DEP,
+    p.addPar ("LUC1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::luc1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of UC1");
 
-    addPar ("LAT", 0.0, false, NO_DEP,
+    p.addPar ("LAT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lat,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of at");
 
-    addPar ("LPRT", 0.0, false, NO_DEP,
+    p.addPar ("LPRT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lprt,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of PRT");
 
-    addPar ("LNTRECF", 0.0, false, NO_DEP,
+    p.addPar ("LNTRECF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lntrecf,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of NTRECF");
 
-    addPar ("LNTRECR", 0.0, false, NO_DEP,
+    p.addPar ("LNTRECR", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lntrecr,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of NTRECR");
 
-    addPar ("LXBJT", 0.0, false, NO_DEP,
+    p.addPar ("LXBJT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lxbjt,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of XBJT");
 
-    addPar ("LXDIF", 0.0, false, NO_DEP,
+    p.addPar ("LXDIF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lxdif,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of CDIF");
 
-    addPar ("LXREC", 0.0, false, NO_DEP,
+    p.addPar ("LXREC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lxrec,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of XREC");
 
-    addPar ("LXTUN", 0.0, false, NO_DEP,
+    p.addPar ("LXTUN", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lxtun,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of XTUN");
 
-    addPar ("LAIGC", 0.0, false, NO_DEP,
+    p.addPar ("LAIGC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::laigc,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of AIGC");
 
-    addPar ("LBIGC", 0.0, false, NO_DEP,
+    p.addPar ("LBIGC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lbigc,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of BIGC");
 
-    addPar ("LCIGC", 0.0, false, NO_DEP,
+    p.addPar ("LCIGC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lcigc,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of CIGC");
 
-    addPar ("LAIGSD", 0.0, false, NO_DEP,
+    p.addPar ("LAIGSD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::laigsd,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of AIGSD");
 
-    addPar ("LBIGSD", 0.0, false, NO_DEP,
+    p.addPar ("LBIGSD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lbigsd,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of BIGSD");
 
-    addPar ("LCIGSD", 0.0, false, NO_DEP,
+    p.addPar ("LCIGSD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lcigsd,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of CIGSD");
 
-    addPar ("LNIGC", 0.0, false, NO_DEP,
+    p.addPar ("LNIGC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lnigc,
       NULL, U_METER, CAT_DEPENDENCY, "Length dependence of NIGC");
 
-    addPar ("LPIGCD", 0.0, false, NO_DEP,
+    p.addPar ("LPIGCD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lpigcd,
       NULL, U_NONE, CAT_DEPENDENCY, "Length dependence of PIGCD");
 
-    addPar ("LPOXEDGE", 0.0, false, NO_DEP,
+    p.addPar ("LPOXEDGE", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lpoxedge,
       NULL, U_METER, CAT_DEPENDENCY, "Length dependence of POXEDGE");
 
-    addPar ("LNCH", 0.0, false, NO_DEP,
+    p.addPar ("LNCH", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lnpeak,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of nch");
 
-    addPar ("LNSUB", 0.0, false, NO_DEP,
+    p.addPar ("LNSUB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lnsub,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of nsub");
 
-    addPar ("LNGATE", 0.0, false, NO_DEP,
+    p.addPar ("LNGATE", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lngate,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of ngate");
 
-    addPar ("LVTH0", 0.0, false, NO_DEP,
+    p.addPar ("LVTH0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lvth0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of VT0");
 
-    addPar ("LK1", 0.0, false, NO_DEP,
+    p.addPar ("LK1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lk1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of K1");
 
-    addPar ("LK1W1", 0.0, false, NO_DEP,
+    p.addPar ("LK1W1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lk1w1,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of K1W1");
 
-    addPar ("LK1W2", 0.0, false, NO_DEP,
+    p.addPar ("LK1W2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lk1w2,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of K1W2");
 
-    addPar ("LK2", 0.0, false, NO_DEP,
+    p.addPar ("LK2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lk2,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of K2");
 
-    addPar ("LK3", 0.0, false, NO_DEP,
+    p.addPar ("LK3", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lk3,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of K3");
 
-    addPar ("LK3B", 0.0, false, NO_DEP,
+    p.addPar ("LK3B", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lk3b,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of K3B");
 
-    addPar ("LKB1", 0.0, false, NO_DEP,
+    p.addPar ("LKB1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lkb1,
       NULL, U_METER, CAT_DEPENDENCY, "Length dependence of KB1");
 
-    addPar ("LW0", 0.0, false, NO_DEP,
+    p.addPar ("LW0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lw0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of W0");
 
-    addPar ("LNLX", 0.0, false, NO_DEP,
+    p.addPar ("LNLX", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lnlx,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of NLX");
 
-    addPar ("LDVT0", 0.0, false, NO_DEP,
+    p.addPar ("LDVT0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ldvt0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of DVT0");
 
-    addPar ("LDVT1", 0.0, false, NO_DEP,
+    p.addPar ("LDVT1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ldvt1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of DVT1");
 
-    addPar ("LDVT2", 0.0, false, NO_DEP,
+    p.addPar ("LDVT2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ldvt2,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of DVT2");
 
-    addPar ("LDVT0W", 0.0, false, NO_DEP,
+    p.addPar ("LDVT0W", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ldvt0w,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of DVT0W");
 
-    addPar ("LDVT1W", 0.0, false, NO_DEP,
+    p.addPar ("LDVT1W", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ldvt1w,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of DVT1W");
 
-    addPar ("LDVT2W", 0.0, false, NO_DEP,
+    p.addPar ("LDVT2W", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ldvt2w,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of DVT2W");
 
-    addPar ("LU0", 0.0, false, NO_DEP,
+    p.addPar ("LU0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lu0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of U0");
 
-    addPar ("LUA", 0.0, false, NO_DEP,
+    p.addPar ("LUA", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lua,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of UA");
 
-    addPar ("LUB", 0.0, false, NO_DEP,
+    p.addPar ("LUB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lub,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of UB");
 
-    addPar ("LUC", 0.0, false, NO_DEP,
+    p.addPar ("LUC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::luc,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of UC");
 
-    addPar ("LVSAT", 0.0, false, NO_DEP,
+    p.addPar ("LVSAT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lvsat,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of vsat");
 
-    addPar ("LA0", 0.0, false, NO_DEP,
+    p.addPar ("LA0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::la0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of a0");
 
-    addPar ("LAGS", 0.0, false, NO_DEP,
+    p.addPar ("LAGS", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lags,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of ags");
 
-    addPar ("LB0", 0.0, false, NO_DEP,
+    p.addPar ("LB0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lb0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of B0");
 
-    addPar ("LB1", 0.0, false, NO_DEP,
+    p.addPar ("LB1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lb1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of B1");
 
-    addPar ("LKETA", 0.0, false, NO_DEP,
+    p.addPar ("LKETA", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lketa,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of keta");
 
-    addPar ("LKETAS", 0.0, false, NO_DEP,
+    p.addPar ("LKETAS", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lketas,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of KETAS");
 
-    addPar ("LA1", 0.0, false, NO_DEP,
+    p.addPar ("LA1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::la1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of a1");
 
-    addPar ("LA2", 0.0, false, NO_DEP,
+    p.addPar ("LA2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::la2,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of a2");
 
-    addPar ("LRDSW", 0.0, false, NO_DEP,
+    p.addPar ("LRDSW", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lrdsw,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of RDSW");
 
-    addPar ("LPRWB", 0.0, false, NO_DEP,
+    p.addPar ("LPRWB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lprwb,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of PRWB");
 
-    addPar ("LPRWG", 0.0, false, NO_DEP,
+    p.addPar ("LPRWG", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lprwg,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of PRWG");
 
-    addPar ("LWR", 0.0, false, NO_DEP,
+    p.addPar ("LWR", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lwr,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of WR");
 
-    addPar ("LNFACTOR", 0.0, false, NO_DEP,
+    p.addPar ("LNFACTOR", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lnfactor,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of nfactor");
 
-    addPar ("LDWG", 0.0, false, NO_DEP,
+    p.addPar ("LDWG", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ldwg,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of DWG");
 
-    addPar ("LDWB", 0.0, false, NO_DEP,
+    p.addPar ("LDWB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ldwb,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of DWB");
 
-    addPar ("LVOFF", 0.0, false, NO_DEP,
+    p.addPar ("LVOFF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lvoff,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of VOFF");
 
-    addPar ("LETA0", 0.0, false, NO_DEP,
+    p.addPar ("LETA0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::leta0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of ETA0");
 
-    addPar ("LETAB", 0.0, false, NO_DEP,
+    p.addPar ("LETAB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::letab,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of ETAB");
 
-    addPar ("LDSUB", 0.0, false, NO_DEP,
+    p.addPar ("LDSUB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ldsub,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of LDSUB");
 
-    addPar ("LCIT", 0.0, false, NO_DEP,
+    p.addPar ("LCIT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lcit,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of cit");
 
-    addPar ("LCDSC", 0.0, false, NO_DEP,
+    p.addPar ("LCDSC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lcdsc,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of cdsc");
 
-    addPar ("LCDSCB", 0.0, false, NO_DEP,
+    p.addPar ("LCDSCB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lcdscb,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of cdscb");
 
-    addPar ("LCDSCD", 0.0, false, NO_DEP,
+    p.addPar ("LCDSCD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lcdscd,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of cdscd");
 
-    addPar ("LPCLM", 0.0, false, NO_DEP,
+    p.addPar ("LPCLM", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lpclm,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of PCLM");
 
-    addPar ("LPDIBLC1", 0.0, false, NO_DEP,
+    p.addPar ("LPDIBLC1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lpdibl1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of PDIBLC1");
 
-    addPar ("LPDIBLC2", 0.0, false, NO_DEP,
+    p.addPar ("LPDIBLC2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lpdibl2,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of PDIBLC2");
 
-    addPar ("LPDIBLCB", 0.0, false, NO_DEP,
+    p.addPar ("LPDIBLCB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lpdiblb,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of PDIBLCB");
 
-    addPar ("LDROUT", 0.0, false, NO_DEP,
+    p.addPar ("LDROUT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ldrout,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of DROUT");
 
-    addPar ("LPVAG", 0.0, false, NO_DEP,
+    p.addPar ("LPVAG", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lpvag,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of PVAG");
 
-    addPar ("LDELTA", 0.0, false, NO_DEP,
+    p.addPar ("LDELTA", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ldelta,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of DELTA");
 
-    addPar ("LALPHA0", 0.0, false, NO_DEP,
+    p.addPar ("LALPHA0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lalpha0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of ALPHA0");
 
-    addPar ("LFBJTII", 0.0, false, NO_DEP,
+    p.addPar ("LFBJTII", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lfbjtii,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of FBJTII");
 
-    addPar ("LBETA0", 0.0, false, NO_DEP,
+    p.addPar ("LBETA0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lbeta0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of BETA0");
 
-    addPar ("LBETA1", 0.0, false, NO_DEP,
+    p.addPar ("LBETA1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lbeta1,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of BETA1");
 
-    addPar ("LBETA2", 0.0, false, NO_DEP,
+    p.addPar ("LBETA2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lbeta2,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of BETA2");
 
-    addPar ("LVDSATII0", 0.0, false, NO_DEP,
+    p.addPar ("LVDSATII0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lvdsatii0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of VDSATII0");
 
-    addPar ("LLII", 0.0, false, NO_DEP,
+    p.addPar ("LLII", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::llii,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of LII");
 
-    addPar ("LESATII", 0.0, false, NO_DEP,
+    p.addPar ("LESATII", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lesatii,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of ESATII");
 
-    addPar ("LSII0", 0.0, false, NO_DEP,
+    p.addPar ("LSII0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lsii0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of SII0");
 
-    addPar ("LSII1", 0.0, false, NO_DEP,
+    p.addPar ("LSII1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lsii1,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of SII1");
 
-    addPar ("LSII2", 0.0, false, NO_DEP,
+    p.addPar ("LSII2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lsii2,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of SII2");
 
-    addPar ("LSIID", 0.0, false, NO_DEP,
+    p.addPar ("LSIID", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lsiid,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of SIID");
 
-    addPar ("LAGIDL", 0.0, false, NO_DEP,
+    p.addPar ("LAGIDL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lagidl,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of AGIDL");
 
-    addPar ("LBGIDL", 0.0, false, NO_DEP,
+    p.addPar ("LBGIDL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lbgidl,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of BGIDL");
 
-    addPar ("LNGIDL", 0.0, false, NO_DEP,
+    p.addPar ("LNGIDL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lngidl,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of NGIDL");
 
-    addPar ("LNTUN", 0.0, false, NO_DEP,
+    p.addPar ("LNTUN", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lntun,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of NTUN");
 
-    addPar ("LNDIODE", 0.0, false, NO_DEP,
+    p.addPar ("LNDIODE", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lndiode,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of NDIODE");
 
-    addPar ("LNRECF0", 0.0, false, NO_DEP,
+    p.addPar ("LNRECF0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lnrecf0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of NRECF0");
 
-    addPar ("LNRECR0", 0.0, false, NO_DEP,
+    p.addPar ("LNRECR0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lnrecr0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of NRECR0");
 
-    addPar ("LISBJT", 0.0, false, NO_DEP,
+    p.addPar ("LISBJT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lisbjt,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of ISBJT");
 
-    addPar ("LISDIF", 0.0, false, NO_DEP,
+    p.addPar ("LISDIF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lisdif,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of ISDIF");
 
-    addPar ("LISREC", 0.0, false, NO_DEP,
+    p.addPar ("LISREC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lisrec,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of ISREC");
 
-    addPar ("LISTUN", 0.0, false, NO_DEP,
+    p.addPar ("LISTUN", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::listun,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of ISTUN");
 
-    addPar ("LVREC0", 0.0, false, NO_DEP,
+    p.addPar ("LVREC0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lvrec0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of VREC0");
 
-    addPar ("LVTUN0", 0.0, false, NO_DEP,
+    p.addPar ("LVTUN0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lvtun0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of VTUN0");
 
-    addPar ("LNBJT", 0.0, false, NO_DEP,
+    p.addPar ("LNBJT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lnbjt,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of NBJT");
 
-    addPar ("LLBJT0", 0.0, false, NO_DEP,
+    p.addPar ("LLBJT0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::llbjt0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of LBJT0");
 
-    addPar ("LVABJT", 0.0, false, NO_DEP,
+    p.addPar ("LVABJT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lvabjt,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of VABJT");
 
-    addPar ("LAELY", 0.0, false, NO_DEP,
+    p.addPar ("LAELY", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::laely,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of AELY");
 
-    addPar ("LAHLI", 0.0, false, NO_DEP,
+    p.addPar ("LAHLI", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lahli,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of AHLI");
 
-    addPar ("LVSDFB", 0.0, false, NO_DEP,
+    p.addPar ("LVSDFB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lvsdfb,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of VSDFB");
 
-    addPar ("LVSDTH", 0.0, false, NO_DEP,
+    p.addPar ("LVSDTH", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lvsdth,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of VSDTH");
 
-    addPar ("LDELVT", 0.0, false, NO_DEP,
+    p.addPar ("LDELVT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ldelvt,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of DELVT");
 
-    addPar ("LACDE", 0.0, false, NO_DEP,
+    p.addPar ("LACDE", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lacde,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of ACDE");
 
-    addPar ("LMOIN", 0.0, false, NO_DEP,
+    p.addPar ("LMOIN", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lmoin,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of MOIN");
 
-    addPar ("LNOFF", 0.0, false, NO_DEP,
+    p.addPar ("LNOFF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lnoff,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Length dependence of NOFF");
 
-    addPar ("LXRCRG1", 0.0, false, NO_DEP,
+    p.addPar ("LXRCRG1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lxrcrg1,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of XRCRG1");
 
-    addPar ("LXRCRG2", 0.0, false, NO_DEP,
+    p.addPar ("LXRCRG2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::lxrcrg2,
       NULL, U_INVALID, CAT_DEPENDENCY, "Length dependence of XRCRG2");
 
-    addPar ("WXJ", 0.0, false, NO_DEP,
+    p.addPar ("WXJ", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wxj,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of XJ");
 
-    addPar ("WALPHAGB1", 0.0, false, NO_DEP,
+    p.addPar ("WALPHAGB1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::walphaGB1,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of ALPHAGB1");
 
-    addPar ("WBETAGB1", 0.0, false, NO_DEP,
+    p.addPar ("WBETAGB1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wbetaGB1,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of BETAGB1");
 
-    addPar ("WALPHAGB2", 0.0, false, NO_DEP,
+    p.addPar ("WALPHAGB2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::walphaGB2,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of ALPHAGB2");
 
-    addPar ("WBETAGB2", 0.0, false, NO_DEP,
+    p.addPar ("WBETAGB2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wbetaGB2,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of BETAGB2");
 
-    addPar ("WCGSL", 0.0, false, NO_DEP,
+    p.addPar ("WCGSL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wcgsl,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of CGSL");
 
-    addPar ("WCGDL", 0.0, false, NO_DEP,
+    p.addPar ("WCGDL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wcgdl,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of CGDL");
 
-    addPar ("WCKAPPA", 0.0, false, NO_DEP,
+    p.addPar ("WCKAPPA", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wckappa,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of CKAPPA");
 
-    addPar ("WNDIF", 0.0, false, NO_DEP,
+    p.addPar ("WNDIF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wndif,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of NDIF");
 
-    addPar ("WUTE", 0.0, false, NO_DEP,
+    p.addPar ("WUTE", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wute,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of UTE");
 
-    addPar ("WKT1", 0.0, false, NO_DEP,
+    p.addPar ("WKT1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wkt1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of KT1");
 
-    addPar ("WKT1L", 0.0, false, NO_DEP,
+    p.addPar ("WKT1L", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wkt1l,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of KT1L");
 
-    addPar ("WKT2", 0.0, false, NO_DEP,
+    p.addPar ("WKT2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wkt2,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of KT2");
 
-    addPar ("WUA1", 0.0, false, NO_DEP,
+    p.addPar ("WUA1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wua1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of UA1");
 
-    addPar ("WUB1", 0.0, false, NO_DEP,
+    p.addPar ("WUB1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wub1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of UB1");
 
-    addPar ("WUC1", 0.0, false, NO_DEP,
+    p.addPar ("WUC1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wuc1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of UC1");
 
-    addPar ("WAT", 0.0, false, NO_DEP,
+    p.addPar ("WAT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wat,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of AT");
 
-    addPar ("WPRT", 0.0, false, NO_DEP,
+    p.addPar ("WPRT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wprt,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of PRT");
 
-    addPar ("WNTRECF", 0.0, false, NO_DEP,
+    p.addPar ("WNTRECF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wntrecf,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of NTRECF");
 
-    addPar ("WNTRECR", 0.0, false, NO_DEP,
+    p.addPar ("WNTRECR", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wntrecr,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of NTRECR");
 
-    addPar ("WXBJT", 0.0, false, NO_DEP,
+    p.addPar ("WXBJT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wxbjt,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of XBIT");
 
-    addPar ("WXDIF", 0.0, false, NO_DEP,
+    p.addPar ("WXDIF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wxdif,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of XDIF");
 
-    addPar ("WXREC", 0.0, false, NO_DEP,
+    p.addPar ("WXREC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wxrec,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of XREC");
 
-    addPar ("WXTUN", 0.0, false, NO_DEP,
+    p.addPar ("WXTUN", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wxtun,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of XTUN");
 
-    addPar ("WAIGC", 0.0, false, NO_DEP,
+    p.addPar ("WAIGC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::waigc,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of AIGC");
 
-    addPar ("WBIGC", 0.0, false, NO_DEP,
+    p.addPar ("WBIGC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wbigc,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of BIGC");
 
-    addPar ("WCIGC", 0.0, false, NO_DEP,
+    p.addPar ("WCIGC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wcigc,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of CIGC");
 
-    addPar ("WAIGSD", 0.0, false, NO_DEP,
+    p.addPar ("WAIGSD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::waigsd,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of AIGSD");
 
-    addPar ("WBIGSD", 0.0, false, NO_DEP,
+    p.addPar ("WBIGSD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wbigsd,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of BIGSD");
 
-    addPar ("WCIGSD", 0.0, false, NO_DEP,
+    p.addPar ("WCIGSD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wcigsd,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of CIGSD");
 
-    addPar ("WNIGC", 0.0, false, NO_DEP,
+    p.addPar ("WNIGC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wnigc,
       NULL, U_METER, CAT_DEPENDENCY, "Width dependence of NIGC");
 
-    addPar ("WPIGCD", 0.0, false, NO_DEP,
+    p.addPar ("WPIGCD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wpigcd,
       NULL, U_NONE, CAT_DEPENDENCY, "Width dependence of PIGCD");
 
-    addPar ("WPOXEDGE", 0.0, false, NO_DEP,
+    p.addPar ("WPOXEDGE", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wpoxedge,
       NULL, U_METER, CAT_DEPENDENCY, "Width dependence of POXEDGE");
 
-    addPar ("WNCH", 0.0, false, NO_DEP,
+    p.addPar ("WNCH", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wnpeak,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of NCH");
 
-    addPar ("WNSUB", 0.0, false, NO_DEP,
+    p.addPar ("WNSUB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wnsub,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of NSUB");
 
-    addPar ("WNGATE", 0.0, false, NO_DEP,
+    p.addPar ("WNGATE", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wngate,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of NGATE");
 
-    addPar ("WVTH0", 0.0, false, NO_DEP,
+    p.addPar ("WVTH0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wvth0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of VTO");
 
-    addPar ("WK1", 0.0, false, NO_DEP,
+    p.addPar ("WK1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wk1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of K1");
 
-    addPar ("WK1W1", 0.0, false, NO_DEP,
+    p.addPar ("WK1W1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wk1w1,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of K1W1");
 
-    addPar ("WK1W2", 0.0, false, NO_DEP,
+    p.addPar ("WK1W2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wk1w2,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of K1W2");
 
-    addPar ("WK2", 0.0, false, NO_DEP,
+    p.addPar ("WK2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wk2,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of K2");
 
-    addPar ("WK3", 0.0, false, NO_DEP,
+    p.addPar ("WK3", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wk3,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of K3");
 
-    addPar ("WK3B", 0.0, false, NO_DEP,
+    p.addPar ("WK3B", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wk3b,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of K3B");
 
-    addPar ("WKB1", 0.0, false, NO_DEP,
+    p.addPar ("WKB1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wkb1,
       NULL, U_METER, CAT_DEPENDENCY, "Width dependence of KB1");
 
-    addPar ("WW0", 0.0, false, NO_DEP,
+    p.addPar ("WW0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ww0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of W0");
 
-    addPar ("WNLX", 0.0, false, NO_DEP,
+    p.addPar ("WNLX", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wnlx,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of NLX");
 
-    addPar ("WDVT0", 0.0, false, NO_DEP,
+    p.addPar ("WDVT0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wdvt0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of DVT0");
 
-    addPar ("WDVT1", 0.0, false, NO_DEP,
+    p.addPar ("WDVT1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wdvt1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of DVT1");
 
-    addPar ("WDVT2", 0.0, false, NO_DEP,
+    p.addPar ("WDVT2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wdvt2,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of DVT2");
 
-    addPar ("WDVT0W", 0.0, false, NO_DEP,
+    p.addPar ("WDVT0W", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wdvt0w,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of DVT0W");
 
-    addPar ("WDVT1W", 0.0, false, NO_DEP,
+    p.addPar ("WDVT1W", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wdvt1w,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of DVT1W");
 
-    addPar ("WDVT2W", 0.0, false, NO_DEP,
+    p.addPar ("WDVT2W", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wdvt2w,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of DVT2W");
 
-    addPar ("WU0", 0.0, false, NO_DEP,
+    p.addPar ("WU0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wu0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of U0");
 
-    addPar ("WUA", 0.0, false, NO_DEP,
+    p.addPar ("WUA", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wua,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of UA");
 
-    addPar ("WUB", 0.0, false, NO_DEP,
+    p.addPar ("WUB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wub,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of UB");
 
-    addPar ("WUC", 0.0, false, NO_DEP,
+    p.addPar ("WUC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wuc,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of UC");
 
-    addPar ("WVSAT", 0.0, false, NO_DEP,
+    p.addPar ("WVSAT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wvsat,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of VSAT");
 
-    addPar ("WA0", 0.0, false, NO_DEP,
+    p.addPar ("WA0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wa0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of A0");
 
-    addPar ("WAGS", 0.0, false, NO_DEP,
+    p.addPar ("WAGS", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wags,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of AGS");
 
-    addPar ("WB0", 0.0, false, NO_DEP,
+    p.addPar ("WB0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wb0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of B0");
 
-    addPar ("WB1", 0.0, false, NO_DEP,
+    p.addPar ("WB1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wb1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of B1");
 
-    addPar ("WKETA", 0.0, false, NO_DEP,
+    p.addPar ("WKETA", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wketa,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of KETA");
 
-    addPar ("WKETAS", 0.0, false, NO_DEP,
+    p.addPar ("WKETAS", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wketas,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of KETAS");
 
-    addPar ("WA1", 0.0, false, NO_DEP,
+    p.addPar ("WA1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wa1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of A1");
 
-    addPar ("WA2", 0.0, false, NO_DEP,
+    p.addPar ("WA2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wa2,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of A2");
 
-    addPar ("WRDSW", 0.0, false, NO_DEP,
+    p.addPar ("WRDSW", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wrdsw,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of RDSW");
 
-    addPar ("WPRWB", 0.0, false, NO_DEP,
+    p.addPar ("WPRWB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wprwb,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of PRWB");
 
-    addPar ("WPRWG", 0.0, false, NO_DEP,
+    p.addPar ("WPRWG", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wprwg,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of PRWG");
 
-    addPar ("WWR", 0.0, false, NO_DEP,
+    p.addPar ("WWR", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wwr,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of WR");
 
-    addPar ("WNFACTOR", 0.0, false, NO_DEP,
+    p.addPar ("WNFACTOR", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wnfactor,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of NFACTOR");
 
-    addPar ("WDWG", 0.0, false, NO_DEP,
+    p.addPar ("WDWG", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wdwg,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of WG");
 
-    addPar ("WDWB", 0.0, false, NO_DEP,
+    p.addPar ("WDWB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wdwb,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of DWB");
 
-    addPar ("WVOFF", 0.0, false, NO_DEP,
+    p.addPar ("WVOFF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wvoff,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of VOFF");
 
-    addPar ("WETA0", 0.0, false, NO_DEP,
+    p.addPar ("WETA0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::weta0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of ETA0");
 
-    addPar ("WETAB", 0.0, false, NO_DEP,
+    p.addPar ("WETAB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wetab,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of ETAB");
 
-    addPar ("WDSUB", 0.0, false, NO_DEP,
+    p.addPar ("WDSUB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wdsub,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of DSUB");
 
-    addPar ("WCIT", 0.0, false, NO_DEP,
+    p.addPar ("WCIT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wcit,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of CIT");
 
-    addPar ("WCDSC", 0.0, false, NO_DEP,
+    p.addPar ("WCDSC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wcdsc,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of CDSC");
 
-    addPar ("WCDSCB", 0.0, false, NO_DEP,
+    p.addPar ("WCDSCB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wcdscb,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of CDSCB");
 
-    addPar ("WCDSCD", 0.0, false, NO_DEP,
+    p.addPar ("WCDSCD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wcdscd,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of CDSCD");
 
-    addPar ("WPCLM", 0.0, false, NO_DEP,
+    p.addPar ("WPCLM", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wpclm,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of PCLM");
 
-    addPar ("WPDIBLC1", 0.0, false, NO_DEP,
+    p.addPar ("WPDIBLC1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wpdibl1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of PDIBLC1");
 
-    addPar ("WPDIBLC2", 0.0, false, NO_DEP,
+    p.addPar ("WPDIBLC2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wpdibl2,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of PDIBLC2");
 
-    addPar ("WPDIBLCB", 0.0, false, NO_DEP,
+    p.addPar ("WPDIBLCB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wpdiblb,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of PDIBLCB");
 
-    addPar ("WDROUT", 0.0, false, NO_DEP,
+    p.addPar ("WDROUT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wdrout,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of DROUT");
 
-    addPar ("WPVAG", 0.0, false, NO_DEP,
+    p.addPar ("WPVAG", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wpvag,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of PVAG");
 
-    addPar ("WDELTA", 0.0, false, NO_DEP,
+    p.addPar ("WDELTA", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wdelta,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of DELTA");
 
-    addPar ("WALPHA0", 0.0, false, NO_DEP,
+    p.addPar ("WALPHA0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::walpha0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of ALPHA0");
 
-    addPar ("WFBJTII", 0.0, false, NO_DEP,
+    p.addPar ("WFBJTII", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wfbjtii,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of FBJTII");
 
-    addPar ("WBETA0", 0.0, false, NO_DEP,
+    p.addPar ("WBETA0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wbeta0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of BETA0");
 
-    addPar ("WBETA1", 0.0, false, NO_DEP,
+    p.addPar ("WBETA1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wbeta1,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of BETA1");
 
-    addPar ("WBETA2", 0.0, false, NO_DEP,
+    p.addPar ("WBETA2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wbeta2,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of BETA2");
 
-    addPar ("WVDSATII0", 0.0, false, NO_DEP,
+    p.addPar ("WVDSATII0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wvdsatii0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of VDSATII0");
 
-    addPar ("WLII", 0.0, false, NO_DEP,
+    p.addPar ("WLII", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wlii,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of LII");
 
-    addPar ("WESATII", 0.0, false, NO_DEP,
+    p.addPar ("WESATII", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wesatii,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of ESATII");
 
-    addPar ("WSII0", 0.0, false, NO_DEP,
+    p.addPar ("WSII0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wsii0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of SII0");
 
-    addPar ("WSII1", 0.0, false, NO_DEP,
+    p.addPar ("WSII1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wsii1,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of SII1");
 
-    addPar ("WSII2", 0.0, false, NO_DEP,
+    p.addPar ("WSII2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wsii2,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of SII2");
 
-    addPar ("WSIID", 0.0, false, NO_DEP,
+    p.addPar ("WSIID", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wsiid,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of SIID");
 
-    addPar ("WAGIDL", 0.0, false, NO_DEP,
+    p.addPar ("WAGIDL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wagidl,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of AGIDL");
 
-    addPar ("WBGIDL", 0.0, false, NO_DEP,
+    p.addPar ("WBGIDL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wbgidl,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of BGIDL");
 
-    addPar ("WNGIDL", 0.0, false, NO_DEP,
+    p.addPar ("WNGIDL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wngidl,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of NGIDL");
 
-    addPar ("WNTUN", 0.0, false, NO_DEP,
+    p.addPar ("WNTUN", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wntun,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of NTUN");
 
-    addPar ("WNDIODE", 0.0, false, NO_DEP,
+    p.addPar ("WNDIODE", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wndiode,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of NDIODE");
 
-    addPar ("WNRECF0", 0.0, false, NO_DEP,
+    p.addPar ("WNRECF0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wnrecf0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of NRECF0");
 
-    addPar ("WNRECR0", 0.0, false, NO_DEP,
+    p.addPar ("WNRECR0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wnrecr0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of NRECR0");
 
-    addPar ("WISBJT", 0.0, false, NO_DEP,
+    p.addPar ("WISBJT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wisbjt,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of ISBJT");
 
-    addPar ("WISDIF", 0.0, false, NO_DEP,
+    p.addPar ("WISDIF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wisdif,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of ISDIF");
 
-    addPar ("WISREC", 0.0, false, NO_DEP,
+    p.addPar ("WISREC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wisrec,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of ISREC");
 
-    addPar ("WISTUN", 0.0, false, NO_DEP,
+    p.addPar ("WISTUN", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wistun,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of ISTUN");
 
-    addPar ("WVREC0", 0.0, false, NO_DEP,
+    p.addPar ("WVREC0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wvrec0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of VREC0");
 
-    addPar ("WVTUN0", 0.0, false, NO_DEP,
+    p.addPar ("WVTUN0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wvtun0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of VTUN0");
 
-    addPar ("WNBJT", 0.0, false, NO_DEP,
+    p.addPar ("WNBJT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wnbjt,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of NBJT");
 
-    addPar ("WLBJT0", 0.0, false, NO_DEP,
+    p.addPar ("WLBJT0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wlbjt0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of LBJT0");
 
-    addPar ("WVABJT", 0.0, false, NO_DEP,
+    p.addPar ("WVABJT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wvabjt,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of VABJT");
 
-    addPar ("WAELY", 0.0, false, NO_DEP,
+    p.addPar ("WAELY", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::waely,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of AELY");
 
-    addPar ("WAHLI", 0.0, false, NO_DEP,
+    p.addPar ("WAHLI", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wahli,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of AHLI");
 
-    addPar ("WVSDFB", 0.0, false, NO_DEP,
+    p.addPar ("WVSDFB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wvsdfb,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of VSDFB");
 
-    addPar ("WVSDTH", 0.0, false, NO_DEP,
+    p.addPar ("WVSDTH", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wvsdth,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of VSDTH");
 
-    addPar ("WDELVT", 0.0, false, NO_DEP,
+    p.addPar ("WDELVT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wdelvt,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of DELVT");
 
-    addPar ("WACDE", 0.0, false, NO_DEP,
+    p.addPar ("WACDE", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wacde,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of ACDE");
 
-    addPar ("WMOIN", 0.0, false, NO_DEP,
+    p.addPar ("WMOIN", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wmoin,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of MOIN");
 
-    addPar ("WNOFF", 0.0, false, NO_DEP,
+    p.addPar ("WNOFF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wnoff,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Width dependence of NOFF");
 
-    addPar ("WXRCRG1", 0.0, false, NO_DEP,
+    p.addPar ("WXRCRG1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wxrcrg1,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of XRCRG1");
 
-    addPar ("WXRCRG2", 0.0, false, NO_DEP,
+    p.addPar ("WXRCRG2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::wxrcrg2,
       NULL, U_INVALID, CAT_DEPENDENCY, "Width dependence of XRCRG2");
 
-    addPar ("PXJ", 0.0, false, NO_DEP,
+    p.addPar ("PXJ", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pxj,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of XJ");
 
-    addPar ("PALPHAGB1", 0.0, false, NO_DEP,
+    p.addPar ("PALPHAGB1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::palphaGB1,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of ALPHAGB1");
 
-    addPar ("PBETAGB1", 0.0, false, NO_DEP,
+    p.addPar ("PBETAGB1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pbetaGB1,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of BETAGB1");
 
-    addPar ("PALPHAGB2", 0.0, false, NO_DEP,
+    p.addPar ("PALPHAGB2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::palphaGB2,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of ALPHAGB2");
 
-    addPar ("PBETAGB2", 0.0, false, NO_DEP,
+    p.addPar ("PBETAGB2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pbetaGB2,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of BETAGB2");
 
-    addPar ("PCGSL", 0.0, false, NO_DEP,
+    p.addPar ("PCGSL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pcgsl,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of CGSL");
 
-    addPar ("PCGDL", 0.0, false, NO_DEP,
+    p.addPar ("PCGDL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pcgdl,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of CGDL");
 
-    addPar ("PCKAPPA", 0.0, false, NO_DEP,
+    p.addPar ("PCKAPPA", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pckappa,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of CKAPPA");
 
-    addPar ("PNDIF", 0.0, false, NO_DEP,
+    p.addPar ("PNDIF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pndif,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of NDIF");
 
-    addPar ("PUTE", 0.0, false, NO_DEP,
+    p.addPar ("PUTE", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pute,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of UTE");
 
-    addPar ("PKT1", 0.0, false, NO_DEP,
+    p.addPar ("PKT1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pkt1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of KT1");
 
-    addPar ("PKT1L", 0.0, false, NO_DEP,
+    p.addPar ("PKT1L", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pkt1l,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of KT1L");
 
-    addPar ("PKT2", 0.0, false, NO_DEP,
+    p.addPar ("PKT2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pkt2,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of KT2");
 
-    addPar ("PUA1", 0.0, false, NO_DEP,
+    p.addPar ("PUA1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pua1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of UA1");
 
-    addPar ("PUB1", 0.0, false, NO_DEP,
+    p.addPar ("PUB1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pub1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of UB1");
 
-    addPar ("PUC1", 0.0, false, NO_DEP,
+    p.addPar ("PUC1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::puc1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of UC1");
 
-    addPar ("PAT", 0.0, false, NO_DEP,
+    p.addPar ("PAT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pat,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of AT");
 
-    addPar ("PPRT", 0.0, false, NO_DEP,
+    p.addPar ("PPRT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pprt,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of PRT");
 
-    addPar ("PNTRECF", 0.0, false, NO_DEP,
+    p.addPar ("PNTRECF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pntrecf,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of NTRECF");
 
-    addPar ("PNTRECR", 0.0, false, NO_DEP,
+    p.addPar ("PNTRECR", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pntrecr,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of NTRECR");
 
-    addPar ("PXBJT", 0.0, false, NO_DEP,
+    p.addPar ("PXBJT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pxbjt,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of XBJT");
 
-    addPar ("PXDIF", 0.0, false, NO_DEP,
+    p.addPar ("PXDIF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pxdif,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of XDIF");
 
-    addPar ("PXREC", 0.0, false, NO_DEP,
+    p.addPar ("PXREC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pxrec,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of XREC");
 
-    addPar ("PXTUN", 0.0, false, NO_DEP,
+    p.addPar ("PXTUN", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pxtun,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of XTUN");
 
-    addPar ("PAIGC", 0.0, false, NO_DEP,
+    p.addPar ("PAIGC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::paigc,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of AIGC");
 
-    addPar ("PBIGC", 0.0, false, NO_DEP,
+    p.addPar ("PBIGC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pbigc,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of BIGC");
 
-    addPar ("PCIGC", 0.0, false, NO_DEP,
+    p.addPar ("PCIGC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pcigc,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of CIGC");
 
-    addPar ("PAIGSD", 0.0, false, NO_DEP,
+    p.addPar ("PAIGSD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::paigsd,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of AIGSD");
 
-    addPar ("PBIGSD", 0.0, false, NO_DEP,
+    p.addPar ("PBIGSD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pbigsd,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of BIGSD");
 
-    addPar ("PCIGSD", 0.0, false, NO_DEP,
+    p.addPar ("PCIGSD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pcigsd,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of CIGSD");
 
-    addPar ("PNIGC", 0.0, false, NO_DEP,
+    p.addPar ("PNIGC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pnigc,
       NULL, U_METER2, CAT_DEPENDENCY, "Cross-term dependence of NIGC");
 
-    addPar ("PPIGCD", 0.0, false, NO_DEP,
+    p.addPar ("PPIGCD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ppigcd,
       NULL, U_NONE, CAT_DEPENDENCY, "Cross-term dependence of PIGCD");
 
-    addPar ("PPOXEDGE", 0.0, false, NO_DEP,
+    p.addPar ("PPOXEDGE", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ppoxedge,
       NULL, U_METER2, CAT_DEPENDENCY, "Cross-term dependence of OXEDGE");
 
-    addPar ("PNCH", 0.0, false, NO_DEP,
+    p.addPar ("PNCH", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pnpeak,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of NCH");
 
-    addPar ("PNSUB", 0.0, false, NO_DEP,
+    p.addPar ("PNSUB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pnsub,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of NSUB");
 
-    addPar ("PNGATE", 0.0, false, NO_DEP,
+    p.addPar ("PNGATE", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pngate,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of NGATE");
 
-    addPar ("PVTH0", 0.0, false, NO_DEP,
+    p.addPar ("PVTH0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pvth0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of VT0");
 
-    addPar ("PK1", 0.0, false, NO_DEP,
+    p.addPar ("PK1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pk1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of K1");
 
-    addPar ("PK1W1", 0.0, false, NO_DEP,
+    p.addPar ("PK1W1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pk1w1,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of K1W1");
 
-    addPar ("PK1W2", 0.0, false, NO_DEP,
+    p.addPar ("PK1W2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pk1w2,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of K1W2");
 
-    addPar ("PK2", 0.0, false, NO_DEP,
+    p.addPar ("PK2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pk2,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of K2");
 
-    addPar ("PK3", 0.0, false, NO_DEP,
+    p.addPar ("PK3", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pk3,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of K3");
 
-    addPar ("PK3B", 0.0, false, NO_DEP,
+    p.addPar ("PK3B", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pk3b,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of K3B");
 
-    addPar ("PKB1", 0.0, false, NO_DEP,
+    p.addPar ("PKB1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pkb1,
       NULL, U_METER2, CAT_DEPENDENCY, "Cross-term dependence of KB1");
 
-    addPar ("PW0", 0.0, false, NO_DEP,
+    p.addPar ("PW0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pw0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of W0");
 
-    addPar ("PNLX", 0.0, false, NO_DEP,
+    p.addPar ("PNLX", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pnlx,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of NLX");
 
-    addPar ("PDVT0", 0.0, false, NO_DEP,
+    p.addPar ("PDVT0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pdvt0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of DVT0");
 
-    addPar ("PDVT1", 0.0, false, NO_DEP,
+    p.addPar ("PDVT1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pdvt1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of DVT1");
 
-    addPar ("PDVT2", 0.0, false, NO_DEP,
+    p.addPar ("PDVT2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pdvt2,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of DVT2");
 
-    addPar ("PDVT0W", 0.0, false, NO_DEP,
+    p.addPar ("PDVT0W", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pdvt0w,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of DVT0W");
 
-    addPar ("PDVT1W", 0.0, false, NO_DEP,
+    p.addPar ("PDVT1W", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pdvt1w,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of DVT1W");
 
-    addPar ("PDVT2W", 0.0, false, NO_DEP,
+    p.addPar ("PDVT2W", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pdvt2w,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of DVT2W");
 
-    addPar ("PU0", 0.0, false, NO_DEP,
+    p.addPar ("PU0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pu0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of U0");
 
-    addPar ("PUA", 0.0, false, NO_DEP,
+    p.addPar ("PUA", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pua,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of UA");
 
-    addPar ("PUB", 0.0, false, NO_DEP,
+    p.addPar ("PUB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pub,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of UB");
 
-    addPar ("PUC", 0.0, false, NO_DEP,
+    p.addPar ("PUC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::puc,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of UC");
 
-    addPar ("PVSAT", 0.0, false, NO_DEP,
+    p.addPar ("PVSAT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pvsat,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of VSAT");
 
-    addPar ("PA0", 0.0, false, NO_DEP,
+    p.addPar ("PA0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pa0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of A0");
 
-    addPar ("PAGS", 0.0, false, NO_DEP,
+    p.addPar ("PAGS", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pags,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of AGS");
 
-    addPar ("PB0", 0.0, false, NO_DEP,
+    p.addPar ("PB0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pb0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of B0");
 
-    addPar ("PB1", 0.0, false, NO_DEP,
+    p.addPar ("PB1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pb1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of B1");
 
-    addPar ("PKETA", 0.0, false, NO_DEP,
+    p.addPar ("PKETA", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pketa,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of KETA");
 
-    addPar ("PKETAS", 0.0, false, NO_DEP,
+    p.addPar ("PKETAS", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pketas,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of KETAS");
 
-    addPar ("PA1", 0.0, false, NO_DEP,
+    p.addPar ("PA1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pa1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of A1");
 
-    addPar ("PA2", 0.0, false, NO_DEP,
+    p.addPar ("PA2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pa2,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of A2");
 
-    addPar ("PRDSW", 0.0, false, NO_DEP,
+    p.addPar ("PRDSW", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::prdsw,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of RDSW");
 
-    addPar ("PPRWB", 0.0, false, NO_DEP,
+    p.addPar ("PPRWB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pprwb,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of PRWB");
 
-    addPar ("PPRWG", 0.0, false, NO_DEP,
+    p.addPar ("PPRWG", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pprwg,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of PRWG");
 
-    addPar ("PWR", 0.0, false, NO_DEP,
+    p.addPar ("PWR", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pwr,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of WR");
 
-    addPar ("PNFACTOR", 0.0, false, NO_DEP,
+    p.addPar ("PNFACTOR", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pnfactor,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of NFACTOR");
 
-    addPar ("PDWG", 0.0, false, NO_DEP,
+    p.addPar ("PDWG", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pdwg,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of DWG");
 
-    addPar ("PDWB", 0.0, false, NO_DEP,
+    p.addPar ("PDWB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pdwb,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of DWB");
 
-    addPar ("PVOFF", 0.0, false, NO_DEP,
+    p.addPar ("PVOFF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pvoff,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of VOFF");
 
-    addPar ("PETA0", 0.0, false, NO_DEP,
+    p.addPar ("PETA0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::peta0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of ETA0");
 
-    addPar ("PETAB", 0.0, false, NO_DEP,
+    p.addPar ("PETAB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::petab,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of ETAB");
 
-    addPar ("PDSUB", 0.0, false, NO_DEP,
+    p.addPar ("PDSUB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pdsub,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of DSUB");
 
-    addPar ("PCIT", 0.0, false, NO_DEP,
+    p.addPar ("PCIT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pcit,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of CIT");
 
-    addPar ("PCDSC", 0.0, false, NO_DEP,
+    p.addPar ("PCDSC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pcdsc,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of CDSC");
 
-    addPar ("PCDSCB", 0.0, false, NO_DEP,
+    p.addPar ("PCDSCB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pcdscb,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of CDSCB");
 
-    addPar ("PCDSCD", 0.0, false, NO_DEP,
+    p.addPar ("PCDSCD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pcdscd,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of CDSCD");
 
-    addPar ("PPCLM", 0.0, false, NO_DEP,
+    p.addPar ("PPCLM", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ppclm,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of PCLM");
 
-    addPar ("PPDIBLC1", 0.0, false, NO_DEP,
+    p.addPar ("PPDIBLC1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ppdibl1,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of PDIBLC1");
 
-    addPar ("PPDIBLC2", 0.0, false, NO_DEP,
+    p.addPar ("PPDIBLC2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ppdibl2,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of PDIBLC2");
 
-    addPar ("PPDIBLCB", 0.0, false, NO_DEP,
+    p.addPar ("PPDIBLCB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ppdiblb,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of PDIBLCB");
 
-    addPar ("PDROUT", 0.0, false, NO_DEP,
+    p.addPar ("PDROUT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pdrout,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of DROUT");
 
-    addPar ("PPVAG", 0.0, false, NO_DEP,
+    p.addPar ("PPVAG", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::ppvag,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of PVAG");
 
-    addPar ("PDELTA", 0.0, false, NO_DEP,
+    p.addPar ("PDELTA", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pdelta,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of DELTA");
 
-    addPar ("PALPHA0", 0.0, false, NO_DEP,
+    p.addPar ("PALPHA0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::palpha0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of ALPHA0");
 
-    addPar ("PFBJTII", 0.0, false, NO_DEP,
+    p.addPar ("PFBJTII", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pfbjtii,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of FBJTII");
 
-    addPar ("PBETA0", 0.0, false, NO_DEP,
+    p.addPar ("PBETA0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pbeta0,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of BETA0");
 
-    addPar ("PBETA1", 0.0, false, NO_DEP,
+    p.addPar ("PBETA1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pbeta1,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of BETA1");
 
-    addPar ("PBETA2", 0.0, false, NO_DEP,
+    p.addPar ("PBETA2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pbeta2,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of BETA2");
 
-    addPar ("PVDSATII0", 0.0, false, NO_DEP,
+    p.addPar ("PVDSATII0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pvdsatii0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of VDSATII0");
 
-    addPar ("PLII", 0.0, false, NO_DEP,
+    p.addPar ("PLII", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::plii,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of LII");
 
-    addPar ("PESATII", 0.0, false, NO_DEP,
+    p.addPar ("PESATII", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pesatii,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of ESATII");
 
-    addPar ("PSII0", 0.0, false, NO_DEP,
+    p.addPar ("PSII0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::psii0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of SII0");
 
-    addPar ("PSII1", 0.0, false, NO_DEP,
+    p.addPar ("PSII1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::psii1,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of SII1");
 
-    addPar ("PSII2", 0.0, false, NO_DEP,
+    p.addPar ("PSII2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::psii2,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of SII2");
 
-    addPar ("PSIID", 0.0, false, NO_DEP,
+    p.addPar ("PSIID", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::psiid,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of SIID");
 
-    addPar ("PAGIDL", 0.0, false, NO_DEP,
+    p.addPar ("PAGIDL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pagidl,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of AGIDL");
 
-    addPar ("PBGIDL", 0.0, false, NO_DEP,
+    p.addPar ("PBGIDL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pbgidl,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of BGIDL");
 
-    addPar ("PNGIDL", 0.0, false, NO_DEP,
+    p.addPar ("PNGIDL", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pngidl,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of NGIDL");
 
-    addPar ("PNTUN", 0.0, false, NO_DEP,
+    p.addPar ("PNTUN", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pntun,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of NTON");
 
-    addPar ("PNDIODE", 0.0, false, NO_DEP,
+    p.addPar ("PNDIODE", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pndiode,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of NDIODE");
 
-    addPar ("PNRECF0", 0.0, false, NO_DEP,
+    p.addPar ("PNRECF0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pnrecf0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of NRECF0");
 
-    addPar ("PNRECR0", 0.0, false, NO_DEP,
+    p.addPar ("PNRECR0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pnrecr0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of NRECR0");
 
-    addPar ("PISBJT", 0.0, false, NO_DEP,
+    p.addPar ("PISBJT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pisbjt,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of ISBJT");
 
-    addPar ("PISDIF", 0.0, false, NO_DEP,
+    p.addPar ("PISDIF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pisdif,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of ISDIF");
 
-    addPar ("PISREC", 0.0, false, NO_DEP,
+    p.addPar ("PISREC", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pisrec,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of ISREC");
 
-    addPar ("PISTUN", 0.0, false, NO_DEP,
+    p.addPar ("PISTUN", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pistun,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of ISTUN");
 
-    addPar ("PVREC0", 0.0, false, NO_DEP,
+    p.addPar ("PVREC0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pvrec0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of VREC0");
 
-    addPar ("PVTUN0", 0.0, false, NO_DEP,
+    p.addPar ("PVTUN0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pvtun0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of VTUN0");
 
-    addPar ("PNBJT", 0.0, false, NO_DEP,
+    p.addPar ("PNBJT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pnbjt,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of NBJT");
 
-    addPar ("PLBJT0", 0.0, false, NO_DEP,
+    p.addPar ("PLBJT0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::plbjt0,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of LBJT0");
 
-    addPar ("PVABJT", 0.0, false, NO_DEP,
+    p.addPar ("PVABJT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pvabjt,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of VABJT");
 
-    addPar ("PAELY", 0.0, false, NO_DEP,
+    p.addPar ("PAELY", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::paely,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of AELY");
 
-    addPar ("PAHLI", 0.0, false, NO_DEP,
+    p.addPar ("PAHLI", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pahli,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of AHLI");
 
-    addPar ("PVSDFB", 0.0, false, NO_DEP,
+    p.addPar ("PVSDFB", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pvsdfb,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of VSDFB");
 
-    addPar ("PVSDTH", 0.0, false, NO_DEP,
+    p.addPar ("PVSDTH", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pvsdth,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of VSDTH");
 
-    addPar ("PDELVT", 0.0, false, NO_DEP,
+    p.addPar ("PDELVT", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pdelvt,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of DELVT");
 
-    addPar ("PACDE", 0.0, false, NO_DEP,
+    p.addPar ("PACDE", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pacde,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of ACDE");
 
-    addPar ("PMOIN", 0.0, false, NO_DEP,
+    p.addPar ("PMOIN", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pmoin,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of MOIN");
 
-    addPar ("PNOFF", 0.0, false, NO_DEP,
+    p.addPar ("PNOFF", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pnoff,
       NULL,  U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of NOFF");
 
-    addPar ("PXRCRG1", 0.0, false, NO_DEP,
+    p.addPar ("PXRCRG1", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pxrcrg1,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of XRCRG1");
 
-    addPar ("PXRCRG2", 0.0, false, NO_DEP,
+    p.addPar ("PXRCRG2", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::pxrcrg2,
       NULL, U_INVALID, CAT_DEPENDENCY, "Cross-term dependence of XRCRG2");
 
-    addPar ("L", 5.0e-6, false, NO_DEP,
+    p.addPar ("L", 5.0e-6, false, NO_DEP,
       &MOSFET_B3SOI::Model::model_l,
       NULL, U_METER,  CAT_GEOMETRY, "Channel length");
 
-    addPar ("W", 5.0e-6, false, NO_DEP,
+    p.addPar ("W", 5.0e-6, false, NO_DEP,
       &MOSFET_B3SOI::Model::model_w,
       NULL, U_METER,  CAT_GEOMETRY, "Channel width");
 
-    addPar ("LMAX", 1.0, false, NO_DEP,
+    p.addPar ("LMAX", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Lmax,
       NULL,  U_METER, CAT_BIN, "Maximum channel length");
 
-    addPar ("LMIN", 0.0, false, NO_DEP,
+    p.addPar ("LMIN", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Lmin,
       NULL,  U_METER, CAT_BIN, "Minimum channel length");
 
-    addPar ("WMAX", 1.0, false, NO_DEP,
+    p.addPar ("WMAX", 1.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Wmax,
       NULL,  U_METER, CAT_BIN, "Maximum channel width");
 
-    addPar ("WMIN", 0.0, false, NO_DEP,
+    p.addPar ("WMIN", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::Wmin,
       NULL,  U_METER, CAT_BIN, "Minimum channel width");
 
-    addPar ("IGMOD", 0.0, false, NO_DEP,
+    p.addPar ("IGMOD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::igbMod,
       &MOSFET_B3SOI::Model::igbModGiven,
     U_NONE, CAT_TUNNEL, "Gate current model selector");
 
-    addPar ("IGBMOD", 0.0, false, NO_DEP,
+    p.addPar ("IGBMOD", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::igbMod,
       &MOSFET_B3SOI::Model::igbModGiven,
     U_NONE, CAT_NONE, "Flicker noise model selector");
 
-    addPar ("VTHO", 0.0, false, NO_DEP,
+    p.addPar ("VTHO", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::vth0,
       &MOSFET_B3SOI::Model::vth0Given,
     U_NONE, CAT_NONE, "Threshold voltage");
 
-    addPar ("VTH0", 0.0, false, NO_DEP,
+    p.addPar ("VTH0", 0.0, false, NO_DEP,
       &MOSFET_B3SOI::Model::vth0,
       &MOSFET_B3SOI::Model::vth0Given,
-    
        U_VOLT, CAT_DC, "Threshold voltage at Vbs = 0 for large L");
 
     // Set up non-double precision variables:
-    addPar ("VERSION", "3.2", false, NO_DEP,
-           &MOSFET_B3SOI::Model::version, NULL,
-           
-            U_NONE, CAT_CONTROL, "Version number");
-    addPar ("CAPMOD", 2, false, NO_DEP,
-           &MOSFET_B3SOI::Model::capMod, NULL,
-           
-            U_NONE, CAT_CONTROL, "Flag for capacitance models");
-    addPar ("MOBMOD", 1, false, NO_DEP,
-           &MOSFET_B3SOI::Model::mobMod, NULL,
-           
-            U_NONE, CAT_CONTROL, "Mobility model selector");
-    addPar ("PARAMCHK", 0, false, NO_DEP,
-           &MOSFET_B3SOI::Model::paramChk, NULL,
-           
-            U_NONE, CAT_CONTROL, "Parameter value check");
-    addPar ("BINUNIT", 1, false, NO_DEP,
-           &MOSFET_B3SOI::Model::binUnit, NULL,
-           
-            U_NONE, CAT_CONTROL, "Binning unit selector");
-    addPar ("SOIMOD", 0, false, NO_DEP,
-           &MOSFET_B3SOI::Model::soiMod, NULL,
-           U_NONE, CAT_VBI, "SIO model selector, SOIMOD=0: BSIMPD, SOIMOD=1: undefined model for PD and FE, SOIMOD=2: ideal FD");
-    addPar ("RGATEMOD", 0, false, NO_DEP,
-           &MOSFET_B3SOI::Model::rgateMod, NULL,
-           U_NONE, CAT_RF, "Gate resistance model selector");
-    addPar ("BUG1830FIX", 0, false, NO_DEP,
-           &MOSFET_B3SOI::Model::bug1830fix, NULL,
-           U_NONE, CAT_RF, "Voltage limter fix for bug 1830");
+    p.addPar ("VERSION", "3.2", &MOSFET_B3SOI::Model::version)
+      .setCategory(CAT_CONTROL)
+      .setDescription("Version number");
+    p.addPar ("CAPMOD", 2, &MOSFET_B3SOI::Model::capMod)
+      .setCategory(CAT_CONTROL)
+      .setDescription("Flag for capacitance models");
+    p.addPar ("MOBMOD", 1, &MOSFET_B3SOI::Model::mobMod)
+      .setCategory(CAT_CONTROL)
+      .setDescription("Mobility model selector");
+    p.addPar ("PARAMCHK", 0, &MOSFET_B3SOI::Model::paramChk)
+      .setCategory(CAT_CONTROL)
+      .setDescription("Parameter value check");
+    p.addPar ("BINUNIT", 1, &MOSFET_B3SOI::Model::binUnit)
+      .setCategory(CAT_CONTROL)
+      .setDescription("Binning unit selector");
+    p.addPar ("SOIMOD", 0, &MOSFET_B3SOI::Model::soiMod)
+      .setCategory(CAT_VBI)
+      .setDescription("SIO model selector, SOIMOD=0: BSIMPD, SOIMOD=1: undefined model for PD and FE, SOIMOD=2: ideal FD");
+    p.addPar ("RGATEMOD", 0, &MOSFET_B3SOI::Model::rgateMod)
+      .setCategory(CAT_RF)
+      .setDescription("Gate resistance model selector");
+    p.addPar ("BUG1830FIX", 0, &MOSFET_B3SOI::Model::bug1830fix)
+      .setCategory(CAT_RF)
+      .setDescription("Voltage limter fix for bug 1830");
 
     // Thermal model setup:
-    DeviceModel::initThermalModel(*this);
+    DeviceModel::initThermalModel(p);
 }
 
-namespace MOSFET_B3SOI {
+
 // static jacobian maps:
 
-vector< vector< vector<int> > > Instance::jacStamp_v;
-vector< vector<int> > Instance::jacMap_v;
-vector< vector< vector<int> > > Instance::jacMap2_v;
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
-}
-
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
+std::vector< std::vector< std::vector<int> > > Instance::jacStamp_v;
+std::vector< std::vector<int> > Instance::jacMap_v;
+std::vector< std::vector< std::vector<int> > > Instance::jacMap2_v;
 
 // pre-processor macros.  Note:  usually, numerical constants such as
 // EPSOX come from  Const.h.  The constants listed here are intended
@@ -2841,7 +2820,7 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Dave Shirley
 // Creation Date : 05/20/04
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
 
   // now set the temperature related stuff.
@@ -2858,14 +2837,12 @@ bool Instance::processParams (string param)
 // Creator       : Dave Shirley
 // Creation Date : 05/20/04
 //-----------------------------------------------------------------------------
-Instance::Instance
-( InstanceBlock & IB,
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock & IB,
   Model &model,
-  MatrixLoadData & mlData1,
-  SolverState &ss1,
-  ExternData  &ed1,
-  DeviceOptions & do1)
-  : DeviceInstance              (IB,mlData1,ss1,ed1,do1),
+  const FactoryBlock &  factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_                              (model),
     paramPtr                              (NULL),
     dNode                                 (0),
@@ -3215,7 +3192,6 @@ Instance::Instance
     Vdp_orig                              (0.0),
     Vgp_orig                              (0.0),
     Vgm_orig                              (0.0),
-    newtonIterOld                         (0),
     Vgsteff                               (0.0),
     Vdseff                                (0.0),
     ni                                    (0.0),
@@ -3731,7 +3707,7 @@ Instance::Instance
 
   // Set any non-constant parameter defaults:
   if (!given("TEMP"))
-    temp = devOptions.temp.dVal();
+    temp = getDeviceOptions().temp.getImmutableValue<double>();
   if (!given("L"))
     l =model_.model_l;
   if (!given("W"))
@@ -3754,39 +3730,39 @@ Instance::Instance
   selfheat = (model_.shMod == 1) && (rth0 != 0);
 
   if (soiMod == 3) /* auto selection */
+  {
      if (Vbs0t > model_.vbs0fd)
+     {
         soiMod = 2; /* ideal FD mode */
+     }
      else
+     {
         if (Vbs0t < model_.vbs0pd)
+        {
            soiMod = 0; /* BSIMPD */
+        }
         else
+        {
            soiMod = 1;
+        }
+     }
+  }
 
   // Calculate any parameters specified as expressions:
   updateDependentParameters();
 
   // calculate dependent (ie computed) params and check for errors:
   //
-  if (devOptions.verboseLevel > 0 && (l > model_.Lmax || l < model_.Lmin))
+  if (getDeviceOptions().verboseLevel > 0 && (l > model_.Lmax || l < model_.Lmin))
   {
-    ostringstream msg;
-    msg << ":: instance processParams \n"
-        << "channel length " << l << " out of specified range ("
-        << model_.Lmin << " , " << model_.Lmax << ")" << endl;
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this)<< "Channel length " << l << " out of specified range ("
+                     << model_.Lmin << " , " << model_.Lmax << ")";
   }
 
-  if (devOptions.verboseLevel > 0 && (w > model_.Wmax || w < model_.Wmin))
+  if (getDeviceOptions().verboseLevel > 0 && (w > model_.Wmax || w < model_.Wmin))
   {
-    ostringstream msg;
-    msg << ":: instance processParams \n"
-        << "channel width " << w << " out of specified range ("
-        << model_.Wmin << " , " << model_.Wmax << ")" << endl;
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Channel width " << w << " out of specified range ("
+                      << model_.Wmin << " , " << model_.Wmax << ")";
   }
 
   // The next block of code determines which of the nodes (solution variables)
@@ -3799,26 +3775,19 @@ Instance::Instance
   //
   if (numExtVars < 4 || (numExtVars < 5 && given("TNODEOUT")))
   {
-    string msg;
     if (given("TNODEOUT"))
-      msg += "Less than 5 external nodes with tnodeout set";
+      UserError0(*this) << "Less than 5 external nodes with tnodeout set";
     else
-      msg += "Less than 4 external nodes without tnodeout set";
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+      UserError0(*this) << "Less than 4 external nodes without tnodeout set";
   }
   if (numExtVars > 7 || (numExtVars > 6 && !given("TNODEOUT")))
   {
-    string msg;
     if (given("TNODEOUT"))
-      msg += "Over 7 nodes with tnodeout set";
+      UserError0(*this) << "Over 7 nodes with tnodeout set";
     else
-      msg += "Over 6 nodes without tnodeout set";
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+      UserError0(*this) <<"Over 6 nodes without tnodeout set";
   }
+
   numIntVars   = 0;
   floating = 0;
   dNode = 2;
@@ -3908,11 +3877,9 @@ Instance::Instance
           // error test - make sure body resistor has a nonzero value
           if ((model_.rbody == 0.0) && (model_.rbsh == 0.0))
           {
-             string msg =
-             "Instance::Instance:";
-             msg += "model parameter rbody=0!\n";
-             N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg);
-             model_.rbody = 1.;
+            UserWarning0(*this) << "Model parameter rbody is 0, setting to 1";
+
+            model_.rbody = 1.;
           }
         }
       }
@@ -3955,11 +3922,9 @@ Instance::Instance
             // error test - make sure body resistor has a nonzero value
             if ((model_.rbody == 0.0) && (model_.rbsh == 0.0))
             {
-               string msg =
-                 "Instance::Instance:";
-               msg += "model parameter rbody=0!\n";
-               N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg);
-               model_.rbody = 1.;
+              UserWarning0(*this) << "Model parameter rbody is 0, setting to 1";
+
+              model_.rbody = 1.;
             }
           }
         }
@@ -4065,8 +4030,8 @@ Instance::Instance
     if (icVPSGiven) ++numIntVars;
   }
 
-  if (!given("AD")) {drainArea = devOptions.defad;}
-  if (!given("AS")) {sourceArea = devOptions.defas;}
+  if (!given("AD")) {drainArea = getDeviceOptions().defad;}
+  if (!given("AS")) {sourceArea = getDeviceOptions().defas;}
 
   // process source/drain series resistance
   drainConductance = model_.sheetResistance * drainSquares;
@@ -4104,32 +4069,31 @@ Instance::Instance
   }
   if (k != numExtVars)
   {
-    cerr << endl;
-    cerr << "numExtVars  = " << numExtVars << endl;
-    cerr << "numIntVars  = " << numIntVars << endl;
-    cerr << "dNode = " << dNode << endl;
-    cerr << "gNode = " << gNode << endl;
-    cerr << "sNode = " << sNode << endl;
-    cerr << "eNode = " << eNode << endl;
-    cerr << "bNode = " << bNode << endl;
-    cerr << "pNode = " << pNode << endl;
-    cerr << "tNode = " << tNode << endl;
-    cerr << "dNodePrime = " << dNodePrime << endl;
-    cerr << "sNodePrime = " << sNodePrime << endl;
-    cerr << "gNodePrime = " << gNodePrime << endl;
-    cerr << "gNodeMid = " << gNodeMid << endl;
-    string msg = "Instance::Instance: Internal error in lead connectivity";
+    std::cerr << std::endl;
+    std::cerr << "numExtVars  = " << numExtVars << std::endl;
+    std::cerr << "numIntVars  = " << numIntVars << std::endl;
+    std::cerr << "dNode = " << dNode << std::endl;
+    std::cerr << "gNode = " << gNode << std::endl;
+    std::cerr << "sNode = " << sNode << std::endl;
+    std::cerr << "eNode = " << eNode << std::endl;
+    std::cerr << "bNode = " << bNode << std::endl;
+    std::cerr << "pNode = " << pNode << std::endl;
+    std::cerr << "tNode = " << tNode << std::endl;
+    std::cerr << "dNodePrime = " << dNodePrime << std::endl;
+    std::cerr << "sNodePrime = " << sNodePrime << std::endl;
+    std::cerr << "gNodePrime = " << gNodePrime << std::endl;
+    std::cerr << "gNodeMid = " << gNodeMid << std::endl;
+    std::string msg = "Instance::Instance: Internal error in lead connectivity";
+
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
   }
 
   setNumStoreVars(16);
   numStateVars = 6;
   numLeadCurrentStoreVars = 5; // drain, gate, source, ext & base lead currents
-  setName(IB.getName());
-  setModelName(model_.getName());
 
   blockHomotopyID =
-    devSupport.getGainScaleBlockID(devOptions.numGainScaleBlocks);
+    devSupport.getGainScaleBlockID(getDeviceOptions().numGainScaleBlocks);
   randomPerturb =
     devSupport.getRandomPerturbation();
 
@@ -4509,7 +4473,7 @@ void Instance::setupJacStamp ()
 
     // While we at it we'll add up how many extra terms we'll need in
     // each row
-    vector< int > additionalValues( numRows, 0 );
+    std::vector< int > additionalValues( numRows, 0 );
 
     if( icVDSGiven )
     {
@@ -4745,78 +4709,78 @@ void Instance::setupJacStamp ()
     }
 
 #ifdef Xyce_DEBUG_DEVICE
-    if (devOptions.debugLevel > 0)
+    if (getDeviceOptions().debugLevel > 0)
     {
-      cout << "Original jacobian stamp before IC's added" << endl;
+      Xyce::dout() << "Original jacobian stamp before IC's added" << std::endl;
       for( int rw=0; rw < jacStamp_v[ jacID ].size() ; ++rw  )
       {
-        cout << "jacStamp_v[ " << jacID << " ][ " << rw << "] = { " ;
+        Xyce::dout() << "jacStamp_v[ " << jacID << " ][ " << rw << "] = { " ;
         for( int cl=0; cl < jacStamp_v[ jacID ][rw].size(); ++cl )
         {
-          cout << jacStamp_v[ jacID ][rw][cl];
+          Xyce::dout() << jacStamp_v[ jacID ][rw][cl];
           if( cl != (jacStamp_v[ jacID ][rw].size()-1) )
           {
-            cout << ", ";
+            Xyce::dout() << ", ";
           }
         }
-        cout << "}" << endl;
+        Xyce::dout() << "}" << std::endl;
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
 
-      cout << "And as viewed through the maps"  << endl;
+      Xyce::dout() << "And as viewed through the maps"  << std::endl;
       for( int rw=0; rw < jacMap_v[ jacID ].size() ; ++rw  )
       {
-        cout << "jacStampIC[ " << jacID << " ][ " << jacMap_v[jacID][rw]
+        Xyce::dout() << "jacStampIC[ " << jacID << " ][ " << jacMap_v[jacID][rw]
         << "] = { " ;
         for( int cl=0; cl < jacMap2_v[ jacID ][rw].size(); ++cl )
         {
-          cout << jacStamp_v[jacID][jacMap_v[jacID][rw]][jacMap2_v[jacID][rw][cl]];
+          Xyce::dout() << jacStamp_v[jacID][jacMap_v[jacID][rw]][jacMap2_v[jacID][rw][cl]];
           if( cl != (jacMap2_v[ jacID ][rw].size()-1) )
           {
-            cout << ", ";
+            Xyce::dout() << ", ";
           }
         }
-        cout << "}" << endl;
+        Xyce::dout() << "}" << std::endl;
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
 
 
-      cout << "jacobian stamp including initial conditions: " << endl
-      << "icVDSRow = " << icVDSRow << endl
-      << "icVGSRow = " << icVGSRow << endl
-      << "icVBSRow = " << icVBSRow << endl
-      << "icVESRow = " << icVESRow << endl
-      << "icVPSRow = " << icVPSRow << endl;
+      Xyce::dout() << "jacobian stamp including initial conditions: " << std::endl
+      << "icVDSRow = " << icVDSRow << std::endl
+      << "icVGSRow = " << icVGSRow << std::endl
+      << "icVBSRow = " << icVBSRow << std::endl
+      << "icVESRow = " << icVESRow << std::endl
+      << "icVPSRow = " << icVPSRow << std::endl;
       for( int rw=0; rw < jacStampIC.size() ; ++rw  )
       {
-        cout << "jacStampIC[ " << rw << "] = { " ;
+        Xyce::dout() << "jacStampIC[ " << rw << "] = { " ;
         for( int cl=0; cl < jacStampIC[rw].size(); ++cl )
         {
-          cout << jacStampIC[rw][cl];
+          Xyce::dout() << jacStampIC[rw][cl];
           if( cl != (jacStampIC[rw].size()-1) )
           {
-            cout << ", ";
+            Xyce::dout() << ", ";
           }
         }
-        cout << "}" << endl;
+        Xyce::dout() << "}" << std::endl;
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
 
-      cout << "And as viewed through the maps"  << endl;
+      Xyce::dout() << "And as viewed through the maps"  << std::endl;
       for( int rw=0; rw < jacMapIC.size() ; ++rw  )
       {
-        cout << "jacStampIC[ " << jacMapIC[rw] << "] = { " ;
+        Xyce::dout() << "jacStampIC[ " << jacMapIC[rw] << "] = { " ;
         for( int cl=0; cl < jacMapIC2[rw].size(); ++cl )
         {
-          cout << jacStampIC[ jacMapIC[rw] ][ jacMapIC2[rw][cl] ];
+          Xyce::dout() << jacStampIC[ jacMapIC[rw] ][ jacMapIC2[rw][cl] ];
           if( cl != (jacMapIC2[rw].size()-1) )
           {
-            cout << ", ";
+            Xyce::dout() << ", ";
           }
         }
-        cout << "}" << endl;
+        Xyce::dout() << "}" << std::endl;
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
     }
 
 #endif // Xyce_DEBUG_DEVICE
@@ -4835,655 +4799,655 @@ void Instance::setupJacStamp ()
 //-----------------------------------------------------------------------------
 void Instance::debugOutputModelParams()
 {
-  if (devOptions.debugLevel > 0)
+  if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "------------------------------------------------------------"
-         <<endl;
-    cout << "Instance: constructor: "<< getName() <<endl;
-    cout << "Model Params:  " << endl;
-    cout << "capMod =                       " << model_.capMod << endl;
-    cout << "mobMod =                       " << model_.mobMod << endl;
-    cout << "paramChk =                     " << model_.paramChk << endl;
-    cout << "binUnit =                      " << model_.binUnit << endl;
-    cout << "version =                      " << model_.version << endl;
-    cout << "tox =                          " << model_.tox << endl;
-    cout << "toxm =                         " << model_.toxm << endl;
-    cout << "dtoxcv =                       " << model_.dtoxcv << endl;
-    cout << "cdsc =                         " << model_.cdsc << endl;
-    cout << "cdscb =                        " << model_.cdscb << endl;
-    cout << "cdscd =                        " << model_.cdscd << endl;
-    cout << "cit =                          " << model_.cit << endl;
-    cout << "nfactor =                      " << model_.nfactor << endl;
-    cout << "vsat =                         " << model_.vsat << endl;
-    cout << "at =                           " << model_.at << endl;
-    cout << "a0 =                           " << model_.a0 << endl;
-    cout << "ags =                          " << model_.ags << endl;
-    cout << "a1 =                           " << model_.a1 << endl;
-    cout << "a2 =                           " << model_.a2 << endl;
-    cout << "keta =                         " << model_.keta << endl;
-    cout << "nsub =                         " << model_.nsub << endl;
-    cout << "npeak =                        " << model_.npeak << endl;
-    cout << "ngate =                        " << model_.ngate << endl;
-    cout << "gamma1 =                       " << model_.gamma1 << endl;
-    cout << "gamma2 =                       " << model_.gamma2 << endl;
-    cout << "vbx =                          " << model_.vbx << endl;
-    cout << "vbm =                          " << model_.vbm << endl;
-    cout << "xt =                           " << model_.xt << endl;
-    cout << "k1 =                           " << model_.k1 << endl;
-    cout << "kt1 =                          " << model_.kt1 << endl;
-    cout << "kt1l =                         " << model_.kt1l << endl;
-    cout << "kt2 =                          " << model_.kt2 << endl;
-    cout << "k2 =                           " << model_.k2 << endl;
-    cout << "k3 =                           " << model_.k3 << endl;
-    cout << "k3b =                          " << model_.k3b << endl;
-    cout << "w0 =                           " << model_.w0 << endl;
-    cout << "nlx =                          " << model_.nlx << endl;
-    cout << "dvt0 =                         " << model_.dvt0 << endl;
-    cout << "dvt1 =                         " << model_.dvt1 << endl;
-    cout << "dvt2 =                         " << model_.dvt2 << endl;
-    cout << "dvt0w =                        " << model_.dvt0w << endl;
-    cout << "dvt1w =                        " << model_.dvt1w << endl;
-    cout << "dvt2w =                        " << model_.dvt2w << endl;
-    cout << "drout =                        " << model_.drout << endl;
-    cout << "dsub =                         " << model_.dsub << endl;
-    cout << "vth0=                          " << model_.vth0 << endl;
-    cout << "ua =                           " << model_.ua << endl;
-    cout << "ua1 =                          " << model_.ua1 << endl;
-    cout << "ub =                           " << model_.ub << endl;
-    cout << "ub1 =                          " << model_.ub1 << endl;
-    cout << "uc =                           " << model_.uc << endl;
-    cout << "uc1 =                          " << model_.uc1 << endl;
-    cout << "u0 =                           " << model_.u0 << endl;
-    cout << "ute =                          " << model_.ute << endl;
-    cout << "voff =                         " << model_.voff << endl;
-    cout << "tnom =                         " << model_.tnom << endl;
-    cout << "cgso =                         " << model_.cgso << endl;
-    cout << "cgdo =                         " << model_.cgdo << endl;
-    cout << "xpart =                        " << model_.xpart << endl;
-    cout << "delta =                        " << model_.delta << endl;
-    cout << "sheetResistance =              " << model_.sheetResistance << endl;
-    cout << "rdsw =                         " << model_.rdsw << endl;
-    cout << "prwg =                         " << model_.prwg << endl;
-    cout << "prwb =                         " << model_.prwb << endl;
-    cout << "prt =                          " << model_.prt << endl;
-    cout << "eta0 =                         " << model_.eta0 << endl;
-    cout << "etab =                         " << model_.etab << endl;
-    cout << "pclm =                         " << model_.pclm << endl;
-    cout << "pdibl1 =                       " << model_.pdibl1 << endl;
-    cout << "pdibl2 =                       " << model_.pdibl2 << endl;
-    cout << "pdiblb =                       " << model_.pdiblb << endl;
-    cout << "pvag =                         " << model_.pvag << endl;
-    cout << "shMod =                        " << model_.shMod << endl;
-    cout << "tbox =                         " << model_.tbox << endl;
-    cout << "tsi =                          " << model_.tsi << endl;
-    cout << "xj =                           " << model_.xj << endl;
-    cout << "rth0 =                         " << model_.rth0 << endl;
-    cout << "cth0 =                         " << model_.cth0 << endl;
-    cout << "ngidl =                        " << model_.ngidl << endl;
-    cout << "agidl =                        " << model_.agidl << endl;
-    cout << "bgidl =                        " << model_.bgidl << endl;
-    cout << "ndiode =                       " << model_.ndiode << endl;
-    cout << "xbjt =                         " << model_.xbjt << endl;
-    cout << "xdif =                         " << model_.xdif << endl;
-    cout << "xrec =                         " << model_.xrec << endl;
-    cout << "xtun =                         " << model_.xtun << endl;
-    cout << "GatesidewallJctPotential =     " << model_.GatesidewallJctPotential << endl;
-    cout << "bodyJctGateSideGradingCoeff =  " << model_.bodyJctGateSideGradingCoeff << endl;
-    cout << "unitLengthGateSidewallJctCap = " << model_.unitLengthGateSidewallJctCap << endl;
-    cout << "Lint =                         " << model_.Lint << endl;
-    cout << "Ll =                           " << model_.Ll << endl;
-    cout << "Llc =                          " << model_.Llc << endl;
-    cout << "Lln =                          " << model_.Lln << endl;
-    cout << "Lw =                           " << model_.Lw << endl;
-    cout << "Lwc =                          " << model_.Lwc << endl;
-    cout << "Lwn =                          " << model_.Lwn << endl;
-    cout << "Lwl =                          " << model_.Lwl << endl;
-    cout << "Lwlc =                         " << model_.Lwlc << endl;
-    cout << "wr =                           " << model_.wr << endl;
-    cout << "Wint =                         " << model_.Wint << endl;
-    cout << "dwg =                          " << model_.dwg << endl;
-    cout << "dwb =                          " << model_.dwb << endl;
-    cout << "Wl =                           " << model_.Wl << endl;
-    cout << "Wlc =                          " << model_.Wlc << endl;
-    cout << "Wln =                          " << model_.Wln << endl;
-    cout << "Ww =                           " << model_.Ww << endl;
-    cout << "Wwc =                          " << model_.Wwc << endl;
-    cout << "Wwn =                          " << model_.Wwn << endl;
-    cout << "Wwl =                          " << model_.Wwl << endl;
-    cout << "Wwlc =                         " << model_.Wwlc << endl;
-    cout << "b0 =                           " << model_.b0 << endl;
-    cout << "b1 =                           " << model_.b1 << endl;
-    cout << "cgsl =                         " << model_.cgsl << endl;
-    cout << "cgdl =                         " << model_.cgdl << endl;
-    cout << "ckappa =                       " << model_.ckappa << endl;
-    cout << "cf =                           " << model_.cf << endl;
-    cout << "clc =                          " << model_.clc << endl;
-    cout << "cle =                          " << model_.cle << endl;
-    cout << "dwc =                          " << model_.dwc << endl;
-    cout << "dlc =                          " << model_.dlc << endl;
-    cout << "alpha0 =                       " << model_.alpha0 << endl;
-    cout << "oxideTrapDensityA =            " << model_.oxideTrapDensityA << endl;
-    cout << "oxideTrapDensityB =            " << model_.oxideTrapDensityB << endl;
-    cout << "oxideTrapDensityC =            " << model_.oxideTrapDensityC << endl;
-    cout << "fnoiMod =                      " << model_.fnoiMod << endl;
-    cout << "tnoiMod =                      " << model_.tnoiMod << endl;
-    cout << "tnoia =                        " << model_.tnoia << endl;
-    cout << "tnoib =                        " << model_.tnoib << endl;
-    cout << "rnoia =                        " << model_.rnoia << endl;
-    cout << "rnoib =                        " << model_.rnoib << endl;
-    cout << "ntnoi =                        " << model_.ntnoi << endl;
-    cout << "em =                           " << model_.em << endl;
-    cout << "ef =                           " << model_.ef << endl;
-    cout << "af =                           " << model_.af << endl;
-    cout << "kf =                           " << model_.kf << endl;
-    cout << "noif =                         " << model_.noif << endl;
-    cout << "k1w1 =                         " << model_.k1w1 << endl;
-    cout << "k1w2 =                         " << model_.k1w2 << endl;
-    cout << "ketas =                        " << model_.ketas << endl;
-    cout << "dwbc =                         " << model_.dwbc << endl;
-    cout << "beta0 =                        " << model_.beta0 << endl;
-    cout << "beta1 =                        " << model_.beta1 << endl;
-    cout << "beta2 =                        " << model_.beta2 << endl;
-    cout << "vdsatii0 =                     " << model_.vdsatii0 << endl;
-    cout << "tii =                          " << model_.tii << endl;
-    cout << "lii =                          " << model_.lii << endl;
-    cout << "sii0 =                         " << model_.sii0 << endl;
-    cout << "sii1 =                         " << model_.sii1 << endl;
-    cout << "sii2 =                         " << model_.sii2 << endl;
-    cout << "siid =                         " << model_.siid << endl;
-    cout << "fbjtii =                       " << model_.fbjtii << endl;
-    cout << "esatii =                       " << model_.esatii << endl;
-    cout << "ntun =                         " << model_.ntun << endl;
-    cout << "nrecf0 =                       " << model_.nrecf0 << endl;
-    cout << "nrecr0 =                       " << model_.nrecr0 << endl;
-    cout << "isbjt =                        " << model_.isbjt << endl;
-    cout << "isdif =                        " << model_.isdif << endl;
-    cout << "isrec =                        " << model_.isrec << endl;
-    cout << "istun =                        " << model_.istun << endl;
-    cout << "ln =                           " << model_.ln << endl;
-    cout << "vrec0 =                        " << model_.vrec0 << endl;
-    cout << "vtun0 =                        " << model_.vtun0 << endl;
-    cout << "nbjt =                         " << model_.nbjt << endl;
-    cout << "lbjt0 =                        " << model_.lbjt0 << endl;
-    cout << "ldif0 =                        " << model_.ldif0 << endl;
-    cout << "vabjt =                        " << model_.vabjt << endl;
-    cout << "aely =                         " << model_.aely << endl;
-    cout << "ahli =                         " << model_.ahli << endl;
-    cout << "rbody =                        " << model_.rbody << endl;
-    cout << "rbsh =                         " << model_.rbsh << endl;
-    cout << "cgeo =                         " << model_.cgeo << endl;
-    cout << "tt =                           " << model_.tt << endl;
-    cout << "ndif =                         " << model_.ndif << endl;
-    cout << "vsdfb =                        " << model_.vsdfb << endl;
-    cout << "vsdth =                        " << model_.vsdth << endl;
-    cout << "csdmin =                       " << model_.csdmin << endl;
-    cout << "asd =                          " << model_.asd << endl;
-    cout << "csdesw =                       " << model_.csdesw << endl;
-    cout << "ntrecf =                       " << model_.ntrecf << endl;
-    cout << "ntrecr =                       " << model_.ntrecr << endl;
-    cout << "dlcb =                         " << model_.dlcb << endl;
-    cout << "fbody =                        " << model_.fbody << endl;
-    cout << "tcjswg =                       " << model_.tcjswg << endl;
-    cout << "tpbswg =                       " << model_.tpbswg << endl;
-    cout << "acde =                         " << model_.acde << endl;
-    cout << "moin =                         " << model_.moin << endl;
-    cout << "noff =                         " << model_.noff << endl;
-    cout << "delvt =                        " << model_.delvt << endl;
-    cout << "kb1 =                          " << model_.kb1 << endl;
-    cout << "dlbg =                         " << model_.dlbg << endl;
-    cout << "igbMod =                       " << model_.igbMod << endl;
-    cout << "igcMod=                        " << model_.igcMod << endl;
-    cout << "toxqm =                        " << model_.toxqm << endl;
-    cout << "wth0 =                         " << model_.wth0 << endl;
-    cout << "rhalo =                        " << model_.rhalo << endl;
-    cout << "ntox =                         " << model_.ntox << endl;
-    cout << "toxref =                       " << model_.toxref << endl;
-    cout << "ebg =                          " << model_.ebg << endl;
-    cout << "vevb =                         " << model_.vevb << endl;
-    cout << "alphaGB1 =                     " << model_.alphaGB1 << endl;
-    cout << "betaGB1 =                      " << model_.betaGB1 << endl;
-    cout << "vgb1 =                         " << model_.vgb1 << endl;
-    cout << "vecb =                         " << model_.vecb << endl;
-    cout << "alphaGB2 =                     " << model_.alphaGB2 << endl;
-    cout << "betaGB2 =                      " << model_.betaGB2 << endl;
-    cout << "vgb2 =                         " << model_.vgb2 << endl;
-    cout << "voxh =                         " << model_.voxh << endl;
-    cout << "deltavox =                     " << model_.deltavox << endl;
-    cout << "aigc =                         " << model_.aigc << endl;
-    cout << "bigc =                         " << model_.bigc << endl;
-    cout << "cigc =                         " << model_.cigc << endl;
-    cout << "aigsd =                        " << model_.aigsd << endl;
-    cout << "bigsd =                        " << model_.bigsd << endl;
-    cout << "cigsd =                        " << model_.cigsd << endl;
-    cout << "nigc =                         " << model_.nigc << endl;
-    cout << "pigcd =                        " << model_.pigcd << endl;
-    cout << "poxedge =                      " << model_.poxedge << endl;
-    cout << "dlcig =                        " << model_.dlcig << endl;
-    cout << "soiMod =                       " << model_.soiMod << endl;
-    cout << "vbs0pd =                       " << model_.vbs0pd << endl;
-    cout << "vbs0fd =                       " << model_.vbs0fd << endl;
-    cout << "vbsa =                         " << model_.vbsa << endl;
-    cout << "nofffd =                       " << model_.nofffd << endl;
-    cout << "vofffd =                       " << model_.vofffd << endl;
-    cout << "k1b =                          " << model_.k1b << endl;
-    cout << "k2b =                          " << model_.k2b << endl;
-    cout << "dk2b =                         " << model_.dk2b << endl;
-    cout << "dvbd0 =                        " << model_.dvbd0 << endl;
-    cout << "dvbd1 =                        " << model_.dvbd1 << endl;
-    cout << "moinFD =                       " << model_.moinFD << endl;
-    cout << "rgateMod =                     " << model_.rgateMod << endl;
-    cout << "xrcrg1 =                       " << model_.xrcrg1 << endl;
-    cout << "xrcrg2 =                       " << model_.xrcrg2 << endl;
-    cout << "rshg =                         " << model_.rshg << endl;
-    cout << "ngcon =                        " << model_.ngcon << endl;
-    cout << "xgw =                          " << model_.xgw << endl;
-    cout << "xgl =                          " << model_.xgl << endl;
-    cout << "lxj =                          " << model_.lxj << endl;
-    cout << "lalphaGB1 =                    " << model_.lalphaGB1 << endl;
-    cout << "lbetaGB1 =                     " << model_.lbetaGB1 << endl;
-    cout << "lalphaGB2 =                    " << model_.lalphaGB2 << endl;
-    cout << "lbetaGB2 =                     " << model_.lbetaGB2 << endl;
-    cout << "lcgsl =                        " << model_.lcgsl << endl;
-    cout << "lcgdl =                        " << model_.lcgdl << endl;
-    cout << "lckappa =                      " << model_.lckappa << endl;
-    cout << "lndif =                        " << model_.lndif << endl;
-    cout << "lute =                         " << model_.lute << endl;
-    cout << "lkt1 =                         " << model_.lkt1 << endl;
-    cout << "lkt1l =                        " << model_.lkt1l << endl;
-    cout << "lkt2 =                         " << model_.lkt2 << endl;
-    cout << "lua1 =                         " << model_.lua1 << endl;
-    cout << "lub1 =                         " << model_.lub1 << endl;
-    cout << "luc1 =                         " << model_.luc1 << endl;
-    cout << "lat =                          " << model_.lat << endl;
-    cout << "lprt =                         " << model_.lprt << endl;
-    cout << "lntrecf =                      " << model_.lntrecf << endl;
-    cout << "lntrecr =                      " << model_.lntrecr << endl;
-    cout << "lxbjt =                        " << model_.lxbjt << endl;
-    cout << "lxdif =                        " << model_.lxdif << endl;
-    cout << "lxrec =                        " << model_.lxrec << endl;
-    cout << "lxtun =                        " << model_.lxtun << endl;
-    cout << "laigc =                        " << model_.laigc << endl;
-    cout << "lbigc =                        " << model_.lbigc << endl;
-    cout << "lcigc =                        " << model_.lcigc << endl;
-    cout << "laigsd =                       " << model_.laigsd << endl;
-    cout << "lbigsd =                       " << model_.lbigsd << endl;
-    cout << "lcigsd =                       " << model_.lcigsd << endl;
-    cout << "lnigc =                        " << model_.lnigc << endl;
-    cout << "lpigcd =                       " << model_.lpigcd << endl;
-    cout << "lpoxedge =                     " << model_.lpoxedge << endl;
-    cout << "lnpeak =                       " << model_.lnpeak << endl;
-    cout << "lnsub =                        " << model_.lnsub << endl;
-    cout << "lngate =                       " << model_.lngate << endl;
-    cout << "lvth0 =                        " << model_.lvth0 << endl;
-    cout << "lk1 =                          " << model_.lk1 << endl;
-    cout << "lk1w1 =                        " << model_.lk1w1 << endl;
-    cout << "lk1w2 =                        " << model_.lk1w2 << endl;
-    cout << "lk2 =                          " << model_.lk2 << endl;
-    cout << "lk3 =                          " << model_.lk3 << endl;
-    cout << "lk3b =                         " << model_.lk3b << endl;
-    cout << "lkb1 =                         " << model_.lkb1 << endl;
-    cout << "lw0 =                          " << model_.lw0 << endl;
-    cout << "lnlx =                         " << model_.lnlx << endl;
-    cout << "ldvt0 =                        " << model_.ldvt0 << endl;
-    cout << "ldvt1 =                        " << model_.ldvt1 << endl;
-    cout << "ldvt2 =                        " << model_.ldvt2 << endl;
-    cout << "ldvt0w =                       " << model_.ldvt0w << endl;
-    cout << "ldvt1w =                       " << model_.ldvt1w << endl;
-    cout << "ldvt2w =                       " << model_.ldvt2w << endl;
-    cout << "lu0 =                          " << model_.lu0 << endl;
-    cout << "lua =                          " << model_.lua << endl;
-    cout << "lub =                          " << model_.lub << endl;
-    cout << "luc =                          " << model_.luc << endl;
-    cout << "lvsat =                        " << model_.lvsat << endl;
-    cout << "la0 =                          " << model_.la0 << endl;
-    cout << "lags =                         " << model_.lags << endl;
-    cout << "lb0 =                          " << model_.lb0 << endl;
-    cout << "lb1 =                          " << model_.lb1 << endl;
-    cout << "lketa =                        " << model_.lketa << endl;
-    cout << "lketas =                       " << model_.lketas << endl;
-    cout << "la1 =                          " << model_.la1 << endl;
-    cout << "la2 =                          " << model_.la2 << endl;
-    cout << "lrdsw =                        " << model_.lrdsw << endl;
-    cout << "lprwb =                        " << model_.lprwb << endl;
-    cout << "lprwg =                        " << model_.lprwg << endl;
-    cout << "lwr =                          " << model_.lwr << endl;
-    cout << "lnfactor =                     " << model_.lnfactor << endl;
-    cout << "ldwg =                         " << model_.ldwg << endl;
-    cout << "ldwb =                         " << model_.ldwb << endl;
-    cout << "lvoff =                        " << model_.lvoff << endl;
-    cout << "leta0 =                        " << model_.leta0 << endl;
-    cout << "letab =                        " << model_.letab << endl;
-    cout << "ldsub =                        " << model_.ldsub << endl;
-    cout << "lcit =                         " << model_.lcit << endl;
-    cout << "lcdsc =                        " << model_.lcdsc << endl;
-    cout << "lcdscb =                       " << model_.lcdscb << endl;
-    cout << "lcdscd =                       " << model_.lcdscd << endl;
-    cout << "lpclm =                        " << model_.lpclm << endl;
-    cout << "lpdibl1 =                      " << model_.lpdibl1 << endl;
-    cout << "lpdibl2 =                      " << model_.lpdibl2 << endl;
-    cout << "lpdiblb =                      " << model_.lpdiblb << endl;
-    cout << "ldrout =                       " << model_.ldrout << endl;
-    cout << "lpvag =                        " << model_.lpvag << endl;
-    cout << "ldelta =                       " << model_.ldelta << endl;
-    cout << "lalpha0 =                      " << model_.lalpha0 << endl;
-    cout << "lfbjtii =                      " << model_.lfbjtii << endl;
-    cout << "lbeta0 =                       " << model_.lbeta0 << endl;
-    cout << "lbeta1 =                       " << model_.lbeta1 << endl;
-    cout << "lbeta2 =                       " << model_.lbeta2 << endl;
-    cout << "lvdsatii0 =                    " << model_.lvdsatii0 << endl;
-    cout << "llii =                         " << model_.llii << endl;
-    cout << "lesatii =                      " << model_.lesatii << endl;
-    cout << "lsii0 =                        " << model_.lsii0 << endl;
-    cout << "lsii1 =                        " << model_.lsii1 << endl;
-    cout << "lsii2 =                        " << model_.lsii2 << endl;
-    cout << "lsiid =                        " << model_.lsiid << endl;
-    cout << "lagidl =                       " << model_.lagidl << endl;
-    cout << "lbgidl =                       " << model_.lbgidl << endl;
-    cout << "lngidl =                       " << model_.lngidl << endl;
-    cout << "lntun =                        " << model_.lntun << endl;
-    cout << "lndiode =                      " << model_.lndiode << endl;
-    cout << "lnrecf0 =                      " << model_.lnrecf0 << endl;
-    cout << "lnrecr0 =                      " << model_.lnrecr0 << endl;
-    cout << "lisbjt =                       " << model_.lisbjt << endl;
-    cout << "lisdif =                       " << model_.lisdif << endl;
-    cout << "lisrec =                       " << model_.lisrec << endl;
-    cout << "listun =                       " << model_.listun << endl;
-    cout << "lvrec0 =                       " << model_.lvrec0 << endl;
-    cout << "lvtun0 =                       " << model_.lvtun0 << endl;
-    cout << "lnbjt =                        " << model_.lnbjt << endl;
-    cout << "llbjt0 =                       " << model_.llbjt0 << endl;
-    cout << "lvabjt =                       " << model_.lvabjt << endl;
-    cout << "laely =                        " << model_.laely << endl;
-    cout << "lahli =                        " << model_.lahli << endl;
-    cout << "lvsdfb =                       " << model_.lvsdfb << endl;
-    cout << "lvsdth =                       " << model_.lvsdth << endl;
-    cout << "ldelvt =                       " << model_.ldelvt << endl;
-    cout << "lacde =                        " << model_.lacde << endl;
-    cout << "lmoin =                        " << model_.lmoin << endl;
-    cout << "lnoff =                        " << model_.lnoff << endl;
-    cout << "lxrcrg1 =                      " << model_.lxrcrg1 << endl;
-    cout << "lxrcrg2 =                      " << model_.lxrcrg2 << endl;
-    cout << "wxj =                          " << model_.wxj << endl;
-    cout << "walphaGB1 =                    " << model_.walphaGB1 << endl;
-    cout << "wbetaGB1 =                     " << model_.wbetaGB1 << endl;
-    cout << "walphaGB2 =                    " << model_.walphaGB2 << endl;
-    cout << "wbetaGB2 =                     " << model_.wbetaGB2 << endl;
-    cout << "wcgsl =                        " << model_.wcgsl << endl;
-    cout << "wcgdl =                        " << model_.wcgdl << endl;
-    cout << "wckappa =                      " << model_.wckappa << endl;
-    cout << "wndif =                        " << model_.wndif << endl;
-    cout << "wute =                         " << model_.wute << endl;
-    cout << "wkt1 =                         " << model_.wkt1 << endl;
-    cout << "wkt1l =                        " << model_.wkt1l << endl;
-    cout << "wkt2 =                         " << model_.wkt2 << endl;
-    cout << "wua1 =                         " << model_.wua1 << endl;
-    cout << "wub1 =                         " << model_.wub1 << endl;
-    cout << "wuc1 =                         " << model_.wuc1 << endl;
-    cout << "wat =                          " << model_.wat << endl;
-    cout << "wprt =                         " << model_.wprt << endl;
-    cout << "wntrecf =                      " << model_.wntrecf << endl;
-    cout << "wntrecr =                      " << model_.wntrecr << endl;
-    cout << "wxbjt =                        " << model_.wxbjt << endl;
-    cout << "wxdif =                        " << model_.wxdif << endl;
-    cout << "wxrec =                        " << model_.wxrec << endl;
-    cout << "wxtun =                        " << model_.wxtun << endl;
-    cout << "waigc =                        " << model_.waigc << endl;
-    cout << "wbigc =                        " << model_.wbigc << endl;
-    cout << "wcigc =                        " << model_.wcigc << endl;
-    cout << "waigsd =                       " << model_.waigsd << endl;
-    cout << "wbigsd =                       " << model_.wbigsd << endl;
-    cout << "wcigsd =                       " << model_.wcigsd << endl;
-    cout << "wnigc =                        " << model_.wnigc << endl;
-    cout << "wpigcd =                       " << model_.wpigcd << endl;
-    cout << "wpoxedge =                     " << model_.wpoxedge << endl;
-    cout << "wnpeak =                       " << model_.wnpeak << endl;
-    cout << "wnsub =                        " << model_.wnsub << endl;
-    cout << "wngate =                       " << model_.wngate << endl;
-    cout << "wvth0 =                        " << model_.wvth0 << endl;
-    cout << "wk1 =                          " << model_.wk1 << endl;
-    cout << "wk1w1 =                        " << model_.wk1w1 << endl;
-    cout << "wk1w2 =                        " << model_.wk1w2 << endl;
-    cout << "wk2 =                          " << model_.wk2 << endl;
-    cout << "wk3 =                          " << model_.wk3 << endl;
-    cout << "wk3b =                         " << model_.wk3b << endl;
-    cout << "wkb1 =                         " << model_.wkb1 << endl;
-    cout << "ww0 =                          " << model_.ww0 << endl;
-    cout << "wnlx =                         " << model_.wnlx << endl;
-    cout << "wdvt0 =                        " << model_.wdvt0 << endl;
-    cout << "wdvt1 =                        " << model_.wdvt1 << endl;
-    cout << "wdvt2 =                        " << model_.wdvt2 << endl;
-    cout << "wdvt0w =                       " << model_.wdvt0w << endl;
-    cout << "wdvt1w =                       " << model_.wdvt1w << endl;
-    cout << "wdvt2w =                       " << model_.wdvt2w << endl;
-    cout << "wu0 =                          " << model_.wu0 << endl;
-    cout << "wua =                          " << model_.wua << endl;
-    cout << "wub =                          " << model_.wub << endl;
-    cout << "wuc =                          " << model_.wuc << endl;
-    cout << "wvsat =                        " << model_.wvsat << endl;
-    cout << "wa0 =                          " << model_.wa0 << endl;
-    cout << "wags =                         " << model_.wags << endl;
-    cout << "wb0 =                          " << model_.wb0 << endl;
-    cout << "wb1 =                          " << model_.wb1 << endl;
-    cout << "wketa =                        " << model_.wketa << endl;
-    cout << "wketas =                       " << model_.wketas << endl;
-    cout << "wa1 =                          " << model_.wa1 << endl;
-    cout << "wa2 =                          " << model_.wa2 << endl;
-    cout << "wrdsw=                         " << model_.wrdsw << endl;
-    cout << "wprwb =                        " << model_.wprwb << endl;
-    cout << "wprwg =                        " << model_.wprwg << endl;
-    cout << "wwr =                          " << model_.wwr << endl;
-    cout << "wnfactor =                     " << model_.wnfactor << endl;
-    cout << "wdwg =                         " << model_.wdwg << endl;
-    cout << "wdwb =                         " << model_.wdwb << endl;
-    cout << "wvoff =                        " << model_.wvoff << endl;
-    cout << "weta0 =                        " << model_.weta0 << endl;
-    cout << "wetab =                        " << model_.wetab << endl;
-    cout << "wdsub =                        " << model_.wdsub << endl;
-    cout << "wcit =                         " << model_.wcit << endl;
-    cout << "wcdsc =                        " << model_.wcdsc << endl;
-    cout << "wcdscb =                       " << model_.wcdscb << endl;
-    cout << "wcdscd =                       " << model_.wcdscd << endl;
-    cout << "wpclm =                        " << model_.wpclm << endl;
-    cout << "wpdibl1 =                      " << model_.wpdibl1 << endl;
-    cout << "wpdibl2 =                      " << model_.wpdibl2 << endl;
-    cout << "wpdiblb =                      " << model_.wpdiblb << endl;
-    cout << "wdrout =                       " << model_.wdrout << endl;
-    cout << "wpvag =                        " << model_.wpvag << endl;
-    cout << "wdelta =                       " << model_.wdelta << endl;
-    cout << "walpha0 =                      " << model_.walpha0 << endl;
-    cout << "wfbjtii =                      " << model_.wfbjtii << endl;
-    cout << "wbeta0 =                       " << model_.wbeta0 << endl;
-    cout << "wbeta1 =                       " << model_.wbeta1 << endl;
-    cout << "wbeta2 =                       " << model_.wbeta2 << endl;
-    cout << "wvdsatii0 =                    " << model_.wvdsatii0 << endl;
-    cout << "wlii =                         " << model_.wlii << endl;
-    cout << "wesatii =                      " << model_.wesatii << endl;
-    cout << "wsii0 =                        " << model_.wsii0 << endl;
-    cout << "wsii1 =                        " << model_.wsii1 << endl;
-    cout << "wsii2 =                        " << model_.wsii2 << endl;
-    cout << "wsiid =                        " << model_.wsiid << endl;
-    cout << "wagidl =                       " << model_.wagidl << endl;
-    cout << "wbgidl =                       " << model_.wbgidl << endl;
-    cout << "wngidl =                       " << model_.wngidl << endl;
-    cout << "wntun =                        " << model_.wntun << endl;
-    cout << "wndiode =                      " << model_.wndiode << endl;
-    cout << "wnrecf0 =                      " << model_.wnrecf0 << endl;
-    cout << "wnrecr0 =                      " << model_.wnrecr0 << endl;
-    cout << "wisbjt =                       " << model_.wisbjt << endl;
-    cout << "wisdif =                       " << model_.wisdif << endl;
-    cout << "wisrec =                       " << model_.wisrec << endl;
-    cout << "wistun =                       " << model_.wistun << endl;
-    cout << "wvrec0 =                       " << model_.wvrec0 << endl;
-    cout << "wvtun0 =                       " << model_.wvtun0 << endl;
-    cout << "wnbjt =                        " << model_.wnbjt << endl;
-    cout << "wlbjt0 =                       " << model_.wlbjt0 << endl;
-    cout << "wvabjt =                       " << model_.wvabjt << endl;
-    cout << "waely =                        " << model_.waely << endl;
-    cout << "wahli =                        " << model_.wahli << endl;
-    cout << "wvsdfb =                       " << model_.wvsdfb << endl;
-    cout << "wvsdth =                       " << model_.wvsdth << endl;
-    cout << "wdelvt =                       " << model_.wdelvt << endl;
-    cout << "wacde =                        " << model_.wacde << endl;
-    cout << "wmoin =                        " << model_.wmoin << endl;
-    cout << "wnoff =                        " << model_.wnoff << endl;
-    cout << "wxrcrg1 =                      " << model_.wxrcrg1 << endl;
-    cout << "wxrcrg2 =                      " << model_.wxrcrg2 << endl;
-    cout << "pxj =                          " << model_.pxj << endl;
-    cout << "palphaGB1 =                    " << model_.palphaGB1 << endl;
-    cout << "pbetaGB1 =                     " << model_.pbetaGB1 << endl;
-    cout << "palphaGB2 =                    " << model_.palphaGB2 << endl;
-    cout << "pbetaGB2 =                     " << model_.pbetaGB2 << endl;
-    cout << "pcgsl =                        " << model_.pcgsl << endl;
-    cout << "pcgdl =                        " << model_.pcgdl << endl;
-    cout << "pckappa =                      " << model_.pckappa << endl;
-    cout << "pndif =                        " << model_.pndif << endl;
-    cout << "pute =                         " << model_.pute << endl;
-    cout << "pkt1 =                         " << model_.pkt1 << endl;
-    cout << "pkt1l =                        " << model_.pkt1l << endl;
-    cout << "pkt2 =                         " << model_.pkt2 << endl;
-    cout << "pua1 =                         " << model_.pua1 << endl;
-    cout << "pub1 =                         " << model_.pub1 << endl;
-    cout << "puc1 =                         " << model_.puc1 << endl;
-    cout << "pat =                          " << model_.pat << endl;
-    cout << "pprt =                         " << model_.pprt << endl;
-    cout << "pntrecf =                      " << model_.pntrecf << endl;
-    cout << "pntrecr =                      " << model_.pntrecr << endl;
-    cout << "pxbjt =                        " << model_.pxbjt << endl;
-    cout << "pxdif =                        " << model_.pxdif << endl;
-    cout << "pxrec =                        " << model_.pxrec << endl;
-    cout << "pxtun =                        " << model_.pxtun << endl;
-    cout << "paigc =                        " << model_.paigc << endl;
-    cout << "pbigc =                        " << model_.pbigc << endl;
-    cout << "pcigc =                        " << model_.pcigc << endl;
-    cout << "paigsd =                       " << model_.paigsd << endl;
-    cout << "pbigsd =                       " << model_.pbigsd << endl;
-    cout << "pcigsd =                       " << model_.pcigsd << endl;
-    cout << "pnigc =                        " << model_.pnigc << endl;
-    cout << "ppigcd =                       " << model_.ppigcd << endl;
-    cout << "ppoxedge =                     " << model_.ppoxedge << endl;
-    cout << "pnpeak =                       " << model_.pnpeak << endl;
-    cout << "pnsub =                        " << model_.pnsub << endl;
-    cout << "pngate =                       " << model_.pngate << endl;
-    cout << "pvth0 =                        " << model_.pvth0 << endl;
-    cout << "pk1 =                          " << model_.pk1 << endl;
-    cout << "pk1w1 =                        " << model_.pk1w1 << endl;
-    cout << "pk1w2 =                        " << model_.pk1w2 << endl;
-    cout << "pk2 =                          " << model_.pk2 << endl;
-    cout << "pk3 =                          " << model_.pk3 << endl;
-    cout << "pk3b =                         " << model_.pk3b << endl;
-    cout << "pkb1 =                         " << model_.pkb1 << endl;
-    cout << "pw0 =                          " << model_.pw0 << endl;
-    cout << "pnlx =                         " << model_.pnlx << endl;
-    cout << "pdvt0 =                        " << model_.pdvt0 << endl;
-    cout << "pdvt1 =                        " << model_.pdvt1 << endl;
-    cout << "pdvt2 =                        " << model_.pdvt2 << endl;
-    cout << "pdvt0w =                       " << model_.pdvt0w << endl;
-    cout << "pdvt1w =                       " << model_.pdvt1w << endl;
-    cout << "pdvt2w =                       " << model_.pdvt2w << endl;
-    cout << "pu0 =                          " << model_.pu0 << endl;
-    cout << "pua =                          " << model_.pua << endl;
-    cout << "pub =                          " << model_.pub << endl;
-    cout << "puc =                          " << model_.puc << endl;
-    cout << "pvsat =                        " << model_.pvsat << endl;
-    cout << "pa0 =                          " << model_.pa0 << endl;
-    cout << "pags =                         " << model_.pags << endl;
-    cout << "pb0 =                          " << model_.pb0 << endl;
-    cout << "pb1 =                          " << model_.pb1 << endl;
-    cout << "pketa =                        " << model_.pketa << endl;
-    cout << "pketas =                       " << model_.pketas << endl;
-    cout << "pa1 =                          " << model_.pa1 << endl;
-    cout << "pa2 =                          " << model_.pa2 << endl;
-    cout << "prdsw =                        " << model_.prdsw << endl;
-    cout << "pprwb =                        " << model_.pprwb << endl;
-    cout << "pprwg =                        " << model_.pprwg << endl;
-    cout << "pwr =                          " << model_.pwr << endl;
-    cout << "pnfactor =                     " << model_.pnfactor << endl;
-    cout << "pdwg =                         " << model_.pdwg << endl;
-    cout << "pdwb =                         " << model_.pdwb << endl;
-    cout << "pvoff=                         " << model_.pvoff << endl;
-    cout << "peta0 =                        " << model_.peta0 << endl;
-    cout << "petab =                        " << model_.petab << endl;
-    cout << "pdsub =                        " << model_.pdsub << endl;
-    cout << "pcit =                         " << model_.pcit << endl;
-    cout << "pcdsc =                        " << model_.pcdsc << endl;
-    cout << "pcdscb =                       " << model_.pcdscb << endl;
-    cout << "pcdscd =                       " << model_.pcdscd << endl;
-    cout << "ppclm =                        " << model_.ppclm << endl;
-    cout << "ppdibl1 =                      " << model_.ppdibl1 << endl;
-    cout << "ppdibl2 =                      " << model_.ppdibl2 << endl;
-    cout << "ppdiblb =                      " << model_.ppdiblb << endl;
-    cout << "pdrout =                       " << model_.pdrout << endl;
-    cout << "ppvag =                        " << model_.ppvag << endl;
-    cout << "pdelta =                       " << model_.pdelta << endl;
-    cout << "palpha0 =                      " << model_.palpha0 << endl;
-    cout << "pfbjtii =                      " << model_.pfbjtii << endl;
-    cout << "pbeta0 =                       " << model_.pbeta0 << endl;
-    cout << "pbeta1 =                       " << model_.pbeta1 << endl;
-    cout << "pbeta2 =                       " << model_.pbeta2 << endl;
-    cout << "pvdsatii0 =                    " << model_.pvdsatii0 << endl;
-    cout << "plii =                         " << model_.plii << endl;
-    cout << "pesatii =                      " << model_.pesatii << endl;
-    cout << "psii0 =                        " << model_.psii0 << endl;
-    cout << "psii1 =                        " << model_.psii1 << endl;
-    cout << "psii2 =                        " << model_.psii2 << endl;
-    cout << "psiid =                        " << model_.psiid << endl;
-    cout << "pagidl =                       " << model_.pagidl << endl;
-    cout << "pbgidl =                       " << model_.pbgidl << endl;
-    cout << "pngidl=                        " << model_.pngidl << endl;
-    cout << "pntun =                        " << model_.pntun << endl;
-    cout << "pndiode =                      " << model_.pndiode << endl;
-    cout << "pnrecf0 =                      " << model_.pnrecf0 << endl;
-    cout << "pnrecr0 =                      " << model_.pnrecr0 << endl;
-    cout << "pisbjt =                       " << model_.pisbjt << endl;
-    cout << "pisdif =                       " << model_.pisdif << endl;
-    cout << "pisrec =                       " << model_.pisrec << endl;
-    cout << "pistun =                       " << model_.pistun << endl;
-    cout << "pvrec0 =                       " << model_.pvrec0 << endl;
-    cout << "pvtun0 =                       " << model_.pvtun0 << endl;
-    cout << "pnbjt =                        " << model_.pnbjt << endl;
-    cout << "plbjt0 =                       " << model_.plbjt0 << endl;
-    cout << "pvabjt =                       " << model_.pvabjt << endl;
-    cout << "paely =                        " << model_.paely << endl;
-    cout << "pahli =                        " << model_.pahli << endl;
-    cout << "pvsdfb =                       " << model_.pvsdfb << endl;
-    cout << "pvsdth =                       " << model_.pvsdth << endl;
-    cout << "pdelvt =                       " << model_.pdelvt << endl;
-    cout << "pacde =                        " << model_.pacde << endl;
-    cout << "pmoin =                        " << model_.pmoin << endl;
-    cout << "pnoff =                        " << model_.pnoff << endl;
-    cout << "pxrcrg1 =                      " << model_.pxrcrg1 << endl;
-    cout << "pxrcrg2 =                      " << model_.pxrcrg2 << endl;
+    Xyce::dout() << Xyce::section_divider
+         <<std::endl;
+    Xyce::dout() << "Instance: constructor: "<< getName() <<std::endl;
+    Xyce::dout() << "Model Params:  " << std::endl;
+    Xyce::dout() << "capMod =                       " << model_.capMod << std::endl;
+    Xyce::dout() << "mobMod =                       " << model_.mobMod << std::endl;
+    Xyce::dout() << "paramChk =                     " << model_.paramChk << std::endl;
+    Xyce::dout() << "binUnit =                      " << model_.binUnit << std::endl;
+    Xyce::dout() << "version =                      " << model_.version << std::endl;
+    Xyce::dout() << "tox =                          " << model_.tox << std::endl;
+    Xyce::dout() << "toxm =                         " << model_.toxm << std::endl;
+    Xyce::dout() << "dtoxcv =                       " << model_.dtoxcv << std::endl;
+    Xyce::dout() << "cdsc =                         " << model_.cdsc << std::endl;
+    Xyce::dout() << "cdscb =                        " << model_.cdscb << std::endl;
+    Xyce::dout() << "cdscd =                        " << model_.cdscd << std::endl;
+    Xyce::dout() << "cit =                          " << model_.cit << std::endl;
+    Xyce::dout() << "nfactor =                      " << model_.nfactor << std::endl;
+    Xyce::dout() << "vsat =                         " << model_.vsat << std::endl;
+    Xyce::dout() << "at =                           " << model_.at << std::endl;
+    Xyce::dout() << "a0 =                           " << model_.a0 << std::endl;
+    Xyce::dout() << "ags =                          " << model_.ags << std::endl;
+    Xyce::dout() << "a1 =                           " << model_.a1 << std::endl;
+    Xyce::dout() << "a2 =                           " << model_.a2 << std::endl;
+    Xyce::dout() << "keta =                         " << model_.keta << std::endl;
+    Xyce::dout() << "nsub =                         " << model_.nsub << std::endl;
+    Xyce::dout() << "npeak =                        " << model_.npeak << std::endl;
+    Xyce::dout() << "ngate =                        " << model_.ngate << std::endl;
+    Xyce::dout() << "gamma1 =                       " << model_.gamma1 << std::endl;
+    Xyce::dout() << "gamma2 =                       " << model_.gamma2 << std::endl;
+    Xyce::dout() << "vbx =                          " << model_.vbx << std::endl;
+    Xyce::dout() << "vbm =                          " << model_.vbm << std::endl;
+    Xyce::dout() << "xt =                           " << model_.xt << std::endl;
+    Xyce::dout() << "k1 =                           " << model_.k1 << std::endl;
+    Xyce::dout() << "kt1 =                          " << model_.kt1 << std::endl;
+    Xyce::dout() << "kt1l =                         " << model_.kt1l << std::endl;
+    Xyce::dout() << "kt2 =                          " << model_.kt2 << std::endl;
+    Xyce::dout() << "k2 =                           " << model_.k2 << std::endl;
+    Xyce::dout() << "k3 =                           " << model_.k3 << std::endl;
+    Xyce::dout() << "k3b =                          " << model_.k3b << std::endl;
+    Xyce::dout() << "w0 =                           " << model_.w0 << std::endl;
+    Xyce::dout() << "nlx =                          " << model_.nlx << std::endl;
+    Xyce::dout() << "dvt0 =                         " << model_.dvt0 << std::endl;
+    Xyce::dout() << "dvt1 =                         " << model_.dvt1 << std::endl;
+    Xyce::dout() << "dvt2 =                         " << model_.dvt2 << std::endl;
+    Xyce::dout() << "dvt0w =                        " << model_.dvt0w << std::endl;
+    Xyce::dout() << "dvt1w =                        " << model_.dvt1w << std::endl;
+    Xyce::dout() << "dvt2w =                        " << model_.dvt2w << std::endl;
+    Xyce::dout() << "drout =                        " << model_.drout << std::endl;
+    Xyce::dout() << "dsub =                         " << model_.dsub << std::endl;
+    Xyce::dout() << "vth0=                          " << model_.vth0 << std::endl;
+    Xyce::dout() << "ua =                           " << model_.ua << std::endl;
+    Xyce::dout() << "ua1 =                          " << model_.ua1 << std::endl;
+    Xyce::dout() << "ub =                           " << model_.ub << std::endl;
+    Xyce::dout() << "ub1 =                          " << model_.ub1 << std::endl;
+    Xyce::dout() << "uc =                           " << model_.uc << std::endl;
+    Xyce::dout() << "uc1 =                          " << model_.uc1 << std::endl;
+    Xyce::dout() << "u0 =                           " << model_.u0 << std::endl;
+    Xyce::dout() << "ute =                          " << model_.ute << std::endl;
+    Xyce::dout() << "voff =                         " << model_.voff << std::endl;
+    Xyce::dout() << "tnom =                         " << model_.tnom << std::endl;
+    Xyce::dout() << "cgso =                         " << model_.cgso << std::endl;
+    Xyce::dout() << "cgdo =                         " << model_.cgdo << std::endl;
+    Xyce::dout() << "xpart =                        " << model_.xpart << std::endl;
+    Xyce::dout() << "delta =                        " << model_.delta << std::endl;
+    Xyce::dout() << "sheetResistance =              " << model_.sheetResistance << std::endl;
+    Xyce::dout() << "rdsw =                         " << model_.rdsw << std::endl;
+    Xyce::dout() << "prwg =                         " << model_.prwg << std::endl;
+    Xyce::dout() << "prwb =                         " << model_.prwb << std::endl;
+    Xyce::dout() << "prt =                          " << model_.prt << std::endl;
+    Xyce::dout() << "eta0 =                         " << model_.eta0 << std::endl;
+    Xyce::dout() << "etab =                         " << model_.etab << std::endl;
+    Xyce::dout() << "pclm =                         " << model_.pclm << std::endl;
+    Xyce::dout() << "pdibl1 =                       " << model_.pdibl1 << std::endl;
+    Xyce::dout() << "pdibl2 =                       " << model_.pdibl2 << std::endl;
+    Xyce::dout() << "pdiblb =                       " << model_.pdiblb << std::endl;
+    Xyce::dout() << "pvag =                         " << model_.pvag << std::endl;
+    Xyce::dout() << "shMod =                        " << model_.shMod << std::endl;
+    Xyce::dout() << "tbox =                         " << model_.tbox << std::endl;
+    Xyce::dout() << "tsi =                          " << model_.tsi << std::endl;
+    Xyce::dout() << "xj =                           " << model_.xj << std::endl;
+    Xyce::dout() << "rth0 =                         " << model_.rth0 << std::endl;
+    Xyce::dout() << "cth0 =                         " << model_.cth0 << std::endl;
+    Xyce::dout() << "ngidl =                        " << model_.ngidl << std::endl;
+    Xyce::dout() << "agidl =                        " << model_.agidl << std::endl;
+    Xyce::dout() << "bgidl =                        " << model_.bgidl << std::endl;
+    Xyce::dout() << "ndiode =                       " << model_.ndiode << std::endl;
+    Xyce::dout() << "xbjt =                         " << model_.xbjt << std::endl;
+    Xyce::dout() << "xdif =                         " << model_.xdif << std::endl;
+    Xyce::dout() << "xrec =                         " << model_.xrec << std::endl;
+    Xyce::dout() << "xtun =                         " << model_.xtun << std::endl;
+    Xyce::dout() << "GatesidewallJctPotential =     " << model_.GatesidewallJctPotential << std::endl;
+    Xyce::dout() << "bodyJctGateSideGradingCoeff =  " << model_.bodyJctGateSideGradingCoeff << std::endl;
+    Xyce::dout() << "unitLengthGateSidewallJctCap = " << model_.unitLengthGateSidewallJctCap << std::endl;
+    Xyce::dout() << "Lint =                         " << model_.Lint << std::endl;
+    Xyce::dout() << "Ll =                           " << model_.Ll << std::endl;
+    Xyce::dout() << "Llc =                          " << model_.Llc << std::endl;
+    Xyce::dout() << "Lln =                          " << model_.Lln << std::endl;
+    Xyce::dout() << "Lw =                           " << model_.Lw << std::endl;
+    Xyce::dout() << "Lwc =                          " << model_.Lwc << std::endl;
+    Xyce::dout() << "Lwn =                          " << model_.Lwn << std::endl;
+    Xyce::dout() << "Lwl =                          " << model_.Lwl << std::endl;
+    Xyce::dout() << "Lwlc =                         " << model_.Lwlc << std::endl;
+    Xyce::dout() << "wr =                           " << model_.wr << std::endl;
+    Xyce::dout() << "Wint =                         " << model_.Wint << std::endl;
+    Xyce::dout() << "dwg =                          " << model_.dwg << std::endl;
+    Xyce::dout() << "dwb =                          " << model_.dwb << std::endl;
+    Xyce::dout() << "Wl =                           " << model_.Wl << std::endl;
+    Xyce::dout() << "Wlc =                          " << model_.Wlc << std::endl;
+    Xyce::dout() << "Wln =                          " << model_.Wln << std::endl;
+    Xyce::dout() << "Ww =                           " << model_.Ww << std::endl;
+    Xyce::dout() << "Wwc =                          " << model_.Wwc << std::endl;
+    Xyce::dout() << "Wwn =                          " << model_.Wwn << std::endl;
+    Xyce::dout() << "Wwl =                          " << model_.Wwl << std::endl;
+    Xyce::dout() << "Wwlc =                         " << model_.Wwlc << std::endl;
+    Xyce::dout() << "b0 =                           " << model_.b0 << std::endl;
+    Xyce::dout() << "b1 =                           " << model_.b1 << std::endl;
+    Xyce::dout() << "cgsl =                         " << model_.cgsl << std::endl;
+    Xyce::dout() << "cgdl =                         " << model_.cgdl << std::endl;
+    Xyce::dout() << "ckappa =                       " << model_.ckappa << std::endl;
+    Xyce::dout() << "cf =                           " << model_.cf << std::endl;
+    Xyce::dout() << "clc =                          " << model_.clc << std::endl;
+    Xyce::dout() << "cle =                          " << model_.cle << std::endl;
+    Xyce::dout() << "dwc =                          " << model_.dwc << std::endl;
+    Xyce::dout() << "dlc =                          " << model_.dlc << std::endl;
+    Xyce::dout() << "alpha0 =                       " << model_.alpha0 << std::endl;
+    Xyce::dout() << "oxideTrapDensityA =            " << model_.oxideTrapDensityA << std::endl;
+    Xyce::dout() << "oxideTrapDensityB =            " << model_.oxideTrapDensityB << std::endl;
+    Xyce::dout() << "oxideTrapDensityC =            " << model_.oxideTrapDensityC << std::endl;
+    Xyce::dout() << "fnoiMod =                      " << model_.fnoiMod << std::endl;
+    Xyce::dout() << "tnoiMod =                      " << model_.tnoiMod << std::endl;
+    Xyce::dout() << "tnoia =                        " << model_.tnoia << std::endl;
+    Xyce::dout() << "tnoib =                        " << model_.tnoib << std::endl;
+    Xyce::dout() << "rnoia =                        " << model_.rnoia << std::endl;
+    Xyce::dout() << "rnoib =                        " << model_.rnoib << std::endl;
+    Xyce::dout() << "ntnoi =                        " << model_.ntnoi << std::endl;
+    Xyce::dout() << "em =                           " << model_.em << std::endl;
+    Xyce::dout() << "ef =                           " << model_.ef << std::endl;
+    Xyce::dout() << "af =                           " << model_.af << std::endl;
+    Xyce::dout() << "kf =                           " << model_.kf << std::endl;
+    Xyce::dout() << "noif =                         " << model_.noif << std::endl;
+    Xyce::dout() << "k1w1 =                         " << model_.k1w1 << std::endl;
+    Xyce::dout() << "k1w2 =                         " << model_.k1w2 << std::endl;
+    Xyce::dout() << "ketas =                        " << model_.ketas << std::endl;
+    Xyce::dout() << "dwbc =                         " << model_.dwbc << std::endl;
+    Xyce::dout() << "beta0 =                        " << model_.beta0 << std::endl;
+    Xyce::dout() << "beta1 =                        " << model_.beta1 << std::endl;
+    Xyce::dout() << "beta2 =                        " << model_.beta2 << std::endl;
+    Xyce::dout() << "vdsatii0 =                     " << model_.vdsatii0 << std::endl;
+    Xyce::dout() << "tii =                          " << model_.tii << std::endl;
+    Xyce::dout() << "lii =                          " << model_.lii << std::endl;
+    Xyce::dout() << "sii0 =                         " << model_.sii0 << std::endl;
+    Xyce::dout() << "sii1 =                         " << model_.sii1 << std::endl;
+    Xyce::dout() << "sii2 =                         " << model_.sii2 << std::endl;
+    Xyce::dout() << "siid =                         " << model_.siid << std::endl;
+    Xyce::dout() << "fbjtii =                       " << model_.fbjtii << std::endl;
+    Xyce::dout() << "esatii =                       " << model_.esatii << std::endl;
+    Xyce::dout() << "ntun =                         " << model_.ntun << std::endl;
+    Xyce::dout() << "nrecf0 =                       " << model_.nrecf0 << std::endl;
+    Xyce::dout() << "nrecr0 =                       " << model_.nrecr0 << std::endl;
+    Xyce::dout() << "isbjt =                        " << model_.isbjt << std::endl;
+    Xyce::dout() << "isdif =                        " << model_.isdif << std::endl;
+    Xyce::dout() << "isrec =                        " << model_.isrec << std::endl;
+    Xyce::dout() << "istun =                        " << model_.istun << std::endl;
+    Xyce::dout() << "ln =                           " << model_.ln << std::endl;
+    Xyce::dout() << "vrec0 =                        " << model_.vrec0 << std::endl;
+    Xyce::dout() << "vtun0 =                        " << model_.vtun0 << std::endl;
+    Xyce::dout() << "nbjt =                         " << model_.nbjt << std::endl;
+    Xyce::dout() << "lbjt0 =                        " << model_.lbjt0 << std::endl;
+    Xyce::dout() << "ldif0 =                        " << model_.ldif0 << std::endl;
+    Xyce::dout() << "vabjt =                        " << model_.vabjt << std::endl;
+    Xyce::dout() << "aely =                         " << model_.aely << std::endl;
+    Xyce::dout() << "ahli =                         " << model_.ahli << std::endl;
+    Xyce::dout() << "rbody =                        " << model_.rbody << std::endl;
+    Xyce::dout() << "rbsh =                         " << model_.rbsh << std::endl;
+    Xyce::dout() << "cgeo =                         " << model_.cgeo << std::endl;
+    Xyce::dout() << "tt =                           " << model_.tt << std::endl;
+    Xyce::dout() << "ndif =                         " << model_.ndif << std::endl;
+    Xyce::dout() << "vsdfb =                        " << model_.vsdfb << std::endl;
+    Xyce::dout() << "vsdth =                        " << model_.vsdth << std::endl;
+    Xyce::dout() << "csdmin =                       " << model_.csdmin << std::endl;
+    Xyce::dout() << "asd =                          " << model_.asd << std::endl;
+    Xyce::dout() << "csdesw =                       " << model_.csdesw << std::endl;
+    Xyce::dout() << "ntrecf =                       " << model_.ntrecf << std::endl;
+    Xyce::dout() << "ntrecr =                       " << model_.ntrecr << std::endl;
+    Xyce::dout() << "dlcb =                         " << model_.dlcb << std::endl;
+    Xyce::dout() << "fbody =                        " << model_.fbody << std::endl;
+    Xyce::dout() << "tcjswg =                       " << model_.tcjswg << std::endl;
+    Xyce::dout() << "tpbswg =                       " << model_.tpbswg << std::endl;
+    Xyce::dout() << "acde =                         " << model_.acde << std::endl;
+    Xyce::dout() << "moin =                         " << model_.moin << std::endl;
+    Xyce::dout() << "noff =                         " << model_.noff << std::endl;
+    Xyce::dout() << "delvt =                        " << model_.delvt << std::endl;
+    Xyce::dout() << "kb1 =                          " << model_.kb1 << std::endl;
+    Xyce::dout() << "dlbg =                         " << model_.dlbg << std::endl;
+    Xyce::dout() << "igbMod =                       " << model_.igbMod << std::endl;
+    Xyce::dout() << "igcMod=                        " << model_.igcMod << std::endl;
+    Xyce::dout() << "toxqm =                        " << model_.toxqm << std::endl;
+    Xyce::dout() << "wth0 =                         " << model_.wth0 << std::endl;
+    Xyce::dout() << "rhalo =                        " << model_.rhalo << std::endl;
+    Xyce::dout() << "ntox =                         " << model_.ntox << std::endl;
+    Xyce::dout() << "toxref =                       " << model_.toxref << std::endl;
+    Xyce::dout() << "ebg =                          " << model_.ebg << std::endl;
+    Xyce::dout() << "vevb =                         " << model_.vevb << std::endl;
+    Xyce::dout() << "alphaGB1 =                     " << model_.alphaGB1 << std::endl;
+    Xyce::dout() << "betaGB1 =                      " << model_.betaGB1 << std::endl;
+    Xyce::dout() << "vgb1 =                         " << model_.vgb1 << std::endl;
+    Xyce::dout() << "vecb =                         " << model_.vecb << std::endl;
+    Xyce::dout() << "alphaGB2 =                     " << model_.alphaGB2 << std::endl;
+    Xyce::dout() << "betaGB2 =                      " << model_.betaGB2 << std::endl;
+    Xyce::dout() << "vgb2 =                         " << model_.vgb2 << std::endl;
+    Xyce::dout() << "voxh =                         " << model_.voxh << std::endl;
+    Xyce::dout() << "deltavox =                     " << model_.deltavox << std::endl;
+    Xyce::dout() << "aigc =                         " << model_.aigc << std::endl;
+    Xyce::dout() << "bigc =                         " << model_.bigc << std::endl;
+    Xyce::dout() << "cigc =                         " << model_.cigc << std::endl;
+    Xyce::dout() << "aigsd =                        " << model_.aigsd << std::endl;
+    Xyce::dout() << "bigsd =                        " << model_.bigsd << std::endl;
+    Xyce::dout() << "cigsd =                        " << model_.cigsd << std::endl;
+    Xyce::dout() << "nigc =                         " << model_.nigc << std::endl;
+    Xyce::dout() << "pigcd =                        " << model_.pigcd << std::endl;
+    Xyce::dout() << "poxedge =                      " << model_.poxedge << std::endl;
+    Xyce::dout() << "dlcig =                        " << model_.dlcig << std::endl;
+    Xyce::dout() << "soiMod =                       " << model_.soiMod << std::endl;
+    Xyce::dout() << "vbs0pd =                       " << model_.vbs0pd << std::endl;
+    Xyce::dout() << "vbs0fd =                       " << model_.vbs0fd << std::endl;
+    Xyce::dout() << "vbsa =                         " << model_.vbsa << std::endl;
+    Xyce::dout() << "nofffd =                       " << model_.nofffd << std::endl;
+    Xyce::dout() << "vofffd =                       " << model_.vofffd << std::endl;
+    Xyce::dout() << "k1b =                          " << model_.k1b << std::endl;
+    Xyce::dout() << "k2b =                          " << model_.k2b << std::endl;
+    Xyce::dout() << "dk2b =                         " << model_.dk2b << std::endl;
+    Xyce::dout() << "dvbd0 =                        " << model_.dvbd0 << std::endl;
+    Xyce::dout() << "dvbd1 =                        " << model_.dvbd1 << std::endl;
+    Xyce::dout() << "moinFD =                       " << model_.moinFD << std::endl;
+    Xyce::dout() << "rgateMod =                     " << model_.rgateMod << std::endl;
+    Xyce::dout() << "xrcrg1 =                       " << model_.xrcrg1 << std::endl;
+    Xyce::dout() << "xrcrg2 =                       " << model_.xrcrg2 << std::endl;
+    Xyce::dout() << "rshg =                         " << model_.rshg << std::endl;
+    Xyce::dout() << "ngcon =                        " << model_.ngcon << std::endl;
+    Xyce::dout() << "xgw =                          " << model_.xgw << std::endl;
+    Xyce::dout() << "xgl =                          " << model_.xgl << std::endl;
+    Xyce::dout() << "lxj =                          " << model_.lxj << std::endl;
+    Xyce::dout() << "lalphaGB1 =                    " << model_.lalphaGB1 << std::endl;
+    Xyce::dout() << "lbetaGB1 =                     " << model_.lbetaGB1 << std::endl;
+    Xyce::dout() << "lalphaGB2 =                    " << model_.lalphaGB2 << std::endl;
+    Xyce::dout() << "lbetaGB2 =                     " << model_.lbetaGB2 << std::endl;
+    Xyce::dout() << "lcgsl =                        " << model_.lcgsl << std::endl;
+    Xyce::dout() << "lcgdl =                        " << model_.lcgdl << std::endl;
+    Xyce::dout() << "lckappa =                      " << model_.lckappa << std::endl;
+    Xyce::dout() << "lndif =                        " << model_.lndif << std::endl;
+    Xyce::dout() << "lute =                         " << model_.lute << std::endl;
+    Xyce::dout() << "lkt1 =                         " << model_.lkt1 << std::endl;
+    Xyce::dout() << "lkt1l =                        " << model_.lkt1l << std::endl;
+    Xyce::dout() << "lkt2 =                         " << model_.lkt2 << std::endl;
+    Xyce::dout() << "lua1 =                         " << model_.lua1 << std::endl;
+    Xyce::dout() << "lub1 =                         " << model_.lub1 << std::endl;
+    Xyce::dout() << "luc1 =                         " << model_.luc1 << std::endl;
+    Xyce::dout() << "lat =                          " << model_.lat << std::endl;
+    Xyce::dout() << "lprt =                         " << model_.lprt << std::endl;
+    Xyce::dout() << "lntrecf =                      " << model_.lntrecf << std::endl;
+    Xyce::dout() << "lntrecr =                      " << model_.lntrecr << std::endl;
+    Xyce::dout() << "lxbjt =                        " << model_.lxbjt << std::endl;
+    Xyce::dout() << "lxdif =                        " << model_.lxdif << std::endl;
+    Xyce::dout() << "lxrec =                        " << model_.lxrec << std::endl;
+    Xyce::dout() << "lxtun =                        " << model_.lxtun << std::endl;
+    Xyce::dout() << "laigc =                        " << model_.laigc << std::endl;
+    Xyce::dout() << "lbigc =                        " << model_.lbigc << std::endl;
+    Xyce::dout() << "lcigc =                        " << model_.lcigc << std::endl;
+    Xyce::dout() << "laigsd =                       " << model_.laigsd << std::endl;
+    Xyce::dout() << "lbigsd =                       " << model_.lbigsd << std::endl;
+    Xyce::dout() << "lcigsd =                       " << model_.lcigsd << std::endl;
+    Xyce::dout() << "lnigc =                        " << model_.lnigc << std::endl;
+    Xyce::dout() << "lpigcd =                       " << model_.lpigcd << std::endl;
+    Xyce::dout() << "lpoxedge =                     " << model_.lpoxedge << std::endl;
+    Xyce::dout() << "lnpeak =                       " << model_.lnpeak << std::endl;
+    Xyce::dout() << "lnsub =                        " << model_.lnsub << std::endl;
+    Xyce::dout() << "lngate =                       " << model_.lngate << std::endl;
+    Xyce::dout() << "lvth0 =                        " << model_.lvth0 << std::endl;
+    Xyce::dout() << "lk1 =                          " << model_.lk1 << std::endl;
+    Xyce::dout() << "lk1w1 =                        " << model_.lk1w1 << std::endl;
+    Xyce::dout() << "lk1w2 =                        " << model_.lk1w2 << std::endl;
+    Xyce::dout() << "lk2 =                          " << model_.lk2 << std::endl;
+    Xyce::dout() << "lk3 =                          " << model_.lk3 << std::endl;
+    Xyce::dout() << "lk3b =                         " << model_.lk3b << std::endl;
+    Xyce::dout() << "lkb1 =                         " << model_.lkb1 << std::endl;
+    Xyce::dout() << "lw0 =                          " << model_.lw0 << std::endl;
+    Xyce::dout() << "lnlx =                         " << model_.lnlx << std::endl;
+    Xyce::dout() << "ldvt0 =                        " << model_.ldvt0 << std::endl;
+    Xyce::dout() << "ldvt1 =                        " << model_.ldvt1 << std::endl;
+    Xyce::dout() << "ldvt2 =                        " << model_.ldvt2 << std::endl;
+    Xyce::dout() << "ldvt0w =                       " << model_.ldvt0w << std::endl;
+    Xyce::dout() << "ldvt1w =                       " << model_.ldvt1w << std::endl;
+    Xyce::dout() << "ldvt2w =                       " << model_.ldvt2w << std::endl;
+    Xyce::dout() << "lu0 =                          " << model_.lu0 << std::endl;
+    Xyce::dout() << "lua =                          " << model_.lua << std::endl;
+    Xyce::dout() << "lub =                          " << model_.lub << std::endl;
+    Xyce::dout() << "luc =                          " << model_.luc << std::endl;
+    Xyce::dout() << "lvsat =                        " << model_.lvsat << std::endl;
+    Xyce::dout() << "la0 =                          " << model_.la0 << std::endl;
+    Xyce::dout() << "lags =                         " << model_.lags << std::endl;
+    Xyce::dout() << "lb0 =                          " << model_.lb0 << std::endl;
+    Xyce::dout() << "lb1 =                          " << model_.lb1 << std::endl;
+    Xyce::dout() << "lketa =                        " << model_.lketa << std::endl;
+    Xyce::dout() << "lketas =                       " << model_.lketas << std::endl;
+    Xyce::dout() << "la1 =                          " << model_.la1 << std::endl;
+    Xyce::dout() << "la2 =                          " << model_.la2 << std::endl;
+    Xyce::dout() << "lrdsw =                        " << model_.lrdsw << std::endl;
+    Xyce::dout() << "lprwb =                        " << model_.lprwb << std::endl;
+    Xyce::dout() << "lprwg =                        " << model_.lprwg << std::endl;
+    Xyce::dout() << "lwr =                          " << model_.lwr << std::endl;
+    Xyce::dout() << "lnfactor =                     " << model_.lnfactor << std::endl;
+    Xyce::dout() << "ldwg =                         " << model_.ldwg << std::endl;
+    Xyce::dout() << "ldwb =                         " << model_.ldwb << std::endl;
+    Xyce::dout() << "lvoff =                        " << model_.lvoff << std::endl;
+    Xyce::dout() << "leta0 =                        " << model_.leta0 << std::endl;
+    Xyce::dout() << "letab =                        " << model_.letab << std::endl;
+    Xyce::dout() << "ldsub =                        " << model_.ldsub << std::endl;
+    Xyce::dout() << "lcit =                         " << model_.lcit << std::endl;
+    Xyce::dout() << "lcdsc =                        " << model_.lcdsc << std::endl;
+    Xyce::dout() << "lcdscb =                       " << model_.lcdscb << std::endl;
+    Xyce::dout() << "lcdscd =                       " << model_.lcdscd << std::endl;
+    Xyce::dout() << "lpclm =                        " << model_.lpclm << std::endl;
+    Xyce::dout() << "lpdibl1 =                      " << model_.lpdibl1 << std::endl;
+    Xyce::dout() << "lpdibl2 =                      " << model_.lpdibl2 << std::endl;
+    Xyce::dout() << "lpdiblb =                      " << model_.lpdiblb << std::endl;
+    Xyce::dout() << "ldrout =                       " << model_.ldrout << std::endl;
+    Xyce::dout() << "lpvag =                        " << model_.lpvag << std::endl;
+    Xyce::dout() << "ldelta =                       " << model_.ldelta << std::endl;
+    Xyce::dout() << "lalpha0 =                      " << model_.lalpha0 << std::endl;
+    Xyce::dout() << "lfbjtii =                      " << model_.lfbjtii << std::endl;
+    Xyce::dout() << "lbeta0 =                       " << model_.lbeta0 << std::endl;
+    Xyce::dout() << "lbeta1 =                       " << model_.lbeta1 << std::endl;
+    Xyce::dout() << "lbeta2 =                       " << model_.lbeta2 << std::endl;
+    Xyce::dout() << "lvdsatii0 =                    " << model_.lvdsatii0 << std::endl;
+    Xyce::dout() << "llii =                         " << model_.llii << std::endl;
+    Xyce::dout() << "lesatii =                      " << model_.lesatii << std::endl;
+    Xyce::dout() << "lsii0 =                        " << model_.lsii0 << std::endl;
+    Xyce::dout() << "lsii1 =                        " << model_.lsii1 << std::endl;
+    Xyce::dout() << "lsii2 =                        " << model_.lsii2 << std::endl;
+    Xyce::dout() << "lsiid =                        " << model_.lsiid << std::endl;
+    Xyce::dout() << "lagidl =                       " << model_.lagidl << std::endl;
+    Xyce::dout() << "lbgidl =                       " << model_.lbgidl << std::endl;
+    Xyce::dout() << "lngidl =                       " << model_.lngidl << std::endl;
+    Xyce::dout() << "lntun =                        " << model_.lntun << std::endl;
+    Xyce::dout() << "lndiode =                      " << model_.lndiode << std::endl;
+    Xyce::dout() << "lnrecf0 =                      " << model_.lnrecf0 << std::endl;
+    Xyce::dout() << "lnrecr0 =                      " << model_.lnrecr0 << std::endl;
+    Xyce::dout() << "lisbjt =                       " << model_.lisbjt << std::endl;
+    Xyce::dout() << "lisdif =                       " << model_.lisdif << std::endl;
+    Xyce::dout() << "lisrec =                       " << model_.lisrec << std::endl;
+    Xyce::dout() << "listun =                       " << model_.listun << std::endl;
+    Xyce::dout() << "lvrec0 =                       " << model_.lvrec0 << std::endl;
+    Xyce::dout() << "lvtun0 =                       " << model_.lvtun0 << std::endl;
+    Xyce::dout() << "lnbjt =                        " << model_.lnbjt << std::endl;
+    Xyce::dout() << "llbjt0 =                       " << model_.llbjt0 << std::endl;
+    Xyce::dout() << "lvabjt =                       " << model_.lvabjt << std::endl;
+    Xyce::dout() << "laely =                        " << model_.laely << std::endl;
+    Xyce::dout() << "lahli =                        " << model_.lahli << std::endl;
+    Xyce::dout() << "lvsdfb =                       " << model_.lvsdfb << std::endl;
+    Xyce::dout() << "lvsdth =                       " << model_.lvsdth << std::endl;
+    Xyce::dout() << "ldelvt =                       " << model_.ldelvt << std::endl;
+    Xyce::dout() << "lacde =                        " << model_.lacde << std::endl;
+    Xyce::dout() << "lmoin =                        " << model_.lmoin << std::endl;
+    Xyce::dout() << "lnoff =                        " << model_.lnoff << std::endl;
+    Xyce::dout() << "lxrcrg1 =                      " << model_.lxrcrg1 << std::endl;
+    Xyce::dout() << "lxrcrg2 =                      " << model_.lxrcrg2 << std::endl;
+    Xyce::dout() << "wxj =                          " << model_.wxj << std::endl;
+    Xyce::dout() << "walphaGB1 =                    " << model_.walphaGB1 << std::endl;
+    Xyce::dout() << "wbetaGB1 =                     " << model_.wbetaGB1 << std::endl;
+    Xyce::dout() << "walphaGB2 =                    " << model_.walphaGB2 << std::endl;
+    Xyce::dout() << "wbetaGB2 =                     " << model_.wbetaGB2 << std::endl;
+    Xyce::dout() << "wcgsl =                        " << model_.wcgsl << std::endl;
+    Xyce::dout() << "wcgdl =                        " << model_.wcgdl << std::endl;
+    Xyce::dout() << "wckappa =                      " << model_.wckappa << std::endl;
+    Xyce::dout() << "wndif =                        " << model_.wndif << std::endl;
+    Xyce::dout() << "wute =                         " << model_.wute << std::endl;
+    Xyce::dout() << "wkt1 =                         " << model_.wkt1 << std::endl;
+    Xyce::dout() << "wkt1l =                        " << model_.wkt1l << std::endl;
+    Xyce::dout() << "wkt2 =                         " << model_.wkt2 << std::endl;
+    Xyce::dout() << "wua1 =                         " << model_.wua1 << std::endl;
+    Xyce::dout() << "wub1 =                         " << model_.wub1 << std::endl;
+    Xyce::dout() << "wuc1 =                         " << model_.wuc1 << std::endl;
+    Xyce::dout() << "wat =                          " << model_.wat << std::endl;
+    Xyce::dout() << "wprt =                         " << model_.wprt << std::endl;
+    Xyce::dout() << "wntrecf =                      " << model_.wntrecf << std::endl;
+    Xyce::dout() << "wntrecr =                      " << model_.wntrecr << std::endl;
+    Xyce::dout() << "wxbjt =                        " << model_.wxbjt << std::endl;
+    Xyce::dout() << "wxdif =                        " << model_.wxdif << std::endl;
+    Xyce::dout() << "wxrec =                        " << model_.wxrec << std::endl;
+    Xyce::dout() << "wxtun =                        " << model_.wxtun << std::endl;
+    Xyce::dout() << "waigc =                        " << model_.waigc << std::endl;
+    Xyce::dout() << "wbigc =                        " << model_.wbigc << std::endl;
+    Xyce::dout() << "wcigc =                        " << model_.wcigc << std::endl;
+    Xyce::dout() << "waigsd =                       " << model_.waigsd << std::endl;
+    Xyce::dout() << "wbigsd =                       " << model_.wbigsd << std::endl;
+    Xyce::dout() << "wcigsd =                       " << model_.wcigsd << std::endl;
+    Xyce::dout() << "wnigc =                        " << model_.wnigc << std::endl;
+    Xyce::dout() << "wpigcd =                       " << model_.wpigcd << std::endl;
+    Xyce::dout() << "wpoxedge =                     " << model_.wpoxedge << std::endl;
+    Xyce::dout() << "wnpeak =                       " << model_.wnpeak << std::endl;
+    Xyce::dout() << "wnsub =                        " << model_.wnsub << std::endl;
+    Xyce::dout() << "wngate =                       " << model_.wngate << std::endl;
+    Xyce::dout() << "wvth0 =                        " << model_.wvth0 << std::endl;
+    Xyce::dout() << "wk1 =                          " << model_.wk1 << std::endl;
+    Xyce::dout() << "wk1w1 =                        " << model_.wk1w1 << std::endl;
+    Xyce::dout() << "wk1w2 =                        " << model_.wk1w2 << std::endl;
+    Xyce::dout() << "wk2 =                          " << model_.wk2 << std::endl;
+    Xyce::dout() << "wk3 =                          " << model_.wk3 << std::endl;
+    Xyce::dout() << "wk3b =                         " << model_.wk3b << std::endl;
+    Xyce::dout() << "wkb1 =                         " << model_.wkb1 << std::endl;
+    Xyce::dout() << "ww0 =                          " << model_.ww0 << std::endl;
+    Xyce::dout() << "wnlx =                         " << model_.wnlx << std::endl;
+    Xyce::dout() << "wdvt0 =                        " << model_.wdvt0 << std::endl;
+    Xyce::dout() << "wdvt1 =                        " << model_.wdvt1 << std::endl;
+    Xyce::dout() << "wdvt2 =                        " << model_.wdvt2 << std::endl;
+    Xyce::dout() << "wdvt0w =                       " << model_.wdvt0w << std::endl;
+    Xyce::dout() << "wdvt1w =                       " << model_.wdvt1w << std::endl;
+    Xyce::dout() << "wdvt2w =                       " << model_.wdvt2w << std::endl;
+    Xyce::dout() << "wu0 =                          " << model_.wu0 << std::endl;
+    Xyce::dout() << "wua =                          " << model_.wua << std::endl;
+    Xyce::dout() << "wub =                          " << model_.wub << std::endl;
+    Xyce::dout() << "wuc =                          " << model_.wuc << std::endl;
+    Xyce::dout() << "wvsat =                        " << model_.wvsat << std::endl;
+    Xyce::dout() << "wa0 =                          " << model_.wa0 << std::endl;
+    Xyce::dout() << "wags =                         " << model_.wags << std::endl;
+    Xyce::dout() << "wb0 =                          " << model_.wb0 << std::endl;
+    Xyce::dout() << "wb1 =                          " << model_.wb1 << std::endl;
+    Xyce::dout() << "wketa =                        " << model_.wketa << std::endl;
+    Xyce::dout() << "wketas =                       " << model_.wketas << std::endl;
+    Xyce::dout() << "wa1 =                          " << model_.wa1 << std::endl;
+    Xyce::dout() << "wa2 =                          " << model_.wa2 << std::endl;
+    Xyce::dout() << "wrdsw=                         " << model_.wrdsw << std::endl;
+    Xyce::dout() << "wprwb =                        " << model_.wprwb << std::endl;
+    Xyce::dout() << "wprwg =                        " << model_.wprwg << std::endl;
+    Xyce::dout() << "wwr =                          " << model_.wwr << std::endl;
+    Xyce::dout() << "wnfactor =                     " << model_.wnfactor << std::endl;
+    Xyce::dout() << "wdwg =                         " << model_.wdwg << std::endl;
+    Xyce::dout() << "wdwb =                         " << model_.wdwb << std::endl;
+    Xyce::dout() << "wvoff =                        " << model_.wvoff << std::endl;
+    Xyce::dout() << "weta0 =                        " << model_.weta0 << std::endl;
+    Xyce::dout() << "wetab =                        " << model_.wetab << std::endl;
+    Xyce::dout() << "wdsub =                        " << model_.wdsub << std::endl;
+    Xyce::dout() << "wcit =                         " << model_.wcit << std::endl;
+    Xyce::dout() << "wcdsc =                        " << model_.wcdsc << std::endl;
+    Xyce::dout() << "wcdscb =                       " << model_.wcdscb << std::endl;
+    Xyce::dout() << "wcdscd =                       " << model_.wcdscd << std::endl;
+    Xyce::dout() << "wpclm =                        " << model_.wpclm << std::endl;
+    Xyce::dout() << "wpdibl1 =                      " << model_.wpdibl1 << std::endl;
+    Xyce::dout() << "wpdibl2 =                      " << model_.wpdibl2 << std::endl;
+    Xyce::dout() << "wpdiblb =                      " << model_.wpdiblb << std::endl;
+    Xyce::dout() << "wdrout =                       " << model_.wdrout << std::endl;
+    Xyce::dout() << "wpvag =                        " << model_.wpvag << std::endl;
+    Xyce::dout() << "wdelta =                       " << model_.wdelta << std::endl;
+    Xyce::dout() << "walpha0 =                      " << model_.walpha0 << std::endl;
+    Xyce::dout() << "wfbjtii =                      " << model_.wfbjtii << std::endl;
+    Xyce::dout() << "wbeta0 =                       " << model_.wbeta0 << std::endl;
+    Xyce::dout() << "wbeta1 =                       " << model_.wbeta1 << std::endl;
+    Xyce::dout() << "wbeta2 =                       " << model_.wbeta2 << std::endl;
+    Xyce::dout() << "wvdsatii0 =                    " << model_.wvdsatii0 << std::endl;
+    Xyce::dout() << "wlii =                         " << model_.wlii << std::endl;
+    Xyce::dout() << "wesatii =                      " << model_.wesatii << std::endl;
+    Xyce::dout() << "wsii0 =                        " << model_.wsii0 << std::endl;
+    Xyce::dout() << "wsii1 =                        " << model_.wsii1 << std::endl;
+    Xyce::dout() << "wsii2 =                        " << model_.wsii2 << std::endl;
+    Xyce::dout() << "wsiid =                        " << model_.wsiid << std::endl;
+    Xyce::dout() << "wagidl =                       " << model_.wagidl << std::endl;
+    Xyce::dout() << "wbgidl =                       " << model_.wbgidl << std::endl;
+    Xyce::dout() << "wngidl =                       " << model_.wngidl << std::endl;
+    Xyce::dout() << "wntun =                        " << model_.wntun << std::endl;
+    Xyce::dout() << "wndiode =                      " << model_.wndiode << std::endl;
+    Xyce::dout() << "wnrecf0 =                      " << model_.wnrecf0 << std::endl;
+    Xyce::dout() << "wnrecr0 =                      " << model_.wnrecr0 << std::endl;
+    Xyce::dout() << "wisbjt =                       " << model_.wisbjt << std::endl;
+    Xyce::dout() << "wisdif =                       " << model_.wisdif << std::endl;
+    Xyce::dout() << "wisrec =                       " << model_.wisrec << std::endl;
+    Xyce::dout() << "wistun =                       " << model_.wistun << std::endl;
+    Xyce::dout() << "wvrec0 =                       " << model_.wvrec0 << std::endl;
+    Xyce::dout() << "wvtun0 =                       " << model_.wvtun0 << std::endl;
+    Xyce::dout() << "wnbjt =                        " << model_.wnbjt << std::endl;
+    Xyce::dout() << "wlbjt0 =                       " << model_.wlbjt0 << std::endl;
+    Xyce::dout() << "wvabjt =                       " << model_.wvabjt << std::endl;
+    Xyce::dout() << "waely =                        " << model_.waely << std::endl;
+    Xyce::dout() << "wahli =                        " << model_.wahli << std::endl;
+    Xyce::dout() << "wvsdfb =                       " << model_.wvsdfb << std::endl;
+    Xyce::dout() << "wvsdth =                       " << model_.wvsdth << std::endl;
+    Xyce::dout() << "wdelvt =                       " << model_.wdelvt << std::endl;
+    Xyce::dout() << "wacde =                        " << model_.wacde << std::endl;
+    Xyce::dout() << "wmoin =                        " << model_.wmoin << std::endl;
+    Xyce::dout() << "wnoff =                        " << model_.wnoff << std::endl;
+    Xyce::dout() << "wxrcrg1 =                      " << model_.wxrcrg1 << std::endl;
+    Xyce::dout() << "wxrcrg2 =                      " << model_.wxrcrg2 << std::endl;
+    Xyce::dout() << "pxj =                          " << model_.pxj << std::endl;
+    Xyce::dout() << "palphaGB1 =                    " << model_.palphaGB1 << std::endl;
+    Xyce::dout() << "pbetaGB1 =                     " << model_.pbetaGB1 << std::endl;
+    Xyce::dout() << "palphaGB2 =                    " << model_.palphaGB2 << std::endl;
+    Xyce::dout() << "pbetaGB2 =                     " << model_.pbetaGB2 << std::endl;
+    Xyce::dout() << "pcgsl =                        " << model_.pcgsl << std::endl;
+    Xyce::dout() << "pcgdl =                        " << model_.pcgdl << std::endl;
+    Xyce::dout() << "pckappa =                      " << model_.pckappa << std::endl;
+    Xyce::dout() << "pndif =                        " << model_.pndif << std::endl;
+    Xyce::dout() << "pute =                         " << model_.pute << std::endl;
+    Xyce::dout() << "pkt1 =                         " << model_.pkt1 << std::endl;
+    Xyce::dout() << "pkt1l =                        " << model_.pkt1l << std::endl;
+    Xyce::dout() << "pkt2 =                         " << model_.pkt2 << std::endl;
+    Xyce::dout() << "pua1 =                         " << model_.pua1 << std::endl;
+    Xyce::dout() << "pub1 =                         " << model_.pub1 << std::endl;
+    Xyce::dout() << "puc1 =                         " << model_.puc1 << std::endl;
+    Xyce::dout() << "pat =                          " << model_.pat << std::endl;
+    Xyce::dout() << "pprt =                         " << model_.pprt << std::endl;
+    Xyce::dout() << "pntrecf =                      " << model_.pntrecf << std::endl;
+    Xyce::dout() << "pntrecr =                      " << model_.pntrecr << std::endl;
+    Xyce::dout() << "pxbjt =                        " << model_.pxbjt << std::endl;
+    Xyce::dout() << "pxdif =                        " << model_.pxdif << std::endl;
+    Xyce::dout() << "pxrec =                        " << model_.pxrec << std::endl;
+    Xyce::dout() << "pxtun =                        " << model_.pxtun << std::endl;
+    Xyce::dout() << "paigc =                        " << model_.paigc << std::endl;
+    Xyce::dout() << "pbigc =                        " << model_.pbigc << std::endl;
+    Xyce::dout() << "pcigc =                        " << model_.pcigc << std::endl;
+    Xyce::dout() << "paigsd =                       " << model_.paigsd << std::endl;
+    Xyce::dout() << "pbigsd =                       " << model_.pbigsd << std::endl;
+    Xyce::dout() << "pcigsd =                       " << model_.pcigsd << std::endl;
+    Xyce::dout() << "pnigc =                        " << model_.pnigc << std::endl;
+    Xyce::dout() << "ppigcd =                       " << model_.ppigcd << std::endl;
+    Xyce::dout() << "ppoxedge =                     " << model_.ppoxedge << std::endl;
+    Xyce::dout() << "pnpeak =                       " << model_.pnpeak << std::endl;
+    Xyce::dout() << "pnsub =                        " << model_.pnsub << std::endl;
+    Xyce::dout() << "pngate =                       " << model_.pngate << std::endl;
+    Xyce::dout() << "pvth0 =                        " << model_.pvth0 << std::endl;
+    Xyce::dout() << "pk1 =                          " << model_.pk1 << std::endl;
+    Xyce::dout() << "pk1w1 =                        " << model_.pk1w1 << std::endl;
+    Xyce::dout() << "pk1w2 =                        " << model_.pk1w2 << std::endl;
+    Xyce::dout() << "pk2 =                          " << model_.pk2 << std::endl;
+    Xyce::dout() << "pk3 =                          " << model_.pk3 << std::endl;
+    Xyce::dout() << "pk3b =                         " << model_.pk3b << std::endl;
+    Xyce::dout() << "pkb1 =                         " << model_.pkb1 << std::endl;
+    Xyce::dout() << "pw0 =                          " << model_.pw0 << std::endl;
+    Xyce::dout() << "pnlx =                         " << model_.pnlx << std::endl;
+    Xyce::dout() << "pdvt0 =                        " << model_.pdvt0 << std::endl;
+    Xyce::dout() << "pdvt1 =                        " << model_.pdvt1 << std::endl;
+    Xyce::dout() << "pdvt2 =                        " << model_.pdvt2 << std::endl;
+    Xyce::dout() << "pdvt0w =                       " << model_.pdvt0w << std::endl;
+    Xyce::dout() << "pdvt1w =                       " << model_.pdvt1w << std::endl;
+    Xyce::dout() << "pdvt2w =                       " << model_.pdvt2w << std::endl;
+    Xyce::dout() << "pu0 =                          " << model_.pu0 << std::endl;
+    Xyce::dout() << "pua =                          " << model_.pua << std::endl;
+    Xyce::dout() << "pub =                          " << model_.pub << std::endl;
+    Xyce::dout() << "puc =                          " << model_.puc << std::endl;
+    Xyce::dout() << "pvsat =                        " << model_.pvsat << std::endl;
+    Xyce::dout() << "pa0 =                          " << model_.pa0 << std::endl;
+    Xyce::dout() << "pags =                         " << model_.pags << std::endl;
+    Xyce::dout() << "pb0 =                          " << model_.pb0 << std::endl;
+    Xyce::dout() << "pb1 =                          " << model_.pb1 << std::endl;
+    Xyce::dout() << "pketa =                        " << model_.pketa << std::endl;
+    Xyce::dout() << "pketas =                       " << model_.pketas << std::endl;
+    Xyce::dout() << "pa1 =                          " << model_.pa1 << std::endl;
+    Xyce::dout() << "pa2 =                          " << model_.pa2 << std::endl;
+    Xyce::dout() << "prdsw =                        " << model_.prdsw << std::endl;
+    Xyce::dout() << "pprwb =                        " << model_.pprwb << std::endl;
+    Xyce::dout() << "pprwg =                        " << model_.pprwg << std::endl;
+    Xyce::dout() << "pwr =                          " << model_.pwr << std::endl;
+    Xyce::dout() << "pnfactor =                     " << model_.pnfactor << std::endl;
+    Xyce::dout() << "pdwg =                         " << model_.pdwg << std::endl;
+    Xyce::dout() << "pdwb =                         " << model_.pdwb << std::endl;
+    Xyce::dout() << "pvoff=                         " << model_.pvoff << std::endl;
+    Xyce::dout() << "peta0 =                        " << model_.peta0 << std::endl;
+    Xyce::dout() << "petab =                        " << model_.petab << std::endl;
+    Xyce::dout() << "pdsub =                        " << model_.pdsub << std::endl;
+    Xyce::dout() << "pcit =                         " << model_.pcit << std::endl;
+    Xyce::dout() << "pcdsc =                        " << model_.pcdsc << std::endl;
+    Xyce::dout() << "pcdscb =                       " << model_.pcdscb << std::endl;
+    Xyce::dout() << "pcdscd =                       " << model_.pcdscd << std::endl;
+    Xyce::dout() << "ppclm =                        " << model_.ppclm << std::endl;
+    Xyce::dout() << "ppdibl1 =                      " << model_.ppdibl1 << std::endl;
+    Xyce::dout() << "ppdibl2 =                      " << model_.ppdibl2 << std::endl;
+    Xyce::dout() << "ppdiblb =                      " << model_.ppdiblb << std::endl;
+    Xyce::dout() << "pdrout =                       " << model_.pdrout << std::endl;
+    Xyce::dout() << "ppvag =                        " << model_.ppvag << std::endl;
+    Xyce::dout() << "pdelta =                       " << model_.pdelta << std::endl;
+    Xyce::dout() << "palpha0 =                      " << model_.palpha0 << std::endl;
+    Xyce::dout() << "pfbjtii =                      " << model_.pfbjtii << std::endl;
+    Xyce::dout() << "pbeta0 =                       " << model_.pbeta0 << std::endl;
+    Xyce::dout() << "pbeta1 =                       " << model_.pbeta1 << std::endl;
+    Xyce::dout() << "pbeta2 =                       " << model_.pbeta2 << std::endl;
+    Xyce::dout() << "pvdsatii0 =                    " << model_.pvdsatii0 << std::endl;
+    Xyce::dout() << "plii =                         " << model_.plii << std::endl;
+    Xyce::dout() << "pesatii =                      " << model_.pesatii << std::endl;
+    Xyce::dout() << "psii0 =                        " << model_.psii0 << std::endl;
+    Xyce::dout() << "psii1 =                        " << model_.psii1 << std::endl;
+    Xyce::dout() << "psii2 =                        " << model_.psii2 << std::endl;
+    Xyce::dout() << "psiid =                        " << model_.psiid << std::endl;
+    Xyce::dout() << "pagidl =                       " << model_.pagidl << std::endl;
+    Xyce::dout() << "pbgidl =                       " << model_.pbgidl << std::endl;
+    Xyce::dout() << "pngidl=                        " << model_.pngidl << std::endl;
+    Xyce::dout() << "pntun =                        " << model_.pntun << std::endl;
+    Xyce::dout() << "pndiode =                      " << model_.pndiode << std::endl;
+    Xyce::dout() << "pnrecf0 =                      " << model_.pnrecf0 << std::endl;
+    Xyce::dout() << "pnrecr0 =                      " << model_.pnrecr0 << std::endl;
+    Xyce::dout() << "pisbjt =                       " << model_.pisbjt << std::endl;
+    Xyce::dout() << "pisdif =                       " << model_.pisdif << std::endl;
+    Xyce::dout() << "pisrec =                       " << model_.pisrec << std::endl;
+    Xyce::dout() << "pistun =                       " << model_.pistun << std::endl;
+    Xyce::dout() << "pvrec0 =                       " << model_.pvrec0 << std::endl;
+    Xyce::dout() << "pvtun0 =                       " << model_.pvtun0 << std::endl;
+    Xyce::dout() << "pnbjt =                        " << model_.pnbjt << std::endl;
+    Xyce::dout() << "plbjt0 =                       " << model_.plbjt0 << std::endl;
+    Xyce::dout() << "pvabjt =                       " << model_.pvabjt << std::endl;
+    Xyce::dout() << "paely =                        " << model_.paely << std::endl;
+    Xyce::dout() << "pahli =                        " << model_.pahli << std::endl;
+    Xyce::dout() << "pvsdfb =                       " << model_.pvsdfb << std::endl;
+    Xyce::dout() << "pvsdth =                       " << model_.pvsdth << std::endl;
+    Xyce::dout() << "pdelvt =                       " << model_.pdelvt << std::endl;
+    Xyce::dout() << "pacde =                        " << model_.pacde << std::endl;
+    Xyce::dout() << "pmoin =                        " << model_.pmoin << std::endl;
+    Xyce::dout() << "pnoff =                        " << model_.pnoff << std::endl;
+    Xyce::dout() << "pxrcrg1 =                      " << model_.pxrcrg1 << std::endl;
+    Xyce::dout() << "pxrcrg2 =                      " << model_.pxrcrg2 << std::endl;
 
-    cout << endl;
-    cout << "Instance Params: " << endl;
-    cout << "l:               " << l << endl;
-    cout << "w:               " << w << endl;
-    cout << "drainArea:       " << drainArea << endl;
-    cout << "sourceArea:      " << sourceArea << endl;
-    cout << "drainSquares:    " << drainSquares << endl;
-    cout << "sourceSquares:   " << sourceSquares << endl;
-    cout << "drainPerimeter:  " << drainPerimeter << endl;
-    cout << "sourcePerimeter: " << sourcePerimeter << endl;
-    cout << "icVBS:           " << icVBS << endl;
-    cout << "icVDS:           " << icVDS << endl;
-    cout << "icVGS:           " << icVGS << endl;
-    cout << "bjtoff:          " << bjtoff << endl;
-    cout << "debugMod:        " << debugMod << endl;
-    cout << "rth0:            " << rth0 << endl;
-    cout << "cth0:            " << cth0 << endl;
-    cout << "bodySquares:     " << bodySquares << endl;
-    cout << "frbody:          " << frbody << endl;
-    cout << "soiMod:          " << soiMod << endl;
-    cout << "nbc:             " << nbc << endl;
-    cout << "nseg:            " << nseg << endl;
-    cout << "pdbcp:           " << pdbcp << endl;
-    cout << "psbcp:           " << psbcp << endl;
-    cout << "agbcp:           " << agbcp << endl;
-    cout << "aebcp:           " << aebcp << endl;
-    cout << "vbsusr:          " << vbsusr << endl;
-    cout << "tnodeout:        " << tnodeout << endl;
-    cout << "rgateMod:        " << rgateMod << endl;
-    cout << "numberParallel:  " << numberParallel << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "Instance Params: " << std::endl;
+    Xyce::dout() << "l:               " << l << std::endl;
+    Xyce::dout() << "w:               " << w << std::endl;
+    Xyce::dout() << "drainArea:       " << drainArea << std::endl;
+    Xyce::dout() << "sourceArea:      " << sourceArea << std::endl;
+    Xyce::dout() << "drainSquares:    " << drainSquares << std::endl;
+    Xyce::dout() << "sourceSquares:   " << sourceSquares << std::endl;
+    Xyce::dout() << "drainPerimeter:  " << drainPerimeter << std::endl;
+    Xyce::dout() << "sourcePerimeter: " << sourcePerimeter << std::endl;
+    Xyce::dout() << "icVBS:           " << icVBS << std::endl;
+    Xyce::dout() << "icVDS:           " << icVDS << std::endl;
+    Xyce::dout() << "icVGS:           " << icVGS << std::endl;
+    Xyce::dout() << "bjtoff:          " << bjtoff << std::endl;
+    Xyce::dout() << "debugMod:        " << debugMod << std::endl;
+    Xyce::dout() << "rth0:            " << rth0 << std::endl;
+    Xyce::dout() << "cth0:            " << cth0 << std::endl;
+    Xyce::dout() << "bodySquares:     " << bodySquares << std::endl;
+    Xyce::dout() << "frbody:          " << frbody << std::endl;
+    Xyce::dout() << "soiMod:          " << soiMod << std::endl;
+    Xyce::dout() << "nbc:             " << nbc << std::endl;
+    Xyce::dout() << "nseg:            " << nseg << std::endl;
+    Xyce::dout() << "pdbcp:           " << pdbcp << std::endl;
+    Xyce::dout() << "psbcp:           " << psbcp << std::endl;
+    Xyce::dout() << "agbcp:           " << agbcp << std::endl;
+    Xyce::dout() << "aebcp:           " << aebcp << std::endl;
+    Xyce::dout() << "vbsusr:          " << vbsusr << std::endl;
+    Xyce::dout() << "tnodeout:        " << tnodeout << std::endl;
+    Xyce::dout() << "rgateMod:        " << rgateMod << std::endl;
+    Xyce::dout() << "numberParallel:  " << numberParallel << std::endl;
   }
 }
 #endif
@@ -5513,47 +5477,9 @@ Instance::~Instance ()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/04
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                                            const vector<int> & extLIDVecRef )
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                                            const std::vector<int> & extLIDVecRef )
 {
-  string msg;
-
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-
-  if (devOptions.debugLevel > 0)
-  {
-    cout << dashedline << endl;
-    cout << "  In Instance::register LIDs\n\n";
-    cout << "  name             = " << getName() << endl;
-  }
-#endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel > 0)
-  {
-    cout << "  number of internal variables: " << numInt << endl;
-    cout << "  number of external variables: " << numExt << endl;
-
-    int i1;
-    for (i1=0;i1<numInt;++i1)
-    {
-      cout << "int["<<i1<<"] = " << intLIDVecRef[i1] << endl;
-    }
-    cout << endl;
-    for (i1=0;i1<numExt;++i1)
-    {
-      cout << "ext["<<i1<<"] = " << extLIDVecRef[i1] << endl;
-    }
-  }
-#endif
 
   numIntVars = 0;
   if (tNode == 1)
@@ -5580,20 +5506,30 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
     if (icVPSGiven) ++numIntVars;
   }
 
-  if ( numIntVars !=  numInt )
-  {
-    cout << numIntVars << " != " << numInt << endl;
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
-  if (numExt != numExtVars)
+#ifdef Xyce_DEBUG_DEVICE
+  if (getDeviceOptions().debugLevel > 0)
   {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "  In Instance::register LIDs\n\n";
+    Xyce::dout() << "  name             = " << getName() << std::endl;
+    Xyce::dout() << "  number of internal variables: " << numIntVars << std::endl;
+    Xyce::dout() << "  number of external variables: " << numExtVars << std::endl;
+
+    int i1;
+    for (i1=0;i1<numIntVars;++i1)
+    {
+      Xyce::dout() << "int["<<i1<<"] = " << intLIDVecRef[i1] << std::endl;
+    }
+    Xyce::dout() << std::endl;
+    for (i1=0;i1<numExtVars;++i1)
+    {
+      Xyce::dout() << "ext["<<i1<<"] = " << extLIDVecRef[i1] << std::endl;
+    }
   }
+#endif
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -5660,10 +5596,8 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
   {
     if( li_Drain == li_Source )
     {
-      msg = "Instance::registerLIDs:";
-      msg += "Tried to specify an initial condition on V_Drain_Source ";
-      msg += "when Drain and Source nodes are the same node.";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
+      DevelFatal(*this).in("Instance::registerLIDs")
+        << "Tried to specify an initial condition on V_Drain_Source when Drain and Source nodes are the same node";
     }
     li_Ids = intLIDVec[intLoc++];
   }
@@ -5672,10 +5606,8 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
   {
     if( li_Gate == li_Source )
     {
-      msg = "Instance::registerLIDs:";
-      msg += "Tried to specify an initial condition on V_Gate_Source ";
-      msg += "when Gate and Source nodes are the same node.";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
+      DevelFatal(*this).in("Instance::registerLIDs")
+        << "Tried to specify an initial condition on V_Gate_Source when Gate and Source nodes are the same node";
     }
     li_Igs = intLIDVec[intLoc++];
   }
@@ -5684,11 +5616,9 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
   {
     if( (li_Body == li_Source) || (li_Body == -1) )
     {
-      msg = "Instance::registerLIDs:";
-      msg += "Tried to specify an initial condition on V_Body_Source ";
-      msg += "when Body and Source nodes are the same node, or";
-      msg += "when Body node does not exist.";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
+      DevelFatal(*this).in("Instance::registerLIDs")
+        << "Tried to specify an initial condition on V_Body_Source when Body and Source nodes are the same node, or"
+        << "when Body node does not exist";
     }
     li_Ibs = intLIDVec[intLoc++];
   }
@@ -5697,10 +5627,8 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
   {
     if( li_Substrate == li_Source )
     {
-      msg = "Instance::registerLIDs:";
-      msg += "Tried to specify an initial condition on V_Substrate_Source ";
-      msg += "when Substrate and Source nodes are the same node.";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
+      DevelFatal(*this).in("Instance::registerLIDs")
+        << "Tried to specify an initial condition on V_Substrate_Source when Substrate and Source nodes are the same node";
     }
     li_Ies = intLIDVec[intLoc++];
   }
@@ -5708,46 +5636,44 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
   {
     if( (li_ExtBody == li_Source) || (li_ExtBody == -1) )
     {
-      msg = "Instance::registerLIDs:";
-      msg += "Tried to specify an initial condition on V_ExtBody_Source ";
-      msg += "when External Body and Source nodes are the same node, ";
-      msg += "or when External Body node does not exist.";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
+      DevelFatal(*this).in("Instance::registerLIDs")
+        << "Tried to specify an initial condition on V_ExtBody_Source when External Body and Source nodes are the same node, "
+        << "or when External Body node does not exist.";
     }
     li_Ips = intLIDVec[intLoc++];
   }
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel > 0)
+  if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "\n  local variable indices:\n";
-    cout << "  li_Drain         = " << li_Drain << endl;
-    cout << "  li_Gate          = " << li_Gate << endl;
-    cout << "  li_Source        = " << li_Source << endl;
-    cout << "  li_Substrate     = " << li_Substrate << endl;
-    cout << "  li_ExtBody       = " << li_ExtBody << endl;
-    cout << "  li_Body          = " << li_Body << endl;
-    cout << "  li_Temperature   = " << li_Temperature << endl;
-    cout << "  li_DrainPrime    = " << li_DrainPrime << endl;
-    cout << "  li_SourcePrime   = " << li_SourcePrime << endl;
-    cout << "  li_GatePrime     = " << li_GatePrime << endl;
-    cout << "  li_GateMid       = " << li_GateMid << endl;
+    Xyce::dout() << "\n  local variable indices:\n";
+    Xyce::dout() << "  li_Drain         = " << li_Drain << std::endl;
+    Xyce::dout() << "  li_Gate          = " << li_Gate << std::endl;
+    Xyce::dout() << "  li_Source        = " << li_Source << std::endl;
+    Xyce::dout() << "  li_Substrate     = " << li_Substrate << std::endl;
+    Xyce::dout() << "  li_ExtBody       = " << li_ExtBody << std::endl;
+    Xyce::dout() << "  li_Body          = " << li_Body << std::endl;
+    Xyce::dout() << "  li_Temperature   = " << li_Temperature << std::endl;
+    Xyce::dout() << "  li_DrainPrime    = " << li_DrainPrime << std::endl;
+    Xyce::dout() << "  li_SourcePrime   = " << li_SourcePrime << std::endl;
+    Xyce::dout() << "  li_GatePrime     = " << li_GatePrime << std::endl;
+    Xyce::dout() << "  li_GateMid       = " << li_GateMid << std::endl;
     if (icVDSGiven)
-      cout << "  li_Ids         = " << li_Ids << endl;
+      Xyce::dout() << "  li_Ids         = " << li_Ids << std::endl;
 
     if (icVGSGiven)
-      cout << "  li_Igs         = " << li_Igs << endl;
+      Xyce::dout() << "  li_Igs         = " << li_Igs << std::endl;
 
     if (icVBSGiven)
-      cout << "  li_Ibs         = " << li_Ibs << endl;
+      Xyce::dout() << "  li_Ibs         = " << li_Ibs << std::endl;
 
     if (icVESGiven)
-      cout << "  li_Ies         = " << li_Ies << endl;
+      Xyce::dout() << "  li_Ies         = " << li_Ies << std::endl;
 
     if (icVPSGiven)
-      cout << "  li_Ips         = " << li_Ips << endl;
+      Xyce::dout() << "  li_Ips         = " << li_Ips << std::endl;
 
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -5761,13 +5687,13 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 05/13/05
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
     // set up the internal names map
-    string tmpstr;
+    std::string tmpstr;
     if (bNode == 1)
     {
       tmpstr = getName()+"_Body";
@@ -5854,16 +5780,16 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 4/4/2013
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getStoreNameMap ()
+std::map<int,std::string> & Instance::getStoreNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if( loadLeadCurrent && storeNameMap.empty ())
   {
     // change subcircuitname:devicetype_deviceName to
     // devicetype:subcircuitName:deviceName
-    string modName(getName());
+    std::string modName(getName());
     spiceInternalName(modName);
-    string tmpstr;
+    std::string tmpstr;
     tmpstr = modName+":DEV_ID";
     storeNameMap[ li_store_dev_id ] = tmpstr;
     tmpstr = modName+":DEV_IG";
@@ -5889,39 +5815,19 @@ map<int,string> & Instance::getStoreNameMap ()
 // Creation Date : 05/20/04
 //-----------------------------------------------------------------------------
 void Instance::registerStateLIDs(
-   const vector<int> & staLIDVecRef )
+   const std::vector<int> & staLIDVecRef )
 {
-  string msg;
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
 
-  if (devOptions.debugLevel > 0)
+  if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl;
-    cout << dashedline << endl;
-    cout << "  In Instance::registerStateLIDs\n\n";
-    cout << "  name             = " << getName() << endl;
-  }
-#endif
-
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel > 0)
-  {
-    cout << "  Number of State LIDs: " << numSta << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "  In Instance::registerStateLIDs\n\n";
+    Xyce::dout() << "  name             = " << getName() << std::endl;
+    Xyce::dout() << "  Number of State LIDs: " << numStateVars << std::endl;
   }
 #endif
 
@@ -5938,19 +5844,19 @@ void Instance::registerStateLIDs(
   li_state_qth      = staLIDVec[n++];
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel > 0)
+  if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "  Local State indices:" << endl;
-    cout << endl;
+    Xyce::dout() << "  Local State indices:" << std::endl;
+    Xyce::dout() << std::endl;
 
-    cout << "  li_state_qb           = " << li_state_qb << endl;
-    cout << "  li_state_qg           = " << li_state_qg << endl;
-    cout << "  li_state_qd           = " << li_state_qd << endl;
-    cout << "  li_state_qe           = " << li_state_qe << endl;
-    cout << "  li_state_qgmid        = " << li_state_qgmid << endl;
-    cout << "  li_state_qth          = " << li_state_qth << endl;
-    cout << endl;
-    cout << dashedline << endl;
+    Xyce::dout() << "  li_state_qb           = " << li_state_qb << std::endl;
+    Xyce::dout() << "  li_state_qg           = " << li_state_qg << std::endl;
+    Xyce::dout() << "  li_state_qd           = " << li_state_qd << std::endl;
+    Xyce::dout() << "  li_state_qe           = " << li_state_qe << std::endl;
+    Xyce::dout() << "  li_state_qgmid        = " << li_state_qgmid << std::endl;
+    Xyce::dout() << "  li_state_qth          = " << li_state_qth << std::endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -5965,41 +5871,9 @@ void Instance::registerStateLIDs(
 // Creation Date :
 //-----------------------------------------------------------------------------
 void Instance::registerStoreLIDs(
-   const vector<int> & stoLIDVecRef )
+   const std::vector<int> & stoLIDVecRef )
 {
-  string msg;
-
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-
-  if (devOptions.debugLevel > 0)
-  {
-    cout << endl;
-    cout << dashedline << endl;
-    cout << "  In Instance::registerStoreLIDs\n\n";
-    cout << "  name             = " << getName() << endl;
-  }
-#endif
-
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables.
-  int numSto = stoLIDVecRef.size();
-
-  if (numSto != getNumStoreVars())
-  {
-    msg = "Instance::registerStoreLIDs:";
-    msg += "numSto != numStoreVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel > 0)
-  {
-    cout << "  Number of Store LIDs: " << numSto << endl;
-  }
-#endif
+  AssertLIDs(stoLIDVecRef.size() == getNumStoreVars());
 
   // Copy over the global ID lists:
   stoLIDVec = stoLIDVecRef;
@@ -6033,33 +5907,6 @@ void Instance::registerStoreLIDs(
     li_store_dev_ie = stoLIDVec[n++];
     li_store_dev_ib = stoLIDVec[n++];
   }
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel > 0)
-  {
-    cout << "  Local Store indices:" << endl;
-    cout << endl;
-    cout << "  li_store_vbd          = " << li_store_vbd << endl;
-    cout << "  li_store_vbs          = " << li_store_vbs << endl;
-    cout << "  li_store_vgs          = " << li_store_vgs << endl;
-    cout << "  li_store_vds          = " << li_store_vds << endl;
-    cout << "  li_store_ves          = " << li_store_ves << endl;
-    cout << "  li_store_vps          = " << li_store_vps << endl;
-    cout << "  li_store_vg           = " << li_store_vg  << endl;
-    cout << "  li_store_vd           = " << li_store_vd << endl;
-    cout << "  li_store_vs           = " << li_store_vs << endl;
-    cout << "  li_store_vp           = " << li_store_vp << endl;
-    cout << "  li_store_ve           = " << li_store_ve << endl;
-    cout << "  li_store_vgp          = " << li_store_vgp << endl;
-    cout << "  li_store_vgm          = " << li_store_vgm << endl;
-    cout << "  li_store_deltemp      = " << li_store_deltemp << endl;
-    cout << "  li_store_vges         = " << li_store_vges << endl;
-    cout << "  li_store_vgms         = " << li_store_vgms << endl;
-    cout << endl;
-    cout << dashedline << endl;
-  }
-#endif
-
 }
 
 //-----------------------------------------------------------------------------
@@ -6070,7 +5917,7 @@ void Instance::registerStoreLIDs(
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/04
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   if ( icVDSGiven || icVGSGiven || icVBSGiven || icVESGiven || icVPSGiven )
   {
@@ -6089,11 +5936,11 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creation Date : 05/20/04
 //-----------------------------------------------------------------------------
 void Instance::registerJacLIDs(
-   const vector< vector<int> > & jacLIDVec )
+   const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
-  vector<int> map;
-  vector< vector<int> > map2;
+  std::vector<int> map;
+  std::vector< std::vector<int> > map2;
 
   // these are used to helpe us pluck the LID's from the right spot
   // without adding a lot of new code to each jacID condition below
@@ -6565,7 +6412,7 @@ void Instance::registerJacLIDs(
   }
   else
   {
-    string msg = "Instance::registerJacLIDs:";
+    std::string msg = "Instance::registerJacLIDs:";
     msg += "jacID out of supported range";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
   }
@@ -6935,12 +6782,11 @@ double SDphi, SDgamma;
 double tmp3, T7, Eg;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
-  if (devOptions.debugLevel > 0 && solState.debugTimeFlag)
+  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << endl << dashedline2 << endl;
-    cout << "Instance::updateTemperature\n";
-    cout << "name = " << getName() << endl;
+    Xyce::dout() << std::endl << subsection_divider << std::endl;
+    Xyce::dout() << "Instance::updateTemperature\n";
+    Xyce::dout() << "name = " << getName() << std::endl;
   }
 #endif
 
@@ -6956,8 +6802,6 @@ double tmp3, T7, Eg;
     // some params may have changed during interpolation
     model_.processParams();
   }
-// PMC
-//  model_.outputParams(0);
 
   Tnom = model_.tnom;
   TempRatio = temp/Tnom;
@@ -6974,9 +6818,9 @@ double tmp3, T7, Eg;
   // size dependent parameters, or those of the instance.  If we are
   // using the instance, we may have to allocate the structure.
 
-  list<SizeDependParam*>::iterator it_dpL =
+  std::list<SizeDependParam*>::iterator it_dpL =
     model_.sizeDependParamList.begin();
-  list<SizeDependParam*>::iterator end_dpL =
+  std::list<SizeDependParam*>::iterator end_dpL =
     model_.sizeDependParamList.end();
 
   paramPtr = NULL;
@@ -7041,24 +6885,14 @@ double tmp3, T7, Eg;
       paramPtr->leff = l - 2.0 * paramPtr->dl;
       if (paramPtr->leff <= 0.0)
       {
-        string msg = " In device: ";
-        msg += getName();
-        msg += ", Effective channel length <= 0";
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+        UserError0(*this) << "Effective channel length <= 0";
       }
 
       paramPtr->weff = w - nbc * model_.dwbc
          - (2.0 - nbc) * paramPtr->dw;
       if (paramPtr->weff <= 0.0)
       {
-        string msg = " In device: ";
-        msg += getName();
-        msg += ", Effective channel length <= 0";
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+        UserError0(*this) << "Effective channel width <= 0";
       }
 
       paramPtr->wdiod = paramPtr->weff / nseg + pdbcp;
@@ -7067,24 +6901,14 @@ double tmp3, T7, Eg;
       paramPtr->leffCV = l - 2.0 * paramPtr->dlc;
       if (paramPtr->leffCV <= 0.0)
       {
-        string msg = " In device: ";
-        msg += getName();
-        msg += ", Effective channel length for C-V <= 0";
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+        UserError0(*this) << "Effective channel length for C-V <= 0";
       }
 
       paramPtr->weffCV = w - nbc * model_.dwbc
          - (2.0 - nbc) * paramPtr->dwc;
       if (paramPtr->weffCV <= 0.0)
       {
-        string msg = " In device: ";
-        msg += getName();
-        msg += ", Effective channel length for C-V <= 0";
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+        UserError0(*this) << "Effective channel width for C-V <= 0";
       }
 
       paramPtr->wdiodCV = paramPtr->weffCV / nseg + pdbcp;
@@ -7093,23 +6917,13 @@ double tmp3, T7, Eg;
       paramPtr->leffCVb = l - 2.0 * paramPtr->dlc - model_.dlcb;
       if (paramPtr->leffCVb <= 0.0)
       {
-        string msg = " In device: ";
-        msg += getName();
-        msg += ", Effective channel length for C-V (body) <= 0";
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+        UserError0(*this) << "Effective channel length for C-V (body) <= 0";
       }
 
       paramPtr->leffCVbg = paramPtr->leffCVb + 2 * model_.dlbg;
       if (paramPtr->leffCVbg <= 0.0)
       {
-        string msg = " In device: ";
-        msg += getName();
-        msg += ", Effective channel length for C-V (backgate) <= 0";
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+        UserError0(*this) << "Effective channel length for C-V (backgate) <= 0";
       }
 
 
@@ -7699,12 +7513,7 @@ double tmp3, T7, Eg;
 
       if (!checkModel ())
       {
-        string msg = " In device: ";
-        msg += getName();
-        msg += ", detected during B3SOIV3 parameter check";
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+        UserError0(*this) << "Problem detected during B3SOIV3 parameter check";
       }
 
       paramPtr->cgdo = (model_.cgdo + paramPtr->cf)
@@ -7834,39 +7643,35 @@ double tmp3, T7, Eg;
       if (model_.k1Given || model_.k2Given)
       {
           if (!model_.k1Given)
-          {   string msg = "Warning: k1 should be specified with k2.";
-              N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_WARNING,msg);
-              paramPtr->k1 = 0.53;
+          {
+            UserWarning(*this) << "k1 should be specified with k2.";
+            
+            paramPtr->k1 = 0.53;
           }
           if (!model_.k2Given)
-          {   string msg = "Warning: k2 should be specified with k1.";
-              N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_WARNING,msg);
-              paramPtr->k2 = -0.0186;
+          {
+            UserWarning(*this) << "k2 should be specified with k1.";
+            paramPtr->k2 = -0.0186;
           }
           if (model_.xtGiven)
           {
-              string msg = "Warning: xt is ignored because k1 or k2 is given.";
-              N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_WARNING,msg);
+            UserWarning(*this) << "xt is ignored because k1 or k2 is given.";
           }
           if (model_.vbxGiven)
           {
-              string msg ="Warning: vbx is ignored because k1 or k2 is given.";
-              N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_WARNING,msg);
+            UserWarning(*this) << "vbx is ignored because k1 or k2 is given.";
           }
           if (model_.vbmGiven)
           {
-              string msg ="Warning: vbm is ignored because k1 or k2 is given.";
-              N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_WARNING,msg);
+            UserWarning(*this) << "vbm is ignored because k1 or k2 is given.";
           }
           if (model_.gamma1Given)
           {
-              string msg="Warning: gamma1 ignored because k1 or k2 is given.";
-              N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_WARNING,msg);
+            UserWarning(*this) << "gamma1 ignored because k1 or k2 is given.";
           }
           if (model_.gamma2Given)
           {
-              string msg="Warning: gamma2 ignored because k1 or k2 is given.";
-              N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_WARNING,msg);
+            UserWarning(*this) << "gamma2 ignored because k1 or k2 is given.";
           }
       }
       else
@@ -8083,8 +7888,7 @@ double tmp3, T7, Eg;
   { grgeltd = 1.0e3; // mho
     if (rgateMod !=0)
     {
-      string msg = "Warning: The gate conductance reset to 1.0e3 mho.";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_WARNING,msg);
+      UserWarning(*this) << "The gate conductance reset to 1.0e3 mho.";
     }
   }
 // v3.1 wanh added for RF end
@@ -8334,7 +8138,7 @@ bool Instance::updateIntermediateVars ()
 
 
   // Don't do charge computations in DC sweeps.
-  if (solState.tranopFlag || solState.acopFlag || solState.transientFlag)
+  if (getSolverState().tranopFlag || getSolverState().acopFlag || getSolverState().transientFlag)
   {
     ChargeComputationNeeded = true;
   }
@@ -8360,16 +8164,15 @@ bool Instance::updateIntermediateVars ()
   // end of b3ld.c parameters.
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
-  if (devOptions.debugLevel > 0 && solState.debugTimeFlag)
+  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "  In updateIntermediateVars\n";
-    cout << "  name = " << getName();
-    cout << "  model name = " << model_.getName();
-    cout <<"   dtype is " << model_.dtype << endl;
-    cout.width(21); cout.precision(13); cout.setf(ios::scientific);
-    cout << "  " << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "  In updateIntermediateVars\n";
+    Xyce::dout() << "  name = " << getName();
+    Xyce::dout() << "  model name = " << model_.getName();
+    Xyce::dout() <<"   dtype is " << model_.dtype << std::endl;
+    Xyce::dout().width(21); Xyce::dout().precision(13); Xyce::dout().setf(std::ios::scientific);
+    Xyce::dout() << "  " << std::endl;
   }
 #endif
 
@@ -8432,22 +8235,22 @@ bool Instance::updateIntermediateVars ()
   Vgm_orig = Vgm;
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel > 0 && solState.debugTimeFlag)
+  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout.precision(18);
-    cout << endl;
-    cout << getName() << "  Blim:     Vd = " << Vd << endl;
-    cout << getName() << "  Blim:     Vg = " << Vg << endl;
-    cout << getName() << "  Blim:     Vs = " << Vs << endl;
-    cout << getName() << "  Blim:     Ve = " << Ve << endl;
-    cout << getName() << "  Blim:     Vb = " << Vb << endl;
-    cout << getName() << "  Blim:     Vp = " << Vp << endl;
-    cout << getName() << "  Blim:delTemp = " << delTemp << endl;
-    cout << getName() << "  Blim:    Vsp = " << Vsp << endl;
-    cout << getName() << "  Blim:    Vdp = " << Vdp << endl;
-    cout << getName() << "  Blim:    Vgp = " << Vgp << endl;
-    cout << getName() << "  Blim:    Vgm = " << Vgm << endl;
-    cout <<  endl;
+    Xyce::dout().precision(18);
+    Xyce::dout() << std::endl;
+    Xyce::dout() << getName() << "  Blim:     Vd = " << Vd << std::endl;
+    Xyce::dout() << getName() << "  Blim:     Vg = " << Vg << std::endl;
+    Xyce::dout() << getName() << "  Blim:     Vs = " << Vs << std::endl;
+    Xyce::dout() << getName() << "  Blim:     Ve = " << Ve << std::endl;
+    Xyce::dout() << getName() << "  Blim:     Vb = " << Vb << std::endl;
+    Xyce::dout() << getName() << "  Blim:     Vp = " << Vp << std::endl;
+    Xyce::dout() << getName() << "  Blim:delTemp = " << delTemp << std::endl;
+    Xyce::dout() << getName() << "  Blim:    Vsp = " << Vsp << std::endl;
+    Xyce::dout() << getName() << "  Blim:    Vdp = " << Vdp << std::endl;
+    Xyce::dout() << getName() << "  Blim:    Vgp = " << Vgp << std::endl;
+    Xyce::dout() << getName() << "  Blim:    Vgm = " << Vgm << std::endl;
+    Xyce::dout() <<  std::endl;
   }
 #endif
 
@@ -8465,21 +8268,21 @@ bool Instance::updateIntermediateVars ()
   ved  = ves - vds;
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel > 0 && solState.debugTimeFlag)
+  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout.precision(18);
-    cout << endl;
-    cout << getName() << "  Blim:    vbs = " << vbs << endl;
-    cout << getName() << "  Blim:    vbd = " << vbd << endl;
-    cout << getName() << "  Blim:    vps = " << vps << endl;
-    cout << getName() << "  Blim:    vpd = " << vpd << endl;
-    cout << getName() << "  Blim:    vgs = " << vgs << endl;
-    cout << getName() << "  Blim:    vds = " << vds << endl;
-    cout << getName() << "  Blim:    ves = " << ves << endl;
-    cout << getName() << "  Blim:    ved = " << ved << endl;
-    cout << getName() << "  Blim:    vgd = " << vgd << endl;
-    cout << getName() << "  Blim:   vges = " << vges<< endl;
-    cout << getName() << "  Blim:   vgms = " << vgms<< endl;
+    Xyce::dout().precision(18);
+    Xyce::dout() << std::endl;
+    Xyce::dout() << getName() << "  Blim:    vbs = " << vbs << std::endl;
+    Xyce::dout() << getName() << "  Blim:    vbd = " << vbd << std::endl;
+    Xyce::dout() << getName() << "  Blim:    vps = " << vps << std::endl;
+    Xyce::dout() << getName() << "  Blim:    vpd = " << vpd << std::endl;
+    Xyce::dout() << getName() << "  Blim:    vgs = " << vgs << std::endl;
+    Xyce::dout() << getName() << "  Blim:    vds = " << vds << std::endl;
+    Xyce::dout() << getName() << "  Blim:    ves = " << ves << std::endl;
+    Xyce::dout() << getName() << "  Blim:    ved = " << ved << std::endl;
+    Xyce::dout() << getName() << "  Blim:    vgd = " << vgd << std::endl;
+    Xyce::dout() << getName() << "  Blim:   vges = " << vges<< std::endl;
+    Xyce::dout() << getName() << "  Blim:   vgms = " << vgms<< std::endl;
   }
 #endif
 
@@ -8498,9 +8301,9 @@ bool Instance::updateIntermediateVars ()
   delTemp_orig = delTemp;
 
   // note initJctFlag will only be true for dcop.
-  if (solState.initJctFlag && !OFF && devOptions.voltageLimiterFlag)
+  if (getSolverState().initJctFlag && !OFF && getDeviceOptions().voltageLimiterFlag)
   {
-    if (solState.inputOPFlag)
+    if (getSolverState().inputOPFlag)
     {
       N_LAS_Vector * flagSolVectorPtr = extData.flagSolVectorPtr;
       if ((*flagSolVectorPtr)[li_Drain] == 0 || (*flagSolVectorPtr)[li_Gate] == 0 ||
@@ -8528,7 +8331,7 @@ bool Instance::updateIntermediateVars ()
       origFlag = 0;
     }
   }
-  else if ((solState.initFixFlag || solState.initJctFlag) && OFF)
+  else if ((getSolverState().initFixFlag || getSolverState().initJctFlag) && OFF)
   {
     delTemp = vps = vbs = vgs = vds = ves = 0.0;
     Vg = Vd = Vs = Vp = Ve = 0.0;
@@ -8536,11 +8339,10 @@ bool Instance::updateIntermediateVars ()
     vges = vgms = 0.0;
   }
 
-  if (solState.newtonIter == 0)
+  if (getSolverState().newtonIter == 0)
   {
-    newtonIterOld = 0;
 
-    if (!solState.dcopFlag || (solState.locaEnabledFlag && solState.dcopFlag))
+    if (!getSolverState().dcopFlag || (getSolverState().locaEnabledFlag && getSolverState().dcopFlag))
     // ie, first newton step of a transient time step or DCOP continuation step.
     {
       // if not dcop, then state vector has final drops of last nonlinear step
@@ -8613,8 +8415,8 @@ bool Instance::updateIntermediateVars ()
   // RightHandSideTerm = current;
   // RightHandSideTerm_Jdxp = conductance*(voltagedrop-voltagedrop_orig);
 
-  if (devOptions.voltageLimiterFlag && !(solState.initJctFlag)
-      && !(solState.initFixFlag && OFF))
+  if (getDeviceOptions().voltageLimiterFlag && !(getSolverState().initJctFlag)
+      && !(getSolverState().initFixFlag && OFF))
   {
     Vg  = B3SOIlimit(Vg,  vg_old,  3.0, &Check);
     Vdp = B3SOIlimit(Vdp, vd_old,  3.0, &Check);
@@ -8641,7 +8443,7 @@ bool Instance::updateIntermediateVars ()
       origFlag = 0;
     }
 
-  } // devOptions.voltageLimiterFlag
+  } // getDeviceOptions().voltageLimiterFlag
 
   // ALL Bypass code removed by TVR --- we never, ever use it, and it just
   // clutters the code
@@ -8650,7 +8452,7 @@ bool Instance::updateIntermediateVars ()
   // In spice3F5 version there are additional lines here but they calculate
   // junk that is only used in bypass, which we never do
 
-  if (devOptions.voltageLimiterFlag && !(solState.initJctFlag))
+  if (getDeviceOptions().voltageLimiterFlag && !(getSolverState().initJctFlag))
   {
     if (vds_old >= 0)  // normal mode
     {
@@ -8705,67 +8507,61 @@ bool Instance::updateIntermediateVars ()
     if (Check == 1) origFlag = 0;
 
 #ifdef Xyce_DEBUG_DEVICE
-    if (devOptions.debugLevel > 0 && solState.debugTimeFlag)
+    if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << endl;
-      cout.precision(18);
-      cout << endl;
-      cout << getName() << "  Alim:     Vd = " << Vd << endl;
-      cout << getName() << "  Alim:     Vg = " << Vg << endl;
-      cout << getName() << "  Alim:     Vs = " << Vs << endl;
-      cout << getName() << "  Alim:     Ve = " << Ve << endl;
-      cout << getName() << "  Alim:     Vb = " << Vb << endl;
-      cout << getName() << "  Alim:     Vp = " << Vp << endl;
-      cout << getName() << "  Alim:delTemp = " << delTemp << endl;
-      cout << getName() << "  Alim:    Vsp = " << Vsp << endl;
-      cout << getName() << "  Alim:    Vdp = " << Vdp << endl;
-      cout << getName() << "  Alim:    Vgp = " << Vgp << endl;
-      cout << getName() << "  Alim:    Vgm = " << Vgm << endl;
+      Xyce::dout() << std::endl;
+      Xyce::dout().precision(18);
+      Xyce::dout() << std::endl;
+      Xyce::dout() << getName() << "  Alim:     Vd = " << Vd << std::endl;
+      Xyce::dout() << getName() << "  Alim:     Vg = " << Vg << std::endl;
+      Xyce::dout() << getName() << "  Alim:     Vs = " << Vs << std::endl;
+      Xyce::dout() << getName() << "  Alim:     Ve = " << Ve << std::endl;
+      Xyce::dout() << getName() << "  Alim:     Vb = " << Vb << std::endl;
+      Xyce::dout() << getName() << "  Alim:     Vp = " << Vp << std::endl;
+      Xyce::dout() << getName() << "  Alim:delTemp = " << delTemp << std::endl;
+      Xyce::dout() << getName() << "  Alim:    Vsp = " << Vsp << std::endl;
+      Xyce::dout() << getName() << "  Alim:    Vdp = " << Vdp << std::endl;
+      Xyce::dout() << getName() << "  Alim:    Vgp = " << Vgp << std::endl;
+      Xyce::dout() << getName() << "  Alim:    Vgm = " << Vgm << std::endl;
 
-      cout << getName() << "  Alim:    vbs = " << vbs << endl;
-      cout << getName() << "  Alim:    vps = " << vps << endl;
-      cout << getName() << "  Alim:    vgs = " << vgs << endl;
-      cout << getName() << "  Alim:    ves = " << ves << endl;
-      cout << getName() << "  Alim:    vds = " << vds << endl;
-      cout << getName() << "  Alim:   vges = " <<vges << endl;
-      cout << getName() << "  Alim:   vgms = " <<vgms << endl;
+      Xyce::dout() << getName() << "  Alim:    vbs = " << vbs << std::endl;
+      Xyce::dout() << getName() << "  Alim:    vps = " << vps << std::endl;
+      Xyce::dout() << getName() << "  Alim:    vgs = " << vgs << std::endl;
+      Xyce::dout() << getName() << "  Alim:    ves = " << ves << std::endl;
+      Xyce::dout() << getName() << "  Alim:    vds = " << vds << std::endl;
+      Xyce::dout() << getName() << "  Alim:   vges = " <<vges << std::endl;
+      Xyce::dout() << getName() << "  Alim:   vgms = " <<vgms << std::endl;
 
-      cout << getName() << "  Alim:    vbd = " << vbd << endl;
+      Xyce::dout() << getName() << "  Alim:    vbd = " << vbd << std::endl;
 
-      cout << getName() << "  Alim:     T0 = " << vbd << endl;
-      cout <<  endl;
-      cout <<  endl;
+      Xyce::dout() << getName() << "  Alim:     T0 = " << vbd << std::endl;
+      Xyce::dout() <<  std::endl;
+      Xyce::dout() <<  std::endl;
 
-      cout <<getName()<<"  Vg_orig      = " << Vg_orig  << endl;
-      cout <<getName()<<"  Vs_orig      = " << Vs_orig  << endl;
-      cout <<getName()<<"  Ve_orig      = " << Ve_orig  << endl;
-      cout <<getName()<<"  Vb_orig      = " << Vb_orig  << endl;
-      cout <<getName()<<"  Vp_orig      = " << Vp_orig  << endl;
-      cout <<getName()<<"  Vsp_orig     = " << Vsp_orig  << endl;
-      cout <<getName()<<"  Vdp_orig     = " << Vdp_orig  << endl;
-      cout <<getName()<<"  Vgp_orig     = " << Vgp_orig  << endl;
-      cout <<getName()<<"  Vgm_orig     = " << Vgm_orig  << endl;
-      cout << endl;
-      cout <<getName()<<"  vbs_orig     = " << vbs_orig  << endl;
-      cout <<getName()<<"  vbd_orig     = " << vbd_orig  << endl;
-      cout <<getName()<<"  vps_orig     = " << vps_orig  << endl;
-      cout <<getName()<<"  vpd_orig     = " << vpd_orig  << endl;
-      cout <<getName()<<"  vgs_orig     = " << vgs_orig  << endl;
-      cout <<getName()<<"  vds_orig     = " << vds_orig  << endl;
-      cout <<getName()<<"  ves_orig     = " << ves_orig  << endl;
-      cout <<getName()<<"  ved_orig     = " << ved_orig  << endl;
-      cout <<getName()<<"  vgd_orig     = " << vgd_orig  << endl;
-      cout <<getName()<<"  vges_orig    = " << vges_orig  << endl;
-      cout <<getName()<<"  vgms_orig    = " << vgms_orig  << endl;
-      cout <<getName()<<"  delTemp_orig = " << delTemp_orig  << endl;
+      Xyce::dout() <<getName()<<"  Vg_orig      = " << Vg_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  Vs_orig      = " << Vs_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  Ve_orig      = " << Ve_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  Vb_orig      = " << Vb_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  Vp_orig      = " << Vp_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  Vsp_orig     = " << Vsp_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  Vdp_orig     = " << Vdp_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  Vgp_orig     = " << Vgp_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  Vgm_orig     = " << Vgm_orig  << std::endl;
+      Xyce::dout() << std::endl;
+      Xyce::dout() <<getName()<<"  vbs_orig     = " << vbs_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  vbd_orig     = " << vbd_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  vps_orig     = " << vps_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  vpd_orig     = " << vpd_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  vgs_orig     = " << vgs_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  vds_orig     = " << vds_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  ves_orig     = " << ves_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  ved_orig     = " << ved_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  vgd_orig     = " << vgd_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  vges_orig    = " << vges_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  vgms_orig    = " << vgms_orig  << std::endl;
+      Xyce::dout() <<getName()<<"  delTemp_orig = " << delTemp_orig  << std::endl;
     }
 #endif
-  }
-
-  // update the "old" newton iteration number.
-  if (solState.newtonIter != 0 && solState.newtonIter != newtonIterOld)
-  {
-    newtonIterOld = solState.newtonIter;
   }
 
   // Finished with what would have been the series of CKTmode
@@ -8994,19 +8790,19 @@ bool Instance::updateIntermediateVars ()
   // Rosychowdhury.  If the artificial parameter flag has been enabled,
   // modify Vds and Vgs.
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel > 0 && solState.debugTimeFlag)
+  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "HOMOTOPY INFO: gainscale   = "
-         << solState.gainScale[blockHomotopyID] << endl;
-    cout << "HOMOTOPY INFO: before vds  = " << Vds << endl;
-    cout << "HOMOTOPY INFO: before vgst = " << Vgs << endl;
-    cout << "vgstConst= " << devOptions.vgstConst << endl;
+    Xyce::dout() << "HOMOTOPY INFO: gainscale   = "
+         << getSolverState().gainScale[blockHomotopyID] << std::endl;
+    Xyce::dout() << "HOMOTOPY INFO: before vds  = " << Vds << std::endl;
+    Xyce::dout() << "HOMOTOPY INFO: before vgst = " << Vgs << std::endl;
+    Xyce::dout() << "vgstConst= " << getDeviceOptions().vgstConst << std::endl;
   }
 #endif
-  if (solState.artParameterFlag)
+  if (getSolverState().artParameterFlag)
   {
-    double alpha = solState.gainScale[blockHomotopyID];
-    if (devOptions.staggerGainScale)
+    double alpha = getSolverState().gainScale[blockHomotopyID];
+    if (getDeviceOptions().staggerGainScale)
     {
       alpha *= (0.3 * randomPerturb + 1.0);
       if (alpha > 1.0)
@@ -9014,21 +8810,21 @@ bool Instance::updateIntermediateVars ()
         alpha = 1.0;
       }
     }
-    double vgstConst = devOptions.vgstConst;
-    if (devOptions.randomizeVgstConst)
+    double vgstConst = getDeviceOptions().vgstConst;
+    if (getDeviceOptions().randomizeVgstConst)
     {
       vgstConst *= randomPerturb;
     }
 
-    Vds = devSupport.contVds (Vds, solState.nltermScale,
-                              devOptions.vdsScaleMin);
+    Vds = devSupport.contVds (Vds, getSolverState().nltermScale,
+                              getDeviceOptions().vdsScaleMin);
     Vgs = devSupport.contVgst(Vgs, alpha, vgstConst);
   }
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel > 0 && solState.debugTimeFlag)
+  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "HOMOTOPY INFO: after vds   = " << Vds << endl;
-    cout << "HOMOTOPY INFO: after vgst  = " << Vgs << endl;
+    Xyce::dout() << "HOMOTOPY INFO: after vds   = " << Vds << std::endl;
+    Xyce::dout() << "HOMOTOPY INFO: after vgst  = " << Vgs << std::endl;
   }
 #endif
   // end of mosfet continuation block.
@@ -11564,11 +11360,7 @@ bool Instance::updateIntermediateVars ()
 
     cbodcon = Ibp;
     cbodcon_Jdxp = 0.0;
-    if (devOptions.voltageLimiterFlag && !origFlag)
-    {
-      tmp = - (Gbpbs * (Vbs-Vbs_orig) + Gbpps * (Vps-Vps_orig));
-      cbodcon_Jdxp = tmp;
-    }
+    cbodcon_Jdxp = - (Gbpbs * (Vbs-Vbs_orig) + Gbpps * (Vps-Vps_orig));
   }
   else // v3.1 soiMod=2: ideal FD
   {
@@ -11578,6 +11370,7 @@ bool Instance::updateIntermediateVars ()
     ibp = Ibp = 0.0;
     gbpbs = 0.0;
     gbpps = gbpT = cbodcon = 0.0;
+    cbodcon_Jdxp = 0.0;
     Gbpbs = Gbpps = 0.0;
   }
   // v3.1
@@ -11649,15 +11442,11 @@ bool Instance::updateIntermediateVars ()
 
   cth = - Ids * Vds;
   cth_Jdxp = 0.0;
-  if (devOptions.voltageLimiterFlag && !origFlag)
-  {
-    tmp = -model_.dtype *(gtempg * (Vgs-Vgs_orig)
-                                +gtempb * (Vbs-Vbs_orig)
-                                +gtempe * (Ves-Ves_orig)
-                                +gtempd * (Vds-Vds_orig))
-      -gtempT * (delTemp-delTemp_orig);
-    cth_Jdxp = tmp;
-  }
+  cth_Jdxp  = -model_.dtype *(gtempg * (Vgs-Vgs_orig)
+                              +gtempb * (Vbs-Vbs_orig)
+                              +gtempe * (Ves-Ves_orig)
+                              +gtempd * (Vds-Vds_orig))
+    -gtempT * (delTemp-delTemp_orig);
 
 
   //  Body current which flows into drainprime node from the drain of device
@@ -11673,15 +11462,11 @@ bool Instance::updateIntermediateVars ()
 
   cjd = Ibd - Iii - Idgidl;
   cjd_Jdxp = 0.0;
-  if (devOptions.voltageLimiterFlag && !origFlag)
-  {
-    tmp = -(gjdb*(Vbs-Vbs_orig)
-            + gjdd*(Vds-Vds_orig)
-            + gjdg*(Vgs-Vgs_orig)
-            + gjde*(Ves-Ves_orig)
-            + gjdT*(delTemp-delTemp_orig));
-    cjd_Jdxp = tmp;
-  }
+  cjd_Jdxp = -(gjdb*(Vbs-Vbs_orig)
+               + gjdd*(Vds-Vds_orig)
+               + gjdg*(Vgs-Vgs_orig)
+               + gjde*(Ves-Ves_orig)
+               + gjdT*(delTemp-delTemp_orig));
 
   //  Body current which flows into sourceprime node from the source of device
   gjsb = Gjsb;
@@ -11692,14 +11477,10 @@ bool Instance::updateIntermediateVars ()
 
   cjs = Ibs - Isgidl;
   cjs_Jdxp = 0.0;
-  if (devOptions.voltageLimiterFlag && !origFlag)
-  {
-    tmp = -(gjsb*(Vbs-Vbs_orig)
-           + gjsd*(Vds-Vds_orig)
-           + gjsg*(Vgs-Vgs_orig)
-           + gjsT*(delTemp-delTemp_orig));
-    cjs_Jdxp = tmp;
-  }
+  cjs_Jdxp = -(gjsb*(Vbs-Vbs_orig)
+               + gjsd*(Vds-Vds_orig)
+               + gjsg*(Vgs-Vgs_orig)
+               + gjsT*(delTemp-delTemp_orig));
 
   //  Current flowing into body node
 
@@ -11710,8 +11491,10 @@ bool Instance::updateIntermediateVars ()
   gbes = Giie;
 
   gbps = - Gbpps;
-  if (selfheat) gbT = GiiT - GjsT - GjdT;
-  else gbT = 0.0;
+  if (selfheat) 
+    gbT = GiiT - GjsT - GjdT;
+  else 
+    gbT = 0.0;
 
 //  spice has:
 //  cbody = Iii + Idgidl + Isgidl - Ibs - Ibd - Ibp + Igb
@@ -11724,16 +11507,12 @@ bool Instance::updateIntermediateVars ()
 //
   cbody_Jdxp = 0.0;
   cbody = Iii + Idgidl + Isgidl - Ibs - Ibd - Ibp + Igb;
-  if (devOptions.voltageLimiterFlag && !origFlag)
-  {
-    tmp = -( (gbbs + dIgb_dVb) * (Vbs - Vbs_orig)
-            +(gbgs + dIgb_dVg) * (Vgs - Vgs_orig)
-            +(gbds + dIgb_dVd) * (Vds - Vds_orig)
-            +gbps              * (Vps - Vps_orig)
-            +(gbes + dIgb_dVe) * (Ves - Ves_orig)
-            +(gbT + dIgb_dT)   * (delTemp - delTemp_orig));
-    cbody_Jdxp  = tmp;
-  }
+  cbody_Jdxp   = -( (gbbs + dIgb_dVb) * (Vbs - Vbs_orig)
+                    +(gbgs + dIgb_dVg) * (Vgs - Vgs_orig)
+                    +(gbds + dIgb_dVd) * (Vds - Vds_orig)
+                    +gbps              * (Vps - Vps_orig)
+                    +(gbes + dIgb_dVe) * (Ves - Ves_orig)
+                    +(gbT + dIgb_dT)   * (delTemp - delTemp_orig));
 
 //  spice has:
 //  cgate = Igb - (dIgb_dVb * Vbs + dIgb_dVe * Ves + dIgb_dVg
@@ -11741,15 +11520,11 @@ bool Instance::updateIntermediateVars ()
 
   cgate_Jdxp = 0.0;
   cgate = Igb;
-  if (devOptions.voltageLimiterFlag && !origFlag)
-  {
-    tmp = -(dIgb_dVb * (Vbs - Vbs_orig) +
-            dIgb_dVe * (Ves - Ves_orig) +
-            dIgb_dVg * (Vgs - Vgs_orig) +
-            dIgb_dVd * (Vds - Vds_orig) +
-            dIgb_dT  * (delTemp - delTemp_orig));
-    cgate_Jdxp  = tmp;
-  }
+  cgate_Jdxp = -(dIgb_dVb * (Vbs - Vbs_orig) +
+                 dIgb_dVe * (Ves - Ves_orig) +
+                 dIgb_dVg * (Vgs - Vgs_orig) +
+                 dIgb_dVd * (Vds - Vds_orig) +
+                 dIgb_dT  * (delTemp - delTemp_orig));
 
   // Calculate Qinv for Noise analysis
 
@@ -12724,11 +12499,8 @@ bool Instance::updateIntermediateVars ()
     Idrain   = drainConductance  * (Vd - Vdp);
     Idrain_Jdxp = 0.0;
 
-    if (devOptions.voltageLimiterFlag && !origFlag)
-    {                       // no limit on Vd, just Vdp
-      tmp = - drainConductance  * ( - (Vdp-Vdp_orig));
-      Idrain_Jdxp  = tmp;
-    }
+    // no limit on Vd, just Vdp
+    Idrain_Jdxp = - drainConductance  * ( - (Vdp-Vdp_orig));
   }
 
   if (sNodePrime == 1)  // if source resistor exists
@@ -12736,11 +12508,8 @@ bool Instance::updateIntermediateVars ()
     Isource  = sourceConductance * (Vs - Vsp);
     Isource_Jdxp = 0.0;
 
-    if (devOptions.voltageLimiterFlag && !origFlag)
-    {                       // no limit on Vs, just Vsp
-      tmp = - sourceConductance  * ( - (Vsp-Vsp_orig));
-      Isource_Jdxp  = tmp;
-    }
+    // no limit on Vs, just Vsp
+      Isource_Jdxp = - sourceConductance  * ( - (Vsp-Vsp_orig));
   }
 
   if (selfheat)
@@ -12754,11 +12523,7 @@ bool Instance::updateIntermediateVars ()
     Igate = grgeltd * (Vg - Vgp);
     Igate_Jdxp = 0.0;
 
-    if (devOptions.voltageLimiterFlag && !origFlag)
-    {
-      tmp = - grgeltd * ((Vg-Vg_orig) - (Vgp-Vgp_orig));
-      Igate_Jdxp  = tmp;
-     }
+    Igate_Jdxp = - grgeltd * ((Vg-Vg_orig) - (Vgp-Vgp_orig));
   }
   else if(rgateMod == 2)
   {
@@ -12804,16 +12569,12 @@ bool Instance::updateIntermediateVars ()
 
       cdreq_Jdxp = 0.0;
       cdreq = model_.dtype * cdrain;
-      if (devOptions.voltageLimiterFlag && !origFlag)
-      {
-        tmp = model_.dtype *
-               (-gds *  (vds-vds_orig)
-                -Gm  *  (vgs-vgs_orig)
-                -Gmbs * (vbs-vbs_orig)
-                -Gme  * (ves-ves_orig))
-                -GmT * (delTemp-delTemp_orig);
-        cdreq_Jdxp  = tmp;
-      }
+      cdreq_Jdxp = model_.dtype *
+        (-gds *  (vds-vds_orig)
+         -Gm  *  (vgs-vgs_orig)
+         -Gmbs * (vbs-vbs_orig)
+         -Gme  * (ves-ves_orig))
+        -GmT * (delTemp-delTemp_orig);
 
       // ceqbs now is compatible with cdreq, ie. going in is +ve
       // Equivalent current source from the diode
@@ -12888,15 +12649,11 @@ bool Instance::updateIntermediateVars ()
 
           Istoteq_Jdxp = 0.0;
           Istoteq = model_.dtype * (Igs + Igcs);
-          if (devOptions.voltageLimiterFlag && !origFlag)
-          {
-            // NOTE: mimicing spice, we don't use the "Vgs/Vds/Vbs" versions
-            tmp = model_.dtype *
-                 (- gIstotg * (vgs-vgs_orig)
-                  - gIgcsd  * (vds-vds_orig)
-                  - gIgcsb  * (vbs-vbs_orig));
-            Istoteq_Jdxp  = tmp;
-          }
+          // NOTE: mimicing spice, we don't use the "Vgs/Vds/Vbs" versions
+          Istoteq_Jdxp = model_.dtype *
+            (- gIstotg * (vgs-vgs_orig)
+             - gIgcsd  * (vds-vds_orig)
+             - gIgcsb  * (vbs-vbs_orig));
 
           gIdtotg = gIgdg + gIgcdg;
           gIdtotd = gIgdd + gIgcdd;
@@ -12907,28 +12664,21 @@ bool Instance::updateIntermediateVars ()
 
           Idtoteq_Jdxp = 0.0;
           Idtoteq = model_.dtype * (Igd + Igcd);
-          if (devOptions.voltageLimiterFlag && !origFlag)
-          {
-            // NOTE: mimicing SPICE, we use the original vgd/vgs/vds not
-            // the "mode aware" "Vgs/Vds" etc.
-            tmp = model_.dtype *
-                  (- gIgdg  * (vgd-vgd_orig)
-                   - gIgcdg * (vgs-vgs_orig)
-                   - gIgcdd * (vds-vds_orig)
-                   - gIgcdb * (vbs-vbs_orig));
-            Idtoteq_Jdxp  = tmp;
-          }
+          // NOTE: mimicing SPICE, we use the original vgd/vgs/vds not
+          // the "mode aware" "Vgs/Vds" etc.
+          Idtoteq_Jdxp = model_.dtype *
+            (- gIgdg  * (vgd-vgd_orig)
+             - gIgcdg * (vgs-vgs_orig)
+             - gIgcdd * (vds-vds_orig)
+             - gIgcdb * (vbs-vbs_orig));
 
           gIgtotg = gIstotg + gIdtotg;
           gIgtotd = gIstotd + gIdtotd;
           gIgtots = gIstots + gIdtots;
           gIgtotb = gIstotb + gIdtotb;
           Igtoteq = Istoteq + Idtoteq;
-          Igtoteq_Jdxp = 0;
-          if (devOptions.voltageLimiterFlag && !origFlag)
-          {
-            Igtoteq_Jdxp = Istoteq_Jdxp + Idtoteq_Jdxp;
-          }
+          Igtoteq_Jdxp = 0.0;
+          Igtoteq_Jdxp = Istoteq_Jdxp + Idtoteq_Jdxp;
       }
       else
       {   gIstotg = gIstotd = gIstots = gIstotb = Istoteq = 0.0;
@@ -12953,13 +12703,9 @@ bool Instance::updateIntermediateVars ()
 
          ceqgcrg_Jdxp = 0.0;
          ceqgcrg = 0.0;
-         if (devOptions.voltageLimiterFlag && !origFlag)
-         {
-           tmp = gcrgd_jac * (vds - vds_orig) +
-                 gcrgg_jac * (vgs - vgs_orig) +
-                 gcrgb_jac * (vbs - vbs_orig);
-           ceqgcrg_Jdxp -= tmp;
-         }
+         ceqgcrg_Jdxp = -(gcrgd_jac * (vds - vds_orig) +
+                          gcrgg_jac * (vgs - vgs_orig) +
+                          gcrgb_jac * (vbs - vbs_orig));
 
          gcrgg_jac -= gcrg;
          gcrg_jac = gcrg;
@@ -12987,15 +12733,11 @@ bool Instance::updateIntermediateVars ()
 
       cdreq_Jdxp = 0.0;
       cdreq = -model_.dtype * cdrain;
-      if (devOptions.voltageLimiterFlag && !origFlag)
-      {
-        tmp = -model_.dtype * (gds   * (vds-vds_orig)
-                                     +Gm   * (vgd-vgd_orig)
-                                     +Gmbs * (vbd-vbd_orig)
-                                     +Gme  * (ves-ves_orig-(vds-vds_orig))
-                                     -GmT  * (delTemp-delTemp_orig));
-        cdreq_Jdxp  = tmp;
-      }
+      cdreq_Jdxp = -model_.dtype * (gds   * (vds-vds_orig)
+                                    +Gm   * (vgd-vgd_orig)
+                                    +Gmbs * (vbd-vbd_orig)
+                                    +Gme  * (ves-ves_orig-(vds-vds_orig))
+                                    -GmT  * (delTemp-delTemp_orig));
 
       ceqbs = cjd;
       ceqbd = cjs;
@@ -13067,15 +12809,11 @@ bool Instance::updateIntermediateVars ()
 
           Istoteq_Jdxp = 0.0;
           Istoteq = model_.dtype * (Igs + Igcd);
-          if (devOptions.voltageLimiterFlag && !origFlag)
-          {
-            tmp = model_.dtype *
-                 (- gIgsg  * (vgs-vgs_orig)
-                  - gIgcdg * (vgd-vgd_orig)
-                  + gIgcdd * (vds-vds_orig)
-                  - gIgcdb * (vbd-vbd_orig));
-            Istoteq_Jdxp  = tmp;
-          }
+          Istoteq_Jdxp = model_.dtype *
+            (- gIgsg  * (vgs-vgs_orig)
+             - gIgcdg * (vgd-vgd_orig)
+             + gIgcdd * (vds-vds_orig)
+             - gIgcdb * (vbd-vbd_orig));
 
 
           gIdtotg = gIgdg + gIgcsg;
@@ -13087,14 +12825,10 @@ bool Instance::updateIntermediateVars ()
 
           Idtoteq_Jdxp = 0.0;
           Idtoteq = model_.dtype * (Igd + Igcs);
-          if (devOptions.voltageLimiterFlag && !origFlag)
-          {
-            tmp = model_.dtype *
-                  (- (gIgdg + gIgcsg) * (vgd-vgd_orig)
-                   + gIgcsd * (vds-vds_orig)
-                   - gIgcsb * (vbd-vbd_orig));
-            Idtoteq_Jdxp  = tmp;
-          }
+          Idtoteq_Jdxp = model_.dtype *
+            (- (gIgdg + gIgcsg) * (vgd-vgd_orig)
+             + gIgcsd * (vds-vds_orig)
+             - gIgcsb * (vbd-vbd_orig));
 
           gIgtotg = gIstotg + gIdtotg;
           gIgtotd = gIstotd + gIdtotd;
@@ -13103,10 +12837,7 @@ bool Instance::updateIntermediateVars ()
           Igtoteq = Istoteq + Idtoteq;
 
           Igtoteq_Jdxp = 0;
-          if (devOptions.voltageLimiterFlag && !origFlag)
-          {
-            Igtoteq_Jdxp = Istoteq_Jdxp + Idtoteq_Jdxp;
-          }
+          Igtoteq_Jdxp = Istoteq_Jdxp + Idtoteq_Jdxp;
       }
       else
       {   gIstotg = gIstotd = gIstots = gIstotb = Istoteq = 0.0;
@@ -13130,14 +12861,9 @@ bool Instance::updateIntermediateVars ()
          // ceqgcrg = -(gcrgg_jac * vgd - gcrgs_jac * vds + gcrgb_jac * vbd);
          ceqgcrg_Jdxp = 0.0;
          ceqgcrg = 0.0;
-         if (devOptions.voltageLimiterFlag && !origFlag)
-         {
-           tmp = gcrgg_jac * (vgd - vgd_orig) -
-                 gcrgs_jac * (vds - vds_orig) +
-                 gcrgb_jac * (vbd - vbd_orig);
-
-           ceqgcrg_Jdxp -= tmp;
-       }
+         ceqgcrg_Jdxp = -(gcrgg_jac * (vgd - vgd_orig) -
+                          gcrgs_jac * (vds - vds_orig) +
+                          gcrgb_jac * (vbd - vbd_orig));
 
          gcrgg_jac -= gcrg;
          gcrg_jac = gcrg;
@@ -13214,14 +12940,14 @@ bool Instance::setupCapacitors_oldDAE ()
   double T0, T1, T2, T3, T4;
   double cgdo_local;
   double cgso_local;
-  double ag0 = solState.pdt;
+  double ag0 = getSolverState().pdt;
 
   // ERK. 12/17/2006.
   // It is necessary to set ag0=0.0, because for the first time step out of
   // the DCOP, all the time derivatives are forced to be zero.  Thus, all
   // their derivatives should also be zero.  If it wasn't for that, then ag0
   // could always be pdt.  (it used to be, before the -jacobian_test capability).
-  if (!(solState.dcopFlag) && solState.initTranFlag && solState.newtonIter==0)
+  if (!(getSolverState().dcopFlag) && getSolverState().initTranFlag && getSolverState().newtonIter==0)
   {
     ag0 = 0.0;
   }
@@ -13568,7 +13294,7 @@ bool Instance::updatePrimaryState ()
   // really needed, at least for new-DAE.  Derivatives out of the DCOP
   // are supposed to be zero at the first newton step.
 
-  if (!(solState.dcopFlag) && solState.initTranFlag && solState.newtonIter==0)
+  if (!(getSolverState().dcopFlag) && getSolverState().initTranFlag && getSolverState().newtonIter==0)
   {
     // re-set the state vector pointer that we are using to the "current"
     // pointer, rather than the "next" pointer.
@@ -13691,7 +13417,7 @@ bool Instance::loadDAEQVector ()
   double Coef_substrate_Jdxp   = 0.0;
   double Coef_temp_Jdxp        = 0.0;
 
-  if (devOptions.voltageLimiterFlag)
+  if (getDeviceOptions().voltageLimiterFlag && !origFlag)
   {
     if (soiMod != 2)
     {
@@ -13764,14 +13490,13 @@ bool Instance::loadDAEFVector ()
   double * dFdxdVpPtr = extData.dFdxdVpVectorRawPtr;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
-  if (devOptions.debugLevel > 0 && solState.debugTimeFlag)
+  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "  Instance::loadDAEFVector" << endl;
-    cout << "  name = " << getName() <<endl;
-    cout.width(28); cout.precision(20); cout.setf(ios::scientific);
-    cout << " " << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "  Instance::loadDAEFVector" << std::endl;
+    Xyce::dout() << "  name = " << getName() <<std::endl;
+    Xyce::dout().width(28); Xyce::dout().precision(20); Xyce::dout().setf(std::ios::scientific);
+    Xyce::dout() << " " << std::endl;
   }
 #endif
 
@@ -13787,7 +13512,7 @@ bool Instance::loadDAEFVector ()
   double Coef_substrate=0.0;
   double Coef_temp=0.0;
 
-  Gmin = devOptions.gmin * 1e-6;
+  Gmin = getDeviceOptions().gmin * 1e-6;
   geltd = grgeltd;
 
   // I have elected to add in the Gmin-based Jdxp terms right here.
@@ -13910,7 +13635,7 @@ bool Instance::loadDAEFVector ()
     }
   }
 
-  if( solState.dcopFlag && icVDSGiven )
+  if( getSolverState().dcopFlag && icVDSGiven )
   {
     if ( icVDSGiven )
     {
@@ -14010,7 +13735,7 @@ bool Instance::loadDAEFVector ()
   double iGmin_bs_Jdxp = model_.dtype*Gmin*(vbs-vbs_orig);
   double iGmin_gd_Jdxp = model_.dtype*Gmin*(vgd-vgd_orig);
 
-  if (devOptions.voltageLimiterFlag)
+  if (getDeviceOptions().voltageLimiterFlag && !origFlag)
   {
     if (soiMod != 2)
     {
@@ -14900,7 +14625,7 @@ bool Instance::loadDAEdFdx ()
   }
   if( icVDSGiven )
   {
-    if( solState.dcopFlag  )
+    if( getSolverState().dcopFlag  )
     {
       dFdx[li_Drain][ADrainEquIdsOffset] += 1.0;
       dFdx[li_Source][ASourceEquIdsOffset] -= 1.0;
@@ -14915,7 +14640,7 @@ bool Instance::loadDAEdFdx ()
 
   if( icVGSGiven )
   {
-    if( solState.dcopFlag  )
+    if( getSolverState().dcopFlag  )
     {
       dFdx[li_Gate][AGateEquIgsOffset] += 1.0;
       dFdx[li_Source][ASourceEquIgsOffset] -= 1.0;
@@ -14930,7 +14655,7 @@ bool Instance::loadDAEdFdx ()
 
   if( icVBSGiven )
   {
-    if( solState.dcopFlag  )
+    if( getSolverState().dcopFlag  )
     {
       dFdx[li_Body][ABodyEquIbsOffset] += 1.0;
       dFdx[li_Source][ASourceEquIbsOffset] -= 1.0;
@@ -14945,7 +14670,7 @@ bool Instance::loadDAEdFdx ()
 
   if( icVESGiven )
   {
-    if( solState.dcopFlag  )
+    if( getSolverState().dcopFlag  )
     {
       dFdx[li_Substrate][ASubstrateEquIesOffset] += 1.0;
       dFdx[li_Source][ASourceEquIesOffset] -= 1.0;
@@ -14960,7 +14685,7 @@ bool Instance::loadDAEdFdx ()
 
   if( icVPSGiven )
   {
-    if( solState.dcopFlag  )
+    if( getSolverState().dcopFlag  )
     {
       dFdx[li_ExtBody][AExtBodyEquIpsOffset] += 1.0;
       dFdx[li_Source][ASourceEquIpsOffset] -= 1.0;
@@ -15206,7 +14931,7 @@ bool Instance::loadMatrix (N_LAS_Matrix & JMat)
 
   if( icVDSGiven )
   {
-    if( solState.dcopFlag  )
+    if( getSolverState().dcopFlag  )
       {
       (JMat)[li_Drain][ADrainEquIdsOffset] += 1.0;
       (JMat)[li_Source][ASourceEquIdsOffset] -= 1.0;
@@ -15221,7 +14946,7 @@ bool Instance::loadMatrix (N_LAS_Matrix & JMat)
 
   if( icVGSGiven )
   {
-    if( solState.dcopFlag  )
+    if( getSolverState().dcopFlag  )
     {
       (JMat)[li_Gate][AGateEquIgsOffset] += 1.0;
       (JMat)[li_Source][ASourceEquIgsOffset] -= 1.0;
@@ -15236,7 +14961,7 @@ bool Instance::loadMatrix (N_LAS_Matrix & JMat)
 
   if( icVBSGiven )
   {
-    if( solState.dcopFlag  )
+    if( getSolverState().dcopFlag  )
     {
       (JMat)[li_Body][ABodyEquIbsOffset] += 1.0;
       (JMat)[li_Source][ASourceEquIbsOffset] -= 1.0;
@@ -15251,7 +14976,7 @@ bool Instance::loadMatrix (N_LAS_Matrix & JMat)
 
   if( icVESGiven )
   {
-    if( solState.dcopFlag  )
+    if( getSolverState().dcopFlag  )
     {
       (JMat)[li_Substrate][ASubstrateEquIesOffset] += 1.0;
       (JMat)[li_Source][ASourceEquIesOffset] -= 1.0;
@@ -15266,7 +14991,7 @@ bool Instance::loadMatrix (N_LAS_Matrix & JMat)
 
   if( icVPSGiven )
   {
-    if( solState.dcopFlag  )
+    if( getSolverState().dcopFlag  )
     {
       (JMat)[li_ExtBody][AExtBodyEquIpsOffset] += 1.0;
       (JMat)[li_Source][ASourceEquIpsOffset] -= 1.0;
@@ -15294,212 +15019,153 @@ bool Instance::loadMatrix (N_LAS_Matrix & JMat)
 bool Instance::checkModel ()
 {
   bool bsuccess = true;
-  string msg;
-  ostringstream err("");
 
   if (paramPtr->nlx < -paramPtr->leff)
   {
-    err << "Fatal: Nlx = " << paramPtr->nlx << " is less than -Leff.";
-    msg = err.str();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "Nlx = " << paramPtr->nlx << " is less than -Leff";
     bsuccess = false;
   }
   if (model_.tox <= 0.0)
   {
-    err << "Fatal: Tox = " << model_.tox << " is not positive.";
-    msg = err.str();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "Tox = " << model_.tox << " is not positive.";
     bsuccess = false;
   }
   if (model_.toxm <= 0.0)
   {
-    err << "Fatal: Toxm = " << model_.toxm << " is not positive.";
-    msg = err.str();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "Toxm = " << model_.toxm << " is not positive.";
     bsuccess = false;
   }
   if (model_.tox - model_.dtoxcv <= 0.0)
   {
-    err << "Fatal: Tox - dtoxcv = " << model_.tox - model_.dtoxcv
-        << " is not positive.";
-    msg = err.str();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "Tox - dtoxcv = " << model_.tox - model_.dtoxcv << " is not positive.";
     bsuccess = false;
   }
   if (model_.tbox <= 0.0)
   {
-    err << "Fatal: Tbox = " << model_.tbox << " is not positive.";
-    msg = err.str();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "Tbox = " << model_.tbox << " is not positive.";
     bsuccess = false;
   }
   if (paramPtr->npeak <= 0.0)
   {
-    err << "Fatal: Nch = " << paramPtr->npeak << " is not positive.";
-    msg = err.str();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "Nch = " << paramPtr->npeak << " is not positive.";
     bsuccess = false;
   }
   if (paramPtr->ngate < 0.0)
   {
-    err << "Fatal: Ngate = " << paramPtr->ngate << " is not positive.";
-    msg = err.str();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "Ngate = " << paramPtr->ngate << " is not positive.";
     bsuccess = false;
   }
   if (paramPtr->ngate > 1.e25)
   {
-    err << "Fatal: Ngate = %" << paramPtr->ngate << " is not positive.";
-    msg = err.str();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "Ngate = %" << paramPtr->ngate << " is not positive.";
     bsuccess = false;
   }
   if (paramPtr->dvt1 < 0.0)
   {
-    err << "Fatal: Dvt1 = " << paramPtr->dvt1 << " is negative.";
-    msg = err.str();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "Dvt1 = " << paramPtr->dvt1 << " is negative.";
     bsuccess = false;
   }
   if (paramPtr->dvt1w < 0.0)
   {
-    err << "Fatal: Dvt1w = " << paramPtr->dvt1w << " is negative.";
-    msg = err.str();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "Dvt1w = " << paramPtr->dvt1w << " is negative.";
     bsuccess = false;
   }
   if (paramPtr->w0 == -paramPtr->weff)
   {
-    msg = "Fatal: (W0 + Weff) = 0 cauing divided-by-zero.\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "(W0 + Weff) = 0 causing divided-by-zero.\n";
     bsuccess = false;
   }
   if (paramPtr->dsub < 0.0)
   {
-    err << "Fatal: Dsub = " << paramPtr->dsub << " is negative.";
-    msg = err.str();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "Dsub = " << paramPtr->dsub << " is negative.";
     bsuccess = false;
   }
   if (paramPtr->b1 == -paramPtr->weff)
   {
-    msg = "Fatal: (B1 + Weff) = 0 causing divided-by-zero.\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "(B1 + Weff) = 0 causing divided-by-zero.\n";
     bsuccess = false;
   }
   if (paramPtr->u0temp <= 0.0)
   {
-    err << "Fatal: u0 at current temperature = " << paramPtr->u0temp
-        << " is not positive.";
-    msg = err.str();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "u0 at current temperature = " << paramPtr->u0temp << " is not positive.";
     bsuccess = false;
   }
   if (paramPtr->delta < 0.0)
   {
-    err << "Fatal: Delta = " << paramPtr->delta << " is not positive.";
-    msg = err.str();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "Delta = " << paramPtr->delta << " is not positive.";
     bsuccess = false;
   }
   if (paramPtr->vsattemp <= 0.0)
   {
-    err << "Fatal: Vsat at current temperature = " << paramPtr->vsattemp
-        << " is not positive.";
-    msg = err.str();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "Vsat at current temperature = " << paramPtr->vsattemp << " is not positive.";
     bsuccess = false;
   }
   if (paramPtr->pclm <= 0.0)
   {
-    err << "Fatal: Pclm = " << paramPtr->pclm << " is not positive.";
-    msg = err.str();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "Pclm = " << paramPtr->pclm << " is not positive.";
     bsuccess = false;
   }
   if (paramPtr->drout < 0.0)
   {
-    err << "Fatal: Drout = " << paramPtr->drout << " is negative.";
-    msg = err.str();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "Drout = " << paramPtr->drout << " is negative.";
     bsuccess = false;
   }
   if ( model_.unitLengthGateSidewallJctCap > 0.0)
   {
     if (drainPerimeter < paramPtr->weff)
     {
-      if (devOptions.verboseLevel > 0)
+      if (getDeviceOptions().verboseLevel > 0)
       {
-        err << "Warning: Pd = " << drainPerimeter << " is less than W.\n";
-        msg = err.str();
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+        UserWarning(*this) << "Pd = " << drainPerimeter << " is less than W.";
       }
       drainPerimeter = paramPtr->weff;
     }
 
     if (sourcePerimeter < paramPtr->weff)
     {
-      if (devOptions.verboseLevel > 0)
+      if (getDeviceOptions().verboseLevel > 0)
       {
-        err << "Warning: Ps = " << sourcePerimeter << " is less than W.\n";
-        msg = err.str();
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+        UserWarning(*this) << "Ps = " << sourcePerimeter << " is less than W.";
       }
       sourcePerimeter =paramPtr->weff;
     }
   }
   if (paramPtr->clc < 0.0)
   {
-    err << "Fatal: Clc = " << paramPtr->clc << " is negative.";
-    msg = err.str();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserError(*this) << "Clc = " << paramPtr->clc << " is negative.";
     bsuccess = false;
   }
 
-  if (devOptions.verboseLevel > 0)
+  if (getDeviceOptions().verboseLevel > 0)
   {
     if (paramPtr->noff < 0.1)
     {
-      err << "Warning: Noff = " << paramPtr->noff << " is too small.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Noff = " << paramPtr->noff << " is too small.";
     }
     if (paramPtr->noff > 4.0)
     {
-      err << "Warning: Noff = " << paramPtr->noff << " is too large.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Noff = " << paramPtr->noff << " is too large.";
     }
     if (paramPtr->moin < 5.0)
     {
-      err << "Warning: Moin = " << paramPtr->moin << " is too small.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Moin = " << paramPtr->moin << " is too small.";
     }
     if (paramPtr->moin > 25.0)
     {
-      err << "Warning: Moin = " << paramPtr->moin << " is too large.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Moin = " << paramPtr->moin << " is too large.";
     }
     if (model_.moinFD < 5.0)
     {
-      err << "Warning: MoinFD = " << model_.moinFD << " is too small.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "MoinFD = " << model_.moinFD << " is too small.";
     }
     if (model_.capMod == 3) {
       if (paramPtr->acde < 0.1)
       {
-        err << "Warning: Acde = " << paramPtr->acde << " is too small.";
-        msg = err.str();
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+        UserWarning(*this) << "Acde = " << paramPtr->acde << " is too small.";
       }
       if (paramPtr->acde > 1.6)
       {
-        err << "Warning: Acde = " << paramPtr->acde << " is too large.";
-        msg = err.str();
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+        UserWarning(*this) << "Acde = " << paramPtr->acde << " is too large.";
       }
     }
   }
@@ -15507,656 +15173,472 @@ bool Instance::checkModel ()
   {
     if (paramPtr->leff <= 5.0e-8)
     {
-      err << "Warning: Leff = " << paramPtr->leff << " may be too small.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Leff = " << paramPtr->leff << " may be too small.";
     }
     if (paramPtr->leffCV <= 5.0e-8)
     {
-      err << "Warning: Leff for CV = " << paramPtr->leffCV << " may be too small.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Leff for CV = " << paramPtr->leffCV << " may be too small.";
     }
     if (paramPtr->weff <= 1.0e-7)
     {
-      err << "Warning: Weff = " << paramPtr->weff << " may be too small.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Weff = " << paramPtr->weff << " may be too small.";
     }
     if (paramPtr->weffCV <= 1.0e-7)
     {
-      err << "Warning: Weff for CV = " << paramPtr->weffCV << " may be too small.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Weff for CV = " << paramPtr->weffCV << " may be too small.";
     }
     if (paramPtr->nlx < 0.0)
     {
-      err << "Warning: Nlx = " << paramPtr->nlx << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Nlx = " << paramPtr->nlx << " is negative.";
     }
     if (model_.tox < 1.0e-9)
     {
-      err << "Warning: Tox = " << model_.tox << " is less than 10A.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Tox = " << model_.tox << " is less than 10A.";
     }
     if (paramPtr->npeak <= 1.0e15)
     {
-      err << "Warning: Nch = " << paramPtr->npeak << " may be too small.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Nch = " << paramPtr->npeak << " may be too small.";
     }
     else if (paramPtr->npeak >= 1.0e21)
     {
-      err << "Warning: Nch = " << paramPtr->npeak << " may be too large.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Nch = " << paramPtr->npeak << " may be too large.";
     }
     if (fabs(paramPtr->nsub) >= 1.0e21)
     {
-      err << "Warning: Nsub = " << paramPtr->nsub << " may be too large.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Nsub = " << paramPtr->nsub << " may be too large.";
     }
     if ((paramPtr->ngate > 0.0) && (paramPtr->ngate <= 1.e18))
     {
-      err << "Warning: Ngate = " << paramPtr->ngate << " is less than 1.E18cm^-3.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Ngate = " << paramPtr->ngate << " is less than 1.E18cm^-3.";
     }
     if (paramPtr->dvt0 < 0.0)
     {
-      err << "Warning: Dvt0 = " << paramPtr->dvt0 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Dvt0 = " << paramPtr->dvt0 << " is negative.";
     }
     if (fabs(1.0e-6 / (paramPtr->w0 + paramPtr->weff)) > 10.0)
     {
-      msg = "Warning: (W0 + Weff) may be too small.";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "(W0 + Weff) may be too small.";
     }
 
     if (paramPtr->nfactor < 0.0)
     {
-      err << "Warning: Nfactor = " << paramPtr->nfactor << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Nfactor = " << paramPtr->nfactor << " is negative.";
     }
 
     if (paramPtr->cdsc < 0.0)
     {
-      err << "Warning: Cdsc = " << paramPtr->cdsc << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Cdsc = " << paramPtr->cdsc << " is negative.";
     }
 
     if (paramPtr->cdscd < 0.0)
     {
-      err << "Warning: Cdscd = " << paramPtr->cdscd << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Cdscd = " << paramPtr->cdscd << " is negative.";
     }
 
     if (paramPtr->eta0 < 0.0)
     {
-      err << "Warning: Eta0 = " << paramPtr->eta0 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Eta0 = " << paramPtr->eta0 << " is negative.";
     }
 
     if (fabs(1.0e-6 / (paramPtr->b1 + paramPtr->weff)) > 10.0)
     {
-      msg = "Warning: (B1 + Weff) may be too small.";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "(B1 + Weff) may be too small.";
     }
 
     if (paramPtr->a2 < 0.01)
     {
-      err << "Warning: A2 = " << paramPtr->a2 << " is too small. Set to 0.01";
-      msg = err.str();
+      UserWarning(*this) << "A2 = " << paramPtr->a2 << " is too small. Set to 0.01";
       paramPtr->a2 = 0.01;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
     }
 
     else if (paramPtr->a2 > 1.0)
     {
-      err << "Warning: A2 = " << paramPtr->a2 << " is larger than 1. A2 is set to 1 and A1 is set to 0.";
-      msg = err.str();
+      UserWarning(*this) << "A2 = " << paramPtr->a2 << " is larger than 1. A2 is set to 1 and A1 is set to 0.";
       paramPtr->a2 = 1.0;
       paramPtr->a1 = 0.0;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
     }
 
     if (paramPtr->rdsw < 0.0)
     {
-      err << "Warning: Rdsw = " << paramPtr->rdsw << " is negative. Set to zero.";
-      msg = err.str();
+      UserWarning(*this) << "Rdsw = " << paramPtr->rdsw << " is negative. Set to zero.";
       paramPtr->rdsw = 0.0;
       paramPtr->rds0 = 0.0;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
     }
 
     else if ((paramPtr->rds0 > 0.0) && (paramPtr->rds0 < 0.001))
     {
-      err << "Warning: Rds at current temperature = " << paramPtr->rds0 << " is less than 0.001 ohm. Set to zero.";
-      msg = err.str();
+      UserWarning(*this) << "Rds at current temperature = " << paramPtr->rds0 << " is less than 0.001 ohm. Set to zero.";
       paramPtr->rds0 = 0.0;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
     }
 
     if (paramPtr->vsattemp < 1.0e3)
     {
-      err << "Warning: Vsat at current temperature = " << paramPtr->vsattemp <<
-             " may be too small.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Vsat at current temperature = " << paramPtr->vsattemp << " may be too small.";
     }
 
     if (paramPtr->pdibl1 < 0.0)
     {
-      err << "Warning: Pdibl1 = " << paramPtr->pdibl1 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Pdibl1 = " << paramPtr->pdibl1 << " is negative.";
     }
 
     if (paramPtr->pdibl2 < 0.0)
     {
-      err << "Warning: Pdibl2 = " << paramPtr->pdibl2 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Pdibl2 = " << paramPtr->pdibl2 << " is negative.";
     }
 
     if (model_.cgdo < 0.0)
     {
-      err << "Warning: cgdo = " << model_.cgdo << " is negative. Set to zero.";
-      msg = err.str();
+      UserWarning(*this) << "cgdo = " << model_.cgdo << " is negative. Set to zero.";
       model_.cgdo = 0.0;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
     }
 
     if (model_.cgso < 0.0)
     {
-      err << "Warning: cgso = " << model_.cgso << " is negative. Set to zero.";
-      msg = err.str();
+      UserWarning(*this) << "cgso = " << model_.cgso << " is negative. Set to zero.";
       model_.cgso = 0.0;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
     }
 
     if (model_.cgeo < 0.0)
     {
-      err << "Warning: cgeo = " << model_.cgeo << " is negative. Set to zero.";
-      msg = err.str();
+      UserWarning(*this) << "cgeo = " << model_.cgeo << " is negative. Set to zero.";
       model_.cgeo = 0.0;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
     }
 
     if (model_.ntun < 0.0)
     {
-      err << "Warning: Ntun = " << model_.ntun << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Ntun = " << model_.ntun << " is negative.";
     }
 
     if (model_.ndiode < 0.0)
     {
-      err << "Warning: Ndiode = " << model_.ndiode << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Ndiode = " << model_.ndiode << " is negative.";
     }
 
     if (model_.isbjt < 0.0)
     {
-      err << "Warning: Isbjt = " << model_.isbjt << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Isbjt = " << model_.isbjt << " is negative.";
     }
 
     if (model_.isdif < 0.0)
     {
-      err << "Warning: Isdif = " << model_.isdif << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Isdif = " << model_.isdif << " is negative.";
     }
 
     if (model_.isrec < 0.0)
     {
-      err << "Warning: Isrec = " << model_.isrec << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Isrec = " << model_.isrec << " is negative.";
     }
 
     if (model_.istun < 0.0)
     {
-      err << "Warning: Istun = " << model_.istun << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Istun = " << model_.istun << " is negative.";
     }
 
     if (model_.tt < 0.0)
     {
-      err << "Warning: Tt = " << model_.tt << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Tt = " << model_.tt << " is negative.";
     }
 
     if (model_.csdmin < 0.0)
     {
-      err << "Warning: Csdmin = " << model_.csdmin << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Csdmin = " << model_.csdmin << " is negative.";
     }
 
     if (model_.csdesw < 0.0)
     {
-      err << "Warning: Csdesw = " << model_.csdesw << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Csdesw = " << model_.csdesw << " is negative.";
     }
 
     if (model_.asd < 0.0)
     {
-      err << "Warning: Asd = " << model_.asd << " should be within (0, 1).";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Asd = " << model_.asd << " should be within (0, 1).";
     }
 
     if (model_.rth0 < 0.0)
     {
-      err << "Warning: Rth0 = " << model_.rth0 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Rth0 = " << model_.rth0 << " is negative.";
     }
 
     if (model_.cth0 < 0.0)
     {
-      err << "Warning: Cth0 = " << model_.cth0 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Cth0 = " << model_.cth0 << " is negative.";
     }
 
     if (model_.rbody < 0.0)
     {
-      err << "Warning: Rbody = " << model_.rbody << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Rbody = " << model_.rbody << " is negative.";
     }
 
     if (model_.rbsh < 0.0)
     {
-      err << "Warning: Rbsh = " << model_.rbsh << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Rbsh = " << model_.rbsh << " is negative.";
     }
 
     if (paramPtr->nigc <= 0.0)
     {
-      err << "Fatal: nigc = " << paramPtr->nigc << " is non-positive.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserError(*this) << "nigc = " << paramPtr->nigc << " is non-positive.";
       bsuccess = false;
     }
 
     if (paramPtr->poxedge <= 0.0)
     {
-      err << "Fatal: poxedge = " << paramPtr->poxedge << " is non-positive.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserError(*this) << "poxedge = " << paramPtr->poxedge << " is non-positive.";
       bsuccess = false;
     }
 
     if (paramPtr->pigcd <= 0.0)
     {
-      err << "Fatal: pigcd = " << paramPtr->pigcd << " is non-positive.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
-      bsuccess = false;
+      UserError(*this) << "pigcd = " << paramPtr->pigcd << " is non-positive.";
+
     }
 
     if (model_.wth0 < 0.0)
     {
-      err << "Warning:  Wth0 = " << model_.wth0 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Wth0 = " << model_.wth0 << " is negative.";
     }
 
     if (model_.rhalo < 0.0)
     {
-      err << "Warning:  Rhalo = " << model_.rhalo << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Rhalo = " << model_.rhalo << " is negative.";
     }
 
     if (model_.ntox < 0.0)
     {
-      err << "Warning:  Ntox = " << model_.ntox << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Ntox = " << model_.ntox << " is negative.";
     }
 
     if (model_.toxref < 0.0)
     {
-      err << "Warning:  Toxref = " << model_.toxref << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Toxref = " << model_.toxref << " is negative.";
       bsuccess = false;
     }
 
     if (model_.ebg < 0.0)
     {
-      err << "Warning:  Ebg = " << model_.ebg << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Ebg = " << model_.ebg << " is negative.";
     }
 
     if (model_.vevb < 0.0)
     {
-      err << "Warning:  Vevb = " << model_.vevb << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Vevb = " << model_.vevb << " is negative.";
     }
 
     if (paramPtr->alphaGB1 < 0.0)
     {
-      err << "Warning:  AlphaGB1 = " << paramPtr->alphaGB1 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " AlphaGB1 = " << paramPtr->alphaGB1 << " is negative.";
     }
 
     if (paramPtr->betaGB1 < 0.0)
     {
-      err << "Warning:  BetaGB1 = " << paramPtr->betaGB1 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " BetaGB1 = " << paramPtr->betaGB1 << " is negative.";
     }
 
     if (model_.vgb1 < 0.0)
     {
-      err << "Warning:  Vgb1 = " << model_.vgb1 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Vgb1 = " << model_.vgb1 << " is negative.";
     }
 
     if (model_.vecb < 0.0)
     {
-      err << "Warning:  Vecb = " << model_.vecb << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Vecb = " << model_.vecb << " is negative.";
     }
 
     if (paramPtr->alphaGB2 < 0.0)
     {
-      err << "Warning:  AlphaGB2 = " << paramPtr->alphaGB2 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " AlphaGB2 = " << paramPtr->alphaGB2 << " is negative.";
     }
 
     if (paramPtr->betaGB2 < 0.0)
     {
-      err << "Warning:  BetaGB2 = " << paramPtr->betaGB2 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " BetaGB2 = " << paramPtr->betaGB2 << " is negative.";
     }
 
     if (model_.vgb2 < 0.0)
     {
-      err << "Warning:  Vgb2 = " << model_.vgb2 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Vgb2 = " << model_.vgb2 << " is negative.";
     }
 
     if (model_.toxqm <= 0.0)
     {
-      err << "Fatal: Toxqm = " << model_.toxqm << " is not positive.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserError(*this) << "Toxqm = " << model_.toxqm << " is not positive.";
       bsuccess = false;
     }
 
     if (model_.voxh < 0.0)
     {
-      err << "Warning:  Voxh = " << model_.voxh << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Voxh = " << model_.voxh << " is negative.";
     }
 
     if (model_.deltavox <= 0.0)
     {
-      err << "Fatal: Deltavox = " << model_.deltavox << " is not positive.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserError(*this) << "Deltavox = " << model_.deltavox << " is not positive.";
     }
 
     if (model_.k1w1 < 0.0)
     {
-      err << "Warning:  K1w1 = " << model_.k1w1 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " K1w1 = " << model_.k1w1 << " is negative.";
     }
 
     if (model_.k1w2 < 0.0)
     {
-      err << "Warning:  K1w2 = " << model_.k1w2 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " K1w2 = " << model_.k1w2 << " is negative.";
     }
 
     if (model_.ketas < 0.0)
     {
-      err << "Warning:  Ketas = " << model_.ketas << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Ketas = " << model_.ketas << " is negative.";
     }
 
     if (model_.dwbc < 0.0)
     {
-      err << "Warning:  Dwbc = " << model_.dwbc << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Dwbc = " << model_.dwbc << " is negative.";
     }
 
     if (model_.beta0 < 0.0)
     {
-      err << "Warning:  Beta0 = " << model_.beta0 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Beta0 = " << model_.beta0 << " is negative.";
     }
 
     if (model_.beta1 < 0.0)
     {
-      err << "Warning:  Beta1 = " << model_.beta1 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Beta1 = " << model_.beta1 << " is negative.";
     }
 
     if (model_.beta2 < 0.0)
     {
-      err << "Warning:  Beta2 = " << model_.beta2 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Beta2 = " << model_.beta2 << " is negative.";
     }
 
     if (model_.tii < 0.0)
     {
-      err << "Warning:  Tii = " << model_.tii << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Tii = " << model_.tii << " is negative.";
     }
 
     if (model_.lii < 0.0)
     {
-      err << "Warning:  Lii = " << model_.lii << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Lii = " << model_.lii << " is negative.";
     }
 
     if (model_.sii1 < 0.0)
     {
-      err << "Warning:  Sii1 = " << model_.sii1 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Sii1 = " << model_.sii1 << " is negative.";
     }
 
     if (model_.sii2 < 0.0)
     {
-      err << "Warning:  Sii2 = " << model_.sii1 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Sii2 = " << model_.sii1 << " is negative.";
     }
 
     if (model_.siid < 0.0)
     {
-      err << "Warning:  Siid = " << model_.siid << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Siid = " << model_.siid << " is negative.";
     }
 
     if (model_.fbjtii < 0.0)
     {
-      err << "Warning:  fbjtii = " << model_.fbjtii << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " fbjtii = " << model_.fbjtii << " is negative.";
     }
 
     if (model_.vrec0 < 0.0)
     {
-      err << "Warning:  Vrec0 = " << model_.vrec0 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Vrec0 = " << model_.vrec0 << " is negative.";
     }
 
     if (model_.vtun0 < 0.0)
     {
-      err << "Warning:  Vtun0 = " << model_.vtun0 << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Vtun0 = " << model_.vtun0 << " is negative.";
     }
 
     if (model_.nbjt < 0.0)
     {
-      err << "Warning:  Nbjt = " << model_.nbjt << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Nbjt = " << model_.nbjt << " is negative.";
     }
 
     if (model_.aely < 0.0)
     {
-      err << "Warning:  Aely = " << model_.aely << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Aely = " << model_.aely << " is negative.";
     }
 
     if (model_.ahli < 0.0)
     {
-      err << "Warning:  Ahli = " << model_.ahli << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Ahli = " << model_.ahli << " is negative.";
     }
 
     if (model_.rbody < 0.0)
     {
-      err << "Warning:  Rbody = " << model_.rbody << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Rbody = " << model_.rbody << " is negative.";
     }
 
     if (model_.rbsh < 0.0)
     {
-      err << "Warning:  Rbsh = " << model_.rbsh << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Rbsh = " << model_.rbsh << " is negative.";
     }
 
     if (paramPtr->ntrecf < 0.0)
     {
-      err << "Warning:  Ntrecf = " << paramPtr->ntrecf << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Ntrecf = " << paramPtr->ntrecf << " is negative.";
     }
 
     if (paramPtr->ntrecr < 0.0)
     {
-      err << "Warning:  Ntrecr = " << paramPtr->ntrecr << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Ntrecr = " << paramPtr->ntrecr << " is negative.";
     }
 
     if (model_.tcjswg < 0.0)
     {
-      err << "Warning:  Tcjswg = " << model_.tcjswg << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Tcjswg = " << model_.tcjswg << " is negative.";
     }
 
     if (model_.tpbswg < 0.0)
     {
-      err << "Warning:  Tpbswg = " << model_.tpbswg << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Tpbswg = " << model_.tpbswg << " is negative.";
     }
 
     if ((model_.acde < 0.1) || (model_.acde > 1.6))
     {
-      err << "Warning:  Acde = " << model_.acde << " is out of range.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Acde = " << model_.acde << " is out of range.";
     }
 
     if ((model_.moin < 5.0)||(model_.moin > 25.0))
     {
-      err << "Warning:  Moin = " << model_.moin << " is out of range.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Moin = " << model_.moin << " is out of range.";
     }
 
     if (model_.dlbg < 0.0)
     {
-      err << "Warning:  dlbg = " << model_.dlbg << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " dlbg = " << model_.dlbg << " is negative.";
     }
 
 
     if (model_.agidl < 0.0)
     {
-      err << "Warning:  Agidl = " << model_.agidl << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Agidl = " << model_.agidl << " is negative.";
     }
 
     if (model_.bgidl < 0.0)
     {
-      err << "Warning:  Bgidl = " << model_.bgidl << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Bgidl = " << model_.bgidl << " is negative.";
     }
 
     if (model_.ngidl < 0.0)
     {
-      err << "Warning:  Ngidl = " << model_.ngidl << " is negative.";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << " Ngidl = " << model_.ngidl << " is negative.";
     }
 
     if (model_.esatii < 0.0)
     {
-      err << "Warning: Esatii = " << model_.esatii << " should be within (0, 1).";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Esatii = " << model_.esatii << " should be within (0, 1).";
     }
 
 
     if (paramPtr->xj > model_.tsi)
     {
-      err << "Warning: Xj = " << paramPtr->xj << " is thicker than Tsi = " << model_.tsi << ".";
-      msg = err.str();
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "Xj = " << paramPtr->xj << " is thicker than Tsi = " << model_.tsi << ".";
     }
 
     if (model_.capMod < 2)
     {
-      msg = "Warning: Warning: capMod < 2 is not supported by BSIM3SOI.";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+      UserWarning(*this) << "capMod < 2 is not supported by BSIM3SOI.";
     }
   }
 
@@ -16218,7 +15700,7 @@ bool Instance::setIC ()
 // Creator       : Dave Shirley
 // Creation Date : 05/20/04
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
 
   if (!given("DSUB"))
@@ -16255,11 +15737,11 @@ bool Model::processParams (string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 03/23/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -16277,10 +15759,11 @@ bool Model::processInstanceParams(string param)
 // Creator       : Dave Shirley
 // Creation Date : 05/20/04
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-                                                  SolverState & ss1,
-                                                  DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
     version                            ("3.2"),
     dtype                              (CONSTNMOS),
     cbox                               (0.0),
@@ -16934,11 +16417,7 @@ Model::Model (const ModelBlock & MB,
     }
     else
     {
-      string msg = "Could not recognize the type for model ";
-      msg += getName();
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+      UserError0(*this) << "Could not recognize the type for model " << getName();
     }
   }
 
@@ -16952,13 +16431,13 @@ Model::Model (const ModelBlock & MB,
 
 #ifdef Xyce_B3SOI_USE_DEFL
   if (!model_lGiven)
-    model_l=devOptions.defl;
+    model_l=getDeviceOptions().defl;
   if (!model_wGiven)
-    model_w=devOptions.defw;
+    model_w=getDeviceOptions().defw;
 #endif
 
   if (!given("TNOM"))
-    tnom = devOptions.tnom;
+    tnom = getDeviceOptions().tnom;
   if (!given("TOXM"))
     toxm = tox;      /* v3.2 */
   if (!given("TOXQM"))
@@ -17031,32 +16510,27 @@ Model::Model (const ModelBlock & MB,
   if ((soiMod != 0) && (soiMod != 1) && (soiMod != 2) && (soiMod != 3))
   {
     soiMod = 0;
-    string msg = "soiMod has been set to its default value: 0";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserWarning(*this) << "soiMod has been set to its default value: 0";
   }
   else if ((rgateMod != 0) && (rgateMod != 1) && (rgateMod != 2) && (rgateMod != 3))
   {
     rgateMod = 0;
-    string msg = "rgateMod has been set to its default value: 0";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserWarning(*this) << "gateMod has been set to its default value: 0";
   }
   if ((fnoiMod != 0) && (fnoiMod != 1))
   {
     fnoiMod = 1;
-    string msg = "fnoiMod has been set to default value: 1";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserWarning(*this) << "noiMod has been set to default value: 1";
   }
   if ((tnoiMod != 0) && (tnoiMod != 1))
   {
     tnoiMod = 0;
-    string msg = "tnoiMod has been set to default value: 0";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING,msg);
+    UserWarning(*this) << "tnoiMod has been set to default value: 0";
   }
   if (GatesidewallJctPotential < 0.1)
   {
     GatesidewallJctPotential = 0.1;
-    string msg = "Given pbswg is less than 0.1. Pbswg is set to 0.1.\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_DEBUG_0,msg);
+    UserWarning(*this) << "Given pbswg is less than 0.1. Pbswg is set to 0.1.\n";
   }
   sizeDependParamList.clear();
 
@@ -17073,18 +16547,18 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  list<SizeDependParam*>::iterator it_dpL =
+  std::list<SizeDependParam*>::iterator it_dpL =
    sizeDependParamList.begin();
-  list<SizeDependParam*>::iterator end_dpL =
+  std::list<SizeDependParam*>::iterator end_dpL =
    sizeDependParamList.end();
   for( ; it_dpL != end_dpL; ++it_dpL )
     delete (*it_dpL);
 
   sizeDependParamList.clear ();
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -17103,25 +16577,46 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i;
-  os << endl;
-  os << "    name     modelName  Parameters" << endl;
+  os << std::endl;
+  os << "    name     modelName  Parameters" << std::endl;
 
   for (i=0, iter=first; iter!=last; ++iter,++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 
 //----------------------------------------------------------------------------
@@ -17139,10 +16634,10 @@ std::ostream &Model::printOutInstances(std::ostream &os) const
 //----------------------------------------------------------------------------
 bool Model::clearTemperatureData ()
 {
-  list<SizeDependParam*>::iterator it_dpL =
+  std::list<SizeDependParam*>::iterator it_dpL =
    sizeDependParamList.begin();
 
-  list<SizeDependParam*>::iterator end_dpL =
+  std::list<SizeDependParam*>::iterator end_dpL =
    sizeDependParamList.end();
 
   for( ; it_dpL != end_dpL; ++it_dpL )
@@ -17169,29 +16664,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 {
   bool bsuccess = true;
 
-  // vector<N_DEV_MOSFET_B3SOIModel*>::iterator iterM;
-  // vector<N_DEV_MOSFET_B3SOIModel*>::iterator firstM = modelContainer_.begin();
-  // vector<N_DEV_MOSFET_B3SOIModel*>::iterator lastM  = modelContainer_.end();
-
-  // vector<N_DEV_MOSFET_B3SOIInstance*>::iterator iterI;
-  // vector<N_DEV_MOSFET_B3SOIInstance*>::iterator firstI;
-  // vector<N_DEV_MOSFET_B3SOIInstance*>::iterator lastI;
-
-
-  // // first loop over the models:
-  // for (iterM=firstM; iterM!=lastM; ++iterM)
-  // {
-  //   // loop over the instances for this model.
-  //   firstI = (*iterM)->instanceContainer.begin();
-  //   lastI   = (*iterM)->instanceContainer.end();
-
-  //   for (iterI=firstI; iterI!=lastI; ++iterI)
-  //   {
-  //     N_DEV_MOSFET_B3SOIInstance & mi = *(*iterI);
-
-  for (ModelMap::const_iterator it_model = getModelMap().begin(); it_model != getModelMap().end(); ++it_model)
-  {
-    for (InstanceVector::const_iterator it = (*it_model).second->getInstanceVector().begin(); it != (*it_model).second->getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
     {
       Instance & mi = *(*it);
 
@@ -17252,7 +16725,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
         currStaVec[mi.li_state_qth] = mi.qth;
       }
     }
-  }
+//  }
 
   return bsuccess;
 }
@@ -17267,7 +16740,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 //-----------------------------------------------------------------------------
 bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  double * storeLeadF, double * storeLeadQ)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & mi = *(*it);
 
@@ -17526,7 +16999,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
     double iGmin_bs_Jdxp = mi.model_.dtype*mi.Gmin*(mi.vbs-mi.vbs_orig);
     double iGmin_gd_Jdxp = mi.model_.dtype*mi.Gmin*(mi.vgd-mi.vgd_orig);
 
-    if (getDeviceOptions().voltageLimiterFlag)
+    if (getDeviceOptions().voltageLimiterFlag && !mi.origFlag)
     {
       if (mi.soiMod != 2)
       {
@@ -17721,7 +17194,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
     double Coef_q_substrate_Jdxp   = 0.0;
     double Coef_q_temp_Jdxp        = 0.0;
 
-    if (getDeviceOptions().voltageLimiterFlag)
+    if (getDeviceOptions().voltageLimiterFlag && !mi.origFlag)
     {
       if (mi.soiMod != 2)
       {
@@ -17791,7 +17264,7 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 #ifdef _OMP
 #pragma omp parallel for
 #endif
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & mi = *(*it);
 
@@ -18802,6 +18275,23 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
   return true;
 }
 #endif
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("m", 10)
+    .registerDevice("m", 57)
+    .registerModelType("pmos", 10)
+    .registerModelType("nmos", 10)
+    .registerModelType("pmos", 57)
+    .registerModelType("nmos", 57);
+}
 
 } // namespace Resistor
 } // namespace Device

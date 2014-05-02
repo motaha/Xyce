@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,28 +36,22 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.45.4.3 $
+// Revision Number: $Revision: 1.56 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
-#ifndef  _MISC_H
-#define  _MISC_H
+#ifndef Xyce_N_UTL_Misc_h
+#define Xyce_N_UTL_Misc_h
 
 typedef unsigned int    UINT;
 
-#define TRUE  1
-#define FALSE 0
-
-#define STATUS_SUCCESS 1
-#define STATUS_FAILURE 0
-
 #define INIT_SUPER_FLAG 1
 
-// ---------- Standard Includes ----------
 #include <string>
+#include <algorithm>
 
 // Some implementations seem not to get this included by the time we use "toupper"
 #ifdef HAVE_CCTYPE
@@ -75,6 +69,29 @@ typedef unsigned int    UINT;
   #define M_PI (2.0*asin(1.0))
 #endif
 #endif
+
+#include <N_UTL_NoCase.h>
+
+namespace Xyce {
+namespace Util {
+
+void toUpper(std::string & tmp);
+void toLower(std::string & tmp);
+void removeWhiteSpace(std::string & tmp);
+int Ival(const std::string & tmpStr);
+bool isInt(const std::string & tmpStr);
+bool Bval(const std::string & tmpStr);
+bool isBool(const std::string & tmpStr);
+bool possibleParam(const std::string & tmpStr);
+
+double Value(const std::string & tmp);
+bool isValue(const std::string & tmp);
+
+std::ostream &word_wrap(std::ostream &os, const std::string &s, std::string::size_type line_length, const std::string &prefix, const std::string &prefix_first_line);
+
+
+} // namespace Util
+} // namespace Xyce
 
 inline double Xycemax ( double f1, double f2) { return f1 > f2 ? f1 : f2; }
 inline double Xycemin ( double f1, double f2) { return f1 < f2 ? f1 : f2; }
@@ -104,15 +121,15 @@ void Xyce_exit( int code );
 struct tagged_param
 {
 
-  tagged_param() : tag(string("")), param(0.0), given(false) {}
+  tagged_param() : tag(std::string("")), param(0.0), given(false) {}
 
-  tagged_param(const string & t, const double & p, bool g = false ) :
+  tagged_param(const std::string & t, const double & p, bool g = false ) :
 	tag(t), param(p), given(g) {}
 
   tagged_param( const tagged_param & right ) :
 	tag(right.tag), param(right.param), given(right.given) {}
 
-  tagged_param & operator=( const tagged_param & right ) 
+  tagged_param & operator=( const tagged_param & right )
   { tag = right.tag; param = right.param; given = right.given; return *this; }
 
   bool operator<( const tagged_param & rhs ) const
@@ -122,7 +139,7 @@ struct tagged_param
 
   friend bool operator!=(const tagged_param & tp1, const tagged_param & tp2);
 
-  string tag;
+  std::string tag;
   double      param;
   bool        given;
 };
@@ -167,7 +184,7 @@ inline bool operator!=(const tagged_param & tp1, const tagged_param & tp2)
 class string_param
 {
   public:
-    string_param(const string & t, const string & v) :
+    string_param(const std::string & t, const std::string & v) :
 	  tag(t), val(v) {}
     // Constructor
 
@@ -177,9 +194,9 @@ class string_param
     ~string_param();
     // Destructor.
 
-    string tag, val;
+    std::string tag, val;
 
-    string getString();
+    std::string getString();
     double getReal();
     int getInteger();
     // Methods to get the "val" in the desired format.
@@ -188,7 +205,7 @@ class string_param
     friend bool operator!=(const string_param & sp1, const string_param & sp2);
 
   private:
-    double Value(const string& str);
+    double Value(const std::string& str);
 };
 
 
@@ -262,252 +279,82 @@ inline bool operator==(const index_pair & ip1, const index_pair & ip2)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
-class ExtendedString : public string
+class ExtendedString : public std::string
 {
   public:
-    ExtendedString        (const char *X) : string(X) {};
-    ExtendedString        (const string & X) : string(X) {};
-    ExtendedString & toUpper();
-    ExtendedString & toLower();
-    ExtendedString & removeWhiteSpace();
-    double Value();
-    bool isValue();
-    int Ival();
-    bool isInt();
-    bool Bval();
-    bool isBool();
-    bool possibleParam();
+    ExtendedString(const char *X)
+      : std::string(X)
+    {}
+
+    ExtendedString(const std::string & X)
+      : std::string(X)
+    {}
+
+    ~ExtendedString()
+    {}
+
+    ExtendedString &toUpper() {
+      Xyce::Util::toUpper(*this);
+
+      return *this;
+    }
+
+    ExtendedString &toLower() {
+      Xyce::Util::toLower(*this);
+
+      return *this;
+    }
+
+    ExtendedString &removeWhiteSpace() {
+      Xyce::Util::removeWhiteSpace(*this);
+
+      return *this;
+    }
+
+    double Value() const {
+      return Xyce::Util::Value(*this);
+    }
+
+    bool isValue() const {
+      return Xyce::Util::isValue(*this);
+    }
+
+    int Ival() const {
+      return Xyce::Util::Ival(*this);
+    }
+
+    bool isInt() const {
+      return Xyce::Util::isInt(*this);
+    }
+
+    bool Bval() const {
+      return Xyce::Util::Bval(*this);
+    }
+
+    bool isBool() const {
+      return Xyce::Util::isBool(*this);
+    }
+
+    bool possibleParam() {
+      return Xyce::Util::possibleParam(*this);
+    }
 };
 
-//-----------------------------------------------------------------------------
-// Function      : ExtendedString::toUpper
-// Purpose       :
-// Special Notes :
-// Scope         : public
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 3/16/00
-//-----------------------------------------------------------------------------
-inline ExtendedString & ExtendedString::toUpper(void)
-{
-  //string::size_type size (length());
-  //for( string::size_type i = 0; i < size; ++i )
-  int size (length());
-  for( int i = 0; i < size; ++i )
-  {
-    if (islower ( (*this)[i] ) )
-    {
-      (*this)[i] = toupper( (*this)[i] );
-    }
-  }
-
-  return (*this);
-}
-
-//-----------------------------------------------------------------------------
-// Function      : ExtendedString::toLower
-// Purpose       :
-// Special Notes :
-// Scope         : public
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 3/16/00
-//-----------------------------------------------------------------------------
-inline ExtendedString & ExtendedString::toLower(void)
-{
-  //string::size_type size (length());
-  //for( string::size_type i =0; i < size; ++i )
-  int size (length());
-  for( int i =0; i < size; ++i )
-  {
-    if (isupper ( (*this)[i] ) )
-    {
-      (*this)[i] = tolower( (*this)[i] );
-    }
-  }
-
-  return (*this);
-}
-
-//-----------------------------------------------------------------------------
-// Function      : ExtendedString::removeWhiteSpace
-// Purpose       :
-// Special Notes :
-// Scope         : public
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 3/16/00
-//-----------------------------------------------------------------------------
-inline ExtendedString & ExtendedString::removeWhiteSpace(void)
-{
-  string::size_type N = string::npos - 1;
-
-  while (N != string::npos)
-  {
-    N = find(" ");
-    if (N != string::npos) erase (N, 1);
-  }
-
-  return (*this);
-}
-
-//-----------------------------------------------------------------------------
-// Description   : Test if string is a bool value
-// Special Notes :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 03/10/06
-//-----------------------------------------------------------------------------
-inline bool ExtendedString::isBool()
-{
-  if (isValue())
-    return true;
-  ExtendedString tmp(*this);
-  tmp.toUpper();
-  if ( tmp == "TRUE" )
-    return true;
-  if ( tmp == "FALSE" )
-    return true;
-  return false;
-}
-
-
-
-//-----------------------------------------------------------------------------
-// Description   : Test if string is an integer
-// Special Notes :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 12/01/05
-//-----------------------------------------------------------------------------
-inline bool ExtendedString::isInt()
-{
-  int j;
-
-  //if ((*this).size() == 0)
-  if ((*this).empty())
-    return false;
-
-  if ((*this)[0] == '-' || (*this)[0] == '+')
-    j = (*this).find_first_not_of("0123456789", 1);
-  else
-    j = (*this).find_first_not_of("0123456789");
-
-  if (j == (int)string::npos)
-    return true;
-
-  // But there's one case where we *could* still be an int.  That would be
-  // if we've got .[0]* at the current point.
-
-  if ((*this)[j] == '.')
-  {
-    int i;
-    i=(*this).find_first_not_of("0",j+1);
-
-    // If we find nothing but 0 after the ., we are still an int.
-    if (i == (int)string::npos)
-     return true;
-  }
-
-  return false;
-}
-
-//-----------------------------------------------------------------------------
-// Description   : Turn string into bool value
-// Special Notes :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 03/10/06
-//-----------------------------------------------------------------------------
-inline bool ExtendedString::Bval()
-{
-  if (isValue())
-  {
-    if (Value() == 0)
-      return false;
-    else
-      return true;
-  }
-  ExtendedString tmp(*this);
-  tmp.toUpper();
-  if ( tmp == "TRUE" )
-    return true;
-  if ( tmp == "FALSE" )
-    return false;
-  return false;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : possibleParam
-// Purpose       : Test is string is a valid Value
-// Special Notes :
-// Scope         : public
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 11/02/05
-//-----------------------------------------------------------------------------
-inline bool ExtendedString::possibleParam()
-{ 
-  string first("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$");
-  string legal("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_0123456789.");
-  string::iterator iterS, iterEnd;
-  int i;
-  bool ok = false;
-
-  for (i=0 ; i<(int)((*this).size()) ; ++i)
-  {
-    if (i == 0)
-    {
-      iterS=first.begin(); 
-      iterEnd=first.end();
-    }
-    else
-    {
-      iterS=legal.begin(); 
-      iterEnd=legal.end();
-    }
-    ok = false;
-    while (iterS!=iterEnd)
-    {
-      if (*(iterS++) == (*this)[i])
-      {
-        ok = true;
-        break;
-      }
-    }
-    if (!ok)
-      break;
-  }
-  if (ok && isBool())
-    ok = false;
-
-  return ok;
-}
-
-
-namespace N_UTL {
-
-void toUpper(string & tmp);
-void toLower(string & tmp);
-void removeWhiteSpace(string & tmp);
-int Ival(const string & tmpStr);
-bool isInt(const string & tmpStr);
-bool Bval(const string & tmpStr);
-bool isBool(const string & tmpStr);
-bool possibleParam(const string & tmpStr);
-
-double Value(const string & tmp);
-bool isValue(const string & tmp);
+namespace Xyce {
+namespace Util {
 
 //-----------------------------------------------------------------------------
 // Function      : toUpper
 // Purpose       :
 // Special Notes :
 // Creator       : Eric Keiter, SNL
-// Creation Date : 
+// Creation Date :
 //-----------------------------------------------------------------------------
-inline void toUpper(string & tmp)
+inline void toUpper(std::string &s)
 {
-  int size (tmp.length());
-  for( int i=0; i < size; ++i )
+  for (std::string::iterator it = s.begin(); it != s.end(); ++it)
   {
-    if (islower ( tmp[i] ) )
-    {
-      tmp[i] = toupper( tmp[i] );
-    }
+    *it = toupper(*it);
   }
 }
 
@@ -516,17 +363,13 @@ inline void toUpper(string & tmp)
 // Purpose       :
 // Special Notes :
 // Creator       : Eric Keiter, SNL
-// Creation Date : 
+// Creation Date :
 //-----------------------------------------------------------------------------
-inline void toLower(string & tmp)
+inline void toLower(std::string &s)
 {
-  int size (tmp.length());
-  for( int i=0; i < size; ++i )
+  for(std::string::iterator it = s.begin(); it != s.end(); ++it)
   {
-    if (isupper ( tmp[i] ) )
-    {
-      tmp[i] = tolower( tmp[i] );
-    }
+    *it = tolower(*it);
   }
 }
 
@@ -535,50 +378,12 @@ inline void toLower(string & tmp)
 // Purpose       :
 // Special Notes :
 // Creator       : Eric Keiter, SNL
-// Creation Date : 
+// Creation Date :
 //-----------------------------------------------------------------------------
-inline void removeWhiteSpace(string & tmp)
+inline void removeWhiteSpace(std::string & tmp)
 {
-  string::size_type N = string::npos - 1;
-  while (N != string::npos)
-  {
-    N = tmp.find(" ");
-    if (N != string::npos) tmp.erase (N, 1);
-  }
-}
-
-//-----------------------------------------------------------------------------
-// Function      : isInt
-// Purpose       :
-// Special Notes :
-// Creator       : Eric Keiter, SNL
-// Creation Date : 
-//-----------------------------------------------------------------------------
-inline bool isInt(const string & tmpStr)
-{
-  int j(0);
-  if (tmpStr.empty())
-   return false;
-
-  if (tmpStr[0] == '-' || tmpStr[0] == '+')
-    j = tmpStr.find_first_not_of("0123456789", 1);
-  else
-    j = tmpStr.find_first_not_of("0123456789");
-
-  if (j == (int)string::npos)
-   return true;
-
-  // But there's one case where we *could* still be an int.  That would be
-  // if we've got .[0]* at the current point.
-  if (tmpStr[j] == '.')
-  {
-    int i=tmpStr.find_first_not_of("0",j+1);
-
-    // If we find nothing but 0 after the ., we are still an int.
-    if (i == (int)string::npos)
-     return true;
-  }
-  return false;
+  std::string::iterator x = std::remove(tmp.begin(), tmp.end(), ' ');
+  tmp.erase(x, tmp.end());
 }
 
 //-----------------------------------------------------------------------------
@@ -586,25 +391,16 @@ inline bool isInt(const string & tmpStr)
 // Purpose       :
 // Special Notes :
 // Creator       : Eric Keiter, SNL
-// Creation Date : 
+// Creation Date :
 //-----------------------------------------------------------------------------
-inline bool Bval(const string & tmpStr)
+inline bool Bval(const std::string & tmpStr)
 {
   if (isValue(tmpStr))
   {
-    if (Value(tmpStr) == 0)
-      return false;
-    else
-      return true;
+    return Value(tmpStr) != 0;
   }
 
-  ExtendedString tmp(tmpStr);
-  tmp.toUpper();
-  if ( tmp == "TRUE" )
-    return true;
-  if ( tmp == "FALSE" )
-    return false;
-  return false;
+  return equal_nocase(tmpStr, "TRUE");
 }
 
 //-----------------------------------------------------------------------------
@@ -612,68 +408,23 @@ inline bool Bval(const string & tmpStr)
 // Purpose       :
 // Special Notes :
 // Creator       : Eric Keiter, SNL
-// Creation Date : 
+// Creation Date :
 //-----------------------------------------------------------------------------
-inline bool isBool(const string & tmpStr)
+inline bool isBool(const std::string & s)
 {
-  if (isValue(tmpStr))
-    return true;
-  ExtendedString tmp(tmpStr);
-  tmp.toUpper();
-  if ( tmp == "TRUE" )
-    return true;
-  if ( tmp == "FALSE" )
-    return true;
-  return false;
+  return isValue(s) || equal_nocase(s, "TRUE") || equal_nocase(s, "FALSE");
 }
 
-//-----------------------------------------------------------------------------
-// Function      : possibleParam
-// Purpose       :
-// Special Notes :
-// Creator       : Eric Keiter, SNL
-// Creation Date : 
-//-----------------------------------------------------------------------------
-inline bool possibleParam(const string & tmpStr)
+inline int Ival(const std::string & tmpStr)
 {
-  string first("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_");
-  string legal("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_0123456789");
-  string::iterator iterS, iterEnd;
-  int i;
-  bool ok(false);
+  if (isInt(tmpStr))
+    return atoi(tmpStr.c_str());
 
-  int size ( tmpStr.size() );
-  for (i=0 ; i< size; ++i)
-  {
-    if (i == 0)
-    {
-      iterS=first.begin(); 
-      iterEnd=first.end();
-    }
-    else
-    {
-      iterS=legal.begin(); 
-      iterEnd=legal.end();
-    }
-    ok = false;
-    while (iterS!=iterEnd)
-    {
-      if (*(iterS++) == tmpStr[i])
-      {
-        ok = true;
-        break;
-      }
-    }
-    if (!ok)
-      break;
-  }
-  if (ok && isBool(tmpStr))
-    ok = false;
-
-  return ok;
+  return 0;
 }
 
-}
+} // namespace Util
+} // namespace Xyce
 
 #ifndef HAVE_IOTA
 // iota is not part of the C++ standard.  It is an extension.
@@ -687,5 +438,4 @@ iota(_ForwardIterator __first, _ForwardIterator __last, _Tp __value)
 }
 #endif
 
-#endif
-
+#endif // Xyce_N_UTL_Misc_h

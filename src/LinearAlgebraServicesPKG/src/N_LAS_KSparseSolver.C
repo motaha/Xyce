@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.7.2.2 $
+// Revision Number: $Revision: 1.17 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -124,16 +124,16 @@ N_LAS_KSparseSolver::~N_LAS_KSparseSolver()
 //-----------------------------------------------------------------------------
 bool N_LAS_KSparseSolver::setOptions( const N_UTL_OptionBlock & OB )
 {
-  for( list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
+  for( std::list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
          it_tpL != OB.getParams().end(); ++it_tpL )
   {
     string tag = it_tpL->uTag();
 
-    if( tag == "OUTPUT_LS" ) outputLS_ = it_tpL->iVal();
+    if( tag == "OUTPUT_LS" ) outputLS_ = it_tpL->getImmutableValue<int>();
     
-    if( tag == "OUTPUT_BASE_LS" ) outputBaseLS_ = it_tpL->iVal();
+    if( tag == "OUTPUT_BASE_LS" ) outputBaseLS_ = it_tpL->getImmutableValue<int>();
     
-    if( tag == "OUTPUT_FAILED_LS" ) outputFailedLS_ = it_tpL->iVal();
+    if( tag == "OUTPUT_FAILED_LS" ) outputFailedLS_ = it_tpL->getImmutableValue<int>();
   }
 
   if( options_ ) delete options_;
@@ -294,9 +294,7 @@ int N_LAS_KSparseSolver::solve( bool ReuseFactors )
 
 #ifdef Xyce_VERBOSE_LINEAR
     double endSolveTime = timer_->elapsedTime();
-    std::string msg1 = "  KSparse Solve Time: " 
-      + Teuchos::Utils::toString(endSolveTime-begSolveTime);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg1);
+    Xyce::lout() << "  KSparse Solve Time: " << (endSolveTime - begSolveTime) << std::endl;
 #endif      
 
     if (linearStatus != 0) {
@@ -331,9 +329,7 @@ int N_LAS_KSparseSolver::solve( bool ReuseFactors )
     res.Update( 1.0, *(prob->GetRHS()), -1.0 );
     res.Norm2( &resNorm );
     prob->GetRHS()->Norm2( &bNorm );
-    std::string msg2 = "Linear System Residual (KSparse) : "  
-      + Teuchos::Utils::toString(resNorm/bNorm);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg2);
+    Xyce::lout() << "Linear System Residual (KSparse) : " << (resNorm/bNorm) << std::endl;
 #endif
 
  if( transform_.get() ) transform_->rvs();
@@ -342,9 +338,7 @@ int N_LAS_KSparseSolver::solve( bool ReuseFactors )
   solutionTime_ = timer_->elapsedTime();
 
 #ifdef Xyce_VERBOSE_LINEAR
-  std::string msg3 = "Total Linear Solution Time (KSparse): " 
-    + Teuchos::Utils::toString(solutionTime_);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg3);
+  Xyce::lout() << "Total Linear Solution Time (KSparse): " << solutionTime_ << std::endl;
 #endif
 
   return 0;

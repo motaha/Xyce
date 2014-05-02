@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.14.2.2 $
+// Revision Number: $Revision: 1.19 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,82 +46,84 @@
 #ifndef N_TOP_CktNodeCreator_h
 #define N_TOP_CktNodeCreator_h 1
 
-// ---------- Standard Includes ----------
 #include <list>
 #include <string>
+
 #include <Teuchos_RefCountPtr.hpp>
 using Teuchos::RefCountPtr;
 using Teuchos::rcp;
 
-// ----------   Xyce Includes   ----------
-#include <N_UTL_Misc.h>
 #include <N_DEV_fwd.h>
+#include <N_TOP_fwd.h>
+#include <N_UTL_Misc.h>
 
-// ---------- Forward Declarations ----------
-
-class N_TOP_CktNode;
-class N_TOP_CktGraph;
-class N_TOP_NodeBlock;
+namespace Xyce {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Class         : N_TOP_CktNodeCreator
+// Class         : CktNodeCreator
 // Purpose       :
 // Special Notes :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-class N_TOP_CktNodeCreator
+class CktNodeCreator
 {
 
 private:
 
   // Constructor (private).
-  N_TOP_CktNodeCreator() { }
+  CktNodeCreator() { }
 
 public:
   // Singleton
-  static N_TOP_CktNodeCreator * instance();
+  static CktNodeCreator * instance();
 
   // Destructor
-  ~N_TOP_CktNodeCreator() { }
+  ~CktNodeCreator() { }
 
 private:
 
   // Copy constructor (private).
-  N_TOP_CktNodeCreator(const N_TOP_CktNodeCreator & right);
+  CktNodeCreator(const CktNodeCreator & right);
 
   // Assignment operator (private).
-  N_TOP_CktNodeCreator & operator = (const N_TOP_CktNodeCreator & right);
+  CktNodeCreator & operator = (const CktNodeCreator & right);
 
-  bool operator == (const N_TOP_CktNodeCreator & right) const;
-  bool operator != (const N_TOP_CktNodeCreator & right) const;
+  bool operator == (const CktNodeCreator & right) const;
+  bool operator != (const CktNodeCreator & right) const;
 
 public:
 
   //------- Voltage Node Creators
-  N_TOP_CktNode * CreateVoltageNode(const string & ID) const;
-  N_TOP_CktNode * CreateVoltageNode(const tagged_param & tpID) const;
-  N_TOP_CktNode * CreateVoltageNode(const N_TOP_NodeBlock & nb) const;
+  CktNode * CreateVoltageNode(const std::string & ID) const;
+  CktNode * CreateVoltageNode(const tagged_param & tpID) const;
+  CktNode * CreateVoltageNode(const NodeBlock & nb) const;
 
   //------- Device Node Creators
-  N_TOP_CktNode * CreateDeviceNode(const string & ID,
-                                   N_DEV_DeviceInstance * instancePtr) const;
-  N_TOP_CktNode * CreateDeviceNode(const string & ID,
-                                   N_DEV_DeviceInstance * instancePtr, int gID,
-                                   list < int > varGIDList) const;
-  N_TOP_CktNode * CreateDeviceNode(const N_TOP_NodeBlock & nb,
-                                   N_DEV_DeviceInstance * instancePtr) const;
-  N_TOP_CktNode * CreateDeviceNode( const N_TOP_NodeBlock & nb,
-                                    const Teuchos::RCP<N_DEV_InstanceBlock> ibPtr,
-		                                N_DEV_DeviceInterface & devIF ) const;
+  CktNode * CreateDeviceNode(const std::string & ID,
+                                   Device::DeviceInstance * instancePtr) const;
+  CktNode * CreateDeviceNode(const std::string & ID,
+                                   Device::DeviceInstance * instancePtr, int gID,
+                                   std::list< int > varGIDList) const;
+  CktNode * CreateDeviceNode(const NodeBlock & nb,
+                                   Device::DeviceInstance * instancePtr) const;
+  CktNode * CreateDeviceNode( const NodeBlock & nb,
+                                    const Teuchos::RCP<Device::InstanceBlock> ibPtr,
+		                                Device::DeviceInterface & devIF ) const;
 
   //------- Sub Ckt Node Creators
-  N_TOP_CktNode * CreateSubCktNode(const string & ID,
-                                   N_TOP_CktGraph * grphPtr) const;
+  CktNode * CreateSubCktNode(const std::string & ID,
+                                   CktGraph * grphPtr) const;
 
-  N_TOP_CktNode * CreateSubCktNode(const N_TOP_NodeBlock & nb,
-                                   N_TOP_CktGraph * grphPtr) const;
+  CktNode * CreateSubCktNode(const NodeBlock & nb,
+                                   CktGraph * grphPtr) const;
 
 };
+
+typedef Xyce::Topo::CktNodeCreator N_TOP_CktNodeCreator;
+
+} // namespace Topo
+} // namespace Xyce
 
 #endif

@@ -38,7 +38,7 @@
 `define CONSTroot2 1.41421356237309504880
 
 // begin of FBH HBT model
-module HBT_X(c,b,e,t);  
+module HBT_X(c,b,e,t) `attr(xyceModelGroup="BJT" xyceLevelNumber="23" xyceDeviceName="FBH HBT_X v2.1");  
 
 //external nodes
     inout e,b,c,t;

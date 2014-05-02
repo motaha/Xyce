@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,199 +36,146 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.101.2.8 $
+// Revision Number: $Revision: 1.132.2.5 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:43 $
+// Revision Date  : $Date: 2014/03/12 17:25:19 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: dgbaur $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
 #include <iostream>
 #include <sstream>
-
-#ifdef HAVE_STRINGS_H
-#include <strings.h>
-#else
-#ifdef HAVE_STRING_H
-// On windows, we don't have this and cannot use strcasecmp, and need to use
-// _stricmp instead.  Groan.
-#include <string.h>
-#else
-error FIXME: Neither strings.h (POSIX) nor string.h (Windows) found.  Cannot find a case-insensitive string compare to use.
-#endif  // HAVE_STRING_H
-#endif  // HAVE_STRINGS_H
-
-// ----------   Xyce Includes   ----------
-
-#include <N_ERH_ErrorMgr.h>
+#include <cctype>
 
 #include <N_IO_CmdParse.h>
 
-#include <N_UTL_Misc.h>
-#include <N_UTL_Expression.h>
-
-#include <N_PDS_Comm.h>
-
-#include <N_DEV_fwd.h>
-#include <N_DEV_DeviceInterface.h>
+#include <N_DEV_Configuration.h>
 #include <N_DEV_DeviceMgr.h>
-#include <N_DEV_Device.h>
-#include <N_DEV_DeviceModel.h>
-#include <N_DEV_DeviceBlock.h>
-#include <N_DEV_DeviceInstance.h>
-#include <N_DEV_OutputPars.h>
-#include <N_DEV_MatrixLoadData.h>
-#include <N_DEV_SolverState.h>
-#include <N_DEV_DeviceOptions.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_Factory.h>
+#include <N_DEV_Dump.h>
+#include <N_DEV_LaTexDoc.h>
+#include <N_DEV_RegisterDevices.h>
+#include <N_ERH_Message.h>
+#include <N_ERH_Progress.h>
+#include <N_PDS_Comm.h>
+#include <N_PDS_Manager.h>
+#include <N_UTL_IndentStreamBuf.h>
 #include <N_UTL_LogStream.h>
-#include <N_UTL_IndentStreamBuf.h>
-
+#include <N_UTL_NoCase.h>
 #include <N_UTL_Version.h>
-#include <N_UTL_IndentStreamBuf.h>
 
-struct DeviceEntityCmp : public std::binary_function<N_DEV_DeviceEntity, N_DEV_DeviceEntity, bool>
+namespace Xyce {
+namespace IO {
+
+//-----------------------------------------------------------------------------
+// Function      : usage
+// Purpose       :
+// Special Notes :
+// Scope         : Public
+// Creator       : David Baur
+// Creation Date : 3/7/2014
+//-----------------------------------------------------------------------------
+///
+/// Print Xyce usage
+///
+/// @param os   Stream to write usage information to
+///
+void usage(std::ostream &os)
 {
-  static bool less_nocase(const std::string &lhs, const std::string &rhs) {
-#ifdef HAVE_STRINGS_H
-    return strcasecmp(lhs.c_str(), rhs.c_str()) < 0;
-#else
-    return _stricmp(lhs.c_str(), rhs.c_str()) < 0;
+  os << "Usage: Xyce [arguments] netlist\n\n"
+     << "Arguments:\n"
+     << "  -b                          batch mode flag for spice compatibility (ignored)\n"
+     << "  -h                          print usage and exit\n"
+     << "  -v                          print version info and exit\n"
+     << "  -capabilities               print compiled-in options and exit\n"
+     << "  -license                    print license and exit\n"
+     << "  -param [device [level [<inst|mod>]]] print a terse summary of model and/or device parameters\n"
+     << "  -info [device [level [<inst|mod>]]] output latex tables of model and device parameters to files\n"
+     << "  -doc [device [level [<inst|mod>]]] output latex tables of model and device parameters to files\n"
+     << "  -doc_cat [device [level [<inst|mod>]]] output latex tables of model and device parameters to files\n"
+     << "  -syntax                     check netlist syntax and exit\n"
+     << "  -norun                      netlist syntax and topology and exit\n"
+     << "  -namesfile                  output internal names file and exit\n"
+     << "  -gui                        gui file output\n"
+     << "  -jacobian_test              jacobian matrix diagnostic\n"
+     << "  -delim <TAB|COMMA|string>   set the output file field delimiter\n"
+     << "  -o <path>                   place the results into <path>\n"
+     << "  -l <path>                   place the log output into <path>, \"cout\" to log to stdout\n"
+     << "  -per-processor              create log file for each procesor, add .<n>.<r> to log path\n"
+     << "  -remeasure [existing Xyce output file] recompute .measure() results with existing data\n"
+     << "  -nox <on|off>               NOX nonlinear solver usage\n"
+     << "  -linsolv <solver>           force usage of specific linear solver\n"
+     << "  -maxord <1..5>              maximum time integration  order\n"
+     << "  -prf <param file name>      specify a file with simulation parameters\n"
+     << "  -rsf <response file name>   specify a file to save simulation responses functions.\n"
+
+#ifndef Xyce_PARALLEL_MPI
+     << "  -r <file>                   generate a rawfile named <file> in binary format\n"
+     << "  -a                          use with  -r <file>  to output in ascii format\n"
 #endif
-  }
 
-  bool operator()(const N_DEV_DeviceEntity &entity_0, const N_DEV_DeviceEntity &entity_1) const {
-    return less_nocase(entity_0.getName(), entity_1.getName());
-  }
-  bool operator()(const N_DEV_DeviceEntity *entity_0, const N_DEV_DeviceEntity *entity_1) const {
-    return less_nocase(entity_0->getName(), entity_1->getName());
-  }
-};
-
-struct DeviceCmp : public std::binary_function<N_DEV_Device, N_DEV_Device, bool>
-{
-  static bool less_nocase(const std::string &lhs, const std::string &rhs) {
-#ifdef HAVE_STRINGS_H
-    return strcasecmp(lhs.c_str(), rhs.c_str()) < 0;
-#else
-    return _stricmp(lhs.c_str(), rhs.c_str()) < 0;
+#ifdef HAVE_DLFCN_H
+     << "  -plugin                     load device plugin\n"
 #endif
-  }
-};
 
-namespace {
-void tolower(std::string &s)
-{
-  for (string::iterator it = s.begin(); it != s.end(); ++it)
-    (*it) = ((*it) < 'A'  || (*it) > 'Z') ? (*it) : (*it) - 'A' + 'a';
-}
+#ifdef Xyce_Dakota
+     << "\nDakota build arguments:\n"
+     << "  -dakota <dakota input file> dakota input file for this simulation\n"
+#endif
 
+#if defined Xyce_DEBUG_NONLINEAR || defined Xyce_DEBUG_TIME || defined Xyce_DEBUG_DEVICE || defined Xyce_TOTALVIEW_BOGON
+     << "\nDebug arguments:\n"
+#endif
+
+#ifdef Xyce_DEBUG_NONLINEAR
+     << "  -ndl <0..N>                 set the nonlinear solver debug level (overrides netlist)\n"
+#endif
+
+#ifdef Xyce_DEBUG_TIME
+     << "  -tdl <0..N>                 set the time integration debug level\n"
+#endif
+#ifdef Xyce_DEBUG_DEVICE
+     << "  -ddl <0..N>                 set the device debug level (overrides netlist)\n"
+     << "  -sdl <0..N>                 set the device sensitivity debug level\n"
+#endif
+
+#ifdef Xyce_TOTALVIEW_BOGON
+     << "  -mpichtv                    required for totalview \n"
+#endif
+     << std::endl;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::N_IO_CmdParse
+// Function      : CmdParse::CmdParse
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Eric Keiter
 // Creation Date : 02/14/01
 //-----------------------------------------------------------------------------
-N_IO_CmdParse::N_IO_CmdParse()
+CmdParse::CmdParse()
 : iargs(0),
   cargs(0),
-  netlistCopy_(false),
-  oneTerm_(false),
-  noDCPath_(false),
-  oneTermRes_(""),
-  noDCPathRes_(""),
   allocatedCargs_(false)
 {
   setCommandArgs();
-
-  // Set up argument list for usage statement;
-  std::ostringstream oss;
-
-  oss << "Usage: Xyce [arguments] netlist\n\n"
-      << "Arguments:\n"
-      << "  -h                          print usage and exit\n"
-      << "  -v                          print version info and exit\n"
-      << "  -capabilities               print compiled-in options and exit\n"
-      << "  -license                    print license and exit\n"
-      << "  -param [Device [level [<inst|mod>]]] print a terse summary of model and/or device parameters\n"
-      << "  -info [Device [level [<inst|mod>]]]  print a description of model and/or device parameters\n"
-      << "  -syntax                     check netlist syntax and exit\n"
-      << "  -norun                      netlist syntax and topology and exit\n"
-      << "  -gui                        gui file output\n"
-      << "  -jacobian_test              jacobian matrix diagnostic\n"
-      //      << "  -test                       run unit tests\n"
-      << "  -delim <TAB|COMMA|string>   set the output file field delimiter\n"
-      << "  -o <file>                   place the results into <file>\n"
-      << "  -l <file>                   place the log output into <file>\n"
-      << "  -remeasure [existing Xyce output file] recompute .measure() results with existing data\n"
-
-#ifndef Xyce_PARALLEL_MPI
-      << "  -r <file>                   generate a rawfile named <file> in binary format\n"
-      << "  -a                          use with  -r <file>  to output in ascii format\n"
-
-#endif
-      << "  -nox <on|off>               NOX nonlinear solver usage\n"
-
-      << "  -linsolv <solver>           force usage of specific linear solver\n"
-
-      << "  -maxord <1..5>              maximum time integration  order\n"
-    //<< "  -method <1..4>              time integration method (old-dae only)\n"
-
-#ifdef Xyce_Dakota
-      << "  -dakota <dakota input file> dakota input file for this simulation\n"
-#endif
-      << "  -prf <param file name>      specify a file with simulation parameters\n"
-      << "  -rsf <response file name>   specify a file to save simulation responses functions.\n"
-
-#ifdef Xyce_DEBUG_NONLINEAR
-      << "  -ndl <0..N>                 set the nonlinear solver debug level (overrides netlist)\n"
-#endif
-#ifdef Xyce_DEBUG_TIME
-      << "  -tdl <0..N>                 set the time integration debug level\n"
-#endif
-#ifdef Xyce_DEBUG_DEVICE
-      << "  -ddl <0..N>                 set the device debug level (overrides netlist)\n"
-      << "  -sdl <0..N>                 set the device sensitivity debug level\n"
-#endif
-
-#ifdef Xyce_TOTALVIEW_BOGON
-      << "  -mpichtv                    required for totalview \n"
-#endif
-      << std::endl;
-
-  usage_ = oss.str();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::N_IO_CmdParse
+// Function      : CmdParse::CmdParse
 // Purpose       : copy constructor
 // Special Notes :
 // Scope         : Public
 // Creator       : Eric Keiter
 // Creation Date : 01/07/07
 //-----------------------------------------------------------------------------
-N_IO_CmdParse::N_IO_CmdParse(N_IO_CmdParse & right) :
+CmdParse::CmdParse(const CmdParse & right) :
   iargs(right.iargs),
   swArgs(right.swArgs),
   stArgs(right.stArgs),
   argIndex(right.argIndex),
-  usage_(right.usage_),
-  parMgr_(right.parMgr_),
-  netlistCopy_(right.netlistCopy_),
-  oneTerm_(right.oneTerm_),
-  noDCPath_(right.noDCPath_),
-  oneTermRes_(right.oneTermRes_),
-  noDCPathRes_(right.noDCPathRes_)
+  parMgr_(right.parMgr_)
 {
   // if we use the copy constructor, then we will own
   // cargs and must delete it. There should be a better
@@ -246,7 +193,7 @@ N_IO_CmdParse::N_IO_CmdParse(N_IO_CmdParse & right) :
       continue;
     }
 
-    string tmpString(right.cargs[i]);
+    std::string tmpString(right.cargs[i]);
     int size = tmpString.size()+2;
     cargs[i] = new char[size];
     for (j=0;j<size;++j) cargs[i][j] = 0;
@@ -256,14 +203,14 @@ N_IO_CmdParse::N_IO_CmdParse(N_IO_CmdParse & right) :
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::N_IO_CmdParse
+// Function      : CmdParse::CmdParse
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Eric Keiter
 // Creation Date : 02/14/01
 //-----------------------------------------------------------------------------
-N_IO_CmdParse::~N_IO_CmdParse()
+CmdParse::~CmdParse()
 {
   if(allocatedCargs_)
   {
@@ -283,21 +230,24 @@ N_IO_CmdParse::~N_IO_CmdParse()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::setCommandArgs
-// Purpose       : Initialize command line argumentws
+// Function      : CmdParse::setCommandArgs
+// Purpose       : Initialize command line arguments
 // Special Notes :
 // Scope         : Public
 // Creator       : Dave Shirley, PSSi
 // Creation Date : 01/24/11
 //-----------------------------------------------------------------------------
-void N_IO_CmdParse::setCommandArgs ()
+void CmdParse::setCommandArgs()
 {
   stArgs.clear();
   swArgs.clear();
   argIndex.clear();
 
+  stArgs[ "netlist" ] = "";     // The input netlist will be a special case.
+
   // Set the maps containing the expected arguments. There are two types
   // of arguments switch arguments and string valued arguments.
+  swArgs[ "-b" ] = 0;
   swArgs[ "-h" ] = 0;           // Help option, print usage and exit.
   swArgs[ "-test" ] = 0;
   swArgs[ "-v" ] = 0;
@@ -305,29 +255,31 @@ void N_IO_CmdParse::setCommandArgs ()
   swArgs[ "-license" ] = 0;
   swArgs[ "-syntax" ] = 0;
   swArgs[ "-norun" ] = 0;
+  swArgs[ "-namesfile" ] = 0;
   swArgs[ "-gui" ] = 0;
   swArgs[ "-jacobian_test" ] = 0;
 
-  stArgs[ "netlist" ] = "";     // The input netlist will be a special case.
   stArgs[ "-delim" ] = "";
   stArgs[ "-o" ] = "";
   stArgs[ "-l" ] = "";          // Output log information to a file.
-
+  swArgs[ "-per-processor" ] = 0;
+  swArgs[ "-messy-cout" ] = 0;
+  stArgs[ "-remeasure" ] = "";  // specify a existing data file on which Xyce will recompute .measure functions.
+  stArgs[ "-nox" ] = "";
+  stArgs[ "-linsolv" ] = "";
+  stArgs[ "-maxord" ] = "";
+  stArgs[ "-prf" ] = "";        // specify a parameter input file to set runtime params from a file
+  stArgs[ "-rsf" ] = "";        // specify a response output file to save results to a file
   stArgs[ "-r" ] = "";          // Output binary rawfile.
   swArgs[ "-a" ] = 0;           // Use ascii instead of binary in rawfile output
 
-  stArgs[ "-nox" ] = "";
-
-  stArgs[ "-linsolv" ] = "";
-
-  stArgs[ "-maxord" ] = "";
-  //stArgs[ "-method" ] = "";
+#ifdef HAVE_DLFCN_H
+  stArgs[ "-plugin" ] = "";
+#endif
 
 #ifdef Xyce_Dakota
   stArgs[ "-dakota" ] = "";     // specify a dakota input file to couple with this simulation
 #endif
-  stArgs[ "-prf" ] = "";        // specify a parameter input file to set runtime params from a file
-  stArgs[ "-rsf" ] = "";        // specify a response output file to save results to a file
 
 #ifdef Xyce_DEBUG_NONLINEAR
   stArgs[ "-ndl" ] = "";
@@ -342,12 +294,11 @@ void N_IO_CmdParse::setCommandArgs ()
 #ifdef Xyce_TOTALVIEW_BOGON
   swArgs[ "-mpichtv" ] = 0;
 #endif
-  stArgs[ "-remeasure" ] = "";  // specify a existing data file on which Xyce will recompute .measure functions.
   return;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::setNetlist
+// Function      : CmdParse::setNetlist
 // Purpose       : This function is used for 2-level newton solves.
 //
 // Special Notes : For 2-level newton, the inner solve is handled by a new
@@ -358,14 +309,14 @@ void N_IO_CmdParse::setCommandArgs ()
 //                 inner problem is described in a different file.
 //
 //                 This function is called after a copy of the original
-//                 N_IO_CmdParse class has been made.
+//                 CmdParse class has been made.
 //
 //
 // Scope         : Public
 // Creator       : Eric Keiter
 // Creation Date : 01/07/07
 //-----------------------------------------------------------------------------
-void N_IO_CmdParse::setNetlist(string & newNetlist)
+void CmdParse::setNetlist(const std::string & newNetlist)
 {
   int netIndex = 0;
 
@@ -375,8 +326,7 @@ void N_IO_CmdParse::setNetlist(string & newNetlist)
   }
   else
   {
-    string errorMsg("N_IO_CmdParse::setNetlist. Unable to find netlist argument.");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, errorMsg);
+    Report::DevelFatal0().in("CmdParse::setNetlist") << "Unable to find netlist argument.";
   }
 
 
@@ -386,15 +336,12 @@ void N_IO_CmdParse::setNetlist(string & newNetlist)
   if ( netIndex >= iargs )
   {
     // Unexectedly ran out of arguments on the command line.
-    string errorMsg("N_IO_CmdParse::setNetlist.  Did not find previous netlist setting.");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, errorMsg);
+    Report::DevelFatal0().in("CmdParse::setNetlist") << "Did not find previous netlist setting.";
   }
   else if (cargs[netIndex][0] == '-')
   {
     // Error if we ran into another option here.
-    string errorMsg("N_IO_CmdParse::setNetlist.  Expected option value,");
-    errorMsg += " but found option: " + string(cargs[netIndex]) + "\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, errorMsg);
+    Report::DevelFatal0().in("CmdParse::setNetlist") << "Expected option value, but found option " << cargs[netIndex];
   }
   else // found it!
 #endif
@@ -414,14 +361,14 @@ void N_IO_CmdParse::setNetlist(string & newNetlist)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::parseCommandLine
+// Function      : CmdParse::parseCommandLine
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Lon Waters
 // Creation Date : 03/13/02
 //-----------------------------------------------------------------------------
-void N_IO_CmdParse::parseCommandLine(int ia, char** ca)
+int CmdParse::parseCommandLine(int ia, char** ca)
 {
   iargs = ia;
   cargs = ca;
@@ -433,12 +380,9 @@ void N_IO_CmdParse::parseCommandLine(int ia, char** ca)
 
   bool allExit = false;
 
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::startSafeBarrier();   //  All procs call (1)
-#endif
   setCommandArgs();
 
-  if( !procID )
+  if (procID == 0)
   {
     for (int i = 1; i < ia; ++i)
     {
@@ -447,7 +391,7 @@ void N_IO_CmdParse::parseCommandLine(int ia, char** ca)
       // so stop command line parsing at that point.
       if (ca[i] == NULL) break;
 
-      string tmpArg(ca[i]);
+      std::string tmpArg(ca[i]);
 
       argIndex[tmpArg] = i;
 
@@ -455,45 +399,65 @@ void N_IO_CmdParse::parseCommandLine(int ia, char** ca)
       {
         if( tmpArg == "-h" )
         {
-          cout << usage_ << endl;
+          usage(Xyce::lout());
           allExit = true;
           break;
         }
         else if( tmpArg == "-v" )
         {
-          cout << N_UTL_Version::getFullVersionString() << endl;
+          Xyce::lout() << N_UTL_Version::getFullVersionString() << std::endl;
           allExit = true;
         }
         else if( tmpArg == "-capabilities" )
         {
-          cout << N_UTL_Version::getCapabilities() << endl;
+          Xyce::lout() << N_UTL_Version::getCapabilities() << std::endl;
           allExit = true;
         }
         else if( tmpArg == "-license" )
         {
-          cout << N_UTL_Version::getLicense() << endl;
+          Xyce::lout() << N_UTL_Version::getLicense() << std::endl;
           allExit = true;
+        }
+        else if (tmpArg == "-plugin")
+        {
+          ++i;
+
+          if ( i >= ia )
+          {
+            // Unexectedly ran out of arguments on the command line.
+            Report::UserError0() << "Did not find required value for option " << ca[i-1];
+            continue;
+          }
+          else if (ca[i][0] == '-')
+          {
+            // Error if we ran into another option here.
+            Report::UserError0() << "Expected option value, but found option " << ca[i];
+            continue;
+          }
+          else
+          {
+            stArgs[tmpArg] = ca[i];
+          }
+
+          const std::string plugin = ca[i];
+
+          for (std::string::size_type i = 0, j = plugin.find_first_of(", "); i != std::string::npos; i = (j == std::string::npos ? j : j + 1), j = plugin.find_first_of(", ", i))
+             Device::registerPlugin(plugin.substr(i, j).c_str());
         }
         else if( tmpArg == "-param" || tmpArg == "-info" ||
                  tmpArg == "-doc"   || tmpArg == "-doc_cat" )
         {
           handleParameterOutputs_(tmpArg, i, ia, ca);
-          allExit=true;
+          allExit = true;
         }
         else if( tmpArg == "-gui")
         {
-           string msg("Xyce setting up problem");
-           N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::GUI_PROGRESS, msg);
+           Report::signalProgress("Xyce setting up problem");
            swArgs[tmpArg] = i;
         }
         else if (argExists(tmpArg))
         {
-          string errorMsg("More than one \"" + tmpArg);
-          errorMsg += "\" command line argument found.";
-          errorMsg += "  Using last one.\n";
-          cerr << endl << errorMsg;
-          // Note: following command results in seg fault, don't know why.
-          //N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_WARNING, errorMsg );
+          Xyce::lout() << "More than one \"" << tmpArg << "\" command line argument found, using last one" << std::endl;
         }
         else if (isSwitchArg(tmpArg))
         {
@@ -506,17 +470,12 @@ void N_IO_CmdParse::parseCommandLine(int ia, char** ca)
           if ( i >= ia )
           {
             // Unexectedly ran out of arguments on the command line.
-            cerr << usage_ << endl;
-            string errorMsg("Did not find required value for option ");
-            errorMsg += string(ca[i-1]) + "\n";
-            N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, errorMsg);
+            Report::UserError0() << "Did not find required value for option " << ca[i-1];
           }
           else if (ca[i][0] == '-')
           {
             // Error if we ran into another option here.
-            string errorMsg("Expected option value,");
-            errorMsg += " but found option: " + string(ca[i]) + "\n";
-            N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, errorMsg);
+            Report::UserError0() << "Expected option value, but found option " << ca[i];
           }
           else
           {
@@ -526,9 +485,7 @@ void N_IO_CmdParse::parseCommandLine(int ia, char** ca)
         else
         {
           // Invalid option, stop here.
-          cerr << usage_ << endl;
-          string errorMsg("Invalid option given: " + tmpArg + "\n");
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, errorMsg);
+          Xyce::lout() << "Invalid option given: " << tmpArg << std::endl;
         }
       }
       else
@@ -559,13 +516,7 @@ void N_IO_CmdParse::parseCommandLine(int ia, char** ca)
           }
           else
           {
-            cerr << usage_ << endl;
-            string errorMsg("Found second netlist on command line: " + tmpArg + "\n");
-  #ifndef Xyce_TOTALVIEW_BOGON
-            N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, errorMsg);
-  #else
-            N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, errorMsg);
-  #endif
+            Xyce::lout() << "Found second netlist on command line: " << tmpArg << std::endl;
           }
         }
       }
@@ -573,16 +524,12 @@ void N_IO_CmdParse::parseCommandLine(int ia, char** ca)
 
     if( !allExit && ( stArgs["netlist"] == "" ) )
     {
-      // No netlist found on command line.
-      cerr << usage_ << endl;
-      string errorMsg("Netlist not found on command line\n");
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, errorMsg);
+      IO::usage(Xyce::lout());
+      Report::UserError0() << "Netlist not found on command line";
     }
   }
 
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::safeBarrier(0);   //  All procs call (1)
-#endif
+  N_ERH_ErrorMgr::safeBarrier(comm.comm());   //  All procs call (1)
 
   // Push cmds to other procs for parallel
   if( !isSerial )
@@ -592,21 +539,21 @@ void N_IO_CmdParse::parseCommandLine(int ia, char** ca)
 
     char * buf = new char[bsize];
 
-    if( !procID )
+    if (procID == 0)
     {
       // broadcast termination flag to other procs and shutdown locally
-      if( allExit )
+      if (allExit)
       {
         size = -1;
         comm.bcast( &size, 1, 0 );
-        Xyce_exit( 0 );
+        return -1;
       }
 
       size = swArgs.size();
       comm.bcast( &size, 1, 0 );
 
-      map<string,int>::iterator it_siM = swArgs.begin();
-      map<string,int>::iterator end_siM = swArgs.end();
+      std::map<std::string,int>::iterator it_siM = swArgs.begin();
+      std::map<std::string,int>::iterator end_siM = swArgs.end();
       for( ; it_siM != end_siM; ++it_siM )
       {
         length = it_siM->first.size();
@@ -622,8 +569,8 @@ void N_IO_CmdParse::parseCommandLine(int ia, char** ca)
       int size = stArgs.size();
       comm.bcast( &size, 1, 0 );
 
-      map<string,string>::iterator it_ssM = stArgs.begin();
-      map<string,string>::iterator end_ssM = stArgs.end();
+      std::map<std::string,std::string>::iterator it_ssM = stArgs.begin();
+      std::map<std::string,std::string>::iterator end_ssM = stArgs.end();
       for( ; it_ssM != end_ssM; ++it_ssM )
       {
         length = it_ssM->first.size();
@@ -643,21 +590,21 @@ void N_IO_CmdParse::parseCommandLine(int ia, char** ca)
     // receive cmds from proc 0
     else
     {
-      string str1, str2;
+      std::string str1, str2;
 
       comm.bcast( &size, 1, 0 );
 
       // shutdown nodes individually
       if( -1 == size )
       {
-        Xyce_exit( 0 );
+        return -1;
       }
 
       for( int i = 0; i < size; ++i )
       {
         comm.bcast( &length, 1, 0 );
         comm.bcast( buf, length, 0 );
-        str1 = string( buf, length );
+        str1 = std::string( buf, length );
 
         comm.bcast( &val, 1, 0 );
 
@@ -669,11 +616,11 @@ void N_IO_CmdParse::parseCommandLine(int ia, char** ca)
       {
         comm.bcast( &length, 1, 0 );
         comm.bcast( buf, length, 0 );
-        str1 = string( buf, length );
+        str1 = std::string( buf, length );
 
         comm.bcast( &length, 1, 0 );
         comm.bcast( buf, length, 0 );
-        str2 = string( buf, length );
+        str2 = std::string( buf, length );
 
         stArgs[str1] = str2;
       }
@@ -682,32 +629,31 @@ void N_IO_CmdParse::parseCommandLine(int ia, char** ca)
     delete [] buf;
 
 #ifdef Xyce_DEBUG_PARALLEL_CMDLINE
-    cout << "*************************\n";
-    cout << "PROC ID: " << procID << endl;
-    cout << "Switched Args\n";
-    cout << "-------------\n";
-    map<string,int>::iterator it_siM = swArgs.begin();
-    map<string,int>::iterator end_siM = swArgs.end();
+    Xyce::dout() << "*************************\n"
+                 << "PROC ID: " << procID << std::endl
+                 << "Switched Args\n"
+                 << "-------------\n";
+    std::map<std::string,int>::iterator it_siM = swArgs.begin();
+    std::map<std::string,int>::iterator end_siM = swArgs.end();
     for( ; it_siM != end_siM; ++it_siM )
-      cout << " " << it_siM->first << ": " << it_siM->second << endl;
-    cout << "-------------\n";
-    cout << "String Args\n";
-    cout << "-------------\n";
-    map<string,string>::iterator it_ssM = stArgs.begin();
-    map<string,string>::iterator end_ssM = stArgs.end();
+      Xyce::dout() << " " << it_siM->first << ": " << it_siM->second << std::endl;
+    Xyce::dout() << std::endl
+                 << "String Args\n"
+                 << "-------------\n";
+    std::map<std::string,std::string>::iterator it_ssM = stArgs.begin();
+    std::map<std::string,std::string>::iterator end_ssM = stArgs.end();
     for( ; it_ssM != end_ssM; ++it_ssM )
-      cout << " " << it_ssM->first << ": " << it_ssM->second << endl;
-    cout << "-------------\n";
-    cout << "*************************\n";
+      Xyce::dout() << " " << it_ssM->first << ": " << it_ssM->second << std::endl;
+    Xyce::dout() << "*************************\n";
 #endif
   }
 
-  // check for shutdown
-  if( allExit && isSerial ) Xyce_exit( 0 );
+  // return -1 for shutdown
+  return allExit && isSerial ? -1 : 0;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::handleParameterOutputs_
+// Function      : CmdParse::handleParameterOutputs_
 //
 // Purpose       : Handles command line arguments like -doc, to output model
 //                 parameters either to stdout or to files, depending on which
@@ -721,27 +667,27 @@ void N_IO_CmdParse::parseCommandLine(int ia, char** ca)
 // Creator       : Eric Keiter
 // Creation Date : 10/31/07
 //-----------------------------------------------------------------------------
-void N_IO_CmdParse::handleParameterOutputs_ (string & tmpArg, int &i, int &ia, char** ca)
+void CmdParse::handleParameterOutputs_(const std::string &tmpArg, int &i, int &ia, char** ca)
 {
-  Xyce::Device::OutputMode::Mode format = Xyce::Device::OutputMode::DEFAULT;
+  Device::OutputMode::Mode format = Device::OutputMode::DEFAULT;
   if (tmpArg == "-param")
-    format = Xyce::Device::OutputMode::PARAM;
+    format = Device::OutputMode::PARAM;
   else if (tmpArg == "-info")
-    format = Xyce::Device::OutputMode::INFO;
+    format = Device::OutputMode::INFO;
   else if (tmpArg == "-doc")
-    format = Xyce::Device::OutputMode::DOC;
+    format = Device::OutputMode::DOC;
   else if (tmpArg == "-doc_cat")
-    format = Xyce::Device::OutputMode::DOC_CAT;
+    format = Device::OutputMode::DOC_CAT;
 
   std::string option_device_name;
   int option_device_level = -1;
   bool print_model = true;
-  bool print_instance=true;
+  bool print_instance = true;
 
   if (i < ia - 1 && ca[i + 1][0] != '-')
   {
     option_device_name = ca[i + 1];
-    if (option_device_name.size() > 1 && tolower(option_device_name[0]) != 'y')
+    if (option_device_name.size() > 1 && std::tolower(option_device_name[0]) != 'y')
     {
       option_device_name = "";
     }
@@ -771,75 +717,46 @@ void N_IO_CmdParse::handleParameterOutputs_ (string & tmpArg, int &i, int &ia, c
     }
   }
 
-  Xyce::Device::Registry2::KeyVector keys = Xyce::Device::getXyceInstanceRegistry().getDerivedKey(typeid(Xyce::Device::Tom::Signature));
+  typedef std::map<std::pair<std::string, int>, Device::Device *> DeviceMap;
 
-  N_DEV_DeviceMgr *dIntPtr = N_DEV_DeviceMgr::factory (*this);
-
-  typedef map<pair<string, int>, N_DEV_Device *> DeviceMap;
-
-  if (format == Xyce::Device::OutputMode::PARAM) {
-    static Xyce::Util::indent_streambuf loutStreambuf(std::cout.rdbuf());
-    static std::ostream lout(&loutStreambuf);
-
-    for (Xyce::Device::Registry2::KeyVector::const_iterator it = keys.begin(); it != keys.end(); ++it)
+  if (format == Device::OutputMode::PARAM) {
+    for (Device::Configuration::ConfigurationMap::const_iterator it = Device::Configuration::getConfigurationMap().begin(); it != Device::Configuration::getConfigurationMap().end(); ++it)
     {
-      Xyce::Device::ParametricData<void> &instance_parameters = Xyce::Device::Tom::execute(Xyce::Device::getXyceInstanceRegistry(), (*it))();
-      Xyce::Device::ParametricData<void> &model_parameters = Xyce::Device::Tom::execute(Xyce::Device::getXyceModelRegistry(), (*it))();
-
-      Xyce::lout() << (*it).first << " level " << (*it).second << Xyce::Util::push << std::endl
-                   <<  "Model" << Xyce::Util::push << std::endl;
-
-      Xyce::lout() << "Parameters" << Xyce::Util::push << std::endl;
-      Xyce::Device::outputParameterMap(Xyce::lout(), model_parameters.getMap());
-      Xyce::lout() << Xyce::Util::pop << std::endl;
-
-      Xyce::lout() << Xyce::Util::pop << std::endl;
-
-      Xyce::lout() <<  "Instance" << Xyce::Util::push << std::endl;
-
-      Xyce::lout() << "Configuration" << Xyce::Util::push << std::endl;
-      Xyce::Device::outputConfiguration(Xyce::lout(), instance_parameters.getConfigTable());
-      Xyce::lout() << Xyce::Util::pop << std::endl;
-
-      Xyce::lout() << "Parameters" << Xyce::Util::push << std::endl;
-      Xyce::Device::outputParameterMap(Xyce::lout(), instance_parameters.getMap());
-      Xyce::lout() << Xyce::Util::pop << std::endl;
-
-      Xyce::lout() << Xyce::Util::pop << std::endl;
-
-      Xyce::lout() << Xyce::Util::pop << std::endl;
+      Xyce::dout() << (*it).first << Xyce::Util::push << std::endl
+                   << *(*it).second << Xyce::Util::pop << std::endl;
     }
   }
   else {
-    for (Xyce::Device::Registry2::KeyVector::const_iterator it = keys.begin(); it != keys.end(); ++it)
+    for (Device::Configuration::ConfigurationMap::const_iterator it = Device::Configuration::getConfigurationMap().begin(); it != Device::Configuration::getConfigurationMap().end(); ++it)
     {
-      const Xyce::Device::DeviceLevelKey &device_key = (*it);
+      const NameLevelKey &device_key = (*it).first;
 
-      std::string device_name = (*it).first;
-      const int device_level = (*it).second;
+      std::string device_name = (*it).first.first;
+      const int device_level = (*it).first.second;
 
       device_name[0] = toupper(device_name[0]);
 
       if ((option_device_name.empty() || Xyce::equal_nocase(option_device_name, device_name)) && (option_device_level == -1 || option_device_level == device_level)) {
-        Xyce::Device::SolverState solState;
-        Xyce::Device::DeviceOptions devOptions(*this);
+        Device::Configuration &configuration = *(*it).second;
 
-        Xyce::Device::Device *device = Xyce::Device::Bob::create(Xyce::Device::getXyceRegistry2(), device_key)(solState, devOptions);
-        std::string device_description = device->getName();
+        std::string device_description = configuration.getName();
+        Device::ParametricData<void> &instance_parameters = configuration.getInstanceParameters();
+        Device::ParametricData<void> &model_parameters = configuration.getModelParameters();
 
-        Xyce::Device::ParametricData<void> &instance_parameters = Xyce::Device::Tom::execute(Xyce::Device::getXyceInstanceRegistry(), device_key)();
-        Xyce::Device::ParametricData<void> &model_parameters = Xyce::Device::Tom::execute(Xyce::Device::getXyceModelRegistry(), device_key)();
-
-        if (device->getName() == "Behavioral Digital")
+        if (configuration.getName() == "Behavioral Digital")
           device_name = "Digital";
-        
+
         if (print_instance && !instance_parameters.getMap().empty()) {
           std::ostringstream path;
           path << device_name << "_" << device_level << "_Device_Instance"
-               << (format == Xyce::Device::OutputMode::DOC_CAT ? "_Category" : "")
+               << (format == Device::OutputMode::DOC_CAT ? "_Category" : "")
                << "_Params.tex";
 
-          std::ofstream os(path.str().c_str(), ios_base::out);
+          std::ofstream os(path.str().c_str(), std::ios_base::out);
+          os << "% This table was generated by Xyce:" << std::endl
+             << "%   Xyce " << (format == Device::OutputMode::DOC_CAT ? "-doc_cat " : "-doc ")
+             << device_name << " " << device_level << std::endl
+             << "%" << std::endl;
 
           laTexDevice(os, device_name, device_level, 0, device_description, instance_parameters, format);
         }
@@ -847,62 +764,65 @@ void N_IO_CmdParse::handleParameterOutputs_ (string & tmpArg, int &i, int &ia, c
         if (print_model && !model_parameters.getMap().empty()) {
           std::ostringstream path;
           path << device_name << "_" << device_level << "_Device_Model"
-               << (format == Xyce::Device::OutputMode::DOC_CAT ? "_Category" : "")
+               << (format == Device::OutputMode::DOC_CAT ? "_Category" : "")
                << "_Params.tex";
 
-          std::ofstream os(path.str().c_str(), ios_base::out);
+          std::ofstream os(path.str().c_str(), std::ios_base::out);
 
-          laTexDevice(os, device_name, device_level, 1, device_description, model_parameters, format);
+          os << "% This table was generated by Xyce:" << std::endl
+             << "%   Xyce " << (format == Device::OutputMode::DOC_CAT ? "-doc_cat " : "-doc ")
+             << device_name << " " << device_level << std::endl
+             << "%" << std::endl;
+
+            laTexDevice(os, device_name, device_level, 1, device_description, model_parameters, format);
         }
-
-        delete device;
       }
     }
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::numArgs
+// Function      : CmdParse::numArgs
 // Purpose       : Returns the number of cmd line args.
 // Special Notes :
 // Scope         : Public
 // Creator       : Eric Keiter
 // Creation Date : 02/19/01
 //-----------------------------------------------------------------------------
-int N_IO_CmdParse::numArgs()
+int CmdParse::numArgs()
 {
   return iargs;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::printArgMap
+// Function      : CmdParse::printArgMap
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Eric Keiter
 // Creation Date : 02/19/01
 //-----------------------------------------------------------------------------
-void N_IO_CmdParse::printArgMap()
+void CmdParse::printArgMap()
 {
-  map<string,string>::iterator iter;
-  map<string,string>::iterator begin = stArgs.begin();
-  map<string,string>::iterator end   = stArgs.end();
+  std::map<std::string,std::string>::iterator iter;
+  std::map<std::string,std::string>::iterator begin = stArgs.begin();
+  std::map<std::string,std::string>::iterator end   = stArgs.end();
 
-  cout << endl << "Command Line Argument Map:" << endl;
-  cout << endl;
+  Xyce::dout() << std::endl << "Command Line Argument Map:" << std::endl;
+  Xyce::dout() << std::endl;
 
   for (iter=begin;iter!=end;++iter)
   {
-    cout << "   map[ ";
-    cout << (iter->first);
-    cout << " ] = ";
-    cout << (iter->second) << endl;
+    Xyce::dout() << "   map[ ";
+    Xyce::dout() << (iter->first);
+    Xyce::dout() << " ] = ";
+    Xyce::dout() << (iter->second) << std::endl;
   }
-  cout << endl;
+  Xyce::dout() << std::endl;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::argExists
+// Function      : CmdParse::argExists
 // Purpose       : This function returns true if the specified
 //                 argument exists on the command line. It returns
 //                 false if either the specified argument does not exist
@@ -912,13 +832,13 @@ void N_IO_CmdParse::printArgMap()
 // Creator       : Eric Keiter
 // Creation Date : 02/19/01
 //-----------------------------------------------------------------------------
-bool N_IO_CmdParse::argExists(const string & arg_tmp) const
+bool CmdParse::argExists(const std::string & arg_tmp) const
 {
-  map<string,int>::const_iterator it = swArgs.find(arg_tmp);
+  std::map<std::string,int>::const_iterator it = swArgs.find(arg_tmp);
   if (it != swArgs.end() && (*it).second != 0)
     return true;
   else {
-    map<string,string>::const_iterator it = stArgs.find(arg_tmp);
+    std::map<std::string,std::string>::const_iterator it = stArgs.find(arg_tmp);
     if (it == stArgs.end())
       return false;
     else
@@ -927,7 +847,7 @@ bool N_IO_CmdParse::argExists(const string & arg_tmp) const
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::getArgumentValue
+// Function      : CmdParse::getArgumentValue
 // Purpose       : This function returns the value of the specified
 //                 string argument
 // Special Notes :
@@ -935,15 +855,15 @@ bool N_IO_CmdParse::argExists(const string & arg_tmp) const
 // Creator       : Lon Waters
 // Creation Date : 03/14/2002
 //-----------------------------------------------------------------------------
-string N_IO_CmdParse::getArgumentValue(const string & argumentName) const
+std::string CmdParse::getArgumentValue(const std::string & argumentName) const
 {
-  map<string,string>::const_iterator it = stArgs.find(argumentName);
+  std::map<std::string,std::string>::const_iterator it = stArgs.find(argumentName);
 
   return it == stArgs.end() ? "" : (*it).second;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::isSwitchArg
+// Function      : CmdParse::isSwitchArg
 // Purpose       : This function returns true if the specified argument
 //                 is a switch argument
 // Special Notes :
@@ -951,7 +871,7 @@ string N_IO_CmdParse::getArgumentValue(const string & argumentName) const
 // Creator       : Lon Waters
 // Creation Date : 03/13/2002
 //-----------------------------------------------------------------------------
-bool N_IO_CmdParse::isSwitchArg(string arg)
+bool CmdParse::isSwitchArg(const std::string &arg)
 {
   bool bsuccess = false;
 
@@ -961,7 +881,7 @@ bool N_IO_CmdParse::isSwitchArg(string arg)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::isStringValuedArg
+// Function      : CmdParse::isStringValuedArg
 // Purpose       : This function returns true if the specified argument
 //                 is a string valued argument
 // Special Notes :
@@ -969,7 +889,7 @@ bool N_IO_CmdParse::isSwitchArg(string arg)
 // Creator       : Lon Waters
 // Creation Date : 03/13/2002
 //-----------------------------------------------------------------------------
-bool N_IO_CmdParse::isStringValuedArg(string arg)
+bool CmdParse::isStringValuedArg(const std::string &arg)
 {
   bool bsuccess = false;
 
@@ -980,148 +900,21 @@ bool N_IO_CmdParse::isStringValuedArg(string arg)
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::getArg
+// Function      : CmdParse::getArg
 // Purpose       :
 // Special Notes :
 // Scope         : Private
 // Creator       : Eric Keiter
 // Creation Date : 10/24/2006
 //-----------------------------------------------------------------------------
-void N_IO_CmdParse::getArg(int i, string & arg)
+void CmdParse::getArg(int i, std::string & arg)
 {
   arg.clear();
   if (cargs[i] != NULL)
   {
-    arg = string(cargs[i]);
+    arg = std::string(cargs[i]);
   }
 }
 
-//-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::getNetlistCopy()
-// Purpose       :
-// Special Notes :
-// Scope         : Public
-// Creator       : Keith Santarelli
-// Creation Date : 12/10/2007
-//-----------------------------------------------------------------------------
-bool N_IO_CmdParse::getNetlistCopy()
-{
-  return netlistCopy_;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::getOneTerm()
-// Purpose       :
-// Special Notes :
-// Scope         : Public
-// Creator       : Keith Santarelli
-// Creation Date : 12/10/2007
-//-----------------------------------------------------------------------------
-bool N_IO_CmdParse::getOneTerm()
-{
-  return oneTerm_;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::getNoDCPath()
-// Purpose       :
-// Special Notes :
-// Scope         : Public
-// Creator       : Keith Santarelli
-// Creation Date : 12/10/2007
-//-----------------------------------------------------------------------------
-bool N_IO_CmdParse::getNoDCPath()
-{
-  return noDCPath_;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::getOneTermRes()
-// Purpose       :
-// Special Notes :
-// Scope         : Public
-// Creator       : Keith Santarelli
-// Creation Date : 12/10/2007
-//-----------------------------------------------------------------------------
-string N_IO_CmdParse::getOneTermRes()
-{
-  return oneTermRes_;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::getNoDCPathRes()
-// Purpose       :
-// Special Notes :
-// Scope         : Public
-// Creator       : Keith Santarelli
-// Creation Date : 12/10/2007
-//-----------------------------------------------------------------------------
-string N_IO_CmdParse::getNoDCPathRes()
-{
-  return noDCPathRes_;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::setNetlistCopy()
-// Purpose       :
-// Special Notes :
-// Scope         : Public
-// Creator       : Keith Santarelli
-// Creation Date : 12/10/2007
-//-----------------------------------------------------------------------------
-void N_IO_CmdParse::setNetlistCopy(bool netlistCopyArg)
-{
-  netlistCopy_ = netlistCopyArg;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::setOneTerm()
-// Purpose       :
-// Special Notes :
-// Scope         : Public
-// Creator       : Keith Santarelli
-// Creation Date : 12/10/2007
-//-----------------------------------------------------------------------------
-void N_IO_CmdParse::setOneTerm(bool oneTermArg)
-{
-  oneTerm_ = oneTermArg;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::setNoDCPath()
-// Purpose       :
-// Special Notes :
-// Scope         : Public
-// Creator       : Keith Santarelli
-// Creation Date : 12/10/2007
-//-----------------------------------------------------------------------------
-void N_IO_CmdParse::setNoDCPath(bool noDCPathArg)
-{
-  noDCPath_ = noDCPathArg;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::setOneTermRes()
-// Purpose       :
-// Special Notes :
-// Scope         : Public
-// Creator       : Keith Santarelli
-// Creation Date : 12/10/2007
-//-----------------------------------------------------------------------------
-void N_IO_CmdParse::setOneTermRes(const string & oneTermResArg)
-{
-  oneTermRes_ = oneTermResArg;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_IO_CmdParse::setNoDCPathRes()
-// Purpose       :
-// Special Notes :
-// Scope         : Public
-// Creator       : Keith Santarelli
-// Creation Date : 12/10/2007
-//-----------------------------------------------------------------------------
-void N_IO_CmdParse::setNoDCPathRes(const string & noDCPathResArg)
-{
-  noDCPathRes_ = noDCPathResArg;
-}
+} // namespace IO
+} // namespace Xyce

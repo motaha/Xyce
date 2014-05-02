@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.2.2.2 $
+// Revision Number: $Revision: 1.7 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/24 23:49:14 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -72,16 +72,12 @@ class SpecieSource : public CompositeParam
 public:
   static ParametricData<SpecieSource> &getParametricData();
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
   SpecieSource ();
-  bool processParam (Param & ndParam, string & param, DevicePDEInstance & di);
+  bool processParam (Param & ndParam, std::string & param, DevicePDEInstance & di);
   void processParams ();
 
 public:
-  string name;         // this is also the index into the map.
+  std::string name;         // this is also the index into the map.
 };
 
 // inline functions
@@ -93,10 +89,10 @@ public:
 // Creator       : Eric R. Keiter, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-inline ostream & operator<<(ostream & os, const SpecieSource & ds)
+inline std::ostream & operator<<(std::ostream & os, const SpecieSource & ds)
 {
   os << ds.name << ":\n";
-  os << endl;
+  os << std::endl;
   return os;
 }
 

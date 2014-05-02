@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.20.2.2 $
+// Revision Number: $Revision: 1.27.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -47,23 +47,22 @@
 #ifndef Xyce_N_DEV_DeviceBlock_h
 #define Xyce_N_DEV_DeviceBlock_h
 
-// ---------- Standard Includes ----------
-
 #include <string>
 #include <vector>
 #include <iosfwd>
-
-// ----------   Xyce Includes   ----------
 
 #include <N_DEV_Param.h>
 #include <N_UTL_Misc.h>
 #include <N_UTL_Xyce.h>
 #include <N_UTL_Packable.h>
 
-// ----------   Other Includes   ----------
 
 namespace Xyce {
 namespace Device {
+
+bool hasSubcircuitInInstanceName(const InstanceBlock &instance_block);
+std::string subcircuitNameFromInstanceName(const InstanceBlock &instance_block);
+std::string modelNameFromInstanceName(const InstanceBlock &instance_block);
 
 //-----------------------------------------------------------------------------
 // Class         : ModelBlock
@@ -74,34 +73,35 @@ namespace Device {
 //-----------------------------------------------------------------------------
 class ModelBlock : public Packable
 {
-  public:
-    ModelBlock(const std::string &name_ = "", const std::string &type_ = "", int level_ = 1);
-    ModelBlock(const ModelBlock & right);
-    ~ModelBlock();
+public:
+  ModelBlock(const std::string &name_ = "", const std::string &type_ = "", int level_ = 1);
 
-    ModelBlock & operator=(const ModelBlock & right);
+  ModelBlock(const ModelBlock & right);
+  ModelBlock & operator=(const ModelBlock & right);
 
-    void clear ();
+  ~ModelBlock();
 
-//Packing Utils
-    Packable * instance() const;
-    int packedByteCount() const;
+  void clear ();
 
-    void pack( char * buf, int bsize, int & pos, N_PDS_Comm * comm ) const;
-    void unpack( char * pB, int bsize, int & pos, N_PDS_Comm * comm );
+  //Packing Utils
+  Packable * instance() const;
+  int packedByteCount() const;
 
-    int operator==(const ModelBlock &right) const;
-    int operator!=(const ModelBlock &right) const;
+  void pack( char * buf, int bsize, int & pos, N_PDS_Comm * comm ) const;
+  void unpack( char * pB, int bsize, int & pos, N_PDS_Comm * comm );
 
-    string name;
-    string type;
-    int level;
-    vector<Param> params;
+  int operator==(const ModelBlock &right) const;
+  int operator!=(const ModelBlock &right) const;
 
-    string netlistFileName_;
-    int lineNumber_;
+  std::string name;
+  std::string type;
+  int level;
+  std::vector<Param> params;
 
-    friend ostream& operator<<(ostream& os, const ModelBlock & mb);
+  std::string netlistFileName_;
+  int lineNumber_;
+
+  friend std::ostream& operator<<(std::ostream& os, const ModelBlock & mb);
 };
 
 //-----------------------------------------------------------------------------
@@ -115,25 +115,32 @@ class InstanceBlock : public Packable
 {
 
 public:
-  InstanceBlock(const std::string & n_str = string() );
+  InstanceBlock(const std::string &name = std::string());
+
   InstanceBlock(const InstanceBlock & right);
+  InstanceBlock & operator=(InstanceBlock & right);
+
   ~InstanceBlock();
 
-  const std::string &getName() const {
+  const std::string &getName() const 
+  {
     return name_;
   }
-  void setName(const std::string &name) {
+
+  void setName(const std::string &name) 
+  {
     name_ = name;
   }
 
-  const std::string &getModelName() const {
+  const std::string &getModelName() const 
+  {
     return modelName_;
   }
-  void setModelName(const std::string &modelName) {
+
+  void setModelName(const std::string &modelName) 
+  {
     modelName_ = modelName;
   }
-
-  InstanceBlock & operator=(InstanceBlock & right);
 
   void clear ();
 
@@ -148,11 +155,11 @@ public:
   int operator!=(InstanceBlock &right) const;
 
 private:
-  string name_;
-  string modelName_;
+  std::string name_;
+  std::string modelName_;
 
 public:
-  vector<Param> params;
+  std::vector<Param> params;
 
   int iNumNodes;
   int numIntVars;
@@ -165,10 +172,10 @@ public:
   bool offFlag;
   bool off;
 
-  string netlistFileName_;
+  std::string netlistFileName_;
   int lineNumber_;
 
-  friend ostream& operator<<(ostream& os, const InstanceBlock & ib);
+  friend std::ostream& operator<<(std::ostream& os, const InstanceBlock & ib);
 };
 
 } // namespace Device

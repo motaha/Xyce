@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.18.2.2 $
+// Revision Number: $Revision: 1.25 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:35 $
+// Revision Date  : $Date: 2014/02/24 23:49:16 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -82,9 +82,9 @@ namespace Device {
 // Creation Date : 03/13/06
 //-----------------------------------------------------------------------------
 CharonInterface::CharonInterface(
-      DeviceOptions & do1,
-      string & netlist,
-      SolverState& ss1)
+  const DeviceOptions & do1,
+  const std::string &   netlist,
+  const SolverState &   ss1)
   : devOptions_(do1),
     inputFileName_(netlist),
     solState_(ss1)
@@ -130,17 +130,13 @@ CharonInterface::~CharonInterface()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 03/13/2006
 //-----------------------------------------------------------------------------
-bool CharonInterface::initialize(
-#ifdef Xyce_PARALLEL_MPI
-                                        N_PDS_Comm * comm
-#endif
-                                      )
+bool CharonInterface::initialize(N_PDS_Comm * comm)
 {
 
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0)
   {
-    cout << "In CharonInterface::initialize" << endl;
+    Xyce::dout() << "In CharonInterface::initialize" << std::endl;
   }
 #endif
 
@@ -168,9 +164,9 @@ bool CharonInterface::initialize(
 //-----------------------------------------------------------------------------
 bool CharonInterface::simulateStep
       ( const SolverState & solState,
-        const map<string,double> & inputMap,
-        vector<double> & outputVector,
-        vector< vector<double> > & jacobian,
+        const std::map<std::string,double> & inputMap,
+        std::vector<double> & outputVector,
+        std::vector< std::vector<double> > & jacobian,
         N_TIA_TwoLevelError & tlError
       )
 {
@@ -178,7 +174,7 @@ bool CharonInterface::simulateStep
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0)
   {
-    cout << "In CharonInterface::simulateStep" << endl;
+    Xyce::dout() << "In CharonInterface::simulateStep" << std::endl;
   }
 #endif
 
@@ -205,7 +201,7 @@ bool CharonInterface::simulateStep
 						       jacobian);
 
 #else
-  string msg = "CharonInterface::simulateStep: Charon support has not been enabled.  Rebuild xyce with the flag --enable-charon.";
+  std::string msg = "CharonInterface::simulateStep: Charon support has not been enabled.  Rebuild xyce with the flag --enable-charon.";
   N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL,msg);
   return true;
 #endif
@@ -244,7 +240,7 @@ bool CharonInterface::finalize ()
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0)
   {
-    cout << "In CharonInterface::finalize" << endl;
+    Xyce::dout() << "In CharonInterface::finalize" << std::endl;
   }
 #endif
 
@@ -265,7 +261,7 @@ bool CharonInterface::run ()
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0)
   {
-    cout << "In CharonInterface::run" << endl;
+    Xyce::dout() << "In CharonInterface::run" << std::endl;
   }
 #endif
 
@@ -281,8 +277,8 @@ bool CharonInterface::run ()
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
 void CharonInterface::homotopyStepSuccess
-      (const vector<string> & paramNames,
-       const vector<double> & paramVals)
+      (const std::vector<std::string> & paramNames,
+       const std::vector<double> & paramVals)
 {
 
   return;
@@ -315,12 +311,12 @@ void CharonInterface::stepSuccess (int analysis)
 
 #ifdef Xyce_CHARON
 
-  //std::cout << "ROGER ** in stepSuccess!!!!" << endl;
+  //Xyce::dout() << "ROGER ** in stepSuccess!!!!" << std::endl;
   bool is_active = true;
   charon::sc::CircuitInterface::getInstance().acceptTimeStep(is_active);
 
 #else
-  string msg = "CharonInterface::stepSuccess: Charon support has not been enabled.  Rebuild xyce with the flag --enable-charon.";
+  std::string msg = "CharonInterface::stepSuccess: Charon support has not been enabled.  Rebuild xyce with the flag --enable-charon.";
   N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL,msg);
 #endif
 

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.10.2.2 $
+// Revision Number: $Revision: 1.15.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/26 20:16:31 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -68,48 +68,44 @@ class DopeInfo : public CompositeParam
 {
   friend class ParametricData<DopeInfo>;
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
 public:
   static ParametricData<DopeInfo> &getParametricData();
 
-  DopeInfo ();
-  bool processParam (Param & ndParam, string & param, DevicePDEInstance & di);
-  void processParams ();
+  DopeInfo();
+  bool processParam(Param & ndParam, std::string & param, DevicePDEInstance & di);
+  void processParams();
 
-  void setupInfo (
-    vector<double> & CVec,
-    vector<double> & CdonorVec,
-    vector<double> & CacceptorVec,
-    vector<double>  & xVec, DeviceSupport & devSup);
+  void setupInfo(
+     std::vector<double> & CVec,
+     std::vector<double> & CdonorVec,
+     std::vector<double> & CacceptorVec,
+     std::vector<double>  & xVec, DeviceSupport & devSup);
 
-  void setupInfo2d (
-    vector<double> & CVec,
-    vector<double> & CdonorVec,
-    vector<double> & CacceptorVec,
-    vector<double> & xVec, vector<double> &yVec, DeviceSupport & devSup);
+  void setupInfo2d(
+     std::vector<double> & CVec,
+     std::vector<double> & CdonorVec,
+     std::vector<double> & CacceptorVec,
+     std::vector<double> & xVec, std::vector<double> &yVec, DeviceSupport & devSup);
 
   static double nsdep(double x, double W, double Dt);
   static double ngdep(double x, double y, double W, double ax, double ay);
   static double ngdep2(double x, double y, double ax, double ay);
   static double erf(double x);
 
-  static void readDopingFile (string & filename, vector<double> & xloc,
-                              vector<double> & nvec, vector<double> & y2, DeviceSupport & devSup);
+  static void readDopingFile(std::string & filename, std::vector<double> & xloc,
+                             std::vector<double> & nvec, std::vector<double> & y2, DeviceSupport & devSup);
 
-  static void readDopingFile (string & filename, vector<double> & xloc,
-                              vector<double> & nvec, vector<double> & y2_n,
-                              vector<double> & pvec, vector<double> & y2_p, DeviceSupport & devSup);
+  static void readDopingFile(std::string & filename, std::vector<double> & xloc,
+                             std::vector<double> & nvec, std::vector<double> & y2_n,
+                             std::vector<double> & pvec, std::vector<double> & y2_p, DeviceSupport & devSup);
 
 public:
-  string name;         // this is also the index into the map.
-  string type;         // p-type or n-type
-  string funcType;     // uniform, step, gaussian.
-  string speciesName;  // boron, phosphorus, etc.
-  string fileName;     // doping file.
-  string exprString;   // if expression based, store here.
+  std::string name;         // this is also the index into the map.
+  std::string type;         // p-type or n-type
+  std::string funcType;     // uniform, step, gaussian.
+  std::string speciesName;  // boron, phosphorus, etc.
+  std::string fileName;     // doping file.
+  std::string exprString;   // if expression based, store here.
 
   // location params:
   double xmin;
@@ -140,10 +136,10 @@ public:
   int flatY;
 
   // arrays for spline fitting, if specified from file:
-  vector<double> xlocVec;
-  vector<double> dopeVec;
-  vector<double> y2Vec;
-  vector<double> splintDopeVec;
+  std::vector<double> xlocVec;
+  std::vector<double> dopeVec;
+  std::vector<double> y2Vec;
+  std::vector<double> splintDopeVec;
 };
 
 // inline functions
@@ -155,7 +151,7 @@ public:
 // Creator       : Eric R. Keiter, 9233, SNL, Parallel Computational Sciences
 // Creation Date : 03/31/03
 //-----------------------------------------------------------------------------
-inline ostream & operator<<(ostream & os, const DopeInfo & di)
+inline std::ostream & operator<<(std::ostream & os, const DopeInfo & di)
 {
   os << di.name << ":\n";
   os << "  type     = " << di.type << "\n";
@@ -177,7 +173,7 @@ inline ostream & operator<<(ostream & os, const DopeInfo & di)
   os << "  flatX    = " << di.flatX << "\n";
   os << "  flatY    = " << di.flatY << "\n";
 
-  os << endl;
+  os << std::endl;
 
   return os;
 }

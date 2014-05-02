@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright(C) 2002-2013  Sandia Corporation
+//    Copyright(C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -25,20 +25,20 @@
 //-------------------------------------------------------------------------
 // Filename       : $RCSfile: N_IO_Outputter.C,v $
 //
-// Purpose        : Output Manager
+// Purpose        :
 //
 // Special Notes  :
 //
-// Creator        : Robert J. Hoekstra, SNL, Parallel Computational Sciences
+// Creator        : Dave Baur
 //
-// Creation Date  : 10/10/00
+// Creation Date  :
 //
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.16.2.24 $
+// Revision Number: $Revision: 1.53.2.3 $
 //
-// Revision Date  : $Date: 2014/01/10 00:08:15 $
+// Revision Date  : $Date: 2014/03/18 21:43:40 $
 //
 // Current Owner  : $Author: erkeite $
 //-------------------------------------------------------------------------
@@ -57,6 +57,7 @@
 #include <N_IO_Outputter.h>
 #include <N_IO_OutputMgr.h>
 #include <N_IO_CmdParse.h>
+#include <N_IO_Op.h>
 
 #include <N_ANP_AnalysisInterface.h>
 #include <N_ANP_AnalysisManager.h>
@@ -70,15 +71,38 @@
 namespace Xyce {
 namespace IO {
 
-namespace { // <unnamed>
+//-----------------------------------------------------------------------------
+// Namespace     : Unnamed
+// Purpose       : file-local scoped methods and data
+// Special Notes :
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+namespace {
 
 //-----------------------------------------------------------------------------
-// Function      : OutputMgr::getTimeDateStamp
+// Function      : deleteList
+// Purpose       : templated function to delete items from container given
+//                 begin and end iterators
+// Special Notes :
+// Scope         : file-local
+// Creator       : David Baur, Raytheon
+// Creation Date : 11/21/2013
+//-----------------------------------------------------------------------------
+template <class II>
+void deleteList(II begin, II end)
+{
+  for (; begin != end; ++begin)
+    delete *begin;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : getTimeDateStamp
 // Purpose       : get current date and time and format for .PRINT output
-// Special Notes : inline
-// Scope         : private
-// Creator       :
-// Creation Date :
+// Special Notes :
+// Scope         : file-local
+// Creator       : David Baur, Raytheon
+// Creation Date : 06/14/2013
 //-----------------------------------------------------------------------------
 std::string getTimeDateStamp()
 {
@@ -92,12 +116,12 @@ std::string getTimeDateStamp()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : OutputMgr::getTecplotTimeDateStamp
+// Function      : getTecplotTimeDateStamp
 // Purpose       : Get current date and time and format for .PRINT output
 // Special Notes : tecplot version of getTimeDateStamp.
-// Scope         : private
-// Creator       : Eric Keiter, SNL
-// Creation Date : 9/6/04
+// Scope         : file-local
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/14/2013
 //-----------------------------------------------------------------------------
 std::string getTecplotTimeDateStamp()
 {
@@ -110,30 +134,87 @@ std::string getTecplotTimeDateStamp()
   return std::string( timeDate);
 }
 
-void tecplotFreqHeader(OutputMgr &output_manager, const PrintParameters &print_parameters, std::ostream &stream, int counter);
-void fixupColumns(const OutputMgr &output_manager, PrintParameters &print_parameters);
+//-----------------------------------------------------------------------------
+//The following are declarations of functions in the unnamed namespace
+//that are defined in a second namespace{} block at the end of this
+//file
+//-----------------------------------------------------------------------------
+void tecplotFreqHeader(OutputMgr &output_manager,
+                       const PrintParameters &print_parameters,
+                       const Util::OpList &op_list, std::ostream &os,
+                       int counter);
+void fixupColumns(const OutputMgr &output_manager,
+                  PrintParameters &print_parameters, Util::OpList &op_list);
 
-std::ostream &printHeader(std::ostream &os, const PrintParameters &print_parameters);
-std::ostream &printHeader(std::ostream &os, const Table::ColumnList &column_list, const std::string &delimiter);
+std::ostream &printHeader(std::ostream &os,
+                          const PrintParameters &print_parameters);
+std::ostream &printHeader(std::ostream &os,
+                          const Table::ColumnList &column_list,
+                          const std::string &delimiter);
 std::ostream &printHeader(std::ostream &os, const Table::Column &column);
-std::ostream &printValue(std::ostream &os, const Table::Column &column, const std::string &delimiter, const int column_index, double value);
+std::ostream &printValue(std::ostream &os, const Table::Column &column,
+                         const std::string &delimiter, const int column_index,
+                         double value);
+//-----------------------------------------------------------------------------
 
+
+//-----------------------------------------------------------------------------
+// Function      : outputFilename
+// Purpose       : return a string for the name of the results output file
+// Special Notes : uses the name on the .print line as the base filename if
+//                 given, otherwise uses the netlist name as the base.
+//                 Adds suffixes or extensions as provided by analysis type.
+// Scope         : file-local
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/14/2013
+//-----------------------------------------------------------------------------
 std::string outputFilename(const PrintParameters &print_parameters, const std::string &netListFilename)
 {
   if (!print_parameters.filename_.empty())
   {
-    return print_parameters.filename_ + print_parameters.suffix_;
+    return print_parameters.filename_ + print_parameters.suffix_ + print_parameters.extraExtension_;
   }
   else
   {
-    return netListFilename + print_parameters.suffix_ + print_parameters.extension_;
+    return netListFilename + print_parameters.suffix_ + print_parameters.defaultExtension_;
   }
+}
+
+//-----------------------------------------------------------------------------
+// Function      : filter
+// Purpose       : Applies a filter to a double value, returning 0 if the
+//                 absolute value of the data is less than the filter.
+// Special Notes :
+// Scope         : file-local
+// Creator       : David Baur, Raytheon
+// Creation Date : 11/25/2013
+//-----------------------------------------------------------------------------
+inline double filter(double value, double filter)
+{
+  return std::abs(value) < filter ? 0.0 : value;
 }
 
 } // namespace <unnamed>
 
 namespace Outputter {
 
+//-----------------------------------------------------------------------------
+// Class         : TimePrn
+// Purpose       : Outputter class for transient runs and "PRN" (Standard)
+//                 output format
+// Special Notes :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------
+// Function      : TimePrn::TimePrn
+// Purpose       : constructor
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur, Raytheon
+// Creation Date : 06/07/2013
+//-----------------------------------------------------------------------------
 TimePrn::TimePrn(OutputMgr &output_manager, const PrintParameters &print_parameters)
   : outputManager_(output_manager),
     printParameters_(print_parameters),
@@ -144,36 +225,86 @@ TimePrn::TimePrn(OutputMgr &output_manager, const PrintParameters &print_paramet
     outStreamPtr_(0),
     headerPrintCalls_(0)
 {
-  if (printParameters_.extension_.empty())
-    printParameters_.extension_ = ".prn";
+  if (printParameters_.defaultExtension_.empty())
+    printParameters_.defaultExtension_ = ".prn";
 
-  fixupColumns(outputManager_, printParameters_);
+  fixupColumns(outputManager_, printParameters_, opList_);
 }
 
+//-----------------------------------------------------------------------------
+// Function      : TimePrn::~TimePrn
+// Purpose       : destructor
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur, Raytheon
+// Creation Date : 06/07/2013
+//-----------------------------------------------------------------------------
 TimePrn::~TimePrn()
 {
   outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
 }
 
+//-----------------------------------------------------------------------------
+// Function      : TimePrn::doParse
+// Purpose       : create the output file name based on print parameters and
+//                 netlist file name.
+// Special Notes : Does no parsing whatsoever.  Vestigal name from when this
+//                 method still read the command line args itself.
+// Scope         : public
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
 void TimePrn::doParse()
 {
   outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
 }
 
+//-----------------------------------------------------------------------------
+// Function      : TimePrn::doOpen
+// Purpose       : Open the output file
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
 void TimePrn::doOpen()
 {
   if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
+  {
     outStreamPtr_ = outputManager_.openFile(outFilename_);
+  }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : TimePrn::timeHeader
+// Purpose       : output the header
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013 ?
+//-----------------------------------------------------------------------------
 void TimePrn::timeHeader()
 {
-  if (outputManager_.getProcID() == 0 && headerPrintCalls_ == 0) {
+  if (outputManager_.getProcID() == 0 && headerPrintCalls_ == 0)
+  {
     printHeader(*outStreamPtr_, printParameters_);
   }
 }
 
-void TimePrn::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vector * stateVecPtr, const N_LAS_Vector * storeVecPtr)
+//-----------------------------------------------------------------------------
+// Function      : TimePrn::doOutputTime
+// Purpose       : Output the current data at a time point
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+void TimePrn::doOutputTime(
+    const N_LAS_Vector * solnVecPtr, 
+    const N_LAS_Vector * stateVecPtr, 
+    const N_LAS_Vector * storeVecPtr)
 {
   outputManager_.setCurrentOutputter(this);
 
@@ -197,12 +328,13 @@ void TimePrn::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vector *
   outputManager_.getCommPtr()->barrier();
 
   int column_index = 0;
-  for (ParameterList::const_iterator it = printParameters_.variableList_.begin() ; it != printParameters_.variableList_.end(); ++it, ++column_index)
+  for (Util::OpList::const_iterator it = opList_.begin() ; it != opList_.end(); ++it, ++column_index)
   {
-    double result = outputManager_.getPrintValue(it, solnVecPtr, stateVecPtr, storeVecPtr);
-    if ((*it).getSimContext() == TIME_VAR)
+    double result = getValue(outputManager_.getCommPtr()->comm(), *(*it), solnVecPtr, 0, stateVecPtr, storeVecPtr).real();
+    result = filter(result, printParameters_.filter_);
+    if ((*it)->opType() == Util::TIME_VAR)
       result *= printParameters_.outputTimeScaleFactor_;
-    
+
     if (outputManager_.getProcID() == 0)
       printValue(os, printParameters_.table_.columnList_[column_index], printParameters_.delimiter_, column_index, result);
 
@@ -215,6 +347,14 @@ void TimePrn::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vector *
     os << std::endl;
 }
 
+//-----------------------------------------------------------------------------
+// Function      : TimePrn::doFinishOutput
+// Purpose       : Output the footer, close stream
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
 void TimePrn::doFinishOutput()
 {
   if (outputManager_.getProcID() == 0)
@@ -244,13 +384,20 @@ void TimePrn::doFinishOutput()
   index_ = 0;
 }
 
-void
-TimePrn::doFinishOutputStep()
+//-----------------------------------------------------------------------------
+// Function      : TimePrn::doFinishOutputStep
+// Purpose       : output footer and close stream for parameter sweep file
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+void TimePrn::doFinishOutputStep()
 {
   // Deal with the *prn file:
   if (outStreamPtr_)
   {
-    if (outputManager_.getPrintEndOfSimulationLine())
+    if ( outputManager_.getPrintEndOfSimulationLine() )
     {
       (*outStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
     }
@@ -260,6 +407,23 @@ TimePrn::doFinishOutputStep()
   }
 }
 
+
+//-----------------------------------------------------------------------------
+// Class         : FrequencyPrn
+// Purpose       : Outputter class for frequency domain data in "PRN" (Standard)
+//                 output format
+// Special Notes :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : FrequencyPrn::FrequencyPrn
+// Purpose       : constructor
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 FrequencyPrn::FrequencyPrn(OutputMgr &output_manager, const PrintParameters &print_parameters)
   : outputManager_(output_manager),
     printParameters_(print_parameters),
@@ -269,30 +433,65 @@ FrequencyPrn::FrequencyPrn(OutputMgr &output_manager, const PrintParameters &pri
     outStreamPtr_(0),
     stepCount_(0)
 {
-  if (printParameters_.extension_.empty())
-    printParameters_.extension_ = ".FD.prn";
+  if (printParameters_.defaultExtension_.empty())
+    printParameters_.defaultExtension_ = ".FD.prn";
 
-  fixupColumns(outputManager_, printParameters_);
+  fixupColumns(outputManager_, printParameters_, opList_);
 }
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyPrn::~FrequencyPrn
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 FrequencyPrn::~FrequencyPrn()
 {
   outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
 }
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyPrn::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void FrequencyPrn::doParse()
 {
   outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
 }
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyPrn::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void FrequencyPrn::doOpen()
 {
   if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
+  {
     outStreamPtr_ = outputManager_.openFile(outFilename_);
+  }
 }
 
-void
-FrequencyPrn::doOutputFrequency(double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
+//-----------------------------------------------------------------------------
+// Function      : FrequencyPrn::doOutputFrequency
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void FrequencyPrn::doOutputFrequency(double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
 {
   outputManager_.setCurrentOutputter(this);
 
@@ -314,12 +513,11 @@ FrequencyPrn::doOutputFrequency(double frequency, const N_LAS_Vector *real_solut
   std::ostream &os = *outStreamPtr_;
 
   int column_index = 0;
-  for (ParameterList::const_iterator it = printParameters_.variableList_.begin(); it != printParameters_.variableList_.end(); ++it, ++column_index)
+  for (Util::OpList::const_iterator it = opList_.begin(); it != opList_.end(); ++it, ++column_index)
   {
-    double varValue = outputManager_.getPrintValue(it, real_solution_vector, NULL, NULL, imaginary_solution_vector);
-
+    double result = getValue(outputManager_.getCommPtr()->comm(), *(*it), real_solution_vector, imaginary_solution_vector, 0, 0).real();
     if (outputManager_.getProcID() == 0)
-      printValue(os, printParameters_.table_.columnList_[column_index], printParameters_.delimiter_, column_index, varValue);
+      printValue(os, printParameters_.table_.columnList_[column_index], printParameters_.delimiter_, column_index, result);
 
     outputManager_.getCommPtr()->barrier();
   }
@@ -330,6 +528,14 @@ FrequencyPrn::doOutputFrequency(double frequency, const N_LAS_Vector *real_solut
     os << std::endl;
 }
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyPrn::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void FrequencyPrn::doFinishOutput()
 {
   if (outputManager_.getProcID() == 0)
@@ -338,6 +544,7 @@ void FrequencyPrn::doFinishOutput()
     {
       if (!outputManager_.getSTEPEnabledFlag() && outputManager_.getPrintEndOfSimulationLine())
       {
+        firstTimePrint_ = true;
         (*outStreamPtr_) << "End of Xyce(TM) Simulation" << std::endl;
         firstTimePrint_ = true;
       }
@@ -353,13 +560,20 @@ void FrequencyPrn::doFinishOutput()
   index_ = 0;
 }
 
-void
-FrequencyPrn::doFinishOutputStep()
+//-----------------------------------------------------------------------------
+// Function      : FrequencyPrn::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void FrequencyPrn::doFinishOutputStep()
 {
   // Deal with the *prn file:
   if (outStreamPtr_)
   {
-    if (outputManager_.getPrintEndOfSimulationLine())
+    if ( outputManager_.getPrintEndOfSimulationLine() )
     {
       (*outStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
     }
@@ -369,6 +583,22 @@ FrequencyPrn::doFinishOutputStep()
   }
 }
 
+//-----------------------------------------------------------------------------
+// Class         : TimeCSV
+// Purpose       : Outputter class for transient runs and "CSV"
+//                 (comma separarated variable) output format
+// Special Notes :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : TimeCSV::TimeCSV
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 TimeCSV::TimeCSV(OutputMgr &output_manager, const PrintParameters &print_parameters)
   : outputManager_(output_manager),
     printParameters_(print_parameters),
@@ -378,29 +608,65 @@ TimeCSV::TimeCSV(OutputMgr &output_manager, const PrintParameters &print_paramet
     outStreamPtr_(0),
     headerPrintCalls_(0)
 {
-  if (printParameters_.extension_.empty())
-    printParameters_.extension_ = ".csv";
+  if (printParameters_.defaultExtension_.empty())
+    printParameters_.defaultExtension_ = ".csv";
 
-  fixupColumns(outputManager_, printParameters_);
+  fixupColumns(outputManager_, printParameters_, opList_);
 }
 
+//-----------------------------------------------------------------------------
+// Function      : TimeCSV::~TimeCSV
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 TimeCSV::~TimeCSV()
 {
   outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
 }
 
 
+//-----------------------------------------------------------------------------
+// Function      : TimeCSV::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void TimeCSV::doParse()
 {
   outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
 }
 
+//-----------------------------------------------------------------------------
+// Function      : TimeCSV::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void TimeCSV::doOpen()
 {
   if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
+  {
     outStreamPtr_ = outputManager_.openFile(outFilename_);
+  }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : TimeCSV::timeHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void TimeCSV::timeHeader()
 {
   if (outputManager_.getProcID() == 0)
@@ -422,7 +688,10 @@ void TimeCSV::timeHeader()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 10/10/00
 //-----------------------------------------------------------------------------
-void TimeCSV::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vector * stateVecPtr, const N_LAS_Vector * storeVecPtr)
+void TimeCSV::doOutputTime(
+    const N_LAS_Vector * solnVecPtr, 
+    const N_LAS_Vector * stateVecPtr, 
+    const N_LAS_Vector * storeVecPtr)
 {
   outputManager_.setCurrentOutputter(this);
   double time = outputManager_.getCircuitTime();
@@ -445,10 +714,11 @@ void TimeCSV::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vector *
   outputManager_.getCommPtr()->barrier();
 
   int column_index = 0;
-  for (ParameterList::const_iterator it = printParameters_.variableList_.begin() ; it != printParameters_.variableList_.end(); ++it, ++column_index)
+  for (Util::OpList::const_iterator it = opList_.begin() ; it != opList_.end(); ++it, ++column_index)
   {
-    double result = outputManager_.getPrintValue(it, solnVecPtr, stateVecPtr, storeVecPtr);
-    if ((*it).getSimContext() == TIME_VAR)
+    double result = getValue(outputManager_.getCommPtr()->comm(), *(*it), solnVecPtr, 0, stateVecPtr, storeVecPtr).real();
+    result = filter(result, printParameters_.filter_);
+    if ((*it)->opType() == Util::TIME_VAR)
       result *= printParameters_.outputTimeScaleFactor_;
 
     if (outputManager_.getProcID() == 0)
@@ -480,15 +750,39 @@ void TimeCSV::doFinishOutput()
   firstTimePrint_ = true;
 }
 
-void
-TimeCSV::doFinishOutputStep()
+//-----------------------------------------------------------------------------
+// Function      : TimeCSV::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void TimeCSV::doFinishOutputStep()
 {
-  if (outStreamPtr_) {
+  if (outStreamPtr_)
+  {
     outputManager_.closeFile(outStreamPtr_);
     outStreamPtr_ = 0;
   }
 }
 
+//-----------------------------------------------------------------------------
+// Class         : FrequencyCSV
+// Purpose       : Outputter class for frequency-domain runs and "CSV"
+//                 (comma separarated variable) output format
+// Special Notes :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : FrequencyCSV::FrequencyCSV
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 FrequencyCSV::FrequencyCSV(OutputMgr &output_manager, const PrintParameters &print_parameters)
   : outputManager_(output_manager),
     printParameters_(print_parameters),
@@ -496,34 +790,68 @@ FrequencyCSV::FrequencyCSV(OutputMgr &output_manager, const PrintParameters &pri
     outFilename_(),
     suffix_(),
     outStreamPtr_(0),
-    headerPrintCalls_(0),
     stepCount_(0)
 {
-  if (printParameters_.extension_.empty())
-    printParameters_.extension_ = ".FD.csv";
+  if (printParameters_.defaultExtension_.empty())
+    printParameters_.defaultExtension_ = ".FD.csv";
 
-  fixupColumns(outputManager_, printParameters_);
+  fixupColumns(outputManager_, printParameters_, opList_);
 }
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyCSV::~FrequencyCSV
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 FrequencyCSV::~FrequencyCSV()
 {
   outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
 }
 
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyCSV::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void FrequencyCSV::doParse()
 {
   outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
 }
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyCSV::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void FrequencyCSV::doOpen()
 {
   if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
+  {
     outStreamPtr_ = outputManager_.openFile(outFilename_);
+  }
 }
 
-void
-FrequencyCSV::doOutputFrequency(double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
+//-----------------------------------------------------------------------------
+// Function      : FrequencyCSV::doOutputFrequency
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void FrequencyCSV::doOutputFrequency(double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
 {
   outputManager_.setCurrentOutputter(this);
 
@@ -544,12 +872,11 @@ FrequencyCSV::doOutputFrequency(double frequency, const N_LAS_Vector *real_solut
   std::ostream &os = *outStreamPtr_;
 
   int column_index = 0;
-  for (ParameterList::const_iterator it = printParameters_.variableList_.begin(); it != printParameters_.variableList_.end(); ++it, ++column_index)
+  for (Util::OpList::const_iterator it = opList_.begin(); it != opList_.end(); ++it, ++column_index)
   {
-    double varValue = outputManager_.getPrintValue(it, real_solution_vector, NULL, NULL, imaginary_solution_vector);
-
+    double result = getValue(outputManager_.getCommPtr()->comm(), *(*it), real_solution_vector, imaginary_solution_vector, 0, 0).real();
     if (outputManager_.getProcID() == 0)
-      printValue(os, printParameters_.table_.columnList_[column_index], printParameters_.delimiter_, column_index, varValue);
+      printValue(os, printParameters_.table_.columnList_[column_index], printParameters_.delimiter_, column_index, result);
 
     outputManager_.getCommPtr()->barrier();
   }
@@ -560,12 +887,20 @@ FrequencyCSV::doOutputFrequency(double frequency, const N_LAS_Vector *real_solut
     os << std::endl;
 }
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyCSV::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void FrequencyCSV::doFinishOutput()
 {
   if (outputManager_.getProcID() == 0)
   {
-    if (outStreamPtr_) {
-
+    if (outStreamPtr_)
+    {
       if (!outputManager_.getSTEPEnabledFlag())
       {
         outputManager_.closeFile(outStreamPtr_);
@@ -577,13 +912,20 @@ void FrequencyCSV::doFinishOutput()
   firstTimePrint_ = true;
 }
 
-void
-FrequencyCSV::doFinishOutputStep()
+//-----------------------------------------------------------------------------
+// Function      : FrequencyCSV::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void FrequencyCSV::doFinishOutputStep()
 {
   // Deal with the *prn file:
   if (outStreamPtr_)
   {
-    if (outputManager_.getPrintEndOfSimulationLine())
+    if ( outputManager_.getPrintEndOfSimulationLine() )
     {
       (*outStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
     }
@@ -593,6 +935,21 @@ FrequencyCSV::doFinishOutputStep()
   outStreamPtr_ = 0;
 }
 
+//-----------------------------------------------------------------------------
+// Class         : TimeTecPlot
+// Purpose       : Outputter class for transient runs, tecplot output format
+// Special Notes :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : TimeTecPlot::TimeTecPlot
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 TimeTecPlot::TimeTecPlot(OutputMgr &output_manager, const PrintParameters &print_parameters)
   : outputManager_(output_manager),
     printParameters_(print_parameters),
@@ -602,29 +959,64 @@ TimeTecPlot::TimeTecPlot(OutputMgr &output_manager, const PrintParameters &print
     outStreamPtr_(0),
     headerPrintCalls_(0)
 {
-  if (printParameters_.extension_.empty())
-    printParameters_.extension_ = ".dat";
+  if (printParameters_.defaultExtension_.empty())
+    printParameters_.defaultExtension_ = ".dat";
 
-  fixupColumns(outputManager_, printParameters_);
+  fixupColumns(outputManager_, printParameters_, opList_);
 }
 
+//-----------------------------------------------------------------------------
+// Function      : TimeTecPlot::~TimeTecPlot
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 TimeTecPlot::~TimeTecPlot()
 {
   outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
 }
 
-
+//-----------------------------------------------------------------------------
+// Function      : TimeTecPlot::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void TimeTecPlot::doParse()
 {
   outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
 }
 
+//-----------------------------------------------------------------------------
+// Function      : TimeTecPlot::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void TimeTecPlot::doOpen()
 {
   if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
+  {
     outStreamPtr_ = outputManager_.openFile(outFilename_);
+  }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : TimeTecPlot::timeHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void TimeTecPlot::timeHeader()
 {
   std::ostream &os = *outStreamPtr_;
@@ -641,21 +1033,23 @@ void TimeTecPlot::timeHeader()
       os << "\tVARIABLES = ";
 
       // output the user-specified solution vars:
-      for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin() ; iterParam != printParameters_.variableList_.end(); ++iterParam)
-        os << "\" " << (*iterParam).tag() << "\" " << std::endl;
+      for (Util::OpList::const_iterator it = opList_.begin() ; it != opList_.end(); ++it)
+        os << "\" " << (*it)->getName() << "\" " << std::endl;
 
       // output some AUXDATA
       os << "DATASETAUXDATA " << getTecplotTimeDateStamp() << std::endl;
 
       if (!outputManager_.getTempSweepFlag())
       {
-        os.setf(ios::scientific);
+        os.setf(std::ios::scientific);
         os.precision( tecplotHeaderPrecision_);
         os << "DATASETAUXDATA TEMP = \"" << outputManager_.getCircuitTemp() << " \"" << std::endl;
       }
+
     } // print header calls=0
 
     os << "ZONE F=POINT ";
+
 
     if (outputManager_.getStepParamVec().empty())
     {
@@ -663,34 +1057,35 @@ void TimeTecPlot::timeHeader()
     }
     else
     {
-      os.setf(ios::scientific);
+      os.setf(std::ios::scientific);
       os.precision( tecplotHeaderPrecision_);
       os << "T= \" ";
-      for (std::vector<N_ANP_SweepParam>::const_iterator iterParam = outputManager_.getStepParamVec().begin(); iterParam != outputManager_.getStepParamVec().end(); ++iterParam)
+      for (std::vector<N_ANP_SweepParam>::const_iterator it = outputManager_.getStepParamVec().begin(); it != outputManager_.getStepParamVec().end(); ++it)
       {
-        os << " " << iterParam->name << " = " << iterParam->currentVal;
+        os << " " << it->name << " = " << it->currentVal;
       }
       os << "\" ";
     }
     os << std::endl;
 
-    os.setf(ios::scientific);
+    os.setf(std::ios::scientific);
     os.precision(printParameters_.streamPrecision_);
 
     // put in the various sweep parameters as auxdata:
-    if (!outputManager_.getStepParamVec().empty()) {
-      for (std::vector<N_ANP_SweepParam>::const_iterator iterParam = outputManager_.getStepParamVec().begin(); iterParam != outputManager_.getStepParamVec().end(); ++iterParam)
+    if (!outputManager_.getStepParamVec().empty())
+    {
+      for (std::vector<N_ANP_SweepParam>::const_iterator it = outputManager_.getStepParamVec().begin(); it != outputManager_.getStepParamVec().end(); ++it)
       {
         // convert any ":" or "%" in the name to a "_", so as not to confuse tecplot.
-        std::string tmpName(iterParam->name);
-        replace(tmpName.begin(), tmpName.end(), '%', '_');
-        replace(tmpName.begin(), tmpName.end(), ':', '_');
-        os << "AUXDATA " << tmpName << " = " << "\" " << iterParam->currentVal << "\" ";
+        std::string name(it->name);
+        std::replace(name.begin(), name.end(), '%', '_');
+        std::replace(name.begin(), name.end(), ':', '_');
+        os << "AUXDATA " << name << " = " << "\" " << it->currentVal << "\" ";
       }
       os << std::endl;
     }
 
-    os.setf(ios::left, ios::adjustfield);
+    os.setf(std::ios::left, std::ios::adjustfield);
 
   } // procID
 
@@ -698,14 +1093,17 @@ void TimeTecPlot::timeHeader()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : OutputMgr::outputPRINT_
-// Purpose       : .PRINT output
+// Function      : TimeTecPlot::doOutputTime
+// Purpose       :
 // Special Notes :
-// Scope         : private
-// Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 10/10/00
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
 //-----------------------------------------------------------------------------
-void TimeTecPlot::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vector * stateVecPtr, const N_LAS_Vector * storeVecPtr)
+void TimeTecPlot::doOutputTime(
+    const N_LAS_Vector * solnVecPtr, 
+    const N_LAS_Vector * stateVecPtr, 
+    const N_LAS_Vector * storeVecPtr)
 {
   outputManager_.setCurrentOutputter(this);
   double time = outputManager_.getCircuitTime();
@@ -727,10 +1125,11 @@ void TimeTecPlot::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vect
   outputManager_.getCommPtr()->barrier();
 
   int i = 1;
-  for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin() ; iterParam != printParameters_.variableList_.end(); ++iterParam, ++i)
+  for (Util::OpList::const_iterator it = opList_.begin() ; it != opList_.end(); ++it, ++i)
   {
-    double result = outputManager_.getPrintValue(iterParam, solnVecPtr, stateVecPtr, storeVecPtr);
-    if ((*iterParam).getSimContext() == TIME_VAR)
+    double result = getValue(outputManager_.getCommPtr()->comm(), *(*it), solnVecPtr, 0, stateVecPtr, storeVecPtr).real();
+    result = filter(result, printParameters_.filter_);
+    if ((*it)->opType() == Util::TIME_VAR)
       result *= printParameters_.outputTimeScaleFactor_;
 
     if (outputManager_.getProcID() == 0)
@@ -747,14 +1146,23 @@ void TimeTecPlot::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vect
   } // procID
 }
 
+//-----------------------------------------------------------------------------
+// Function      : TimeTecPlot::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void TimeTecPlot::doFinishOutput()
 {
   if (outputManager_.getProcID() == 0)
   {
     if (outStreamPtr_)
     {
-      if (!outputManager_.getSTEPEnabledFlag())
+      if (!outputManager_.getSTEPEnabledFlag() && outputManager_.getPrintEndOfSimulationLine() )
       {
+        (*outStreamPtr_) << "End of Xyce(TM) Simulation" << std::endl;
         outputManager_.closeFile(outStreamPtr_);
         outStreamPtr_ = 0;
         headerPrintCalls_ = 0;
@@ -765,17 +1173,45 @@ void TimeTecPlot::doFinishOutput()
   firstTimePrint_ = true;
 }
 
-void
-TimeTecPlot::doFinishOutputStep()
+//-----------------------------------------------------------------------------
+// Function      : TimeTecPlot:: doFinishOutputStep()
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void TimeTecPlot::doFinishOutputStep()
 {
   // Deal with the *tecplot file:
   if (outStreamPtr_)
   {
+    if (outputManager_.getPrintEndOfSimulationLine())
+    {
+      (*outStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
+    }
+
     outputManager_.closeFile(outStreamPtr_);
     outStreamPtr_ = 0;
   }
 }
 
+//-----------------------------------------------------------------------------
+// Class         : FrequencyTecPlot
+// Purpose       : Outputter class for frequency domain runs, tecplot output
+//                 format
+// Special Notes :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : FrequencyTecPlot::FrequencyTecPlot
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 FrequencyTecPlot::FrequencyTecPlot(OutputMgr &output_manager, const PrintParameters &print_parameters)
   : outputManager_(output_manager),
     printParameters_(print_parameters),
@@ -785,54 +1221,92 @@ FrequencyTecPlot::FrequencyTecPlot(OutputMgr &output_manager, const PrintParamet
     firstTime_(true),
     index_(0)
 {
-  if (printParameters_.extension_.empty())
-    printParameters_.extension_ = ".FD.dat";
+  if (printParameters_.defaultExtension_.empty())
+    printParameters_.defaultExtension_ = ".FD.dat";
 
-  fixupColumns(outputManager_, printParameters_);
+  fixupColumns(outputManager_, printParameters_, opList_);
 }
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyTecPlot::~FrequencyTecPlot()
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 FrequencyTecPlot::~FrequencyTecPlot()
 {
   outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
 }
 
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyTecPlot::doParse()
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void FrequencyTecPlot::doParse()
 {
   outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
 }
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyTecPlot::doOpen()
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void FrequencyTecPlot::doOpen()
 {
   if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
+  {
     outStreamPtr_ = outputManager_.openFile(outFilename_);
+  }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyTecPlot::frequencyHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void FrequencyTecPlot::frequencyHeader()
 {
   index_ = 0;
 
   // STD header
   // Freq Domain Headers
-  tecplotFreqHeader(outputManager_, printParameters_, *outStreamPtr_, stepCount_);
+  tecplotFreqHeader(outputManager_, printParameters_, opList_, *outStreamPtr_, stepCount_);
 
-  outStreamPtr_->setf(ios::scientific);
+  outStreamPtr_->setf(std::ios::scientific);
   outStreamPtr_->precision(printParameters_.streamPrecision_);
-  outStreamPtr_->setf(ios::left, ios::adjustfield);
+  outStreamPtr_->setf(std::ios::left, std::ios::adjustfield);
 
   ++stepCount_;
 }
 
-void
-FrequencyTecPlot::doOutputFrequency(double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
+//-----------------------------------------------------------------------------
+// Function      : FrequencyTecPlot::doOutputFrequency
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void FrequencyTecPlot::doOutputFrequency(double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
 {
   outputManager_.setCurrentOutputter(this);
   bool firstColPrinted = false;
-  int index = 0;
-
-  std::ostringstream ost;
-  ost << outputManager_.getProcID();
-  string pN(ost.str());
 
   if (outputManager_.getProcID() == 0)
   {
@@ -843,36 +1317,34 @@ FrequencyTecPlot::doOutputFrequency(double frequency, const N_LAS_Vector *real_s
       frequencyHeader();
       firstTime_ = false;
     }
-    else // If running tecplot, the header needs to be revised each time.
-         // Don't know how yet.
-    {
 
-    }
-
-    if (printParameters_.delimiter_ == "")
-    {
-      outStreamPtr_->width(printParameters_.streamWidth_);
-    }
-
-    // Output a TAB.
-    if (printParameters_.delimiter_ != "")
-    {
-      (*outStreamPtr_) << printParameters_.delimiter_;
-    }
   } // procID
 
+  std::ostream &os = *outStreamPtr_;
 
   if (outputManager_.getProcID() == 0)
   {
     if (printParameters_.delimiter_ == "")
     {
-      outStreamPtr_->width(printParameters_.streamWidth_);
+      os.width(printParameters_.streamWidth_);
+    }
+
+    // Output a TAB.
+    if (printParameters_.delimiter_ != "")
+    {
+      os << printParameters_.delimiter_;
+    }
+
+    if (printParameters_.delimiter_ == "")
+    {
+      os.width(printParameters_.streamWidth_);
     }
     else
     {
-      outStreamPtr_->width(0);
-      if (firstColPrinted) {
-        (*outStreamPtr_) << printParameters_.delimiter_;
+      os.width(0);
+      if (firstColPrinted)
+      {
+        os << printParameters_.delimiter_;
       }
     }
 
@@ -880,26 +1352,31 @@ FrequencyTecPlot::doOutputFrequency(double frequency, const N_LAS_Vector *real_s
   }
 
   // periodic time-domain steady-state output
+  for (Util::OpList::const_iterator it = opList_.begin(); it != opList_.end(); ++it)
   {
-    for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin(); iterParam != printParameters_.variableList_.end(); ++iterParam)
+    double result = getValue(outputManager_.getCommPtr()->comm(), *(*it), real_solution_vector, imaginary_solution_vector, 0, 0).real();
+    if (outputManager_.getProcID() == 0)
     {
-      double varValue = outputManager_.getPrintValue(iterParam, real_solution_vector, NULL, NULL, imaginary_solution_vector);
+      os << result << " ";
+    }
+    outputManager_.getCommPtr()->barrier();
 
-      if (outputManager_.getProcID() == 0)
-      {
-        (*outStreamPtr_) << varValue << " ";
-      }
-      outputManager_.getCommPtr()->barrier();
-
-    } // end of output variable loop.
-  }
+  } // end of output variable loop.
 
   if (outputManager_.getProcID() == 0)
   {
-    (*outStreamPtr_) << std::endl;
+    os << std::endl;
   }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyTecPlot::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void FrequencyTecPlot::doFinishOutput()
 {
   if (outputManager_.getProcID() == 0)
@@ -918,11 +1395,19 @@ void FrequencyTecPlot::doFinishOutput()
       }
     }
   } // procID
+
   firstTime_ = true;
 }
 
-void
-FrequencyTecPlot::doFinishOutputStep()
+//-----------------------------------------------------------------------------
+// Function      : FrequencyTecPlot::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void FrequencyTecPlot::doFinishOutputStep()
 {
   if (outStreamPtr_)
   {
@@ -936,6 +1421,22 @@ FrequencyTecPlot::doFinishOutputStep()
   }
 }
 
+//-----------------------------------------------------------------------------
+// Class         : TimeProbe
+// Purpose       : Outputter class for transient runs, Probe output
+//                 format (PSpice-compatibility output)
+// Special Notes :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : TimeProbe::TimeProbe
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 TimeProbe::TimeProbe(OutputMgr &output_manager, const PrintParameters &print_parameters)
   : outputManager_(output_manager),
     printParameters_(print_parameters),
@@ -946,21 +1447,49 @@ TimeProbe::TimeProbe(OutputMgr &output_manager, const PrintParameters &print_par
     outStreamPtr_(0),
     headerPrintCalls_(0)
 {
-  if (printParameters_.extension_.empty())
-    printParameters_.extension_ = ".csd";
+  if (printParameters_.defaultExtension_.empty())
+    printParameters_.defaultExtension_ = ".csd";
 
-  fixupColumns(outputManager_, printParameters_);
+  fixupColumns(outputManager_, printParameters_, opList_);
 }
 
+//-----------------------------------------------------------------------------
+// Function      : TimeProbe::~TimeProbe
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 TimeProbe::~TimeProbe()
-{}
+{
+  outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
+}
 
 
+//-----------------------------------------------------------------------------
+// Function      : TimeProbe::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void TimeProbe::doParse()
 {
   outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
 }
 
+//-----------------------------------------------------------------------------
+// Function      : TimeProbe::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void TimeProbe::doOpen()
 {
   if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
@@ -969,6 +1498,14 @@ void TimeProbe::doOpen()
   }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : TimeProbe::timeHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void TimeProbe::timeHeader()
 {
   std::ostream &os = *outStreamPtr_;
@@ -977,9 +1514,9 @@ void TimeProbe::timeHeader()
   {
     // count the number of output variables.
     printCount_ = 0;
-    for (ParameterList::const_iterator iterParam2 = printParameters_.variableList_.begin() ; iterParam2 != printParameters_.variableList_.end(); ++iterParam2)
+    for (Util::OpList::const_iterator it = opList_.begin() ; it != opList_.end(); ++it)
     {
-      if (iterParam2->getSimContext() != UNDEFINED)
+      if ((*it)->opType() != Util::UNDEFINED)
         ++printCount_;
     }
 
@@ -988,7 +1525,7 @@ void TimeProbe::timeHeader()
        << N_UTL_Version::getShortVersionString() << "'" << std::endl;
     os << "TITLE='* " << outputManager_.getNetListFilename() << "'" << std::endl;
 
-    os.setf(ios::scientific);
+    os.setf(std::ios::scientific);
     os.precision(0); // streamPrecision_);
     if (outputManager_.getStepParamVec().empty())
     {
@@ -996,15 +1533,10 @@ void TimeProbe::timeHeader()
     }
     else
     {
-      std::vector<N_ANP_SweepParam>::const_iterator iterParam;
-      std::vector<N_ANP_SweepParam>::const_iterator firstParam=outputManager_.getStepParamVec().begin();
-      std::vector<N_ANP_SweepParam>::const_iterator lastParam=outputManager_.getStepParamVec().end();
-
       os << "SUBTITLE='Step param";
-      for (iterParam=firstParam;iterParam!=lastParam;++iterParam)
+      for (std::vector<N_ANP_SweepParam>::const_iterator it = outputManager_.getStepParamVec().begin(); it != outputManager_.getStepParamVec().end(); ++it)
       {
-        os << " " << iterParam->name << " = ";
-        os << iterParam->currentVal;
+        os << " " << it->name << " = " << it->currentVal;
       }
     }
 
@@ -1012,7 +1544,7 @@ void TimeProbe::timeHeader()
 
     // set the time/date stamp
     os << getTimeDateStamp();
-    os.setf(ios::scientific);
+    os.setf(std::ios::scientific);
     os.precision(printParameters_.streamPrecision_);
     os << "TEMPERATURE='" << outputManager_.getCircuitTemp();
     os << "'" << std::endl;
@@ -1072,7 +1604,7 @@ void TimeProbe::timeHeader()
         os << outputManager_.getDCParamVec()[idc].name;
         os << "' ";
         os << "SWEEP" << idc+1 << "VALUE='";
-        os.setf(ios::scientific);
+        os.setf(std::ios::scientific);
         os.precision(printParameters_.streamPrecision_);
         os << outputManager_.getDCParamVec()[idc].currentVal;
         os << "' ";
@@ -1086,21 +1618,21 @@ void TimeProbe::timeHeader()
     os << "#N" << std::endl;
 
     int i = 0;
-    for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin() ; iterParam != printParameters_.variableList_.end(); ++iterParam, ++i)
+    for (Util::OpList::const_iterator it = opList_.begin() ; it != opList_.end(); ++it, ++i)
     {
       if (i > 18)
       {
         i = 0;
         os << std::endl;
       }
-      os << "'" << (*iterParam).tag() << "' ";
+      os << "'" << (*it)->getName() << "' ";
     }
     if (i != 0)
       os << std::endl;
 
-    os.setf(ios::scientific);
+    os.setf(std::ios::scientific);
     os.precision(printParameters_.streamPrecision_);
-    os.setf(ios::left, ios::adjustfield);
+    os.setf(std::ios::left, std::ios::adjustfield);
 
   } // procID
 
@@ -1108,14 +1640,17 @@ void TimeProbe::timeHeader()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : OutputMgr::outputPRINT_
-// Purpose       : .PRINT output
+// Function      : TimeProbe::doOutputTime
+// Purpose       :
 // Special Notes :
-// Scope         : private
-// Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 10/10/00
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
 //-----------------------------------------------------------------------------
-void TimeProbe::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vector * stateVecPtr, const N_LAS_Vector * storeVecPtr)
+void TimeProbe::doOutputTime(
+    const N_LAS_Vector * solnVecPtr, 
+    const N_LAS_Vector * stateVecPtr, 
+    const N_LAS_Vector * storeVecPtr)
 {
   outputManager_.setCurrentOutputter(this);
   double time = outputManager_.getCircuitTime();
@@ -1148,10 +1683,10 @@ void TimeProbe::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vector
   std::ostream &os = *outStreamPtr_;
 
   int i = 1;
-  for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin() ; iterParam != printParameters_.variableList_.end(); ++iterParam, ++i)
+  for (Util::OpList::const_iterator it = opList_.begin() ; it != opList_.end(); ++it, ++i)
   {
-    double result = outputManager_.getPrintValue(iterParam, solnVecPtr, stateVecPtr, storeVecPtr);
-    if ((*iterParam).getSimContext() == TIME_VAR)
+    double result = getValue(outputManager_.getCommPtr()->comm(), *(*it), solnVecPtr, 0, stateVecPtr, storeVecPtr).real();
+    if ((*it)->opType() == Util::TIME_VAR)
       result *= printParameters_.outputTimeScaleFactor_;
 
     if (outputManager_.getProcID() == 0)
@@ -1171,6 +1706,14 @@ void TimeProbe::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vector
   }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : TimeProbe::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void TimeProbe::doFinishOutput()
 {
   if (outputManager_.getProcID() == 0)
@@ -1192,13 +1735,36 @@ void TimeProbe::doFinishOutput()
   firstTimePrint_ = true;
 }
 
-void
-TimeProbe::doFinishOutputStep()
+//-----------------------------------------------------------------------------
+// Function      : TimeProbe::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void TimeProbe::doFinishOutputStep()
 {
   outputManager_.closeFile(outStreamPtr_);
   outStreamPtr_ = 0;
 }
 
+//-----------------------------------------------------------------------------
+// Class         : FrequencyProbe
+// Purpose       : Outputter class for frequency-domain runs, Probe output
+//                 format (PSpice-compatibility output)
+// Special Notes :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : FrequencyProbe::FrequencyProbe
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 FrequencyProbe::FrequencyProbe(OutputMgr &output_manager, const PrintParameters &print_parameters)
   : outputManager_(output_manager),
     printParameters_(print_parameters),
@@ -1209,21 +1775,49 @@ FrequencyProbe::FrequencyProbe(OutputMgr &output_manager, const PrintParameters 
     outStreamPtr_(0),
     headerPrintCalls_(0)
 {
-  if (printParameters_.extension_.empty())
-    printParameters_.extension_ = ".csd";
+  if (printParameters_.defaultExtension_.empty())
+    printParameters_.defaultExtension_ = ".csd";
 
-  fixupColumns(outputManager_, printParameters_);
+  fixupColumns(outputManager_, printParameters_, opList_);
 }
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyProbe::~FrequencyProbe
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 FrequencyProbe::~FrequencyProbe()
-{}
+{
+  outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
+}
 
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyProbe::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void FrequencyProbe::doParse()
 {
   outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
 }
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyProbe::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void FrequencyProbe::doOpen()
 {
   if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
@@ -1232,6 +1826,14 @@ void FrequencyProbe::doOpen()
   }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyProbe::frequencyHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void FrequencyProbe::frequencyHeader()
 {
   std::ostream &os = *outStreamPtr_;
@@ -1240,9 +1842,9 @@ void FrequencyProbe::frequencyHeader()
   {
     // count the number of output variables.
     printCount_ = 0;
-    for (ParameterList::const_iterator iterParam2 = printParameters_.variableList_.begin() ; iterParam2 != printParameters_.variableList_.end(); ++iterParam2)
+    for (Util::OpList::const_iterator it = opList_.begin() ; it != opList_.end(); ++it)
     {
-      if (iterParam2->getSimContext() != UNDEFINED)
+      if ((*it)->opType() != Util::UNDEFINED)
         ++printCount_;
     }
 
@@ -1251,7 +1853,7 @@ void FrequencyProbe::frequencyHeader()
        << N_UTL_Version::getShortVersionString() << "'" << std::endl;
     os << "TITLE='* " << outputManager_.getNetListFilename() << "'" << std::endl;
 
-    os.setf(ios::scientific);
+    os.setf(std::ios::scientific);
     os.precision(0); // streamPrecision_);
     if (outputManager_.getStepParamVec().empty())
     {
@@ -1259,15 +1861,10 @@ void FrequencyProbe::frequencyHeader()
     }
     else
     {
-      std::vector<N_ANP_SweepParam>::const_iterator iterParam;
-      std::vector<N_ANP_SweepParam>::const_iterator firstParam=outputManager_.getStepParamVec().begin();
-      std::vector<N_ANP_SweepParam>::const_iterator lastParam=outputManager_.getStepParamVec().end();
-
       os << "SUBTITLE='Step param";
-      for (iterParam=firstParam;iterParam!=lastParam;++iterParam)
+      for (std::vector<N_ANP_SweepParam>::const_iterator it = outputManager_.getStepParamVec().begin(); it != outputManager_.getStepParamVec().end(); ++it)
       {
-        os << " " << iterParam->name << " = ";
-        os << iterParam->currentVal;
+        os << " " << it->name << " = " << it->currentVal;
       }
     }
 
@@ -1275,7 +1872,7 @@ void FrequencyProbe::frequencyHeader()
 
     // set the time/date stamp
     os << getTimeDateStamp();
-    os.setf(ios::scientific);
+    os.setf(std::ios::scientific);
     os.precision(printParameters_.streamPrecision_);
     os << "TEMPERATURE='" << outputManager_.getCircuitTemp();
     os << "'" << std::endl;
@@ -1287,9 +1884,9 @@ void FrequencyProbe::frequencyHeader()
       "NODES='" << printCount_ << "'" << std::endl;
 
     os << "SWEEPVAR='";
-    string varName = outputManager_.getPRINTDCname();
+    std::string varName = outputManager_.getPRINTDCname();
     if( varName == "" )
-    { 
+    {
       varName="FREQ";
     }
     os << varName;
@@ -1321,7 +1918,7 @@ void FrequencyProbe::frequencyHeader()
         os << outputManager_.getDCParamVec()[idc].name;
         os << "' ";
         os << "SWEEP" << idc+1 << "VALUE='";
-        os.setf(ios::scientific);
+        os.setf(std::ios::scientific);
         os.precision(printParameters_.streamPrecision_);
         os << outputManager_.getDCParamVec()[idc].currentVal;
         os << "' ";
@@ -1335,9 +1932,9 @@ void FrequencyProbe::frequencyHeader()
     os << "#N" << std::endl;
 
     int i = 0;
-    for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin() ; iterParam != printParameters_.variableList_.end(); ++iterParam, ++i)
+    for (Util::OpList::const_iterator it = opList_.begin() ; it != opList_.end(); ++it, ++i)
     {
-      os << "'" << (*iterParam).tag() << "' ";
+      os << "'" << (*it)->getName() << "' ";
       if (i > 3)
       {
         i = 0;
@@ -1348,20 +1945,26 @@ void FrequencyProbe::frequencyHeader()
     if (i != 0)
       os << std::endl;
 
-    os << flush;
+    os.flush();
 
-    os.setf(ios::scientific);
+    os.setf(std::ios::scientific);
     os.precision(printParameters_.streamPrecision_);
-    os.setf(ios::left, ios::adjustfield);
+    os.setf(std::ios::left, std::ios::adjustfield);
 
   } // procID
 
   ++headerPrintCalls_;
 }
 
-
-void
-FrequencyProbe::doOutputFrequency(double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
+//-----------------------------------------------------------------------------
+// Function      : FrequencyProbe::doOutputFrequency
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void FrequencyProbe::doOutputFrequency(double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
 {
   if (outputManager_.getProcID() == 0)
   {
@@ -1386,23 +1989,12 @@ FrequencyProbe::doOutputFrequency(double frequency, const N_LAS_Vector *real_sol
   std::ostream &os = *outStreamPtr_;
 
   int i = 1;
-  for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin() ; iterParam != printParameters_.variableList_.end(); ++iterParam, ++i)
+  for (Util::OpList::const_iterator it = opList_.begin() ; it != opList_.end(); ++it, ++i)
   {
-    // if context type of the param is SOLUTION_VAR then it is complex and 
-    // we need to get both the real and imaginary part for output.
-    // Any other context type is just real and the imaginary part will be zero
-    double varValue = outputManager_.getPrintValue(iterParam, real_solution_vector, NULL, NULL, imaginary_solution_vector);
-    double varValueIm = 0.0;
-    if( iterParam->getSimContext() == SOLUTION_VAR )
-    {
-      // note we fake out getPrintValue to return the imaginary component by passing it in as the real vector.
-      // not a great idea, but getPrintValue() will be rewritten to return complex types later.
-      varValueIm = outputManager_.getPrintValue(iterParam, imaginary_solution_vector, NULL, NULL, imaginary_solution_vector);
-    }
-
+    complex result = getValue(outputManager_.getCommPtr()->comm(), *(*it), real_solution_vector, imaginary_solution_vector, 0, 0);
     if (outputManager_.getProcID() == 0)
     {
-      os << varValue << "/" << varValueIm << ":" << i << "   ";
+      os << result.real() << "/" << result.imag() << ":" << i << "   ";
       if ((i/5)*5 == i)os << std::endl;
     }
 
@@ -1416,6 +2008,14 @@ FrequencyProbe::doOutputFrequency(double frequency, const N_LAS_Vector *real_sol
   }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyProbe::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void FrequencyProbe::doFinishOutput()
 {
   if (outputManager_.getProcID() == 0)
@@ -1437,13 +2037,28 @@ void FrequencyProbe::doFinishOutput()
   firstTimePrint_ = true;
 }
 
-void
-FrequencyProbe::doFinishOutputStep()
+//-----------------------------------------------------------------------------
+// Function      : FrequencyProbe::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void FrequencyProbe::doFinishOutputStep()
 {
   outputManager_.closeFile(outStreamPtr_);
   outStreamPtr_ = 0;
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HBPrn::HBPrn
+// Purpose       : Outputter for HB runs, standard (PRN) output
+//                 format
+// Special Notes :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
 HBPrn::HBPrn(OutputMgr &output_manager, const PrintParameters &freq_print_parameters, const PrintParameters &time_print_parameters)
   : outputManager_(output_manager),
     freqPrintParameters_(freq_print_parameters),
@@ -1456,37 +2071,76 @@ HBPrn::HBPrn(OutputMgr &output_manager, const PrintParameters &freq_print_parame
     timeStreamPtr_(0),
     freqStreamPtr_(0)
 {
-  if (timePrintParameters_.extension_.empty())
-    timePrintParameters_.extension_ = ".HB.TD.prn";
+  if (timePrintParameters_.defaultExtension_.empty())
+    timePrintParameters_.defaultExtension_ = ".HB.TD.prn";
 
-  if (freqPrintParameters_.extension_.empty())
-    freqPrintParameters_.extension_ = ".HB.FD.prn";
+  if (freqPrintParameters_.defaultExtension_.empty())
+    freqPrintParameters_.defaultExtension_ = ".HB.FD.prn";
 
-  fixupColumns(outputManager_, timePrintParameters_);
-  fixupColumns(outputManager_, freqPrintParameters_);
+  fixupColumns(outputManager_, timePrintParameters_, timeOpList_);
+  fixupColumns(outputManager_, freqPrintParameters_, freqOpList_);
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HBPrn::~HBPrn
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 HBPrn::~HBPrn()
 {
   outputManager_.closeFile(timeStreamPtr_);
   outputManager_.closeFile(freqStreamPtr_);
+
+  deleteList(timeOpList_.begin(), timeOpList_.end());
+  deleteList(freqOpList_.begin(), freqOpList_.end());
 }
 
 
+//-----------------------------------------------------------------------------
+// Function      : HBPrn::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HBPrn::doParse()
 {
   timeFilename_ = outputFilename(timePrintParameters_, outputManager_.getNetListFilename());
   freqFilename_ = outputFilename(freqPrintParameters_, outputManager_.getNetListFilename());
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HBPrn::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HBPrn::doOpen()
 {
   if (outputManager_.getProcID() == 0 && timeStreamPtr_ == 0)
+  {
     timeStreamPtr_ = outputManager_.openFile(timeFilename_);
+  }
   if (outputManager_.getProcID() == 0 && freqStreamPtr_ == 0)
+  {
     freqStreamPtr_ = outputManager_.openFile(freqFilename_);
+  }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HBPrn::doOutputHB
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HBPrn::doOutputHB(
   const std::vector<double>&    timePoints,
   const std::vector<double>&    freqPoints,
@@ -1533,10 +2187,9 @@ void HBPrn::doOutputHB(
 
     { // periodic time-domain steady-state output
       int column_index = 0;
-      for (ParameterList::const_iterator it = timePrintParameters_.variableList_.begin(); it != timePrintParameters_.variableList_.end(); ++it, ++column_index)
+      for (Util::OpList::const_iterator it = timeOpList_.begin(); it != timeOpList_.end(); ++it, ++column_index)
       {
-        double result = outputManager_.getPrintValue(it, solnVecPtr);
-
+        double result = getValue(outputManager_.getCommPtr()->comm(), *(*it), solnVecPtr, 0, 0, 0).real();
         if (outputManager_.getProcID() == 0)
           printValue(time_os, timePrintParameters_.table_.columnList_[column_index], timePrintParameters_.delimiter_, column_index, result);
 
@@ -1546,14 +2199,13 @@ void HBPrn::doOutputHB(
 
     { // Fourier coefficient output
       int column_index = 0;
-      for (ParameterList::const_iterator it = freqPrintParameters_.variableList_.begin(); it != freqPrintParameters_.variableList_.end(); ++it, ++column_index)
+      for (Util::OpList::const_iterator it = freqOpList_.begin(); it != freqOpList_.end(); ++it, ++column_index)
       {
         // state and store vec are not available in this context, but we must
         // pass in both the real and imaginary vectors
-        double varValue = outputManager_.getPrintValue(it, realVecPtr, NULL, NULL, imagVecPtr);
-
+        double result = getValue(outputManager_.getCommPtr()->comm(), *(*it), realVecPtr, imagVecPtr, 0, 0).real();
         if (outputManager_.getProcID() == 0)
-          printValue(freq_os, freqPrintParameters_.table_.columnList_[column_index], freqPrintParameters_.delimiter_, column_index, varValue);
+          printValue(freq_os, freqPrintParameters_.table_.columnList_[column_index], freqPrintParameters_.delimiter_, column_index, result);
 
         outputManager_.getCommPtr()->barrier();
       }
@@ -1568,6 +2220,14 @@ void HBPrn::doOutputHB(
   }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HBPrn::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HBPrn::doFinishOutput()
 {
   if (timeStreamPtr_)
@@ -1597,20 +2257,27 @@ void HBPrn::doFinishOutput()
   }
 }
 
-void
-HBPrn::doFinishOutputStep()
+//-----------------------------------------------------------------------------
+// Function      : HBPrn::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void HBPrn::doFinishOutputStep()
 {
   // Deal with the *prn file:
   if (timeStreamPtr_)
   {
-    if (outputManager_.getPrintEndOfSimulationLine())
+    if ( outputManager_.getPrintEndOfSimulationLine() )
     {
       (*timeStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
     }
   }
   if (freqStreamPtr_)
   {
-    if (outputManager_.getPrintEndOfSimulationLine())
+    if ( outputManager_.getPrintEndOfSimulationLine() )
     {
       (*freqStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
     }
@@ -1622,6 +2289,22 @@ HBPrn::doFinishOutputStep()
   freqStreamPtr_ = 0;
 }
 
+//-----------------------------------------------------------------------------
+// Class         : HBCSV
+// Purpose       : Outputter class for HB runs, CSV (comma separated) output
+//                 format
+// Special Notes :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : HBCSV::HBCSV
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 HBCSV::HBCSV(OutputMgr &output_manager, const PrintParameters &freq_print_parameters, const PrintParameters &time_print_parameters)
   : outputManager_(output_manager),
     freqPrintParameters_(freq_print_parameters),
@@ -1634,37 +2317,76 @@ HBCSV::HBCSV(OutputMgr &output_manager, const PrintParameters &freq_print_parame
     timeStreamPtr_(0),
     freqStreamPtr_(0)
 {
-  if (timePrintParameters_.extension_.empty())
-    timePrintParameters_.extension_ = ".HB.TD.csv";
+  if (timePrintParameters_.defaultExtension_.empty())
+    timePrintParameters_.defaultExtension_ = ".HB.TD.csv";
 
-  if (freqPrintParameters_.extension_.empty())
-    freqPrintParameters_.extension_ = ".HB.FD.csv";
+  if (freqPrintParameters_.defaultExtension_.empty())
+    freqPrintParameters_.defaultExtension_ = ".HB.FD.csv";
 
-  fixupColumns(outputManager_, timePrintParameters_);
-  fixupColumns(outputManager_, freqPrintParameters_);
+  fixupColumns(outputManager_, timePrintParameters_, timeOpList_);
+  fixupColumns(outputManager_, freqPrintParameters_, freqOpList_);
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HBCSV::~HBCSV
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 HBCSV::~HBCSV()
 {
   outputManager_.closeFile(timeStreamPtr_);
   outputManager_.closeFile(freqStreamPtr_);
+
+  deleteList(timeOpList_.begin(), timeOpList_.end());
+  deleteList(freqOpList_.begin(), freqOpList_.end());
 }
 
 
+//-----------------------------------------------------------------------------
+// Function      : HBCSV::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HBCSV::doParse()
 {
   timeFilename_ = outputFilename(timePrintParameters_, outputManager_.getNetListFilename());
   freqFilename_ = outputFilename(freqPrintParameters_, outputManager_.getNetListFilename());
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HBCSV::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HBCSV::doOpen()
 {
   if (outputManager_.getProcID() == 0 && timeStreamPtr_ == 0)
+  {
     timeStreamPtr_ = outputManager_.openFile(timeFilename_);
+  }
   if (outputManager_.getProcID() == 0 && freqStreamPtr_ == 0)
+  {
     freqStreamPtr_ = outputManager_.openFile(freqFilename_);
+  }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HBCSV::doOutputHB
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HBCSV::doOutputHB(
   const std::vector<double>&    timePoints,
   const std::vector<double>&    freqPoints,
@@ -1711,10 +2433,9 @@ void HBCSV::doOutputHB(
 
     { // periodic time-domain steady-state output
       int column_index = 0;
-      for (ParameterList::const_iterator it = timePrintParameters_.variableList_.begin(); it != timePrintParameters_.variableList_.end(); ++it, ++column_index)
+      for (Util::OpList::const_iterator it = timeOpList_.begin(); it != timeOpList_.end(); ++it, ++column_index)
       {
-        double result = outputManager_.getPrintValue(it, solnVecPtr);
-
+        double result = getValue(outputManager_.getCommPtr()->comm(), *(*it), solnVecPtr, 0, 0, 0).real();
         if (outputManager_.getProcID() == 0)
           printValue(time_os, timePrintParameters_.table_.columnList_[column_index], timePrintParameters_.delimiter_, column_index, result);
 
@@ -1724,14 +2445,13 @@ void HBCSV::doOutputHB(
 
     { // Fourier coefficient output
       int column_index = 0;
-      for (ParameterList::const_iterator it = freqPrintParameters_.variableList_.begin(); it != freqPrintParameters_.variableList_.end(); ++it, ++column_index)
+      for (Util::OpList::const_iterator it = freqOpList_.begin(); it != freqOpList_.end(); ++it, ++column_index)
       {
         // state and store vec are not available in this context, but we must
         // pass in both the real and imaginary vectors
-        double varValue = outputManager_.getPrintValue(it, realVecPtr, NULL, NULL, imagVecPtr);
-
+        double result = getValue(outputManager_.getCommPtr()->comm(), *(*it), realVecPtr, imagVecPtr, 0, 0).real();
         if (outputManager_.getProcID() == 0)
-          printValue(freq_os, freqPrintParameters_.table_.columnList_[column_index], freqPrintParameters_.delimiter_, column_index, varValue);
+          printValue(freq_os, freqPrintParameters_.table_.columnList_[column_index], freqPrintParameters_.delimiter_, column_index, result);
 
         outputManager_.getCommPtr()->barrier();
       }
@@ -1746,6 +2466,14 @@ void HBCSV::doOutputHB(
   }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HBCSV::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HBCSV::doFinishOutput()
 {
   if (timeStreamPtr_)
@@ -1775,20 +2503,27 @@ void HBCSV::doFinishOutput()
   }
 }
 
-void
-HBCSV::doFinishOutputStep()
+//-----------------------------------------------------------------------------
+// Function      : HBCSV::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void HBCSV::doFinishOutputStep()
 {
   // Deal with the *prn file:
   if (timeStreamPtr_)
   {
-    if (outputManager_.getPrintEndOfSimulationLine())
+    if ( outputManager_.getPrintEndOfSimulationLine() )
     {
       (*timeStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
     }
   }
   if (freqStreamPtr_)
   {
-    if (outputManager_.getPrintEndOfSimulationLine())
+    if ( outputManager_.getPrintEndOfSimulationLine() )
     {
       (*freqStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
     }
@@ -1801,6 +2536,22 @@ HBCSV::doFinishOutputStep()
   freqStreamPtr_ = 0;
 }
 
+//-----------------------------------------------------------------------------
+// Class         : HBTecPlot
+// Purpose       : Outputter class for HB runs, TecPlot output
+//                 format
+// Special Notes :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : HBTecPlot::HBTecPlot
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 HBTecPlot::HBTecPlot(OutputMgr &output_manager, const PrintParameters &freq_print_parameters, const PrintParameters &time_print_parameters)
   : outputManager_(output_manager),
     freqPrintParameters_(freq_print_parameters),
@@ -1813,37 +2564,75 @@ HBTecPlot::HBTecPlot(OutputMgr &output_manager, const PrintParameters &freq_prin
     timeStreamPtr_(0),
     freqStreamPtr_(0)
 {
-  if (timePrintParameters_.extension_.empty())
-    timePrintParameters_.extension_ = ".HB.TD.dat";
+  if (timePrintParameters_.defaultExtension_.empty())
+    timePrintParameters_.defaultExtension_ = ".HB.TD.dat";
 
-  if (freqPrintParameters_.extension_.empty())
-    freqPrintParameters_.extension_ = ".HB.FD.dat";
+  if (freqPrintParameters_.defaultExtension_.empty())
+    freqPrintParameters_.defaultExtension_ = ".HB.FD.dat";
 
-  fixupColumns(outputManager_, timePrintParameters_);
-  fixupColumns(outputManager_, freqPrintParameters_);
+  fixupColumns(outputManager_, timePrintParameters_, timeOpList_);
+  fixupColumns(outputManager_, freqPrintParameters_, freqOpList_);
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HBTecPlot::~HBTecPlot
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 HBTecPlot::~HBTecPlot()
 {
   outputManager_.closeFile(timeStreamPtr_);
   outputManager_.closeFile(freqStreamPtr_);
+
+  deleteList(timeOpList_.begin(), timeOpList_.end());
+  deleteList(freqOpList_.begin(), freqOpList_.end());
 }
 
-
+//-----------------------------------------------------------------------------
+// Function      : HBTecPlot::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HBTecPlot::doParse()
 {
   timeFilename_ = outputFilename(timePrintParameters_, outputManager_.getNetListFilename());
   freqFilename_ = outputFilename(freqPrintParameters_, outputManager_.getNetListFilename());
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HBTecPlot::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HBTecPlot::doOpen()
 {
   if (outputManager_.getProcID() == 0 && timeStreamPtr_ == 0)
+  {
     timeStreamPtr_ = outputManager_.openFile(timeFilename_);
+  }
   if (outputManager_.getProcID() == 0 && freqStreamPtr_ == 0)
+  {
     freqStreamPtr_ = outputManager_.openFile(freqFilename_);
+  }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HBTecPlot::doOutputHB
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HBTecPlot::doOutputHB(
   const std::vector<double>&    timePoints,
   const std::vector<double>&    freqPoints,
@@ -1857,7 +2646,7 @@ void HBTecPlot::doOutputHB(
 
   std::ostringstream ost;
   ost << outputManager_.getProcID();
-  string pN(ost.str());
+  std::string pN(ost.str());
 
   if (outputManager_.getProcID() == 0)
   {
@@ -1867,7 +2656,7 @@ void HBTecPlot::doOutputHB(
       doOpen();
 
       tecplotTimeHBHeader(*timeStreamPtr_);
-      tecplotFreqHeader(outputManager_, freqPrintParameters_, *freqStreamPtr_, stepCount_);
+      tecplotFreqHeader(outputManager_, freqPrintParameters_, freqOpList_, *freqStreamPtr_, stepCount_);
 
       ++stepCount_;
 
@@ -1890,10 +2679,9 @@ void HBTecPlot::doOutputHB(
 
     { // periodic time-domain steady-state output
       int column_index = 0;
-      for (ParameterList::const_iterator it = timePrintParameters_.variableList_.begin(); it != timePrintParameters_.variableList_.end(); ++it, ++column_index)
+      for (Util::OpList::const_iterator it = timeOpList_.begin(); it != timeOpList_.end(); ++it, ++column_index)
       {
-        double result = outputManager_.getPrintValue(it, solnVecPtr);
-
+        double result = getValue(outputManager_.getCommPtr()->comm(), *(*it), solnVecPtr, 0, 0, 0).real();
         if (outputManager_.getProcID() == 0)
           printValue(time_os, timePrintParameters_.table_.columnList_[column_index], timePrintParameters_.delimiter_, column_index, result);
 
@@ -1903,17 +2691,18 @@ void HBTecPlot::doOutputHB(
 
     { // Fourier coefficient output
       int column_index = 0;
-      for (ParameterList::const_iterator it = freqPrintParameters_.variableList_.begin(); it != freqPrintParameters_.variableList_.end(); ++it, ++column_index)
+      for (Util::OpList::const_iterator it = freqOpList_.begin(); it != freqOpList_.end(); ++it, ++column_index)
       {
-        double varValue = outputManager_.getPrintValue(it, realVecPtr, NULL, NULL, imagVecPtr);
+        double result = getValue(outputManager_.getCommPtr()->comm(), *(*it), realVecPtr, imagVecPtr, 0, 0).real();
         if (outputManager_.getProcID() == 0)
-          printValue(freq_os, freqPrintParameters_.table_.columnList_[column_index], freqPrintParameters_.delimiter_, column_index, varValue);
+          printValue(freq_os, freqPrintParameters_.table_.columnList_[column_index], freqPrintParameters_.delimiter_, column_index, result);
 
         outputManager_.getCommPtr()->barrier();
       }
     } // Fourier coefficient output
 
-    if (outputManager_.getProcID() == 0) {
+    if (outputManager_.getProcID() == 0)
+    {
       freq_os << std::endl;
       time_os << std::endl;
     }
@@ -1922,6 +2711,14 @@ void HBTecPlot::doOutputHB(
   } // time scale loop.
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HBTecPlot::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HBTecPlot::doFinishOutput()
 {
   if (timeStreamPtr_)
@@ -1942,7 +2739,6 @@ void HBTecPlot::doFinishOutput()
 
   if (!outputManager_.getSTEPEnabledFlag())
   {
-
     outputManager_.closeFile(timeStreamPtr_);
     timeStreamPtr_ = 0;
     outputManager_.closeFile(freqStreamPtr_);
@@ -1956,20 +2752,27 @@ void HBTecPlot::doFinishOutput()
   }
 }
 
-void
-HBTecPlot::doFinishOutputStep()
+//-----------------------------------------------------------------------------
+// Function      : HBTecPlot::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void HBTecPlot::doFinishOutputStep()
 {
   // Deal with the *dat file:
   if (timeStreamPtr_)
   {
-    if (outputManager_.getPrintEndOfSimulationLine())
+    if ( outputManager_.getPrintEndOfSimulationLine() )
     {
       (*timeStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
     }
   }
   if (freqStreamPtr_)
   {
-    if (outputManager_.getPrintEndOfSimulationLine())
+    if ( outputManager_.getPrintEndOfSimulationLine() )
     {
       (*freqStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
     }
@@ -1983,76 +2786,95 @@ HBTecPlot::doFinishOutputStep()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : OutputMgr::tecplotTimeHBHeader_
+// Function      : HBTecPlot::tecplotTimeHBHeader
 // Purpose       : header for tecplot. Time Domain HB(default)
 // Special Notes :
-// Scope         : private
+// Scope         :
 // Creator       : Todd Coffey, Ting Mei
 // Creation Date : 7/31/08
 //-----------------------------------------------------------------------------
-void HBTecPlot::tecplotTimeHBHeader( ostream & stream)
+void HBTecPlot::tecplotTimeHBHeader( std::ostream & stream)
 {
-  int tecplotHeaderPrecision_ = 2;
-  stream.setf(ios::scientific);
-  stream.precision( tecplotHeaderPrecision_);
+  std::ostream &os = *timeStreamPtr_;
+
+  static const int tecplotHeaderPrecision_ = 2;
+  os.setf(std::ios::scientific);
+  os.precision( tecplotHeaderPrecision_);
+
 
   if (stepCount_ == 0)
   {
-    stream << " TITLE      = \" Xyce Time Domain HB data, " << outputManager_.getNetListFilename() << "\", " << std::endl;
+    os << " TITLE      = \" Xyce Time Domain HB data, " << outputManager_.getNetListFilename() << "\", " << std::endl;
 
     // output the user-specified solution vars:
-    stream << "\tVARIABLES = ";
-    for (ParameterList::const_iterator iterParam = timePrintParameters_.variableList_.begin() ; iterParam != timePrintParameters_.variableList_.end(); ++iterParam)
+    os << "\tVARIABLES = ";
+    for (Util::OpList::const_iterator it = timeOpList_.begin() ; it != timeOpList_.end(); ++it)
     {
-      stream << "\" " << (*iterParam).tag() << "\" " << std::endl;
+      os << "\" " << (*it)->getName() << "\" " << std::endl;
     }
 
-    stream << "DATASETAUXDATA ";
-    stream << getTecplotTimeDateStamp();
-    stream << std::endl;
+    os << "DATASETAUXDATA " << getTecplotTimeDateStamp() << std::endl;
     if (!outputManager_.getTempSweepFlag())
     {
-      stream << "DATASETAUXDATA TEMP = \"" << outputManager_.getCircuitTemp() << " \"" << std::endl;
+      stream << "DATASETAUXDATA TEMP = \"" << outputManager_.getCircuitTemp() <<
+ " \"" << std::endl;
     }
   }
 
-  stream << "ZONE F=POINT ";
+  os << "ZONE F=POINT  ";
+
   if (outputManager_.getStepParamVec().empty())
   {
-    stream << " T=\"Xyce data\" ";
+    os << " T=\"Xyce data\" ";
   }
   else
   {
-    std::vector<N_ANP_SweepParam>::const_iterator iterParam;
-    std::vector<N_ANP_SweepParam>::const_iterator firstParam=outputManager_.getStepParamVec().begin();
-    std::vector<N_ANP_SweepParam>::const_iterator lastParam=outputManager_.getStepParamVec().end();
-
-    stream << " T= \" ";
-    for (iterParam=firstParam;iterParam!=lastParam;++iterParam)
+    os << " T= \" ";
+    for (std::vector<N_ANP_SweepParam>::const_iterator it = outputManager_.getStepParamVec().begin(); it != outputManager_.getStepParamVec().end(); ++it)
     {
-      stream << " " << iterParam->name << " = ";
-      stream << iterParam->currentVal;
+      os << " " << it->name << " = " << it->currentVal;
     }
-    stream << "\" ";
+    os << "\" ";
   }
-  stream << std::endl;
+
+  os << std::endl;
 
   // put in the various sweep parameters as auxdata:
-  if (!outputManager_.getStepParamVec().empty()) {
-    for (std::vector<N_ANP_SweepParam>::const_iterator iterParam = outputManager_.getStepParamVec().begin(); iterParam != outputManager_.getStepParamVec().end(); ++iterParam)
+  if (!outputManager_.getStepParamVec().empty())
+  {
+    for (std::vector<N_ANP_SweepParam>::const_iterator iterParam = outputManager_.getStepParamVec().begin();
+        iterParam != outputManager_.getStepParamVec().end();
+        ++iterParam)
     {
       // convert any ":" or "%" in the name to a "_", so as not to confuse tecplot.
       std::string tmpName(iterParam->name);
       replace(tmpName.begin(), tmpName.end(), '%', '_');
       replace(tmpName.begin(), tmpName.end(), ':', '_');
-      stream << "AUXDATA " << tmpName << " = " << "\" " << iterParam->currentVal << "\" ";
+      os << "AUXDATA " << tmpName << " = " << "\" " << iterParam->currentVal
+ << "\" ";
     }
-    stream << std::endl;
+    os << std::endl;
   }
 
-  stream << flush;
+  os << std::flush;
 }
 
+//-----------------------------------------------------------------------------
+// Class         : MPDEPrn
+// Purpose       : Outputter class for MPDE runs, standard (PRN) output
+//                 format
+// Special Notes :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : MPDEPrn::MPDEPrn
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 MPDEPrn::MPDEPrn(OutputMgr &output_manager, const PrintParameters &print_parameters)
   : outputManager_(output_manager),
     printParameters_(print_parameters),
@@ -2063,48 +2885,79 @@ MPDEPrn::MPDEPrn(OutputMgr &output_manager, const PrintParameters &print_paramet
     n1_(0),
     n2_(0)
 {
-  if (printParameters_.extension_.empty())
-    printParameters_.extension_ = ".MPDE.prn";
+  if (printParameters_.defaultExtension_.empty())
+    printParameters_.defaultExtension_ = ".MPDE.prn";
 
   printParameters_.table_.addColumn("TIME1", printParameters_.streamWidth_, printParameters_.streamPrecision_, Table::JUSTIFICATION_RIGHT);
   printParameters_.table_.addColumn("TIME2", printParameters_.streamWidth_, printParameters_.streamPrecision_, Table::JUSTIFICATION_RIGHT);
 
-  fixupColumns(outputManager_, printParameters_);
+  fixupColumns(outputManager_, printParameters_, opList_);
 }
 
+//-----------------------------------------------------------------------------
+// Function      : MPDEPrn::~MPDEPrn
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 MPDEPrn::~MPDEPrn()
 {
   outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
 }
 
 
+//-----------------------------------------------------------------------------
+// Function      : MPDEPrn::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void MPDEPrn::doParse()
 {
-  // if (outputManager_.getSTEPEnabledFlag())
-  // {
-  //   std::ostringstream num;
-  //   num << stepCount_;
-  //   outFilename_ = outputManager_.getNetListFilename() + ".STEP" + num.str() + ".prn";
-  //   ++stepCount_;
-  // }
-  // else
-  // {
-    outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
-  // }
+  outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
 }
 
+//-----------------------------------------------------------------------------
+// Function      : MPDEPrn::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void MPDEPrn::doOpen()
 {
   if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
+  {
     outStreamPtr_ = outputManager_.openFile(outFilename_);
+  }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : MPDEPrn::mpdeHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void MPDEPrn::mpdeHeader()
 {}
 
-void MPDEPrn::doOutputTime(const N_LAS_Vector *solution_vector, const N_LAS_Vector *state_vector, const N_LAS_Vector *store_vector)
-{}
-
+//-----------------------------------------------------------------------------
+// Function      : MPDEPrn::doOutputMPDE
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void MPDEPrn::doOutputMPDE(double time, const N_LAS_Vector *solution_vector)
 {
   outputManager_.setCurrentOutputter(this);
@@ -2133,7 +2986,7 @@ void MPDEPrn::doOutputMPDE(double time, const N_LAS_Vector *solution_vector)
   } // procID
 
   std::ostream &os = *outStreamPtr_;
-  
+
   // Loop over the fast time points of the N_LAS_BlockVecor:
   for (int iblock=0;iblock<n2_+1;++iblock)
   {
@@ -2164,10 +3017,9 @@ void MPDEPrn::doOutputMPDE(double time, const N_LAS_Vector *solution_vector)
     }
 
     int column_index = 2;
-    for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin(); iterParam != printParameters_.variableList_.end(); ++iterParam, ++column_index)
+    for (Util::OpList::const_iterator it = opList_.begin(); it != opList_.end(); ++it, ++column_index)
     {
-      double result = outputManager_.getPrintValue(iterParam, solnVecPtr);
-
+      double result = getValue(outputManager_.getCommPtr()->comm(), *(*it), solnVecPtr, 0, 0, 0).real();
       if (outputManager_.getProcID() == 0)
       {
         printValue(os, printParameters_.table_.columnList_[column_index], printParameters_.delimiter_, column_index, result);
@@ -2184,45 +3036,37 @@ void MPDEPrn::doOutputMPDE(double time, const N_LAS_Vector *solution_vector)
   } // fast time scale loop.
 }
 
-void MPDEPrn::doOutputHomotopy(const std::vector<std::string> & parameter_names, const std::vector<double> & parameter_values, const N_LAS_Vector * solution_vector)
-{}
-
-void MPDEPrn::doOutputMORTF(bool origSystem, const double & freq, const Teuchos::SerialDenseMatrix<int, std::complex<double> >& H)
-{}
-
-void MPDEPrn::doOutputHB(
-  const std::vector<double>&    timePoints,
-  const std::vector<double>&    freqPoints,
-  const N_LAS_BlockVector &     timeDomainSolnVec,
-  const N_LAS_BlockVector &     freqDomainSolnVecReal,
-  const N_LAS_BlockVector &     freqDomainSolnVecImaginary)
-{
-}
-
-void
-MPDEPrn::doOutputFrequency(double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
-{}
-
-
-void MPDEPrn::doResetOutput()
-{}
-
+//-----------------------------------------------------------------------------
+// Function      : MPDEPrn::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void MPDEPrn::doFinishOutput()
 {
   outputManager_.closeFile(outStreamPtr_);
   outStreamPtr_ = 0;
 }
 
-void
-MPDEPrn::doFinishOutputStep()
+//-----------------------------------------------------------------------------
+// Function      : MPDEPrn::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void MPDEPrn::doFinishOutputStep()
 {
 }
 
 //-----------------------------------------------------------------------------
-// Function      : OutputMgr::stdTimeMPDEHeader_
+// Function      : MPDEPrn::stdTimeMPDEHeader
 // Purpose       : header for std. Time Domain MPDE(default)
 // Special Notes :
-// Scope         : private
+// Scope         :
 // Creator       : Todd Coffey, Ting Mei
 // Creation Date : 7/31/08
 //-----------------------------------------------------------------------------
@@ -2230,6 +3074,22 @@ void MPDEPrn::stdTimeMPDEHeader( std::ostream & stream)
 {
 }
 
+//-----------------------------------------------------------------------------
+// Class         : MPDETecPlot
+// Purpose       : Outputter class for MPDE runs, TecPlot output
+//                 format
+// Special Notes :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : MPDETecPlot::MPDETecPlot
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
 MPDETecPlot::MPDETecPlot(OutputMgr &output_manager, const PrintParameters &print_parameters)
   : outputManager_(output_manager),
     printParameters_(print_parameters),
@@ -2242,15 +3102,32 @@ MPDETecPlot::MPDETecPlot(OutputMgr &output_manager, const PrintParameters &print
 {
 }
 
+//-----------------------------------------------------------------------------
+// Function      : MPDETecPlot::~MPDETecPlot
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 MPDETecPlot::~MPDETecPlot()
 {
   outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
 }
 
 
+//-----------------------------------------------------------------------------
+// Function      : MPDETecPlot::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void MPDETecPlot::doParse()
 {
-  ///////////////////////////////////////////////////////////////////////
   if (outputManager_.getSTEPEnabledFlag())
   {
     std::ostringstream num;
@@ -2262,62 +3139,60 @@ void MPDETecPlot::doParse()
   {
     outFilename_ = outputManager_.getNetListFilename() + ".MPDE.prn";
   }
-  ///////////////////////////////////////////////////////////////////////
 }
 
+//-----------------------------------------------------------------------------
+// Function      : MPDETecPlot::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void MPDETecPlot::doOpen()
 {
   if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
+  {
     outStreamPtr_ = outputManager_.openFile(outFilename_);
+  }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : MPDETecPlot::doOutputHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void MPDETecPlot::doOutputHeader()
 {
-  ParameterList::const_iterator iterParam = printParameters_.variableList_.begin();
-  ParameterList::const_iterator iterParam_end = printParameters_.variableList_.end();
-
-  while ( iterParam != iterParam_end &&
-          iterParam->tag() != "I" &&
-          iterParam->tag() != "V" &&
-          iterParam->tag() != "VSTART" &&
-          !(iterParam->hasExpressionTag()))
-  {
-    ++iterParam;
-  }
-
-  (*outStreamPtr_) << " TITLE = \" Xyce MPDE data, " << outputManager_.getNetListFilename() << "\", " << std::endl;
-  (*outStreamPtr_) << "\tVARIABLES = \"T1(sec) \", \"T2(sec)\", \n";
+  (*outStreamPtr_) << " TITLE = \" Xyce MPDE data, " << outputManager_.getNetListFilename() << "\", " << std::endl
+                   << "\tVARIABLES = \"T1(sec) \", \"T2(sec)\", " << std::endl;
 
   // output the user-specified solution vars:
-  while (iterParam != printParameters_.variableList_.end())
+  for (Util::OpList::const_iterator it = opList_.begin(); it != opList_.end(); ++it)
   {
-    (*outStreamPtr_) << "\" ";
-    (*outStreamPtr_) << (*iterParam).tag();
-
-    ++iterParam;
-    (*outStreamPtr_) << "\" " << std::endl;
+    (*outStreamPtr_) << "\" "<< (*it)->getName() << "\" " << std::endl;
   }
+
   // output some AUXDATA
-  (*outStreamPtr_) << "DATASETAUXDATA ";
-  (*outStreamPtr_) << getTecplotTimeDateStamp();
-  (*outStreamPtr_) << std::endl;
+  (*outStreamPtr_) << "DATASETAUXDATA " << getTecplotTimeDateStamp() << std::endl
+                   << "ZONE I=" << n2_ + 1 << ", " << " J=" << n1_ << ", " << " F=POINT\n" << std::endl;
 
-  (*outStreamPtr_) << "ZONE I=" << n2_ + 1<<", ";
-  (*outStreamPtr_) << " J=" << n1_ << ", ";
-  (*outStreamPtr_) << " F=POINT\n";
-
-  (*outStreamPtr_) << std::endl;
-
-  (*outStreamPtr_) << flush;
-
-  outStreamPtr_->setf(ios::scientific);
-  outStreamPtr_->precision(80); // streamPrecision_);
-  outStreamPtr_->setf(ios::left, ios::adjustfield);
+  outStreamPtr_->setf(std::ios::scientific);
+  outStreamPtr_->precision(printParameters_.streamPrecision_);
+  outStreamPtr_->setf(std::ios::left, std::ios::adjustfield);
 }
 
-void MPDETecPlot::doOutputTime(const N_LAS_Vector *solution_vector, const N_LAS_Vector *state_vector, const N_LAS_Vector *store_vector)
-{}
-
+//-----------------------------------------------------------------------------
+// Function      : MPDETecPlot::doOutputMPDE
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void MPDETecPlot::doOutputMPDE(double time, const N_LAS_Vector *solution_vector)
 {
   outputManager_.setCurrentOutputter(this);
@@ -2332,7 +3207,7 @@ void MPDETecPlot::doOutputMPDE(double time, const N_LAS_Vector *solution_vector)
 
   std::ostringstream ost;
   ost << outputManager_.getProcID();
-  string pN(ost.str());
+  std::string pN(ost.str());
 
   if (outputManager_.getProcID() == 0)
   {
@@ -2351,28 +3226,20 @@ void MPDETecPlot::doOutputMPDE(double time, const N_LAS_Vector *solution_vector)
     }
 
     if (printParameters_.delimiter_ == "")
+    {
       outStreamPtr_->width(printParameters_.streamWidth_);
+    }
 
     // Output a TAB.
     if (printParameters_.delimiter_ != "")
+    {
       (*outStreamPtr_) << printParameters_.delimiter_;
+    }
   } // procID
 
-  ParameterList::const_iterator iterParam = printParameters_.variableList_.begin();
-  ParameterList::const_iterator begin_tpL;
-  ParameterList::const_iterator last = printParameters_.variableList_.end();
-
-  while ( iterParam != last &&
-          iterParam->tag() != "I" &&
-          iterParam->tag() != "V" &&
-          iterParam->tag() != "VSTART" &&
-          !(iterParam->hasExpressionTag()))
-  {
-    ++iterParam;
-  }
-  begin_tpL = iterParam;
-
-  // Get the indices:
+  Util::OpList::const_iterator iterParam = opList_.begin();
+  Util::OpList::const_iterator begin_tpL;
+  Util::OpList::const_iterator last = opList_.end();
 
   // Loop over the fast time points of the N_LAS_BlockVecor:
   for (int iblock=0;iblock<n2_+1;++iblock)
@@ -2401,7 +3268,9 @@ void MPDETecPlot::doOutputMPDE(double time, const N_LAS_Vector *solution_vector)
 
       // time 1:
       if (printParameters_.delimiter_ == "")
+      {
         outStreamPtr_->width(printParameters_.streamWidth_);
+      }
       else
       {
         outStreamPtr_->width(0);
@@ -2413,12 +3282,16 @@ void MPDETecPlot::doOutputMPDE(double time, const N_LAS_Vector *solution_vector)
 
       // time 2:
       if (printParameters_.delimiter_ == "")
+      {
         outStreamPtr_->width(printParameters_.streamWidth_);
+      }
       else
       {
         outStreamPtr_->width(0);
         if (printParameters_.delimiter_ != "")
+        {
           (*outStreamPtr_) << printParameters_.delimiter_;
+        }
       }
 
       (*outStreamPtr_) << second;
@@ -2427,14 +3300,13 @@ void MPDETecPlot::doOutputMPDE(double time, const N_LAS_Vector *solution_vector)
     int i;
     for (i = 1, iterParam=begin_tpL ; iterParam != last; ++iterParam, ++i)
     {
-      double result;
-      result = 0.0;
-      result = outputManager_.getPrintValue(iterParam, solnVecPtr);
-
+      double result = getValue(outputManager_.getCommPtr()->comm(), *(*iterParam), solnVecPtr, 0, 0, 0).real();
       if (outputManager_.getProcID() == 0)
       {
         if (printParameters_.delimiter_ == "")
+        {
           outStreamPtr_->width(printParameters_.streamWidth_);
+        }
         else
         {
           outStreamPtr_->width(0);
@@ -2457,45 +3329,61 @@ void MPDETecPlot::doOutputMPDE(double time, const N_LAS_Vector *solution_vector)
 
   if (outputManager_.getProcID() == 0)
   {
-    (*outStreamPtr_) << std::endl << flush;
+    (*outStreamPtr_) << std::endl;
+    (*outStreamPtr_).flush();
   }
-
 }
 
-void MPDETecPlot::doOutputHomotopy(const std::vector<std::string> & parameter_names, const std::vector<double> & parameter_values, const N_LAS_Vector * solution_vector)
-{}
-
-void MPDETecPlot::doOutputMORTF(bool origSystem, const double & freq, const Teuchos::SerialDenseMatrix<int, std::complex<double> >& H)
-{}
-
-void MPDETecPlot::doOutputHB(
-  const std::vector<double>&    timePoints,
-  const std::vector<double>&    freqPoints,
-  const N_LAS_BlockVector &     timeDomainSolnVec,
-  const N_LAS_BlockVector &     freqDomainSolnVecReal,
-  const N_LAS_BlockVector &     freqDomainSolnVecImaginary)
-{}
-
-void
-MPDETecPlot::doOutputFrequency(double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
-{}
-
-void MPDETecPlot::doResetOutput()
-{}
-
+//-----------------------------------------------------------------------------
+// Function      : MPDETecPlot::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void MPDETecPlot::doFinishOutput()
 {
+  if (outStreamPtr_)
+  {
+    if (!outputManager_.getSTEPEnabledFlag() && outputManager_.getPrintEndOfSimulationLine())
+    {
+      (*outStreamPtr_) << "End of Xyce(TM) Simulation" << std::endl;
+    }
+  }
+
+  if (!outputManager_.getSTEPEnabledFlag())
+  {
+    outputManager_.closeFile(outStreamPtr_);
+    outStreamPtr_= 0;
+  }
+}
+
+//-----------------------------------------------------------------------------
+// Function      : MPDETecPlot::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void MPDETecPlot::doFinishOutputStep()
+{
+  // Deal with the *dat file:
+  if (outStreamPtr_)
+  {
+    if ( outputManager_.getPrintEndOfSimulationLine() )
+    {
+      (*outStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
+    }
+  }
+
   outputManager_.closeFile(outStreamPtr_);
   outStreamPtr_= 0;
 }
 
-void
-MPDETecPlot::doFinishOutputStep()
-{
-}
-
 //-----------------------------------------------------------------------------
-// Function      : OutputMgr::stdTimeMPDEHeader_
+// Function      : MPDETecPlot::stdTimeMPDEHeader
 // Purpose       : header for std. Time Domain MPDE(default)
 // Special Notes :
 // Scope         : private
@@ -2506,7 +3394,22 @@ void MPDETecPlot::stdTimeMPDEHeader( std::ostream & stream)
 {
 }
 
-
+//-----------------------------------------------------------------------------
+// Class         : HomotopyPrn
+// Purpose       : Outputter class for homotopy output, standard (PRN) output
+//                 format
+// Special Notes :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : HomotopyPrn::HomotopyPrn
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 HomotopyPrn::HomotopyPrn(OutputMgr &output_manager, const PrintParameters &print_parameters)
   : outputManager_(output_manager),
     printParameters_(print_parameters),
@@ -2517,20 +3420,46 @@ HomotopyPrn::HomotopyPrn(OutputMgr &output_manager, const PrintParameters &print
     printCount_(0),
     firstTimeHomotopy_(true)
 {
-  fixupColumns(outputManager_, printParameters_);
+  fixupColumns(outputManager_, printParameters_, opList_);
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HomotopyPrn::~HomotopyPrn
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 HomotopyPrn::~HomotopyPrn()
 {
   outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
 }
 
 
+//-----------------------------------------------------------------------------
+// Function      : HomotopyPrn::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HomotopyPrn::doParse()
 {
-  outFilename_ = outputManager_.getNetListFilename() + ".HOMOTOPY.prn";
+  outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HomotopyPrn::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HomotopyPrn::doOpen()
 {
   if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
@@ -2539,30 +3468,59 @@ void HomotopyPrn::doOpen()
   }
 }
 
-void HomotopyPrn::homotopyHeader(const std::vector<std::string> & parameter_names, const std::vector<double> & param_values, const N_LAS_Vector * solution_vector)
+//-----------------------------------------------------------------------------
+// Function      : HomotopyPrn::homotopyHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void HomotopyPrn::homotopyHeader(const std::vector<std::string> & parameter_names, 
+    const std::vector<double> & param_values, const N_LAS_Vector * solution_vector)
 {
   std::ostream &os = *outStreamPtr_;
 
-  if (columnList_.empty()) {
-    Table::Justification justification = printParameters_.delimiter_.empty() ? Table::JUSTIFICATION_CENTER :  Table::JUSTIFICATION_NONE;
+  if (columnList_.empty())
+  {
+    Table::Justification justification = printParameters_.delimiter_.empty() ? 
+      Table::JUSTIFICATION_CENTER :  Table::JUSTIFICATION_NONE;
 
-    for (std::vector<std::string>::const_iterator it = parameter_names.begin(); it != parameter_names.end(); ++it)
-      columnList_.push_back(Table::Column((*it), std::ios_base::scientific, printParameters_.streamWidth_, printParameters_.streamPrecision_, justification));
+    for (std::vector<std::string>::const_iterator it = parameter_names.begin(); 
+        it != parameter_names.end(); ++it)
+    {
+      columnList_.push_back(Table::Column((*it), std::ios_base::scientific, 
+            printParameters_.streamWidth_, printParameters_.streamPrecision_, justification));
+    }
   }
 
   index_ = 0;
 
+  int homotopyParamStartIndex=1;
+  if (printParameters_.index_==false) // if noindex, then use 0 for start of homotopy params, otherwise 1
+  {
+    homotopyParamStartIndex=0;
+  }
+
   if (stepCount_ == 0)
   {
     int column_index = 0;
-    for (Table::ColumnList::const_iterator it = printParameters_.table_.columnList_.begin(); it != printParameters_.table_.columnList_.end(); ++it, ++column_index) {
+    for (Table::ColumnList::const_iterator it = printParameters_.table_.columnList_.begin(); 
+        it != printParameters_.table_.columnList_.end(); ++it, ++column_index)
+    {
       if (it != printParameters_.table_.columnList_.begin())
+      {
         os << (printParameters_.delimiter_.empty() ? " " : printParameters_.delimiter_);
+      }
 
-      if (column_index == 1) {
-        for (Table::ColumnList::const_iterator it2 = columnList_.begin(); it2 != columnList_.end(); ++it2) {
+      if (column_index == homotopyParamStartIndex)
+      {
+        for (Table::ColumnList::const_iterator it2 = columnList_.begin(); it2 != columnList_.end(); ++it2)
+        {
           if (it2 != columnList_.begin())
+          {
             os << printParameters_.delimiter_;
+          }
           printHeader(os, (*it2));
         }
       }
@@ -2576,6 +3534,14 @@ void HomotopyPrn::homotopyHeader(const std::vector<std::string> & parameter_name
   ++stepCount_;
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HomotopyPrn::doOutputHomotopy
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HomotopyPrn::doOutputHomotopy(const std::vector<std::string> & parameter_names, const std::vector<double> & parameter_values, const N_LAS_Vector * solution_vector)
 {
   outputManager_.setCurrentOutputter(this);
@@ -2597,49 +3563,109 @@ void HomotopyPrn::doOutputHomotopy(const std::vector<std::string> & parameter_na
 
   std::ostream &os = *outStreamPtr_;
 
-  int column_index = 0;
-  for (ParameterList::const_iterator it = printParameters_.variableList_.begin(); it != printParameters_.variableList_.end(); ++it, ++column_index)
+  int homotopyParamStartIndex=1;
+  if (printParameters_.index_==false) // if noindex, then use 0 for start of homotopy params, otherwise 1
   {
-    double result = outputManager_.getPrintValue(it, solution_vector);
+    homotopyParamStartIndex=0;
+  }
 
-    if (outputManager_.getProcID() == 0) {
-      if (column_index == 1)
+  int column_index = 0;
+  for (Util::OpList::const_iterator it = opList_.begin(); it != opList_.end(); ++it, ++column_index)
+  {
+    double result = getValue(outputManager_.getCommPtr()->comm(), *(*it), solution_vector, 0, 0, 0).real();
+    if (outputManager_.getProcID() == 0)
+    {
+      if (column_index == homotopyParamStartIndex)
+      {
         for (int i = 0; i < parameter_values.size(); ++i)
+        {
           printValue(os, columnList_[i], printParameters_.delimiter_, 1, parameter_values[i]);
+        }
+      }
 
-      printValue(os, printParameters_.table_.columnList_[column_index], printParameters_.delimiter_, column_index, result);
+      printValue(os, printParameters_.table_.columnList_[column_index], 
+          printParameters_.delimiter_, column_index, result);
     }
 
     outputManager_.getCommPtr()->barrier();
   }
 
   if (outputManager_.getProcID() == 0)
+  {
     os << std::endl;
+  }
 
   ++index_;
 }
 
-void HomotopyPrn::doResetOutput()
-{}
-
+//-----------------------------------------------------------------------------
+// Function      : HomotopyPrn::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HomotopyPrn::doFinishOutput()
 {
+  if (outputManager_.getProcID() == 0)
+  {
+    if (outStreamPtr_)
+    {
+      if (!outputManager_.getSTEPEnabledFlag() && outputManager_.getPrintEndOfSimulationLine())
+      {
+        (*outStreamPtr_) << "End of Xyce(TM) Homotopy Simulation" << std::endl;
+      }
+    }
+
+    if (!outputManager_.getSTEPEnabledFlag())
+    {
+      outputManager_.closeFile(outStreamPtr_);
+      outStreamPtr_ = 0;
+    }
+  } // procID
   firstTimeHomotopy_ = true;
 }
 
-void
-HomotopyPrn::doFinishOutputStep()
+//-----------------------------------------------------------------------------
+// Function      : HomotopyPrn::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void HomotopyPrn::doFinishOutputStep()
 {
   // close the homotopy file.
   if (outStreamPtr_)
   {
-    (*outStreamPtr_) << "End of Xyce(TM) Homotopy Simulation" << std::endl;
+    if ( outputManager_.getPrintEndOfSimulationLine() )
+    {
+      (*outStreamPtr_) << "End of Xyce(TM) Homotopy Simulation" << std::endl;
+    }
   }
 
   outputManager_.closeFile(outStreamPtr_);
   outStreamPtr_ = 0;
 }
 
+//-----------------------------------------------------------------------------
+// Class         : HomotopyTecPlot
+// Purpose       : Outputter class for homotopy output, TecPlot output
+//                 format
+// Special Notes :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : HomotopyTecPlot::HomotopyTecPlot
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 HomotopyTecPlot::HomotopyTecPlot(OutputMgr &output_manager, const PrintParameters &print_parameters)
   : outputManager_(output_manager),
     printParameters_(print_parameters),
@@ -2650,33 +3676,44 @@ HomotopyTecPlot::HomotopyTecPlot(OutputMgr &output_manager, const PrintParameter
     printCount_(0),
     firstTimeHomotopy_(true)
 {
+  fixupColumns(outputManager_, printParameters_, opList_);
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HomotopyTecPlot::~HomotopyTecPlot
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 HomotopyTecPlot::~HomotopyTecPlot()
 {
   outputManager_.closeFile(outStreamPtr_);
+  deleteList(opList_.begin(), opList_.end());
 }
 
-
+//-----------------------------------------------------------------------------
+// Function      : HomotopyTecPlot::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HomotopyTecPlot::doParse()
 {
-  string finalSuffix = ".prn";
-  if (outputManager_.getFormat() == Format::TECPLOT)
-  {
-    finalSuffix = ".dat";
-  }
-  else if (outputManager_.getFormat() == Format::CSV)
-  {
-    finalSuffix = ".csv";
-  }
-  else if (outputManager_.getFormat() == Format::PROBE)
-  {
-    finalSuffix = ".csd";
-  }
-
-  outFilename_ = outputManager_.getNetListFilename() + ".HOMOTOPY" + finalSuffix;
+  outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HomotopyTecPlot::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HomotopyTecPlot::doOpen()
 {
   if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
@@ -2685,220 +3722,220 @@ void HomotopyTecPlot::doOpen()
   }
 }
 
-void HomotopyTecPlot::doOutputHeader(const std::vector<std::string> & parameter_names, const std::vector<double> & param_values, const N_LAS_Vector * solution_vector)
+//-----------------------------------------------------------------------------
+// Function      : HomotopyTecPlot::doOutputHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void HomotopyTecPlot::doOutputHeader(const std::vector<std::string> & parameter_names, 
+    const std::vector<double> & param_values, 
+    const N_LAS_Vector * solution_vector)
 {
-  outputManager_.setCurrentOutputter(this);
-  index_ = 0;
+  if (columnList_.empty())
+  {
+    Table::Justification justification = printParameters_.delimiter_.empty() ? 
+      Table::JUSTIFICATION_CENTER :  Table::JUSTIFICATION_NONE;
 
+    for (std::vector<std::string>::const_iterator it = parameter_names.begin(); 
+        it != parameter_names.end(); ++it)
+    {
+      columnList_.push_back(Table::Column((*it), std::ios_base::scientific, 
+        printParameters_.streamWidth_, printParameters_.streamPrecision_, justification));
+    }
+  }
+
+  std::ostream &os = *outStreamPtr_;
+
+  index_ = 0;
   ParameterList::const_iterator iterParam = printParameters_.variableList_.begin();
   ParameterList::const_iterator last = printParameters_.variableList_.end();
 
   if (stepCount_ == 0)
   {
-    (*outStreamPtr_) << " TITLE = \" Xyce homotopy data, " << outputManager_.getNetListFilename() << "\", " << std::endl;
-    (*outStreamPtr_) << "\tVARIABLES = ";
+    os << " TITLE = \" Xyce homotopy data, " << outputManager_.getNetListFilename() << "\", " << std::endl;
+    os << "\tVARIABLES = ";
 
     // output the continuation parameters:
     std::vector<std::string>::const_iterator iter_name;
-    for (iter_name=parameter_names.begin(); iter_name!= parameter_names.end();
-         ++iter_name)
+    for (iter_name = parameter_names.begin(); iter_name!= parameter_names.end(); ++iter_name)
     {
-      (*outStreamPtr_) << "\" ";
-      (*outStreamPtr_) << *iter_name;
-      (*outStreamPtr_) << "\" " << std::endl;
+      os << "\" ";
+      os << *iter_name;
+      os << "\" " << std::endl;
     }
 
     // output the user-specified solution vars:
-    while (iterParam != printParameters_.variableList_.end())
+    for (Util::OpList::const_iterator it = opList_.begin(); it != opList_.end(); ++it)
     {
-      if ( !((*iterParam).getSimContext() == TIME_VAR) )
-      {
-        (*outStreamPtr_) << "\" ";
-        (*outStreamPtr_) << (*iterParam).tag();
-        (*outStreamPtr_) << "\" " << std::endl;
-      }
-      ++iterParam;
+      os << "\" " << (*it)->getName() << "\" " << std::endl;
     }
   }
 
   // output some AUXDATA
-  (*outStreamPtr_) << "DATASETAUXDATA ";
-  (*outStreamPtr_) << getTecplotTimeDateStamp();
-  (*outStreamPtr_) << std::endl;
+  os << "DATASETAUXDATA ";
+  os << getTecplotTimeDateStamp();
+  os << std::endl;
 
-  (*outStreamPtr_) << "ZONE F=POINT";
+  os << "ZONE F=POINT";
 
 
   if (outputManager_.getStepParamVec().empty())
   {
-    (*outStreamPtr_) << " T=\"Xyce data\" ";
+    os << " T=\"Xyce data\" ";
   }
   else
   {
-    std::vector<N_ANP_SweepParam>::const_iterator iterParam;
-    std::vector<N_ANP_SweepParam>::const_iterator firstParam=outputManager_.getStepParamVec().begin();
-    std::vector<N_ANP_SweepParam>::const_iterator lastParam=outputManager_.getStepParamVec().end();
-
-    (*outStreamPtr_) << " T= \" ";
-    for (iterParam=firstParam;iterParam!=lastParam;++iterParam)
+    os << " T= \" ";
+    for (std::vector<N_ANP_SweepParam>::const_iterator it = outputManager_.getStepParamVec().begin(); 
+         it != outputManager_.getStepParamVec().end(); ++it)
     {
-      int tecplotHeaderPrecision_ = 2;
-      outStreamPtr_->setf(ios::scientific);
-      outStreamPtr_->precision( tecplotHeaderPrecision_);
-      (*outStreamPtr_) << " " << iterParam->name << " = ";
-      (*outStreamPtr_) << iterParam->currentVal;
+      static const int tecplotHeaderPrecision = 2;
+      os.setf(std::ios::scientific);
+      os.precision(tecplotHeaderPrecision);
+      os << " " << it->name << " = " << it->currentVal;
     }
-    (*outStreamPtr_) << "\" ";
+    os << "\" ";
   }
 
-  (*outStreamPtr_) << std::endl;
-  (*outStreamPtr_) << flush;
+  os << std::endl;
 
-
-  outStreamPtr_->setf(ios::scientific);
-  outStreamPtr_->precision(printParameters_.streamPrecision_);
-  outStreamPtr_->setf(ios::left, ios::adjustfield);
-
+  os.setf(std::ios::scientific);
+  os.precision(printParameters_.streamPrecision_);
+  os.setf(std::ios::left, std::ios::adjustfield);
 
   ++stepCount_;
 }
 
-void HomotopyTecPlot::doOutputTime(const N_LAS_Vector *solution_vector, const N_LAS_Vector *state_vector, const N_LAS_Vector *store_vector)
-{}
-
-void HomotopyTecPlot::doOutputMPDE(double time, const N_LAS_Vector *solution_vector)
-{}
-
-void HomotopyTecPlot::doOutputHomotopy(const std::vector<std::string> & parameter_names, const std::vector<double> & parameter_values, const N_LAS_Vector * solution_vector)
+//-----------------------------------------------------------------------------
+// Function      : HomotopyTecPlot::doOutputHomotopy
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void HomotopyTecPlot::doOutputHomotopy(const std::vector<std::string> & parameter_names, 
+    const std::vector<double> & parameter_values, const N_LAS_Vector * solution_vector)
 {
   outputManager_.setCurrentOutputter(this);
-  std::ostringstream ost;
-  ost << outputManager_.getProcID();
-  string pN(ost.str());
+
 
   double tmpTime = outputManager_.getAnaIntPtr()->getTime();
 
-  if (outputManager_.getProcID() == 0)
+  if (outputManager_.getProcID() == 0) 
   {
-
     if (firstTimeHomotopy_) //Setup Output Stream and Print Out Header
     {
       doOpen();
       doOutputHeader(parameter_names, parameter_values, solution_vector);
-
       firstTimeHomotopy_ = false;
-    }
-
-    if (printParameters_.delimiter_ == "")
-      outStreamPtr_->width(8);
-    else
-      outStreamPtr_->width(0);
-
-    if (printParameters_.delimiter_ == "")
-      outStreamPtr_->width(printParameters_.streamWidth_);
-
-    // Output homotopy params
-    for (int iparam=0;iparam < parameter_values.size(); ++iparam)
-    {
-
-      if (printParameters_.delimiter_ == "")
-        outStreamPtr_->width(printParameters_.streamWidth_);
-      else
-      {
-        outStreamPtr_->width(0);
-        if (printParameters_.delimiter_ != "")
-          (*outStreamPtr_) << printParameters_.delimiter_;
-      }
-
-      (*outStreamPtr_) << parameter_values[iparam];
-    }
-  } // procID
-
-  // output user-requested variables
-  ParameterList::const_iterator iterParam = printParameters_.variableList_.begin();
-  ParameterList::const_iterator last = printParameters_.variableList_.end();
-
-  bool foundFirstParam=false;
-  while ( iterParam != last &&  !foundFirstParam)
-  {
-    if (iterParam->getSimContext() != UNDEFINED)
-    {
-      // found the beginning so exit this loop
-      foundFirstParam=true;
-    }
-    else
-    {
-      ++iterParam;
     }
   }
 
-  int i;
-  for (i = 1; iterParam != last; ++iterParam, ++i)
-  {
-    double result;
-    result = 0.0;
-    if ( !((*iterParam).getSimContext() == TIME_VAR) )
-    {
-      result = outputManager_.getPrintValue(iterParam, solution_vector);
+  std::ostream &os = *outStreamPtr_;
 
-      if (outputManager_.getProcID() == 0)
+  int column_index = 0;
+  for (Util::OpList::const_iterator it = opList_.begin(); 
+      it != opList_.end(); ++it, ++column_index)
+  {
+    double result = 
+      getValue(outputManager_.getCommPtr()->comm(), *(*it), solution_vector, 0, 0, 0).real();
+    if (outputManager_.getProcID() == 0)
+    {
+      if (column_index == 0)
       {
-        if (printParameters_.delimiter_ == "")
-          outStreamPtr_->width(printParameters_.streamWidth_);
-        else
+        for (int i = 0; i < parameter_values.size(); ++i)
         {
-          outStreamPtr_->width(0);
-          if (printParameters_.delimiter_ != "")
-            (*outStreamPtr_) << printParameters_.delimiter_;
+          printValue(os, columnList_[i], printParameters_.delimiter_, 1, parameter_values[i]);
         }
-        (*outStreamPtr_) << result;
       }
+
+      printValue(os, printParameters_.table_.columnList_[column_index], 
+          printParameters_.delimiter_, column_index, result);
     }
+
     outputManager_.getCommPtr()->barrier();
   }
 
   if (outputManager_.getProcID() == 0)
-    (*outStreamPtr_) << std::endl;
+  {
+    os << std::endl;
+  }
+
+  ++index_;
 }
 
-void HomotopyTecPlot::doOutputMORTF(bool origSystem, const double & freq, const Teuchos::SerialDenseMatrix<int, std::complex<double> >& H)
-{}
-
-void HomotopyTecPlot::doOutputHB(
-  const std::vector<double>&    timePoints,
-  const std::vector<double>&    freqPoints,
-  const N_LAS_BlockVector &     timeDomainSolnVec,
-  const N_LAS_BlockVector &     freqDomainSolnVecReal,
-  const N_LAS_BlockVector &     freqDomainSolnVecImaginary)
-{
-}
-
-void
-HomotopyTecPlot::doOutputFrequency(double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
-{}
-
-
-void HomotopyTecPlot::doResetOutput()
-{}
-
+//-----------------------------------------------------------------------------
+// Function      : HomotopyTecPlot::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HomotopyTecPlot::doFinishOutput()
 {
+  if (outputManager_.getProcID() == 0)
+  {
+    if (outStreamPtr_)
+    {
+      if (!outputManager_.getSTEPEnabledFlag() && outputManager_.getPrintEndOfSimulationLine())
+      {
+        (*outStreamPtr_) << "End of Xyce(TM) Homotopy Simulation" << std::endl;
+      }
+    }
+
+    if (!outputManager_.getSTEPEnabledFlag())
+    {
+      outputManager_.closeFile(outStreamPtr_);
+      outStreamPtr_ = 0;
+    }
+  } // procID
   firstTimeHomotopy_ = true;
 }
 
-void
-HomotopyTecPlot::doFinishOutputStep()
+//-----------------------------------------------------------------------------
+// Function      : HomotopyTecPlot::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void HomotopyTecPlot::doFinishOutputStep()
 {
   // close the homotopy file.
   if (outStreamPtr_)
   {
-    (*outStreamPtr_) << "End of Xyce(TM) Homotopy Simulation" << std::endl;
+    if ( outputManager_.getPrintEndOfSimulationLine() )
+    {
+      (*outStreamPtr_) << "End of Xyce(TM) Homotopy Simulation" << std::endl;
+    }
   }
 
   outputManager_.closeFile(outStreamPtr_);
   outStreamPtr_ = 0;
 }
 
+//-----------------------------------------------------------------------------
+// Class         : HomotopyProbe
+// Purpose       : Outputter class for homotopy output, Probe output
+//                 format
+// Special Notes :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : HomotopyProbe::HomotopyProbe
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 HomotopyProbe::HomotopyProbe(OutputMgr &output_manager, const PrintParameters &print_parameters)
   : outputManager_(output_manager),
     printParameters_(print_parameters),
@@ -2911,32 +3948,44 @@ HomotopyProbe::HomotopyProbe(OutputMgr &output_manager, const PrintParameters &p
 {
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HomotopyProbe::~HomotopyProbe
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 HomotopyProbe::~HomotopyProbe()
 {
   outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
 }
 
-
-void HomotopyProbe::doParse()
+//-----------------------------------------------------------------------------
+// Function      :
+// Purpose       : HomotopyProbe::doParse
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void
+HomotopyProbe::doParse()
 {
-  string finalSuffix = ".prn";
-  if (outputManager_.getFormat() == Format::TECPLOT)
-  {
-    finalSuffix = ".dat";
-  }
-  else if (outputManager_.getFormat() == Format::CSV)
-  {
-    finalSuffix = ".csv";
-  }
-  else if (outputManager_.getFormat() == Format::PROBE)
-  {
-    finalSuffix = ".csd";
-  }
-
-  outFilename_ = outputManager_.getNetListFilename() + ".HOMOTOPY" + finalSuffix;
+  outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
 }
 
-void HomotopyProbe::doOpen()
+//-----------------------------------------------------------------------------
+// Function      : HomotopyProbe::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  HomotopyProbe::doOpen()
 {
   if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
   {
@@ -2944,134 +3993,114 @@ void HomotopyProbe::doOpen()
   }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HomotopyProbe::doOutputHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void HomotopyProbe::doOutputHeader(const std::vector<std::string> & parameter_names, const std::vector<double> & param_values, const N_LAS_Vector * solution_vector)
 {
+  std::ostream &os = *outStreamPtr_;
+
   index_ = 0;
 
-  ParameterList::const_iterator iterParam = printParameters_.variableList_.begin();
-  ParameterList::const_iterator last = printParameters_.variableList_.end();
+  printCount_ = opList_.size();
 
+  os << "#H" << std::endl;
 
-  while ( iterParam != last && iterParam->tag() != "I" &&
-          iterParam->tag() != "V" &&
-          iterParam->tag() != "VSTART" &&
-          !(iterParam->hasExpressionTag()))
-  {
-    ++iterParam;
-  }
-
-  printCount_ = 0;
-  ParameterList::const_iterator iterParam2;
-  for (iterParam2 = iterParam; iterParam2 != last; ++iterParam2)
-  {
-    if (iterParam2->tag() == "I" || iterParam2->tag() == "V" ||
-        iterParam2->hasExpressionTag() )
-      ++printCount_;
-  }
-
-  (* outStreamPtr_) << "#H" << std::endl;
-
-  (*outStreamPtr_) << "SOURCE='Xyce' VERSION='"
+  os << "SOURCE='Xyce' VERSION='"
                    << N_UTL_Version::getShortVersionString() << "'" << std::endl;
 
-  (*outStreamPtr_) << "TITLE='* " << outputManager_.getNetListFilename() << "'" << std::endl;
-  (*outStreamPtr_) << "SUBTITLE='spice probe data'" << std::endl;
+  os << "TITLE='* " << outputManager_.getNetListFilename() << "'" << std::endl;
+  os << "SUBTITLE='spice probe data'" << std::endl;
 
   // set the time/date stamp
-  (*outStreamPtr_) << getTimeDateStamp();
-  outStreamPtr_->setf(ios::scientific);
-  outStreamPtr_->precision(printParameters_.streamPrecision_);
-  (*outStreamPtr_) << "TEMPERATURE='" << outputManager_.getCircuitTemp();
-  (*outStreamPtr_) << "'" << std::endl;
+  os << getTimeDateStamp();
+  os.setf(std::ios::scientific);
+  os.precision(printParameters_.streamPrecision_);
+  os << "TEMPERATURE='" << outputManager_.getCircuitTemp();
+  os << "'" << std::endl;
 
   if (printParameters_.printType_ == PrintType::TRAN)
-    (*outStreamPtr_) << "ANALYSIS='Transient Analysis' SERIALNO='12345'" <<  std::endl;
+    os << "ANALYSIS='Transient Analysis' SERIALNO='12345'" <<  std::endl;
   else
-    (*outStreamPtr_) << "ANALYSIS='DC transfer characteristic' " <<
-      "SERIALNO='12345'" <<  std::endl;
+    os << "ANALYSIS='DC transfer characteristic' " << "SERIALNO='12345'" <<  std::endl;
 
-  (*outStreamPtr_) << "ALLVALUES='NO' COMPLEXVALUES='NO' " <<
-    "NODES='" << printCount_ << "'" << std::endl;
+  os << "ALLVALUES='NO' COMPLEXVALUES='NO' " << "NODES='" << printCount_ << "'" << std::endl;
 
   if (printParameters_.printType_ == PrintType::TRAN)
   {
-    (*outStreamPtr_) << "SWEEPVAR='Time' SWEEPMODE='VAR_STEP'" <<
-      std::endl;
+    os << "SWEEPVAR='Time' SWEEPMODE='VAR_STEP'" << std::endl;
   }
   else
   {
-    (*outStreamPtr_) << "SWEEPVAR='Voltage' SWEEPMODE='VAR_STEP'" <<
-      std::endl;
+    os << "SWEEPVAR='Voltage' SWEEPMODE='VAR_STEP'" <<std::endl;
   }
 
   // This line assumes that we're doing a homotopy that goes from 0 to 1.
   // This will never be a transient output.
-  (*outStreamPtr_) << "XBEGIN='0.0'  XEND='1.0'"<<std::endl;
+  os << "XBEGIN='0.0'  XEND='1.0'"<<std::endl;
 
-  (*outStreamPtr_) << "FORMAT='0 VOLTSorAMPS;EFLOAT : "
-                   << "NODEorBRANCH;NODE  '  " << std::endl;
+  os << "FORMAT='0 VOLTSorAMPS;EFLOAT : " << "NODEorBRANCH;NODE  '  " << std::endl;
 
-  (*outStreamPtr_) << "DGTLDATA='NO'" << std::endl;
+  os << "DGTLDATA='NO'" << std::endl;
 
-  (*outStreamPtr_) << "#N" << std::endl;
+  os << "#N" << std::endl;
 
   // print the continuation parameter names:
-  int i;
-  std::vector<std::string>::const_iterator iter_name;
-  for (i=0, iter_name=parameter_names.begin(); iter_name!= parameter_names.end();
-       ++iter_name, ++i)
+  int i = 0;
+  for (std::vector<std::string>::const_iterator iter_name = parameter_names.begin(); iter_name != parameter_names.end(); ++iter_name, ++i)
   {
-    (*outStreamPtr_) << "'";
-    (*outStreamPtr_) << *iter_name;
-    (*outStreamPtr_) << "' ";
+    os << "'" << *iter_name << "' ";
 
     if (i > 3)
     {
       i = 0;
-      (*outStreamPtr_) << std::endl;
+      os << std::endl;
     }
   }
 
   // print output variable names:
-  for (; iterParam != last; ++i)
+  for (Util::OpList::const_iterator it = opList_.begin(); it != opList_.end(); ++it, ++i)
   {
-    (*outStreamPtr_) << "'";
-    (*outStreamPtr_) << (*iterParam).tag();
-    (*outStreamPtr_) << "' ";
-
-    ++iterParam;
+    os << "'" << (*it)->getName() << "' ";
 
     if (i > 3)
     {
       i = 0;
-      (*outStreamPtr_) << std::endl;
+      os << std::endl;
     }
   }
-  if (i != 0)(*outStreamPtr_) << std::endl;
+  if (i != 0)
+    os << std::endl;
 
 
-  (*outStreamPtr_) << flush;
+  os.flush();
 
-  outStreamPtr_->setf(ios::scientific);
-  outStreamPtr_->precision(printParameters_.streamPrecision_);
-  outStreamPtr_->setf(ios::left, ios::adjustfield);
+  os.setf(std::ios::scientific);
+  os.precision(printParameters_.streamPrecision_);
+  os.setf(std::ios::left, std::ios::adjustfield);
 
 
   ++stepCount_;
 }
 
-void HomotopyProbe::doOutputTime(const N_LAS_Vector *solution_vector, const N_LAS_Vector *state_vector, const N_LAS_Vector *store_vector)
-{}
-
-void HomotopyProbe::doOutputMPDE(double time, const N_LAS_Vector *solution_vector)
-{}
-
-void HomotopyProbe::doOutputHomotopy(const std::vector<std::string> & parameter_names, const std::vector<double> & parameter_values, const N_LAS_Vector * solution_vector)
+//-----------------------------------------------------------------------------
+// Function      : HomotopyProbe::doOutputHomotopy
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  HomotopyProbe::doOutputHomotopy(const std::vector<std::string> & parameter_names, const std::vector<double> & parameter_values, const N_LAS_Vector * solution_vector)
 {
+  std::ostream &os = *outStreamPtr_;
+
   outputManager_.setCurrentOutputter(this);
-  std::ostringstream ost;
-  ost << outputManager_.getProcID();
-  string pN(ost.str());
 
   double tmpTime = outputManager_.getAnaIntPtr()->getTime();
 
@@ -3086,16 +4115,16 @@ void HomotopyProbe::doOutputHomotopy(const std::vector<std::string> & parameter_
       firstTimeHomotopy_ = false;
     }
 
-    outStreamPtr_->width( 0);
+    os.width( 0);
     if (printParameters_.printType_ == PrintType::TRAN)
     {
-      (*outStreamPtr_) << "#C " << tmpTime << " ";
-      (*outStreamPtr_) << printCount_ << std::endl;
+      os << "#C " << tmpTime << " ";
+      os << printCount_ << std::endl;
     }
     else
     {
-      (*outStreamPtr_) << "#C " << outputManager_.getPRINTDCvalue() << " ";
-      (*outStreamPtr_) << printCount_ << std::endl;
+      os << "#C " << outputManager_.getPRINTDCvalue() << " ";
+      os << printCount_ << std::endl;
     }
 
     //-------------------------------------
@@ -3106,87 +4135,70 @@ void HomotopyProbe::doOutputHomotopy(const std::vector<std::string> & parameter_
     {
 
       if (printParameters_.delimiter_ == "")
-        outStreamPtr_->width(printParameters_.streamWidth_);
+      {
+        os.width(printParameters_.streamWidth_);
+      }
       else
       {
-        outStreamPtr_->width(0);
+        os.width(0);
         if (printParameters_.delimiter_ != "")
-          (*outStreamPtr_) << printParameters_.delimiter_;
+          os << printParameters_.delimiter_;
       }
 
-      (*outStreamPtr_) << parameter_values[iparam];
+      os << parameter_values[iparam];
     }
   } // procID
 
-  ParameterList::const_iterator iterParam = printParameters_.variableList_.begin();
-  ParameterList::const_iterator last = printParameters_.variableList_.end();
-
-  bool foundFirstParam=false;
-  while ( iterParam != last &&  !foundFirstParam)
-  {
-    if (iterParam->getSimContext() != UNDEFINED)
-    {
-      // found the beginning so exit this loop
-      foundFirstParam=true;
-    }
-    else
-    {
-      ++iterParam;
-    }
-  }
+  Util::OpList::const_iterator iterParam = opList_.begin();
+  Util::OpList::const_iterator last = opList_.end();
 
   int i;
   for (i = 1; iterParam != last; ++iterParam, ++i)
   {
-    double result;
-    result = 0.0;
-    result = outputManager_.getPrintValue(iterParam, solution_vector);
-
+    double result = getValue(outputManager_.getCommPtr()->comm(), *(*iterParam), solution_vector, 0, 0, 0).real();
     if (outputManager_.getProcID() == 0)
     {
       if (printParameters_.delimiter_ == "")
-        outStreamPtr_->width(printParameters_.streamWidth_);
+      {
+        os.width(printParameters_.streamWidth_);
+      }
       else
       {
-        outStreamPtr_->width(0);
+        os.width(0);
         if (printParameters_.delimiter_ != "")
-          (*outStreamPtr_) << printParameters_.delimiter_;
+          os << printParameters_.delimiter_;
       }
-      (*outStreamPtr_) << result;
+      os << result;
     }
 
     outputManager_.getCommPtr()->barrier();
   }
 
   if (outputManager_.getProcID() == 0)
-    (*outStreamPtr_) << std::endl;
+    os << std::endl;
 }
 
-void HomotopyProbe::doOutputMORTF(bool origSystem, const double & freq, const Teuchos::SerialDenseMatrix<int, std::complex<double> >& H)
-{}
-
-void HomotopyProbe::doOutputHB(
-  const std::vector<double>&    timePoints,
-  const std::vector<double>&    freqPoints,
-  const N_LAS_BlockVector &     timeDomainSolnVec,
-  const N_LAS_BlockVector &     freqDomainSolnVecReal,
-  const N_LAS_BlockVector &     freqDomainSolnVecImaginary)
-{
-}
-
-void
-HomotopyProbe::doOutputFrequency(double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
-{}
-
-
-void HomotopyProbe::doResetOutput()
-{}
-
-void HomotopyProbe::doFinishOutput()
+//-----------------------------------------------------------------------------
+// Function      : HomotopyProbe::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  HomotopyProbe::doFinishOutput()
 {
   firstTimeHomotopy_ = true;
 }
 
+//-----------------------------------------------------------------------------
+// Function      : HomotopyProbe::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void
 HomotopyProbe::doFinishOutputStep()
 {
@@ -3200,6 +4212,702 @@ HomotopyProbe::doFinishOutputStep()
   outStreamPtr_ = 0;
 }
 
+
+
+//-----------------------------------------------------------------------------
+// Class         : SensitivityPrn
+// Purpose       : Outputter class for sensitivity output, standard (PRN) output
+//                 format
+// Special Notes :
+// Creator       : Eric Keiter
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : SensitivityPrn::SensitivityPrn
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : Eric Keiter
+// Creation Date :
+//-----------------------------------------------------------------------------
+SensitivityPrn::SensitivityPrn(OutputMgr &output_manager, const PrintParameters &print_parameters)
+  : outputManager_(output_manager),
+    printParameters_(print_parameters),
+    outFilename_(),
+    outStreamPtr_(0),
+    stepCount_(0),
+    index_(0),
+    printCount_(0),
+    firstTimeSensitivity_(true),
+    headerPrintCalls_(0)
+{
+  if (printParameters_.defaultExtension_.empty())
+    printParameters_.defaultExtension_ = "SENS.prn";
+
+  fixupColumns(outputManager_, printParameters_, opList_);
+}
+
+//-----------------------------------------------------------------------------
+// Function      : SensitivityPrn::~SensitivityPrn
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : Eric Keiter
+// Creation Date :
+//-----------------------------------------------------------------------------
+SensitivityPrn::~SensitivityPrn()
+{
+  outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
+}
+
+
+//-----------------------------------------------------------------------------
+// Function      : SensitivityPrn::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : Eric Keiter
+// Creation Date :
+//-----------------------------------------------------------------------------
+void SensitivityPrn::doParse()
+{
+  outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
+}
+
+//-----------------------------------------------------------------------------
+// Function      : SensitivityPrn::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : Eric Keiter
+// Creation Date :
+//-----------------------------------------------------------------------------
+void SensitivityPrn::doOpen()
+{
+  if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
+  {
+    outStreamPtr_ = outputManager_.openFile(outFilename_);
+  }
+}
+
+//-----------------------------------------------------------------------------
+// Function      : SensitivityPrn::sensitivityHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : Eric Keiter
+// Creation Date :
+//-----------------------------------------------------------------------------
+void SensitivityPrn::sensitivityHeader(
+    const std::vector<std::string> & parameter_names)
+{
+  std::ostream &os = *outStreamPtr_;
+
+  if (columnList_.empty())
+  {
+    Table::Justification justification = 
+      printParameters_.delimiter_.empty() ? Table::JUSTIFICATION_CENTER :  Table::JUSTIFICATION_NONE;
+
+    for (std::vector<std::string>::const_iterator 
+        it = parameter_names.begin(); it != parameter_names.end(); ++it)
+    {
+      columnList_.push_back(Table::Column((*it), std::ios_base::scientific, 
+            printParameters_.streamWidth_, 
+            printParameters_.streamPrecision_, 
+            justification));
+    }
+  }
+
+  index_ = 0;
+
+  if (stepCount_ == 0)
+  {
+    int column_index = 0;
+    for (Table::ColumnList::const_iterator 
+        it = printParameters_.table_.columnList_.begin(); 
+        it != printParameters_.table_.columnList_.end(); 
+        ++it, ++column_index)
+    {
+      if (it != printParameters_.table_.columnList_.begin())
+      {
+        os << (printParameters_.delimiter_.empty() ? " " : printParameters_.delimiter_);
+      }
+      printHeader(os, (*it));
+    }
+
+    for (Table::ColumnList::const_iterator it2 = columnList_.begin(); it2 != columnList_.end(); ++it2)
+    {
+      if (it2 != columnList_.begin())
+      {
+        os << printParameters_.delimiter_;
+      }
+      printHeader(os, (*it2));
+    }
+    os << std::endl;
+  }
+
+  ++stepCount_;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : SensitivityPrn::doOutputSensitivity
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : Eric Keiter
+// Creation Date :
+//-----------------------------------------------------------------------------
+void SensitivityPrn::doOutputSensitivity(
+    const std::vector<std::string> & parameter_names, 
+    const std::vector<double> & objective_values, 
+    const std::vector<double> & direct_values, 
+    const std::vector<double> & adjoint_values,
+    const std::vector<double> & scaled_direct_values, 
+    const std::vector<double> & scaled_adjoint_values,
+    const N_LAS_Vector *solution_vector,
+    const N_LAS_Vector *state_vector, 
+    const N_LAS_Vector *store_vector)
+{
+  outputManager_.setCurrentOutputter(this);
+
+  double tmpTime = outputManager_.getAnaIntPtr()->getTime();
+
+  if (outputManager_.getProcID() == 0)
+  {
+
+    if (firstTimeSensitivity_) //Setup Output Stream and Print Out Header
+    {
+      doOpen();
+
+      sensitivityHeader(parameter_names);
+
+      firstTimeSensitivity_ = false;
+
+      ++headerPrintCalls_;
+
+      index_ = 0;
+    }
+  }
+
+  std::ostream &os = *outStreamPtr_;
+  outputManager_.getCommPtr()->barrier();
+
+  int column_index = 0;
+  for (Util::OpList::const_iterator it = opList_.begin(); it != opList_.end(); ++it, ++column_index)
+  {
+     double result = getValue(outputManager_.getCommPtr()->comm(), *(*it), 
+         solution_vector, 0, state_vector, store_vector).real();
+
+    result = filter(result, printParameters_.filter_);
+
+    if ((*it)->opType() == Util::TIME_VAR)
+      result *= printParameters_.outputTimeScaleFactor_;
+
+    if (outputManager_.getProcID() == 0)
+      printValue(os, printParameters_.table_.columnList_[column_index], 
+          printParameters_.delimiter_, column_index, result);
+
+    outputManager_.getCommPtr()->barrier();
+  }
+
+  for (int i = 0; i < objective_values.size(); ++i)
+  {
+    if (outputManager_.getProcID() == 0)
+    {
+      printValue(os, columnList_[i], printParameters_.delimiter_, 1, objective_values[i]);
+    }
+    outputManager_.getCommPtr()->barrier();
+  }
+
+  for (int i = 0; i < direct_values.size(); ++i)
+  {
+    if (outputManager_.getProcID() == 0)
+    {
+      printValue(os, columnList_[i], printParameters_.delimiter_, 1, direct_values[i]);
+    }
+    outputManager_.getCommPtr()->barrier();
+  }
+
+  for (int i = 0; i < scaled_direct_values.size(); ++i)
+  {
+    if (outputManager_.getProcID() == 0)
+    {
+      printValue(os, columnList_[i], printParameters_.delimiter_, 1, scaled_direct_values[i]);
+    }
+    outputManager_.getCommPtr()->barrier();
+  }
+
+  for (int i = 0; i < adjoint_values.size(); ++i)
+  {
+    if (outputManager_.getProcID() == 0)
+    {
+      printValue(os, columnList_[i], printParameters_.delimiter_, 1, adjoint_values[i]);
+    }
+    outputManager_.getCommPtr()->barrier();
+  }
+
+  for (int i = 0; i < scaled_adjoint_values.size(); ++i)
+  {
+    if (outputManager_.getProcID() == 0)
+    {
+      printValue(os, columnList_[i], printParameters_.delimiter_, 1, scaled_adjoint_values[i]);
+    }
+    outputManager_.getCommPtr()->barrier();
+  }
+
+  if (outputManager_.getProcID() == 0)
+  {
+    os << std::endl;
+  }
+
+  ++index_;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : SensitivityPrn::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : Eric Keiter
+// Creation Date :
+//-----------------------------------------------------------------------------
+void SensitivityPrn::doFinishOutput()
+{
+  if (outputManager_.getProcID() == 0)
+  {
+
+    if (outStreamPtr_)
+    {
+      if (!outputManager_.getSTEPEnabledFlag() && outputManager_.getPrintEndOfSimulationLine())
+      {
+        (*outStreamPtr_) << "End of Xyce(TM) Simulation" << std::endl;
+        // set to zero so that if there is more output, as in MPDE,
+        // a new header will get printed as well.  Can't do this
+        // at the top of this function as it would break .STEP's use
+        // of this function.
+        headerPrintCalls_ = 0;
+      }
+    }
+
+    if (!outputManager_.getSTEPEnabledFlag())
+    {
+      outputManager_.closeFile(outStreamPtr_);
+      outStreamPtr_ = 0;
+    }
+  } // procID
+
+  firstTimeSensitivity_ = true;
+  index_ = 0;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : SensitivityPrn::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : Eric Keiter
+// Creation Date :
+//-----------------------------------------------------------------------------
+void SensitivityPrn::doFinishOutputStep()
+{
+  // close the sensitivity file.
+  if (outStreamPtr_)
+  {
+    if ( outputManager_.getPrintEndOfSimulationLine() )
+    {
+      (*outStreamPtr_) << "End of Xyce(TM) Sensitivity Simulation" << std::endl;
+    }
+  }
+
+  outputManager_.closeFile(outStreamPtr_);
+  outStreamPtr_ = 0;
+}
+
+
+//-----------------------------------------------------------------------------
+// Class         : SensitivityTecPlot
+// Purpose       : Outputter class for sensitivity output, TecPlot output
+//                 format
+// Special Notes :
+// Creator       : Eric Keiter
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : SensitivityTecPlot::SensitivityTecPlot
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : Eric Keiter
+// Creation Date :
+//-----------------------------------------------------------------------------
+SensitivityTecPlot::SensitivityTecPlot(OutputMgr &output_manager, const PrintParameters &print_parameters)
+  : outputManager_(output_manager),
+    printParameters_(print_parameters),
+    outFilename_(),
+    outStreamPtr_(0),
+    stepCount_(0),
+    index_(0),
+    printCount_(0),
+    firstTimeSensitivity_(true),
+    headerPrintCalls_(0)
+{
+  if (printParameters_.defaultExtension_.empty())
+    printParameters_.defaultExtension_ = "SENS.dat";
+
+  fixupColumns(outputManager_, printParameters_, opList_);
+}
+
+//-----------------------------------------------------------------------------
+// Function      : SensitivityTecPlot::~SensitivityTecPlot
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : Eric Keiter
+// Creation Date :
+//-----------------------------------------------------------------------------
+SensitivityTecPlot::~SensitivityTecPlot()
+{
+  outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
+}
+
+//-----------------------------------------------------------------------------
+// Function      : SensitivityTecPlot::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : Eric Keiter
+// Creation Date :
+//-----------------------------------------------------------------------------
+void SensitivityTecPlot::doParse()
+{
+  outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
+}
+
+//-----------------------------------------------------------------------------
+// Function      : SensitivityTecPlot::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : Eric Keiter
+// Creation Date :
+//-----------------------------------------------------------------------------
+void SensitivityTecPlot::doOpen()
+{
+  if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
+  {
+    outStreamPtr_ = outputManager_.openFile(outFilename_);
+  }
+}
+
+//-----------------------------------------------------------------------------
+// Function      : SensitivityTecPlot::sensitivityHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : Eric Keiter
+// Creation Date :
+//-----------------------------------------------------------------------------
+void SensitivityTecPlot::sensitivityHeader(
+    const std::vector<std::string> & parameter_names)
+{
+  std::ostream &os = *outStreamPtr_;
+
+  if (columnList_.empty())
+  {
+    Table::Justification justification = 
+      printParameters_.delimiter_.empty() ? Table::JUSTIFICATION_CENTER :  Table::JUSTIFICATION_NONE;
+
+    for (std::vector<std::string>::const_iterator 
+        it = parameter_names.begin(); it != parameter_names.end(); ++it)
+    {
+      columnList_.push_back(Table::Column((*it), std::ios_base::scientific, 
+            printParameters_.streamWidth_, 
+            printParameters_.streamPrecision_, 
+            justification));
+    }
+  }
+
+
+  index_ = 0;
+  if (outputManager_.getProcID() == 0)
+  {
+    int tecplotHeaderPrecision_ = 2;
+
+    if (stepCount_ == 0)
+    {
+      os << "TITLE = \"" << outputManager_.getNetListFilename() << " - " << outputManager_.getTitle() << "\", " << std::endl;
+      os << "\tVARIABLES = ";
+
+      // output the user-specified solution vars:
+      for (Util::OpList::const_iterator 
+          it = opList_.begin() ; it != opList_.end(); ++it)
+      {
+        os << "\" " << (*it)->getName() << "\" " << std::endl;
+      }
+
+      // output the .sens params
+      std::vector<std::string>::const_iterator iter_name;
+      for (iter_name = parameter_names.begin(); iter_name!= parameter_names.end(); ++iter_name)
+      {
+        os << "\" ";
+        os << *iter_name;
+        os << "\" " << std::endl;
+      }  
+
+      // output some AUXDATA
+      os << "DATASETAUXDATA " << getTecplotTimeDateStamp() << std::endl;
+
+      if (!outputManager_.getTempSweepFlag())
+      {
+        os.setf(std::ios::scientific);
+        os.precision( tecplotHeaderPrecision_);
+        os << "DATASETAUXDATA TEMP = \"" << outputManager_.getCircuitTemp() << " \"" << std::endl;
+      }
+
+    } // print header calls=0
+
+    os << "ZONE F=POINT ";
+
+
+    if (outputManager_.getStepParamVec().empty())
+    {
+      os << "T=\"Xyce data\" ";
+    }
+    else
+    {
+      os.setf(std::ios::scientific);
+      os.precision( tecplotHeaderPrecision_);
+      os << "T= \" ";
+      for (std::vector<N_ANP_SweepParam>::const_iterator 
+          it = outputManager_.getStepParamVec().begin(); 
+          it != outputManager_.getStepParamVec().end(); ++it)
+      {
+        os << " " << it->name << " = " << it->currentVal;
+      }
+      os << "\" ";
+    }
+    os << std::endl;
+
+    os.setf(std::ios::scientific);
+    os.precision(printParameters_.streamPrecision_);
+
+    // put in the various sweep parameters as auxdata:
+    if (!outputManager_.getStepParamVec().empty())
+    {
+      for (std::vector<N_ANP_SweepParam>::const_iterator 
+          it = outputManager_.getStepParamVec().begin(); 
+          it != outputManager_.getStepParamVec().end(); ++it)
+      {
+        // convert any ":" or "%" in the name to a "_", so as not to confuse tecplot.
+        std::string name(it->name);
+        std::replace(name.begin(), name.end(), '%', '_');
+        std::replace(name.begin(), name.end(), ':', '_');
+        os << "AUXDATA " << name << " = " << "\" " << it->currentVal << "\" ";
+      }
+      os << std::endl;
+    }
+
+    os.setf(std::ios::left, std::ios::adjustfield);
+
+  } // procID
+
+  ++stepCount_;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : SensitivityTecPlot::doOutputSensitivity
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : Eric Keiter
+// Creation Date :
+//-----------------------------------------------------------------------------
+void SensitivityTecPlot::doOutputSensitivity(
+    const std::vector<std::string> & parameter_names, 
+    const std::vector<double> & objective_values, 
+    const std::vector<double> & direct_values, 
+    const std::vector<double> & adjoint_values,
+    const std::vector<double> & scaled_direct_values, 
+    const std::vector<double> & scaled_adjoint_values,
+    const N_LAS_Vector *solution_vector,
+    const N_LAS_Vector *state_vector, 
+    const N_LAS_Vector *store_vector)
+{
+  outputManager_.setCurrentOutputter(this);
+  double tmpTime = outputManager_.getAnaIntPtr()->getTime();
+
+  if (outputManager_.getProcID() == 0)
+  {
+
+    if (firstTimeSensitivity_) //Setup Output Stream and Print Out Header
+    {
+      doOpen();
+
+      sensitivityHeader(parameter_names);
+
+      firstTimeSensitivity_ = false;
+
+      ++headerPrintCalls_;
+
+      index_ = 0;
+    }
+  }
+
+  std::ostream &os = *outStreamPtr_;
+  outputManager_.getCommPtr()->barrier();
+
+  int column_index = 0;
+  for (Util::OpList::const_iterator it = opList_.begin(); it != opList_.end(); ++it, ++column_index)
+  {
+     double result = getValue(outputManager_.getCommPtr()->comm(), *(*it), 
+         solution_vector, 0, state_vector, store_vector).real();
+
+    result = filter(result, printParameters_.filter_);
+
+    if ((*it)->opType() == Util::TIME_VAR)
+      result *= printParameters_.outputTimeScaleFactor_;
+
+    if (outputManager_.getProcID() == 0)
+      printValue(os, printParameters_.table_.columnList_[column_index], 
+          printParameters_.delimiter_, column_index, result);
+
+    outputManager_.getCommPtr()->barrier();
+  }
+
+  for (int i = 0; i < objective_values.size(); ++i)
+  {
+    if (outputManager_.getProcID() == 0)
+    {
+      printValue(os, columnList_[i], printParameters_.delimiter_, 1, objective_values[i]);
+    }
+    outputManager_.getCommPtr()->barrier();
+  }
+
+  for (int i = 0; i < direct_values.size(); ++i)
+  {
+    if (outputManager_.getProcID() == 0)
+    {
+      printValue(os, columnList_[i], printParameters_.delimiter_, 1, direct_values[i]);
+    }
+    outputManager_.getCommPtr()->barrier();
+  }
+
+  for (int i = 0; i < scaled_direct_values.size(); ++i)
+  {
+    if (outputManager_.getProcID() == 0)
+    {
+      printValue(os, columnList_[i], printParameters_.delimiter_, 1, scaled_direct_values[i]);
+    }
+    outputManager_.getCommPtr()->barrier();
+  }
+
+  for (int i = 0; i < adjoint_values.size(); ++i)
+  {
+    if (outputManager_.getProcID() == 0)
+    {
+      printValue(os, columnList_[i], printParameters_.delimiter_, 1, adjoint_values[i]);
+    }
+    outputManager_.getCommPtr()->barrier();
+  }
+
+  for (int i = 0; i < scaled_adjoint_values.size(); ++i)
+  {
+    if (outputManager_.getProcID() == 0)
+    {
+      printValue(os, columnList_[i], printParameters_.delimiter_, 1, scaled_adjoint_values[i]);
+    }
+    outputManager_.getCommPtr()->barrier();
+  }
+
+  if (outputManager_.getProcID() == 0)
+  {
+    os << std::endl;
+  }
+
+  ++index_;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : SensitivityTecPlot::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : Eric Keiter
+// Creation Date :
+//-----------------------------------------------------------------------------
+void SensitivityTecPlot::doFinishOutput()
+{
+    if (outputManager_.getProcID() == 0)
+  {
+
+    if (outStreamPtr_)
+    {
+      if (!outputManager_.getSTEPEnabledFlag() && outputManager_.getPrintEndOfSimulationLine())
+      {
+        (*outStreamPtr_) << "End of Xyce(TM) Simulation" << std::endl;
+        // set to zero so that if there is more output, as in MPDE,
+        // a new header will get printed as well.  Can't do this
+        // at the top of this function as it would break .STEP's use
+        // of this function.
+        headerPrintCalls_ = 0;
+      }
+    }
+
+    if (!outputManager_.getSTEPEnabledFlag())
+    {
+      outputManager_.closeFile(outStreamPtr_);
+      outStreamPtr_ = 0;
+    }
+  } // procID
+
+  firstTimeSensitivity_ = true;
+  index_ = 0;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : SensitivityTecPlot::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : Eric Keiter
+// Creation Date :
+//-----------------------------------------------------------------------------
+void SensitivityTecPlot::doFinishOutputStep()
+{
+  // close the sensitivity file.
+  if (outStreamPtr_)
+  {
+    if ( outputManager_.getPrintEndOfSimulationLine() )
+    {
+      (*outStreamPtr_) << "End of Xyce(TM) Sensitivity Simulation" << std::endl;
+    }
+  }
+
+  outputManager_.closeFile(outStreamPtr_);
+  outStreamPtr_ = 0;
+}
+
+//-----------------------------------------------------------------------------
+// Class         : TimeRaw
+// Purpose       : Outputter class for transient output, rawfile output
+//                 format
+// Special Notes : Invoked by "FORMAT=raw" on .print line, not -r on command
+//                 line.  -r is handled by the "OverrideRaw" classes.
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : TimeRaw::TimeRaw
+// Purpose       : Constructor
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 TimeRaw::TimeRaw(OutputMgr &output_manager, const PrintParameters &print_parameters)
   : outputManager_(output_manager),
     printParameters_(print_parameters),
@@ -3209,31 +4917,386 @@ TimeRaw::TimeRaw(OutputMgr &output_manager, const PrintParameters &print_paramet
     numPointsPos_( 0),
     outputRAWTitleAndDate_(false)
 {
-  if (printParameters_.extension_.empty())
-    printParameters_.extension_ = ".raw";
+  if (printParameters_.defaultExtension_.empty())
+    printParameters_.defaultExtension_ = ".raw";
 
-  fixupColumns(outputManager_, printParameters_);
+  fixupColumns(outputManager_, printParameters_, opList_);
 }
 
-TimeRaw::~TimeRaw() {
+//-----------------------------------------------------------------------------
+// Function      : TimeRaw::~TimeRaw
+// Purpose       : destructor
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+TimeRaw::~TimeRaw()
+{
   outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
 }
 
-void TimeRaw::doParse() {
-  // prepare output manager to write
+//-----------------------------------------------------------------------------
+// Function      : TimeRaw::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  TimeRaw::doParse() {
   outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
 }
 
 
-void TimeRaw::doOpen()
+//-----------------------------------------------------------------------------
+// Function      : TimeRaw::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  TimeRaw::doOpen()
 {
   if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
     outStreamPtr_ = outputManager_.openBinaryFile(outFilename_);
 }
 
-void TimeRaw::timeHeader()
+//-----------------------------------------------------------------------------
+// Function      : TimeRaw::timeHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  TimeRaw::timeHeader()
 {
-  std::vector< pair< std::string, char > > nT;
+  NodeNamePairMap::iterator name_i, name_end;
+  name_end = outputManager_.getAllNodes().end();
+
+  std::ostream &os = *outStreamPtr_;
+
+  if (outputManager_.getProcID() == 0)
+  {
+    if (!outputRAWTitleAndDate_)
+    {
+      // in multi-plot RAW files, the Title and Date are only output once
+      // afer that each plot gets the same header.  Thus, only do this section
+      // once.
+
+      outputRAWTitleAndDate_ = true;
+
+      os << "Title: " << outputManager_.getTitle() << std::endl;
+
+      // create formatted timestamp
+      const time_t now = time( NULL);
+      char timeDate[ 40 ];
+      strftime( timeDate, 40, "%a %b %d %I:%M:%S %Y", localtime( &now));
+      os << "Date: " << timeDate << std::endl;
+    }
+
+    // format plot name
+    std::ostringstream plotName;
+
+    if (!outputManager_.getStepParamVec().empty())
+    {
+      plotName << "Step Analysis: Step " << outputManager_.getStepLoopNumber() + 1
+               << " of " << outputManager_.getMaxParamSteps()
+               << " params: ";
+      for (std::vector<N_ANP_SweepParam>::const_iterator it = outputManager_.getStepParamVec().begin();
+          it != outputManager_.getStepParamVec().end(); ++it)
+      {
+        plotName << " name = " << it->name << " value = " << it->currentVal << "  ";
+      }
+    }
+
+    // while there is a doOutputHeaderAC(), AC can call this function
+    // if it outputting a DC operating point.  Thus it's included
+    // in this if statement.
+    if (printParameters_.printType_ == PrintType::TRAN)
+    {
+      plotName << "Transient Analysis";
+    }
+    else if ( printParameters_.printType_ == PrintType::AC)
+    {
+      plotName << "DC operating point";
+    }
+    else
+    {
+      plotName << "DC transfer characteristic";
+    }
+
+    os << "Plotname: " << plotName.str() << std::endl;
+
+    // format the flags
+    std::string flags("real");
+    os << "Flags: " << flags << std::endl;
+
+  } // end proc0 check
+
+  // prepare header for partial dump
+  int numVars = 0;
+  if (printParameters_.printType_ == PrintType::DC)
+    ++numVars;
+
+  numVars += opList_.size();
+
+  // format number of internal and external variables included here + time
+  if (outputManager_.getProcID() == 0)
+  {
+    os << "No. Variables: " << numVars << std::endl;
+
+    // format total number of data points & remember the streampos
+    os << "No. Points: ";
+    numPointsPos_ = outStreamPtr_->tellp(); // <= 344 due to 80 char line limit
+    os << "                  " << std::endl; // this will be overwritten
+
+    if (outputManager_.getOutputVersionInRawFile() )
+    {
+      // spice3 does not output the version number of the simulator in the 
+      // in the raw file header.  Optionally let one output the version 
+      // if whatever program is going to read the file expects it
+      os << "Version: " << N_UTL_Version::getFullVersionString() << std::endl;
+    }
+
+    // NOTE: dimensions, command, options, and scale not considered
+
+    // write the variable information
+    os << "Variables:" << std::endl;
+
+    // The variable list appears next.  The format is:
+    //         [tab](index) [tab](name) [tab](type)
+    // Note that the(index) corresponds to the rawfile, not the soln vec.
+
+    // write variable names for select data points
+    std::string tmpNodeName, tmpType;
+    int i = 0;
+    if (printParameters_.printType_ == PrintType::DC)
+    {
+      os << "\t" << 0 << "\t" << "sweep\tvoltage\n";
+      ++i;
+    }
+
+    for (Util::OpList::const_iterator it = opList_.begin() ; it != opList_.end(); ++it, ++i)
+    {
+      // set the type
+      if (Util::hasExpressionTag((*it)->getName())) { tmpType = "expression"; }
+      else if ((*it)->getName() == "INDEX")  { }
+      else if ((*it)->getName() == "TIME")  { tmpType = "time"; }
+      else if ((*it)->getName() == "FREQUENCY")  { tmpType = "frequency"; }
+      else if ((*it)->getName()[0] == 'I')  { tmpType = "current";    }
+      else if ((*it)->getName()[0] == 'V')  { tmpType = "voltage";    }
+      else                              { tmpType = "unknown";    }
+
+      // write the header line
+      os << "\t" << i
+         << "\t" << (*it)->getName()
+         << "\t" << tmpType
+         << "\n";
+
+      // NOTE: other types, and params & dims, not considered
+    }
+
+    // write data marker
+    // this string is actually ignored, but the pair of EOL markers is used
+    os << "Binary:" << std::endl;
+  }
+}
+
+//-----------------------------------------------------------------------------
+// Function      : TimeRaw::doOutputTime
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  TimeRaw::doOutputTime(
+    const N_LAS_Vector * solnVecPtr, 
+    const N_LAS_Vector * stateVecPtr, 
+    const N_LAS_Vector * storeVecPtr)
+{
+  outputManager_.setCurrentOutputter(this);
+
+  // write rawfile header on first call
+  if (numPoints_ == 0)
+  {
+    doOpen();
+
+    timeHeader();
+  }
+
+  std::ostream &os = *outStreamPtr_;
+
+  // file IO on proc 0 only
+  if (outputManager_.getProcID() == 0)
+  {
+    // output the time/step values
+    switch (printParameters_.printType_)
+    {
+      case PrintType::TRAN:
+        break;
+
+      case PrintType::AC:
+        break;
+
+      case PrintType::DC:
+      {
+        double dc_sweep = outputManager_.getPRINTDCvalue();
+        outStreamPtr_->write((char *) &dc_sweep, sizeof(double));
+      }
+      break;
+    }
+  }
+
+  // select values to write from .PRINT line if FORMAT=RAW
+  for (Util::OpList::const_iterator it = opList_.begin() ; it != opList_.end(); ++it)
+  {
+    // retrieve values from all procs
+    double result = getValue(outputManager_.getCommPtr()->comm(),  *(*it), solnVecPtr, 0, 0, 0).real();
+    if ((*it)->opType() == Xyce::Util::TIME_VAR)
+      result *= printParameters_.outputTimeScaleFactor_;
+
+    // file IO only on proc 0
+    if (outputManager_.getProcID() == 0)
+    {
+      outStreamPtr_->write((char *) &result , sizeof(result));
+    } // end proc0
+  } // end for
+
+  outputManager_.getCommPtr()->barrier();
+
+  // keep track of number of datapoints
+  ++numPoints_;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : TimeRaw::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  TimeRaw::doFinishOutput()
+{
+  if (outputManager_.getProcID() == 0)
+  {
+    if (outStreamPtr_ && numPoints_ != 0)
+    {
+
+      // need to move file pointer back to header and
+      // write out the number of points.
+      long currentFilePos = outStreamPtr_->tellp();
+
+      // locate the position for number of points
+      outStreamPtr_->seekp( numPointsPos_);
+
+      // overwrite blank space with value
+      (*outStreamPtr_) << numPoints_;
+
+      // move file pointer to the end again.
+      outStreamPtr_->seekp( currentFilePos);
+    }
+  }
+
+  // reset numPoints_ as it is used as a flag to print the header.
+  numPoints_ = 0;
+}
+
+//-----------------------------------------------------------------------------
+// Class         : FrequencyRaw
+// Purpose       : Outputter class for frequency-domain output, rawfile output
+//                 format
+// Special Notes : Invoked by "FORMAT=raw" on .print line, not -r on command
+//                 line.  -r is handled by the "OverrideRaw" classes.
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : FrequencyRaw::FrequencyRaw
+// Purpose       : Constructor
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+FrequencyRaw::FrequencyRaw(OutputMgr &output_manager, const PrintParameters &print_parameters)
+  : outputManager_(output_manager),
+    printParameters_(print_parameters),
+    outFilename_(""),
+    outStreamPtr_( NULL),
+    numPoints_( 0),
+    numPointsPos_( 0),
+    outputRAWTitleAndDate_(false)
+{
+  if (printParameters_.defaultExtension_.empty())
+    printParameters_.defaultExtension_ = ".raw";
+
+  fixupColumns(outputManager_, printParameters_, opList_);
+}
+
+//-----------------------------------------------------------------------------
+// Function      : FrequencyRaw::~FrequencyRaw
+// Purpose       : destructor
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+FrequencyRaw::~FrequencyRaw()
+{
+  outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
+}
+
+//-----------------------------------------------------------------------------
+// Function      : FrequencyRaw::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  FrequencyRaw::doParse()
+{
+  // prepare output manager to write
+  numPoints_ = 0;
+
+  outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
+}
+
+
+//-----------------------------------------------------------------------------
+// Function      : FrequencyRaw::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  FrequencyRaw::doOpen()
+{
+  if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
+    outStreamPtr_ = outputManager_.openBinaryFile(outFilename_);
+}
+
+
+//-----------------------------------------------------------------------------
+// Function      : FrequencyRaw::frequencyHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  FrequencyRaw::frequencyHeader()
+{
   NodeNamePairMap::iterator name_i, name_end;
   name_end = outputManager_.getAllNodes().end();
 
@@ -3266,13 +5329,337 @@ void TimeRaw::timeHeader()
       plotName << "Step Analysis: Step " << outputManager_.getStepLoopNumber() + 1
                << " of " << outputManager_.getMaxParamSteps()
                << " params: ";
-      std::vector<N_ANP_SweepParam>::const_iterator currItr = outputManager_.getStepParamVec().begin();
-      std::vector<N_ANP_SweepParam>::const_iterator endItr = outputManager_.getStepParamVec().end();
+      for (std::vector<N_ANP_SweepParam>::const_iterator it = outputManager_.getStepParamVec().begin();
+          it != outputManager_.getStepParamVec().end(); ++it)
+      {
+        plotName << " name = " << it->name << " value = " << it->currentVal << "  ";
+      }
+    }
+    if (!outputManager_.getDCParamVec().empty())
+    {
+      plotName << "DC Sweep: Step " << outputManager_.getDCLoopNumber() + 1
+               << " of " << outputManager_.getMaxDCSteps()
+               << " params: ";
+      std::vector<N_ANP_SweepParam>::const_iterator currItr = outputManager_.getDCParamVec().begin();
+      std::vector<N_ANP_SweepParam>::const_iterator endItr = outputManager_.getDCParamVec().end();
       while ( currItr != endItr)
       {
         plotName << " name = " << currItr->name
                  << " value = " << currItr->currentVal << "  ";
         currItr++;
+      }
+    }
+    if (printParameters_.printType_ == PrintType::TRAN)
+    {
+      plotName << "Transient Analysis";
+    }
+    else if ( printParameters_.printType_ == PrintType::AC)
+    {
+      plotName << "AC Analysis";
+    }
+    else
+    {
+      plotName << "DC transfer characteristic";
+    }
+
+    os << "Plotname: " << plotName.str() << std::endl;
+
+    // format the flags
+    std::string flags("complex");
+    os << "Flags: " << flags << std::endl;
+
+  } // end proc0 check
+
+  int numVars = 0;
+  if (printParameters_.printType_ == PrintType::TRAN)
+  {
+  }
+  else if (printParameters_.printType_ == PrintType::AC)
+  {
+  }
+  else
+  {
+    ++numVars;
+  }
+  numVars += opList_.size();
+
+  if (outputManager_.getProcID() == 0)
+  {
+    // format number of internal and external variables included here + time
+    os << "No. Variables: " << numVars << std::endl;
+
+    // format total number of data points & remember the streampos
+    os << "No. Points: ";
+    numPointsPos_ = outStreamPtr_->tellp(); // <= 344 due to 80 char line limit
+    os << "                  " << std::endl; // this will be overwritten
+
+    if (outputManager_.getOutputVersionInRawFile() )
+    {
+      // spice3 does not output the version number of the simulator in the 
+      // in the raw file header.  Optionally let one output the version 
+      // if whatever program is going to read the file expects it
+      os << "Version: " << N_UTL_Version::getFullVersionString() << std::endl;
+    }
+
+    // NOTE: dimensions, command, options, and scale not considered
+
+    // write the variable information
+    os << "Variables:" << std::endl;
+
+    // The variable list appears next.  The format is:
+    //         [tab](index) [tab](name) [tab](type)
+    // Note that the(index) corresponds to the rawfile, not the soln vec.
+
+    // write variable names for select data points
+    std::string tmpNodeName, tmpType;
+    int i = 0;
+    // add timestep header info(Spice3f5 style)
+    if (printParameters_.printType_ == PrintType::TRAN)
+    {
+    }
+    else if (printParameters_.printType_ == PrintType::AC)
+    {
+    }
+    else
+    {
+      os << "\t" << 0 << "\t" << "sweep\tvoltage\n";
+      ++i;
+    }
+
+    for (Util::OpList::const_iterator it = opList_.begin() ; it != opList_.end(); ++it, ++i)
+    {
+      std::string tmpNodeName, tmpType;
+      // set the type
+      if (Util::hasExpressionTag((*it)->getName())) { tmpType = "expression"; }
+      else if ((*it)->getName() == "INDEX")  { }
+      else if ((*it)->getName() == "TIME")  { tmpType = "time"; }
+      else if ((*it)->getName() == "FREQUENCY")  { tmpType = "frequency"; }
+      else if ((*it)->getName()[0] == 'I')  { tmpType = "current";    }
+      else if ((*it)->getName()[0] == 'V')  { tmpType = "voltage";    }
+      else                              { tmpType = "unknown";    }
+
+      // write the header line
+      os << "\t" << i
+         << "\t" << (*it)->getName()
+         << "\t" << tmpType
+         << "\n";
+
+      // NOTE: other types, and params & dims, not considered
+    }
+
+    // write data marker
+    // this string is actually ignored, but the pair of EOL markers is used
+    os << "Binary:" << std::endl;
+  } // end proc0 check
+}
+
+
+
+//-----------------------------------------------------------------------------
+// Function      : FrequencyRaw::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  FrequencyRaw::doFinishOutput()
+{
+  if (outputManager_.getProcID() == 0)
+  {
+    if (outStreamPtr_ && numPoints_ != 0)
+    {
+      // need to move file pointer back to header and
+      // write out the number of points.
+      long currentFelePost = outStreamPtr_->tellp();
+
+      // locate the position for number of points
+      outStreamPtr_->seekp( numPointsPos_);
+
+      // overwrite blank space with value
+      (*outStreamPtr_) << numPoints_;
+
+      // move file pointer to the end again.
+      outStreamPtr_->seekp( currentFelePost);
+    }
+  }
+
+  // reset numPoints_ as it is used as a flag to print the header.
+  numPoints_ = 0;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : FrequencyRaw::doOutputFrequency
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void
+FrequencyRaw::doOutputFrequency(double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
+{
+  outputManager_.setCurrentOutputter(this);
+
+  if (outputManager_.getProcID() == 0)
+  {
+    if (!outStreamPtr_)
+    {
+      doOpen();
+
+      numPoints_ = 0;
+
+      frequencyHeader();
+    }
+  }
+
+  outputManager_.getCommPtr()->barrier();
+
+  // select values to write from .PRINT line if FORMAT=RAW
+  for (Util::OpList::const_iterator it = opList_.begin() ; it != opList_.end(); ++it)
+  {
+    complex result = getValue(outputManager_.getCommPtr()->comm(), *(*it), real_solution_vector, imaginary_solution_vector, 0, 0);
+    if (outputManager_.getProcID() == 0)
+    {
+      double realPart=result.real();
+      double imagPart=result.imag();
+      outStreamPtr_->write((char *) &realPart, sizeof( double));
+      outStreamPtr_->write((char *) &imagPart, sizeof( double));
+    }
+  }
+
+  outputManager_.getCommPtr()->barrier();
+
+  // keep track of number of datapoints
+  ++numPoints_;
+}
+
+//-----------------------------------------------------------------------------
+// Class         : TimeRawAscii
+// Purpose       : Outputter class for transient output, rawfile output
+//                 format, ascii version
+// Special Notes : Invoked by "FORMAT=raw" on .print line, not -r on command
+//                 line.  -r is handled by the "OverrideRaw" classes.
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : TimeRawAscii::TimeRawAscii
+// Purpose       : Constructor
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+TimeRawAscii::TimeRawAscii(OutputMgr &output_manager, const PrintParameters &print_parameters)
+  : outputManager_(output_manager),
+    printParameters_(print_parameters),
+    outFilename_( ""),
+    outStreamPtr_( NULL),
+    numPoints_(0),
+    numPointsPos_( 0),
+    outputRAWTitleAndDate_(false)
+{
+  if (printParameters_.defaultExtension_.empty())
+    printParameters_.defaultExtension_ = ".raw";
+
+  fixupColumns(outputManager_, printParameters_, opList_);
+}
+
+//-----------------------------------------------------------------------------
+// Function      : TimeRawAscii::~TimeRawAscii
+// Purpose       : Destructor
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+TimeRawAscii::~TimeRawAscii()
+{
+  outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
+}
+
+//-----------------------------------------------------------------------------
+// Function      : TimeRawAscii::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  TimeRawAscii::doParse()
+{
+  outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
+}
+
+//-----------------------------------------------------------------------------
+// Function      : TimeRawAscii::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  TimeRawAscii::doOpen()
+{
+  if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
+  {
+    outStreamPtr_ = outputManager_.openFile(outFilename_);
+
+    // set output value characteristics
+    outStreamPtr_->setf( std::ios::scientific);
+    outStreamPtr_->precision(8);
+    outStreamPtr_->setf( std::ios::left, std::ios::adjustfield);
+  }
+}
+
+//-----------------------------------------------------------------------------
+// Function      : TimeRawAscii::timeHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  TimeRawAscii::timeHeader()
+{
+  NodeNamePairMap::iterator name_i, name_end;
+  name_end = outputManager_.getAllNodes().end();
+
+  std::ostream &os = *outStreamPtr_;
+
+  if (outputManager_.getProcID() == 0)
+  {
+    if (!outputRAWTitleAndDate_)
+    {
+      // in multi-plot RAW files, the Title and Date are only output once
+      // afer that each plot gets the same header.  Thus, only do this section
+      // once.
+
+      outputRAWTitleAndDate_ = true;
+
+      os << "Title: " << outputManager_.getTitle() << std::endl;
+
+      // create formatted timestamp
+      const time_t now = time( NULL);
+      char timeDate[ 40 ];
+      strftime( timeDate, 40, "%a %b %d %I:%M:%S %Y", localtime( &now));
+      os << "Date: " << timeDate << std::endl;
+    }
+
+    // format plot name
+    std::ostringstream plotName;
+
+    if (!outputManager_.getStepParamVec().empty())
+    {
+      plotName << "Step Analysis: Step " << outputManager_.getStepLoopNumber() + 1
+               << " of " << outputManager_.getMaxParamSteps()
+               << " params: ";
+      for (std::vector<N_ANP_SweepParam>::const_iterator it = outputManager_.getStepParamVec().begin(); it != outputManager_.getStepParamVec().end(); ++it)
+      {
+        plotName << " name = " << it->name << " value = " << it->currentVal << "  ";
       }
     }
 
@@ -3301,38 +5688,34 @@ void TimeRaw::timeHeader()
   } // end proc0 check
 
   // prepare header for partial dump
+  int numVars = 0;
+  if (printParameters_.printType_ == PrintType::DC)
+    ++numVars;
+
+  numVars += opList_.size();
+
   if (outputManager_.getProcID() == 0)
   {
-    int numVars = 0;
-    switch (printParameters_.printType_) {
-      case PrintType::TRAN:
-      case PrintType::AC:
-        break;
-
-      case PrintType::DC:
-        ++numVars; // sweep
-        break;
-    }
-
-    numVars += printParameters_.variableList_.size();
-
     // format number of internal and external variables included here + time
     os << "No. Variables: " << numVars << std::endl;
-  }
 
-  outputManager_.getCommPtr()->barrier();
-
-  if (outputManager_.getProcID() == 0)
-  {
     // format total number of data points & remember the streampos
     os << "No. Points: ";
     numPointsPos_ = outStreamPtr_->tellp(); // <= 344 due to 80 char line limit
     os << "                  " << std::endl; // this will be overwritten
 
-    // for full compatability with spice3 raw file, output version number here
-    os << "Version: " << N_UTL_Version::getFullVersionString() << std::endl;
+    if (outputManager_.getOutputVersionInRawFile() )
+    {
+      // spice3 does not output the version number of the simulator in the 
+      // in the raw file header.  Optionally let one output the version 
+      // if whatever program is going to read the file expects it
+      os << "Version: " << N_UTL_Version::getFullVersionString() << std::endl;
+    }
 
     // NOTE: dimensions, command, options, and scale not considered
+
+    // write the variable information
+    os << "Variables:" << std::endl;
 
     // The variable list appears next.  The format is:
     //         [tab](index) [tab](name) [tab](type)
@@ -3340,38 +5723,28 @@ void TimeRaw::timeHeader()
 
     // write variable names for select data points
     std::string tmpNodeName, tmpType;
-
     int i = 0;
-    // write the variable information
-    os << "Variables:" << std::endl;
-
-    switch (printParameters_.printType_) {
-      case PrintType::TRAN:
-        break;
-
-      case PrintType::AC:
-        break;
-
-      case PrintType::DC:
-        os << "\t" << 0 << "\t" << "sweep\tvoltage\n";
-        ++i;
-        break;
+    if (printParameters_.printType_ == PrintType::DC)
+    {
+      // add timestep header info(Spice3f5 style)
+      os << "\t" << 0 << "\t" << "sweep\tvoltage\n";
+      ++i;
     }
 
-    for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin() ; iterParam != printParameters_.variableList_.end(); ++iterParam, ++i)
+    for (Util::OpList::const_iterator it = opList_.begin() ; it != opList_.end(); ++it, ++i)
     {
       // set the type
-      if (iterParam->hasExpressionTag()) { tmpType = "expression"; }
-      else if (iterParam->tag() == "INDEX")  { }
-      else if (iterParam->tag() == "TIME")  { tmpType = "time"; }
-      else if (iterParam->tag() == "FREQUENCY")  { tmpType = "frequency"; }
-      else if (iterParam->tag()[0] == 'I')  { tmpType = "current";    }
-      else if (iterParam->tag()[0] == 'V')  { tmpType = "voltage";    }
+      if (Util::hasExpressionTag((*it)->getName())) { tmpType = "expression"; }
+      else if ((*it)->getName() == "INDEX")  { }
+      else if ((*it)->getName() == "TIME")  { tmpType = "time"; }
+      else if ((*it)->getName() == "FREQUENCY")  { tmpType = "frequency"; }
+      else if ((*it)->getName()[0] == 'I')  { tmpType = "current";    }
+      else if ((*it)->getName()[0] == 'V')  { tmpType = "voltage";    }
       else                              { tmpType = "unknown";    }
 
       // write the header line
       os << "\t" << i
-         << "\t" << (*iterParam).tag()
+         << "\t" << (*it)->getName()
          << "\t" << tmpType
          << "\n";
 
@@ -3379,12 +5752,22 @@ void TimeRaw::timeHeader()
     }
 
     // write data marker
-    // this string is actually ignored, but the pair of EOL markers is used
-    os << "Binary:" << std::endl;
-  }
+    os << "Values:" << std::endl;
+  } // end proc0 check
 }
 
-void TimeRaw::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vector * stateVecPtr, const N_LAS_Vector * storeVecPtr)
+//-----------------------------------------------------------------------------
+// Function      : TimeRawAscii::doOutputTime
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  TimeRawAscii::doOutputTime(
+    const N_LAS_Vector * solnVecPtr, 
+    const N_LAS_Vector * stateVecPtr, 
+    const N_LAS_Vector * storeVecPtr)
 {
   outputManager_.setCurrentOutputter(this);
 
@@ -3401,592 +5784,28 @@ void TimeRaw::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vector *
   // file IO on proc 0 only
   if (outputManager_.getProcID() == 0)
   {
-    // output the time/step values
-    switch (printParameters_.printType_) {
-      case PrintType::TRAN:
-        break;
-
-      case PrintType::AC:
-        break;
-
-      case PrintType::DC:
-      {
-        double dc_sweep = outputManager_.getPRINTDCvalue();
-        outStreamPtr_->write((char *) &dc_sweep, sizeof(double));
-      }
-      break;
-    }
-  }
-
-  outputManager_.getCommPtr()->barrier();
-
-  // select values to write from .PRINT line if FORMAT=RAW
-  for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin() ; iterParam != printParameters_.variableList_.end(); ++iterParam)
-  {
-    // retrieve values from all procs
-    double tmp = outputManager_.getPrintValue( iterParam, solnVecPtr);
-    if ((*iterParam).getSimContext() == TIME_VAR)
-      tmp *= printParameters_.outputTimeScaleFactor_;
-
-    // file IO only on proc 0
-    if (outputManager_.getProcID() == 0)
-    {
-      // write binary data to rawfile
-      outStreamPtr_->write((char *) &tmp , sizeof(tmp));
-    } // end proc0
-  } // end for
-
-  outputManager_.getCommPtr()->barrier();
-
-  // keep track of number of datapoints
-  ++numPoints_;
-}
-
-void TimeRaw::doFinishOutput()
-{
-  if (outputManager_.getProcID() == 0)
-  {
-    if (outStreamPtr_ && numPoints_ != 0) {
-
-      // need to move file pointer back to header and
-      // write out the number of points.
-      long currentFilePos = outStreamPtr_->tellp();
-
-      // locate the position for number of points
-      outStreamPtr_->seekp( numPointsPos_);
-
-      // overwrite blank space with value
-      (*outStreamPtr_) << numPoints_;
-
-      // move file pointer to the end again.
-      outStreamPtr_->seekp( currentFilePos);
-    }
-  }
-
-  // reset numPoints_ as it is used as a flag to print the header.
-  numPoints_ = 0;
-}
-
-void
-TimeRaw::doFinishOutputStep()
-{}
-
-FrequencyRaw::FrequencyRaw(OutputMgr &output_manager, const PrintParameters &print_parameters)
-  : outputManager_(output_manager),
-    printParameters_(print_parameters),
-    outFilename_(""),
-    outStreamPtr_( NULL),
-    numPoints_( 0),
-    numPointsPos_( 0),
-    outputRAWTitleAndDate_(false)
-{
-  if (printParameters_.extension_.empty())
-    printParameters_.extension_ = ".raw";
-
-  fixupColumns(outputManager_, printParameters_);
-}
-
-FrequencyRaw::~FrequencyRaw() {
-  outputManager_.closeFile(outStreamPtr_);
-}
-
-void FrequencyRaw::doParse() {
-  // prepare output manager to write
-  numPoints_ = 0;
-
-  outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
-}
-
-
-void FrequencyRaw::doOpen()
-{
-  if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
-    outStreamPtr_ = outputManager_.openBinaryFile(outFilename_);
-}
-
-
-void FrequencyRaw::frequencyHeader()
-{
-  // This routine was split off of doOutputHeader because an
-  // AC analysis can output both real data "doOutput" and complex
-  // data via doOutputAC.  Each of these doOutput routines must
-  // call a doHeader routine which can specify the right underlying
-  // data type.  So rather than add more conditional logic we chose
-  // to separate out the functionality for the different use cases.
-  int numVars;
-  std::vector< pair< std::string, char > > nT;
-  NodeNamePairMap::iterator name_i, name_end;
-  name_end = outputManager_.getAllNodes().end();
-
-  if (outputManager_.getProcID() == 0)
-  {
-    if (!outputRAWTitleAndDate_)
-    {
-      // in multi-plot RAW files, the Title and Date are only output once
-      // afer that each plot gets the same header.  Thus, only do this section
-      // once.
-
-      outputRAWTitleAndDate_=true;
-
-      (*outStreamPtr_) << "Title: " << outputManager_.getTitle() << std::endl;
-
-      // create formatted timestamp
-      const time_t now = time( NULL);
-      char timeDate[ 40 ];
-      strftime( timeDate, 40, "%a %b %d %I:%M:%S %Y", localtime( &now));
-      (*outStreamPtr_) << "Date: " << timeDate << std::endl;
-    }
-
-    // format plot name
-    std::ostringstream plotName;
-
-    if (!outputManager_.getStepParamVec().empty())
-    {
-      plotName << "Step Analysis: Step " << outputManager_.getStepLoopNumber() + 1
-               << " of " << outputManager_.getMaxParamSteps()
-               << " params: ";
-      std::vector<N_ANP_SweepParam>::const_iterator currItr = outputManager_.getStepParamVec().begin();
-      std::vector<N_ANP_SweepParam>::const_iterator endItr = outputManager_.getStepParamVec().end();
-      while ( currItr != endItr)
-      {
-        plotName << " name = " << currItr->name
-                 << " value = " << currItr->currentVal << "  ";
-        currItr++;
-      }
-    }
-    if (!outputManager_.getDCParamVec().empty())
-    {
-      plotName << "DC Sweep: Step " << outputManager_.getDCLoopNumber() + 1
-               << " of " << outputManager_.getMaxDCSteps()
-               << " params: ";
-      std::vector<N_ANP_SweepParam>::const_iterator currItr = outputManager_.getDCParamVec().begin();
-      std::vector<N_ANP_SweepParam>::const_iterator endItr = outputManager_.getDCParamVec().end();
-      while ( currItr != endItr)
-      {
-        plotName << " name = " << currItr->name
-                 << " value = " << currItr->currentVal << "  ";
-        currItr++;
-      }
-    }
-    if (printParameters_.printType_ == PrintType::TRAN)
-    {
-      plotName << "Transient Analysis";
-    }
-    else if ( printParameters_.printType_ == PrintType::AC)
-    {
-      plotName << "AC Analysis";
-    }
-    else
-    {
-      plotName << "DC transfer characteristic";
-    }
-
-    (*outStreamPtr_) << "Plotname: " << plotName.str() << std::endl;
-
-    // format the flags
-    std::string flags("complex");
-    (*outStreamPtr_) << "Flags: " << flags << std::endl;
-
-  } // end proc0 check
-
-  // prepare header for partial dump
-  if (outputManager_.getProcID() == 0)
-  {
-    numVars = 0;
-    for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin() ; iterParam != printParameters_.variableList_.end(); ++iterParam)
-    {
-      // count params
-      ++numVars;
-
-      // skip over node names
-      if (iterParam->tag() == "I" || iterParam->tag() == "V")
-      {
-        ++iterParam;
-      }
-    }
-  } // end proc0 check
-
-    // format number of internal and external variables included here + time
-  (*outStreamPtr_) << "No. Variables: " << numVars << std::endl;
-
-  outputManager_.getCommPtr()->barrier();
-
-  if (outputManager_.getProcID() == 0)
-  {
-    // format total number of data points & remember the streampos
-    (*outStreamPtr_) << "No. Points: ";
-    numPointsPos_ = outStreamPtr_->tellp(); // <= 344 due to 80 char line limit
-    (*outStreamPtr_) << "                  " << std::endl; // this will be overwritten
-
-    // for full compatability with spice3 raw file, output version number here
-    (*outStreamPtr_) << "Version: " << N_UTL_Version::getFullVersionString() << std::endl;
-
-    // NOTE: dimensions, command, options, and scale not considered
-
-    // write the variable information
-    (*outStreamPtr_) << "Variables:" << std::endl;
-
-    // The variable list appears next.  The format is:
-    //         [tab](index) [tab](name) [tab](type)
-    // Note that the(index) corresponds to the rawfile, not the soln vec.
-
-    // write variable names for select data points
-    std::string tmpNodeName, tmpType;
-    int i = 0;
-    // add timestep header info(Spice3f5 style)
-    if (printParameters_.printType_ == PrintType::TRAN)
-    {
-    }
-    else if (printParameters_.printType_ == PrintType::AC)
-    {
-    }
-    else
-    {
-      (*outStreamPtr_) << "\t" << 0 << "\t";
-      (*outStreamPtr_) << "sweep\tvoltage\n";
-      ++i;
-    }
-
-    for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin() ; iterParam != printParameters_.variableList_.end(); ++iterParam, ++i)
-    {
-      // set the type
-      if (iterParam->hasExpressionTag()) { tmpType = "expression"; }
-      else if (iterParam->tag() == "INDEX")  { }
-      else if (iterParam->tag() == "TIME")  { tmpType = "time"; }
-      else if (iterParam->tag() == "FREQUENCY")  { tmpType = "frequency"; }
-      else if (iterParam->tag()[0] == 'I')  { tmpType = "current";    }
-      else if (iterParam->tag()[0] == 'V')  { tmpType = "voltage";    }
-      else                              { tmpType = "unknown";    }
-
-      (*outStreamPtr_) << "\t" << i
-                       << "\t" << (*iterParam).tag()
-                       << "\t" << tmpType
-                       << "\n";
-
-      // NOTE: other types, and params & dims, not considered
-    }
-
-    // write data marker
-    // this string is actually ignored, but the pair of EOL markers is used
-    (*outStreamPtr_) << "Binary:" << std::endl;
-  } // end proc0 check
-}
-
-
-
-void FrequencyRaw::doFinishOutput()
-{
-  if (outputManager_.getProcID() == 0)
-  {
-    if (outStreamPtr_ && numPoints_ != 0) {
-      // need to move file pointer back to header and
-      // write out the number of points.
-      long currentFelePost = outStreamPtr_->tellp();
-
-      // locate the position for number of points
-      outStreamPtr_->seekp( numPointsPos_);
-
-      // overwrite blank space with value
-      (*outStreamPtr_) << numPoints_;
-
-      // move file pointer to the end again.
-      outStreamPtr_->seekp( currentFelePost);
-    }
-  }
-
-  // reset numPoints_ as it is used as a flag to print the header.
-  numPoints_ = 0;
-}
-
-void
-FrequencyRaw::doOutputFrequency(double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
-{
-  outputManager_.setCurrentOutputter(this);
-
-  if (!outStreamPtr_)
-  {
-    doOpen();
-
-    numPoints_ = 0;
-
-    frequencyHeader();
-  }
-
-  outputManager_.getCommPtr()->barrier();
-
-  // select values to write from .PRINT line if FORMAT=RAW
-  for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin() ; iterParam != printParameters_.variableList_.end(); ++iterParam)
-  {
-    // if context type of the param is SOLUTION_VAR then it is complex and 
-    // we need to get both the real and imaginary part for output.
-    // Any other context type is just real and the imaginary part will be zero
-    double varValue = outputManager_.getPrintValue(iterParam, real_solution_vector, NULL, NULL, imaginary_solution_vector);
-    double varValueIm = 0.0;
-    if( iterParam->getSimContext() == SOLUTION_VAR )
-    {
-      // note we fake out getPrintValue to return the imaginary component by passing it in as the real vector.
-      // not a great idea, but getPrintValue() will be rewritten to return complex types later.
-      varValueIm = outputManager_.getPrintValue(iterParam, imaginary_solution_vector, NULL, NULL, imaginary_solution_vector);
-    }
-    if (outputManager_.getProcID() == 0)
-    {
-      outStreamPtr_->write((char *)&varValue , sizeof( double));
-      outStreamPtr_->write((char *)&varValueIm , sizeof( double));
-    }
-  }
-
-  outputManager_.getCommPtr()->barrier();
-
-  // keep track of number of datapoints
-  ++numPoints_;
-}
-
-void
-FrequencyRaw::doFinishOutputStep()
-{}
-
-TimeRawAscii::TimeRawAscii(OutputMgr &output_manager, const PrintParameters &print_parameters)
-  : outputManager_(output_manager),
-    printParameters_(print_parameters),
-    outFilename_( ""),
-    outStreamPtr_( NULL),
-    numPoints_(0),
-    numPointsPos_( 0),
-    outputRAWTitleAndDate_(false)
-{
-  if (printParameters_.extension_.empty())
-    printParameters_.extension_ = ".raw";
-
-  fixupColumns(outputManager_, printParameters_);
-}
-
-TimeRawAscii::~TimeRawAscii() {
-  outputManager_.closeFile(outStreamPtr_);
-}
-
-void TimeRawAscii::doParse() {
-  outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
-}
-
-void TimeRawAscii::doOpen()
-{
-  if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0) {
-    outStreamPtr_ = outputManager_.openFile(outFilename_);
-    
-    // set output value characteristics
-    outStreamPtr_->setf( ios::scientific);
-    outStreamPtr_->precision(8);
-    outStreamPtr_->setf( ios::left, ios::adjustfield);
-  }
-}
-
-void TimeRawAscii::timeHeader()
-{
-  int numVars;
-  std::vector< pair< std::string, char > > nT;
-  NodeNamePairMap::iterator name_i, name_end;
-  name_end = outputManager_.getAllNodes().end();
-
-  if (outputManager_.getProcID() == 0)
-  {
-    if (!outputRAWTitleAndDate_)
-    {
-      // in multi-plot RAW files, the Title and Date are only output once
-      // afer that each plot gets the same header.  Thus, only do this section
-      // once.
-
-      outputRAWTitleAndDate_ = true;
-
-      (*outStreamPtr_) << "Title: " << outputManager_.getTitle() << std::endl;
-
-      // create formatted timestamp
-      const time_t now = time( NULL);
-      char timeDate[ 40 ];
-      strftime( timeDate, 40, "%a %b %d %I:%M:%S %Y", localtime( &now));
-      (*outStreamPtr_) << "Date: " << timeDate << std::endl;
-    }
-
-    // format plot name
-    std::ostringstream plotName;
-
-    if (!outputManager_.getStepParamVec().empty())
-    {
-      plotName << "Step Analysis: Step " << outputManager_.getStepLoopNumber() + 1
-               << " of " << outputManager_.getMaxParamSteps()
-               << " params: ";
-      std::vector<N_ANP_SweepParam>::const_iterator currItr = outputManager_.getStepParamVec().begin();
-      std::vector<N_ANP_SweepParam>::const_iterator endItr = outputManager_.getStepParamVec().end();
-      while ( currItr != endItr)
-      {
-        plotName << " name = " << currItr->name
-                 << " value = " << currItr->currentVal << "  ";
-        currItr++;
-      }
-    }
-
-    // while there is a doOutputHeaderAC(), AC can call this function
-    // if it outputting a DC operating point.  Thus it's included
-    // in this if statement.
-    if (printParameters_.printType_ == PrintType::TRAN)
-    {
-      plotName << "Transient Analysis";
-    }
-    else if ( printParameters_.printType_ == PrintType::AC)
-    {
-      plotName << "DC operating point";
-    }
-    else
-    {
-      plotName << "DC transfer characteristic";
-    }
-
-    (*outStreamPtr_) << "Plotname: " << plotName.str() << std::endl;
-
-    // format the flags
-    std::string flags("real");
-    (*outStreamPtr_) << "Flags: " << flags << std::endl;
-
-  } // end proc0 check
-
-  // prepare header for partial dump
-  if (outputManager_.getProcID() == 0)
-  {
-    numVars = 0;
-    if (printParameters_.printType_ == PrintType::TRAN)
-    {
-    }
-    else if (printParameters_.printType_ == PrintType::AC)
-    {
-    }
-    else
-    {
-      ++numVars;
-    }
-    for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin() ; iterParam != printParameters_.variableList_.end(); ++iterParam)
-    {
-      // count params
-      ++numVars;
-
-      // skip over node names
-      if (iterParam->tag() == "I" || iterParam->tag() == "V")
-      {
-        ++iterParam;
-      }
-    }
-  } // end proc0 check
-
-  outputManager_.getCommPtr()->barrier();
-
-  if (outputManager_.getProcID() == 0)
-  {
-    // format number of internal and external variables included here + time
-    (*outStreamPtr_) << "No. Variables: " << numVars << std::endl;
-
-    // format total number of data points & remember the streampos
-    (*outStreamPtr_) << "No. Points: ";
-    numPointsPos_ = outStreamPtr_->tellp(); // <= 344 due to 80 char line limit
-    (*outStreamPtr_) << "                  " << std::endl; // this will be overwritten
-
-    // for full compatability with spice3 raw file, output version number here
-    (*outStreamPtr_) << "Version: " << N_UTL_Version::getFullVersionString() << std::endl;
-
-    // NOTE: dimensions, command, options, and scale not considered
-
-    // write the variable information
-    (*outStreamPtr_) << "Variables:" << std::endl;
-
-    // The variable list appears next.  The format is:
-    //         [tab](index) [tab](name) [tab](type)
-    // Note that the(index) corresponds to the rawfile, not the soln vec.
-
-    // write variable names for select data points
-    std::string tmpNodeName, tmpType;
-    int i = 0;
-    if (printParameters_.printType_ == PrintType::TRAN)
-    {
-    }
-    else if (printParameters_.printType_ == PrintType::AC)
-    {
-    }
-    else
-    {
-      // add timestep header info(Spice3f5 style)
-      (*outStreamPtr_) << "\t" << 0 << "\t";
-
-      (*outStreamPtr_) << "sweep\tvoltage\n";
-      ++i;
-    }
-
-    for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin() ; iterParam != printParameters_.variableList_.end(); ++iterParam, ++i)
-    {
-      // set the type
-      if (iterParam->hasExpressionTag()) { tmpType = "expression"; }
-      else if (iterParam->tag() == "INDEX")  { }
-      else if (iterParam->tag() == "TIME")  { tmpType = "time"; }
-      else if (iterParam->tag() == "FREQUENCY")  { tmpType = "frequency"; }
-      else if (iterParam->tag()[0] == 'I')  { tmpType = "current";    }
-      else if (iterParam->tag()[0] == 'V')  { tmpType = "voltage";    }
-      else                              { tmpType = "unknown";    }
-
-      // write the header line
-      (*outStreamPtr_) << "\t" << i
-                       << "\t" << (*iterParam).tag()
-                       << "\t" << tmpType
-                       << "\n";
-
-      // NOTE: other types, and params & dims, not considered
-    }
-
-    // write data marker
-    (*outStreamPtr_) << "Values:" << std::endl;
-  } // end proc0 check
-}
-
-void TimeRawAscii::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vector * stateVecPtr, const N_LAS_Vector * storeVecPtr)
-{
-  outputManager_.setCurrentOutputter(this);
-
-  // write rawfile header on first call
-  if (numPoints_ == 0)
-  {
-    doOpen();
-
-    timeHeader();
-  }
-
-  // file IO on proc 0 only
-  if (outputManager_.getProcID() == 0)
-  {
     // write the index to ascii rawfile
-    (*outStreamPtr_) << numPoints_;
-
+    os << numPoints_;
   }
 
-  outputManager_.getCommPtr()->barrier();
-
   // select values to write from .PRINT line if FORMAT=RAW
-  for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin() ; iterParam != printParameters_.variableList_.end(); ++iterParam)
+  for (Util::OpList::const_iterator it = opList_.begin() ; it != opList_.end(); ++it)
   {
     // retrieve values from all procs
-    double tmp = outputManager_.getPrintValue( iterParam, solnVecPtr);
-    if ((*iterParam).getSimContext() == TIME_VAR)
-      tmp *= printParameters_.outputTimeScaleFactor_;
+    double result = getValue(outputManager_.getCommPtr()->comm(), *(*it), solnVecPtr, 0, 0, 0).real();
+    if ((*it)->opType() == Xyce::Util::TIME_VAR)
+      result *= printParameters_.outputTimeScaleFactor_;
 
     // file IO only on proc 0
     if (outputManager_.getProcID() == 0)
     {
-      // write formatted values to rawfile
-      (*outStreamPtr_) << "\t" << tmp << "\n";
-
-    } // end proc0
-
-  } // end for
-
+      os << "\t" << result << "\n";
+    }
+  }
 
   if (outputManager_.getProcID() == 0)
   {
-    // write newline to rawfile
-    (*outStreamPtr_) << std::endl;
+    os << std::endl;
   }
 
   outputManager_.getCommPtr()->barrier();
@@ -3994,11 +5813,20 @@ void TimeRawAscii::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vec
   // keep track of number of datapoints
   ++numPoints_;
 }
-void TimeRawAscii::doFinishOutput()
+//-----------------------------------------------------------------------------
+// Function      : TimeRawAscii::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  TimeRawAscii::doFinishOutput()
 {
   if (outputManager_.getProcID() == 0)
   {
-    if (outStreamPtr_ && numPoints_ != 0) {
+    if (outStreamPtr_ && numPoints_ != 0)
+    {
       // need to move file pointer back to header and
       // write out the number of points.
       long currentFelePost = outStreamPtr_->tellp();
@@ -4020,11 +5848,36 @@ void TimeRawAscii::doFinishOutput()
 }
 
 
+//-----------------------------------------------------------------------------
+// Function      : TimeRawAscii::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void
 TimeRawAscii::doFinishOutputStep()
-{}
+{
+}
 
-
+//-----------------------------------------------------------------------------
+// Class         : FrequencyRawAscii
+// Purpose       : Outputter class for frequency-domain output, rawfile output
+//                 format, ascii version
+// Special Notes : Invoked by "FORMAT=raw" on .print line, not -r on command
+//                 line.  -r is handled by the "OverrideRaw" classes.
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : FrequencyRawAscii::FrequencyRawAscii
+// Purpose       : Constructor
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 FrequencyRawAscii::FrequencyRawAscii(OutputMgr &output_manager, const PrintParameters &print_parameters)
   : outputManager_(output_manager),
     printParameters_(print_parameters),
@@ -4034,44 +5887,75 @@ FrequencyRawAscii::FrequencyRawAscii(OutputMgr &output_manager, const PrintParam
     numPointsPos_( 0),
     outputRAWTitleAndDate_(false)
 {
-  if (printParameters_.extension_.empty())
-    printParameters_.extension_ = ".raw";
+  if (printParameters_.defaultExtension_.empty())
+    printParameters_.defaultExtension_ = ".raw";
 
-  fixupColumns(outputManager_, printParameters_);
+  fixupColumns(outputManager_, printParameters_, opList_);
 }
 
-FrequencyRawAscii::~FrequencyRawAscii() {
+//-----------------------------------------------------------------------------
+// Function      : FrequencyRawAscii::~FrequencyRawAscii
+// Purpose       : destructor
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+FrequencyRawAscii::~FrequencyRawAscii()
+{
   outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
 }
 
-void FrequencyRawAscii::doParse() {
+//-----------------------------------------------------------------------------
+// Function      : FrequencyRawAscii::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  FrequencyRawAscii::doParse()
+{
   outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
 }
 
-void FrequencyRawAscii::doOpen()
+//-----------------------------------------------------------------------------
+// Function      : FrequencyRawAscii::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  FrequencyRawAscii::doOpen()
 {
-  if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0) {
+  if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
+  {
     outStreamPtr_ = outputManager_.openFile(outFilename_);
-    
+
     // set output value characteristics
-    outStreamPtr_->setf( ios::scientific);
+    outStreamPtr_->setf( std::ios::scientific);
     outStreamPtr_->precision(8);
-    outStreamPtr_->setf( ios::left, ios::adjustfield);
+    outStreamPtr_->setf( std::ios::left, std::ios::adjustfield);
   }
 }
 
-void FrequencyRawAscii::frequencyHeader()
+//-----------------------------------------------------------------------------
+// Function      : FrequencyRawAscii::frequencyHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  FrequencyRawAscii::frequencyHeader()
 {
-  // This routine was split off of doOutputHeader because an
-  // AC analysis can output both real data "doOutput" and complex
-  // data via doOutputAC.  Each of these doOutput routines must
-  // call a doHeader routine which can specify the right underlying
-  // data type.  So rather than add more conditional logic we chose
-  // to separate out the functionality for the different use cases.
-  int numVars;
-  std::vector< pair< std::string, char > > nT;
   NodeNamePairMap::iterator name_i, name_end;
   name_end = outputManager_.getAllNodes().end();
+
+  std::ostream &os = *outStreamPtr_;
 
   if (outputManager_.getProcID() == 0)
   {
@@ -4083,13 +5967,13 @@ void FrequencyRawAscii::frequencyHeader()
 
       outputRAWTitleAndDate_ = true;
 
-      (*outStreamPtr_) << "Title: " << outputManager_.getTitle() << std::endl;
+      os << "Title: " << outputManager_.getTitle() << std::endl;
 
       // create formatted timestamp
       const time_t now = time( NULL);
       char timeDate[ 40 ];
       strftime( timeDate, 40, "%a %b %d %I:%M:%S %Y", localtime( &now));
-      (*outStreamPtr_) << "Date: " << timeDate << std::endl;
+      os << "Date: " << timeDate << std::endl;
     }
 
     // format plot name
@@ -4100,13 +5984,9 @@ void FrequencyRawAscii::frequencyHeader()
       plotName << "Step Analysis: Step " << outputManager_.getStepLoopNumber() + 1
                << " of " << outputManager_.getMaxParamSteps()
                << " params: ";
-      std::vector<N_ANP_SweepParam>::const_iterator currItr = outputManager_.getStepParamVec().begin();
-      std::vector<N_ANP_SweepParam>::const_iterator endItr = outputManager_.getStepParamVec().end();
-      while ( currItr != endItr)
+      for (std::vector<N_ANP_SweepParam>::const_iterator it = outputManager_.getStepParamVec().begin(); it != outputManager_.getStepParamVec().end(); ++it)
       {
-        plotName << " name = " << currItr->name
-                 << " value = " << currItr->currentVal << "  ";
-        currItr++;
+        plotName << " name = " << it->name << " value = " << it->currentVal << "  ";
       }
     }
     if (!outputManager_.getDCParamVec().empty())
@@ -4136,68 +6016,55 @@ void FrequencyRawAscii::frequencyHeader()
       plotName << "DC transfer characteristic";
     }
 
-    (*outStreamPtr_) << "Plotname: " << plotName.str() << std::endl;
+    os << "Plotname: " << plotName.str() << std::endl;
 
     // format the flags
     std::string flags("complex");
-    (*outStreamPtr_) << "Flags: " << flags << std::endl;
+    os << "Flags: " << flags << std::endl;
+  }
 
-  } // end proc0 check
+  int numVars = 0;
+  if (printParameters_.printType_ == PrintType::TRAN)
+  {
+  }
+  else if (printParameters_.printType_ == PrintType::AC)
+  {
+  }
+  else
+  {
+    ++numVars;
+  }
+  numVars += opList_.size();
 
-  // prepare header for partial dump
   if (outputManager_.getProcID() == 0)
   {
-    numVars = 0;
-    if (printParameters_.printType_ == PrintType::TRAN)
-    {
-    }
-    else if (printParameters_.printType_ == PrintType::AC)
-    {
-    }
-    else
-    {
-      ++numVars;
-    }
-    for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin() ; iterParam != printParameters_.variableList_.end(); ++iterParam)
-    {
-      // count params
-      ++numVars;
-
-      // skip over node names
-      if (iterParam->tag() == "I" || iterParam->tag() == "V")
-      {
-        ++iterParam;
-      }
-    }
-
     // format number of internal and external variables included here + time
-    (*outStreamPtr_) << "No. Variables: " << numVars << std::endl;
+    os << "No. Variables: " << numVars << std::endl;
 
-  } // end proc0 check
-
-  outputManager_.getCommPtr()->barrier();
-
-  if (outputManager_.getProcID() == 0)
-  {
     // format total number of data points & remember the streampos
-    (*outStreamPtr_) << "No. Points: ";
+    os << "No. Points: ";
     numPointsPos_ = outStreamPtr_->tellp(); // <= 344 due to 80 char line limit
-    (*outStreamPtr_) << "                  " << std::endl; // this will be overwritten
+    os << "                  " << std::endl; // this will be overwritten
 
-    // for full compatability with spice3 raw file, output version number here
-    (*outStreamPtr_) << "Version: " << N_UTL_Version::getFullVersionString() << std::endl;
+    if (outputManager_.getOutputVersionInRawFile() )
+    {
+      // spice3 does not output the version number of the simulator in the 
+      // in the raw file header.  Optionally let one output the version 
+      // if whatever program is going to read the file expects it
+      os << "Version: " << N_UTL_Version::getFullVersionString() << std::endl;
+    }
+
 
     // NOTE: dimensions, command, options, and scale not considered
 
     // write the variable information
-    (*outStreamPtr_) << "Variables:" << std::endl;
+    os << "Variables:" << std::endl;
 
     // The variable list appears next.  The format is:
     //         [tab](index) [tab](name) [tab](type)
     // Note that the(index) corresponds to the rawfile, not the soln vec.
 
     // write variable names for select data points
-    std::string tmpNodeName, tmpType;
     int i = 0;
 
     // add timestep header info(Spice3f5 style)
@@ -4209,48 +6076,58 @@ void FrequencyRawAscii::frequencyHeader()
     }
     else
     {
-      (*outStreamPtr_) << "\t" << 0 << "\t";
-      (*outStreamPtr_) << "sweep\tvoltage\n";
+      os << "\t" << 0 << "\t" << "sweep\tvoltage\n";
       ++i;
     }
 
-    for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin() ; iterParam != printParameters_.variableList_.end(); ++iterParam, ++i)
+    for (Util::OpList::const_iterator it = opList_.begin() ; it != opList_.end(); ++it, ++i)
     {
+      std::string tmpNodeName, tmpType;
       // set the type
-      if (iterParam->hasExpressionTag()) { tmpType = "expression"; }
-      else if (iterParam->tag() == "INDEX")  { }
-      else if (iterParam->tag() == "TIME")  { tmpType = "time"; }
-      else if (iterParam->tag() == "FREQUENCY")  { tmpType = "frequency"; }
-      else if (iterParam->tag()[0] == 'I')  { tmpType = "current";    }
-      else if (iterParam->tag()[0] == 'V')  { tmpType = "voltage";    }
+      if (Util::hasExpressionTag((*it)->getName())) { tmpType = "expression"; }
+      else if ((*it)->getName() == "INDEX")  { }
+      else if ((*it)->getName() == "TIME")  { tmpType = "time"; }
+      else if ((*it)->getName() == "FREQUENCY")  { tmpType = "frequency"; }
+      else if ((*it)->getName()[0] == 'I')  { tmpType = "current";    }
+      else if ((*it)->getName()[0] == 'V')  { tmpType = "voltage";    }
       else                              { tmpType = "unknown";    }
 
       // write the header line
-      (*outStreamPtr_) << "\t" << i
-                       << "\t" << (*iterParam).tag()
-                       << "\t" << tmpType
-                       << "\n";
+      os << "\t" << i
+         << "\t" << (*it)->getName()
+         << "\t" << tmpType
+         << "\n";
 
       // NOTE: other types, and params & dims, not considered
     }
 
     // write data marker
-    (*outStreamPtr_) << "Values:" << std::endl;
+    os << "Values:" << std::endl;
   } // end proc0 check
 }
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyRawAscii::doOutputFrequency
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void
 FrequencyRawAscii::doOutputFrequency(double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
 {
   outputManager_.setCurrentOutputter(this);
-
-  if (!outStreamPtr_)
+  if (outputManager_.getProcID() == 0)
   {
-    doOpen();
+    if (!outStreamPtr_)
+    {
+      doOpen();
 
-    numPoints_ = 0;
+      numPoints_ = 0;
 
-    frequencyHeader();
+      frequencyHeader();
+    }
   }
 
   // file IO on proc 0 only
@@ -4265,23 +6142,12 @@ FrequencyRawAscii::doOutputFrequency(double frequency, const N_LAS_Vector *real_
   outputManager_.getCommPtr()->barrier();
 
   // select values to write from .PRINT line if FORMAT=RAW
-  for (ParameterList::const_iterator iterParam = printParameters_.variableList_.begin() ; iterParam != printParameters_.variableList_.end(); ++iterParam)
+  for (Util::OpList::const_iterator it = opList_.begin() ; it != opList_.end(); ++it)
   {
-    // if context type of the param is SOLUTION_VAR then it is complex and 
-    // we need to get both the real and imaginary part for output.
-    // Any other context type is just real and the imaginary part will be zero
-    double varValue = outputManager_.getPrintValue(iterParam, real_solution_vector, NULL, NULL, imaginary_solution_vector);
-    double varValueIm = 0.0;
-    if( iterParam->getSimContext() == SOLUTION_VAR )
-    {
-      // note we fake out getPrintValue to return the imaginary component by passing it in as the real vector.
-      // not a great idea, but getPrintValue() will be rewritten to return complex types later.
-      varValueIm = outputManager_.getPrintValue(iterParam, imaginary_solution_vector, NULL, NULL, imaginary_solution_vector);
-    }
-    // file IO only on proc 0
+    complex result = getValue(outputManager_.getCommPtr()->comm(), *(*it), real_solution_vector, imaginary_solution_vector, 0, 0);
     if (outputManager_.getProcID() == 0)
     {
-      (*outStreamPtr_) << "\t"  << varValue << ", " << varValueIm << "\n";
+      (*outStreamPtr_) << "\t"  << result.real() << ", " << result.imag() << "\n";
     }
   }
 
@@ -4298,12 +6164,20 @@ FrequencyRawAscii::doOutputFrequency(double frequency, const N_LAS_Vector *real_
   ++numPoints_;
 }
 
-void FrequencyRawAscii::doFinishOutput()
+//-----------------------------------------------------------------------------
+// Function      : FrequencyRawAscii::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  FrequencyRawAscii::doFinishOutput()
 {
   if (outputManager_.getProcID() == 0)
   {
-    if (outStreamPtr_) {
-
+    if (outStreamPtr_)
+    {
       // need to move file pointer back to header and
       // write out the number of points.
       long currentFelePost = outStreamPtr_->tellp();
@@ -4325,11 +6199,35 @@ void FrequencyRawAscii::doFinishOutput()
 }
 
 
+//-----------------------------------------------------------------------------
+// Function      : FrequencyRawAscii::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void
 FrequencyRawAscii::doFinishOutputStep()
-{}
+{
+}
 
-
+//-----------------------------------------------------------------------------
+// Class         : OverrideRaw
+// Purpose       : Outputter class for rawfile output format
+// Special Notes : Invoked by -r on command line.  FORMAT=RAW on print line
+//                 is handled by the TimeRaw* and FrequencyRaw* classes
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : OverrideRaw::OverrideRaw
+// Purpose       : Constructor
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 OverrideRaw::OverrideRaw(OutputMgr &output_manager, const PrintParameters &print_parameters)
   : outputManager_(output_manager),
     printParameters_(print_parameters),
@@ -4339,37 +6237,74 @@ OverrideRaw::OverrideRaw(OutputMgr &output_manager, const PrintParameters &print
     numPointsPos_( 0),
     outputRAWTitleAndDate_(false)
 {
-  if (printParameters_.extension_.empty())
-    printParameters_.extension_ = ".raw";
+  if (printParameters_.defaultExtension_.empty())
+    printParameters_.defaultExtension_ = ".raw";
 }
 
-OverrideRaw::~OverrideRaw() {
+//-----------------------------------------------------------------------------
+// Function      : OverrideRaw::~OverrideRaw
+// Purpose       : destructor
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+OverrideRaw::~OverrideRaw()
+{
   outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
 }
 
-void OverrideRaw::doParse() {
+//-----------------------------------------------------------------------------
+// Function      : OverrideRaw::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRaw::doParse()
+{
   outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
 }
 
-void OverrideRaw::doOpen()
+//-----------------------------------------------------------------------------
+// Function      : OverrideRaw::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRaw::doOpen()
 {
-  if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0){
+  if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
+  {
     outStreamPtr_ = outputManager_.openBinaryFile(outFilename_);
 
     // set output value characteristics
-    outStreamPtr_->setf( ios::scientific);
+    outStreamPtr_->setf( std::ios::scientific);
     outStreamPtr_->precision(8);
-    outStreamPtr_->setf( ios::left, ios::adjustfield);
+    outStreamPtr_->setf( std::ios::left, std::ios::adjustfield);
   }
 }
 
 
-void OverrideRaw::timeHeader()
+//-----------------------------------------------------------------------------
+// Function      : OverrideRaw::timeHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRaw::timeHeader()
 {
-  int numVars;
-  std::vector< pair< std::string, char > > nT;
   NodeNamePairMap::iterator name_i, name_end;
   name_end = outputManager_.getAllNodes().end();
+
+  std::ostream &os = *outStreamPtr_;
 
   if (outputManager_.getProcID() == 0)
   {
@@ -4379,15 +6314,15 @@ void OverrideRaw::timeHeader()
       // afer that each plot gets the same header.  Thus, only do this section
       // once.
 
-      outputRAWTitleAndDate_=true;
+      outputRAWTitleAndDate_ = true;
 
-      (*outStreamPtr_) << "Title: " << outputManager_.getTitle() << std::endl;
+      os << "Title: " << outputManager_.getTitle() << std::endl;
 
       // create formatted timestamp
       const time_t now = time( NULL);
       char timeDate[ 40 ];
       strftime( timeDate, 40, "%a %b %d %I:%M:%S %Y", localtime( &now));
-      (*outStreamPtr_) << "Date: " << timeDate << std::endl;
+      os << "Date: " << timeDate << std::endl;
     }
 
     // format plot name
@@ -4398,13 +6333,9 @@ void OverrideRaw::timeHeader()
       plotName << "Step Analysis: Step " << outputManager_.getStepLoopNumber() + 1
                << " of " << outputManager_.getMaxParamSteps()
                << " params: ";
-      std::vector<N_ANP_SweepParam>::const_iterator currItr = outputManager_.getStepParamVec().begin();
-      std::vector<N_ANP_SweepParam>::const_iterator endItr = outputManager_.getStepParamVec().end();
-      while ( currItr != endItr)
+      for (std::vector<N_ANP_SweepParam>::const_iterator it = outputManager_.getStepParamVec().begin(); it != outputManager_.getStepParamVec().end(); ++it)
       {
-        plotName << " name = " << currItr->name
-                 << " value = " << currItr->currentVal << "  ";
-        currItr++;
+        plotName << " name = " << it->name << " value = " << it->currentVal << "  ";
       }
     }
 
@@ -4424,11 +6355,11 @@ void OverrideRaw::timeHeader()
       plotName << "DC transfer characteristic";
     }
 
-    (*outStreamPtr_) << "Plotname: " << plotName.str() << std::endl;
+    os << "Plotname: " << plotName.str() << std::endl;
 
     // format the flags
     std::string flags("real");
-    (*outStreamPtr_) << "Flags: " << flags << std::endl;
+    os << "Flags: " << flags << std::endl;
 
   } // end proc0 check
 
@@ -4438,7 +6369,9 @@ void OverrideRaw::timeHeader()
   outputManager_.getTopPtr()->returnVarTypeVec( typeRefs);
 
   // count data points
-  numVars = outputManager_.getAllNodes().size();
+  int numVars = outputManager_.getAllNodes().size();
+
+  std::vector< std::pair< std::string, char > > nT;
 
 #ifdef Xyce_PARALLEL_MPI
 
@@ -4462,7 +6395,7 @@ void OverrideRaw::timeHeader()
     // store local names
     for ( name_i = outputManager_.getAllNodes().begin(); name_i != name_end ; ++name_i)
     {
-      nT.push_back( pair< std::string, char>((*name_i).first,
+      nT.push_back( std::pair< std::string, char>((*name_i).first,
                                              typeRefs[(*name_i).second.first]));
     }
 
@@ -4487,11 +6420,10 @@ void OverrideRaw::timeHeader()
         outputManager_.getCommPtr()->unpack( b, bSize, pos, &t, 1);
 
         // store remote names
-        nT.push_back( pair< std::string, char >( name, t));
+        nT.push_back( std::pair< std::string, char >( name, t));
       }
     }
   } // end proc0 check
-
   else
   {
     pos = 0;
@@ -4528,19 +6460,24 @@ void OverrideRaw::timeHeader()
 
   // format number of internal and external variables included here + time
   if (outputManager_.getProcID() == 0)
-    (*outStreamPtr_) << "No. Variables: " << numVars + 1 << std::endl;
+    os << "No. Variables: " << numVars + 1 << std::endl;
 
   outputManager_.getCommPtr()->barrier();
 
   if (outputManager_.getProcID() == 0)
   {
     // format total number of data points & remember the streampos
-    (*outStreamPtr_) << "No. Points: ";
+    os << "No. Points: ";
     numPointsPos_ = outStreamPtr_->tellp(); // <= 344 due to 80 char line limit
-    (*outStreamPtr_) << "                  " << std::endl; // this will be overwritten
+    os << "                  " << std::endl; // this will be overwritten
 
-    // for full compatability with spice3 raw file, output version number here
-    (*outStreamPtr_) << "Version: " << N_UTL_Version::getFullVersionString() << std::endl;
+    if (outputManager_.getOutputVersionInRawFile() )
+    {
+      // spice3 does not output the version number of the simulator in the 
+      // in the raw file header.  Optionally let one output the version 
+      // if whatever program is going to read the file expects it
+      os << "Version: " << N_UTL_Version::getFullVersionString() << std::endl;
+    }
 
     // NOTE: dimensions, command, options, and scale not considered
 
@@ -4549,30 +6486,30 @@ void OverrideRaw::timeHeader()
     // Note that the(index) corresponds to the rawfile, not the soln vec.
 
     // write variable names for select data points
-    std::string tmpNodeName, tmpType;
+    std::string tmpType;
     // write the variable information
-    (*outStreamPtr_) << "Variables:" << std::endl;
+    os << "Variables:" << std::endl;
 
     // add timestep header info(Spice3f5 style)
-    (*outStreamPtr_) << "\t" << 0 << "\t";
+    os << "\t" << 0 << "\t";
 
     if (printParameters_.printType_ == PrintType::TRAN)
     {
-      (*outStreamPtr_) << "time\ttime\n";
+      os << "time\ttime\n";
     }
     else if (printParameters_.printType_ == PrintType::AC)
     {
-      (*outStreamPtr_) << "frequency\tfrequency\n";
+      os << "frequency\tfrequency\n";
     }
     else
     {
-      (*outStreamPtr_) << "sweep\tvoltage\n";
+      os << "sweep\tvoltage\n";
     }
 
     std::string::size_type uPos;
     for ( int i = 0; i < numVars; ++i)
     {
-      tmpNodeName =(nT[i]).first;
+      std::string tmpNodeName =(nT[i]).first;
 
       // format is:  [tab](index) [tab](name) [tab](type)
       //   the index corresponds to the rawfile, not the soln vec
@@ -4582,20 +6519,21 @@ void OverrideRaw::timeHeader()
         tmpNodeName = "V(" +(nT[i]).first + ")";
       }
 
-      uPos = tmpNodeName.rfind( "_", tmpNodeName.size()); if (uPos != std::string::npos)
-                                                          {
-                                                            tmpNodeName.replace( uPos, 1, "#");
-                                                          }
+      uPos = tmpNodeName.rfind( "_", tmpNodeName.size());
+      if (uPos != std::string::npos)
+      {
+        tmpNodeName.replace( uPos, 1, "#");
+      }
 
-      (*outStreamPtr_) << "\t" << i + 1 << "\t" << tmpNodeName << "\t";
+      os << "\t" << i + 1 << "\t" << tmpNodeName << "\t";
 
       if ((nT[i]).second == 'I' ||(nT[i]).second == 'i')
       {
-        (*outStreamPtr_) << "current\n" ;
+        os << "current\n" ;
       }
       else
       {
-        (*outStreamPtr_) << "voltage\n";
+        os << "voltage\n";
       }
 
       // NOTE: other types, and params & dims, not considered
@@ -4603,11 +6541,19 @@ void OverrideRaw::timeHeader()
 
     // write data marker
     // this string is actually ignored, but the pair of EOL markers is used
-    (*outStreamPtr_) << "Binary:" << std::endl;
+    os << "Binary:" << std::endl;
   } // end proc0 check
 }
 
-void OverrideRaw::frequencyHeader()
+//-----------------------------------------------------------------------------
+// Function      : OverrideRaw::frequencyHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRaw::frequencyHeader()
 {
   // This routine was split off of doOutputHeader because an
   // AC analysis can output both real data "doOutput" and complex
@@ -4616,7 +6562,7 @@ void OverrideRaw::frequencyHeader()
   // data type.  So rather than add more conditional logic we chose
   // to separate out the functionality for the different use cases.
   int numVars;
-  std::vector< pair< std::string, char > > nT;
+  std::vector< std::pair< std::string, char > > nT;
   NodeNamePairMap::iterator name_i, name_end;
   name_end = outputManager_.getAllNodes().end();
 
@@ -4647,13 +6593,9 @@ void OverrideRaw::frequencyHeader()
       plotName << "Step Analysis: Step " << outputManager_.getStepLoopNumber() + 1
                << " of " << outputManager_.getMaxParamSteps()
                << " params: ";
-      std::vector<N_ANP_SweepParam>::const_iterator currItr = outputManager_.getStepParamVec().begin();
-      std::vector<N_ANP_SweepParam>::const_iterator endItr = outputManager_.getStepParamVec().end();
-      while ( currItr != endItr)
+      for (std::vector<N_ANP_SweepParam>::const_iterator it = outputManager_.getStepParamVec().begin(); it != outputManager_.getStepParamVec().end(); ++it)
       {
-        plotName << " name = " << currItr->name
-                 << " value = " << currItr->currentVal << "  ";
-        currItr++;
+        plotName << " name = " << it->name << " value = " << it->currentVal << "  ";
       }
     }
     if (!outputManager_.getDCParamVec().empty())
@@ -4715,18 +6657,15 @@ void OverrideRaw::frequencyHeader()
 
   if (outputManager_.getProcID() == 0)
   {
-
 #endif
-
     // store local names
     for ( name_i = outputManager_.getAllNodes().begin(); name_i != name_end ; ++name_i)
     {
-      nT.push_back( pair< std::string, char>((*name_i).first,
+      nT.push_back( std::pair< std::string, char>((*name_i).first,
                                              typeRefs[(*name_i).second.first]));
     }
 
 #ifdef Xyce_PARALLEL_MPI
-
     // receive data points from procN in order
     for ( int p = 1; p < outputManager_.getNumProcs(); ++p)
     {
@@ -4746,11 +6685,10 @@ void OverrideRaw::frequencyHeader()
         outputManager_.getCommPtr()->unpack( b, bSize, pos, &t, 1);
 
         // store remote names
-        nT.push_back( pair< std::string, char >( name, t));
+        nT.push_back( std::pair< std::string, char >( name, t));
       }
     }
   } // end proc0 check
-
   else
   {
     pos = 0;
@@ -4798,8 +6736,13 @@ void OverrideRaw::frequencyHeader()
     numPointsPos_ = outStreamPtr_->tellp();
     (*outStreamPtr_) << "                  " << std::endl; // this will be overwritten
 
-    // for full compatability with spice3 raw file, output version number here
-    (*outStreamPtr_) << "Version: " << N_UTL_Version::getFullVersionString() << std::endl;
+    if (outputManager_.getOutputVersionInRawFile() )
+    {
+      // spice3 does not output the version number of the simulator in the 
+      // in the raw file header.  Optionally let one output the version 
+      // if whatever program is going to read the file expects it
+      (*outStreamPtr_) << "Version: " << N_UTL_Version::getFullVersionString() << std::endl;
+    }
 
     // NOTE: dimensions, command, options, and scale not considered
 
@@ -4841,10 +6784,11 @@ void OverrideRaw::frequencyHeader()
         tmpNodeName = "V(" +(nT[i]).first + ")";
       }
 
-      uPos = tmpNodeName.rfind( "_", tmpNodeName.size()); if (uPos != std::string::npos)
-                                                          {
-                                                            tmpNodeName.replace( uPos, 1, "#");
-                                                          }
+      uPos = tmpNodeName.rfind( "_", tmpNodeName.size());
+      if (uPos != std::string::npos)
+      {
+        tmpNodeName.replace( uPos, 1, "#");
+      }
 
       (*outStreamPtr_) << "\t" << i + 1 << "\t" << tmpNodeName << "\t";
 
@@ -4867,7 +6811,18 @@ void OverrideRaw::frequencyHeader()
 }
 
 
-void OverrideRaw::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vector * stateVecPtr, const N_LAS_Vector * storeVecPtr)
+//-----------------------------------------------------------------------------
+// Function      : OverrideRaw::doOutputTime
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRaw::doOutputTime(
+    const N_LAS_Vector * solnVecPtr, 
+    const N_LAS_Vector * stateVecPtr, 
+    const N_LAS_Vector * storeVecPtr)
 {
   outputManager_.setCurrentOutputter(this);
 
@@ -4921,18 +6876,14 @@ void OverrideRaw::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vect
     // dump proc0 data points
     for ( name_i = outputManager_.getAllNodes().begin(); name_i != name_end ; ++name_i)
     {
-      double tmp =(*solnVecPtr)[(*name_i).second.first];
-      if (fabs( tmp) < outputManager_.getFilter())
-      {
-        tmp = 0.0;
-      }
+      double result = (*solnVecPtr)[(*name_i).second.first];
+      result = filter(result, printParameters_.filter_);
 
       // write binary data to rawfile
-      outStreamPtr_->write((char *)&tmp , sizeof( double));
+      outStreamPtr_->write((char *)&result , sizeof( double));
     }
 
 #ifdef Xyce_PARALLEL_MPI
-
     // receive data points from procN in order
     for ( int p = 1; p < outputManager_.getNumProcs(); ++p)
     {
@@ -4951,7 +6902,6 @@ void OverrideRaw::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vect
     }
 
   } // end proc0 work
-
   else
   {
     // pack and send local data points to proc0
@@ -4960,13 +6910,10 @@ void OverrideRaw::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vect
 
     for ( name_i = outputManager_.getAllNodes().begin(); name_i != name_end ; ++name_i)
     {
-      double tmp =(*solnVecPtr)[(*name_i).second.first];
-      if (fabs( tmp) < outputManager_.getFilter())
-      {
-        tmp = 0.0;
-      }
+      double result =(*solnVecPtr)[(*name_i).second.first];
+      result = filter(result, printParameters_.filter_);
 
-      outputManager_.getCommPtr()->pack( &tmp, 1, b, bSize, pos);
+      outputManager_.getCommPtr()->pack( &result, 1, b, bSize, pos);
     }
 
     outputManager_.getCommPtr()->send( &e, 1, 0);
@@ -4983,10 +6930,27 @@ void OverrideRaw::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vect
   ++numPoints_;
 }
 
-void OverrideRaw::doResetOutput()
-{}
+//-----------------------------------------------------------------------------
+// Function      : OverrideRaw::doResetOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRaw::doResetOutput()
+{
+}
 
-void OverrideRaw::doFinishOutput()
+//-----------------------------------------------------------------------------
+// Function      : OverrideRaw::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRaw::doFinishOutput()
 {
   if (outputManager_.getProcID() == 0)
   {
@@ -5009,11 +6973,18 @@ void OverrideRaw::doFinishOutput()
   numPoints_=0;
 }
 
+//-----------------------------------------------------------------------------
+// Function      : OverrideRaw::doOutputFrequency
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void
 OverrideRaw::doOutputFrequency(double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
 {
   outputManager_.setCurrentOutputter(this);
-  double tmp;
 
   if (numPoints_ == 0)
   {
@@ -5024,14 +6995,13 @@ OverrideRaw::doOutputFrequency(double frequency, const N_LAS_Vector *real_soluti
 
   outputManager_.getCommPtr()->barrier();
 
-  tmp=frequency;
-
+  double result = frequency;
   // file IO only on proc 0
   if (outputManager_.getProcID() == 0)
   {
-    outStreamPtr_->write((char *)&tmp , sizeof( double));
-    tmp = 0.0;
-    outStreamPtr_->write((char *)&tmp , sizeof( double));
+    outStreamPtr_->write((char *) &result, sizeof(double));
+    result = 0.0;
+    outStreamPtr_->write((char *) &result, sizeof(double));
   }
 
   NodeNamePairMap::iterator name_i, name_end;
@@ -5056,22 +7026,15 @@ OverrideRaw::doOutputFrequency(double frequency, const N_LAS_Vector *real_soluti
     // dump proc0 data points
     for ( name_i = outputManager_.getAllNodes().begin(); name_i != name_end ; ++name_i)
     {
-      tmp =(*real_solution_vector)[(*name_i).second.first];
-      double tmpImg =(*imaginary_solution_vector)[(*name_i).second.first];
-      if (fabs( tmp) < outputManager_.getFilter())
-      {
-        tmp = 0.0;
-      }
-      if (fabs( tmpImg) < outputManager_.getFilter())
-      {
-        tmpImg = 0.0;
-      }
+      complex result = complex((*real_solution_vector)[(*name_i).second.first], (*imaginary_solution_vector)[(*name_i).second.first]);
 
       // write formatted values to rawfile
       if (outputManager_.getProcID() == 0)
       {
-        outStreamPtr_->write((char *)&tmp , sizeof( double));
-        outStreamPtr_->write((char *)&tmpImg , sizeof( double));
+        double realPart=result.real();
+        double imagPart=result.imag();
+        outStreamPtr_->write((char *) &realPart, sizeof(double));
+        outStreamPtr_->write((char *) &imagPart, sizeof(double));
       }
     }
 
@@ -5086,20 +7049,20 @@ OverrideRaw::doOutputFrequency(double frequency, const N_LAS_Vector *real_soluti
       outputManager_.getCommPtr()->recv( b, s, p);
       for ( int j = 0; j < e; j++)
       {
-        outputManager_.getCommPtr()->unpack( b, bSize, pos, &tmp, 1);
+        double result = 0.0;
+        outputManager_.getCommPtr()->unpack( b, bSize, pos, &result, 1);
 
         // write formatted values to rawfile
         if (outputManager_.getProcID() == 0)
         {
-          outStreamPtr_->write((char *)&tmp , sizeof( double));
-          tmp = 0;
-          outStreamPtr_->write((char *)&tmp , sizeof( double));
+          outStreamPtr_->write((char *) &result, sizeof(double));
+          result = 0.0;
+          outStreamPtr_->write((char *) &result, sizeof(double));
         }
       }
     }
 
   } // end proc0 work
-
   else
   {
     // pack and send local data points to proc0
@@ -5108,13 +7071,9 @@ OverrideRaw::doOutputFrequency(double frequency, const N_LAS_Vector *real_soluti
 
     for ( name_i = outputManager_.getAllNodes().begin(); name_i != name_end ; ++name_i)
     {
-      tmp =(*real_solution_vector)[(*name_i).second.first];
-      if (fabs( tmp) < outputManager_.getFilter())
-      {
-        tmp = 0.0;
-      }
-
-      outputManager_.getCommPtr()->pack( &tmp, 1, b, bSize, pos);
+      double result =(*real_solution_vector)[(*name_i).second.first];
+      result = filter(result, printParameters_.filter_);
+      outputManager_.getCommPtr()->pack( &result, 1, b, bSize, pos);
     }
 
     outputManager_.getCommPtr()->send( &e, 1, 0);
@@ -5131,28 +7090,89 @@ OverrideRaw::doOutputFrequency(double frequency, const N_LAS_Vector *real_soluti
   ++numPoints_;
 }
 
-void OverrideRaw::doOutputHB(
+//-----------------------------------------------------------------------------
+// Function      : OverrideRaw::doOutputHB
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRaw::doOutputHB(
   const std::vector<double>&    timePoints,
   const std::vector<double>&    freqPoints,
   const N_LAS_BlockVector &     timeDomainSolnVec,
   const N_LAS_BlockVector &     freqDomainSolnVecReal,
   const N_LAS_BlockVector &     freqDomainSolnVecImaginary)
-{}
+{
+}
 
-void OverrideRaw::doOutputMPDE(double time, const N_LAS_Vector *solution_vector)
-{}
+//-----------------------------------------------------------------------------
+// Function      : OverrideRaw::doOutputMPDE
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRaw::doOutputMPDE(double time, const N_LAS_Vector *solution_vector)
+{
+}
 
-void OverrideRaw::doOutputHomotopy(const std::vector<std::string> & parameter_names, const std::vector<double> & parameter_values, const N_LAS_Vector * solution_vector)
-{}
+//-----------------------------------------------------------------------------
+// Function      : OverrideRaw::doOutputHomotopy
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRaw::doOutputHomotopy(const std::vector<std::string> & parameter_names, const std::vector<double> & parameter_values, const N_LAS_Vector * solution_vector)
+{
+}
 
-void OverrideRaw::doOutputMORTF(bool origSystem, const double & freq, const Teuchos::SerialDenseMatrix<int, std::complex<double> >& H)
-{}
+//-----------------------------------------------------------------------------
+// Function      : OverrideRaw::doOutputMORTF
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRaw::doOutputMORTF(bool origSystem, const double & freq, const Teuchos::SerialDenseMatrix<int, std::complex<double> >& H)
+{
+}
 
+//-----------------------------------------------------------------------------
+// Function      : OverrideRaw::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void
 OverrideRaw::doFinishOutputStep()
-{}
+{
+}
 
 
+//-----------------------------------------------------------------------------
+// Class         : OverrideRawAscii
+// Purpose       : Outputter class for rawfile output format, ascii version
+// Special Notes : Invoked by -r on command line.  FORMAT=RAW on print line
+//                 is handled by the TimeRaw* and FrequencyRaw* classes
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : OverrideRawAscii::OverrideRawAscii
+// Purpose       : Constructor
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 OverrideRawAscii::OverrideRawAscii(OutputMgr &output_manager, const PrintParameters &print_parameters)
   : outputManager_(output_manager),
     printParameters_(print_parameters),
@@ -5162,34 +7182,69 @@ OverrideRawAscii::OverrideRawAscii(OutputMgr &output_manager, const PrintParamet
     numPointsPos_( 0),
     outputRAWTitleAndDate_(false)
 {
-  if (printParameters_.extension_.empty())
-    printParameters_.extension_ = ".raw";
+  if (printParameters_.defaultExtension_.empty())
+    printParameters_.defaultExtension_ = ".raw";
 }
 
-OverrideRawAscii::~OverrideRawAscii() {
+//-----------------------------------------------------------------------------
+// Function      : OverrideRawAscii::~OverrideRawAscii
+// Purpose       : destructor
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+OverrideRawAscii::~OverrideRawAscii()
+{
   outputManager_.closeFile(outStreamPtr_);
+
+  deleteList(opList_.begin(), opList_.end());
 }
 
-void OverrideRawAscii::doParse() {
+//-----------------------------------------------------------------------------
+// Function      : OverrideRawAscii::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRawAscii::doParse()
+{
   outFilename_ = outputFilename(printParameters_, outputManager_.getNetListFilename());
 }
 
-void OverrideRawAscii::doOpen()
+//-----------------------------------------------------------------------------
+// Function      : OverrideRawAscii::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRawAscii::doOpen()
 {
-  if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0) {
+  if (outputManager_.getProcID() == 0 && outStreamPtr_ == 0)
+  {
     outStreamPtr_ = outputManager_.openFile(outFilename_);
 
     // set output value characteristics
-    outStreamPtr_->setf( ios::scientific);
+    outStreamPtr_->setf( std::ios::scientific);
     outStreamPtr_->precision(8);
-    outStreamPtr_->setf( ios::left, ios::adjustfield);
+    outStreamPtr_->setf( std::ios::left, std::ios::adjustfield);
   }
 }
 
-void OverrideRawAscii::timeHeader()
+//-----------------------------------------------------------------------------
+// Function      : OverrideRawAscii::timeHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRawAscii::timeHeader()
 {
-  int numVars;
-  std::vector< pair< std::string, char > > nT;
   NodeNamePairMap::iterator name_i, name_end;
   name_end = outputManager_.getAllNodes().end();
 
@@ -5220,13 +7275,9 @@ void OverrideRawAscii::timeHeader()
       plotName << "Step Analysis: Step " << outputManager_.getStepLoopNumber() + 1
                << " of " << outputManager_.getMaxParamSteps()
                << " params: ";
-      std::vector<N_ANP_SweepParam>::const_iterator currItr = outputManager_.getStepParamVec().begin();
-      std::vector<N_ANP_SweepParam>::const_iterator endItr = outputManager_.getStepParamVec().end();
-      while ( currItr != endItr)
+      for (std::vector<N_ANP_SweepParam>::const_iterator it = outputManager_.getStepParamVec().begin(); it != outputManager_.getStepParamVec().end(); ++it)
       {
-        plotName << " name = " << currItr->name
-                 << " value = " << currItr->currentVal << "  ";
-        currItr++;
+        plotName << " name = " << it->name << " value = " << it->currentVal << "  ";
       }
     }
     if (!outputManager_.getDCParamVec().empty())
@@ -5273,7 +7324,8 @@ void OverrideRawAscii::timeHeader()
   outputManager_.getTopPtr()->returnVarTypeVec( typeRefs);
 
   // count data points
-  numVars = outputManager_.getAllNodes().size();
+  int numVars = outputManager_.getAllNodes().size();
+  std::vector< std::pair< std::string, char > > nT;
 
 #ifdef Xyce_PARALLEL_MPI
 
@@ -5298,7 +7350,7 @@ void OverrideRawAscii::timeHeader()
     // store local names
     for ( name_i = outputManager_.getAllNodes().begin(); name_i != name_end ; ++name_i)
     {
-      nT.push_back( pair< std::string, char>((*name_i).first,
+      nT.push_back( std::pair< std::string, char>((*name_i).first,
                                              typeRefs[(*name_i).second.first]));
     }
 
@@ -5323,11 +7375,10 @@ void OverrideRawAscii::timeHeader()
         outputManager_.getCommPtr()->unpack( b, bSize, pos, &t, 1);
 
         // store remote names
-        nT.push_back( pair< std::string, char >( name, t));
+        nT.push_back( std::pair< std::string, char >( name, t));
       }
     }
   } // end proc0 check
-
   else
   {
     pos = 0;
@@ -5374,8 +7425,13 @@ void OverrideRawAscii::timeHeader()
     numPointsPos_ = outStreamPtr_->tellp(); // <= 344 due to 80 char line limit
     (*outStreamPtr_) << "                  " << std::endl; // this will be overwritten
 
-    // for full compatability with spice3 raw file, output version number here
-    (*outStreamPtr_) << "Version: " << N_UTL_Version::getFullVersionString() << std::endl;
+    if (outputManager_.getOutputVersionInRawFile() )
+    {
+      // spice3 does not output the version number of the simulator in the 
+      // in the raw file header.  Optionally let one output the version 
+      // if whatever program is going to read the file expects it
+      (*outStreamPtr_) << "Version: " << N_UTL_Version::getFullVersionString() << std::endl;
+    }
 
     // NOTE: dimensions, command, options, and scale not considered
 
@@ -5418,10 +7474,11 @@ void OverrideRawAscii::timeHeader()
         tmpNodeName = "V(" +(nT[i]).first + ")";
       }
 
-      uPos = tmpNodeName.rfind( "_", tmpNodeName.size()); if (uPos != std::string::npos)
-                                                          {
-                                                            tmpNodeName.replace( uPos, 1, "#");
-                                                          }
+      uPos = tmpNodeName.rfind( "_", tmpNodeName.size());
+      if (uPos != std::string::npos)
+      {
+        tmpNodeName.replace( uPos, 1, "#");
+      }
 
       (*outStreamPtr_) << "\t" << i + 1 << "\t" << tmpNodeName << "\t";
 
@@ -5444,7 +7501,15 @@ void OverrideRawAscii::timeHeader()
 }
 
 
-void OverrideRawAscii::frequencyHeader()
+//-----------------------------------------------------------------------------
+// Function      : OverrideRawAscii::frequencyHeader
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRawAscii::frequencyHeader()
 {
   // This routine was split off of doOutputHeader because an
   // AC analysis can output both real data "doOutput" and complex
@@ -5453,7 +7518,7 @@ void OverrideRawAscii::frequencyHeader()
   // data type.  So rather than add more conditional logic we chose
   // to separate out the functionality for the different use cases.
   int numVars;
-  std::vector< pair< std::string, char > > nT;
+  std::vector< std::pair< std::string, char > > nT;
   NodeNamePairMap::iterator name_i, name_end;
   name_end = outputManager_.getAllNodes().end();
 
@@ -5484,13 +7549,10 @@ void OverrideRawAscii::frequencyHeader()
       plotName << "Step Analysis: Step " << outputManager_.getStepLoopNumber() + 1
                << " of " << outputManager_.getMaxParamSteps()
                << " params: ";
-      std::vector<N_ANP_SweepParam>::const_iterator currItr = outputManager_.getStepParamVec().begin();
-      std::vector<N_ANP_SweepParam>::const_iterator endItr = outputManager_.getStepParamVec().end();
-      while ( currItr != endItr)
+      for (std::vector<N_ANP_SweepParam>::const_iterator it = outputManager_.getStepParamVec().begin();
+          it != outputManager_.getStepParamVec().end(); ++it)
       {
-        plotName << " name = " << currItr->name
-                 << " value = " << currItr->currentVal << "  ";
-        currItr++;
+        plotName << " name = " << it->name << " value = " << it->currentVal << "  ";
       }
     }
     if (!outputManager_.getDCParamVec().empty())
@@ -5557,7 +7619,7 @@ void OverrideRawAscii::frequencyHeader()
     // store local names
     for ( name_i = outputManager_.getAllNodes().begin(); name_i != name_end ; ++name_i)
     {
-      nT.push_back( pair< std::string, char>((*name_i).first,
+      nT.push_back( std::pair< std::string, char>((*name_i).first,
                                              typeRefs[(*name_i).second.first]));
     }
 
@@ -5582,11 +7644,10 @@ void OverrideRawAscii::frequencyHeader()
         outputManager_.getCommPtr()->unpack( b, bSize, pos, &t, 1);
 
         // store remote names
-        nT.push_back( pair< std::string, char >( name, t));
+        nT.push_back( std::pair< std::string, char >( name, t));
       }
     }
   } // end proc0 check
-
   else
   {
     pos = 0;
@@ -5613,7 +7674,7 @@ void OverrideRawAscii::frequencyHeader()
     outputManager_.getCommPtr()->send( b, s, 0);
   } // end procN check
 
-    // clean up
+  // clean up
   if (b != NULL)
   {
     free( b);
@@ -5634,8 +7695,13 @@ void OverrideRawAscii::frequencyHeader()
     numPointsPos_ = outStreamPtr_->tellp(); // <= 344 due to 80 char line limit
     (*outStreamPtr_) << "                  " << std::endl; // this will be overwritten
 
-    // for full compatability with spice3 raw file, output version number here
-    (*outStreamPtr_) << "Version: " << N_UTL_Version::getFullVersionString() << std::endl;
+    if (outputManager_.getOutputVersionInRawFile() )
+    {
+      // spice3 does not output the version number of the simulator in the 
+      // in the raw file header.  Optionally let one output the version 
+      // if whatever program is going to read the file expects it
+      (*outStreamPtr_) << "Version: " << N_UTL_Version::getFullVersionString() << std::endl;
+    }
 
     // NOTE: dimensions, command, options, and scale not considered
 
@@ -5674,10 +7740,11 @@ void OverrideRawAscii::frequencyHeader()
         tmpNodeName = "V(" +(nT[i]).first + ")";
       }
 
-      uPos = tmpNodeName.rfind( "_", tmpNodeName.size()); if (uPos != std::string::npos)
-                                                          {
-                                                            tmpNodeName.replace( uPos, 1, "#");
-                                                          }
+      uPos = tmpNodeName.rfind( "_", tmpNodeName.size());
+      if (uPos != std::string::npos)
+      {
+        tmpNodeName.replace( uPos, 1, "#");
+      }
 
       (*outStreamPtr_) << "\t" << i + 1 << "\t" << tmpNodeName << "\t";
 
@@ -5698,7 +7765,18 @@ void OverrideRawAscii::frequencyHeader()
   } // end proc0 check
 }
 
-void OverrideRawAscii::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vector * stateVecPtr, const N_LAS_Vector * storeVecPtr)
+//-----------------------------------------------------------------------------
+// Function      : OverrideRawAscii::doOutputTime
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRawAscii::doOutputTime(
+    const N_LAS_Vector * solnVecPtr, 
+    const N_LAS_Vector * stateVecPtr, 
+    const N_LAS_Vector * storeVecPtr)
 {
   outputManager_.setCurrentOutputter(this);
 
@@ -5722,7 +7800,8 @@ void OverrideRawAscii::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS
     os << numPoints_;
 
     // output the time/step values
-    if ( printParameters_.printType_ == PrintType::TRAN) {
+    if ( printParameters_.printType_ == PrintType::TRAN)
+    {
       tmp = outputManager_.getCircuitTime();
       tmp *= printParameters_.outputTimeScaleFactor_;
     }
@@ -5750,20 +7829,15 @@ void OverrideRawAscii::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS
 
   if (outputManager_.getProcID() == 0)
   {
-
 #endif
 
     // dump proc0 data points
     for ( name_i = outputManager_.getAllNodes().begin(); name_i != name_end ; ++name_i)
     {
-      double tmp =(*solnVecPtr)[(*name_i).second.first];
-      if (fabs( tmp) < outputManager_.getFilter())
-      {
-        tmp = 0.0;
-      }
+      double result = (*solnVecPtr)[(*name_i).second.first];
+      result = filter(result, printParameters_.filter_);
 
-      // write formatted values to rawfile
-      os << "\t" << tmp << "\n";
+      os << "\t" << result << "\n";
     }
 
 #ifdef Xyce_PARALLEL_MPI
@@ -5786,7 +7860,6 @@ void OverrideRawAscii::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS
     }
 
   } // end proc0 work
-
   else
   {
     // pack and send local data points to proc0
@@ -5795,13 +7868,10 @@ void OverrideRawAscii::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS
 
     for ( name_i = outputManager_.getAllNodes().begin(); name_i != name_end ; ++name_i)
     {
-      double tmp = (*solnVecPtr)[(*name_i).second.first];
-      if (fabs( tmp) < outputManager_.getFilter())
-      {
-        tmp = 0.0;
-      }
+      double result = (*solnVecPtr)[(*name_i).second.first];
+      result = filter(result, printParameters_.filter_);
 
-      outputManager_.getCommPtr()->pack( &tmp, 1, b, bSize, pos);
+      outputManager_.getCommPtr()->pack( &result, 1, b, bSize, pos);
     }
 
     outputManager_.getCommPtr()->send( &e, 1, 0);
@@ -5824,6 +7894,14 @@ void OverrideRawAscii::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS
   ++numPoints_;
 }
 
+//-----------------------------------------------------------------------------
+// Function      : OverrideRawAscii::doOutputFrequency
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void
 OverrideRawAscii::doOutputFrequency(double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
 {
@@ -5876,19 +7954,9 @@ OverrideRawAscii::doOutputFrequency(double frequency, const N_LAS_Vector *real_s
     // dump proc0 data points
     for ( name_i = outputManager_.getAllNodes().begin(); name_i != name_end ; ++name_i)
     {
-      tmp =(*real_solution_vector)[(*name_i).second.first];
-      double tmpImg =(*imaginary_solution_vector)[(*name_i).second.first];
-      if (fabs( tmp) < outputManager_.getFilter())
-      {
-        tmp = 0.0;
-      }
-      if (fabs( tmpImg) < outputManager_.getFilter())
-      {
-        tmpImg = 0.0;
-      }
+      complex result  = complex((*real_solution_vector)[(*name_i).second.first], (*imaginary_solution_vector)[(*name_i).second.first]);
 
-      // write formatted values to rawfile
-      (*outStreamPtr_) << "\t" << tmp << ", " << tmpImg << "\n";
+      (*outStreamPtr_) << "\t" << result.real() << ", " << result.imag() << "\n";
     }
 
 #ifdef Xyce_PARALLEL_MPI
@@ -5910,7 +7978,6 @@ OverrideRawAscii::doOutputFrequency(double frequency, const N_LAS_Vector *real_s
     }
 
   } // end proc0 work
-
   else
   {
     // pack and send local data points to proc0
@@ -5919,11 +7986,8 @@ OverrideRawAscii::doOutputFrequency(double frequency, const N_LAS_Vector *real_s
 
     for ( name_i = outputManager_.getAllNodes().begin(); name_i != name_end ; ++name_i)
     {
-      tmp =(*real_solution_vector)[(*name_i).second.first];
-      if (fabs( tmp) < outputManager_.getFilter())
-      {
-        tmp = 0.0;
-      }
+      double result = (*real_solution_vector)[(*name_i).second.first];
+      result = filter(result, printParameters_.filter_);
 
       outputManager_.getCommPtr()->pack( &tmp, 1, b, bSize, pos);
     }
@@ -5949,31 +8013,85 @@ OverrideRawAscii::doOutputFrequency(double frequency, const N_LAS_Vector *real_s
   ++numPoints_;
 }
 
-void OverrideRawAscii::doOutputHB(
+//-----------------------------------------------------------------------------
+// Function      : OverrideRawAscii::doOutputHB
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRawAscii::doOutputHB(
   const std::vector<double>&    timePoints,
   const std::vector<double>&    freqPoints,
   const N_LAS_BlockVector &     timeDomainSolnVec,
   const N_LAS_BlockVector &     freqDomainSolnVecReal,
   const N_LAS_BlockVector &     freqDomainSolnVecImaginary)
-{}
+{
+}
 
-void OverrideRawAscii::doOutputMPDE(double time, const N_LAS_Vector *solution_vector)
-{}
+//-----------------------------------------------------------------------------
+// Function      : OverrideRawAscii::doOutputMPDE
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRawAscii::doOutputMPDE(double time, const N_LAS_Vector *solution_vector)
+{
+}
 
-void OverrideRawAscii::doOutputHomotopy(const std::vector<std::string> & parameter_names, const std::vector<double> & parameter_values, const N_LAS_Vector * solution_vector)
-{}
+//-----------------------------------------------------------------------------
+// Function      : OverrideRawAscii::doOutputHomotopy
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRawAscii::doOutputHomotopy(const std::vector<std::string> & parameter_names, const std::vector<double> & parameter_values, const N_LAS_Vector * solution_vector)
+{
+}
 
-void OverrideRawAscii::doOutputMORTF(bool origSystem, const double & freq, const Teuchos::SerialDenseMatrix<int, std::complex<double> >& H)
-{}
+//-----------------------------------------------------------------------------
+// Function      : OverrideRawAscii::doOutputMORTF
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRawAscii::doOutputMORTF(bool origSystem, const double & freq, const Teuchos::SerialDenseMatrix<int, std::complex<double> >& H)
+{
+}
 
-void OverrideRawAscii::doResetOutput()
-{}
+//-----------------------------------------------------------------------------
+// Function      : OverrideRawAscii::doResetOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRawAscii::doResetOutput()
+{
+}
 
-void OverrideRawAscii::doFinishOutput()
+//-----------------------------------------------------------------------------
+// Function      : OverrideRawAscii::doFinishOutput
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  OverrideRawAscii::doFinishOutput()
 {
   if (outputManager_.getProcID() == 0)
   {
-    if (outStreamPtr_) {
+    if (outStreamPtr_)
+    {
       // need to move file pointer back to header and
       // write out the number of points.
       long currentFelePost = outStreamPtr_->tellp();
@@ -5995,10 +8113,34 @@ void OverrideRawAscii::doFinishOutput()
 }
 
 
+//-----------------------------------------------------------------------------
+// Function      : OverrideRawAscii::doFinishOutputStep
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 void
 OverrideRawAscii::doFinishOutputStep()
-{}
+{
+}
 
+//-----------------------------------------------------------------------------
+// Class         : MOR
+// Purpose       : Outputter class for MOR runs
+// Special Notes :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/7/2013
+//-----------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+// Function      : MOR::MOR
+// Purpose       : Constructor
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 MOR::MOR(OutputMgr &output_manager, const PrintParameters &print_parameters)
   : outputManager_(output_manager),
     printParameters_(print_parameters),
@@ -6009,17 +8151,37 @@ MOR::MOR(OutputMgr &output_manager, const PrintParameters &print_parameters)
     outStreamPtr_(0),
     headerPrintCalls_(0)
 {
-  if (printParameters_.extension_.empty())
-    printParameters_.extension_ = ".prn";
+  if (printParameters_.defaultExtension_.empty())
+    printParameters_.defaultExtension_ = ".prn";
 }
 
+//-----------------------------------------------------------------------------
+// Function      : MOR::~MOR
+// Purpose       : destructor
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 MOR::~MOR()
 {
-  if (outStreamPtr_ != &std::cout)
+  if (outStreamPtr_ != &Xyce::dout())
+  {
     delete outStreamPtr_;
+  }
+
+  deleteList(opList_.begin(), opList_.end());
 }
 
-void MOR::doParse()
+//-----------------------------------------------------------------------------
+// Function      : MOR::doParse
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  MOR::doParse()
 {
   if (openOrig_)
   {
@@ -6031,7 +8193,15 @@ void MOR::doParse()
   }
 }
 
-void MOR::doOpen()
+//-----------------------------------------------------------------------------
+// Function      : MOR::doOpen
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void  MOR::doOpen()
 {
   if (stepCount_ == 0)
   {
@@ -6051,21 +8221,20 @@ void MOR::doOpen()
 // Creator       : Heidi Thornquist, Ting Mei
 // Creation Date : 5/25/12
 //-----------------------------------------------------------------------------
-void MOR::outputMORHeaders(int numPorts)
+void  MOR::outputMORHeaders(int numPorts)
 {
   index_ = 0;
 
 #ifdef Xyce_DEBUG_IO
-  cout << "MOR Header output:" << std::endl;
+  Xyce::dout() << "MOR Header output:" << std::endl;
 #endif
 
   // hardwire the AC print format to tecplot or gnuplot(not PROBE!)
   if (format_ != Format::TECPLOT && format_ != Format::STD)
   {
+    Report::UserWarning() << "MOR output can only use tecplot format, resetting to gnuplot format.";
+
     format_ = Format::STD;
-    string msg("MOR output can only use tecplot or gnuplot format.");
-    msg += "  Resetting to gnuplot format.\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING, msg);
   }
 
   if (format_ == Format::TECPLOT) // tecplot header
@@ -6081,9 +8250,9 @@ void MOR::outputMORHeaders(int numPorts)
     stdFreqMORHeader_(*outStreamPtr_, numPorts);
   }
 
-  outStreamPtr_->setf(ios::scientific);
+  outStreamPtr_->setf(std::ios::scientific);
   outStreamPtr_->precision(printParameters_.streamPrecision_);
-  outStreamPtr_->setf(ios::left, ios::adjustfield);
+  outStreamPtr_->setf(std::ios::left, std::ios::adjustfield);
 
   ++stepCount_;
 }
@@ -6098,12 +8267,12 @@ void MOR::outputMORHeaders(int numPorts)
 // Creator       : Heidi Thornquist, Ting Mei
 // Creation Date : 5/25/12
 //-----------------------------------------------------------------------------
-void MOR::doOutputMORTF(bool origSystem, const double & freq, const Teuchos::SerialDenseMatrix<int, std::complex<double> >& H)
+void  MOR::doOutputMORTF(bool origSystem, const double & freq, const Teuchos::SerialDenseMatrix<int, std::complex<double> >& H)
 {
   bool firstColPrinted = false;
 
 #ifdef Xyce_DEBUG_IO
-  cout << "Begin outputMORTF" << std::endl;
+  Xyce::dout() << "Begin outputMORTF" << std::endl;
 #endif
 
   std::ostringstream ost;
@@ -6154,7 +8323,8 @@ void MOR::doOutputMORTF(bool origSystem, const double & freq, const Teuchos::Ser
     else
     {
       outStreamPtr_->width(0);
-      if (firstColPrinted) {
+      if (firstColPrinted)
+      {
         (*outStreamPtr_) << printParameters_.delimiter_;
       }
     }
@@ -6178,7 +8348,8 @@ void MOR::doOutputMORTF(bool origSystem, const double & freq, const Teuchos::Ser
           else
           {
             outStreamPtr_->width(0);
-            if (printParameters_.delimiter_ != "") {
+            if (printParameters_.delimiter_ != "")
+            {
               (*outStreamPtr_) << printParameters_.delimiter_;
             }
           }
@@ -6191,7 +8362,8 @@ void MOR::doOutputMORTF(bool origSystem, const double & freq, const Teuchos::Ser
           else
           {
             outStreamPtr_->width(0);
-            if (printParameters_.delimiter_ != "") {
+            if (printParameters_.delimiter_ != "")
+            {
               (*outStreamPtr_) << printParameters_.delimiter_;
             }
           }
@@ -6217,7 +8389,7 @@ void MOR::doOutputMORTF(bool origSystem, const double & freq, const Teuchos::Ser
 // Creator       : Heidi Thornquist, Ting Mei
 // Creation Date : 5/31/12
 //-----------------------------------------------------------------------------
-void MOR::stdFreqMORHeader_(ostream & stream, int numPorts)
+void  MOR::stdFreqMORHeader_(std::ostream & stream, int numPorts)
 {
   Table table;
   Table::Justification freqJust = Table::JUSTIFICATION_LEFT;
@@ -6254,11 +8426,11 @@ void MOR::stdFreqMORHeader_(ostream & stream, int numPorts)
 // Function      : MOR::tecplotFreqMORHeader_
 // Purpose       : header for tecplot. Freq Domain for MOR(default)
 // Special Notes :
-// Scope         : private
+// Scope         :
 // Creator       : Heidi Thornquist and Ting Mei
 // Creation Date : 5/31/12
 //-----------------------------------------------------------------------------
-void MOR::tecplotFreqMORHeader_(ostream & stream, int counter, int numPorts)
+void  MOR::tecplotFreqMORHeader_(std::ostream & stream, int counter, int numPorts)
 {
   if (counter == 0)
   {
@@ -6290,69 +8462,47 @@ void MOR::tecplotFreqMORHeader_(ostream & stream, int counter, int numPorts)
     stream << "ZONE F=POINT\n";
   }
   stream << std::endl;
-  stream << flush;
+  stream.flush();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : MOR::outputPRINT_
-// Purpose       : .PRINT FORMAT=STD time domain output
+// Function      : MOR::doResetOutput
+// Purpose       :
 // Special Notes :
-// Scope         : private
-// Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 10/10/00
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date :
 //-----------------------------------------------------------------------------
-void MOR::doOutputTime(const N_LAS_Vector * solnVecPtr, const N_LAS_Vector * stateVecPtr, const N_LAS_Vector * storeVecPtr)
+void  MOR::doResetOutput()
 {
-}
-
-void
-MOR::doOutputFrequency(double frequency, const N_LAS_Vector *real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
-{
-}
-
-void MOR::doOutputHB(
-  const std::vector<double>&    timePoints,
-  const std::vector<double>&    freqPoints,
-  const N_LAS_BlockVector &     timeDomainSolnVec,
-  const N_LAS_BlockVector &     freqDomainSolnVecReal,
-  const N_LAS_BlockVector &     freqDomainSolnVecImaginary)
-{}
-
-void MOR::doOutputMPDE(double time, const N_LAS_Vector *solution_vector)
-{}
-
-void MOR::doOutputHomotopy(const std::vector<std::string> & parameter_names, const std::vector<double> & parameter_values, const N_LAS_Vector * solution_vector)
-{}
-
-void MOR::doFinishOutput()
-{}
-
-void MOR::doResetOutput() {
   firstTimePrint_ = true;
   stepCount_ = 0;
 }
 
-void MOR::doFinishOutputStep()
-{
-}
-
 } // namespace outputter
 
+//-----------------------------------------------------------------------------
+// Namespace     : Unnamed
+// Purpose       : file-local scoped methods and data
+// Special Notes : This second unnamed namespace block defines some functions
+//                 that had only been declared in the previous block
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
 namespace { // <unnamed>
 
 //-----------------------------------------------------------------------------
-// Function      : MOR::tecplotFreqHeader_
+// Function      : tecplotFreqHeader
 // Purpose       : header for tecplot. Freq Domain(default)
 // Special Notes :
-// Scope         : private
+// Scope         : file-local
 // Creator       : Eric Keiter
 // Creation Date : 4/11/12
 //-----------------------------------------------------------------------------
-void tecplotFreqHeader(OutputMgr &output_manager, const PrintParameters &print_parameters, std::ostream &os, int counter)
+void tecplotFreqHeader(OutputMgr &output_manager, const PrintParameters &print_parameters, const Util::OpList &op_list, std::ostream &os, int counter)
 {
-
-  int tecplotHeaderPrecision_ = 2;
-  os.setf(ios::scientific);
+  static const int tecplotHeaderPrecision_ = 2;
+  os.setf(std::ios::scientific);
   os.precision( tecplotHeaderPrecision_);
 
   if (counter == 0)
@@ -6361,22 +8511,23 @@ void tecplotFreqHeader(OutputMgr &output_manager, const PrintParameters &print_p
     os << "\tVARIABLES = ";
 
     // output the user-specified solution vars:
-    for (ParameterList::const_iterator iterParam = print_parameters.variableList_.begin() ; iterParam != print_parameters.variableList_.end(); ++iterParam)
+    for (Util::OpList::const_iterator it = op_list.begin() ; it != op_list.end(); ++it)
     {
       os << "\" ";
-      if ( (*iterParam).tag() == "FREQUENCY" )
+      if ( (*it)->getName() == "FREQUENCY" )
       {
         os << "FREQ";
       }
       else
       {
-        os << (*iterParam).tag() ;
+        os << (*it)->getName() ;
       }
       os << "\" " << std::endl;
     }
     os << "DATASETAUXDATA ";
     os << getTecplotTimeDateStamp();
     os << std::endl;
+
     if (!output_manager.getTempSweepFlag())
     {
       os << "DATASETAUXDATA TEMP = \"" << output_manager.getCircuitTemp() << " \"" << std::endl;
@@ -6384,7 +8535,7 @@ void tecplotFreqHeader(OutputMgr &output_manager, const PrintParameters &print_p
   }
 
   // output some AUXDATA
-  os << "ZONE F=POINT ";
+  os << "ZONE F=POINT  ";
 
   if (output_manager.getStepParamVec().empty())
   {
@@ -6392,23 +8543,22 @@ void tecplotFreqHeader(OutputMgr &output_manager, const PrintParameters &print_p
   }
   else
   {
-    std::vector<N_ANP_SweepParam>::const_iterator iterParam;
-    std::vector<N_ANP_SweepParam>::const_iterator firstParam=output_manager.getStepParamVec().begin();
-    std::vector<N_ANP_SweepParam>::const_iterator lastParam=output_manager.getStepParamVec().end();
-
     os << " T= \" ";
-    for (iterParam=firstParam;iterParam!=lastParam;++iterParam)
+    for (std::vector<N_ANP_SweepParam>::const_iterator it = output_manager.getStepParamVec().begin(); it != output_manager.getStepParamVec().end(); ++it)
     {
-      os << " " << iterParam->name << " = ";
-      os << iterParam->currentVal;
+      os << " " << it->name << " = " << it->currentVal;
     }
     os << "\" ";
   }
+
   os << std::endl;
 
   // put in the various sweep parameters as auxdata:
-  if (!output_manager.getStepParamVec().empty()) {
-    for (std::vector<N_ANP_SweepParam>::const_iterator iterParam = output_manager.getStepParamVec().begin(); iterParam != output_manager.getStepParamVec().end(); ++iterParam)
+  if (!output_manager.getStepParamVec().empty())
+  {
+    for (std::vector<N_ANP_SweepParam>::const_iterator iterParam = output_manager.getStepParamVec().begin();
+    iterParam != output_manager.getStepParamVec().end();
+    ++iterParam)
     {
       // convert any ":" or "%" in the name to a "_", so as not to confuse tecplot.
       std::string tmpName(iterParam->name);
@@ -6419,18 +8569,35 @@ void tecplotFreqHeader(OutputMgr &output_manager, const PrintParameters &print_p
     os << std::endl;
   }
 
-  os << flush;
+  os << std::flush; 
 }
 
+//-----------------------------------------------------------------------------
+// Function      : printHeader
+// Purpose       : Given print parameters and a stream, print the header
+// Special Notes : top level function
+// Scope         : file-local
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 std::ostream &printHeader(std::ostream &os, const PrintParameters &print_parameters)
 {
   return printHeader(os, print_parameters.table_.columnList_, print_parameters.delimiter_);
 }
 
 
+//-----------------------------------------------------------------------------
+// Function      : printHeader
+// Purpose       : Given stream, column list, and delimiter, print header
+// Special Notes :
+// Scope         : file-local
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 std::ostream &printHeader(std::ostream &os, const Table::ColumnList &column_list, const std::string &delimiter)
 {
-  for (Table::ColumnList::const_iterator it = column_list.begin(); it != column_list.end(); ++it) {
+  for (Table::ColumnList::const_iterator it = column_list.begin(); it != column_list.end(); ++it)
+  {
     if (it != column_list.begin())
       os << (delimiter.empty() ? " " : delimiter);
 
@@ -6443,6 +8610,14 @@ std::ostream &printHeader(std::ostream &os, const Table::ColumnList &column_list
 }
 
 
+//-----------------------------------------------------------------------------
+// Function      : printHeader
+// Purpose       : print a single column of the header on the given stream.
+// Special Notes :
+// Scope         : file-local
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 std::ostream &printHeader(std::ostream &os, const Table::Column &column)
 {
   std::string name = column.name_;
@@ -6455,8 +8630,10 @@ std::ostream &printHeader(std::ostream &os, const Table::Column &column)
   // if (column.width_ < name.size())
   //   column.width_ = name.size();
 
-  if (column.width_ > name.size()) {
-    switch (column.justification_) {
+  if (column.width_ > name.size())
+  {
+    switch (column.justification_)
+    {
       case Table::JUSTIFICATION_LEFT:
         right_padding = column.width_ - left_padding - name.size();
         break;
@@ -6475,47 +8652,130 @@ std::ostream &printHeader(std::ostream &os, const Table::Column &column)
   return os;
 }
 
-void fixupColumns(const OutputMgr &output_manager, PrintParameters &print_parameters)
+//-----------------------------------------------------------------------------
+// Function      : createOps
+// Purpose       : given an output manager and a (print) parameter list, and
+//                 a back_inserter iterator for an OpList, generate all the
+//                 "Ops" needed to obtain the values in the print parameter
+//                 list, and add to the end of the OpList associated
+//                 with the iterator.
+// Special Notes : If we're in frequency domain, solution var access
+//                 such as V(A) gets expanded into two ops, one for real part,
+// Scope         : file-local
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void
+createOps(const OutputMgr &output_manager, bool expandComplexTypes, const NetlistLocation &netlist_location, ParameterList::iterator begin, ParameterList::iterator end, std::back_insert_iterator<Util::OpList> inserter)
 {
+  Util::OpList tempOpList;
+
+  makeOps(output_manager, netlist_location, begin, end, std::back_inserter(tempOpList));
+
+  for (Util::OpList::const_iterator it = tempOpList.begin(); it != tempOpList.end(); ++it)
+  {
+    if (expandComplexTypes && (*it)->opType() == Util::SOLUTION_VAR)
+    {
+      std::string solutionName = (*it)->getName();
+      int index = -1;
+      const SolutionOp *op = dynamic_cast<const SolutionOp *>(*it);
+      if (op)
+        index = op->index_;
+
+      delete *it;
+      *inserter++ = new SolutionRealOp("Re(" + solutionName + ")", index);
+      *inserter++ = new SolutionImaginaryOp("Im(" + solutionName + ")", index);
+    }
+    else if (expandComplexTypes && (*it)->opType() == Util::VOLTAGE_DIFFERENCE)
+    {
+      std::string solutionName = (*it)->getName();
+      int index1 = -1;
+      int index2 = -1;
+      const VoltageDifferenceOp *op =
+        dynamic_cast<const VoltageDifferenceOp *>(*it);
+      if (op)
+      {
+        index1 = op->index1_;
+        index2 = op->index2_;
+      }
+
+      delete *it;
+      *inserter++ = new VoltageDifferenceRealOp("Re(" + solutionName + ")",
+                                                index1, index2);
+      *inserter++ = new VoltageDifferenceImaginaryOp("Im(" + solutionName + ")",
+                                                     index1, index2);
+    }
+    else
+      *inserter++ = *it;
+  }
+}
+
+//-----------------------------------------------------------------------------
+// Function      : fixupColumns
+// Purpose       : given an output manager and a (print) parameter list, and
+//                 an OpList, fill the list with the ops needed via createOps,
+//                 and add additional output columns for things like
+//                 index, time, frequency.  Set formatting options for these
+//                 additional columns, set delimiter.
+// Special Notes :
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
+void fixupColumns(const OutputMgr &output_manager, PrintParameters &print_parameters, Util::OpList &op_list)
+{
+  createOps(output_manager, print_parameters.expandComplexTypes_, print_parameters.netlistLocation_, print_parameters.variableList_.begin(), print_parameters.variableList_.end(), std::back_inserter(op_list));
+
   Table::Justification justification = print_parameters.delimiter_.empty() ? Table::JUSTIFICATION_CENTER :  Table::JUSTIFICATION_NONE;
 
-  for (ParameterList::const_iterator it = print_parameters.variableList_.begin() ; it != print_parameters.variableList_.end(); ++it)
+  for (Util::OpList::const_iterator it = op_list.begin() ; it != op_list.end(); ++it)
   {
-    switch ((*it).getSimContext())
+    switch ((*it)->opType())
     {
-      case INDEX:
-        print_parameters.table_.addColumn("INDEX", ios_base::fixed, 5, 0, Table::JUSTIFICATION_LEFT);
+      case Util::INDEX:
+        print_parameters.table_.addColumn("INDEX", std::ios_base::fixed, 5, 0, Table::JUSTIFICATION_LEFT);
         break;
 
-      case TIME_VAR:
+      case Util::TIME_VAR:
         print_parameters.table_.addColumn("TIME", print_parameters.streamWidth_, print_parameters.streamPrecision_, justification);
         break;
 
-      case FREQUENCY:
+      case Util::FREQUENCY:
         print_parameters.table_.addColumn("FREQ", print_parameters.streamWidth_, print_parameters.streamPrecision_, justification);
         break;
 
       default:
-        print_parameters.table_.addColumn((*it).tag(), print_parameters.streamWidth_, print_parameters.streamPrecision_, justification);
+        print_parameters.table_.addColumn((*it)->getName(), print_parameters.streamWidth_, print_parameters.streamPrecision_, justification);
         break;
     }
   }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : printValue
+// Purpose       :
+// Special Notes :
+// Scope         : file-local
+// Creator       : David Baur, Raytheon
+// Creation Date :
+//-----------------------------------------------------------------------------
 std::ostream &printValue(std::ostream &os, const Table::Column &column, const std::string &delimiter, const int column_index, double value)
 {
-  if (delimiter.empty()) {
+  if (delimiter.empty())
+  {
     if (column_index != 0)
       os <<  " ";
-    os << std::resetiosflags(ios_base::floatfield) << std::setiosflags(column.format_)
-       << std::resetiosflags(ios_base::adjustfield) << std::setiosflags(column.justification_ == Table::JUSTIFICATION_LEFT ? ios_base::left : ios_base::right)
+    os << std::resetiosflags(std::ios_base::floatfield) << std::setiosflags(column.format_)
+       << std::resetiosflags(std::ios_base::adjustfield) 
+       << std::setiosflags(column.justification_ == Table::JUSTIFICATION_LEFT ? std::ios_base::left : std::ios_base::right)
        << std::setprecision(column.precision_) << std::setw(column.width_)
        << value;
   }
-  else {
+  else
+  {
     if (column_index != 0)
       os << delimiter;
-    os << std::resetiosflags(ios_base::floatfield) << std::setiosflags(column.format_) << std::setw(0) << std::setprecision(column.precision_) << value;
+    os << std::resetiosflags(std::ios_base::floatfield) << std::setiosflags(column.format_) 
+      << std::setw(0) << std::setprecision(column.precision_) << value;
   }
 
   return os;

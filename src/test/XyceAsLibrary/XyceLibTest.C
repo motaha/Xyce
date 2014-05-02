@@ -1,7 +1,7 @@
 //-----------------------------------------------------------------------------
 // Copyright Notice
 //
-// Copyright (c) 2002, Sandia Corporation, Albuquerque, NM, USA.  Under the
+// Copyright (c) 2002, 2013, Sandia Corporation, Albuquerque, NM, USA.  Under the
 // terms of Contract DE-AC04-94AL85000, there is a non-exclusive license for
 // use of this work by or on behalf of the U.S. Government.  Export of this
 // program may require a license from the United States Government.
@@ -17,9 +17,9 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.5 $
-// Revision Date  : $Date: 2009/04/23 21:04:34 $
-// Current Owner  : $Author: rlschie $
+// Revision Number: $Revision: 1.6 $
+// Revision Date  : $Date: 2013/09/26 20:14:46 $
+// Current Owner  : $Author: dgbaur $
 //-----------------------------------------------------------------------------
 
 // 
@@ -127,18 +127,18 @@ int main( int argc, char * argv[] )
   //
   // for debugging print out the set of time voltage pairs
   //
-  //   std::cout << "xyceTimeVoltageUpdateMap = ";
+  //   Xyce::dout() << "xyceTimeVoltageUpdateMap = ";
   //   for ( ; tvCurrentPair != tvEndPair; ++tvCurrentPair )
   //   {
-  //     std::cout << "\"" << tvCurrentPair->first << "\": ";
+  //     Xyce::dout() << "\"" << tvCurrentPair->first << "\": ";
   //     vector< pair<double,double> >::iterator currentPair = (tvCurrentPair->second).begin();
   //     vector< pair<double,double> >::iterator endPair = (tvCurrentPair->second).end();
   //     for( ;currentPair != endPair; ++currentPair)
   //     {
-  //       std::cout << "( " << currentPair->first << ", " << currentPair->second << " ) ";
+  //       Xyce::dout() << "( " << currentPair->first << ", " << currentPair->second << " ) ";
   //     }
   //   }
-  //   std::cout << std::endl;
+  //   Xyce::dout() << std::endl;
   
   map< string, vector< pair<double,double> >* > timeVoltageUpdateMap;
 
@@ -156,27 +156,27 @@ int main( int argc, char * argv[] )
   //
   // for debugging print out the new set of time voltage pairs
   //
-  //   std::cout << "New time voltage pairs " << std::endl;
+  //   Xyce::dout() << "New time voltage pairs " << std::endl;
   //   map< string, vector< pair<double,double> >* >::iterator ntvCurrentPair = timeVoltageUpdateMap.begin();
   //   map< string, vector< pair<double,double> >* >::iterator ntvEndPair = timeVoltageUpdateMap.end();
   //   
-  //   std::cout << "timeVoltageUpdateMap = ";
+  //   Xyce::dout() << "timeVoltageUpdateMap = ";
   //   for ( ; ntvCurrentPair != ntvEndPair; ++ntvCurrentPair )
   //   {
-  //     std::cout << "\"" << ntvCurrentPair->first << "\": ";
+  //     Xyce::dout() << "\"" << ntvCurrentPair->first << "\": ";
   //     vector< pair<double,double> >::iterator currentPair = ntvCurrentPair->second->begin();
   //     vector< pair<double,double> >::iterator endPair = ntvCurrentPair->second->end();
   //     for( ;currentPair != endPair; ++currentPair)
   //     {
-  //       std::cout << "( " << currentPair->first << ", " << currentPair->second << " ) ";
+  //       Xyce::dout() << "( " << currentPair->first << ", " << currentPair->second << " ) ";
   //     }
   //   }
-  //   std::cout << std::endl;
+  //   Xyce::dout() << std::endl;
 
   // Update the time-voltage pairs in Xyce
   if (timeVoltageUpdateMap.size() != 0)
   {
-    //std::cout << "Calling updateTimeVoltagePairs " << std::endl;
+    //Xyce::dout() << "Calling updateTimeVoltagePairs " << std::endl;
     xycePtr_->updateTimeVoltagePairs(timeVoltageUpdateMap);
   }
   
@@ -189,12 +189,12 @@ int main( int argc, char * argv[] )
   do
   {
 
-    //std::cout << "Calling simulateUntil( " << requstedTime << ", " << actualTime << ")" << std::endl;
+    //Xyce::dout() << "Calling simulateUntil( " << requstedTime << ", " << actualTime << ")" << std::endl;
     simStatus = xycePtr_->simulateUntil(requstedTime, actualTime);
-    //std::cout << "Simulation Paused at " << actualTime << std::endl;
+    //Xyce::dout() << "Simulation Paused at " << actualTime << std::endl;
     if( !simStatus )
     {
-      std::cout << "Simulation exited early. " << std::endl;
+      Xyce::dout() << "Simulation exited early. " << std::endl;
       break;
     } 
     
@@ -206,15 +206,15 @@ int main( int argc, char * argv[] )
       tvCurrentPair = xyceTimeVoltageUpdateMap.begin();
       tvEndPair = xyceTimeVoltageUpdateMap.end();
       
-      //std::cout << "BUG 1628 Check: xyceTimeVoltageUpdateMap = ";
+      //Xyce::dout() << "BUG 1628 Check: xyceTimeVoltageUpdateMap = ";
       for ( ; tvCurrentPair != tvEndPair; ++tvCurrentPair )
       {
-        //std::cout << "\"" << tvCurrentPair->first << "\": ";
+        //Xyce::dout() << "\"" << tvCurrentPair->first << "\": ";
         vector< pair<double,double> >::iterator currentPair = (tvCurrentPair->second).begin();
         vector< pair<double,double> >::iterator endPair = (tvCurrentPair->second).end();
         for( ;currentPair != endPair; ++currentPair)
         {
-          //std::cout << "( " << currentPair->first << ", " << currentPair->second << " ) ";
+          //Xyce::dout() << "( " << currentPair->first << ", " << currentPair->second << " ) ";
           if( currentPair->first == 0.0 )
           {
             // we have a dc op value so but 1628 is considered a pass
@@ -226,7 +226,7 @@ int main( int argc, char * argv[] )
     
     if( actualTime > nextDacPauseTime )
     {
-      //std::cout << "actualTime > nextDacPauseTime " << actualTime << " > " << nextDacPauseTime << std::endl;
+      //Xyce::dout() << "actualTime > nextDacPauseTime " << actualTime << " > " << nextDacPauseTime << std::endl;
       if( !pass_bug_1500 )
       {
         // On bug 1500 the ADC/DACs were not setting breakpoints that Xyce could use
@@ -267,7 +267,7 @@ int main( int argc, char * argv[] )
       if (timeVoltageUpdateMap.size() != 0)
       {
 
-        //std::cout << "Calling updateTimeVoltagePairs " << std::endl;
+        //Xyce::dout() << "Calling updateTimeVoltagePairs " << std::endl;
         xycePtr_->updateTimeVoltagePairs(timeVoltageUpdateMap);
       }
       nextDacPauseTime += deltaTimeForPause;
@@ -286,29 +286,29 @@ int main( int argc, char * argv[] )
   //
   // print out status:
   //
-  std::cout << "BUG  1466 = ";
+  Xyce::dout() << "BUG  1466 = ";
   if( pass_bug_1466 ) 
-    std::cout << "pass" << std::endl;
+    Xyce::dout() << "pass" << std::endl;
   else
-    std::cout << "FAIL" << std::endl;
+    Xyce::dout() << "FAIL" << std::endl;
     
-    std::cout << "BUG  1499 = ";
+    Xyce::dout() << "BUG  1499 = ";
   if( pass_bug_1499 ) 
-    std::cout << "pass" << std::endl;
+    Xyce::dout() << "pass" << std::endl;
   else
-    std::cout << "FAIL" << std::endl;
+    Xyce::dout() << "FAIL" << std::endl;
   
-  std::cout << "BUG  1500 = ";
+  Xyce::dout() << "BUG  1500 = ";
   if( pass_bug_1500 ) 
-    std::cout << "pass" << std::endl;
+    Xyce::dout() << "pass" << std::endl;
   else
-    std::cout << "FAIL" << std::endl;
+    Xyce::dout() << "FAIL" << std::endl;
     
-  std::cout << "BUG  1628 = ";
+  Xyce::dout() << "BUG  1628 = ";
   if( pass_bug_1628 ) 
-    std::cout << "pass" << std::endl;
+    Xyce::dout() << "pass" << std::endl;
   else
-    std::cout << "FAIL" << std::endl;
+    Xyce::dout() << "FAIL" << std::endl;
     
   int returnStatus = 0;
   if( !(pass_bug_1466 && pass_bug_1499 && pass_bug_1500 && pass_bug_1628) )

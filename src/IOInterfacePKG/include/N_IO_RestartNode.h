@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.14.2.2 $
+// Revision Number: $Revision: 1.20 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,67 +46,70 @@
 #ifndef Xyce_N_IO_RestartNode_h
 #define Xyce_N_IO_RestartNode_h
 
-// ---------- Standard Includes ----------
 #include <vector>
 #include <iosfwd>
-
-// ----------   Xyce Includes   ----------
 
 #include <N_DEV_fwd.h>
 #include <N_UTL_Packable.h>
 #include <N_TOP_Misc.h>
 
-// ---------- Forward Declarations ----------
+namespace Xyce {
+namespace IO {
 
 //-----------------------------------------------------------------------------
-// Class         : N_IO_RestartNode
+// Class         : RestartNode
 // Purpose       :
 // Special Notes :
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 8/22/01
 //-----------------------------------------------------------------------------
-class N_IO_RestartNode : public Packable
+class RestartNode : public Packable
 {
 public:
 
   // Constructor
-  N_IO_RestartNode(const string & id = "", const int inType = _VNODE ) : ID(id), type(inType), devState(0) { }
+  RestartNode(const std::string & id = "", const int inType = _VNODE ) : ID(id), type(inType), devState(0) { }
 
   // Destructor
-  ~N_IO_RestartNode();
+  ~RestartNode();
 
   // Copy constructor
-  N_IO_RestartNode(const N_IO_RestartNode & right);
+  RestartNode(const RestartNode & right);
 
   // Assignment operator
-  N_IO_RestartNode & operator = (const N_IO_RestartNode & right);
+  RestartNode & operator = (const RestartNode & right);
 
-  bool operator == (const N_IO_RestartNode & right) { return ID == right.ID; }
+  bool operator == (const RestartNode & right) { return ID == right.ID; }
 
-  bool operator != (const N_IO_RestartNode & right) { return ID != right.ID; }
+  bool operator != (const RestartNode & right) { return ID != right.ID; }
 
-  bool operator < (const N_IO_RestartNode & right) { return ID < right.ID; }
+  bool operator < (const RestartNode & right) { return ID < right.ID; }
 
-  Packable * instance() const { return new N_IO_RestartNode(); }
+  Packable * instance() const { return new RestartNode(); }
 
   int packedByteCount() const;
 
   void pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) const;
   void unpack(char * buf, int bsize, int & pos, N_PDS_Comm * comm);
 
-  void dump( ostream & os );
-  void restore( istream & is );
+  void dump( std::ostream & os );
+  void restore( std::istream & is );
 
-  string ID;
+  std::string ID;
   int type;
 
-  vector < vector < double > > solnVarData;
-  vector < vector < double > > stateVarData;
-  vector < vector < double > > storeVarData;
+  std::vector< std::vector< double > > solnVarData;
+  std::vector< std::vector< double > > stateVarData;
+  std::vector< std::vector< double > > storeVarData;
 
-  N_DEV_DeviceState * devState;
+  Device::DeviceState * devState;
 
-  friend ostream & operator << (ostream & os, const N_IO_RestartNode & rn);
+  friend std::ostream & operator << (std::ostream & os, const RestartNode & rn);
 };
+
+} // namespace IO
+} // namespace Xyce
+
+typedef Xyce::IO::RestartNode N_IO_RestartNode;
 
 #endif

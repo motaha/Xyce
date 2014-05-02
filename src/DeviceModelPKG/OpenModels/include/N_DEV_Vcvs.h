@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.66.2.2 $
+// Revision Number: $Revision: 1.83.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -47,7 +47,8 @@
 #define Xyce_N_DEV_Vcvs_h
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_DeviceTemplate.h>
+#include <N_DEV_Configuration.h>
+#include <N_DEV_DeviceMaster.h>
 #include <N_DEV_Source.h>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceInstance.h>
@@ -57,8 +58,21 @@ namespace Xyce {
 namespace Device {
 namespace Vcvs {
 
-// ---------- Forward Declarations ----------
 class Model;
+class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance>
+{
+  static const char *name() {return "Linear Voltage Controlled Voltage Source";}
+  static const char *deviceTypeName() {return "E level 1";}
+  static const int numNodes() {return 4;}
+  static const char *primaryParameter() {return "G";}
+  static const bool isLinearDevice() {return true;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : Instance
@@ -71,95 +85,90 @@ class Instance : public DeviceInstance
 {
   friend class ParametricData<Instance>;
   friend class Model;
-  friend class Master;
+  friend class Traits;friend class Master;
 
 public:
-  static ParametricData<Instance> &getParametricData();
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
+  Instance(
+     const Configuration &       configuration,
+     const InstanceBlock &     IBref,
+     Model &                   Viter,
+     const FactoryBlock &      factory_block);
 
-    Instance(InstanceBlock & IBref,
-			   Model & Viter,
-                       MatrixLoadData & mlData1,
-                       SolverState &ss1,
-                       ExternData  &ed1,
-                       DeviceOptions & do1);
-
-    ~Instance();
+  ~Instance();
 
 private:
   Instance(const Instance &);
   Instance &operator=(const Instance &);
 
 public:
-    void registerLIDs( const vector<int> & intLIDVecRef,
-	               const vector<int> & extLIDVecRef );
-    void registerStateLIDs( const vector<int> & staLIDVecRef );
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
+  void registerStateLIDs( const std::vector<int> & staLIDVecRef );
 
-    map<int,string> & getIntNameMap ();
+  std::map<int,std::string> & getIntNameMap ();
 
-    const vector< vector<int> > & jacobianStamp() const;
-    void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-    bool updateIntermediateVars () { return true; };
-    bool updatePrimaryState ();
+  bool updateIntermediateVars () { return true; };
+  bool updatePrimaryState ();
 
-    // load functions, residual:
-    bool loadDAEQVector () {return true;}
-    bool loadDAEFVector ();
+  // load functions, residual:
+  bool loadDAEQVector () {return true;}
+  bool loadDAEFVector ();
 
-    // load functions, Jacobian:
-    bool loadDAEdQdx () {return true;}
-    bool loadDAEdFdx ();
+  // load functions, Jacobian:
+  bool loadDAEdQdx () {return true;}
+  bool loadDAEdFdx ();
 
-    void setupPointers();
+  void setupPointers();
 
-    void varTypes( vector<char> & varTypeVec );
+  void varTypes( std::vector<char> & varTypeVec );
 
-  public:
-    // iterator reference to the vcvs model which owns this instance.
+public:
+  // iterator reference to the vcvs model which owns this instance.
   // Getters and setters
-  Model &getModel() {
+  Model &getModel() 
+  {
     return model_;
   }
 
 private:
-  static vector< vector<int> > jacStamp;
+  static std::vector< std::vector<int> > jacStamp;
 
   Model &       model_;         //< Owning model
 
-    double Gain;
-    double LeadCurrent;
+  double Gain;
+  double LeadCurrent;
 
-    InstanceBlock IB;
+  InstanceBlock IB;
 
-    // Matrix equation index variables:
+  // Matrix equation index variables:
 
-    // local indices (offsets)
-    int li_Pos;
-    int li_Neg;
-    int li_Bra;
+  // local indices (offsets)
+  int li_Pos;
+  int li_Neg;
+  int li_Bra;
 
-    int li_ContPos;
-    int li_ContNeg;
+  int li_ContPos;
+  int li_ContNeg;
 
-    // Offset variables for all of the above index variables.
-    int ABraEquPosNodeOffset;
-    int ABraEquNegNodeOffset;
-    int ABraEquContPosNodeOffset;
-    int ABraEquContNegNodeOffset;
-    int APosEquBraVarOffset;
-    int ANegEquBraVarOffset;
+  // Offset variables for all of the above index variables.
+  int ABraEquPosNodeOffset;
+  int ABraEquNegNodeOffset;
+  int ABraEquContPosNodeOffset;
+  int ABraEquContNegNodeOffset;
+  int APosEquBraVarOffset;
+  int ANegEquBraVarOffset;
 
-    // Ptr variables for all of the above index variables.
-    double * f_BraEquPosNodePtr;
-    double * f_BraEquNegNodePtr;
-    double * f_BraEquContPosNodePtr;
-    double * f_BraEquContNegNodePtr;
-    double * f_PosEquBraVarPtr;
-    double * f_NegEquBraVarPtr;
+  // Ptr variables for all of the above index variables.
+  double * f_BraEquPosNodePtr;
+  double * f_BraEquNegNodePtr;
+  double * f_BraEquContPosNodePtr;
+  double * f_BraEquContNegNodePtr;
+  double * f_PosEquBraVarPtr;
+  double * f_NegEquBraVarPtr;
 };
 
 //-----------------------------------------------------------------------------
@@ -175,19 +184,14 @@ class Model : public DeviceModel
 
   friend class ParametricData<Model>;
   friend class Instance;
-  friend class Master;
+  friend class Traits;friend class Master;
 
-  public:
-  static ParametricData<Model> &getParametricData();
-
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-    Model (const ModelBlock & MB,
-                           SolverState & ss1,
-                       DeviceOptions & do1);
-    ~Model();
+public:
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &        MB,
+     const FactoryBlock &      factory_block);
+  ~Model();
 
 private:
   Model();
@@ -195,28 +199,41 @@ private:
   Model &operator=(const Model &);
 
 public:
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
+
   virtual std::ostream &printOutInstances(std::ostream &os) const;
 
-    virtual bool processParams(std::string param = "")
-    {}
+  virtual bool processParams() 
+  {
+    return true;
+  }
 
-    virtual bool processInstanceParams(std::string param = "")
-    {}
+  virtual bool processInstanceParams() 
+  {
+    return true;
+  }
 
 
 public:
-  InstanceVector &getInstanceVector() {
+  void addInstance(Instance *instance) 
+  {
+    instanceContainer.push_back(instance);
+  }
+
+  InstanceVector &getInstanceVector() 
+  {
     return instanceContainer;
   }
 
-  const InstanceVector &getInstanceVector() const {
+  const InstanceVector &getInstanceVector() const 
+  {
     return instanceContainer;
   }
 
-  private:
-    vector<Instance*> instanceContainer;
+private:
+  std::vector<Instance*> instanceContainer;
 
-  private:
+private:
 };
 
 //-----------------------------------------------------------------------------
@@ -226,32 +243,28 @@ public:
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 11/26/08
 //-----------------------------------------------------------------------------
-class Master : public Xyce::Device::DeviceTemplate<Model, Instance>
+class Master : public DeviceMaster<Traits>
 {
-  public:
-    Master (
-      const std::string &dn,
-      const std::string &cn,
-      const std::string &dmName,
-           LinearDevice linearDev,
-           SolverState & ss1,
-           DeviceOptions & do1)
-      : Xyce::Device::DeviceTemplate<Model, Instance>(
-           dn, cn, dmName, linearDev, ss1, do1)
-    {
+  friend class Instance;
+  friend class Model;
 
-    }
+public:
+  Master(
+     const Configuration &       configuration,
+     const FactoryBlock &      factory_block,
+     const SolverState & ss1,
+     const DeviceOptions & do1)
+    : DeviceMaster<Traits>(configuration, factory_block, ss1, do1)
+  {}
 
-    virtual bool updateState (double * solVec, double * staVec, double * stoVec);
+  virtual bool updateState (double * solVec, double * staVec, double * stoVec);
 
-    // load functions:
-    virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
-    virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
-
-    friend class Instance;
-    friend class Model;
+  // load functions:
+  virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
+  virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
 };
 
+void registerDevice();
 
 } // namespace Vcvs
 } // namespace Device

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,28 +36,30 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.38.2.4 $
+// Revision Number: $Revision: 1.52.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/03/14 22:04:46 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: jcverle $
 //-----------------------------------------------------------------------------
 
 #ifndef Xyce_N_DEV_DeviceModel_h
 #define Xyce_N_DEV_DeviceModel_h
 
+#include <iosfwd>
 #include <map>
 #include <string>
 #include <vector>
 
 #include <N_DEV_fwd.h>
+#include <N_DEV_Device.h>
 #include <N_DEV_DeviceEntity.h>
 #include <N_DEV_Pars.h>
 
 namespace Xyce {
 namespace Device {
 
-/** 
+/**
  * @class DeviceModel N_DEV_DeviceModel.h
  *
  * @author Eric Keiter, SNL, Parallel Computational Sciences
@@ -70,28 +72,34 @@ class DeviceModel : public DeviceEntity
   enum fitType {LINEAR_FIT, LOG_FIT};
 
 public:
-    /** 
-     * Add the parameter "TEMPMODEL" to the parametric_data.
-     *
-     * @param parametric_data 
-     */
-    template<class T>
-    static void initThermalModel(ParametricData<T> &parametric_data) {
-      parametric_data.addPar("TEMPMODEL", "NONE", false, ParameterType::NO_DEP, &DeviceModel::temperatureModel, NULL, U_NONE, CAT_CONTROL,
-                             "Specification to type of parameter interpolation over temperature (see User's Guide section 5.3)");
-    }
+  /**
+   * Add the parameter "TEMPMODEL" to the parametric_data.
+   *
+   * @param parametric_data
+   */
+  template<class T>
+  static void initThermalModel(ParametricData<T> &parametric_data) 
+  {
+    parametric_data.addPar("TEMPMODEL", "NONE", &DeviceModel::temperatureModel)
+      .setCategory(CAT_CONTROL)
+      .setDescription("Specifies the type of parameter interpolation over temperature");
+  }
 
-    /** 
-     * Add the parameter "DOSEMODEL" to the parametric_data.
-     *
-     * @param parametric_data 
-     */
-    template<class T>
-    static void initDoseModel(ParametricData<T> &parametric_data) {
-      parametric_data.addPar ("DOSEMODEL", "NONE", false, ParameterType::NO_DEP, &DeviceModel::doseModel, NULL);
-    }
-    
-  DeviceModel(const ModelBlock &model_block, SolverState &solver_state, DeviceOptions &device_options);
+  /**
+   * Add the parameter "DOSEMODEL" to the parametric_data.
+   *
+   * @param parametric_data
+   */
+  template<class T>
+  static void initDoseModel(ParametricData<T> &parametric_data) 
+  {
+    parametric_data.addPar("DOSEMODEL", "NONE", &DeviceModel::doseModel);
+  }
+
+  DeviceModel(
+     const ModelBlock &        model_block,
+     ParametricData<void> &    parametric_data,
+     const FactoryBlock &      factory_block);
 
   virtual ~DeviceModel ();
 
@@ -101,55 +109,60 @@ private:
   DeviceModel &operator=(const DeviceModel &);
 
 public:
-  void setModParams(std::vector<Param> params);
+  void setModParams(const std::vector<Param> &params);
+
+  virtual void forEachInstance(DeviceInstanceOp &op) const = 0;
 
   virtual std::ostream &printOutInstances(std::ostream &os) const = 0;
 
-    /** 
-     * processParams 
-     *
-     * @param param 
-     *
-     * @return true if parameter processing was successful
-     */
-    virtual bool processParams(std::string param = "") = 0;
+  /**
+   * processParams
+   *
+   * @return true if parameter processing was successful
+   */
+  virtual bool processParams() = 0;
 
-    /** 
-     * processInstanceParams 
-     *
-     * @param param 
-     *
-     * @return true if parameter processing was successful
-     */
-    virtual bool processInstanceParams(std::string param = "") = 0;
+  /**
+   * processInstanceParams
+   *
+   * @return true if parameter processing was successful
+   */
+  virtual bool processInstanceParams() = 0;
 
-  virtual bool clearTemperatureData () {return true;}
+  virtual bool clearTemperatureData () 
+  {
+    return true;
+  }
 
-#if 0
-  void perturbSensParam (Param & ndParam);
-#endif
+  //   void perturbSensParam (Param & ndParam);
 
   void saveParams ();
   bool interpolateTNOM (double);
   bool interpolateDOSE (double);
   void restoreParams ();
 
-  virtual bool getBinPrefixFlag () {return false;}
+  virtual bool getBinPrefixFlag () 
+  {
+    return false;
+  }
 
 private:
   bool interpolated ();
   bool interpolate (double);
 
 public:
-  int getLevel() const {
+  int getLevel() const 
+  {
     return level_;
   }
 
-  void setLevel(int level) {
+  void setLevel(int level) 
+  {
     level_ = level;
   }
 
-  const std::string &getType() const {
+  const std::string &getType() const 
+  {
     return type_;
   }
 

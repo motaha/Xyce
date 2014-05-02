@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.9.2.2 $
+// Revision Number: $Revision: 1.20 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -202,7 +202,7 @@ bool N_LAS_ShyLUSolver::setOptions(const N_UTL_OptionBlock& OB)
     if( Teuchos::is_null(transform_) ) transform_ = N_LAS_TransformTool()( OB );
   }
 
-  return STATUS_SUCCESS;
+  return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -220,15 +220,15 @@ bool N_LAS_ShyLUSolver::setParam( const N_UTL_Param & param )
 
   // Set our copies of these parameters.
   if( tag == "AZ_max_iter" )
-    setInnerMaxIter(param.iVal());
+    setInnerMaxIter(param.getImmutableValue<int>());
   else if( tag == "AZ_tol" )
-    setInnerTol(param.dVal());
+    setInnerTol(param.getImmutableValue<double>());
   else if( tag == "ShyLU_rthresh" )
-    setRelThresh(param.dVal());
+    setRelThresh(param.getImmutableValue<double>());
   else if( uTag == "OUTPUT_LS" )
-    outputLS_ = param.iVal();
+    outputLS_ = param.getImmutableValue<int>();
   else if( uTag == "OUTPUT_BASE_LS" )
-    outputBaseLS_ = param.iVal();
+    outputBaseLS_ = param.getImmutableValue<int>();
 
   return true;
 }
@@ -292,27 +292,7 @@ bool N_LAS_ShyLUSolver::setShyLUParam_(const char * paramName,
 // Creation Date : 09/25/07
 //-----------------------------------------------------------------------------
 void N_LAS_ShyLUSolver::printParams_() const
-{
-/*
-  string dashedline =  "------------------------------------------------"
-    "-----------------------------";
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\n");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\n***** Linear solver options:\n");
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\tPreconditioner:\t\t",
-                         preCond_);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\tTolerance:\t\t",
-                         tolerance_);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\tMax Iterations:\t\t",
-                         maxIter_);
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\n");
-*/
-}
+{}
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_ShyLUSolver::solve
@@ -329,7 +309,6 @@ int N_LAS_ShyLUSolver::solve( bool ReuseFactors )
 
 #if defined(Xyce_DETAILED_LINSOLVE_TIMES) || defined(Xyce_VERBOSE_LINEAR)
   double time1 = 0.0, time2 = 0.0;
-  std::string shylu_time;
 #endif
 
 #ifdef Xyce_DETAILED_LINSOLVE_TIMES
@@ -358,8 +337,7 @@ int N_LAS_ShyLUSolver::solve( bool ReuseFactors )
   if( Teuchos::is_null(solver_) ) {
 
     if (lasProblem_.matrixFree()) {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_ERROR_0,
-                             "N_LAS_ShyLUSolver::solve() cannot work on matrix-free linear systems!\n");
+      Xyce::Report::DevelFatal0().in("N_LAS_ShyLUSolver::solve()") << "cannot work on matrix-free linear systems!";
     }
 
     Epetra_CrsMatrix * epetraA = dynamic_cast<Epetra_CrsMatrix*>(problem_->GetMatrix());
@@ -373,8 +351,7 @@ int N_LAS_ShyLUSolver::solve( bool ReuseFactors )
 
 #if defined(Xyce_DETAILED_LINSOLVE_TIMES) || defined(Xyce_VERBOSE_LINEAR)
     time1 = timer_->wallTime();
-    shylu_time = "ShyLU Initialize Time: " + Teuchos::Utils::toString( time1-time2 );
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, shylu_time);
+    Xyce::lout() << "ShyLU Initialize Time: " << (time1 - time2) << std::endl;
 #endif
 
     
@@ -428,22 +405,20 @@ int N_LAS_ShyLUSolver::solve( bool ReuseFactors )
   
 #if defined(Xyce_DETAILED_LINSOLVE_TIMES) || defined(Xyce_VERBOSE_LINEAR)
   time2 = timer_->wallTime();
-  shylu_time = "ShyLU Compute Time: " + Teuchos::Utils::toString( time2-time1 );
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, shylu_time);
+  Xyce::lout() << "ShyLU Compute Time: " << (time2 - time1) << std::endl;
 #endif
 
   // Solve the linear system
   int solveRet = solver_->ApplyInverse( *problem_->GetRHS(), *problem_->GetLHS() );
 
-  if (solveRet) 
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_ERROR_0,
-			   "N_LAS_ShyLUSolver::solve() ShyLU solver could not be applied!\n");
+  if (solveRet)
+    Xyce::Report::DevelFatal0().in("N_LAS_ShyLUSolver::solve()") << "ShyLU solver could not be applied!";
+  
   //numLinearIters_ = solver_->getNumIters();
 
 #if defined(Xyce_DETAILED_LINSOLVE_TIMES) || defined(Xyce_VERBOSE_LINEAR)
   time1 = timer_->wallTime();
-  shylu_time = "ShyLU Solve Time: " + Teuchos::Utils::toString( time1-time2 );
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, shylu_time);
+  Xyce::lout() << "ShyLU Solve Time: " << (time1 - time2) << std::endl;
 #endif
 
 #ifdef Xyce_DEBUG_LINEAR
@@ -456,8 +431,7 @@ int N_LAS_ShyLUSolver::solve( bool ReuseFactors )
   resid.Norm2( &actual_resids[0] );
   b->Norm2( &rhs_norm[0] );
   for (int i=0; i<numrhs; i++ ) {
-    shylu_time = "Problem " + Teuchos::Utils::toString( i ) + " : \t" + Teuchos::Utils::toString( actual_resids[i]/rhs_norm[i] );
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, shylu_time);
+    Xyce::lout() << "Problem " << i << " : \t" <<(actual_resids[i]/rhs_norm[i]) << std::endl;
   }
 #endif
 

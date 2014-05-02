@@ -90,15 +90,14 @@ am__aclocal_m4_deps = $(top_srcdir)/config/libtool.m4 \
 	$(top_srcdir)/config/lt~obsolete.m4 \
 	$(top_srcdir)/config/xyce_check_bison.m4 \
 	$(top_srcdir)/config/xyce_check_braindamaged_random_shuffle.m4 \
-	$(top_srcdir)/config/xyce_check_flexible_insert.m4 \
 	$(top_srcdir)/config/xyce_check_iota.m4 \
-	$(top_srcdir)/config/xyce_check_stl_member_templates.m4 \
 	$(top_srcdir)/config/xyce_debug_option.m4 \
 	$(top_srcdir)/config/xyce_finite_number_check.m4 \
 	$(top_srcdir)/config/xyce_library_include.m4 \
 	$(top_srcdir)/config/xyce_library_option.m4 \
 	$(top_srcdir)/config/xyce_test_using_dec_cxx.m4 \
 	$(top_srcdir)/config/xyce_test_using_icclt11_cxx.m4 \
+	$(top_srcdir)/config/xyce_trilinos_library_option.m4 \
 	$(top_srcdir)/acinclude.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -114,9 +113,9 @@ am_libIOInterface_la_OBJECTS = N_IO_CmdParse.lo \
 	N_IO_RestartMgr.lo N_IO_SpiceSeparatedFieldTool.lo \
 	N_IO_CircuitMetadata.lo N_IO_CircuitBlock.lo \
 	N_IO_CircuitContext.lo N_IO_DeviceBlock.lo N_IO_OptionBlock.lo \
-	N_IO_ParameterBlock.lo N_IO_FunctionBlock.lo \
-	N_IO_RestartNode.lo N_IO_mmio.lo N_IO_PkgOptionsMgr.lo \
-	N_IO_FourierMgr.lo
+	N_IO_ParameterBlock.lo N_IO_Report.lo N_IO_FunctionBlock.lo \
+	N_IO_RestartNode.lo N_IO_Op.lo N_IO_mmio.lo \
+	N_IO_PkgOptionsMgr.lo N_IO_FourierMgr.lo
 libIOInterface_la_OBJECTS = $(am_libIOInterface_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -308,6 +307,7 @@ MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MAYBE_NONFREE = @MAYBE_NONFREE@
+MAYBE_PLUGIN = @MAYBE_PLUGIN@
 MAYBE_RAD = @MAYBE_RAD@
 MKDIR_P = @MKDIR_P@
 NM = @NM@
@@ -416,12 +416,15 @@ libIOInterface_la_SOURCES = \
   $(srcdir)/src/N_IO_DeviceBlock.C \
   $(srcdir)/src/N_IO_OptionBlock.C \
   $(srcdir)/src/N_IO_ParameterBlock.C \
+  $(srcdir)/src/N_IO_Report.C \
   $(srcdir)/src/N_IO_FunctionBlock.C \
   $(srcdir)/src/N_IO_RestartNode.C \
+  $(srcdir)/src/N_IO_Op.C \
   $(srcdir)/src/N_IO_mmio.C \
   $(srcdir)/src/N_IO_PkgOptionsMgr.C \
   $(srcdir)/src/N_IO_FourierMgr.C \
   $(srcdir)/include/N_IO_fwd.h \
+  $(srcdir)/include/N_IO_Op.h \
   $(srcdir)/include/N_IO_NetlistImportTool.h \
   $(srcdir)/include/N_IO_DistributionTool.h \
   $(srcdir)/include/N_IO_SpiceSeparatedFieldTool.h \
@@ -435,6 +438,7 @@ libIOInterface_la_SOURCES = \
   $(srcdir)/include/N_IO_CmdParse.h \
   $(srcdir)/include/N_IO_mmio.h \
   $(srcdir)/include/N_IO_OutputMgr.h \
+  $(srcdir)/include/N_IO_Report.h \
   $(srcdir)/include/N_IO_Outputter.h \
   $(srcdir)/include/N_IO_Objective.h \
   $(srcdir)/include/N_IO_RestartMgr.h \
@@ -507,11 +511,13 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_FunctionBlock.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_NetlistImportTool.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_Objective.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_Op.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_OptionBlock.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_OutputMgr.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_Outputter.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_ParameterBlock.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_PkgOptionsMgr.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_Report.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_RestartMgr.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_RestartNode.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_IO_SpiceSeparatedFieldTool.Plo@am__quote@
@@ -636,6 +642,13 @@ N_IO_ParameterBlock.lo: $(srcdir)/src/N_IO_ParameterBlock.C
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_IO_ParameterBlock.lo `test -f '$(srcdir)/src/N_IO_ParameterBlock.C' || echo '$(srcdir)/'`$(srcdir)/src/N_IO_ParameterBlock.C
 
+N_IO_Report.lo: $(srcdir)/src/N_IO_Report.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_IO_Report.lo -MD -MP -MF $(DEPDIR)/N_IO_Report.Tpo -c -o N_IO_Report.lo `test -f '$(srcdir)/src/N_IO_Report.C' || echo '$(srcdir)/'`$(srcdir)/src/N_IO_Report.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_IO_Report.Tpo $(DEPDIR)/N_IO_Report.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_IO_Report.C' object='N_IO_Report.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_IO_Report.lo `test -f '$(srcdir)/src/N_IO_Report.C' || echo '$(srcdir)/'`$(srcdir)/src/N_IO_Report.C
+
 N_IO_FunctionBlock.lo: $(srcdir)/src/N_IO_FunctionBlock.C
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_IO_FunctionBlock.lo -MD -MP -MF $(DEPDIR)/N_IO_FunctionBlock.Tpo -c -o N_IO_FunctionBlock.lo `test -f '$(srcdir)/src/N_IO_FunctionBlock.C' || echo '$(srcdir)/'`$(srcdir)/src/N_IO_FunctionBlock.C
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_IO_FunctionBlock.Tpo $(DEPDIR)/N_IO_FunctionBlock.Plo
@@ -649,6 +662,13 @@ N_IO_RestartNode.lo: $(srcdir)/src/N_IO_RestartNode.C
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_IO_RestartNode.C' object='N_IO_RestartNode.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_IO_RestartNode.lo `test -f '$(srcdir)/src/N_IO_RestartNode.C' || echo '$(srcdir)/'`$(srcdir)/src/N_IO_RestartNode.C
+
+N_IO_Op.lo: $(srcdir)/src/N_IO_Op.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_IO_Op.lo -MD -MP -MF $(DEPDIR)/N_IO_Op.Tpo -c -o N_IO_Op.lo `test -f '$(srcdir)/src/N_IO_Op.C' || echo '$(srcdir)/'`$(srcdir)/src/N_IO_Op.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_IO_Op.Tpo $(DEPDIR)/N_IO_Op.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_IO_Op.C' object='N_IO_Op.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_IO_Op.lo `test -f '$(srcdir)/src/N_IO_Op.C' || echo '$(srcdir)/'`$(srcdir)/src/N_IO_Op.C
 
 N_IO_mmio.lo: $(srcdir)/src/N_IO_mmio.C
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_IO_mmio.lo -MD -MP -MF $(DEPDIR)/N_IO_mmio.Tpo -c -o N_IO_mmio.lo `test -f '$(srcdir)/src/N_IO_mmio.C' || echo '$(srcdir)/'`$(srcdir)/src/N_IO_mmio.C

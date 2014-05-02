@@ -4,9 +4,8 @@
 //   Copyright 2002 Sandia Corporation. Under the terms
 //   of Contract DE-AC04-94AL85000 with Sandia Corporation, the U.S.
 //   Government retains certain rights in this software.
-//
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -21,7 +20,6 @@
 //    You should have received a copy of the GNU General Public License
 //    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //-----------------------------------------------------------------------------
-
 //-----------------------------------------------------------------------------
 // Filename       : $RCSfile: N_DEV_MaterialSupport.h,v $
 //
@@ -36,9 +34,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.12.2.2 $
+// Revision Number: $Revision: 1.21.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/26 20:16:31 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -48,15 +46,15 @@
 
 #include <Sacado.hpp>
 
-  // ---------- Standard Includes ----------
+// ---------- Standard Includes ----------
 #include <string>
 
-  // ----------   Xyce Includes   ----------
+// ----------   Xyce Includes   ----------
 #include <N_DEV_Const.h>
 #include <N_UTL_Param.h>
 #include <N_ERH_ErrorMgr.h>
 
-  // ---------- Forward Declarations ----------
+// ---------- Forward Declarations ----------
 
 namespace Xyce {
 namespace Device {
@@ -71,124 +69,124 @@ namespace Device {
 template <typename ScalarT>
 class MobInfo
 {
-  public:
-    MobInfo():
-      mobModelName("carr"),
-      materialName("si"),
-      holeFlag(false),
-      fieldDependent(false),
-      N(1.0e15),
-      Na(1.0e15),
-      Nd(1.0e15),
-      T( CONSTREFTEMP ), // 300.15 K
-      refTemp( CONSTREFTEMP ), // 300.15 K
-      p(static_cast<ScalarT>(1.45e10)),
-      n(static_cast<ScalarT>(1.45e10)),
-      epar(static_cast<ScalarT>(0.0)),
-      eperp(static_cast<ScalarT>(1.5e4))
-    {};
+public:
+  MobInfo():
+    mobModelName("carr"),
+    materialName("si"),
+    holeFlag(false),
+    fieldDependent(false),
+    N(1.0e15),
+    Na(1.0e15),
+    Nd(1.0e15),
+    T( CONSTREFTEMP ), // 300.15 K
+    refTemp( CONSTREFTEMP ), // 300.15 K
+    p(static_cast<ScalarT>(1.45e10)),
+    n(static_cast<ScalarT>(1.45e10)),
+    epar(static_cast<ScalarT>(0.0)),
+    eperp(static_cast<ScalarT>(1.5e4))
+  {};
 
-  public:
-    string mobModelName;
-    string materialName;
-    bool holeFlag;
-    bool fieldDependent;
-    double N;
-    double Na;
-    double Nd;
-    double T;
-    double refTemp;
-    ScalarT p;
-    ScalarT n;
-    ScalarT epar;
-    ScalarT eperp;
+public:
+  std::string mobModelName;
+  std::string materialName;
+  bool holeFlag;
+  bool fieldDependent;
+  ScalarT N;
+  ScalarT Na;
+  ScalarT Nd;
+  double T;
+  double refTemp;
+  ScalarT p;
+  ScalarT n;
+  ScalarT epar;
+  ScalarT eperp;
 };
 
-  //-----------------------------------------------------------------------------
-  // Class         : MaterialSupport
-  // Purpose       : Class which contains materials-related data and
-  //                 functions.
-  // Special Notes :
-  // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-  // Creation Date : 3/16/00
-  //-----------------------------------------------------------------------------
-  class MaterialSupport
-  {
-    public:
-      MaterialSupport ();
+//-----------------------------------------------------------------------------
+// Class         : MaterialSupport
+// Purpose       : Class which contains materials-related data and
+//                 functions.
+// Special Notes :
+// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
+// Creation Date : 3/16/00
+//-----------------------------------------------------------------------------
+class MaterialSupport
+{
+public:
+  MaterialSupport ();
 
-      MaterialSupport (const MaterialSupport & right);
+  MaterialSupport (const MaterialSupport & right);
 
-      virtual ~MaterialSupport ();
+  virtual ~MaterialSupport ();
 
-      template <typename ScalarT>
-      ScalarT calcMob (MobInfo<ScalarT> & min);
+  template <typename ScalarT>
+  ScalarT calcMob (MobInfo<ScalarT> & min);
 
-      template <typename ScalarT>
-      ScalarT calcAnalyticMob (MobInfo<ScalarT> & min);
+  template <typename ScalarT>
+  ScalarT calcAnalyticMob (MobInfo<ScalarT> & min);
 
-      template <typename ScalarT>
-      ScalarT calcAroraMob (MobInfo<ScalarT> & min);
+  template <typename ScalarT>
+  ScalarT calcAroraMob (MobInfo<ScalarT> & min);
 
-      template <typename ScalarT>
-      ScalarT calcCarrierMobOld (MobInfo<ScalarT> & min);
+  template <typename ScalarT>
+  ScalarT calcCarrierMobOld (MobInfo<ScalarT> & min);
 
-      template <typename ScalarT>
-      ScalarT calcCarrierMobNew (MobInfo<ScalarT> & min);
+  template <typename ScalarT>
+  ScalarT calcCarrierMobNew (MobInfo<ScalarT> & min);
 
-      template <typename ScalarT>
-      ScalarT calcLombardiMob (MobInfo<ScalarT> & min);
+  template <typename ScalarT>
+  ScalarT calcLombardiMob (MobInfo<ScalarT> & min);
 
-      template <typename ScalarT>
-      ScalarT calcPhilipsMob (MobInfo<ScalarT> & min);
+  template <typename ScalarT>
+  ScalarT calcPhilipsMob (MobInfo<ScalarT> & min);
 
-      template <typename ScalarT>
-      void applyHighFieldMobilityModel(MobInfo<ScalarT> & min, ScalarT & mobil);
+  template <typename ScalarT>
+  void applyHighFieldMobilityModel(MobInfo<ScalarT> & min, ScalarT & mobil);
 
-      double workfunc(string & metal);
-      double affin(const string & material);
-      double bandgap(const string & material, double temp);
+  double workfunc(std::string & metal);
+  double affin(const std::string & material);
+  double bandgap(const std::string & material, double temp);
 
-      double calcLt (bool holeFlag, double conc);
+  double calcLt (bool holeFlag, double conc);
 
-      double calcRsrh (const string & material,
-                     double ni,
-                     double n, double p,
-                     double tn, double tp);
-
-      double calcRaug (const string & material, double ni, double n, double p);
-
-      double pdRsrhN (const string & material, double ni,
+  double calcRsrh (const std::string & material,
+                   double ni,
                    double n, double p,
                    double tn, double tp);
 
-      double pdRsrhP (const string & material, double ni,
-                   double n, double p,
-                   double tn, double tp);
+  double calcRaug (const std::string & material, double ni, double n, double p);
 
-      double pdRaugN (const string & material, double ni, double n, double p);
-      double pdRaugP (const string & material, double ni, double n, double p);
+  double pdRsrhN (const std::string & material, double ni,
+                  double n, double p,
+                  double tn, double tp);
 
-      double getNi (const string & material, double temp);
-      double getNi_old (const string & material, double temp);
+  double pdRsrhP (const std::string & material, double ni,
+                  double n, double p,
+                  double tn, double tp);
 
-      double getRelPerm (const string & material);
+  double pdRaugN (const std::string & material, double ni, double n, double p);
+  double pdRaugP (const std::string & material, double ni, double n, double p);
 
-      double getEffectiveMassN (const string & material);
-      double getEffectiveMassP (const string & material);
+  double getNi (const std::string & material, double temp);
+  double getNi_old (const std::string & material, double temp);
 
-      double getDOSEffectiveMassN (const string & material);
-      double getDOSEffectiveMassP (const string & material);
+  double getRelPerm (const std::string & material);
 
-    protected:
+  double getEffectiveMassN (const std::string & material);
+  double getEffectiveMassP (const std::string & material);
 
-    private:
+  double getDOSEffectiveMassN (const std::string & material);
+  double getDOSEffectiveMassP (const std::string & material);
 
-    public:
+protected:
 
-    protected:
+private:
 
-    private:
+public:
+
+protected:
+
+private:
 };
 
 // Mobility model functions.
@@ -242,10 +240,7 @@ ScalarT MaterialSupport::calcMob(MobInfo<ScalarT> & min)
   }
   else  // model not recognized:
   {
-    string msg = "Mobility model: ";
-    msg += mobility;
-    msg += " not recognized.\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,msg);
+    Report::UserFatal0() << "Mobility model " << mobility << " not recognized.";
   }
 
   if (min.fieldDependent && fabs(min.epar)>0.0)
@@ -256,9 +251,7 @@ ScalarT MaterialSupport::calcMob(MobInfo<ScalarT> & min)
 #ifdef Xyce_DEBUG_DEVICE
   if (mobil != 0.0 && !(mobil > 0.0) && !(mobil < 0.0))
   {
-    string msg =
-    "MaterialSupport::calcMob.  Mobility calc = nan.\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,msg);
+    Report::DevelFatal0().in("MaterialSupport::calcMob") << "Mobility calc = nan.";
   }
 #endif
 
@@ -355,26 +348,22 @@ ScalarT MaterialSupport::calcAnalyticMob (MobInfo<ScalarT> & min)
   }
   else
   {
-    string msg =
-    "Analytic (Caughy-Thomas) mobility model not supported for ";
-     msg += mater;
-     msg += ".\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,msg);
+    Report::UserFatal0() << "Analytic (Caughy-Thomas) mobility model not supported for " << mater;
   }
 
   // hole mobility
   if(min.holeFlag)
   {
     mobil = mup_min +
-    (mup_max*pow((min.T/min.refTemp),nup) - mup_min)/
-    (1.0 + pow((min.T/min.refTemp),xip)*pow((min.N/nrefp),alphap));
+      (mup_max*pow((min.T/min.refTemp),nup) - mup_min)/
+      (1.0 + pow((min.T/min.refTemp),xip)*pow((min.N/nrefp),alphap));
   }
   // electron mobility
   else
   {
     mobil = mun_min +
-    (mun_max*pow((min.T/min.refTemp),nun) - mun_min)/
-    (1.0 + pow((min.T/min.refTemp),xin)*pow((min.N/nrefn),alphan));
+      (mun_max*pow((min.T/min.refTemp),nun) - mun_min)/
+      (1.0 + pow((min.T/min.refTemp),xin)*pow((min.N/nrefn),alphan));
   }
 
   return mobil;
@@ -485,11 +474,7 @@ ScalarT MaterialSupport::calcAroraMob (MobInfo<ScalarT> & min)
   }
   else
   {
-    string msg =
-    "Arora mobility model not supported for ";
-     msg += mater;
-     msg += ".\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,msg);
+    Report::UserFatal0() << "Arora mobility model not supported for " << mater;
   }
 
   alphan = an_arora*pow((min.T/min.refTemp),exn4_aro);
@@ -498,15 +483,15 @@ ScalarT MaterialSupport::calcAroraMob (MobInfo<ScalarT> & min)
   if(min.holeFlag)
   {
     mobil = mup1_aro*pow((min.T/min.refTemp),exp1_aro)+
-    (mup2_aro*pow((min.T/min.refTemp),exp2_aro))/
-    (1.0+pow((min.N/cp_arora*pow((min.T/min.refTemp),exp3_aro)),alphap));
+      (mup2_aro*pow((min.T/min.refTemp),exp2_aro))/
+      (1.0+pow((min.N/cp_arora*pow((min.T/min.refTemp),exp3_aro)),alphap));
   }
   else
   {
     mobil =
-    mun1_aro*pow((min.T/min.refTemp),exn1_aro)+
-    (mun2_aro*pow((min.T/min.refTemp),exn2_aro))/
-    (1.0+pow((min.N/cn_arora*pow((min.T/min.refTemp),exn3_aro)),alphan));
+      mun1_aro*pow((min.T/min.refTemp),exn1_aro)+
+      (mun2_aro*pow((min.T/min.refTemp),exn2_aro))/
+      (1.0+pow((min.N/cn_arora*pow((min.T/min.refTemp),exn3_aro)),alphan));
   }
 
   return mobil;
@@ -537,7 +522,8 @@ ScalarT MaterialSupport::calcCarrierMobOld (MobInfo<ScalarT> & min)
   mater.toLower();
   ScalarT mobil=0.0;
 
-  double Al, Bl, Ai, Bi, mul, mui;
+  double Al, Bl, Ai, Bi;
+  ScalarT  mul, mui;
   ScalarT muc, X;
 
   if(mater=="si") // silicon
@@ -577,11 +563,7 @@ ScalarT MaterialSupport::calcCarrierMobOld (MobInfo<ScalarT> & min)
   }
   else
   {
-    string msg =
-    "Carrier-carrier mobility model not supported for ";
-     msg += mater;
-     msg += ".\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,msg);
+    Report::UserFatal0() << "Carrier-carrier mobility model not supported for " << mater;
   }
 
   // lattice scattering term:
@@ -589,7 +571,7 @@ ScalarT MaterialSupport::calcCarrierMobOld (MobInfo<ScalarT> & min)
 
   // impurity scattering term:
   mui = (Ai*pow(min.T,1.5)/min.N)*(log(1.0+Bi*min.T*min.T/min.N)-
-    Bi*min.T*min.T/(min.N+Bi*min.T*min.T));
+                                   Bi*min.T*min.T/(min.N+Bi*min.T*min.T));
 
   // carrier-carrier scattering term:
   //  first, make sure n and p are kosher.
@@ -597,7 +579,7 @@ ScalarT MaterialSupport::calcCarrierMobOld (MobInfo<ScalarT> & min)
   ScalarT P = fabs(min.p); if(P == 0.0) P = 1.0;
 
   muc = (2.0e17*pow(min.T,1.5)/sqrt(P*N))*
-  1.0/(log(1.0+8.28e8*min.T*min.T*pow(P*N,-1.0/3.0)));
+    1.0/(log(1.0+8.28e8*min.T*min.T*pow(P*N,-1.0/3.0)));
 
   X = sqrt(6.0*mul*(mui+muc)/(mui*muc));
   mobil = mul*(1.025/(1.0+pow(X/1.68,1.43))-0.025);
@@ -605,14 +587,14 @@ ScalarT MaterialSupport::calcCarrierMobOld (MobInfo<ScalarT> & min)
 #ifdef Xyce_DEBUG_DEVICE
   if (mobil != 0.0 && !(mobil > 0.0) && !(mobil < 0.0))
   {
-    cout << "mobil is nan" << endl;
-    cout << "mul = " << mul << endl;
-    cout << "mui = " << mui << endl;
-    cout << "muc = " << muc << endl;
-    cout << "X   = " << X << endl;
-    cout << "T   = " << min.T << endl;
-    cout << "n   = " << min.n << endl;
-    cout << "p   = " << min.p << endl;
+    Xyce::dout() << "mobil is nan" << std::endl;
+    Xyce::dout() << "mul = " << mul << std::endl;
+    Xyce::dout() << "mui = " << mui << std::endl;
+    Xyce::dout() << "muc = " << muc << std::endl;
+    Xyce::dout() << "X   = " << X << std::endl;
+    Xyce::dout() << "T   = " << min.T << std::endl;
+    Xyce::dout() << "n   = " << min.n << std::endl;
+    Xyce::dout() << "p   = " << min.p << std::endl;
   }
 #endif
   return mobil;
@@ -753,11 +735,7 @@ ScalarT MaterialSupport::calcCarrierMobNew (MobInfo<ScalarT> & min)
   }
   else
   {
-    string msg =
-    "Carrier-carrier mobility model not supported for ";
-    msg += mater;
-    msg += ".\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,msg);
+    Report::UserFatal0() << "Carrier-carrier mobility model not supported for " << mater;
   }
 
   ScalarT n_impurity = fabs(min.N);
@@ -768,7 +746,7 @@ ScalarT MaterialSupport::calcCarrierMobNew (MobInfo<ScalarT> & min)
 
   // Carrier-carrier scattering term
   ScalarT muc = a_ccs*pow((min.T/min.refTemp),1.5)/sqrt(P*N)*
-  1.0/(log(1.0+b_ccs*pow((min.T/min.refTemp),2.0)*pow(P*N,-1.0/3.0)));
+    1.0/(log(1.0+b_ccs*pow((min.T/min.refTemp),2.0)*pow(P*N,-1.0/3.0)));
 
   // electron or hole
   if(min.holeFlag)
@@ -781,7 +759,7 @@ ScalarT MaterialSupport::calcCarrierMobNew (MobInfo<ScalarT> & min)
     ScalarT gB_hole = bp_iis*pow((min.T/min.refTemp), 2.0)/(N+P);
 
     ScalarT mui_h = (ap_iis*pow((min.T/min.refTemp),1.5)/n_impurity)/
-     (log(1.0 + gB_hole) - gB_hole/(1.0 + gB_hole));
+      (log(1.0 + gB_hole) - gB_hole/(1.0 + gB_hole));
 
     ScalarT muic_h = 1.0/(1.0/muc + 1.0/mui_h);
 
@@ -804,7 +782,7 @@ ScalarT MaterialSupport::calcCarrierMobNew (MobInfo<ScalarT> & min)
     ScalarT gB_elec = bn_iis*pow((min.T/min.refTemp), 2.0)/(N+P);
 
     ScalarT mui_e = (an_iis*pow((min.T/min.refTemp),1.5)/n_impurity)/
-       (log(1.0 + gB_elec) - gB_elec/(1.0 + gB_elec));
+      (log(1.0 + gB_elec) - gB_elec/(1.0 + gB_elec));
 
     ScalarT muic_e = 1.0/(1.0/muc + 1.0/mui_e);
 
@@ -848,8 +826,8 @@ ScalarT MaterialSupport::calcLombardiMob (MobInfo<ScalarT> & min)
   ScalarT mobil=0.0;
 
   ScalarT muac, musr;
-  double mub, mumax;
-  double mun0_lsm, mun1_lsm, mun2_lsm, crn_lsm, csn_lsm;
+  ScalarT mub, mumax;
+  ScalarT mun0_lsm, mun1_lsm, mun2_lsm, crn_lsm, csn_lsm;
   double bn_lsm, cn_lsm, dn_lsm, exn1_lsm, exn2_lsm, exn3_lsm;
   double exn4_lsm, exn8_lsm;
   double mup0_lsm, mup1_lsm, mup2_lsm, crp_lsm, csp_lsm;
@@ -960,11 +938,7 @@ ScalarT MaterialSupport::calcLombardiMob (MobInfo<ScalarT> & min)
   }
   else
   {
-    string msg =
-    "Lobardi surface mobility model not supported for ";
-     msg += mater;
-     msg += ".\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,msg);
+    Report::UserFatal0() << "Lobardi surface mobility model not supported for " << mater;
   }
 
   if(min.holeFlag)
@@ -972,7 +946,7 @@ ScalarT MaterialSupport::calcLombardiMob (MobInfo<ScalarT> & min)
     muac = bp_lsm/min.eperp + cp_lsm*pow(min.N,exp4_lsm)/(min.T*pow(min.eperp,1.0/3.0));
     mumax = mup2_lsm*pow((min.T/min.refTemp),-exp3_lsm);
     mub = mup0_lsm*exp(-pc_lsm/min.N) + mumax/(1.0 + pow(min.N/crp_lsm, exp1_lsm))-
-    mup1_lsm/(1.0 + pow(csp_lsm/min.N, exp2_lsm));
+      mup1_lsm/(1.0 + pow(csp_lsm/min.N, exp2_lsm));
     musr = dp_lsm/pow(min.eperp, exp8_lsm);
   }
   else
@@ -980,7 +954,7 @@ ScalarT MaterialSupport::calcLombardiMob (MobInfo<ScalarT> & min)
     muac = bn_lsm/min.eperp + cn_lsm*pow(min.N,exn4_lsm)/(min.T*pow(min.eperp,1.0/3.0));
     mumax = mun2_lsm*pow((min.T/min.refTemp),-exn3_lsm);
     mub = mun0_lsm + (mumax - mun0_lsm)/(1.0 + pow(min.N/crn_lsm, exn1_lsm))-
-    mun1_lsm/(1.0 + pow(csn_lsm/min.N, exn2_lsm));
+      mun1_lsm/(1.0 + pow(csn_lsm/min.N, exn2_lsm));
     musr = dn_lsm/pow(min.eperp, exn8_lsm);
   }
 
@@ -1077,17 +1051,13 @@ ScalarT MaterialSupport::calcPhilipsMob (MobInfo<ScalarT> & min)
   }
   else
   {
-    string msg =
-    "Philips mobility model not supported for ";
-     msg += mater;
-     msg += ".\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,msg);
+    Report::UserFatal0() << "Philips mobility model not supported for " << mater;
   }
 
   double me_mo = 1.0;
   double mh_mo = 1.258;
-  double Nd_doping = min.Nd;
-  double Na_doping = min.Na;
+  ScalarT Nd_doping = min.Nd;
+  ScalarT Na_doping = min.Na;
   ScalarT n_dens = min.n;
   ScalarT p_dens = min.p;
 
@@ -1096,8 +1066,8 @@ ScalarT MaterialSupport::calcPhilipsMob (MobInfo<ScalarT> & min)
   if (n_dens <= 1.0 ) n_dens = 1.0;
   if (p_dens <= 1.0 ) p_dens = 1.0;
 
-  double Ndeff = Nd_doping * ( 1.0 + 1.0/(crfd_um + pow(nrfd_um/Nd_doping,2.0)));
-  double Naeff = Na_doping * ( 1.0 + 1.0/(crfa_um + pow(nrfa_um/Na_doping,2.0)));
+  ScalarT Ndeff = Nd_doping * ( 1.0 + 1.0/(crfd_um + pow(nrfd_um/Nd_doping,2.0)));
+  ScalarT Naeff = Na_doping * ( 1.0 + 1.0/(crfa_um + pow(nrfa_um/Na_doping,2.0)));
 
   double vsat = 2.4e7/(1.0+0.8*exp(min.T/600.0));
   if(min.holeFlag)
@@ -1117,28 +1087,28 @@ ScalarT MaterialSupport::calcPhilipsMob (MobInfo<ScalarT> & min)
     while( (FPpmin > 0.00001) || (FPpmin < -0.00001) )
     {
       FPpmin = 1.0 - (0.89233/pow(0.41372+Ppmin*pow(1.0/mh_mo*Tps,0.28227),0.19778))
-                   + (0.005978/pow(Ppmin*pow(mh_mo/Tps,0.72169),1.80618));
+        + (0.005978/pow(Ppmin*pow(mh_mo/Tps,0.72169),1.80618));
 
       dFPpmin = -0.89233*(-0.19778)*
-                pow(0.41372+Ppmin*pow(1.0/mh_mo*Tps,0.28227),-1.19778)*
-                pow(1.0/mh_mo*Tps,0.28227) +
-                0.005978*(-1.80618)*
-                pow(Ppmin*pow(mh_mo/Tps,0.72169),-2.80618)*
-                pow(mh_mo/Tps,0.72169);
+        pow(0.41372+Ppmin*pow(1.0/mh_mo*Tps,0.28227),-1.19778)*
+        pow(1.0/mh_mo*Tps,0.28227) +
+        0.005978*(-1.80618)*
+        pow(Ppmin*pow(mh_mo/Tps,0.72169),-2.80618)*
+        pow(mh_mo/Tps,0.72169);
 
       Ppmin = Ppmin - FPpmin/dFPpmin;
     }
 
     ScalarT FPp = (0.7643*pow(Pp,0.6478) + 2.2999 + 6.5502*mh_mo/me_mo)
-                  /(pow(Pp,0.6478) + 2.3670 - 0.8552*mh_mo/me_mo);
+      /(pow(Pp,0.6478) + 2.3670 - 0.8552*mh_mo/me_mo);
 
     ScalarT GPp = 1.0 - (0.89233/pow(0.41372+Pp*pow(1.0/mh_mo*Tps,0.28227),0.19778))
-                      + (0.005978/pow(Pp*pow(mh_mo/Tps,0.72169),1.80618));
+      + (0.005978/pow(Pp*pow(mh_mo/Tps,0.72169),1.80618));
 
     if (Pp < Ppmin)
     {
       GPp = 1.0 - (0.89233/pow(0.41372+Ppmin*pow(1.0/mh_mo*Tps,0.28227),0.19778))
-                + (0.005978/pow(Ppmin*pow(mh_mo/Tps,0.72169),1.80618));
+        + (0.005978/pow(Ppmin*pow(mh_mo/Tps,0.72169),1.80618));
     }
 
     ScalarT Nsceffp = Ndeff*GPp + Naeff + n_dens/FPp;
@@ -1148,7 +1118,7 @@ ScalarT MaterialSupport::calcPhilipsMob (MobInfo<ScalarT> & min)
     ScalarT mu2p = mmxp_um*mmnp_um/(mmxp_um-mmnp_um)*pow(Tps,-0.5);
 
     ScalarT muDAn = mu1p*(Nscp/Nsceffp)*pow(nrfp_um/Nscp,alpp_um)
-                  + mu2p*(n_dens+p_dens)/Nsceffp;
+      + mu2p*(n_dens+p_dens)/Nsceffp;
 
     mobil = 1.0/(1.0/mulattp+1.0/muDAn);
   }
@@ -1158,7 +1128,7 @@ ScalarT MaterialSupport::calcPhilipsMob (MobInfo<ScalarT> & min)
     double Tns = min.T/min.refTemp;
     ScalarT Nscn = Ndeff + Naeff + p_dens;
     ScalarT Pn = Tns*Tns * (1.0/(2.459/(3.97e13*pow(Nscn,-2.0/3.0))
-                            + 3.828/(1.36e20/(n_dens+p_dens)*me_mo)));
+                                 + 3.828/(1.36e20/(n_dens+p_dens)*me_mo)));
 
     // Initial values Pnmin is the Pmin value for 300 K.
     // Initial values of FPnmin and dFPnmin are chosen to start the loop.
@@ -1169,28 +1139,28 @@ ScalarT MaterialSupport::calcPhilipsMob (MobInfo<ScalarT> & min)
     while( (FPnmin > 0.00001) || (FPnmin < -0.00001) )
     {
       FPnmin = 1.0 - (0.89233/pow(0.41372+Pnmin*pow(1.0/me_mo*Tns,0.28227),0.19778))
-                  + (0.005978/pow(Pnmin*pow(me_mo/Tns,0.72169),1.80618));
+        + (0.005978/pow(Pnmin*pow(me_mo/Tns,0.72169),1.80618));
 
       dFPnmin = -0.89233*(-0.19778)*
-               pow(0.41372+Pnmin*pow(1.0/me_mo*Tns,0.28227),-1.19778)*
-               pow(1.0/me_mo*Tns,0.28227) +
-               0.005978*(-1.80618)*
-               pow(Pnmin*pow(me_mo/Tns,0.72169),-2.80618)*
-               pow(me_mo/Tns,0.72169);
+        pow(0.41372+Pnmin*pow(1.0/me_mo*Tns,0.28227),-1.19778)*
+        pow(1.0/me_mo*Tns,0.28227) +
+        0.005978*(-1.80618)*
+        pow(Pnmin*pow(me_mo/Tns,0.72169),-2.80618)*
+        pow(me_mo/Tns,0.72169);
 
       Pnmin = Pnmin - FPnmin/dFPnmin;
     }
 
     ScalarT FPn = (0.7643*pow(Pn,0.6478) + 2.2999 + 6.5502*me_mo/mh_mo)
-                  /(pow(Pn,0.6478) + 2.3670 - 0.8552*me_mo/mh_mo);
+      /(pow(Pn,0.6478) + 2.3670 - 0.8552*me_mo/mh_mo);
 
     ScalarT GPn = 1.0 - (0.89233/pow(0.41372+Pn*pow(1.0/me_mo*Tns,0.28227),0.19778))
-                      + (0.005978/pow(Pn*pow(me_mo/Tns,0.72169),1.80618));
+      + (0.005978/pow(Pn*pow(me_mo/Tns,0.72169),1.80618));
 
     if (Pn < Pnmin)
     {
       GPn = 1.0 - (0.89233/pow(0.41372+Pnmin*pow(1.0/me_mo*Tns,0.28227),0.19778))
-                + (0.005978/pow(Pnmin*pow(me_mo/Tns,0.72169),1.80618));
+        + (0.005978/pow(Pnmin*pow(me_mo/Tns,0.72169),1.80618));
     }
 
     ScalarT Nsceffn = Ndeff + Naeff*GPn + p_dens/FPn;
@@ -1199,26 +1169,26 @@ ScalarT MaterialSupport::calcPhilipsMob (MobInfo<ScalarT> & min)
     ScalarT mu2n = mmxn_um*mmnn_um/(mmxn_um-mmnn_um)*pow(Tns,-0.5);
 
     ScalarT muDAp = mu1n*(Nscn/Nsceffn)*pow(nrfn_um/Nscn,alpn_um)
-                  + mu2n*(n_dens+p_dens)/Nsceffn;
+      + mu2n*(n_dens+p_dens)/Nsceffn;
 
     mobil = 1.0/(1.0/mulattn+1.0/muDAp);
   }
 
 
 #if 0  // from Myers 1D:
-    //subroutine mobility(tk,dv,cd,ca,ce,ch,eu0,hu0,eu,hu)
+  //subroutine mobility(tk,dv,cd,ca,ce,ch,eu0,hu0,eu,hu)
 
-    // tev = temperature in eV.
-    // eu = electron mobility
-    // hu = hole mobility
-    // tk = temp
-    // dv = potential drop
-    // cd = donor density
-    // ca = acceptor density
-    // ce = electron density
-    // ch = hole density
+  // tev = temperature in eV.
+  // eu = electron mobility
+  // hu = hole mobility
+  // tk = temp
+  // dv = potential drop
+  // cd = donor density
+  // ca = acceptor density
+  // ce = electron density
+  // ch = hole density
 
-    tk300 = tk/300.0d0
+  tk300 = tk/300.0d0
     em = 1.0d0
     hm = 1.258d0
     cd1 = (1.0d0+1.0d0/(0.21d0+(4.0d20/(cd+1.0))**2))*(cd+1.0d0)
@@ -1258,7 +1228,7 @@ ScalarT MaterialSupport::calcPhilipsMob (MobInfo<ScalarT> & min)
     hu = hu0/hu
 #endif
 
-  return mobil;
+    return mobil;
 }
 
 // ----------------------------------------------------------------------------
@@ -1294,7 +1264,7 @@ ScalarT MaterialSupport::calcPhilipsMob (MobInfo<ScalarT> & min)
 // ----------------------------------------------------------------------------
 template <typename ScalarT>
 void MaterialSupport::applyHighFieldMobilityModel
-  (MobInfo<ScalarT> & min, ScalarT & mobil)
+(MobInfo<ScalarT> & min, ScalarT & mobil)
 {
   ScalarT mob0 = mobil;
 
@@ -1352,7 +1322,7 @@ void MaterialSupport::applyHighFieldMobilityModel
     else  // Barnes for e-
     {
       mobil = (mob0 + (vsatn/min.epar)*pow((min.epar/eon),4.0))/
-              (1.0 + pow((min.epar/eon),4.0));
+        (1.0 + pow((min.epar/eon),4.0));
     }
   }
   else if (mater=="inalas" || mater=="alinas") // indium aluminum arsenide
@@ -1369,7 +1339,7 @@ void MaterialSupport::applyHighFieldMobilityModel
     else  // Barnes for e-
     {
       mobil = (mob0 + (vsatn/min.epar)*pow((min.epar/eon),4.0))/
-              (1.0 + pow((min.epar/eon),4.0));
+        (1.0 + pow((min.epar/eon),4.0));
     }
   }
   else if (mater=="ingaas" || mater=="gainas") // indium galium arsenide
@@ -1386,7 +1356,7 @@ void MaterialSupport::applyHighFieldMobilityModel
     else  // Barnes for e-
     {
       mobil = (mob0 + (vsatn/min.epar)*pow((min.epar/eon),4.0))/
-              (1.0 + pow((min.epar/eon),4.0));
+        (1.0 + pow((min.epar/eon),4.0));
     }
   }
   else if (mater=="inp")
@@ -1403,7 +1373,7 @@ void MaterialSupport::applyHighFieldMobilityModel
     else  // Barnes for e-
     {
       mobil = (mob0 + (vsatn/min.epar)*pow((min.epar/eon),4.0))/
-              (1.0 + pow((min.epar/eon),4.0));
+        (1.0 + pow((min.epar/eon),4.0));
     }
   }
   else if (mater=="ingap")
@@ -1420,18 +1390,11 @@ void MaterialSupport::applyHighFieldMobilityModel
     else  // Barnes for e-
     {
       mobil = (mob0 + (vsatn/min.epar)*pow((min.epar/eon),4.0))/
-              (1.0 + pow((min.epar/eon),4.0));
+        (1.0 + pow((min.epar/eon),4.0));
     }
   }
   else
   {
-#if 0
-    string msg =
-    "high-field mobility model not supported for ";
-     msg += mater;
-     msg += ".\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_WARNING_0,msg);
-#endif
     mobil = mob0; // just ignore in this case.  Code can still run.
   }
 }

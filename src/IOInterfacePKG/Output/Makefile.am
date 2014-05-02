@@ -8,14 +8,9 @@ libOutput_la_SOURCES = \
   $(srcdir)/include/N_IO_OutputFileBase.h \
   $(srcdir)/src/N_IO_OutputPrn.C \
   $(srcdir)/include/N_IO_OutputPrn.h \
-  $(srcdir)/src/N_IO_OutputRaw.C \
-  $(srcdir)/include/N_IO_OutputRaw.h \
-  $(srcdir)/src/N_IO_OutputProbe.C \
-  $(srcdir)/include/N_IO_OutputProbe.h \
-  $(srcdir)/src/N_IO_OutputTecplot.C \
-  $(srcdir)/include/N_IO_OutputTecplot.h \
   $(srcdir)/src/N_IO_OutputHDF5.C \
   $(srcdir)/include/N_IO_OutputHDF5.h \
+  $(srcdir)/include/N_IO_Measure_fwd.h  \
   $(srcdir)/src/N_IO_MeasureManager.C  \
   $(srcdir)/include/N_IO_MeasureManager.h  \
   $(srcdir)/src/N_IO_MeasureBase.C \

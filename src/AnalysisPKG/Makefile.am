@@ -20,6 +20,8 @@ libAnalysis_la_SOURCES = \
   $(srcdir)/src/N_ANP_Step.C \
   $(srcdir)/src/N_ANP_SweepParam.C \
   $(srcdir)/src/N_ANP_Transient.C \
+  $(srcdir)/src/N_ANP_Report.C \
+  $(srcdir)/include/N_ANP_fwd.h \
   $(srcdir)/include/N_ANP_AnalysisBase.h \
   $(srcdir)/include/N_ANP_AnalysisInterface.h \
   $(srcdir)/include/N_ANP_AnalysisManager.h \
@@ -34,5 +36,6 @@ libAnalysis_la_SOURCES = \
   $(srcdir)/include/N_ANP_SweepParam.h \
   $(srcdir)/include/N_ANP_AC.h \
   $(srcdir)/include/N_ANP_MOR.h \
+  $(srcdir)/include/N_ANP_Report.h \
   $(srcdir)/include/N_ANP_Transient.h 
   

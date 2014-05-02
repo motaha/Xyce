@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.10.2.2 $
+// Revision Number: $Revision: 1.25.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -47,10 +47,12 @@
 #define Xyce_N_DEV_Xygra_h
 
 // ----------   Xyce Includes   ----------
+#include <N_DEV_Configuration.h>
 #include <Sacado.hpp>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceInstance.h>
 #include <N_DEV_DeviceModel.h>
+#include <N_DEV_CompositeParam.h>
 
 namespace Xyce {
 namespace Device {
@@ -70,33 +72,42 @@ class XygraCoilData : public CompositeParam
 public:
   static ParametricData<XygraCoilData> &getParametricData();
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
   XygraCoilData();
 
   void processParams();
 #ifdef Xyce_DEBUG_DEVICE
-  friend ostream & operator<<(ostream & os, const XygraCoilData & xcd);
+  friend std::ostream & operator<<(std::ostream & os, const XygraCoilData & xcd);
 #endif
 
 private:
 
 private:
-  string name;
+  std::string name;
   int numWindings;
 
 public:
-  string getName() const { return name;};
+  std::string getName() const { return name;};
   int getNumWindings() const { return numWindings;};
 };
 
 
 namespace Xygra {
 
-// ---------- Forward Declarations ----------
 class Model;
+class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance>
+{
+  static const char *name() {return "Xygra";}
+  static const char *deviceTypeName() {return "Xygra level 1";}
+  static const int numNodes() {return 2;}
+  static const int numOptionalNodes() {return 1000;}
+  static const bool isLinearDevice() {return true;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : Instance
@@ -113,23 +124,16 @@ class Instance : public DeviceInstance
 {
   friend class ParametricData<Instance>;
   friend class Model;
-
+  friend class Traits;
+    
   typedef Sacado::Fad::DFad<double> XygraFadType;
 
 public:
-  static ParametricData<Instance> &getParametricData();
-
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
   Instance(
-    InstanceBlock &            IB,
-    Model & Miter,
-    MatrixLoadData &           mlData1,
-    SolverState &              ss1,
-    ExternData  &              ed1,
-    DeviceOptions &            do1);
+     const Configuration &       configuration,
+     const InstanceBlock &            IB,
+     Model & Miter,
+     const FactoryBlock &factory_block);
 
   ~Instance();
 
@@ -138,16 +142,16 @@ private:
   Instance &operator=(const Instance &);
 
 public:
-  void registerLIDs( const vector<int> & intLIDVecRef,
-                     const vector<int> & extLIDVecRef );
-  void registerStateLIDs( const vector<int> & staLIDVecRef );
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
+  void registerStateLIDs( const std::vector<int> & staLIDVecRef );
 
-  map<int,string> & getIntNameMap ();
+  std::map<int,std::string> & getIntNameMap ();
 
-  const vector< vector<int> > & jacobianStamp() const;
-  void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-  bool processParams (string param = "");
+  bool processParams ();
   bool updateTemperature(const double & temp_tmp);
 
   bool updateIntermediateVars ();
@@ -156,16 +160,16 @@ public:
 
   bool setIC ();
 
-  bool getVoltages(vector<double> &voltageValues);
-  bool setConductances(const vector< vector<double> > &conductanceMatrix);
-  bool setK(const vector< vector<double> > &kMatrix, const double t=0);
-  bool setSources(const vector<double> &sourceVector,const double t=0);
+  bool getVoltages(std::vector<double> &voltageValues);
+  bool setConductances(const std::vector< std::vector<double> > &conductanceMatrix);
+  bool setK(const std::vector< std::vector<double> > &kMatrix, const double t=0);
+  bool setSources(const std::vector<double> &sourceVector,const double t=0);
   int getNumNodes();
   int getNumWindings();
-  void getCoilWindings(vector<int> &coilWindings);
+  void getCoilWindings(std::vector<int> &coilWindings);
   void getCoilNames(std::vector<std::string> &coilNames);
 
-  void varTypes( vector<char> & varTypeVec );
+  void varTypes( std::vector<char> & varTypeVec );
 
   // load functions, residual:
   bool loadDAEQVector ();
@@ -177,7 +181,7 @@ public:
   bool loadDAEdQdx ();
   bool loadDAEdFdx ();
 
-  CompositeParam *constructComposite (string &, string &);
+  CompositeParam *constructComposite (const std::string &, const std::string &);
 
 protected:
 private:
@@ -187,7 +191,8 @@ private:
 public:
   // iterator reference to the Xygra model which owns this instance.
   // Getters and setters
-  Model &getModel() {
+  Model &getModel() 
+  {
     return model_;
   }
 
@@ -195,7 +200,7 @@ private:
 
   Model &       model_;         //< Owning model
 
-  map <string,CompositeParam *> coilDataMap;
+  std::map<std::string, XygraCoilData *> coilDataMap;
 
 private:
   // parameter variables
@@ -209,7 +214,7 @@ private:
   // local solution indices (offsets)
   // This device uses an array of li_ values instead of individually named
   // variables.
-  vector<int> li_Nodes_;
+  std::vector<int> li_Nodes_;
 
   // Matrix equation index variables:
 
@@ -217,48 +222,48 @@ private:
   // discrete variables.
   // A_Equ_NodeOffests[equation][node] is the offset for node in
   // equation
-  vector< vector<int> > A_Equ_NodeOffsets_;
+  std::vector< std::vector<int> > A_Equ_NodeOffsets_;
 
-  vector< vector<int> > jacStamp_;
+  std::vector< std::vector<int> > jacStamp_;
 
   // These guys hold the Alegra input
-  vector< vector<double> > theConductanceMatrix_;
-  vector< vector<double> > theKMatrix_;
-  vector< vector<double> > k0_;
-  vector< vector<double> > k1_;
-  vector<double> theSourceVector_;
-  vector<double> s0_;
-  vector<double> s1_;
+  std::vector< std::vector<double> > theConductanceMatrix_;
+  std::vector< std::vector<double> > theKMatrix_;
+  std::vector< std::vector<double> > k0_;
+  std::vector< std::vector<double> > k1_;
+  std::vector<double> theSourceVector_;
+  std::vector<double> s0_;
+  std::vector<double> s1_;
   // times that (s0,k0) and (s1,k1) apply to.
   double t0_;
   double t1_;
 
   // For vector composite:
-  vector<XygraCoilData*> coilDataVec;
+  std::vector<XygraCoilData*> coilDataVec;
   // total number of coils
   int nCoils;
   // number of windngs in each coil
-  vector <int> nWindings;
+  std::vector<int> nWindings;
   // names of each coil
-  vector <string> coilNames;
+  std::vector<std::string> coilNames;
   // sum over coils of number of windings per coil
   int totalNumWindings;
   // offsets into global node array of start of each coil's external vars
-  vector <int> coilExtStart;
+  std::vector<int> coilExtStart;
   // offsets into global node array of start of each coil's Internal vars
-  vector <int> coilIntStart;
+  std::vector<int> coilIntStart;
   // vector of pairs of nodes (pos,neg) for every winding
-  vector <pair<int,int> > windingNodes;
+  std::vector<std::pair<int,int> > windingNodes;
 
   // For computation of RHS/F vector and jacobian/dFdX
   // We copy solution vars here so we can differentiate w.r.t them.
-  vector<XygraFadType> solutionVars;
+  std::vector<XygraFadType> solutionVars;
   // This is the vector of winding dv's
-  vector<XygraFadType> dV;
+  std::vector<XygraFadType> dV;
   // This is the vector of winding currents
-  vector<XygraFadType> windingCurrents;
+  std::vector<XygraFadType> windingCurrents;
   // and finally the vector of contributions into F:
-  vector<XygraFadType> fContributions;
+  std::vector<XygraFadType> fContributions;
 };
 
 //-----------------------------------------------------------------------------
@@ -274,17 +279,13 @@ class Model : public DeviceModel
 
   friend class ParametricData<Model>;
   friend class Instance;
-
+  friend class Traits;
+    
 public:
-  static ParametricData<Model> &getParametricData();
-
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Model(const ModelBlock & MB,
-        SolverState & ss1,
-        DeviceOptions & do1);
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &          MB,
+     const FactoryBlock &        factory_block);
   ~Model();
 
 private:
@@ -293,23 +294,32 @@ private:
   Model &operator=(const Model &);
 
 public:
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
+    
   virtual std::ostream &printOutInstances(std::ostream &os) const;
 
-  bool processParams (string param = "");
-  bool processInstanceParams (string param = "");
+  bool processParams ();
+  bool processInstanceParams ();
 
 
 public:
-  InstanceVector &getInstanceVector() {
+  void addInstance(Instance *instance) 
+  {
+    instanceContainer.push_back(instance);
+  }
+
+  InstanceVector &getInstanceVector() 
+  {
     return instanceContainer;
   }
 
-  const InstanceVector &getInstanceVector() const {
+  const InstanceVector &getInstanceVector() const 
+  {
     return instanceContainer;
   }
 
 private:
-  vector<Instance*> instanceContainer;
+  std::vector<Instance*> instanceContainer;
 
 private:
 
@@ -343,6 +353,8 @@ inline int Instance::getNumWindings()
 {
   return totalNumWindings;
 }
+
+void registerDevice();
 
 } // namespace Resistor
 } // namespace Device

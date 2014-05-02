@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.32.2.2 $
+// Revision Number: $Revision: 1.38 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:46 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -93,10 +93,10 @@ public:
     fastTimeDiscRCPtr_(disc),
     periodicTimesOffset_(0),
     period_(0),
-    bOmegadQdt2Ptr_(0),
     mpdeMgrRCPtr_(mgr),
-    warpMPDEPhasePtr_(warpMPDEPhasePtr),
-    warpMPDE_(warpMPDEPhasePtr != Teuchos::null)
+    bOmegadQdt2Ptr_(0),
+    warpMPDE_(warpMPDEPhasePtr != Teuchos::null),
+    warpMPDEPhasePtr_(warpMPDEPhasePtr)
   {}
 
   // Destructor
@@ -155,9 +155,9 @@ public:
                           N_LAS_Vector * dQdxdVpVectorPtr)  { return false; }
 
   // Assign times for fast time scale
-  void setFastTimes( const vector<double> & times );
+  void setFastTimes( const std::vector<double> & times );
   
-  void setPeriodFlags( const vector<bool> & periodicFlags );
+  void setPeriodFlags( const std::vector<bool> & periodicFlags );
   
   // Construct a periodic version of times_
   void constructPeriodicTimes();
@@ -213,7 +213,11 @@ public:
   // Registration method for a temp vector in constructin dq/dt2
   void registerOmegadQdt2( RefCountPtr<N_LAS_BlockVector> omegadQdt2Ptr);
 
-private :
+    virtual bool setParam (std::string & name, double val) { return false; }
+    virtual double getParamAndReduce (const std::string & name) { return 0.0; }
+    virtual bool getParamAndReduce (const std::string & name, double & val) { return false; }
+
+  private :
 
   //MPDE State
   N_MPDE_State & state_;
@@ -222,15 +226,15 @@ private :
   RefCountPtr<const N_MPDE_Discretization> fastTimeDiscRCPtr_;
 
   //Fast Time Scale Points
-  vector<double> times_;
+  std::vector<double> times_;
   int periodicTimesOffset_;
-  vector<double> periodicTimes_;
+  std::vector<double> periodicTimes_;
   double period_;
   
   //a vector of bools to indicate if a solution variable does not
   //appear to be periodic.  Non-periodic signals will be handled
   //differently by the MPDE_Loader class
-  vector<bool> nonPeriodic_;
+  std::vector<bool> nonPeriodic_;
   
   // Base Application loader
   RefCountPtr<N_LOA_Loader> appLoaderPtr_;

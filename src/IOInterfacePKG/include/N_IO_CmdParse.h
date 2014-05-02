@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -38,133 +38,199 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.27.2.3 $
+// Revision Number: $Revision: 1.36.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Date  : $Date: 2014/03/10 16:15:21 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: dgbaur $
 //-----------------------------------------------------------------------------
 
 #ifndef _N_IO_CMDPARSE_
 #define _N_IO_CMDPARSE_
 
+#include <iosfwd>
 #include <string>
 #include <map>
-#include <Teuchos_RefCountPtr.hpp>
-using Teuchos::RefCountPtr;
-using Teuchos::rcp;
-using Teuchos::rcpFromRef;
 
+#include <N_IO_fwd.h>
 #include <N_DEV_fwd.h>
 #include <N_UTL_Xyce.h>
-#include <N_PDS_Manager.h>
+
+class N_PDS_Manager;
+
+namespace Xyce {
+namespace IO {
+
+void usage(std::ostream &os);
+
+// KRS, 12/10/07: the following functions are related to some private variables that actually have nothing to do with
+// parsing the command line.  In order to make Xyce produce netlist files that contain resistors between ground and
+// either a node that has no DC path to ground or a node that is only connected to one device terminal, some information
+// needs to be passed between the I/O package and the topology package.  Since both packages have access to the command
+// line arguments, I'm kludging the information I need to pass here.
+
+class HangingResistor {
+public:
+  HangingResistor()
+    : netlistCopy_(false),
+      oneTerm_(false),
+      noDCPath_(false),
+      oneTermRes_(""),
+      noDCPathRes_("")
+  {}
+
+  HangingResistor(const HangingResistor &right)
+    : netlistCopy_(right.netlistCopy_),
+      oneTerm_(right.oneTerm_),
+      noDCPath_(right.noDCPath_),
+      oneTermRes_(right.oneTermRes_),
+      noDCPathRes_(right.noDCPathRes_)
+  {}
+
+  bool getNetlistCopy() 
+  {
+    return netlistCopy_;
+  }
+
+  bool getOneTerm() 
+  {
+    return oneTerm_;
+  }
+
+  bool getNoDCPath() 
+  {
+    return noDCPath_;
+  }
+
+  std::string getOneTermRes() 
+  {
+    return oneTermRes_;
+  }
+
+  std::string getNoDCPathRes() 
+  {
+    return noDCPathRes_;
+  }
+
+  void setNetlistCopy(bool netlistCopyArg) 
+  {
+    netlistCopy_ = netlistCopyArg;
+  }
+
+  void setOneTerm(bool oneTermArg) 
+  {
+    oneTerm_ = oneTermArg;
+  }
+
+  void setNoDCPath(bool noDCPathArg) 
+  {
+    noDCPath_ = noDCPathArg;
+  }
+
+  void setOneTermRes(const std::string & oneTermResArg) 
+  {
+    oneTermRes_ = oneTermResArg;
+  }
+
+  void setNoDCPathRes(const std::string & noDCPathResArg) 
+  {
+    noDCPathRes_ = noDCPathResArg;
+  }
+
+private:
+  //KRS, 12/10/07:  private variables introduced to make copies of netlists
+  //which automatically add resistors between "dangling" nodes and ground
+  bool        netlistCopy_;
+  bool        oneTerm_;
+  bool        noDCPath_;
+  std::string oneTermRes_;
+  std::string noDCPathRes_;
+};
+
 
 //-----------------------------------------------------------------------------
-// Class         : N_IO_CmdParse
+// Class         : CmdParse
 // Purpose       :
 // Special Notes :
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 02/14/01
 //-----------------------------------------------------------------------------
-class N_IO_CmdParse
+class CmdParse
 {
+public:
+  CmdParse();
+
+  virtual ~CmdParse();
+
+  CmdParse(const CmdParse &);
+
+private:
+  CmdParse &operator=(const CmdParse &);
 
 public:
-
-  // constructor
-  N_IO_CmdParse();
-
-  // special copy constructor
-  N_IO_CmdParse(N_IO_CmdParse & right);
-
-  // destructor
-  virtual ~N_IO_CmdParse();
-
-  void setCommandArgs ();
-  bool registerParallelMgr( N_PDS_Manager * parMgr )
-  {
-    // Using rcpFromRef to create a NON-OWNING RCP using an undefined type.
-    // Note:  N_PDS_Manager is forward declared above.
-    RefCountPtr<N_PDS_Manager> parMgrRCPtr = rcpFromRef(*parMgr);
-    registerParallelMgr(parMgrRCPtr);
-    return true;
-  }
-
-  bool registerParallelMgr( RefCountPtr<N_PDS_Manager> parMgr )
+  bool registerParallelMgr( N_PDS_Manager * parMgr ) 
   {
     parMgr_ = parMgr;
+
     return true;
   }
 
-  void parseCommandLine(int iargs, char **cargs);
+  int argc() const 
+  {
+    return iargs;
+  }
 
-//  bool argExists(const char *arg_tmp) const;
-  bool argExists(const string & arg_tmp) const;
+  char **argv() const 
+  {
+    return cargs;
+  }
 
-  string getArgumentValue(const string & argumentName) const;
+  void setCommandArgs ();
+
+  int parseCommandLine(int iargs, char **cargs);
+
+  bool argExists(const std::string & arg_tmp) const;
+
+  std::string getArgumentValue(const std::string & argumentName) const;
 
   // Returns the number of cmd line args.
   int numArgs();
 
   void printArgMap();
 
-  void getArg(int i, string & arg);
+  void getArg(int i, std::string & arg);
 
-  void setNetlist(string & newNetlist);
+  void setNetlist(const std::string & newNetlist);
 
-  //KRS, 12/10/07:  the following functions are related to some private
-  //variables that actually have nothing to do with parsing the command line.
-  //In order to make Xyce produce netlist files that contain resistors between
-  //ground and either a node that has no DC path to ground or a node that is
-  //only connected to one device terminal, some information needs to be passed
-  //between the I/O package and the topology package.  Since both packages have
-  //access to the command line arguments, I'm kludging the information I need
-  //to pass here.
+  HangingResistor &getHangingResistor()
+  {
+    return hangingResistor_;
+  }
 
-  bool getNetlistCopy();
-  bool getOneTerm();
-  bool getNoDCPath();
-  string getOneTermRes();
-  string getNoDCPathRes();
+private:
+  bool isSwitchArg(const std::string &arg);
+  bool isStringValuedArg(const std::string &arg);
 
-  void setNetlistCopy(bool netlistCopyArg);
-  void setOneTerm(bool oneTermArg);
-  void setNoDCPath(bool noDCPathArg);
-  void setOneTermRes(const string & oneTermResArg);
-  void setNoDCPathRes(const string & noDCPathResArg);
-
-protected:
+  void handleParameterOutputs_(const std::string & tmp, int &i, int &ia, char** ca);
 
 private :
+  int         iargs;
+  char **     cargs;
+  bool        allocatedCargs_;
 
-  int iargs;
-  char ** cargs;
+  N_PDS_Manager *     parMgr_;
 
-  std::string usage_;
+  std::map<std::string, int>          swArgs;
+  std::map<std::string, std::string>  stArgs;
 
-  RefCountPtr<N_PDS_Manager> parMgr_;
+  std::map<std::string, int>          argIndex;
 
-  map<string,int> swArgs;
-  map<string,string> stArgs;
-
-  map<string,int> argIndex;
-
-  bool isSwitchArg(string arg);
-  bool isStringValuedArg(string arg);
-
-  void handleParameterOutputs_ (string & tmp, int &i, int &ia, char** ca);
-
-  //KRS, 12/10/07:  private variables introduced to make copies of netlists
-  //which automatically add resistors between "dangling" nodes and ground
-  bool netlistCopy_;
-  bool oneTerm_;
-  bool noDCPath_;
-  bool allocatedCargs_;
-  string oneTermRes_;
-  string noDCPathRes_;
-
-  friend class Xyce::Device::XyceInterface;
-
+  HangingResistor             hangingResistor_;
 };
+
+} // namespace IO
+} // namespace Xyce
+
+typedef Xyce::IO::CmdParse N_IO_CmdParse;
 
 #endif

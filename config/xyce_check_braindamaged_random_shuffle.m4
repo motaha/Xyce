@@ -22,15 +22,12 @@ ac_cv_xyce_braindamaged_random_shuffle,
 #else
 #include <algo.h>
 #endif
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
 ]],
 [[
 
-  vector<int> ipVec(5,0);
+  std::vector<int> ipVec(5,0);
 
-  random_shuffle(ipVec.begin(),ipVec.end());
+  std::random_shuffle(ipVec.begin(),ipVec.end());
 ]])], ac_cv_xyce_braindamaged_random_shuffle=no , ac_cv_xyce_braindamaged_random_shuffle=yes)
 AC_LANG_POP(C++)
 ])

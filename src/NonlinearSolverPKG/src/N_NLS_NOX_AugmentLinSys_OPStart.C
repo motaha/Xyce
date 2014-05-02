@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.24.2.2 $
+// Revision Number: $Revision: 1.28 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -145,12 +145,12 @@ void N_NLS_NOX::AugmentLinSysOPStart::augmentJacobian(N_LAS_Matrix * jacobian)
   Xyce::NodeNamePairMap::iterator op_i;
   Xyce::NodeNamePairMap::iterator op_end = op_.end();
   int i, row, rowLen, global_row, numRows;
-  vector<int> col;
-  vector<double> val;
-  vector<double> resTmp;
+  std::vector<int> col;
+  std::vector<double> val;
+  std::vector<double> resTmp;
   bool diag;
   int GID;
-  map<int,string> rowOut;
+  std::map<int,std::string> rowOut;
 
   // erkeite: Determine which rows have diagonal elements already.
   // A lot of this code is needed to avoid causing the matrix to
@@ -196,10 +196,10 @@ void N_NLS_NOX::AugmentLinSysOPStart::augmentJacobian(N_LAS_Matrix * jacobian)
     int myPos;
     pdsCommPtr_->scanSum(&numG, &myPos, 1);
     myPos -= numG;
-    vector<int> buf(numG_tot,0);
-    vector<int> buf_g(numG_tot,0);
-    set<int>::iterator skip_i=skipGID.begin();
-    set<int>::iterator skip_end=skipGID.end();
+    std::vector<int> buf(numG_tot,0);
+    std::vector<int> buf_g(numG_tot,0);
+    std::set<int>::iterator skip_i=skipGID.begin();
+    std::set<int>::iterator skip_end=skipGID.end();
     for ( ; skip_i != skip_end ; ++skip_i)
       buf[myPos++] = *skip_i;
     pdsCommPtr_->sumAll (&buf[0], &buf_g[0], numG_tot);
@@ -211,8 +211,8 @@ void N_NLS_NOX::AugmentLinSysOPStart::augmentJacobian(N_LAS_Matrix * jacobian)
   }
 
   op_i = op_.begin();
-  set<int>::iterator skipLIDEnd = skipLID.end();
-  set<int>::iterator skipGIDEnd = skipGID.end();
+  std::set<int>::iterator skipLIDEnd = skipLID.end();
+  std::set<int>::iterator skipGIDEnd = skipGID.end();
   for ( ; op_i != op_end ; ++op_i)
   {
     row = (*op_i).second.first;

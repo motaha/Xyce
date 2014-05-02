@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,8 +31,8 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.75.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:47 $
+// Revision Number: $Revision: 1.85 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
@@ -54,6 +54,7 @@
 #include <N_LAS_BlockMatrix.h>
 
 #include <N_PDS_ParMap.h>
+#include <N_PDS_Comm.h>
 
 #include <Epetra_MultiVector.h>
 
@@ -77,14 +78,14 @@ N_MPDE_Loader::~N_MPDE_Loader()
 // Creator       : Robert Hoekstra, 9233, Computational Sciences
 // Creation Date : 03/12/04
 //-----------------------------------------------------------------------------
-void N_MPDE_Loader::setFastTimes( const vector<double> & times )
+void N_MPDE_Loader::setFastTimes( const std::vector<double> & times )
 { 
   times_ = times;
   constructPeriodicTimes();
 }
 
 
-void N_MPDE_Loader::setPeriodFlags( const vector<bool> & periodicFlags )
+void N_MPDE_Loader::setPeriodFlags( const std::vector<bool> & periodicFlags )
 { 
   nonPeriodic_ = periodicFlags;
 }
@@ -117,21 +118,21 @@ void N_MPDE_Loader::constructPeriodicTimes()
   }
   for( int i=(timesSize+periodicTimesOffset_); i< (timesSize + 2*periodicTimesOffset_); i++ )
   {
-    periodicTimes_[i] = times_[i - timesSize - 1] + period_;
+    periodicTimes_[i] = period_ - times_[i - (timesSize+periodicTimesOffset_) + 1];
   }
   
-  /*
-  std::cout << "periodicTimes_ array is" << std::endl;
-  for( int i=0; i<periodicTimes_.size(); i++)
+#ifdef Xyce_DEBUG_MPDE
+  Xyce::dout() << "periodicTimes_ array is" << std::endl;
+  for( int i=0; i<(int)periodicTimes_.size(); i++)
   {
-    std::cout << "  periodicTimes_[ " << i << " ] = " << periodicTimes_[i];
+    Xyce::dout() << "  periodicTimes_[ " << i << " ] = " << periodicTimes_[i];
     if( (i >= periodicTimesOffset_) && (i < (timesSize + periodicTimesOffset_) ) )
     {
-      std::cout << "\ttimes_[ " << (i-periodicTimesOffset_) << " ] = " << times_[i-periodicTimesOffset_];
+      Xyce::dout() << "\ttimes_[ " << (i-periodicTimesOffset_) << " ] = " << times_[i-periodicTimesOffset_];
     } 
-    std::cout << std::endl;
+    Xyce::dout() << std::endl;
   }
-  */
+#endif
   
 }
 
@@ -172,20 +173,20 @@ bool N_MPDE_Loader::findNonPeriodicSignals_(const N_LAS_BlockVector & solutionBl
     }
     
 //#ifdef Xyce_DEBUG_MPDE
-    std::cout << "bool N_MPDE_Loader::findNonPeriodicSignals_() For solution variable " << i
+    Xyce::dout() << "bool N_MPDE_Loader::findNonPeriodicSignals_() For solution variable " << i
       << " The difference over the periodic boundary is " << signalDiff
       << " This will be treated as ";
       
     if( nonPeriodic_[i] )
     {
-      std::cout << " Non-periodic";
+      Xyce::dout() << " Non-periodic";
     }
     else
     {
-      std::cout << " Periodic";
+      Xyce::dout() << " Periodic";
     }
     
-    std::cout << std::endl;      
+    Xyce::dout() << std::endl;      
 //#endif // Xyce_DEBUG_MPDE
   }
   return true;
@@ -208,16 +209,12 @@ bool N_MPDE_Loader::loadDAEMatrices( N_LAS_Vector * X,
                                      N_LAS_Matrix * dFdx)
 {
 #ifdef Xyce_DEBUG_MPDE
-  const string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
   if (mpdeMgrRCPtr_->debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                            "  N_MPDE_Loader::loadDAEMatrices");
-    cout << "warpMPDE flag = " << warpMPDE_ << endl;
+    Xyce::dout() << std::endl
+           << Xyce::section_divider << std::endl
+           << "  N_MPDE_Loader::loadDAEMatrices" << std::endl
+           << "  warpMPDE flag = " << warpMPDE_ << std::endl;
   }
 #endif // Xyce_DEBUG_MPDE
   //Zero out matrices
@@ -229,6 +226,7 @@ bool N_MPDE_Loader::loadDAEMatrices( N_LAS_Vector * X,
   N_LAS_BlockMatrix & bdQdx = *dynamic_cast<N_LAS_BlockMatrix*>(dQdx);
   N_LAS_BlockMatrix & bdFdx = *dynamic_cast<N_LAS_BlockMatrix*>(dFdx);
   N_LAS_BlockVector & bX = *dynamic_cast<N_LAS_BlockVector*>(X);
+
 #ifdef Xyce_FLEXIBLE_DAE_LOADS
   N_LAS_BlockVector & bS = *dynamic_cast<N_LAS_BlockVector*>(S);
   N_LAS_BlockVector & bdSdt = *dynamic_cast<N_LAS_BlockVector*>(dSdt);
@@ -241,7 +239,7 @@ bool N_MPDE_Loader::loadDAEMatrices( N_LAS_Vector * X,
 #ifdef Xyce_DEBUG_MPDE
     if (mpdeMgrRCPtr_->debugLevel > 0)
     {
-      cout << "Processing diagonal matrix block " << i << " of " << BlockCount-1 << endl;
+      Xyce::dout() << "Processing diagonal matrix block " << i << " of " << BlockCount-1 << std::endl;
     }
 #endif // Xyce_DEBUG_MPDE
 #ifdef Xyce_FLEXIBLE_DAE_LOADS
@@ -275,18 +273,21 @@ bool N_MPDE_Loader::loadDAEMatrices( N_LAS_Vector * X,
     // Add \dot{phi} = omega dQdx contribution here
     int phiGID = warpMPDEPhasePtr_->getPhiGID();
     int phiLID = bX.pmap()->globalToLocalIndex(phiGID);
-    vector<int> colIndices;
-    vector<double> coeffs;
-    colIndices.push_back(phiLID);
-    coeffs.push_back(1.0);
-    bdQdx.replaceLocalRow( phiLID, colIndices.size(), &coeffs[0], &colIndices[0] );
-
-    // tscoffe/tmei 08/10/05:  Add omega dependency for warped MPDE to every dq/dt2 equation
-    // tscoffe 12/12/06:  For WaMPDE, we're augmenting two columns, omega & phi, and
-    // the indexing starts at zero, so the index of omega is 0.
-    // tscoffe 01/11/07:  Add \dot{phi} = omega dFdx derivative term here:
-    (*bOmegadQdt2Ptr_)[phiLID] = -1.0;
-    bdFdx.replaceAugmentedColumn(0,*bOmegadQdt2Ptr_);
+    if (phiLID >= 0)
+    {
+      std::vector<int> colIndices;
+      std::vector<double> coeffs;
+      colIndices.push_back(phiGID);
+      coeffs.push_back(1.0);
+      bdQdx.replaceAugmentedRow( phiGID, colIndices.size(), &coeffs[0], &colIndices[0] );
+    
+      // tscoffe/tmei 08/10/05:  Add omega dependency for warped MPDE to every dq/dt2 equation
+      // tscoffe 12/12/06:  For WaMPDE, we're augmenting two columns, omega & phi, and
+      // the indexing starts at zero, so the index of omega is 0.
+      // tscoffe 01/11/07:  Add \dot{phi} = omega dFdx derivative term here:
+      (*bOmegadQdt2Ptr_)[phiLID] = -1.0;
+    }
+    bdFdx.replaceAugmentedColumn(warpMPDEPhasePtr_->getOmegaGID(),*bOmegadQdt2Ptr_);
   }
 
   // Fast Time scale discretization terms:
@@ -297,14 +298,14 @@ bool N_MPDE_Loader::loadDAEMatrices( N_LAS_Vector * X,
   int Start = fastTimeDiscRCPtr_->Start();
   int Width = fastTimeDiscRCPtr_->Width();
   
-  const vector<double> & Coeffs = fastTimeDiscRCPtr_->Coeffs();
+  const std::vector<double> & Coeffs = fastTimeDiscRCPtr_->Coeffs();
   
   for( int i = 0; i < BlockCount; ++i )
   {
 #ifdef Xyce_DEBUG_MPDE
     if (mpdeMgrRCPtr_->debugLevel > 0)
     {
-      cout << "Processing off diagonal matrix blocks on row " << i << " of " << BlockCount-1 << endl;
+      Xyce::dout() << "Processing off diagonal matrix blocks on row " << i << " of " << BlockCount-1 << std::endl;
     }
 #endif // Xyce_DEBUG_MPDE
     int Loc;
@@ -335,41 +336,42 @@ bool N_MPDE_Loader::loadDAEMatrices( N_LAS_Vector * X,
   // tscoffe/tmei 08/10/05:  Add omega equation for warped MPDE
   if ( warpMPDE_ ) 
   {
-    vector<int> colIndices;
-    vector<double> coeffs;
+    std::vector<int> colIndices;
+    std::vector<double> coeffs;
     int omegaGID = warpMPDEPhasePtr_->getOmegaGID();
-    int omegaLID = bX.pmap()->globalToLocalIndex(omegaGID);
     warpMPDEPhasePtr_->getPhaseConditionDerivative(&bX,times_,&colIndices,&coeffs);
-    //bdFdx.replaceLocalRow( omegaLID, colIndices.size() , &coeffs[0], &colIndices[0]);
-    for (int i1=0;i1<colIndices.size();++i1)
-    {
-      bdFdx[omegaLID][i1] = coeffs[i1];
-    }
+    bdFdx.replaceAugmentedRow( omegaGID, colIndices.size(), &coeffs[0], &colIndices[0] );
   }
 
+  // Now that the matrix loading is finished, call fillComplete().
   dQdx->fillComplete();
   dFdx->fillComplete();
+
+  // For BlockMatrix objects, synchronize the global copy of the block matrix.
+  bdQdx.assembleGlobalMatrix();
+  bdFdx.assembleGlobalMatrix();
  
 #ifdef Xyce_DEBUG_MPDE
   if (mpdeMgrRCPtr_->debugLevel > 1)
   {
-    cout << "MPDE bX:" << endl;
-    bX.printPetraObject();
-    cout << "MPDE bdQdx:" << endl;
-    bdQdx.printPetraObject();
-    cout << "MPDE bdFdx:" << endl;
-    bdFdx.printPetraObject();
+    Xyce::dout() << "MPDE bX:" << std::endl;
+    bX.printPetraObject(std::cout);
+    Xyce::dout() << "MPDE bdQdx:" << std::endl;
+    bdQdx.printPetraObject(std::cout);
+    Xyce::dout() << "MPDE bdFdx:" << std::endl;
+    bdFdx.printPetraObject(std::cout);
 #ifdef Xyce_FLEXIBLE_DAE_LOADS
-    cout << "MPDE bS:" << endl;
-    bS.printPetraObject();
-    cout << "MPDE dSdt:" << endl;
-    bdSdt.printPetraObject();
-    cout << "MPDE bStore:" << endl;
-    bStore.printPetraObject();
+    Xyce::dout() << "MPDE bS:" << std::endl;
+    bS.printPetraObject(std::cout);
+    Xyce::dout() << "MPDE dSdt:" << std::endl;
+    bdSdt.printPetraObject(std::cout);
+    Xyce::dout() << "MPDE bStore:" << std::endl;
+    bStore.printPetraObject(std::cout);
 #endif // Xyce_FLEXIBLE_DAE_LOADS
+  
+    Xyce::dout() << Xyce::section_divider << std::endl;
   }
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
 #endif // Xyce_DEBUG_MPDE
   return true;
 }
@@ -435,18 +437,12 @@ bool N_MPDE_Loader::loadDAEVectors( N_LAS_Vector * X,
                                     N_LAS_Vector * dQdxdVp )
 {
 #ifdef Xyce_DEBUG_MPDE
-  const string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
   if (mpdeMgrRCPtr_->debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                            "  N_MPDE_Loader::loadDAEVectors");
-    cout << "warpMPDE flag = ";
-    if (warpMPDE_) { cout << "true" << endl; } 
-    else { cout << "false" << endl; }
+    Xyce::dout() << std::endl
+           << Xyce::section_divider << std::endl
+           << "  N_MPDE_Loader::loadDAEVectors" << std::endl
+           << "warpMPDE flag = " << (warpMPDE_ ? "true" : "false") << std::endl;
   }
 #endif // Xyce_DEBUG_MPDE
   //Zero out vectors
@@ -465,7 +461,6 @@ bool N_MPDE_Loader::loadDAEVectors( N_LAS_Vector * X,
 
   N_LAS_Vector appQ( *appNextVecPtr_ );
   N_LAS_Vector appF( *appNextVecPtr_ );
-
   N_LAS_Vector appdFdxdVp( *appNextVecPtr_ );
   N_LAS_Vector appdQdxdVp( *appNextVecPtr_ );
 
@@ -500,7 +495,7 @@ bool N_MPDE_Loader::loadDAEVectors( N_LAS_Vector * X,
 #ifdef Xyce_DEBUG_MPDE
     if (mpdeMgrRCPtr_->debugLevel > 0)
     {
-      cout << "Processing vectors for block " << i << " of " << BlockCount-1 << endl;
+      Xyce::dout() << "Processing vectors for block " << i << " of " << BlockCount-1 << std::endl;
     }
 #endif // Xyce_DEBUG_MPDE
     //Set Time for fast time scale somewhere
@@ -510,7 +505,7 @@ bool N_MPDE_Loader::loadDAEVectors( N_LAS_Vector * X,
 #ifdef Xyce_DEBUG_MPDE
     if (mpdeMgrRCPtr_->debugLevel > 0)
     {
-      cout << "Calling updateSources on the appLoader" << endl;
+      Xyce::dout() << "Calling updateSources on the appLoader" << std::endl;
     }
 #endif // Xyce_DEBUG_MPDE
     //Update the sources
@@ -532,7 +527,7 @@ bool N_MPDE_Loader::loadDAEVectors( N_LAS_Vector * X,
 #ifdef Xyce_DEBUG_MPDE
     if (mpdeMgrRCPtr_->debugLevel > 0)
     {
-      cout << "Updating State for block " << i << " of " << BlockCount-1 << endl;
+      Xyce::dout() << "Updating State for block " << i << " of " << BlockCount-1 << std::endl;
     }
 #endif // Xyce_DEBUG_MPDE
 
@@ -554,7 +549,7 @@ bool N_MPDE_Loader::loadDAEVectors( N_LAS_Vector * X,
 #ifdef Xyce_DEBUG_MPDE
     if (mpdeMgrRCPtr_->debugLevel > 0)
     {
-      cout << "Calling loadDAEVectors on the appLoader" << endl;
+      Xyce::dout() << "Calling loadDAEVectors on the appLoader" << std::endl;
     }
 #endif // Xyce_DEBUG_MPDE
 
@@ -581,7 +576,7 @@ bool N_MPDE_Loader::loadDAEVectors( N_LAS_Vector * X,
 #ifdef Xyce_DEBUG_MPDE
     if (mpdeMgrRCPtr_->debugLevel > 0)
     {
-      cout << "Processing matrices for block " << i << " of " << BlockCount-1 << endl;
+      Xyce::dout() << "Processing matrices for block " << i << " of " << BlockCount-1 << std::endl;
     }
 #endif // Xyce_DEBUG_MPDE
 
@@ -595,35 +590,40 @@ bool N_MPDE_Loader::loadDAEVectors( N_LAS_Vector * X,
 #ifdef Xyce_DEBUG_MPDE
     if (mpdeMgrRCPtr_->debugLevel > 0)
     {
-      cout << "Copying diagonal block into bmdQdx" << endl;
+      Xyce::dout() << "Copying diagonal block into bmdQdx" << std::endl;
     }
 #endif // Xyce_DEBUG_MPDE
     bmdQdxPtr_->block(i,i).add( *appdQdxPtr_ );
 #ifdef Xyce_DEBUG_MPDE
     if (mpdeMgrRCPtr_->debugLevel > 0)
     {
-      cout << "Copying diagonal block into bmdFdx" << endl;
+      Xyce::dout() << "Copying diagonal block into bmdFdx" << std::endl;
     }
 #endif // Xyce_DEBUG_MPDE
     bmdFdxPtr_->block(i,i).add( *appdFdxPtr_ );
 #endif
   }
+  
   int phiGID = -1;
   int phiLID = -1;
   if (warpMPDE_)
   {
     // Add \dot{phi(t_1)} = omega(t_1) term to Q
     phiGID = warpMPDEPhasePtr_->getPhiGID();
-    phiLID = bX.pmap()->globalToLocalIndex(phiGID);
-    double phiValue = bX[phiLID];
-    bQ.setElementByGlobalIndex( phiGID, phiValue );
-#ifdef Xyce_DEBUG_MPDE
-    if (mpdeMgrRCPtr_->debugLevel > 0)
+    phiLID = bQ.pmap()->globalToLocalIndex(phiGID);
+    if (phiLID >= 0)
     {
-      cout << "Inserting phi with value = " << phiValue << " into q" << endl;
-    }
+      double phiValue = bX[phiLID];
+
+#ifdef Xyce_DEBUG_MPDE
+      if (mpdeMgrRCPtr_->debugLevel > 0)
+      {
+        Xyce::dout() << "Inserting phi with value = " << phiValue << " into q" << std::endl;
+      }
 #endif // Xyce_DEBUG_MPDE
 
+      bQ.setElementByGlobalIndex( phiGID, phiValue );
+    }
   }
 
   //-------------------------------------------------------------
@@ -632,18 +632,26 @@ bool N_MPDE_Loader::loadDAEVectors( N_LAS_Vector * X,
 
   int Start = fastTimeDiscRCPtr_->Start();
   int Width = fastTimeDiscRCPtr_->Width();
-  const vector<double> & Coeffs = fastTimeDiscRCPtr_->Coeffs();
+  const std::vector<double> & Coeffs = fastTimeDiscRCPtr_->Coeffs();
     
   double omega = 1.0;
   int omegaGID = -1;
   if (warpMPDE_)
   {
+    omegaGID = warpMPDEPhasePtr_->getOmegaGID();
+
     // tscoffe/tmei 08/04/05:  zero out temporary vector for use in Jacobian
     bOmegadQdt2Ptr_->putScalar(0.0);
     // tscoffe/tmei 08/11/05:  Convert global indices to local indices:
-    omegaGID = warpMPDEPhasePtr_->getOmegaGID();
+
     int omegaLID = bX.pmap()->globalToLocalIndex(omegaGID);
-    omega = bX[omegaLID]; 
+
+    double tmpOmega = 0.0; 
+    if (omegaLID >= 0)
+    {
+      tmpOmega = bX[omegaLID];
+    }
+    bX.pmap()->pdsComm()->sumAll( &tmpOmega, &omega, 1 );
   }
 
   for( int i = 0; i < BlockCount; ++i )
@@ -651,7 +659,7 @@ bool N_MPDE_Loader::loadDAEVectors( N_LAS_Vector * X,
 #ifdef Xyce_DEBUG_MPDE
     if (mpdeMgrRCPtr_->debugLevel > 0)
     {
-      cout << "Processing dQdt2 block " << i << " of " << BlockCount-1 << endl;
+      Xyce::dout() << "Processing dQdt2 block " << i << " of " << BlockCount-1 << std::endl;
     }
 #endif // Xyce_DEBUG_MPDE
     dQdt2.putScalar(0.0);
@@ -689,43 +697,66 @@ bool N_MPDE_Loader::loadDAEVectors( N_LAS_Vector * X,
   if ( warpMPDE_ )
   {
     double phaseValue = warpMPDEPhasePtr_->getPhaseCondition(&bX,times_);
-    bF.setElementByGlobalIndex( omegaGID, phaseValue );
-    // Add \dot{phi(t_1)} = omega(t_1) term to F
-    bF.setElementByGlobalIndex( phiGID, -omega );
-#ifdef Xyce_DEBUG_MPDE
-    if (mpdeMgrRCPtr_->debugLevel > 0)
+    if ( bF.pmap()->globalToLocalIndex(omegaGID) >= 0 )
     {
-      cout << "Inserting phase condition = " << phaseValue << " into f" << endl;
-      cout << "Inserting omega = " << omega << " into f" << endl;
-    }
+#ifdef Xyce_DEBUG_MPDE
+      if (mpdeMgrRCPtr_->debugLevel > 0)
+      {
+        Xyce::dout() << "Inserting phase condition = " << phaseValue << " into f" << std::endl;
+        Xyce::dout() << "Inserting omega = " << omega << " into f" << std::endl;
+      }
 #endif // Xyce_DEBUG_MPDE
+
+      bF.setElementByGlobalIndex( omegaGID, phaseValue );
+      // Add \dot{phi(t_1)} = omega(t_1) term to F
+      bF.setElementByGlobalIndex( phiGID, -omega );
+    }
   }
+
+  // Now that the vector loading is finished, synchronize the global copy of the block vector
+  bX.assembleGlobalVector();
+  bS.assembleGlobalVector();
+  bdSdt.assembleGlobalVector();
+  bStore.assembleGlobalVector();
+  bQ.assembleGlobalVector();
+  bF.assembleGlobalVector();
+  bdFdxdVp.assembleGlobalVector();
+  bdQdxdVp.assembleGlobalVector();
+  bcurrS.assembleGlobalVector();
+  blastS.assembleGlobalVector();
+  bcurrStore.assembleGlobalVector();
+  blastStore.assembleGlobalVector();
 
 #ifdef Xyce_DEBUG_MPDE
   if (mpdeMgrRCPtr_->debugLevel > 1)
   {
-    cout << "MPDE X Vector" << endl;
-    bX.printPetraObject();
-    cout << "MPDE S Vector" << endl;
-    bS.printPetraObject();
-    cout << "MPDE dSdt Vector" << endl;
-    bdSdt.printPetraObject();
-    cout << "MPDE Store Vector" << endl;
-    bStore.printPetraObject();
-    cout << "MPDE Q Vector" << endl;
-    bQ.printPetraObject();
-    cout << "MPDE F Vector" << endl;
-    bF.printPetraObject();
+    Xyce::dout() << "MPDE X Vector" << std::endl;
+    bX.printPetraObject(std::cout);
+    Xyce::dout() << "MPDE S Vector" << std::endl;
+    bS.printPetraObject(std::cout);
+    Xyce::dout() << "MPDE dSdt Vector" << std::endl;
+    bdSdt.printPetraObject(std::cout);
+    Xyce::dout() << "MPDE Store Vector" << std::endl;
+    bStore.printPetraObject(std::cout);
+    Xyce::dout() << "MPDE Q Vector" << std::endl;
+    bQ.printPetraObject(std::cout);
+    Xyce::dout() << "MPDE F Vector" << std::endl;
+    bF.printPetraObject(std::cout);
 
 #ifndef Xyce_FLEXIBLE_DAE_LOADS
-    cout << "MPDE bmdQdx_" << endl;
-    bmdQdxPtr_->printPetraObject();
-    cout << "MPDE bmdFdx_" << endl;
-    bmdFdxPtr_->printPetraObject();
+    bmdQdxPtr_->assembleGlobalMatrix();
+    Xyce::dout() << "MPDE bmdQdx_" << std::endl;
+    bmdQdxPtr_->printPetraObject(std::cout);
+
+    bmdFdxPtr_->assembleGlobalMatrix();
+    Xyce::dout() << "MPDE bmdFdx_" << std::endl;
+    bmdFdxPtr_->printPetraObject(std::cout);
 #endif // Xyce_FLEXIBLE_DAE_LOADS
+
+    Xyce::dout() << Xyce::section_divider << std::endl;
   }
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
 #endif // Xyce_DEBUG_MPDE
+
   return true;
 }
 

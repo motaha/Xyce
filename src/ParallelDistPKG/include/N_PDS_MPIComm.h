@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -39,9 +39,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.14.2.2 $
+// Revision Number: $Revision: 1.20 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -51,20 +51,10 @@
 
 #ifdef Xyce_PARALLEL_MPI
 
-// ---------- Standard Includes ----------
-
-// ----------   Xyce Includes   ----------
-
 #include <N_ERH_ErrorMgr.h>
-
-// ----------  Other Includes   ----------
 
 #include <mpi.h>
 #include<list>
-
-// ----------  Fwd Declarations ----------
-
-//typedef unsigned int MPI_Comm;
 
 //-----------------------------------------------------------------------------
 // Class         : N_PDS_MPIComm
@@ -79,7 +69,7 @@ class N_PDS_MPIComm
 public:
 
   N_PDS_MPIComm( int iargs, char * cargs[] );
-  N_PDS_MPIComm( const MPI_Comm & mComm );
+  N_PDS_MPIComm( const MPI_Comm mComm );
 
   //Destructor
   ~N_PDS_MPIComm();
@@ -96,7 +86,7 @@ public:
   // Get the total number of processors in this communicator.
   int numProc() const;
 
-  MPI_Comm & comm();
+  MPI_Comm comm() const;
 
   // MPI_Bcast wrappers
   bool bcast( int * val, const int & count, const int & root ) const;
@@ -157,7 +147,7 @@ protected:
   bool mpiCommOwned_;
 
   mutable MPI_Status status_;
-  list <MPI_Request> request_;
+  std::list<MPI_Request> request_;
   
   // Note number of processors 
   int numProc_;
@@ -179,7 +169,7 @@ private:
 // Creator       : Scott A. Hutchinson, SNL, Parallel Computational Sciences
 // Creation Date : 03/13/00
 //-----------------------------------------------------------------------------
-inline MPI_Comm & N_PDS_MPIComm::comm()
+inline MPI_Comm N_PDS_MPIComm::comm() const
 {
   return mpiComm_;
 }

@@ -90,15 +90,14 @@ am__aclocal_m4_deps = $(top_srcdir)/config/libtool.m4 \
 	$(top_srcdir)/config/lt~obsolete.m4 \
 	$(top_srcdir)/config/xyce_check_bison.m4 \
 	$(top_srcdir)/config/xyce_check_braindamaged_random_shuffle.m4 \
-	$(top_srcdir)/config/xyce_check_flexible_insert.m4 \
 	$(top_srcdir)/config/xyce_check_iota.m4 \
-	$(top_srcdir)/config/xyce_check_stl_member_templates.m4 \
 	$(top_srcdir)/config/xyce_debug_option.m4 \
 	$(top_srcdir)/config/xyce_finite_number_check.m4 \
 	$(top_srcdir)/config/xyce_library_include.m4 \
 	$(top_srcdir)/config/xyce_library_option.m4 \
 	$(top_srcdir)/config/xyce_test_using_dec_cxx.m4 \
 	$(top_srcdir)/config/xyce_test_using_icclt11_cxx.m4 \
+	$(top_srcdir)/config/xyce_trilinos_library_option.m4 \
 	$(top_srcdir)/acinclude.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -109,7 +108,10 @@ CONFIG_CLEAN_VPATH_FILES =
 am__objects_1 = XyceLibTest.$(OBJEXT)
 am_XyceLibTest_OBJECTS = $(am__objects_1)
 XyceLibTest_OBJECTS = $(am_XyceLibTest_OBJECTS)
-XyceLibTest_DEPENDENCIES = $(top_builddir)/src/libxyce.la
+@RADMODELS_TRUE@am__DEPENDENCIES_1 = $(top_builddir)/src/DeviceModelPKG/SandiaModels/libSandiaModels.la
+@NONFREEMODELS_TRUE@am__DEPENDENCIES_2 = $(top_builddir)/src/DeviceModelPKG/Xyce_NonFree/libNonFree.la
+XyceLibTest_DEPENDENCIES = $(top_builddir)/src/libxyce.la \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_2)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -120,7 +122,8 @@ XyceLibTest_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) \
 am__objects_2 = testHarness1685.$(OBJEXT)
 am_testHarness1685_OBJECTS = $(am__objects_2)
 testHarness1685_OBJECTS = $(am_testHarness1685_OBJECTS)
-testHarness1685_DEPENDENCIES = $(top_builddir)/src/libxyce.la
+testHarness1685_DEPENDENCIES = $(top_builddir)/src/libxyce.la \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_2)
 testHarness1685_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CXXLD) \
 	$(AM_CXXFLAGS) $(CXXFLAGS) $(testHarness1685_LDFLAGS) \
@@ -251,6 +254,7 @@ MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MAYBE_NONFREE = @MAYBE_NONFREE@
+MAYBE_PLUGIN = @MAYBE_PLUGIN@
 MAYBE_RAD = @MAYBE_RAD@
 MKDIR_P = @MKDIR_P@
 NM = @NM@
@@ -344,12 +348,20 @@ top_srcdir = @top_srcdir@
 AM_CPPFLAGS = @Xyce_INCS@
 
 # needed for Dakota 4.x not 5.0
-@DAKOTA_OBJ_NEEDED_TRUE@DAKOTA_OBJS = $(DAKOTA_ARCH_DIR)/lib/Cparam.o 
+@DAKOTA_OBJ_NEEDED_TRUE@DAKOTA_OBJS = 
+@RADMODELS_FALSE@RADLD = 
+
+# conditionally link in radiation-aware device models.
+@RADMODELS_TRUE@RADLD = $(top_builddir)/src/DeviceModelPKG/SandiaModels/libSandiaModels.la
+@NONFREEMODELS_FALSE@NONFREELD = 
+
+# conditionally link in radiation-aware device models.
+@NONFREEMODELS_TRUE@NONFREELD = $(top_builddir)/src/DeviceModelPKG/Xyce_NonFree/libNonFree.la
 XYCELIBTESTSOURCES = \
   $(srcdir)/XyceLibTest.C 
 
 XyceLibTest_SOURCES = $(XYCELIBTESTSOURCES)
-XyceLibTest_LDADD = $(top_builddir)/src/libxyce.la
+XyceLibTest_LDADD = $(top_builddir)/src/libxyce.la $(RADLD) $(NONFREELD)
 XyceLibTest_LDFLAGS = -static $(AM_LDFLAGS) $(DAKOTA_OBJS)
 BUG1685TESTSOURCES = \
   $(srcdir)/testHarness1685.C 
@@ -357,7 +369,7 @@ BUG1685TESTSOURCES = \
 
 # standalone testHarness1685  executable
 testHarness1685_SOURCES = $(BUG1685TESTSOURCES)
-testHarness1685_LDADD = $(top_builddir)/src/libxyce.la
+testHarness1685_LDADD = $(top_builddir)/src/libxyce.la $(RADLD) $(NONFREELD)
 testHarness1685_LDFLAGS = -static $(AM_LDFLAGS) $(DAKOTA_OBJS)
 all: all-am
 

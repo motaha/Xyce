@@ -9,13 +9,12 @@ project ( Xyce )
 
 # set Xyce release version string
 set ( Xyce_VERSION_MAJOR           6                CACHE STRING " " )
-set ( Xyce_VERSION_MINOR           0                CACHE STRING " " )
-set ( Xyce_VERSION_PATCH           1                CACHE STRING " " )
+set ( Xyce_VERSION_MINOR           1                CACHE STRING " " )
+set ( Xyce_VERSION_PATCH           0                CACHE STRING " " )
 set ( Xyce_VERSION_EXTRA           ""    CACHE STRING " " )
 
 # DEBUG:  rewrite the version code; be sure to use quotes
-set ( VERSION                      "R::6.0.1"         CACHE INTERNAL " " )
-
+set ( VERSION                      "R::6.1"         CACHE INTERNAL " " )
 
 # set the top-level arch directory (eg. /Net/Proj/Xyce/arch/linux)
 # set ( Xyce_ARCHDIR                 "/Net/Proj/Xyce/arch/linux" )

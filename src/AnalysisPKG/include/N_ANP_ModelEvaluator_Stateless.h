@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -39,9 +39,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.3.6.2 $
+// Revision Number: $Revision: 1.7 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:30 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -62,18 +62,21 @@ class N_LAS_BlockVector;
 
 using Teuchos::RCP;
 
-// This defines the class N_ANP_ModelEvaluator_Stateless derived from
+namespace Xyce {
+namespace Analysis {
+
+// This defines the class ModelEvaluator_Stateless derived from
 // EpetraExt:ModelEvaluator
-class N_ANP_ModelEvaluator_Stateless : public EpetraExt::ModelEvaluator {
+class ModelEvaluator_Stateless : public EpetraExt::ModelEvaluator {
 
   public:
     // (Default) Constructor of the class  
-    N_ANP_ModelEvaluator_Stateless();
+    ModelEvaluator_Stateless();
 
     // Destructor of the class 
-    virtual ~N_ANP_ModelEvaluator_Stateless();
+    virtual ~ModelEvaluator_Stateless();
 
-    void set_XyceModelEvaluator(const RCP<N_ANP_ModelEvaluator>& xyceME); 
+    void set_XyceModelEvaluator(const RCP<Analysis::ModelEvaluator>& xyceME); 
 
     /** \name Overridden from EpetraExt::ModelEvaluator . */
     //@{
@@ -95,7 +98,7 @@ class N_ANP_ModelEvaluator_Stateless : public EpetraExt::ModelEvaluator {
     bool isInitialized_;
 
     //RCP<N_CIR_Xyce> xycePtr_;
-    RCP<N_ANP_ModelEvaluator> xyceME_;
+    RCP<Analysis::ModelEvaluator> xyceME_;
 
     EpetraExt::ModelEvaluator::InArgs inArgs_;
     EpetraExt::ModelEvaluator::OutArgs outArgs_;
@@ -110,10 +113,15 @@ class N_ANP_ModelEvaluator_Stateless : public EpetraExt::ModelEvaluator {
 };
 
 // Nonmember constructor
-RCP<N_ANP_ModelEvaluator_Stateless> N_ANP_modelEvaluator_Stateless();
+RCP<ModelEvaluator_Stateless> N_ANP_modelEvaluator_Stateless();
 
 // Nonmember constructor
-RCP<N_ANP_ModelEvaluator_Stateless> N_ANP_modelEvaluator_Stateless(
+RCP<ModelEvaluator_Stateless> N_ANP_modelEvaluator_Stateless(
     const RCP<N_ANP_ModelEvaluator>& xyceME);
+
+} // namespace Analysis
+} // namespace Xyce
+
+typedef Xyce::Analysis::ModelEvaluator_Stateless N_ANP_ModelEvaluator_Stateless;
 
 #endif // N_ANP_MODEL_EVALUATOR_STATELESS_H

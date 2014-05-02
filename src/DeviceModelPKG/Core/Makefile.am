@@ -1,4 +1,3 @@
-
 AM_CPPFLAGS = @Xyce_INCS@
 
 noinst_LTLIBRARIES = libDeviceCore.la
@@ -25,7 +24,10 @@ endif
 #these are extra parser-related files that we want to include conditionally
 PARSER_SRCS= $(srcdir)/include/N_DEV_ReactionLexer.h
 
-libDeviceCore_la_SOURCES =  \
+libDeviceCore_la_SOURCES = \
+  $(srcdir)/src/N_DEV_RegisterDevices.C \
+  $(srcdir)/src/N_DEV_Algorithm.C \
+  $(srcdir)/src/N_DEV_Print.C \
   $(srcdir)/src/N_DEV_CompositeParam.C \
   $(srcdir)/src/N_DEV_Configuration.C \
   $(srcdir)/src/N_DEV_DeviceBlock.C \
@@ -38,9 +40,13 @@ libDeviceCore_la_SOURCES =  \
   $(srcdir)/src/N_DEV_DeviceSensitivities.C \
   $(srcdir)/src/N_DEV_DeviceState.C \
   $(srcdir)/src/N_DEV_DeviceSupport.C \
+  $(srcdir)/src/N_DEV_DeviceMaster.C \
+  $(srcdir)/src/N_DEV_Dump.C \
   $(srcdir)/src/N_DEV_MatrixLoadData.C \
+  $(srcdir)/src/N_DEV_Message.C \
+  $(srcdir)/src/N_DEV_NameLevelKey.C \
   $(srcdir)/src/N_DEV_NumericalJacobian.C \
-  $(srcdir)/src/N_DEV_OutputPars.C \
+  $(srcdir)/src/N_DEV_LaTexDoc.C \
   $(srcdir)/src/N_DEV_Param.C \
   $(srcdir)/src/N_DEV_Pars.C \
   $(srcdir)/src/N_DEV_RateConstantCalculators.C \
@@ -53,7 +59,11 @@ libDeviceCore_la_SOURCES =  \
   $(srcdir)/src/N_DEV_Source.C \
   $(srcdir)/src/N_DEV_SourceData.C \
   $(srcdir)/src/N_DEV_SpecieSource.C \
-  $(srcdir)/src/N_DEV_Units.C  \
+  $(srcdir)/src/N_DEV_Units.C \
+  $(srcdir)/include/N_DEV_fwd.h \
+  $(srcdir)/include/N_DEV_RegisterDevices.h \
+  $(srcdir)/include/N_DEV_Algorithm.h \
+  $(srcdir)/include/N_DEV_Print.h \
   $(srcdir)/include/N_DEV_CompositeParam.h \
   $(srcdir)/include/N_DEV_Configuration.h \
   $(srcdir)/include/N_DEV_Const.h \
@@ -68,13 +78,16 @@ libDeviceCore_la_SOURCES =  \
   $(srcdir)/include/N_DEV_DeviceSensitivities.h \
   $(srcdir)/include/N_DEV_DeviceState.h \
   $(srcdir)/include/N_DEV_DeviceSupport.h \
-  $(srcdir)/include/N_DEV_DeviceTemplate.h \
+  $(srcdir)/include/N_DEV_DeviceMaster.h \
+  $(srcdir)/include/N_DEV_Dump.h \
   $(srcdir)/include/N_DEV_ExternData.h \
   $(srcdir)/include/N_DEV_ExternalSimulationData.h \
   $(srcdir)/include/N_DEV_Interpolators.h \
   $(srcdir)/include/N_DEV_MatrixLoadData.h \
+  $(srcdir)/include/N_DEV_Message.h \
+  $(srcdir)/include/N_DEV_NameLevelKey.h \
   $(srcdir)/include/N_DEV_NumericalJacobian.h \
-  $(srcdir)/include/N_DEV_OutputPars.h \
+  $(srcdir)/include/N_DEV_LaTexDoc.h \
   $(srcdir)/include/N_DEV_Param.h \
   $(srcdir)/include/N_DEV_Pars.h \
   $(srcdir)/include/N_DEV_RateConstantCalculators.h \
@@ -89,8 +102,7 @@ libDeviceCore_la_SOURCES =  \
   $(srcdir)/include/N_DEV_Specie.h \
   $(srcdir)/include/N_DEV_SpecieSource.h \
   $(srcdir)/include/N_DEV_TransportHelper.h \
-  $(srcdir)/include/N_DEV_Units.h \
-  $(srcdir)/include/N_DEV_fwd.h
+  $(srcdir)/include/N_DEV_Units.h
 
 # these can't be in "SOURCES" above or automake screams about YACC.
 EXTRA_DIST=$(srcdir)/src/N_DEV_ReactionLexer.l \

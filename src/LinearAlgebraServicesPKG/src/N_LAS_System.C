@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -39,40 +39,16 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.69.6.2 $
+// Revision Number: $Revision: 1.77 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
-#include <N_UTL_Misc.h>
-
 #include <iostream>
-
-#ifdef HAVE_ALGORITHM
-#include <algorithm>
-#else
-#ifdef HAVE_ALGO_H
-#include <algo.h>
-#else
-#error Must have either <algorithm> or <algo.h>!
-#endif
-#endif
-//#if defined LINUX
-//#include <algo.h>
-//#elif KAILINUX
-//#include <algorithm>
-//#endif
-
-// ----------   Xyce Includes   ----------
-
-#include <N_UTL_Misc.h>
 
 #include <N_LAS_System.h>
 
@@ -91,10 +67,6 @@
 #include <N_LAS_Vector.h>
 
 #include <Epetra_MapColoring.h>
-
-#ifdef Xyce_VERBOSE_LINEAR
- #include <N_ERH_ErrorMgr.h>
-#endif
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_System::~N_LAS_System
@@ -234,7 +206,7 @@ bool N_LAS_System::initializeSystem()
   bSuccess = bSuccess && registerFVector( lasBuilder_->createVector() );
 #ifdef Xyce_DEBUG_VOLTLIM
   bSuccess = bSuccess && registerDxVoltlimVector( lasBuilder_->createVector() );
- 
+
   // old DAE:
   bSuccess = bSuccess && registerJDX2Vector( lasBuilder_->createVector() );
   bSuccess = bSuccess && registerJacTestMatrix( lasBuilder_->createMatrix() );
@@ -293,7 +265,7 @@ bool N_LAS_System::updateExternValsStateVector(N_LAS_MultiVector * stateVector)
 // Special Notes :
 // Scope         : Public
 // Creator       : Eric Keiter
-// Creation Date : 
+// Creation Date :
 //-----------------------------------------------------------------------------
 bool N_LAS_System::updateExternValsStoreVector(N_LAS_MultiVector * storeVector)
 {
@@ -327,23 +299,9 @@ bool N_LAS_System::localInMatrix(const int & row) const
 //-----------------------------------------------------------------------------
 bool N_LAS_System::localInSolnVector(const int & row) const
 {
-#ifdef BAD_STL
-	vector<int>::const_iterator iterB = lasQueryUtil_->rowList_GID().begin();
-	vector<int>::const_iterator iterE = lasQueryUtil_->rowList_GID().end();
-	int total = 0;
-	for( ; iterB != iterE ; ++iterB )
-  {
-		if( *iterB == row )
-    {
-			++total;
-    }
-  }
-	return total;
-#else
   return count(lasQueryUtil_->rowList_GID().begin(),
                lasQueryUtil_->rowList_GID().end(),
                row );
-#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -356,23 +314,9 @@ bool N_LAS_System::localInSolnVector(const int & row) const
 //-----------------------------------------------------------------------------
 bool N_LAS_System::localInStateVector(const int & row) const
 {
-#ifdef BAD_STL
-	vector<int>::const_iterator iterB = lasQueryUtil_->rowList_StateGID().begin();
-	vector<int>::const_iterator iterE = lasQueryUtil_->rowList_StateGID().end();
-	int total = 0;
-	for( ; iterB != iterE ; ++iterB )
-  {
-		if( *iterB == row )
-    {
-			++total;
-    }
-  }
-	return total;
-#else
   return count(lasQueryUtil_->rowList_StateGID().begin(),
                lasQueryUtil_->rowList_StateGID().end(),
                row );
-#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -385,38 +329,38 @@ bool N_LAS_System::localInStateVector(const int & row) const
 //-----------------------------------------------------------------------------
 void N_LAS_System::debug() const
 {
-  cout << "Linear System Debug Output" << endl;
-  cout << "--------------------------" << endl;
+  Xyce::dout() << "Linear System Debug Output" << std::endl;
+  Xyce::dout() << "--------------------------" << std::endl;
 
-  cout << "RHS Vector:" << endl;
-  rhsVectorPtr_->printPetraObject();
+  Xyce::dout() << "RHS Vector:" << std::endl;
+  rhsVectorPtr_->printPetraObject(Xyce::dout());
 
-  cout << "Current Solution Vector:" << endl;
-  (*currSolVectorPtrPtr_)->printPetraObject();
+  Xyce::dout() << "Current Solution Vector:" << std::endl;
+  (*currSolVectorPtrPtr_)->printPetraObject(Xyce::dout());
 
-  cout << "Next Solution Vector:" << endl;
-  (*nextSolVectorPtrPtr_)->printPetraObject();
+  Xyce::dout() << "Next Solution Vector:" << std::endl;
+  (*nextSolVectorPtrPtr_)->printPetraObject(Xyce::dout());
 
-  cout << "Next Solution Derivative Vector:" << endl;
-  (*nextSolDerivVectorPtrPtr_)->printPetraObject();
+  Xyce::dout() << "Next Solution Derivative Vector:" << std::endl;
+  (*nextSolDerivVectorPtrPtr_)->printPetraObject(Xyce::dout());
 
-  cout << "Current State Vector:" << endl;
-  (*currStaVectorPtrPtr_)->printPetraObject();
+  Xyce::dout() << "Current State Vector:" << std::endl;
+  (*currStaVectorPtrPtr_)->printPetraObject(Xyce::dout());
 
-  cout << "Next State Vector:" << endl;
-  (*nextStaVectorPtrPtr_)->printPetraObject();
+  Xyce::dout() << "Next State Vector:" << std::endl;
+  (*nextStaVectorPtrPtr_)->printPetraObject(Xyce::dout());
 
-  cout << "Temp Solution Vector:" << endl;
-  (*tmpSolVectorPtrPtr_)->printPetraObject();
+  Xyce::dout() << "Temp Solution Vector:" << std::endl;
+  (*tmpSolVectorPtrPtr_)->printPetraObject(Xyce::dout());
 
-  cout << "Temp Solution Derivative Vector:" << endl;
-  (*tmpSolDerivVectorPtrPtr_)->printPetraObject();
+  Xyce::dout() << "Temp Solution Derivative Vector:" << std::endl;
+  (*tmpSolDerivVectorPtrPtr_)->printPetraObject(Xyce::dout());
 
-  cout << "Temp State Vector:" << endl;
-  (*tmpStaVectorPtrPtr_)->printPetraObject();
+  Xyce::dout() << "Temp State Vector:" << std::endl;
+  (*tmpStaVectorPtrPtr_)->printPetraObject(Xyce::dout());
 
-  cout << "Temp State Derivative Vector:" << endl;
-  (*tmpStaDerivVectorPtrPtr_)->printPetraObject();
+  Xyce::dout() << "Temp State Derivative Vector:" << std::endl;
+  (*tmpStaDerivVectorPtrPtr_)->printPetraObject(Xyce::dout());
 
 }
 

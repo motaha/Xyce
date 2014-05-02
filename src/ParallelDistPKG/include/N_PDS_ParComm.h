@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -39,9 +39,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.14.2.2 $
+// Revision Number: $Revision: 1.20 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -49,21 +49,16 @@
 #ifndef Xyce_N_PDS_ParComm_h
 #define Xyce_N_PDS_ParComm_h
 
-// ---------- Standard Includes ----------
-
 #ifdef Xyce_PARALLEL_MPI
 #include <mpi.h>
+#include <Epetra_MpiComm.h>
+#else
+#include <Epetra_SerialComm.h>
 #endif
-
-// ----------   Xyce Includes   ----------
 
 #include <N_PDS_Comm.h>
 
 #include <N_ERH_ErrorMgr.h>
-
-// ----------  Other Includes   ----------
-
-// ----------  Fwd Declarations ----------
 
 class N_PDS_MPIComm;
 
@@ -84,7 +79,7 @@ public:
   N_PDS_ParComm(int iargs, char * cargs[]);
 
 #ifdef Xyce_PARALLEL_MPI
-  N_PDS_ParComm( MPI_Comm * comm );
+  N_PDS_ParComm( MPI_Comm comm );
 #endif
 
   //Destructor
@@ -98,6 +93,8 @@ public:
   // Cloning
   N_PDS_Comm * clone() const { return new N_PDS_ParComm(* this); }
 
+    Xyce::Parallel::Machine comm() const;
+    
   // Get my processor ID.
   int procID() const;
 
@@ -106,6 +103,10 @@ public:
 
   // Is this a serial run?
   bool isSerial() const { return isSerial_; }
+
+  // Get the last processor flag (by default true in serial)
+  // NOTE:  This is used for generating augmented linear systems.
+  bool isLastProc() const { return (petraComm_->MyPID() == (petraComm_->NumProc()-1)); }
 
   // Wrappers for Petra_Comm functionality.
   bool scanSum(const double * vals, double * sums, const int & count) const;

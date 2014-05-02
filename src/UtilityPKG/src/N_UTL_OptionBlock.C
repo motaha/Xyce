@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,23 +36,20 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.15.2.2 $
+// Revision Number: $Revision: 1.26 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
 #include <iostream>
 
-// ----------   Xyce Includes   ----------
 #include <N_UTL_OptionBlock.h>
 #include <N_PDS_Comm.h>
-#include <N_ERH_ErrorMgr.h>
+#include <N_ERH_Message.h>
 
 namespace Xyce {
 namespace Util {
@@ -65,8 +62,9 @@ namespace Util {
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/15/01
 //-----------------------------------------------------------------------------
-OptionBlock::OptionBlock(const string & n_str)
+OptionBlock::OptionBlock(const std::string & n_str)
   : name_(n_str),
+    netlistLocation_(),
     status_(NEW_STATE),
     params_()
 {
@@ -82,6 +80,7 @@ OptionBlock::OptionBlock(const string & n_str)
 //-----------------------------------------------------------------------------
 OptionBlock::OptionBlock(const OptionBlock & right)
   : name_(right.name_),
+    netlistLocation_(right.netlistLocation_),
     status_(right.status_),
     params_(right.params_)
 {
@@ -101,7 +100,7 @@ OptionBlock::~OptionBlock()
 
 //-----------------------------------------------------------------------------
 // Function      : OptionBlock::compareParamLists
-// Purpose       : Compares contained N_UTL_Param lists
+// Purpose       : Compares contained Param lists
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical Systems Modeling
@@ -113,15 +112,15 @@ bool OptionBlock::compareParamLists( const OptionBlock & right ) const
   if( params_.size() == right.params_.size() )
   {
     // length of params list is the same, so they may match
-    list< N_UTL_Param >::const_iterator existingListItr = params_.begin();
-    list< N_UTL_Param >::const_iterator existingListEnd = params_.end();
-    list< N_UTL_Param >::const_iterator newListItr = right.params_.begin();
-    list< N_UTL_Param >::const_iterator newListEnd = right.params_.end();
+    std::list< Param >::const_iterator existingListItr = params_.begin();
+    std::list< Param >::const_iterator existingListEnd = params_.end();
+    std::list< Param >::const_iterator newListItr = right.params_.begin();
+    std::list< Param >::const_iterator newListEnd = right.params_.end();
     while( existingListItr != existingListEnd )
     {
       if( !(existingListItr->deepCompare(*newListItr)) )
       {
-        // N_UTL_Param objects didn't match
+        // Param objects didn't match
         // thus these two lists are not the same
         match = false;
         break;
@@ -225,12 +224,18 @@ int OptionBlock::packedByteCount() const
 
   int size, length, i;
 
-  list<N_UTL_Param>::const_iterator it_tpL;
+  std::list<Param>::const_iterator it_tpL;
 
   //----- count name
   length = name_.length();
   byteCount += sizeof(int);
   byteCount += length;
+
+  //----- count netlistLocation
+  length = netlistLocation_.getPath().length();
+  byteCount += sizeof(int);
+  byteCount += length;
+  byteCount += sizeof(int);
 
   //----- count status
   byteCount += sizeof(int);
@@ -257,14 +262,25 @@ int OptionBlock::packedByteCount() const
 void OptionBlock::pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) const
 {
 
+#ifdef Xyce_DEBUG_TOPOLOGY
+  Xyce::dout() << "Packing OptionBlock: " << getName() << std::endl;
+#endif
+
   int size, length;
   int i;
-  list<N_UTL_Param>::const_iterator it_tpL;
+  std::list<Param>::const_iterator it_tpL;
 
   //----- pack name
   length = name_.length();
   comm->pack( &length, 1, buf, bsize, pos );
   comm->pack( name_.c_str(), length, buf, bsize, pos );
+
+  //----- pack netlist location
+  length = netlistLocation_.getPath().length();
+  comm->pack( &length, 1, buf, bsize, pos );
+  comm->pack( netlistLocation_.getPath().c_str(), length, buf, bsize, pos );
+  int line_number = netlistLocation_.getLineNumber();
+  comm->pack( &line_number, 1, buf, bsize, pos );
 
   //----- pack status
   comm->pack( &status_, 1, buf, bsize, pos );
@@ -276,8 +292,8 @@ void OptionBlock::pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) cons
     it_tpL->pack( buf, bsize, pos, comm );
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "Packed " << pos << " bytes for OptionBlock: " <<
-    getName() << endl;
+  Xyce::dout() << "Packed " << pos << " of " << bsize << " bytes for OptionBlock: " <<
+    getName() << std::endl;
 #endif
 
 }
@@ -298,16 +314,29 @@ void OptionBlock::unpack(char * pB, int bsize,int & pos, N_PDS_Comm * comm)
 
   //----- unpack name
   comm->unpack( pB, bsize, pos, &length, 1 );
-  name_ = string( (pB+pos), length);
+  name_ = std::string( (pB+pos), length);
   pos += length;
+
+#ifdef Xyce_DEBUG_TOPOLOGY
+  Xyce::dout() << "Unpacking OptionBlock: " << getName() << std::endl;
+#endif
+
+  //----- unpack netlist location
+  comm->unpack( pB, bsize, pos, &length, 1 );
+  netlistLocation_.setPath(std::string( (pB+pos), length));
+  pos += length;
+  int line_number;
+  comm->unpack( pB, bsize, pos, &line_number, 1 );
+  netlistLocation_.setLineNumber(line_number);
 
   //----- unpack status
   comm->unpack( pB, bsize, pos, &status_, 1 );
 
   //----- unpack params
   comm->unpack( pB, bsize, pos, &size, 1 );
+
   params_.clear();
-  N_UTL_Param param;
+  Param param;
   for( i = 0; i < size; ++i )
   {
     param.unpack( pB, bsize, pos, comm );
@@ -315,8 +344,8 @@ void OptionBlock::unpack(char * pB, int bsize,int & pos, N_PDS_Comm * comm)
   }
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "Unpacked " << pos << " bytes for OptionBlock: " <<
-    getName() << endl;
+  Xyce::dout() << "Unpacked " << pos << " of " << bsize << " bytes for OptionBlock: " <<
+    getName() << std::endl;
 #endif
 
 }
@@ -330,12 +359,12 @@ void OptionBlock::unpack(char * pB, int bsize,int & pos, N_PDS_Comm * comm)
 // Creator       : Richard Schiek, Electrical and Microsystem Modeling
 // Creation Date : 3/11/2009
 //-----------------------------------------------------------------------------
-bool OptionBlock::tagExists( const string iTag ) const
+bool OptionBlock::tagExists( const std::string iTag ) const
 {
   bool retValue=false;
 
-  list<N_UTL_Param>::const_iterator paramListIt = params_.begin();
-  list<N_UTL_Param>::const_iterator paramListItEnd = params_.end();
+  std::list<Param>::const_iterator paramListIt = params_.begin();
+  std::list<Param>::const_iterator paramListItEnd = params_.end();
   while( paramListIt != paramListItEnd )
   {
     if(paramListIt->tag() == iTag)
@@ -358,17 +387,17 @@ bool OptionBlock::tagExists( const string iTag ) const
 // Creator       : Richard Schiek, Electrical and Microsystem Modeling
 // Creation Date : 3/11/2009
 //-----------------------------------------------------------------------------
-string OptionBlock::getTagValueAsString( string iTag ) const
+std::string OptionBlock::getTagValueAsString( std::string iTag ) const
 {
-  string retValue;
+  std::string retValue;
 
-  list<N_UTL_Param>::const_iterator paramListIt = params_.begin();
-  list<N_UTL_Param>::const_iterator paramListItEnd = params_.end();
+  std::list<Param>::const_iterator paramListIt = params_.begin();
+  std::list<Param>::const_iterator paramListItEnd = params_.end();
   while( paramListIt != paramListItEnd )
   {
     if(paramListIt->tag() == iTag)
     {
-      retValue = paramListIt->sVal();
+      retValue = paramListIt->stringValue();
       break;
     }
     paramListIt++;
@@ -385,17 +414,17 @@ string OptionBlock::getTagValueAsString( string iTag ) const
 // Creator       : Richard Schiek, Electrical and Microsystem Modeling
 // Creation Date : 3/11/2009
 //-----------------------------------------------------------------------------
-double OptionBlock::getTagValueAsDouble( string iTag ) const
+double OptionBlock::getTagValueAsDouble( std::string iTag ) const
 {
   double retValue;
 
-  list<N_UTL_Param>::const_iterator paramListIt = params_.begin();
-  list<N_UTL_Param>::const_iterator paramListItEnd = params_.end();
+  std::list<Param>::const_iterator paramListIt = params_.begin();
+  std::list<Param>::const_iterator paramListItEnd = params_.end();
   while( paramListIt != paramListItEnd )
   {
     if(paramListIt->tag() == iTag)
     {
-      retValue = paramListIt->dVal();
+      retValue = paramListIt->getImmutableValue<double>();
       break;
     }
     paramListIt++;
@@ -412,17 +441,17 @@ double OptionBlock::getTagValueAsDouble( string iTag ) const
 // Creator       : Richard Schiek, Electrical and Microsystem Modeling
 // Creation Date : 3/11/2009
 //-----------------------------------------------------------------------------
-int OptionBlock::getTagValueAsInt( string iTag ) const
+int OptionBlock::getTagValueAsInt( std::string iTag ) const
 {
   int retValue;
 
-  list<N_UTL_Param>::const_iterator paramListIt = params_.begin();
-  list<N_UTL_Param>::const_iterator paramListItEnd = params_.end();
+  std::list<Param>::const_iterator paramListIt = params_.begin();
+  std::list<Param>::const_iterator paramListItEnd = params_.end();
   while( paramListIt != paramListItEnd )
   {
     if(paramListIt->tag() == iTag)
     {
-      retValue = paramListIt->iVal();
+      retValue = paramListIt->getImmutableValue<int>();
       break;
     }
     paramListIt++;
@@ -441,22 +470,22 @@ int OptionBlock::getTagValueAsInt( string iTag ) const
 //-----------------------------------------------------------------------------
 std::ostream & operator<<(std::ostream & os, const OptionBlock & mb)
 {
-  list<N_UTL_Param>::const_iterator it_pL, end_pL;
+  std::list<Param>::const_iterator it_pL, end_pL;
 
-  os << "Option Block" << endl;
-  os << " name:  " << mb.getName() << endl;
-  os << " status: " << mb.getStatus() << endl;
-  os << " Params" << endl;
-  os << " -------------" << endl;
+  os << "Option Block" << std::endl;
+  os << " name:  " << mb.getName() << std::endl;
+  os << " status: " << mb.getStatus() << std::endl;
+  os << " Params" << std::endl;
+  os << " -------------" << std::endl;
 
   it_pL=mb.getParams().begin();
   end_pL=mb.getParams().end();
   for ( ; it_pL != end_pL; ++it_pL)
   {
-    cout << *it_pL;
+    os << *it_pL;
   }
-  os << " -------------" << endl;
-  os << endl;
+  os << " -------------" << std::endl;
+  os << std::endl;
 
   return os;
 }

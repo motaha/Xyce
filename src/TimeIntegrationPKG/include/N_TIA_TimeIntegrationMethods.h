@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -39,9 +39,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.53.2.2 $
+// Revision Number: $Revision: 1.60 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -67,19 +67,17 @@ using Teuchos::rcp;
 // ----------   Xyce Includes   ----------
 #include <N_UTL_Xyce.h>
 #include <N_IO_fwd.h>
+#include <N_PDS_fwd.h>
 #include <N_TIA_DataStore.h>
 #include <N_ANP_SweepParam.h>
 #include <N_TIA_TimeIntegrationEnum.h>
 
 #include <N_ANP_OutputMgrAdapter.h>
 
-// ----------   Forward Declarations ---------
-class N_PDS_Comm;
 class N_TIA_StepErrorControl;
 class N_TIA_TimeIntInfo;
 class N_LAS_Vector;
 class N_LAS_Matrix;
-class N_ERH_ErrorMgr;
 
 //-----------------------------------------------------------------------------
 // Class         : N_TIA_TimeIntegrationMethod
@@ -116,15 +114,15 @@ public:
   virtual void obtainCorrectorDeriv() = 0;
 
   // Compute an estimate of the error in the integration step (abstract).
-  virtual void updateDerivsBlock(const list < index_pair > & solGIDList,
-                                 const list < index_pair > & staGIDList) = 0;
+  virtual void updateDerivsBlock(const std::list<index_pair> & solGIDList,
+                                 const std::list<index_pair> & staGIDList) = 0;
 
   // Compute an estimate of the error in the integration step (abstract).
   virtual double computeErrorEstimate() = 0;
 
   // Interpolate solution, state or store approximation at prescribed time point (abstract).
   virtual bool interpolateSolution(double timepoint,
-      	N_LAS_Vector * tmpSolVectorPtr, vector<N_LAS_Vector*> & historyVec) = 0;
+      	N_LAS_Vector * tmpSolVectorPtr, std::vector<N_LAS_Vector*> & historyVec) = 0;
 
   // Print output using interpolation when order is high
   virtual bool printOutputSolution(
@@ -132,7 +130,7 @@ public:
                   const double time,
                   N_LAS_Vector * solnVecPtr,
                   const bool doNotInterpolate,
-                  const vector<double> &outputInterpolationTimes,
+                  const std::vector<double> &outputInterpolationTimes,
                   bool skipPrintLineOutput );
 
   // Print MPDE output using local interpolation methods
@@ -268,10 +266,8 @@ class N_TIA_WorkingIntegrationMethod
     // Method which creates a time-integration method.
     void createTimeIntegMethod(const unsigned int integMethod);
 
-#ifdef Xyce_VERBOSE_TIME
     // Output the current time-integration method.
-    void printWorkingIntegMethod();
-#endif
+    void printWorkingIntegMethod(std::ostream &os);
 
     // Current integration method flag.
     unsigned int workingIntegMethod;
@@ -283,7 +279,7 @@ class N_TIA_WorkingIntegrationMethod
     void obtainPredictor() { integMethodPtr->obtainPredictor(); }
     void obtainPredictorDeriv() { integMethodPtr->obtainPredictorDeriv(); }
     void obtainCorrectorDeriv() { integMethodPtr->obtainCorrectorDeriv(); }
-    void updateDerivsBlock ( const list<index_pair> & solGIDList, const list<index_pair> & staGIDList)
+    void updateDerivsBlock ( const std::list<index_pair> & solGIDList, const std::list<index_pair> & staGIDList)
     { integMethodPtr->updateDerivsBlock (solGIDList, staGIDList); }
 
     int getOrder() { return integMethodPtr->getOrder(); }
@@ -332,7 +328,7 @@ class N_TIA_WorkingIntegrationMethod
                   const double time,
                   N_LAS_Vector * solnVecPtr,
                   const bool doNotInterpolate,
-                  const vector<double> &outputInterpolationTimes,
+                  const std::vector<double> &outputInterpolationTimes,
                   bool skipPrintLineOutput )
     {
       return integMethodPtr->printOutputSolution(

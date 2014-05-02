@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.18.2.5 $
+// Revision Number: $Revision: 1.23 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -96,13 +96,13 @@ N_LAS_Solver * N_LAS_SolverFactory::create( N_UTL_OptionBlock & options,
     return new N_LAS_SimpleSolver( prob, options );
 
 #ifdef Xyce_PARALLEL_MPI
-  string type = "AZTECOO";
+  std::string type = "AZTECOO";
   if (!prob.matrixFree() && lsDim < 1000)
   {
     type = "KLU";
   }
 #else
-  string type = "KLU";
+  std::string type = "KLU";
   if (prob.matrixFree())
   {
     type = "AZTECOO";
@@ -129,14 +129,14 @@ N_LAS_Solver * N_LAS_SolverFactory::create( N_UTL_OptionBlock & options,
   {
     if ((type != "AZTECOO") && (type != "BELOS"))
     {
-      string msg = "The linear solver option that was specified is not compatible with a matrix free analysis type, changing to AZTECOO";
+      std::string msg = "The linear solver option that was specified is not compatible with a matrix free analysis type, changing to AZTECOO";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING, msg);
       type = "AZTECOO";
     }
   }
 
 #ifdef Xyce_PARALLEL_MPI
-  // If this is a parallel build and serial execution, use Belos.  
+  // If this is a parallel build and serial execution, use Belos.
   // Otherwise, AztecOO will throw an error because of the serial communicator.
   // Because the N_PDS_ParMap is not guaranteed to be created for any N_LAS_MultiVector, call Epetra.
   int numProcs = ((prob.epetraObj().GetRHS())->Map()).Comm().NumProc();

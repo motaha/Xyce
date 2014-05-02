@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.14.2.2 $
+// Revision Number: $Revision: 1.19 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,57 +46,51 @@
 #ifndef N_TOP_CktNode_Ckt_h
 #define N_TOP_CktNode_Ckt_h 1
 
-// ---------- Standard Includes ----------
-
-// ----------   Xyce Includes   ----------
-
 #include <N_TOP_CktNode.h>
 
-// ---------- Forward Declarations ----------
-
-class N_TOP_CktGraph;
-
+namespace Xyce {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Class         : N_TOP_CktNode_Ckt
+// Class         : CktNode_Ckt
 // Purpose       :
 // Special Notes :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-class N_TOP_CktNode_Ckt : public N_TOP_CktNode
+class CktNode_Ckt : public CktNode
 {
 
 private:
 
   // Default constructor (private).
-  N_TOP_CktNode_Ckt() { }
+  CktNode_Ckt() { }
 
   // Assignment operator (private).
-  N_TOP_CktNode_Ckt & operator = (const N_TOP_CktNode_Ckt & right);
+  CktNode_Ckt & operator = (const CktNode_Ckt & right);
 
 public:
 
   // Constructor
-  N_TOP_CktNode_Ckt(N_TOP_CktGraph * grphPtr, const string & ID = string(""),
+  CktNode_Ckt(CktGraph * grphPtr, const std::string & ID = std::string(""),
                     const int & gID = 0,
-                    const list < int > & varGIDList = list < int > (),
-                    const list < int > & statevarGIDList = list < int > (),
-                    const list < int > & storevarGIDList = list < int > (),
+                    const std::list< int > & varGIDList = std::list< int > (),
+                    const std::list< int > & statevarGIDList = std::list< int > (),
+                    const std::list< int > & storevarGIDList = std::list< int > (),
                     const int & pNum = 0, const bool & owned = true)
     :
-    N_TOP_CktNode(ID, gID, varGIDList, statevarGIDList, storevarGIDList, pNum, owned),
+    CktNode(ID, gID, varGIDList, statevarGIDList, storevarGIDList, pNum, owned),
     cktGphPtr_(grphPtr)
     { }
 
   // Constructor
-  N_TOP_CktNode_Ckt(N_TOP_CktGraph * grphPtr, const N_TOP_NodeBlock & nb)
+  CktNode_Ckt(CktGraph * grphPtr, const NodeBlock & nb)
     :
-    N_TOP_CktNode(nb), cktGphPtr_(grphPtr)
+    CktNode(nb), cktGphPtr_(grphPtr)
     { }
 
   // Destructor
-  ~N_TOP_CktNode_Ckt() { }
+  ~CktNode_Ckt() { }
 
   int type() const { return _CNODE; }
 
@@ -111,26 +105,31 @@ public:
 private:
 
   // Pointer to the circuit graph.
-  N_TOP_CktGraph * cktGphPtr_;
+  CktGraph * cktGphPtr_;
 
 public:
 
-  ostream & put(ostream & os) const;
+  std::ostream & put(std::ostream & os) const;
 
 };
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNode_Ckt::operator=
+// Function      : CktNode_Ckt::operator=
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-inline N_TOP_CktNode_Ckt & N_TOP_CktNode_Ckt::operator = (
-  const N_TOP_CktNode_Ckt & right)
+inline CktNode_Ckt & CktNode_Ckt::operator = (
+  const CktNode_Ckt & right)
 {
   return * this;
 }
+
+} // namespace Topo
+} // namespace Xyce
+
+typedef Xyce::Topo::CktNode_Ckt N_TOP_CktNode_Ckt;
 
 #endif

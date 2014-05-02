@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -41,9 +41,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.6.6.2 $
+// Revision Number: $Revision: 1.10 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -54,30 +54,34 @@
 #else
 #include <math.h>
 #endif
+
+namespace Xyce {
+namespace Util {
+
 enum BreakpointType 
   {
     SIMPLE_BREAKPOINT,
     PAUSE_BREAKPOINT
   };
 
-class N_UTL_BreakPoint
+class BreakPoint
 {
 
  public:
   // constructors
   // default
-  N_UTL_BreakPoint () : time(0.0), type(SIMPLE_BREAKPOINT) {}
+  BreakPoint () : time(0.0), type(SIMPLE_BREAKPOINT) {}
   // from a double and type enum
-  N_UTL_BreakPoint(double t, BreakpointType ty=SIMPLE_BREAKPOINT);
+  BreakPoint(double t, BreakpointType ty=SIMPLE_BREAKPOINT);
   // copy
-  N_UTL_BreakPoint( const N_UTL_BreakPoint& right);
+  BreakPoint( const BreakPoint& right);
   // assignment operators
-  N_UTL_BreakPoint& operator= ( const N_UTL_BreakPoint& b);
-  N_UTL_BreakPoint& operator= ( const double& t);
+  BreakPoint& operator= ( const BreakPoint& b);
+  BreakPoint& operator= ( const double& t);
   // logical overloaded operators
-  inline  bool operator==(const N_UTL_BreakPoint b) const;
-  inline  bool operator<(const N_UTL_BreakPoint b) const;
-  inline  bool operator>(const N_UTL_BreakPoint b) const;
+  inline  bool operator==(const BreakPoint b) const;
+  inline  bool operator<(const BreakPoint b) const;
+  inline  bool operator>(const BreakPoint b) const;
   inline  void set(double t, BreakpointType ty);
   void set(double t, int ty);
 
@@ -93,33 +97,33 @@ class N_UTL_BreakPoint
 };
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_BreakPoint::value
+// Function      : BreakPoint::value
 // Purpose       : return the double part of a breakpoint
 // Special Notes : 
 // Scope         : public
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 04/28/2004
 //-----------------------------------------------------------------------------
-inline double N_UTL_BreakPoint::value() const
+inline double BreakPoint::value() const
 {
   return time;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_BreakPoint::bptype
+// Function      : BreakPoint::bptype
 // Purpose       : return the type of a breakpoint
 // Special Notes : 
 // Scope         : public
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 04/28/2004
 //-----------------------------------------------------------------------------
-inline BreakpointType N_UTL_BreakPoint::bptype() const
+inline BreakpointType BreakPoint::bptype() const
 {
   return type;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_BreakPoint::setBPTol
+// Function      : BreakPoint::setBPTol
 // Purpose       : Sets the static (class) variable bptol_, which 
 //                 is used in comparisons between breakpoints
 // Special Notes : 
@@ -127,13 +131,13 @@ inline BreakpointType N_UTL_BreakPoint::bptype() const
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 04/28/2004
 //-----------------------------------------------------------------------------
-inline void N_UTL_BreakPoint::setBPTol(double tol)
+inline void BreakPoint::setBPTol(double tol)
 {
   bptol_=tol;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_BreakPoint::getBPTol
+// Function      : BreakPoint::getBPTol
 // Purpose       : returns the static (class) variable bptol_, which 
 //                 is used in comparisons between breakpoints
 // Special Notes : 
@@ -141,15 +145,15 @@ inline void N_UTL_BreakPoint::setBPTol(double tol)
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 04/28/2004
 //-----------------------------------------------------------------------------
-inline double N_UTL_BreakPoint::getBPTol()
+inline double BreakPoint::getBPTol()
 {
   return bptol_;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_BreakPoint::operator==
-// Function      : N_UTL_BreakPoint::operator<
-// Function      : N_UTL_BreakPoint::operator>
+// Function      : BreakPoint::operator==
+// Function      : BreakPoint::operator<
+// Function      : BreakPoint::operator>
 // Purpose       : compares two breakpoints, using the "bptol_" as tolerance
 // Special Notes : 
 // Scope         : public
@@ -157,28 +161,34 @@ inline double N_UTL_BreakPoint::getBPTol()
 // Creation Date : 04/28/2004
 //-----------------------------------------------------------------------------
 // comparison (equality)
-inline bool N_UTL_BreakPoint::operator== (const N_UTL_BreakPoint b) const
+inline bool BreakPoint::operator== (const BreakPoint b) const
 { return (fabs(time-b.time) <= bptol_);}
 
 // comparison (less than)
-inline bool N_UTL_BreakPoint::operator< (const N_UTL_BreakPoint b) const
+inline bool BreakPoint::operator< (const BreakPoint b) const
 { return (time<b.time && b.time-time>bptol_);}
 
 // comparison (greater than)
-inline bool N_UTL_BreakPoint::operator> (const N_UTL_BreakPoint b) const
+inline bool BreakPoint::operator> (const BreakPoint b) const
 { return (time>b.time && time-b.time>bptol_);}
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_BreakPoint::set
+// Function      : BreakPoint::set
 // Purpose       : Used to set the value and type of an existing object
 // Special Notes : 
 // Scope         : public
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 04/28/2004
 //-----------------------------------------------------------------------------
-inline void N_UTL_BreakPoint::set(double t, BreakpointType ty)
+inline void BreakPoint::set(double t, BreakpointType ty)
 {
   time=t;
   type=ty;
 }
+
+} // namespace Util
+} // namespace Xyce
+
+typedef Xyce::Util::BreakPoint N_UTL_BreakPoint;
+
 #endif

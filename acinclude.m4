@@ -25,10 +25,7 @@ ac_cv_cxx_have_numeric_limits,
  AC_LANG_PUSH(C++)
  AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([[#include <limits>
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
-]],[[double e = numeric_limits<double>::epsilon(); return 0;]])],
+]],[[double e = std::numeric_limits<double>::epsilon(); return 0;]])],
  ac_cv_cxx_have_numeric_limits=yes, ac_cv_cxx_have_numeric_limits=no)
  AC_LANG_POP(C++)
 ])
@@ -49,10 +46,7 @@ ac_cv_cxx_have_cstdio,
  AC_LANG_PUSH(C++)
  AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([[#include <cstdio>
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
-]],[[char foobie[128];sprintf(foobie,"%d\n",1); return 0;]])],
+]],[[char foobie[128];std::sprintf(foobie,"%d\n",1); return 0;]])],
  ac_cv_cxx_have_cstdio=yes, ac_cv_cxx_have_cstdio=no)
  AC_LANG_POP(C++)
 ])
@@ -74,10 +68,7 @@ ac_cv_cxx_have_fenv_h,
  AC_LANG_PUSH(C++)
  AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([[#include <fenv.h>
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
-]],[[feenableexcept(FE_DIVBYZERO); return 0;]])],
+]],[[std::feenableexcept(FE_DIVBYZERO); return 0;]])],
  ac_cv_cxx_have_fenv_h=yes, ac_cv_cxx_have_fenv_h=no)
  AC_LANG_POP(C++)
 ])
@@ -99,10 +90,7 @@ ac_cv_cxx_have_algorithm,
  AC_LANG_PUSH(C++)
  AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([[#include <algorithm>
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
-]],[[int baz; baz = min(1,2); return 0;]])],
+]],[[int baz; baz = std::min(1,2); return 0;]])],
  ac_cv_cxx_have_algorithm=yes, ac_cv_cxx_have_algorithm=no)
  AC_LANG_POP(C++)
 ])
@@ -119,10 +107,7 @@ ac_cv_cxx_have_algo_h,
  AC_LANG_PUSH(C++)
  AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([[#include <algo.h>
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
-]],[[int baz; baz = min(1,2); return 0;]])],
+]],[[int baz; baz = std::min(1,2); return 0;]])],
  ac_cv_cxx_have_algo_h=yes, ac_cv_cxx_have_algo_h=no)
  AC_LANG_POP(C++)
 ])
@@ -146,10 +131,7 @@ ac_cv_cxx_need_pair_h,
  AC_LANG_PUSH(C++)
  AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([[ #include <string>
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif 
-]],[[typedef pair<string,int> NodeID]])],
+]],[[typedef std::pair<std::string,int> NodeID]])],
  ac_cv_cxx_need_pair_h=no, ac_cv_cxx_need_pair_h=yes)
  AC_LANG_POP(C++)
 ] )
@@ -189,11 +171,8 @@ ac_cv_cxx_have_stl,
  AC_COMPILE_IFELSE(
 [AC_LANG_PROGRAM([[#include <list>
 #include <deque>
-#ifdef HAVE_NAMESPACES
-using namespace std;
-#endif
-]],[[list<int> x; x.push_back(5);
-list<int>::iterator iter = x.begin(); if (iter != x.end()) ++iter; return 0;]])],
+]],[[std::list<int> x; x.push_back(5);
+std::list<int>::iterator iter = x.begin(); if (iter != x.end()) ++iter; return 0;]])],
  ac_cv_cxx_have_stl=yes, ac_cv_cxx_have_stl=no)
  AC_LANG_POP(C++)
 ])

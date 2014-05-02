@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -38,9 +38,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.3.6.2 $
+// Revision Number: $Revision: 1.6.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/26 20:16:31 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -63,7 +63,7 @@
 
 class RESHEAD
 {
-  public:
+public:
   char szLogo[64];                      // text logo
   char szSign[16];                      // signature
   char szMeshFile[128];                 // name of mesh file
@@ -79,7 +79,7 @@ class RESHEAD
 
 class XLATARRAY
 {
-  public:
+public:
   char szName[LEN_IDENT+1];             // array name
   UINT uOffset;                         // array offset
   UINT cDim;                            // number of dimensions
@@ -88,7 +88,7 @@ class XLATARRAY
 
 class XLATVAR
 {
-  public:
+public:
   char szName[LEN_IDENT+1];             // variable name
   UINT uOffset;                         // variable offset
 };
@@ -107,34 +107,34 @@ class XLATVAR
 //-----------------------------------------------------------------------------
 class DAXLATARRAY
 { private:
-    UINT cSize;               // total number of elements
-    UINT uInc;                // increment size
-    UINT cElements;           // number of elements in array
-    XLATARRAY *dynarray;      // dynamic array
+  UINT cSize;               // total number of elements
+  UINT uInc;                // increment size
+  UINT cElements;           // number of elements in array
+  XLATARRAY *dynarray;      // dynamic array
 
-    void IncSize ()
-    { if (cElements == cSize)
-      { cSize += uInc;
-        dynarray =
+  void IncSize ()
+  { if (cElements == cSize)
+    { cSize += uInc;
+      dynarray =
         (XLATARRAY *) realloc(dynarray, cSize*sizeof(XLATARRAY));
-      }
     }
+  }
 
-  public:
-    void set            (const char *,UINT ,UINT,UINT,UINT,UINT);
-    UINT GetElements ()       { return cElements;    }
-    UINT Add (XLATARRAY t)    { IncSize(); dynarray[cElements] = t;
-                                return cElements++; }
+public:
+  void set            (const char *,UINT ,UINT,UINT,UINT,UINT);
+  UINT GetElements ()       { return cElements;    }
+  UINT Add (XLATARRAY t)    { IncSize(); dynarray[cElements] = t;
+    return cElements++; }
 
-    void RemoveLast ()        { --cElements;         }
-    void Flush ()             { cElements = 0;       }
+  void RemoveLast ()        { --cElements;         }
+  void Flush ()             { cElements = 0;       }
 
-    XLATARRAY *GetPointer (UINT i) { return dynarray + i; }
-    XLATARRAY operator[]  (UINT i) { return dynarray[i];  }
+  XLATARRAY *GetPointer (UINT i) { return dynarray + i; }
+  XLATARRAY operator[]  (UINT i) { return dynarray[i];  }
 
-  public:
-     DAXLATARRAY (int numMeshPoints);
-    ~DAXLATARRAY ()                { delete [] dynarray; }
+public:
+  DAXLATARRAY (int numMeshPoints);
+  ~DAXLATARRAY ()                { delete [] dynarray; }
 };
 
 #endif // Xyce_N_DEV_SGF_INTERFACE_h

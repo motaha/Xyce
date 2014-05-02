@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.60.2.2 $
+// Revision Number: $Revision: 1.72 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:44 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -53,20 +53,17 @@
 #include <map>
 #include <vector>
 
-// ----------   Xyce Includes   ----------
-
 #include <N_UTL_Xyce.h>
+#include <N_PDS_fwd.h>
 #include <N_UTL_Packable.h>
 
-// ----------  Other Includes   ----------
-#include <Teuchos_RefCountPtr.hpp>
-using Teuchos::RefCountPtr;
+#include <Teuchos_RCP.hpp>
+using Teuchos::RCP;
 using Teuchos::rcp;
 
 // --------  Forward Declarations --------
 
 class N_PDS_ParMap;
-class N_PDS_Comm;
 class N_LAS_Vector;
 
 class Epetra_MultiVector;
@@ -105,10 +102,11 @@ public:
 
   // Constructor takes the oMultiVector and generates the aMultiVector
   N_LAS_MultiVector( Epetra_MultiVector * overlapMV, Epetra_Map& parMap, bool isOwned = true );
-
+  
   // Assignment operator
   N_LAS_MultiVector & operator=(const N_LAS_MultiVector & right);
-  // Copy consturctor
+
+  // Copy constructor
   N_LAS_MultiVector(const N_LAS_MultiVector & right);
 
   //Destructor
@@ -184,16 +182,13 @@ public:
   	const N_LAS_MultiVector & B);
 
   // Fill vector with constant value.
-  void putScalar(const double scalar);
-  void putScalarIncExt(const double scalar);
+  virtual void putScalar(const double scalar);
 
   // Add to vector with constant value.
-  void addScalar(const double scalar);
-  void addScalarIncExt(const double scalar);
+  virtual void addScalar(const double scalar);
 
   // Absolute value element-wise for vector
   void absValue(const N_LAS_MultiVector & A);
-  void absValueIncExt(const N_LAS_MultiVector & A);
 
   // Reciprocal of elements in vector
   void reciprocal(const N_LAS_MultiVector & A);
@@ -204,8 +199,8 @@ public:
   const double *& operator[] (int index) const;
 
   // Vector access function
-  RefCountPtr<const N_LAS_Vector> getVectorView(int index) const;
-  RefCountPtr<N_LAS_Vector> getNonConstVectorView(int index);
+  RCP<const N_LAS_Vector> getVectorView(int index) const;
+  RCP<N_LAS_Vector> getNonConstVectorView(int index);
 
   // Get the global (across all processors) length of the multi-vector
   int globalLength() const;
@@ -239,14 +234,10 @@ public:
   // Set for vector elements by their global index
   bool setElementByGlobalIndex(const int & global_index, const double & val,
   	const int & vec_index = 0);
-  bool setElementByGlobalIndexIncExt(const int & global_index,
-  	const double & val, const int & vec_index = 0);
 
   // Sum vector elements by their global index
   bool sumElementByGlobalIndex(const int & global_index, const double & val,
   	const int & vec_index = 0);
-  bool sumElementByGlobalIndexIncExt(const int & global_index,
-  	const double & val, const int & vec_index = 0);
 
   // Clear the external vector map
   void clearExternVectorMap() { externVectorMap_.clear(); }
@@ -255,7 +246,7 @@ public:
   	const double & value);
 
   // Print the underlying Petra object.
-  virtual void printPetraObject() const;
+  virtual void printPetraObject(std::ostream &os) const;
 
   Packable * instance() const { return new N_LAS_MultiVector(* this); }
 
@@ -265,8 +256,11 @@ public:
   void unpack(char * buf, int bsize, int & pos, N_PDS_Comm * comm);
 
   // Get the parallel map associated with this multi-vector
-  N_PDS_ParMap * pmap() { return parallelMap_; }
-  N_PDS_ParMap * omap() { return overlapMap_; }
+  N_PDS_ParMap * pmap() { return parallelMap_.get(); }
+  N_PDS_ParMap * omap() { return overlapMap_.get(); }
+
+  // Get the parallel communicator associated with this multi-vector
+  N_PDS_Comm * pdsComm() { return pdsComm_.get(); }
 
   Epetra_MultiVector & epetraObj() { return *aMultiVector_; }
 
@@ -278,13 +272,13 @@ public:
 protected:
 
   // Pointer to the multi-vector's parallel map object
-  N_PDS_ParMap * parallelMap_;
+  RCP<N_PDS_ParMap> parallelMap_;
+
+  // Parallel Map for overlapped data
+  RCP<N_PDS_ParMap> overlapMap_;
 
   // Pointer the Petra multi-vector object.
   Epetra_MultiVector * aMultiVector_;
-
-  // Parallel Map for overlapped data
-  N_PDS_ParMap * overlapMap_;
 
   // Overlapped view of multi-vector
   Epetra_MultiVector * oMultiVector_;
@@ -298,19 +292,20 @@ protected:
   // Subset View Transform
   EpetraExt::MultiVector_View * viewTransform_;
 
+  // Communicator object, if one is needed.
+  // NOTE: This communicator is only created when N_LAS_MultiVector is constructed with an Epetra_MultiVector object.
+  RCP<N_PDS_Comm> pdsComm_;
+
   // isOwned flag
   bool isOwned_;
 
 private:
 
   // Map containing extern elements from migration
-  map<int,double> externVectorMap_;
+    std::map<int,double> externVectorMap_;
 
-#ifdef Xyce_DEBUG_LINEAR
   // Process library error codes.
-  void processError(string methodMsg, int error) const;
-#endif
-
+  void processError(const char *methodMsg, int error) const;
 };
 
 //-----------------------------------------------------------------------------

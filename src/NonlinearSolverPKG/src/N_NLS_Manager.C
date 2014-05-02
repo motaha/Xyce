@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -38,7 +38,7 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.169.2.4 $
+// Revision Number: $Revision: 1.181 $
 //
 // Revision Date  : $Date $
 //
@@ -134,10 +134,10 @@ N_NLS_Manager::~N_NLS_Manager()
 // Creator       : Rich Schiek, 1437
 // Creation Date : 10/21/08
 //-----------------------------------------------------------------------------
-bool N_NLS_Manager::registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr )
+bool N_NLS_Manager::registerPkgOptionsMgr( N_IO_PkgOptionsMgr *pkgOptPtr )
 {
   pkgOptMgrPtr_ = pkgOptPtr;
-  string netListFile = "";
+  std::string netListFile = "";
   if (commandLine_.getArgumentValue("netlist") != "")
   {
     netListFile = commandLine_.getArgumentValue("netlist");
@@ -428,40 +428,40 @@ void N_NLS_Manager::usingNox_ ()
   N_UTL_OptionBlock OBtran = optionBlockMap_["transient"];
 
   // scan for changes to the dcop values of noxFlag_
-  for (list<N_UTL_Param>::const_iterator it_tpL = OBdcop.getParams().begin();
+  for (std::list<N_UTL_Param>::const_iterator it_tpL = OBdcop.getParams().begin();
        it_tpL != OBdcop.getParams().end(); ++ it_tpL)
   {
     if (it_tpL->uTag() == "NOX")
     {
-      noxFlag_ = it_tpL->iVal();
+      noxFlag_ = it_tpL->getImmutableValue<int>();
       noxFlagInner_ = noxFlag_;
     }
   }
 
   // now check for a nox flag on the .options twolevel line, if it exists.
-  map<string,N_UTL_OptionBlock>::iterator obmIter = optionBlockMap_.find("twolevel") ;
+  std::map<std::string,N_UTL_OptionBlock>::iterator obmIter = optionBlockMap_.find("twolevel") ;
   if ( obmIter != optionBlockMap_.end() )
   {
     //N_UTL_OptionBlock OBtwoLevel = optionBlockMap_["twolevel"];
     N_UTL_OptionBlock OBtwoLevel = obmIter->second;
-    for (list<N_UTL_Param>::const_iterator it_tpL = OBtwoLevel.getParams().begin();
+    for (std::list<N_UTL_Param>::const_iterator it_tpL = OBtwoLevel.getParams().begin();
 	 it_tpL != OBtwoLevel.getParams().end(); ++ it_tpL)
     {
       if (it_tpL->uTag() == "NOX")
       {
-        noxFlagInner_ = it_tpL->iVal();
+        noxFlagInner_ = it_tpL->getImmutableValue<int>();
       }
     }
   }
 
 
   // scan for changes to the transient value for noxFlagTransient_
-  for (list<N_UTL_Param>::const_iterator it_tpL = OBtran.getParams().begin();
+  for (std::list<N_UTL_Param>::const_iterator it_tpL = OBtran.getParams().begin();
        it_tpL != OBtran.getParams().end(); ++ it_tpL)
   {
     if (it_tpL->uTag() == "NOX")
     {
-      noxFlagTransient_ = it_tpL->iVal();
+      noxFlagTransient_ = it_tpL->getImmutableValue<int>();
     }
   }
 
@@ -469,12 +469,12 @@ void N_NLS_Manager::usingNox_ ()
   if ( obmIter != optionBlockMap_.end() )
   {
     N_UTL_OptionBlock OBhb= obmIter->second;
-    for (list<N_UTL_Param>::const_iterator it_tpL = OBhb.getParams().begin();
+    for (std::list<N_UTL_Param>::const_iterator it_tpL = OBhb.getParams().begin();
 	 it_tpL != OBhb.getParams().end(); ++ it_tpL)
     {
       if (it_tpL->uTag() == "NOX")
       {
-        noxFlag_ = it_tpL->iVal();
+        noxFlag_ = it_tpL->getImmutableValue<int>();
         noxFlagInner_ = noxFlag_;
       }
     }
@@ -490,18 +490,9 @@ void N_NLS_Manager::usingNox_ ()
   }
 
 #ifdef Xyce_DEBUG_NONLINEAR
-  string msg = "noxFlag is: ";
-  if (noxFlag_) msg += "TRUE";
-  else          msg += "FALSE";
-  msg += "\n";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg);
-  string msg2 = "noxFlagTransient is: ";
-  if (noxFlagTransient_) msg2 += "TRUE";
-  else          msg2 += "FALSE";
-  msg2 += "\n";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg2);
+  Xyce::dout() << "noxFlag is: " << (noxFlag_ ? "true" : "false") << std::endl
+               << "noxFlagTransient is: " <<  (noxFlagTransient_ ? "true" : "false") << std::endl;
 #endif
-
 }
 
 //-----------------------------------------------------------------------------
@@ -568,7 +559,7 @@ bool N_NLS_Manager::allocateSolver_ ()
   bs1 = nlsPtr_->registerOutputMgr (outputPtr_); bsuccess = bsuccess && bs1;
   bs1 = nlsPtr_->registerParallelMgr (pdsMgrPtr_); bsuccess = bsuccess && bs1;
 
-  map<string,N_UTL_OptionBlock>::iterator obmIter = optionBlockMap_.find("dcop") ;
+  std::map<std::string,N_UTL_OptionBlock>::iterator obmIter = optionBlockMap_.find("dcop") ;
 
   if ( obmIter != optionBlockMap_.end() )
   {
@@ -737,7 +728,7 @@ void N_NLS_Manager::allocateTranSolver()
     nlsPtr_->initializeAll();
     nlsPtr_->setReturnCodes (retCodes_);
 
-    map<string,N_UTL_OptionBlock>::iterator obmIter = optionBlockMap_.find("transient") ;
+    std::map<std::string,N_UTL_OptionBlock>::iterator obmIter = optionBlockMap_.find("transient") ;
     if ( obmIter != optionBlockMap_.end() )
     {
       //  const N_UTL_OptionBlock OB = optionBlockMap_["transient"];
@@ -897,7 +888,7 @@ int N_NLS_Manager::solve()
   if (status >= 0)
   {
     if (Teuchos::is_null(exprPtr))
-      exprPtr = Teuchos::rcp( new N_UTL_Expression (string("0")) );
+      exprPtr = Teuchos::rcp( new N_UTL_Expression (std::string("0")) );
     exprPtr->set_accepted_time();
   }
 
@@ -1115,18 +1106,26 @@ bool N_NLS_Manager::enableSensitivity ()
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 10/31/02
 //-----------------------------------------------------------------------------
-bool N_NLS_Manager::calcSensitivity ()
+bool N_NLS_Manager::calcSensitivity 
+  (
+   std::vector<double> & objectiveVec,
+   std::vector<double> & dOdpVec, 
+   std::vector<double> & dOdpAdjVec,
+   std::vector<double> & scaled_dOdpVec, 
+   std::vector<double> & scaled_dOdpAdjVec)
 {
   bool bsuccess = true;
 
   if (!setupSensFlag_)
   {
-    string msg = "Function N_NLS_Manager::calcSensitivity called,\n";
+    std::string msg = "Function N_NLS_Manager::calcSensitivity called,\n";
     msg += "but N_NLS_Manager::enableSensitivity must be called first.\n";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   }
 
-  bsuccess = nlsSensitivityPtr_->solve ();
+  bsuccess = nlsSensitivityPtr_->solve (objectiveVec, 
+      dOdpVec, dOdpAdjVec,
+      scaled_dOdpVec, scaled_dOdpAdjVec);
 
   return bsuccess;
 }
@@ -1147,7 +1146,7 @@ bool N_NLS_Manager::setupSensitivity_ ()
   nlsSensitivityPtr_ = new N_NLS_Sensitivity (*nlsPtr_, *topPtr_, commandLine_);
   bs1 = nlsSensitivityPtr_->registerParallelMgr (pdsMgrPtr_); bsuccess = bsuccess && bs1;
 
-  map<string,N_UTL_OptionBlock>::iterator obmIter = optionBlockMap_.find("sens") ;
+  std::map<std::string,N_UTL_OptionBlock>::iterator obmIter = optionBlockMap_.find("sens") ;
   if ( obmIter != optionBlockMap_.end() )
   {
     const N_UTL_OptionBlock OB = obmIter->second;
@@ -1279,9 +1278,9 @@ bool N_NLS_Manager::setNodeSetOptions (const N_UTL_OptionBlock& OB )
 // Creation Date : 03/04/06
 //-----------------------------------------------------------------------------
 bool N_NLS_Manager::obtainConductances (
-        const map<string,double> & inputMap,
-        vector<double> & outputVector,
-        vector< vector<double> > & jacobian
+        const std::map<std::string,double> & inputMap,
+        std::vector<double> & outputVector,
+        std::vector< std::vector<double> > & jacobian
     )
 {
   bool bsuccess = true;
@@ -1316,8 +1315,8 @@ void N_NLS_Manager::setMatrixFreeFlag ( bool matrixFreeFlag )
 // Creation Date : 03/04/06
 //-----------------------------------------------------------------------------
 bool N_NLS_Manager::obtainConductances (
-        const string & isoName,
-        vector< vector<double> > & jacobian )
+        const std::string & isoName,
+        std::vector< std::vector<double> > & jacobian )
 {
   bool bsuccess = true;
 

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.45.2.2 $
+// Revision Number: $Revision: 1.51 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:26 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -59,13 +59,12 @@
 using Teuchos::RefCountPtr;
 using Teuchos::rcp;
 
-// ----------   Xyce Includes   ----------
+#include <N_ANP_fwd.h>
+
 #include <N_TIA_DataStore.h>
 #include <N_TIA_StepErrorControl.h>
 #include <N_TIA_TimeIntegrationMethods.h>
 #include <N_PDS_ParMap.h>
-
-class N_ANP_OutputMgrAdapter;
 
 //-----------------------------------------------------------------------------
 // Class         : N_TIA_BackwardDifferentiation15
@@ -93,18 +92,18 @@ public:
   virtual void obtainCorrectorDeriv() {return;}
 
   // Compute an estimate of the error in the integration step (BDF1-5).
-  virtual void updateDerivsBlock(const list < index_pair > & solGIDList,
-                                 const list < index_pair > & staGIDList) {return;}
+  virtual void updateDerivsBlock(const std::list< index_pair > & solGIDList,
+                                 const std::list< index_pair > & staGIDList) {return;}
 
   // Compute an estimate of the error in the integration step (BDF1-5).
   virtual double computeErrorEstimate() { return sec.ck_*ds.WRMS_errorNorm(); }
 
   // Interpolate solution approximation at prescribed time point (BDF1-5).
   virtual bool interpolateSolution(double timepoint,
-                  N_LAS_Vector * tmpSolVectorPtr, vector <N_LAS_Vector*> & historyVec);
+                  N_LAS_Vector * tmpSolVectorPtr, std::vector<N_LAS_Vector*> & historyVec);
 
   // Interpolate MPDE solution approximation at prescribed time point (BDF1-5).
-  virtual bool interpolateMPDESolution(vector<double>& timepoint,
+  virtual bool interpolateMPDESolution(std::vector<double>& timepoint,
                   N_LAS_Vector * tmpSolVectorPtr);
   
   // Print transient output from MPDE simulation
@@ -128,7 +127,7 @@ public:
                   const double time,
 	                N_LAS_Vector * solnVecPtr,
                   const bool doNotInterpolate,
-                  const vector<double> & outputInterpolationTimes,
+                  const std::vector<double> & outputInterpolationTimes,
                   bool skipPrintLineOutput);
 
   // .SAVE output using interpolation when order is high
@@ -215,7 +214,6 @@ private:
 
   // Used to keep track of last interpolation point in printMPDEOutputSolution
   double timept_; 
-
 };
 
   // Computes the step addjustment(BDF1-5).

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.268.2.3 $
+// Revision Number: $Revision: 1.296.2.3 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -53,236 +53,212 @@
 
 // ----------   Xyce Includes   ----------
 #include <N_DEV_Const.h>
+#include <N_DEV_DeviceOptions.h>
 #include <N_DEV_Diode.h>
 #include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
-#include <N_DEV_DeviceOptions.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
 
 #include <N_LAS_Matrix.h>
 #include <N_LAS_Vector.h>
 
 namespace Xyce {
 namespace Device {
+namespace Diode {
 
-template<>
-ParametricData<Diode::Instance>::ParametricData()
+void Traits::loadInstanceParameters(ParametricData<Diode::Instance> &p)
 {
-  setNumNodes(2);
-  setNumOptionalNodes(0);
-  setNumFillNodes(0);
-  setModelRequired(1);
-  addModelType("D");
+  p.addPar ("AREA",  1.0, &Diode::Instance::Area)
+    .setCategory(CAT_GEOMETRY)
+    .setDescription("Area scaling value (scales IS, ISR, IKF, RS, CJ0, and IBV)");
 
-  // Set up double precision variables:
-  addPar ("AREA",  1.0, false,   ParameterType::NO_DEP,
-          &Diode::Instance::Area,
-          NULL,
-          U_NONE, CAT_GEOMETRY, "Area scaling value (scales IS, ISR, IKF, RS, CJ0, and IBV)");
+  p.addPar ("IC",    0.0, &Diode::Instance::InitCond)
+    .setGivenMember(&Diode::Instance::InitCondGiven)
+    .setCategory(CAT_NONE);
 
-  addPar ("IC",    0.0, false,   ParameterType::NO_DEP,
-          &Diode::Instance::InitCond,
-          &Diode::Instance::InitCondGiven,
-          STANDARD, CAT_NONE, "");
+  p.addPar ("TEMP",  0.0, &Diode::Instance::Temp)
+    .setExpressionAccess(ParameterType::TIME_DEP)
+    .setDescription("Device temperature");
 
-  addPar ("TEMP",  0.0, false, ParameterType::TIME_DEP,
-          &Diode::Instance::Temp,
-          NULL,
-          STANDARD, CAT_NONE, "");
-
-  // Set up non-double precision variables:
-  addPar ("OFF", 0, false, ParameterType::NO_DEP,
-          &Diode::Instance::off, NULL,
-          U_LOGIC, CAT_CONTROL, "Initial voltage drop across device set to zero");
-  addPar ("LAMBERTW", 0, false, ParameterType::NO_DEP,
-          &Diode::Instance::lambertWFlag, NULL,
-          U_LOGIC, CAT_CONTROL, "Option to solve diode equations with the Lambert-W function");
+  p.addPar ("OFF", 0, &Diode::Instance::off)
+    .setUnit(U_LOGIC)
+    .setCategory(CAT_CONTROL)
+    .setDescription("Initial voltage drop across device set to zero");
+  p.addPar ("LAMBERTW", 0, &Diode::Instance::lambertWFlag)
+    .setUnit(U_LOGIC)
+    .setCategory(CAT_CONTROL)
+    .setDescription("Option to solve diode equations with the Lambert-W function");
 }
 
-template<>
-ParametricData<Diode::Model>::ParametricData()
+void Traits::loadModelParameters(ParametricData<Diode::Model> &p)
 {
-  addPar ("IS", 1.0e-14, false, ParameterType::NO_DEP,
-          &Diode::Model::IS,
-          NULL,
-          U_AMP, CAT_CURRENT, "Saturation current");
+  p.addPar ("IS", 1.0e-14, &Diode::Model::IS)
+    .setUnit(U_AMP)
+    .setCategory(CAT_CURRENT)
+    .setDescription("Saturation current");
 
   // synonym for IS
-  addPar ("JS", 1.0e-14, false, ParameterType::NO_DEP,
-          &Diode::Model::IS,
-          NULL,
-          U_AMP, CAT_CURRENT, "Saturation current");
+  p.addPar ("JS", 1.0e-14, &Diode::Model::IS)
+    .setUnit(U_AMP)
+    .setCategory(CAT_CURRENT)
+    .setDescription("Saturation current");
 
-  addPar ("RS",  0.0, false, ParameterType::MIN_RES,
-          &Diode::Model::RS,
-          NULL,
-          U_OHM, CAT_RES, "Parasitic resistance");
+  p.addPar ("RS",  0.0, &Diode::Model::RS)
+    .setExpressionAccess(ParameterType::MIN_RES)
+    .setUnit(U_OHM)
+    .setCategory(CAT_RES)
+    .setDescription("Parasitic resistance");
 
-  addPar ("N",  1.0, true, ParameterType::NO_DEP,
-          &Diode::Model::N,
-          NULL,
-          U_NONE, CAT_PROCESS, "Emission coefficient");
+  p.addPar ("N",  1.0, &Diode::Model::N)
+    .setCategory(CAT_PROCESS)
+    .setOriginalValueStored(true)
+    .setDescription("Emission coefficient");
 
-  addPar ("ISR", 0.0, false, ParameterType::NO_DEP,
-          &Diode::Model::ISR,
-          NULL,
-          U_AMP, CAT_CURRENT, "Recombination current parameter (level 2)");
+  p.addPar ("ISR", 0.0, &Diode::Model::ISR)
+    .setUnit(U_AMP)
+    .setCategory(CAT_CURRENT)
+    .setDescription("Recombination current parameter (level 2)");
 
-  addPar ("NR", 2.0, false, ParameterType::NO_DEP,
-          &Diode::Model::NR,
-          NULL,
-          U_NONE, CAT_NONE, "Emission coefficient for ISR (level 2)");
+  p.addPar ("NR", 2.0, &Diode::Model::NR)
+    .setCategory(CAT_NONE)
+    .setDescription("Emission coefficient for ISR (level 2)");
 
-  addPar ("IKF", 0.0, false, ParameterType::NO_DEP,
-          &Diode::Model::IKF,
-          NULL,
-          U_AMP, CAT_CURRENT, "High-injection \"knee\" current (level 2)");
+  p.addPar ("IKF", 0.0, &Diode::Model::IKF)
+    .setUnit(U_AMP)
+    .setCategory(CAT_CURRENT)
+    .setDescription("High-injection \"knee\" current (level 2)");
 
-  addPar ("TT", 0.0, false, ParameterType::NO_DEP,
-          &Diode::Model::TT,
-          NULL,
-          U_SECOND, CAT_PROCESS, "Transit time");
+  p.addPar ("TT", 0.0, &Diode::Model::TT)
+    .setUnit(U_SECOND)
+    .setCategory(CAT_PROCESS)
+    .setDescription("Transit time");
 
-  addPar ("CJO", 0.0, false, ParameterType::MIN_CAP,
-          &Diode::Model::CJO,
-          NULL,
-          U_FARAD, CAT_CAP, "Zero-bias p-n depletion capacitance");
+  p.addPar ("CJO", 0.0, &Diode::Model::CJO)
+    .setExpressionAccess(ParameterType::MIN_CAP)
+    .setUnit(U_FARAD)
+    .setCategory(CAT_CAP)
+    .setDescription("Zero-bias p-n depletion capacitance");
 
   // synonyms for CJO
-  addPar ("CJ", 0.0, false, ParameterType::MIN_CAP,
-          &Diode::Model::CJO,
-          NULL,
-          U_FARAD, CAT_CAP, "Zero-bias p-n depletion capacitance");
-  addPar ("CJ0", 0.0, false, ParameterType::MIN_CAP,
-          &Diode::Model::CJO,
-          NULL,
-          U_FARAD, CAT_CAP, "Zero-bias p-n depletion capacitance");
+  p.addPar ("CJ", 0.0, &Diode::Model::CJO)
+    .setExpressionAccess(ParameterType::MIN_CAP)
+    .setUnit(U_FARAD)
+    .setCategory(CAT_CAP)
+    .setDescription("Zero-bias p-n depletion capacitance");
 
-  addPar ("VJ", 1.0, false, ParameterType::NO_DEP,
-          &Diode::Model::VJ,
-          NULL,
-          U_VOLT, CAT_VOLT, "Potential for p-n junction");
+  p.addPar ("CJ0", 0.0, &Diode::Model::CJO)
+    .setExpressionAccess(ParameterType::MIN_CAP)
+    .setUnit(U_FARAD)
+    .setCategory(CAT_CAP)
+    .setDescription("Zero-bias p-n depletion capacitance");
 
-  addPar ("M", 0.5, false, ParameterType::NO_DEP,
-          &Diode::Model::M,
-          NULL,
-          U_NONE, CAT_PROCESS, "Grading parameter for p-n junction");
+  p.addPar ("VJ", 1.0, &Diode::Model::VJ)
+    .setUnit(U_VOLT)
+    .setCategory(CAT_VOLT)
+    .setDescription("Potential for p-n junction");
 
-  addPar ("EG", 1.11, false, ParameterType::NO_DEP,
-          &Diode::Model::EG,
-          NULL,
-          U_EV, CAT_PROCESS, "Bandgap voltage (barrier height)");
+  p.addPar ("M", 0.5, &Diode::Model::M)
+    .setCategory(CAT_PROCESS)
+    .setDescription("Grading parameter for p-n junction");
 
-  addPar ("XTI", 3.0, false, ParameterType::NO_DEP,
-          &Diode::Model::XTI,
-          NULL,
-          U_NONE, CAT_TEMP, "IS temperature exponent");
+  p.addPar ("EG", 1.11, &Diode::Model::EG)
+    .setUnit(U_EV)
+    .setCategory(CAT_PROCESS)
+    .setDescription("Bandgap voltage (barrier height)");
 
-  addPar ("TIKF", 0.0, false, ParameterType::NO_DEP,
-          &Diode::Model::TIKF,
-          NULL,
-          U_DEGCM1, CAT_TEMP, "IKF temperature coefficient (linear) (level 2)");
+  p.addPar ("XTI", 3.0, &Diode::Model::XTI)
+    .setCategory(CAT_TEMP)
+    .setDescription("IS temperature exponent");
 
-  addPar ("TBV1", 0.0, false, ParameterType::NO_DEP,
-          &Diode::Model::TBV1,
-          NULL,
-          U_DEGCM1, CAT_TEMP, "BV temperature coefficient (linear) (level 2)");
+  p.addPar ("TIKF", 0.0, &Diode::Model::TIKF)
+    .setUnit(U_DEGCM1)
+    .setCategory(CAT_TEMP)
+    .setDescription("IKF temperature coefficient (linear) (level 2)");
 
-  addPar ("TBV2", 0.0, false, ParameterType::NO_DEP,
-          &Diode::Model::TBV2,
-          NULL,
-          U_DEGCM2, CAT_TEMP, "BV temperature coefficient (quadratic) (level 2)");
+  p.addPar ("TBV1", 0.0, &Diode::Model::TBV1)
+    .setUnit(U_DEGCM1)
+    .setCategory(CAT_TEMP)
+    .setDescription("BV temperature coefficient (linear) (level 2)");
 
-  addPar ("TRS1", 0.0, false, ParameterType::NO_DEP,
-          &Diode::Model::TRS1,
-          NULL,
-          U_DEGCM1, CAT_TEMP, "RS temperature coefficient (linear) (level 2)");
+  p.addPar ("TBV2", 0.0, &Diode::Model::TBV2)
+    .setUnit(U_DEGCM2)
+    .setCategory(CAT_TEMP)
+    .setDescription("BV temperature coefficient (quadratic) (level 2)");
 
-  addPar ("TRS2", 0.0, false, ParameterType::NO_DEP,
-          &Diode::Model::TRS2,
-          NULL,
-          U_DEGCM2, CAT_TEMP, "RS temperature coefficient (quadratic) (level 2)");
-  addPar ("FC", 0.5, false, ParameterType::NO_DEP,
-          &Diode::Model::FC,
-          NULL,
-          U_NONE, CAT_CAP, "Forward-bias depletion capacitance coefficient");
+  p.addPar ("TRS1", 0.0, &Diode::Model::TRS1)
+    .setUnit(U_DEGCM1)
+    .setCategory(CAT_TEMP)
+    .setDescription("RS temperature coefficient (linear) (level 2)");
 
-  addPar ("BV", 1E99, false, ParameterType::NO_DEP,
-          &Diode::Model::BV,
-          &Diode::Model::BVGiven,
-          U_VOLT, CAT_VOLT, "Reverse breakdown \"knee\" voltage");
+  p.addPar ("TRS2", 0.0, &Diode::Model::TRS2)
+    .setUnit(U_DEGCM2)
+    .setCategory(CAT_TEMP)
+    .setDescription("RS temperature coefficient (quadratic) (level 2)");
+
+  p.addPar ("FC", 0.5, &Diode::Model::FC)
+    .setCategory(CAT_CAP)
+    .setDescription("Forward-bias depletion capacitance coefficient");
+
+  p.addPar ("BV", 1E99, &Diode::Model::BV)
+    .setGivenMember(&Diode::Model::BVGiven)
+    .setUnit(U_VOLT)
+    .setCategory(CAT_VOLT)
+    .setDescription("Reverse breakdown \"knee\" voltage");
 
   // synonym for BV
-  addPar ("VB", 1E99, false, ParameterType::NO_DEP,
-          &Diode::Model::BV,
-          &Diode::Model::BVGiven,
-          U_VOLT, CAT_VOLT, "Reverse breakdown \"knee\" voltage");
+  p.addPar ("VB", 1E99, &Diode::Model::BV)
+    .setGivenMember(&Diode::Model::BVGiven)
+    .setUnit(U_VOLT)
+    .setCategory(CAT_VOLT)
+    .setDescription("Reverse breakdown \"knee\" voltage");
 
-  addPar ("IBV", 1.0e-3, false, ParameterType::NO_DEP,
-          &Diode::Model::IBV,
-          NULL,
-          U_AMP, CAT_CURRENT, "Reverse breakdown \"knee\" current");
+  p.addPar ("IBV", 1.0e-3, &Diode::Model::IBV)
+    .setUnit(U_AMP)
+    .setCategory(CAT_CURRENT)
+    .setDescription("Reverse breakdown \"knee\" current");
 
-  addPar ("IRF", 1.0, false, ParameterType::NO_DEP,
-          &Diode::Model::IRF,
-          NULL,
-          U_NONE, CAT_CURRENT, "Reverse current fitting factor");
+  p.addPar ("IRF", 1.0, &Diode::Model::IRF)
+    .setCategory(CAT_CURRENT)
+    .setDescription("Reverse current fitting factor");
 
-  addPar ("NBV", 1.0, false, ParameterType::NO_DEP,
-          &Diode::Model::NBV,
-          NULL,
-          U_NONE, CAT_PROCESS, "Reverse breakdown ideality factor (level 2)");
+  p.addPar ("NBV", 1.0, &Diode::Model::NBV)
+    .setCategory(CAT_PROCESS)
+    .setDescription("Reverse breakdown ideality factor (level 2)");
 
-  addPar ("IBVL", 0.0, false, ParameterType::NO_DEP,
-          &Diode::Model::IBVL,
-          NULL,
-          U_AMP, CAT_CURRENT, "Low-level reverse breakdown \"knee\" current (level 2)");
+  p.addPar ("IBVL", 0.0, &Diode::Model::IBVL)
+    .setUnit(U_AMP)
+    .setCategory(CAT_CURRENT)
+    .setDescription("Low-level reverse breakdown \"knee\" current (level 2)");
 
-  addPar ("NBVL", 1.0, false, ParameterType::NO_DEP,
-          &Diode::Model::NBVL,
-          NULL,
-          U_NONE, CAT_PROCESS, "Low-level reverse breakdown ideality factor (level 2)");
+  p.addPar ("NBVL", 1.0, &Diode::Model::NBVL)
+    .setCategory(CAT_PROCESS)
+    .setDescription("Low-level reverse breakdown ideality factor (level 2)");
 
-  addPar ("TNOM", 0.0, false, ParameterType::NO_DEP,
-          &Diode::Model::TNOM,
-          NULL,
-          STANDARD, CAT_NONE, "");
+  p.addPar ("TNOM", 0.0, &Diode::Model::TNOM)
+    .setCategory(CAT_NONE)
+    .setDescription("");
 
-  addPar ("KF", 0.0, false, ParameterType::NO_DEP,
-          &Diode::Model::KF,
-          NULL,
-          U_NONE, CAT_FLICKER, "Flicker noise coefficient");
+  p.addPar ("KF", 0.0, &Diode::Model::KF)
+    .setCategory(CAT_FLICKER)
+    .setDescription("Flicker noise coefficient");
 
-  addPar ("AF", 1.0, false, ParameterType::NO_DEP,
-          &Diode::Model::AF,
-          NULL,
-          U_NONE, CAT_FLICKER, "Flicker noise exponent");
+  p.addPar ("AF", 1.0, &Diode::Model::AF)
+    .setCategory(CAT_FLICKER)
+    .setDescription("Flicker noise exponent");
 }
 
-  namespace Diode {
-
-vector< vector<int> > Instance::jacStamp_RS;
-vector< vector<int> > Instance::jacStamp;
-
-vector<int> Instance::jacMap_RS;
-vector<int> Instance::jacMap;
-
-vector< vector<int> > Instance::jacMap2_RS;
-vector< vector<int> > Instance::jacMap2;
 
 
+std::vector< std::vector<int> > Instance::jacStamp_RS;
+std::vector< std::vector<int> > Instance::jacStamp;
 
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
+std::vector<int> Instance::jacMap_RS;
+std::vector<int> Instance::jacMap;
 
-  return parMap;
-}
-
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
+std::vector< std::vector<int> > Instance::jacMap2_RS;
+std::vector< std::vector<int> > Instance::jacMap2;
 
 //-----------------------------------------------------------------------------
 // Function      : Instance::processParams
@@ -292,7 +268,7 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Instance::processParams(string param)
+bool Instance::processParams()
 {
   updateTemperature( Temp );
   return true;
@@ -306,19 +282,17 @@ bool Instance::processParams(string param)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
-Instance::Instance(InstanceBlock & IB,
-                   Model & Miter,
-                   MatrixLoadData & mlData1,
-                   SolverState &ss1,
-                   ExternData  &ed1,
-                   DeviceOptions & do1)
-
-  : DeviceInstance(IB, mlData1, ss1, ed1, do1),
-    model_(Miter),
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock & instance_block,
+  Model &               model,
+  const FactoryBlock &  factory_block)
+  : DeviceInstance(instance_block, configuration.getInstanceParameters(), factory_block),
+    model_(model),
     off(0),
     Area(1.0),
     InitCond(0.0),
-    Temp(getDeviceOptions().temp.dVal()),
+    Temp(getDeviceOptions().temp.getImmutableValue<double>()),
     lambertWFlag(0),
     InitCondGiven(false),
     tJctPot(0.0),
@@ -406,13 +380,13 @@ Instance::Instance(InstanceBlock & IB,
   setDefaultParams ();
 
   // Set params according to instance line and constant defaults from metadata:
-  setParams (IB.params);
+  setParams (instance_block.params);
 
   // Set any non-constant parameter defaults:
   if (!given("LAMBERTW"))
     lambertWFlag = getDeviceOptions().lambertWFlag;
   if (!given("TEMP"))
-    Temp = getDeviceOptions().temp.dVal();
+    Temp = getDeviceOptions().temp.getImmutableValue<double>();
   if ( (model_.RS == 0.0) || (lambertWFlag == 1) )
     numIntVars = 0;
   if ( model_.CJO == 0.0 )
@@ -448,52 +422,23 @@ Instance::~Instance()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/20/02
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                             const vector<int> & extLIDVecRef)
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                             const std::vector<int> & extLIDVecRef)
 {
-  string msg;
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
 
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl << dashedline << endl;
-    cout << "In Instance::register LIDs\n\n";
-    cout << "name             = " << getName() << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "In Instance::register LIDs\n\n";
+    Xyce::dout() << "name             = " << getName() << std::endl;
+    Xyce::dout() << "number of internal variables: " << numIntVars << std::endl;
+    Xyce::dout() << "number of external variables: " << numExtVars << std::endl;
   }
 #endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << "number of internal variables: " << numInt << endl;
-    cout << "number of external variables: " << numExt << endl;
-  }
-#endif
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
-
-  //Test for Ohmic Resistance.  If RS=0, Pri=Pos Node
-  //-------------------------------------------------
-  if ( numInt != numIntVars )
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -516,18 +461,18 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "\nSolution and RHS variables:\n";
-    cout << "\nli_Pos = ";
-    cout.width(4);
-    cout << li_Pos << endl;
+    Xyce::dout() << "\nSolution and RHS variables:\n";
+    Xyce::dout() << "\nli_Pos = ";
+    Xyce::dout().width(4);
+    Xyce::dout() << li_Pos << std::endl;
 
-    cout << "\nli_Neg = ";
-    cout.width(4);
-    cout << li_Neg << endl;
+    Xyce::dout() << "\nli_Neg = ";
+    Xyce::dout().width(4);
+    Xyce::dout() << li_Neg << std::endl;
 
-    cout << "\nli_Pri = ";
-    cout.width(4);
-    cout << li_Pri << endl;
+    Xyce::dout() << "\nli_Pri = ";
+    Xyce::dout().width(4);
+    Xyce::dout() << li_Pri << std::endl;
 
   }
 #endif
@@ -537,8 +482,8 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "\nEnd of Instance::register LIDs\n";
-    cout << dashedline << endl;
+    Xyce::dout() << "\nEnd of Instance::register LIDs\n";
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 }
@@ -551,12 +496,12 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 05/13/05
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
-    string tmpstr;
+    std::string tmpstr;
     if ( li_Pos != li_Pri )
     {
       tmpstr = getName()+"_internal";
@@ -576,43 +521,10 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/20/02
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-  string msg;
-  int i;
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << endl;
-    cout << dashedline << endl;
-    cout << "  In Instance::registerStateLIDs\n\n";
-    cout << "  name             = " << getName() << endl;
-  }
-#endif
-
-  // Check if the size of the ID lists equals the proper # of variables.
-  int numSta = staLIDVecRef.size();
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << "  Number of State LIDs: " << numSta << endl;
-  }
-#endif
-  //-------------------------------------------------------------
-  if( numSta != numStateVars )
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
-
-  i=0;
   // copy over the global ID lists:
   staLIDVec = staLIDVecRef;
 }
@@ -626,41 +538,11 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 // Creation Date :
 //-----------------------------------------------------------------------------
 void Instance::registerStoreLIDs(
-  const vector<int> & stoLIDVecRef )
+  const std::vector<int> & stoLIDVecRef )
 {
+  AssertLIDs(stoLIDVecRef.size() == getNumStoreVars());
 
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << endl;
-    cout << dashedline << endl;
-    cout << "  In Instance::registerStoreLIDs\n\n";
-    cout << "  name             = " << getName() << endl;
-  }
-#endif
-
-  // Check if the size of the ID lists equals the proper # of variables.
-  int numSto = stoLIDVecRef.size();
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << "  Number of Store LIDs: " << numSto << endl;
-  }
-#endif
-
-  //-------------------------------------------------------------
-  if( numSto != getNumStoreVars() )
-  {
-    string msg = "Instance::registerStoreLIDs:";
-    msg += "numSto != numStoreVars";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
-
-  // copy over the global ID lists:
+// copy over the global ID lists:
   stoLIDVec = stoLIDVecRef;
   li_storevd = stoLIDVec[0];
   if( loadLeadCurrent )
@@ -671,7 +553,7 @@ void Instance::registerStoreLIDs(
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "li_storevd = " << li_storevd;
+    Xyce::dout() << "li_storevd = " << li_storevd;
   }
 #endif
 
@@ -692,9 +574,9 @@ std::map<int, std::string> & N_DEV_DiodeInstance::getStoreNameMap ()
   {
     // change subcircuitname:devicetype_deviceName to
     // devicetype:subcircuitName:deviceName
-    string modName(getName());
+    std::string modName(getName());
     spiceInternalName(modName);
-    string tmpstr;
+    std::string tmpstr;
     tmpstr = modName+":vd";
     storeNameMap[ li_storevd ] = tmpstr;
     if( loadLeadCurrent )
@@ -715,7 +597,7 @@ std::map<int, std::string> & N_DEV_DiodeInstance::getStoreNameMap ()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 9/2/02
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   if( model_.RS && (lambertWFlag != 1) )
     return jacStamp_RS;
@@ -731,11 +613,11 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 9/2/02
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
-  vector<int> map;
-  vector< vector<int> > map2;
+  std::vector<int> map;
+  std::vector< std::vector<int> > map2;
 
   if( model_.RS && (lambertWFlag != 1) )
   {
@@ -889,19 +771,6 @@ bool Instance::loadDAEFVector ()
   {
     (extData.nextStoVectorRawPtr)[li_store_dev_i] = Id;
   }
-
-
-  if( loadLeadCurrent )
-  {
-    (extData.nextStoVectorRawPtr)[li_store_dev_i] = Id;
-  }
-
-
-  if( loadLeadCurrent )
-  {
-    (extData.nextStoVectorRawPtr)[li_store_dev_i] = Id;
-  }
-
 
   return true;
 }
@@ -1143,8 +1012,8 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel>0 && getSolverState().debugTimeFlag)
   {
-    cout << "----------------------------------------------" << endl;
-    cout << "Instance::updateIntermediateVars " << getName()<<endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() << "Instance::updateIntermediateVars " << getName()<<std::endl;
   }
 #endif
 
@@ -1217,11 +1086,11 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel>0 && getSolverState().debugTimeFlag)
         {
-          cout  << "Normal exponential regime." << endl;
-          cout  << " Vd  = " << Vd << endl;
-          cout  << " Vte = " << Vte << endl;
-          cout  << " Id  = " << Id  << endl;
-          cout  << " Gd  = " << Gd  << endl;
+          Xyce::dout()  << "Normal exponential regime." << std::endl;
+          Xyce::dout()  << " Vd  = " << Vd << std::endl;
+          Xyce::dout()  << " Vte = " << Vte << std::endl;
+          Xyce::dout()  << " Id  = " << Id  << std::endl;
+          Xyce::dout()  << " Gd  = " << Gd  << std::endl;
         }
 #endif
 
@@ -1237,11 +1106,11 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel>0 && getSolverState().debugTimeFlag)
         {
-          cout  << "Linear reverse bias regime." << endl;
-          cout  << " Vd       = " << Vd << endl;
-          cout  << " tBrkdwnV = " << tBrkdwnV << endl;
-          cout  << " Id       = " << Id  << endl;
-          cout  << " Gd       = " << Gd  << endl;
+          Xyce::dout()  << "Linear reverse bias regime." << std::endl;
+          Xyce::dout()  << " Vd       = " << Vd << std::endl;
+          Xyce::dout()  << " tBrkdwnV = " << tBrkdwnV << std::endl;
+          Xyce::dout()  << " Id       = " << Id  << std::endl;
+          Xyce::dout()  << " Gd       = " << Gd  << std::endl;
         }
 #endif
       }
@@ -1269,11 +1138,11 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel>0 && getSolverState().debugTimeFlag)
         {
-          cout  << "Reverse breakdown regime." << endl;
-          cout  << " Vd       = " << Vd << endl;
-          cout  << " tBrkdwnV = " << tBrkdwnV << endl;
-          cout  << " Id       = " << Id  << endl;
-          cout  << " Gd       = " << Gd  << endl;
+          Xyce::dout()  << "Reverse breakdown regime." << std::endl;
+          Xyce::dout()  << " Vd       = " << Vd << std::endl;
+          Xyce::dout()  << " tBrkdwnV = " << tBrkdwnV << std::endl;
+          Xyce::dout()  << " Id       = " << Id  << std::endl;
+          Xyce::dout()  << " Gd       = " << Gd  << std::endl;
         }
 #endif
       }
@@ -1286,7 +1155,7 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel>0 && getSolverState().debugTimeFlag)
     {
-      cout << " Level 2 diode code " << endl;
+      Xyce::dout() << " Level 2 diode code " << std::endl;
     }
 #endif
     // Adjustment for linear portion of reverse current
@@ -1330,17 +1199,17 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel>0 && getSolverState().debugTimeFlag)
       {
-        cout  << "L2 Normal exponential regime." << endl;
-        cout  << " Vd  = " << Vd << endl;
-        cout  << " Vte = " << Vte << endl;
-        cout  << " Id  = " << Id  << endl;
-        cout  << " Irec= " << Irec  << endl;
-        cout  << " Gd  = " << Gd  << endl;
-        cout  << " Gd1 = " << Gd1 << endl;
-        cout  << " Gd2 = " << Gd2 << endl;
-        cout  << " Khi = " << Khi << endl;
-        cout  << " Kgen=" << Kgen << endl;
-        cout  << "DKgen=" <<DKgen << endl;
+        Xyce::dout()  << "L2 Normal exponential regime." << std::endl;
+        Xyce::dout()  << " Vd  = " << Vd << std::endl;
+        Xyce::dout()  << " Vte = " << Vte << std::endl;
+        Xyce::dout()  << " Id  = " << Id  << std::endl;
+        Xyce::dout()  << " Irec= " << Irec  << std::endl;
+        Xyce::dout()  << " Gd  = " << Gd  << std::endl;
+        Xyce::dout()  << " Gd1 = " << Gd1 << std::endl;
+        Xyce::dout()  << " Gd2 = " << Gd2 << std::endl;
+        Xyce::dout()  << " Khi = " << Khi << std::endl;
+        Xyce::dout()  << " Kgen=" << Kgen << std::endl;
+        Xyce::dout()  << "DKgen=" <<DKgen << std::endl;
       }
 #endif
     }
@@ -1355,11 +1224,11 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel>0 && getSolverState().debugTimeFlag)
       {
-        cout  << "L2 Linear reverse bias regime." << endl;
-        cout  << " Vd       = " << Vd << endl;
-        cout  << " tBrkdwnV = " << tBrkdwnV << endl;
-        cout  << " Id       = " << Id  << endl;
-        cout  << " Gd       = " << Gd  << endl;
+        Xyce::dout()  << "L2 Linear reverse bias regime." << std::endl;
+        Xyce::dout()  << " Vd       = " << Vd << std::endl;
+        Xyce::dout()  << " tBrkdwnV = " << tBrkdwnV << std::endl;
+        Xyce::dout()  << " Id       = " << Id  << std::endl;
+        Xyce::dout()  << " Gd       = " << Gd  << std::endl;
       }
 #endif
     }
@@ -1386,11 +1255,11 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel>0 && getSolverState().debugTimeFlag)
       {
-        cout  << "L2 Reverse breakdown regime." << endl;
-        cout  << " Vd       = " << Vd << endl;
-        cout  << " tBrkdwnV = " << tBrkdwnV << endl;
-        cout  << " Id       = " << Id  << endl;
-        cout  << " Gd       = " << Gd  << endl;
+        Xyce::dout()  << "L2 Reverse breakdown regime." << std::endl;
+        Xyce::dout()  << " Vd       = " << Vd << std::endl;
+        Xyce::dout()  << " tBrkdwnV = " << tBrkdwnV << std::endl;
+        Xyce::dout()  << " Id       = " << Id  << std::endl;
+        Xyce::dout()  << " Gd       = " << Gd  << std::endl;
       }
 #endif
     }
@@ -1431,8 +1300,8 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel>0 && getSolverState().debugTimeFlag)
     {
-      cout << "Qd = " << Qd << endl;
-      cout << "Cd = " << Qd << endl;
+      Xyce::dout() << "Qd = " << Qd << std::endl;
+      Xyce::dout() << "Cd = " << Qd << std::endl;
     }
 #endif
   }
@@ -1445,7 +1314,7 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel>0 && getSolverState().debugTimeFlag)
   {
-    cout << "----------------------------------------------" << endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
   }
 #endif
 
@@ -1643,36 +1512,36 @@ bool Instance::updateTemperature( const double & temp )
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel>0 && getSolverState().debugTimeFlag)
   {
-    cout << "----------------------------------------------" << endl;
-    cout << "Instance::UpdateTemperature" << getName() <<endl;
-    cout << " IS = " << model_.IS << endl;
-    cout << " vtnom   = " << vtnom << endl;
-    cout << " xfc     = " << xfc << endl;
-    cout << " TNOM    = " << TNOM << endl;
-    cout << " vt      = " << vt << endl;
-    cout << " fact2   = " << fact2 << endl;
-    cout << " egfet   = " << egfet << endl;
-    cout << " arg     = " << arg   << endl;
-    cout << " pbfact  = " << pbfact   << endl;
-    cout << " egfet1  = " << egfet1   << endl;
-    cout << " arg1    = " << arg1     << endl;
-    cout << " fact1   = " << fact1    << endl;
-    cout << " pbfact1 = " << pbfact1  << endl;
-    cout << " pbo     = " << pbo      << endl;
-    cout << " gmaold  = " << gmaold   << endl;
-    cout << " gmanew  = " << gmanew   << endl;
-    cout << " tJctCap = " << tJctCap  << endl;
-    cout << " tJctPot = " << tJctPot  << endl;
-    cout << " tSatCur = " << tSatCur  << endl;
-    cout << " tF1     = " << tF1      << endl;
-    cout << " tDepCap = " << tDepCap  << endl;
-    cout << " vte     = " << vte      << endl;
-    cout << " tempBV  = " << tempBV   << endl;
-    cout << " tVcrit  = " << tVcrit   << endl;
-    cout << " tRS     = " << tRS      << endl;
-    cout << " tCOND   = " << tCOND    << endl;
-    cout << " tIRF    = " << tIRF     << endl;
-    cout << " tBrkdwnV= " << tBrkdwnV << endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() << "Instance::UpdateTemperature" << getName() <<std::endl;
+    Xyce::dout() << " IS = " << model_.IS << std::endl;
+    Xyce::dout() << " vtnom   = " << vtnom << std::endl;
+    Xyce::dout() << " xfc     = " << xfc << std::endl;
+    Xyce::dout() << " TNOM    = " << TNOM << std::endl;
+    Xyce::dout() << " vt      = " << vt << std::endl;
+    Xyce::dout() << " fact2   = " << fact2 << std::endl;
+    Xyce::dout() << " egfet   = " << egfet << std::endl;
+    Xyce::dout() << " arg     = " << arg   << std::endl;
+    Xyce::dout() << " pbfact  = " << pbfact   << std::endl;
+    Xyce::dout() << " egfet1  = " << egfet1   << std::endl;
+    Xyce::dout() << " arg1    = " << arg1     << std::endl;
+    Xyce::dout() << " fact1   = " << fact1    << std::endl;
+    Xyce::dout() << " pbfact1 = " << pbfact1  << std::endl;
+    Xyce::dout() << " pbo     = " << pbo      << std::endl;
+    Xyce::dout() << " gmaold  = " << gmaold   << std::endl;
+    Xyce::dout() << " gmanew  = " << gmanew   << std::endl;
+    Xyce::dout() << " tJctCap = " << tJctCap  << std::endl;
+    Xyce::dout() << " tJctPot = " << tJctPot  << std::endl;
+    Xyce::dout() << " tSatCur = " << tSatCur  << std::endl;
+    Xyce::dout() << " tF1     = " << tF1      << std::endl;
+    Xyce::dout() << " tDepCap = " << tDepCap  << std::endl;
+    Xyce::dout() << " vte     = " << vte      << std::endl;
+    Xyce::dout() << " tempBV  = " << tempBV   << std::endl;
+    Xyce::dout() << " tVcrit  = " << tVcrit   << std::endl;
+    Xyce::dout() << " tRS     = " << tRS      << std::endl;
+    Xyce::dout() << " tCOND   = " << tCOND    << std::endl;
+    Xyce::dout() << " tIRF    = " << tIRF     << std::endl;
+    Xyce::dout() << " tBrkdwnV= " << tBrkdwnV << std::endl;
   }
 #endif
 
@@ -1708,11 +1577,11 @@ bool Instance::lambertWCurrent(double Isat, double Vte, double RS)
       if (getDeviceOptions().debugLevel > 0)
       {
       if (ierr == 0)
-      cout << "Safe LambertW return" << endl;
+      Xyce::dout() << "Safe LambertW return" << std::endl;
       else if (ierr == 1)
-      cout << "LambertW argument not in domain" << endl;
+      Xyce::dout() << "LambertW argument not in domain" << std::endl;
       else
-      cout << "Arithmetic problems with LambertW" << endl;
+      Xyce::dout() << "Arithmetic problems with LambertW" << std::endl;
       }
       #endif
 
@@ -1723,16 +1592,16 @@ bool Instance::lambertWCurrent(double Isat, double Vte, double RS)
       #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0)
       {
-      cout << "lambWArg   = " << lambWArg << endl;
-      cout << "lambWError = " << lambWError << endl;
-      cout << "Id         = " << Id << endl;
-      cout << "Gd         = " << Gd << endl;
-      cout << "Icd        = " << Icd << endl;
-      cout << "Cd         = " << Cd  << endl;
-      cout << "Qd         = " << Qd  << endl;
-      cout << "AA         = " << AA << endl;
-      cout << "XX         = " << XX << endl;
-      cout << "Using lambertwCurrent w/ capacitance" << endl;
+      Xyce::dout() << "lambWArg   = " << lambWArg << std::endl;
+      Xyce::dout() << "lambWError = " << lambWError << std::endl;
+      Xyce::dout() << "Id         = " << Id << std::endl;
+      Xyce::dout() << "Gd         = " << Gd << std::endl;
+      Xyce::dout() << "Icd        = " << Icd << std::endl;
+      Xyce::dout() << "Cd         = " << Cd  << std::endl;
+      Xyce::dout() << "Qd         = " << Qd  << std::endl;
+      Xyce::dout() << "AA         = " << AA << std::endl;
+      Xyce::dout() << "XX         = " << XX << std::endl;
+      Xyce::dout() << "Using lambertwCurrent w/ capacitance" << std::endl;
       }
       #endif
       }
@@ -1786,11 +1655,11 @@ bool Instance::lambertWLinearReverseBias(double Isat, double Vte, double RS)
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
     if (ierr == 0)
-      cout << "Safe LambertW return" << endl;
+      Xyce::dout() << "Safe LambertW return" << std::endl;
     else if (ierr == 1)
-      cout << "LambertW argument not in domain" << endl;
+      Xyce::dout() << "LambertW argument not in domain" << std::endl;
     else
-      cout << "Arithmetic problems with LambertW" << endl;
+      Xyce::dout() << "Arithmetic problems with LambertW" << std::endl;
   }
 #endif
 
@@ -1804,12 +1673,12 @@ bool Instance::lambertWLinearReverseBias(double Isat, double Vte, double RS)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "lambWArg   = " << lambWArg << endl;
-    cout << "lambWError = " << lambWError << endl;
-    cout << "lambWReturn= " << lambWReturn << endl;
-    cout << "Id         = " << Id << endl;
-    cout << "Gd         = " << Gd << endl;
-    cout << "Using lambertwReverseBias" << endl;
+    Xyce::dout() << "lambWArg   = " << lambWArg << std::endl;
+    Xyce::dout() << "lambWError = " << lambWError << std::endl;
+    Xyce::dout() << "lambWReturn= " << lambWReturn << std::endl;
+    Xyce::dout() << "Id         = " << Id << std::endl;
+    Xyce::dout() << "Gd         = " << Gd << std::endl;
+    Xyce::dout() << "Using lambertwReverseBias" << std::endl;
   }
 #endif
 
@@ -1844,11 +1713,11 @@ bool Instance::lambertWBreakdownCurrent(double Isat, double Vte, double RS)
       if (getDeviceOptions().debugLevel > 0)
       {
       if (ierr == 0)
-      cout << "Safe LambertW return" << endl;
+      Xyce::dout() << "Safe LambertW return" << std::endl;
       else if (ierr == 1)
-      cout << "LambertW argument not in domain" << endl;
+      Xyce::dout() << "LambertW argument not in domain" << std::endl;
       else
-      cout << "Arithmetic problems with LambertW" << endl;
+      Xyce::dout() << "Arithmetic problems with LambertW" << std::endl;
       }
       #endif
 
@@ -1858,16 +1727,16 @@ bool Instance::lambertWBreakdownCurrent(double Isat, double Vte, double RS)
       #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0)
       {
-      cout << "lambWArg   = " << lambWArg << endl;
-      cout << "lambWError = " << lambWError << endl;
-      cout << "Id         = " << Id << endl;
-      cout << "Gd         = " << Gd << endl;
-      cout << "Icd        = " << Icd << endl;
-      cout << "Cd         = " << Cd  << endl;
-      cout << "Qd         = " << Qd  << endl;
-      cout << "AA         = " << AA << endl;
-      cout << "XX         = " << XX << endl;
-      cout << "Using lambertwBreakdown w/ capacitance" << endl;
+      Xyce::dout() << "lambWArg   = " << lambWArg << std::endl;
+      Xyce::dout() << "lambWError = " << lambWError << std::endl;
+      Xyce::dout() << "Id         = " << Id << std::endl;
+      Xyce::dout() << "Gd         = " << Gd << std::endl;
+      Xyce::dout() << "Icd        = " << Icd << std::endl;
+      Xyce::dout() << "Cd         = " << Cd  << std::endl;
+      Xyce::dout() << "Qd         = " << Qd  << std::endl;
+      Xyce::dout() << "AA         = " << AA << std::endl;
+      Xyce::dout() << "XX         = " << XX << std::endl;
+      Xyce::dout() << "Using lambertwBreakdown w/ capacitance" << std::endl;
       }
       #endif
       }
@@ -1900,7 +1769,7 @@ bool Instance::lambertWBreakdownCurrent(double Isat, double Vte, double RS)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   //limit grading coeff
   if( M > 0.9 ) M = 0.9;
@@ -1931,12 +1800,12 @@ bool Model::processParams (string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 03/23/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1954,10 +1823,11 @@ bool Model::processInstanceParams(string param)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
-Model::Model(const ModelBlock & MB,
-             SolverState & ss1,
-             DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
     IS(1.0e-14),
     RS(0.0),
     COND(0.0),
@@ -2009,35 +1879,33 @@ Model::Model(const ModelBlock & MB,
   // Note: Level 2 only params are: ISR, NR, IKF, NBV, IBVL, NBVL, TIKF, TBV1, TBV2, TRS1, TRS2
   if (getLevel() == 1)
   {
-    string msg = "Illegal parameter(s) given for level 1 diode:";
-    int okSize = msg.size();
+    std::string bad_parameters;
+
     if (given("ISR"))
-      msg += " ISR";
+      bad_parameters += " ISR";
     if (given("NR"))
-      msg += " NR";
+      bad_parameters += " NR";
     if (given("IKF"))
-      msg += " IKF";
+      bad_parameters += " IKF";
     if (given("NBV"))
-      msg += " NBV";
+      bad_parameters += " NBV";
     if (given("IBVL"))
-      msg += " IBVL";
+      bad_parameters += " IBVL";
     if (given("NBVL"))
-      msg += " NBVL";
+      bad_parameters += " NBVL";
     if (given("TIKF"))
-      msg += " TIKF";
+      bad_parameters += " TIKF";
     if (given("TBV1"))
-      msg += " TBV1";
+      bad_parameters += " TBV1";
     if (given("TBV2"))
-      msg += " TBV2";
+      bad_parameters += " TBV2";
     if (given("TRS1"))
-      msg += " TRS1";
+      bad_parameters += " TRS1";
     if (given("TRS2"))
-      msg += " TRS2";
-    if (msg.size() > okSize)
+      bad_parameters += " TRS2";
+    if (!bad_parameters.empty())
     {
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+      UserError0(*this) << "Illegal parameter(s) given for level 1 diode:" << bad_parameters;
     }
   }
 
@@ -2055,9 +1923,9 @@ Model::Model(const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model()
 {
-  vector<Instance*>::iterator iterI;
-  vector<Instance*>::iterator firstI = instanceContainer.begin ();
-  vector<Instance*>::iterator lastI  = instanceContainer.end ();
+  std::vector<Instance*>::iterator iterI;
+  std::vector<Instance*>::iterator firstI = instanceContainer.begin ();
+  std::vector<Instance*>::iterator lastI  = instanceContainer.end ();
 
   // loop over instances:
   for (iterI = firstI; iterI != lastI; ++iterI)
@@ -2077,31 +1945,52 @@ Model::~Model()
 
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i;
-  os << endl;
-  os << "    name     getModelName()  Parameters" << endl;
+  os << std::endl;
+  os << "    name     model name  Parameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "      ";
-    os << (*iter)->getModelName();
+    os << getName();
 
-    os << endl;
-    os << "AREA   = " << (*iter)->Area << endl;
-    os << "  IC   = " << (*iter)->InitCond   << endl;
-    os << "TEMP   = " << (*iter)->Temp << endl;
-    os << " off   = " << (*iter)->off  << endl;
+    os << std::endl;
+    os << "AREA   = " << (*iter)->Area << std::endl;
+    os << "  IC   = " << (*iter)->InitCond   << std::endl;
+    os << "TEMP   = " << (*iter)->Temp << std::endl;
+    os << " off   = " << (*iter)->off  << std::endl;
 
-    os << endl;
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 //-----------------------------------------------------------------------------
 // Diode Master functions:
@@ -2119,7 +2008,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 {
   bool bsuccess = true;
 
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & di = *(*it);
 
@@ -2144,7 +2033,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 //-----------------------------------------------------------------------------
 bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  double * storeLeadF, double * storeLeadQ)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & di = *(*it);
     // load F:
@@ -2198,7 +2087,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
 //-----------------------------------------------------------------------------
 bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & di = *(*it);
 
@@ -2237,6 +2126,21 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
   return true;
 }
 
-  } // namespace Diode
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("d", 1)
+    .registerDevice("d", 2)
+    .registerModelType("d", 1)
+    .registerModelType("d", 2);
+}
+
+} // namespace Diode
 } // namespace Device
 } // namespace Xyce

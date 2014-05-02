@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.55.2.4 $
+// Revision Number: $Revision: 1.69.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/03/03 18:29:29 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,269 +46,460 @@
 #ifndef  N_UTL_PARAM_H
 #define  N_UTL_PARAM_H
 
-// ---------- Forward Declarations ----------
-
-class N_UTL_ParamData;
-class N_UTL_Expression;
-
-// ---------- Standard Includes ----------
+#include <stdexcept>
+#include <iosfwd>
 #include <string>
 #include <vector>
-#include <iosfwd>
-#ifdef HAVE_STRCASECMP
-#include <string.h>
-#endif
 
-#include <Teuchos_RefCountPtr.hpp>
-using Teuchos::RefCountPtr;
-using Teuchos::rcp;
-
-// ----------   Xyce Includes   ----------
-#include <N_UTL_Xyce.h>
+#include <N_UTL_fwd.h>
 #include <N_UTL_Misc.h>
 #include <N_UTL_Packable.h>
+#include <N_UTL_Expression.h>
 #include <N_UTL_ExpressionData.h>
+#include <N_UTL_NoCase.h>
+#include <N_UTL_Op.h>
 
-enum { STR, DBLE, INT, LNG, EXPR, BOOL, STR_VEC, INT_VEC, DBLE_VEC, DBLE_VEC_IND, COMPOSITE };
+namespace Xyce {
+namespace Util {
 
+/** 
+ * Parameter tyep enumeration.
+ *
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+ * @date   Tue Dec 17 15:02:32 2013
+ */enum { STR, DBLE, INT, LNG, EXPR, BOOL, STR_VEC, INT_VEC, DBLE_VEC, DBLE_VEC_IND, COMPOSITE };
 
-// this enum is used to define what the context of the N_UTL_Param object
-// is within the simulation for evaluation of the parameter.   For example
-// "TEMPERATURE" indicates that this N_UTL_Param object referes to the
-// current temperature defined by the simulator, and no additional
-// information is needed.  If the context is "VOLTAGE" then to evaluate the
-// N_UTL_Param object one will also need and index into the solution
-// vector.  Thus, this context tells one how to use the extIndex1 and
-// extIndex2 vars to assign a value to the N_UTL_Param object.  (two
-// indicies are needed for voltage differences.  otherwise just about
-// everything else needs only one extra index.
-//
-// One wrinkle in this is that the list of N_UTL_Param objects stores
-// I( name ), V(name) and N(name) as two sequential N_UTL_Param ojects one for the
-// I, V or N and the following one for the "name".
-// Likewise V( name1, name2 ) uses three N_UTL_Param objects, one for V
-// and two for name1 and name2.
-// These following N_UTL_Param objects which hold names are needed once to
-// find indicies but not after that.  Thus there is an enum NODE_OR_DEVICE_NAME
-// to categorize those N_UTL_Param objects that can be dropped after context
-// resolution.
+}
 
-typedef enum {
-  UNDEFINED,
-  INDEX,
-  CONSTANT,
-  TEMPERATURE,
-  FREQUENCY,
-  TIME_VAR,
-  STEP_SWEEP_VAR,
-  DC_SWEEP_VAR,
-  EXPRESSION,
-  VOLTAGE_DIFFERENCE,
-  NODE_OR_DEVICE_NAME,
-  SOLUTION_VAR,
-  STATE_VAR,
-  STORE_VAR,
-  DEVICE_PARAMETER,
-  GLOBAL_PARAMETER,
-  OBJECTIVE_FUNCTION,
-  MEASURE_FUNCTION,
-  SOLUTION_VAR_REAL,               // these are for solution variables under AC analysis where
-  SOLUTION_VAR_IMAG,               // solution is complex and could be printed as real, imaginary,
-  SOLUTION_VAR_MAG,                // magnitude, phase and Db = (20*log10(magnitude))
-  SOLUTION_VAR_PHASE,
-  SOLUTION_VAR_DB,
-  VOLTAGE_DIFFERENCE_REAL,
-  VOLTAGE_DIFFERENCE_IMAG
-} SimulatorVariableContext;
+/** 
+ * DataTypeTraits casts a C++ data type to the corresponding enumerated value.
+ *
+ * 
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+ * @date   Tue Dec 17 14:55:02 2013
+ */template<>
+ struct DataTypeTrait<std::string>
+   {
+     enum {type = Util::STR};
+ };
 
-
-// ----------   Other Includes   ----------
-
-class N_UTL_ParamData
+template<>
+struct DataTypeTrait<double>
 {
-  public:
+  enum {type = Util::DBLE};
+};
 
-    N_UTL_ParamData()
-      : tag_(string()), type_(-1), simVarContext(UNDEFINED), extIndex1(-1), extIndex2(-1) {}
+template<>
+struct DataTypeTrait<int>
+{
+  enum {type = Util::INT};
+};
 
-    N_UTL_ParamData(const string & t, const string & v)
-      : tag_(t), type_(STR), simVarContext(UNDEFINED), extIndex1(-1), extIndex2(-1)
-    {
-      vals.stringVal_ = new string(v);
-    }
-    N_UTL_ParamData(const string & t, const double & v)
-      : tag_(t), type_(DBLE), simVarContext(UNDEFINED), extIndex1(-1), extIndex2(-1)
-    {
-      vals.dbleVal_ = v;
-    }
-    N_UTL_ParamData(const string & t, const int & v)
-      : tag_(t), type_(INT), simVarContext(UNDEFINED), extIndex1(-1), extIndex2(-1)
-    {
-      vals.intVal_ = v;
-    }
-    N_UTL_ParamData(const string & t, const long & v)
-      : tag_(t), type_(LNG), simVarContext(UNDEFINED), extIndex1(-1), extIndex2(-1)
-    {
-      vals.lngVal_ = v;
-    }
-    N_UTL_ParamData(const string & t, const bool & v)
-      : tag_(t), type_(BOOL), simVarContext(UNDEFINED), extIndex1(-1), extIndex2(-1)
-    {
-      vals.boolVal_ = v;
-    }
+template<>
+struct DataTypeTrait<long>
+{
+  enum {type = Util::LNG};
+};
 
-    N_UTL_ParamData(const string & t, const vector<string> & v);
-    N_UTL_ParamData(const string & t, const vector<double> & v);
-    N_UTL_ParamData(const string & t, const vector<int> & v);
-    N_UTL_ParamData(const string & t, const N_UTL_Expression & v);
+template<>
+struct DataTypeTrait<bool>
+{
+  enum {type = Util::BOOL};
+};
 
-    ~N_UTL_ParamData();
+template<>
+struct DataTypeTrait<std::vector<std::string> >
+{
+  enum {type = Util::STR_VEC};
+};
 
-    void freeAllocatedStorage();
+template<>
+struct DataTypeTrait<std::vector<int> >
+{
+  enum {type = Util::INT_VEC};
+};
+
+template<>
+struct DataTypeTrait<std::vector<double> >
+{
+  enum {type = Util::DBLE_VEC};
+};
 
 
-    string sReturnVal;
-    string tag_;
-    int type_;
-    union
-    {
-      N_UTL_Expression *expression;
-      string * stringVal_;
-      double dbleVal_;
-      int    intVal_;
-      long   lngVal_;
-      bool   boolVal_;
-      vector <string> * stringVec_;
-      vector <double> * dbleVec_;
-      vector <int> * intVec_;
-      N_UTL_Expression * exprVal_;
-    } vals;
+template<>
+struct DataTypeTrait<Util::Expression>
+{
+  enum {type = Util::EXPR};
+};
 
-    // The simVarContext is used to determine how to evaluate
-    // the value of this parameter during the simulation.  If the
-    // context requires additional data for the evaluation (like
-    // an offset or index into a vector), that can be stored in
-    // extIndex1 or extIndex2.  For the more complex case of an expression,
-    // the additional data can be stored in the expressionDataRCP object.
-    // This keeps the categorization and evaluation of the N_UTL_Param object
-    // compact and easy to re-evaluate every time step.
-    SimulatorVariableContext simVarContext;
-    int extIndex1;
-    int extIndex2;
-    RCP<N_UTL_ExpressionData> expressionDataRCP;
-    string qualifiedParameterOrFunctionName;
-    double fixedValue;
+
+template<>
+struct DataTypeTrait<Util::Param>
+{
+  enum {type = -1};
+};
+
+namespace Util {
+
+/** 
+ * Print the parameters value to the output stream.
+ *
+ * @param os output stream
+ * @param value value to print
+ *
+ * @return output stream
+ *
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+ * @date   Tue Dec 17 14:56:12 2013
+ */
+template<class T>
+inline std::ostream &printValue(std::ostream &os, const T &value) 
+{
+  return os << value;
+}
+
+/** 
+ * Print the vector parameters value to the output stream as a comma separated list.
+ *
+ * @param os output stream
+ * @param vector vector of values to print
+ *
+ * @return output stream
+ *
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+ * @date   Tue Dec 17 14:56:12 2013
+ */
+template<class T>
+inline std::ostream &printValue(std::ostream &os, const std::vector<T> &vector) 
+{
+  for (typename std::vector<T>::const_iterator it = vector.begin(); it != vector.end(); ++it) 
+  {
+    if (it != vector.begin())
+      os << ", ";
+    os << *it;
+  }
+  
+  return os;
+}
+
+/** 
+ * Print an expressions value (current does nothing) to the output stream.
+ *
+ * 
+ * @param os output stream
+ * @param expression expression to print
+ *
+ * @return 
+ *
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+ * @date   Tue Dec 17 14:58:01 2013
+ */
+inline std::ostream &printValue(std::ostream &os, const Expression &expression)
+{
+  return os;
+}
+
+template<class T>
+class ParamData;
+
+/** 
+ * ParamData<void> is the base class for storing a parameters value.
+ *
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+ * @date   Tue Dec 17 14:58:58 2013
+ */template<>
+ class ParamData<void>
+   {
+   public:
+     ParamData()
+     {}
+
+   private:
+     ParamData(const ParamData &param_data);
+     ParamData &operator=(const ParamData &param_data);
+
+   public:
+     virtual ~ParamData()
+     {}
+
+     /** 
+      * Returns the typeid of the parameter's value.
+      *
+      * 
+      *
+      * @return 
+      *
+      * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+      * @date   Tue Dec 17 15:00:24 2013
+      */
+     virtual const std::type_info &type() const = 0;
+
+     /** 
+      * Returns the type enumeration value of the parameter's value.
+      *
+      * @return type enumeration value
+      *
+      * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+      * @date   Tue Dec 17 15:01:08 2013
+      */
+     virtual int enumType() const = 0;
+
+     /** 
+      * Return the parameter's value converted to a string.
+      *
+      * @return string of the parameter's value
+      *
+      * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+      * @date   Tue Dec 17 15:02:01 2013
+      */
+     virtual std::string stringValue() = 0;
+
+     /** 
+      * Deep copy of the parameter's value.
+      *
+      * @return copy of the parameter's value
+      *
+      * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+      * @date   Tue Dec 17 15:03:44 2013
+      */
+     virtual ParamData *clone() = 0;
+
+     /** 
+      * Returns true if the parameter's value is of the specifed type.
+      *
+      * @return true if the parameter's value is of the specifed type.
+      *
+      * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+      * @date   Tue Dec 17 15:04:29 2013
+      */
+     template <class U>
+     bool isType()
+     {
+       return typeid(U) == type();
+     }
+ };
+
+
+/** 
+ * Stores a parameter value of any type.
+ *
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+ * @date   Tue Dec 17 15:05:08 2013
+ */
+template <class T>
+class ParamData : public ParamData<void>
+{
+public:
+  ParamData()
+    : value_(),
+      enumType_(-1)
+  {}
+
+  ParamData(const T &t)
+    : enumType_(DataTypeTrait<T>::type),
+      value_(t)
+  {}
+
+  virtual ~ParamData()
+  {}
+
+private:
+  ParamData(const ParamData &param_data);
+  ParamData &operator=(const ParamData &param_data);
+
+public:
+  virtual const std::type_info &type() const
+  {
+    return typeid(T);
+  }
+
+  virtual int enumType() const
+  {
+    return enumType_;
+  }
+
+  T &getValue()
+  {
+    return value_;
+  }
+
+  const T &getValue() const
+  {
+    return value_;
+  }
+
+  virtual ParamData *clone()
+  {
+    return new ParamData(value_);
+  }
+
+  virtual std::string stringValue()
+  {
+    std::ostringstream oss;
+    printValue(oss, value_);
+    return oss.str();
+  }
+
+private:
+  int         enumType_;                      ///< Parameter's type enumeration value
+  T           value_;                         ///< Parameter's value
 };
 
 //-----------------------------------------------------------------------------
-// Class         : N_UTL_Param
+// Class         : Param
 // Purpose       :
 // Special Notes :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/10/01
 //-----------------------------------------------------------------------------
-class N_UTL_Param : public Packable
+class Param : public Packable
 {
+  friend std::ostream &operator<<(std::ostream & os, const Param & p);
+
 public:
+  Param()
+    : tag_(),
+      data_(0)
+  {}
 
-  // Default constructor.
-  N_UTL_Param();
+  template <class T>
+  Param( const std::string & t, const T & v )
+    : tag_(t),
+      data_(new ParamData<T>(v))
+  {}
 
-  // Constructors
-  N_UTL_Param(const string & t, const string & v);
-  N_UTL_Param(const string & t, const double & v);
-  N_UTL_Param(const string & t, const int & v);
-  N_UTL_Param(const string & t, const long & v);
-  N_UTL_Param(const string & t, const bool & v);
-  N_UTL_Param(const string & t, const char * v);
-  N_UTL_Param(const string & t, const vector<string> & v);
-  N_UTL_Param(const string & t, const vector<double> & v);
-  N_UTL_Param(const string & t, const vector<int> & v);
-  N_UTL_Param(const string & t, const N_UTL_Expression & v);
+  Param(const std::string & t, const char * v)
+    : tag_(t),
+      data_(new ParamData<std::string>(std::string(v)))
+  {}
 
-  // Copy constructor.
-  N_UTL_Param(N_UTL_Param const & rhsParam);
+  Param(const Param &rhsParam)
+    : tag_(rhsParam.tag_),
+      data_(rhsParam.data_ ? rhsParam.data_->clone() : 0)
+  {}
 
-  // Assignment operator.
-  N_UTL_Param & operator = (N_UTL_Param const & rhsParam);
+
+  Param &operator=(Param const & rhsParam) 
+  {
+    tag_ = rhsParam.tag_;
+    delete data_;
+    data_ = rhsParam.data_ ? rhsParam.data_->clone() : 0;
+
+    return *this;
+  }
+
+  virtual ~Param()
+  {
+    delete data_;
+  }
 
   // deepCompare -- compare TAG and Value if TAGS are the same
-  bool deepCompare(N_UTL_Param const & rhsParam) const;
+  bool deepCompare(Param const & rhsParam) const;
 
-  // Equality operator.
-  bool operator == (N_UTL_Param const & rhsParam) const;
+  bool operator==(Param const & rhsParam) const 
+  {
+    return Xyce::compare_nocase(tag_.c_str(), rhsParam.tag_.c_str()) == 0;
+  }
 
-  // None-equality operator.
-  bool operator != (N_UTL_Param const & rhsParam) const;
+  bool operator!=(Param const & rhsParam) const 
+  {
+    return Xyce::compare_nocase(tag_.c_str(), rhsParam.tag_.c_str()) != 0;
+  }
 
-  // Less-than operator.
-  bool operator < (N_UTL_Param const & rhsParam) const;
+  bool operator<(Param const & rhsParam) const 
+  {
+    return Xyce::compare_nocase(tag_.c_str(), rhsParam.tag_.c_str()) < 0;
+  }
 
-  // Greater-than operator.
-  bool operator > (N_UTL_Param const & rhsParam) const;
+  bool operator>(Param const & rhsParam) const 
+  {
+    return Xyce::compare_nocase(tag_.c_str(), rhsParam.tag_.c_str()) > 0;
+  }
 
-  // Destructor
-  virtual ~N_UTL_Param();
+  void setTag(const std::string & tag) 
+  {
+    tag_ = tag;
+  }
 
-  // Methods to set reset value.
-  N_UTL_Param & set(const string & tag, const N_UTL_Param &);
-  N_UTL_Param & set(const string & tag, const string & val);
-  N_UTL_Param & set(const string & tag, const double & val);
-  N_UTL_Param & set(const string & tag, const int & val);
-  N_UTL_Param & set(const string & tag, const long & val);
-  N_UTL_Param & set(const string & tag, const bool & val);
-  N_UTL_Param & set(const string & tag, const char * val);
-  N_UTL_Param & set(const string & tag, const vector<string> & val);
-  N_UTL_Param & set(const string & tag, const vector<double> & val);
-  N_UTL_Param & set(const string & tag, const vector<int> & val);
-  N_UTL_Param & set(const string & tag, const N_UTL_Expression & val);
+  void setVal(const Param &param)
+  {
+    delete data_;
+    data_ = param.data_->clone();
+  }
 
-  void setTag(const string & tag);
+  template <class T>
+  void setVal(const T &t) 
+  {
+    delete data_;
+    data_ = new ParamData<T>(t);
+  }
 
-  void setVal(const N_UTL_Param &);
-  void setVal(const string & val);
-  void setVal(const double & val);
-  void setVal(const int & val);
-  void setVal(const long & val);
-  void setVal(const bool & val);
-  void setVal(const char * val);
-  void setVal(const vector<string> & val);
-  void setVal(const vector<double> & val);
-  void setVal(const vector<int> & val);
-  void setVal(const N_UTL_Expression & val);
+  void setVal(const char *t) 
+  {
+    delete data_;
+    data_ = new ParamData<std::string>(std::string(t));
+  }
+
+  void setVal(const ExtendedString &t) 
+  {
+    delete data_;
+    data_ = new ParamData<std::string>(std::string(t));
+  }
+
+
+  // Methods to set value.
+  template <class T>
+  Param &set(const std::string & tag, const T &val) 
+  {
+    tag_ = tag;
+    setVal(val);
+    return *this;
+  }
+
+  template<class T>
+  T &getValue() 
+  {
+    if (data_->isType<T>())
+      return static_cast<ParamData<T> &>(*data_).getValue();
+    throw std::runtime_error("Wrong type");
+  }
+
+  template<class T>
+  const T &getValue() const 
+  {
+    if (data_->isType<T>())
+      return static_cast<ParamData<T> &>(*data_).getValue();
+    throw std::runtime_error("Wrong type");
+  }
+
+  template<class T>
+  T getImmutableValue() const;
 
   // Methods to get tag.
-  const string & tag() const;
-  const string uTag() const;
-  const string lTag() const;
+  const std::string &tag() const 
+  {
+    return tag_;
+  }
+
+  std::string uTag() const 
+  {
+    return ExtendedString( tag_ ).toUpper();
+  }
 
   // Methods to get the "val" in the desired format.
-  const string & sVal() const;
-  const double & dVal() const;
-  const int & iVal() const;
-  const long & lVal() const;
-  bool bVal() const;
-  vector<string> * sVecPtr();
-  const vector<string> & sVecVal() const;
-  vector<double> * dVecPtr();
-  const vector<double> & dVecVal() const;
-  vector<int> * iVecPtr();
-  const vector<int> & iVecVal() const;
-  N_UTL_Expression * ePtr();
-  N_UTL_Expression * ePtr() const;
-  const N_UTL_Expression & eVal() const;
+  std::string stringValue() const;
 
   // Special accessor methods.
-  const string usVal() const;
-  const string lsVal() const;
+  std::string usVal() const;
+  std::string lsVal() const;
 
-  const int & getType() const;
+  int getType() const 
+  {
+    return data_->enumType();
+  }
 
   // Method for checking if the parameter is expression valued.
   bool hasExpressionValue() const;
-
-  // Method for checking if the parameter is expression valued.
-  bool hasExpressionTag () const;
 
   // Method to check if the parameter value is enclosed in double quotes.
   bool isQuoted();
@@ -320,137 +511,70 @@ public:
   bool isBool() const;
 
   // Methods for working with time dependency of parameters.
-  void setTimeDependent( bool const& timeDependent );
+  void setTimeDependent( bool timeDependent );
   bool isTimeDependent() const;
 
-  // Method for accessing context data
-  SimulatorVariableContext getSimContext() const {return data_->simVarContext;};
-  int getExtraIndex1() const {return data_->extIndex1;};
-  int getExtraIndex2() const {return data_->extIndex2;};
-  RCP<N_UTL_ExpressionData> getExpressionDataPointer() const {return data_->expressionDataRCP;};
-  string getQualifiedParameterOrFunctionName() const {return data_->qualifiedParameterOrFunctionName; };
-  double getFixedValue() const {return data_->fixedValue; };
-
-  // method for setting context and extra data.  Only need three combinations
-  // as we figure out the context and extra data at the same time and then set it.
-  void setSimContextAndData( SimulatorVariableContext aSimContext);
-  void setSimContextAndData( SimulatorVariableContext aSimContext, int extraIndex1);
-  void setSimContextAndData( SimulatorVariableContext aSimContext, int extraIndex1, int extraIndex2 );
-  void setSimContextAndData( SimulatorVariableContext aSimContext, RCP<N_UTL_ExpressionData> expDataRcp);
-  void setSimContextAndData( SimulatorVariableContext aSimContext, string parameterName );
-  void setSimContextAndData( SimulatorVariableContext aSimContext, double aValue );
-
-  // Method for outputting for debugging
-  virtual void print();
-
   // Packing Functionality
-  virtual Packable * instance() const;
+  virtual Packable * instance() const /* override */;
 
   // Counts bytes needed to pack block.
-  virtual int packedByteCount() const;
+  virtual int packedByteCount() const /* override */;
 
   // Packs OptionBlock into char buffer using MPI_PACK.
-  virtual void pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) const;
+  virtual void pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) const /* override */;
 
   // Unpacks OptionBlock from char buffer using MPI_UNPACK.
-  virtual void unpack(char * pB, int bsize, int & pos, N_PDS_Comm * comm);
-
-  friend ostream & operator << (ostream & os, const N_UTL_Param & p);
+  virtual void unpack(char * pB, int bsize, int & pos, N_PDS_Comm * comm) /* override */;
 
 private:
-
-  // Pointer to parameter data.
-  N_UTL_ParamData * data_;
+  std::string         tag_;
+  ParamData<void> *   data_;
 };
 
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::operator==
-// Purpose       : "==" operator
-// Special Notes :
-// Scope         : public
-// Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 5/15/01
-//-----------------------------------------------------------------------------
-inline bool N_UTL_Param::operator==( N_UTL_Param const& rhsParam ) const
+inline void setParamValue(Param &param, const Param &from_param) 
 {
-#ifndef HAVE_STRCASECMP
-  return ( uTag() == rhsParam.uTag() );
-#else
-  return (
-  strcasecmp(
-  ( data_->tag_.c_str() ),
-  ( rhsParam.data_->tag_.c_str() ) )==0
-      );
-#endif
+  param.setVal(from_param);
+}
+
+inline void setParam(Param &param, const std::string &tag, const Param &from_param) 
+{
+  param.set(tag, from_param);
+}
+
+template<class T>
+inline void setParamValue(Param &param, const T &t) 
+{
+  param.setVal(t);
+}
+
+template<class T>
+inline void setParam(Param &param, const std::string &tag, const T &t) 
+{
+  param.set(tag, t);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::operator<
-// Purpose       : "<" operator
-// Special Notes :
-// Scope         : public
-// Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 5/15/01
+// Function      : hasExpressionTag
+// Purpose       : Determine if the Param value is an expression.
+// Special Notes : This checks the tag.
+// Scope         :
+// Creator       : Eric Keiter, SNL, Computational Sciences
+// Creation Date : 08/15/04
 //-----------------------------------------------------------------------------
-inline bool N_UTL_Param::operator<( N_UTL_Param const& rhsParam ) const
+inline bool hasExpressionTag(const std::string &tag)
 {
-#ifndef HAVE_STRCASECMP
-  return ( uTag() < rhsParam.uTag() );
-#else
-  return (
-    strcasecmp(
-    ( data_->tag_.c_str() ),
-    ( rhsParam.data_->tag_.c_str() ) )<0
-        );
-#endif
+  return !tag.empty() && *tag.begin() == '{' && *(tag.end() - 1) == '}';
 }
 
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::operator>
-// Purpose       : ">" operator
-// Special Notes :
-// Scope         : public
-// Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 5/15/01
-//-----------------------------------------------------------------------------
-inline bool N_UTL_Param::operator>( N_UTL_Param const& rhsParam ) const
+inline bool hasExpressionTag(const Param &param)
 {
-#ifndef HAVE_STRCASECMP
-  return ( uTag() > rhsParam.uTag() );
-#else
-  return (
-    strcasecmp(
-    ( data_->tag_.c_str() ),
-    ( rhsParam.data_->tag_.c_str() ) )>0
-        );
-#endif
+  return hasExpressionTag(param.tag());
 }
 
-//-----------------------------------------------------------------------------
-// Function      : upperTag
-// Purpose       :
-// Special Notes :
-// Scope         : Public
-// Creator       : Rob Hoekstra, SNL
-// Creation Date : 5/10/01
-//-----------------------------------------------------------------------------
-inline const string N_UTL_Param::uTag() const
-{
-  return ExtendedString( data_->tag_ ).toUpper();
-}
+} // namespace Util
+} // namespace Xyce
 
-//-----------------------------------------------------------------------------
-// Function      : lowerTag
-// Purpose       :
-// Special Notes :
-// Scope         : Public
-// Creator       : Rob Hoekstra, SNL
-// Creation Date : 5/10/01
-//-----------------------------------------------------------------------------
-inline const string N_UTL_Param::lTag() const
-{
-  return ExtendedString( data_->tag_ ).toLower();
-}
+typedef Xyce::Util::Param N_UTL_Param;
+typedef Xyce::Util::Param N_UTL_Param;
 
 #endif

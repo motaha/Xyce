@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.3.2.2 $
+// Revision Number: $Revision: 1.8.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/26 20:16:31 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -63,20 +63,11 @@ namespace Device {
 //-----------------------------------------------------------------------------
 class PDEMeshContainer
 {
+public:
+  PDEMeshContainer ();
+  ~PDEMeshContainer ();
 
-  public:
-    PDEMeshContainer ();
-    ~PDEMeshContainer ();
-
-    virtual bool initializeMesh (string & meshFileName);
-
-  protected:
-  private:
-
-  public:
-  protected:
-  private:
-
+  virtual bool initializeMesh (const std::string & meshFileName);
 };
 
 } // namespace Device

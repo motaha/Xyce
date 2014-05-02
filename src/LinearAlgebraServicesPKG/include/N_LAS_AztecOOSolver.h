@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.19.2.2 $
+// Revision Number: $Revision: 1.24 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:44 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,17 +46,10 @@
 #ifndef Xyce_N_LAS_AztecOOSolver_h
 #define Xyce_N_LAS_AztecOOSolver_h
 
-// ---------- Standard Includes ----------
-
-// ----------   Xyce Includes   ----------
 #include <Teuchos_RCP.hpp>
 #include <N_LAS_TransformTool.h>
 #include <N_UTL_fwd.h>
 #include <N_LAS_Solver.h>
-
-// ---------  Other Includes  -----------
-
-// ---------  Fwd Declares --------------
 
 class AztecOO;
 
@@ -66,7 +59,6 @@ class Ifpack_CrsRiluk;
 class Ifpack_IlukGraph;
 
 class N_LAS_Problem;
-class N_UTL_Timer;
 class N_LAS_Preconditioner;
 class N_LAS_Matrix;
 
@@ -93,7 +85,7 @@ public:
   //Control of solver options
   bool setOptions( const N_UTL_OptionBlock & OB );
   bool setDefaultOptions();
-  bool setDefaultOption( const string & option );
+  bool setDefaultOption( const std::string & option );
   bool setParam( const N_UTL_Param & param );
   bool setPreconditioner( const Teuchos::RCP<N_LAS_Preconditioner>& precond )
   { precond_ = precond; isPrecSet_ = false; return true; }

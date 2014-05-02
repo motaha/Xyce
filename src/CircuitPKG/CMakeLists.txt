@@ -14,8 +14,5 @@ set ( XYCE_INCLUDE_DIRECTORIES ${XYCE_INCLUDE_DIRECTORIES}
       ${CMAKE_CURRENT_SOURCE_DIR}/include
       CACHE INTERNAL "X_I" )
 
-
-
-
 # -- build requested libraries -----------------------------------------------
 # libxyce is created at top level.  See ${Xyce_SOURCE_DIR}/src/CMakeLists.txt 

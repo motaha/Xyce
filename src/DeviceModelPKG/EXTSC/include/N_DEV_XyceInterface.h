@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.23.2.2 $
+// Revision Number: $Revision: 1.29 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:35 $
+// Revision Date  : $Date: 2014/02/24 23:49:16 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -53,11 +53,9 @@
 #include <N_DEV_fwd.h>
 #include <N_DEV_ExternCodeInterface.h>
 #include <N_UTL_Misc.h>
+#include <N_UTL_fwd.h>
+#include <N_CIR_fwd.h>
 #include <N_IO_CmdParse.h>
-
-// ---------- Forward Declarations ----------
-class N_CIR_Xyce;
-class N_UTL_BreakPoint;
 
 class N_TIA_TimeIntInfo;
 class N_TIA_TwoLevelError;
@@ -75,23 +73,24 @@ namespace Device {
 class XyceInterface : public ExternCodeInterface
 {
   public:
-    XyceInterface (DeviceOptions & do1,
-        N_IO_CmdParse & cp,
-        string & netlist);
+    XyceInterface(
+      const DeviceOptions & do1,
+      const IO::CmdParse & cp,
+      const std::string & netlist);
 
     virtual ~XyceInterface();
 
-    bool initialize(
-#ifdef Xyce_PARALLEL_MPI
-                    N_PDS_Comm * comm = 0
-#endif
-                   );
+  private:
+    XyceInterface (const XyceInterface &right);
+
+  public:
+    bool initialize(N_PDS_Comm * comm = 0);
 
     bool simulateStep
       ( const SolverState & solState,
-        const map<string,double> & inputMap,
-        vector<double> & outputVector,
-        vector< vector<double> > & jacobian,
+        const std::map<std::string,double> & inputMap,
+        std::vector<double> & outputVector,
+        std::vector< std::vector<double> > & jacobian,
         N_TIA_TwoLevelError & tlError
       );
 
@@ -99,35 +98,29 @@ class XyceInterface : public ExternCodeInterface
     bool run ();
 
     void homotopyStepSuccess
-      (const vector<string> & paramNames,
-       const vector<double> & paramVals);
+      (const std::vector<std::string> & paramNames,
+       const std::vector<double> & paramVals);
 
     void homotopyStepFailure ();
 
     void stepSuccess (int analysis);
     void stepFailure (int analysis);
 
-    bool getBreakPoints (vector<N_UTL_BreakPoint> &breakPointTimes);
+    bool getBreakPoints (std::vector<N_UTL_BreakPoint> &breakPointTimes);
 
     bool updateStateArrays ();
     bool startTimeStep ( const N_TIA_TimeIntInfo & tiInfo );
-    bool setInternalParam (string & name, double val);
+    bool setInternalParam (std::string & name, double val);
 
     bool getInitialQnorm (N_TIA_TwoLevelError & tle);
 
-  protected:
-  private:
-    XyceInterface (const XyceInterface &right);
 
-  public:
-  protected:
   private:
 
-    string netlistFileName_;
-    N_CIR_Xyce * XycePtr_;
-    DeviceOptions & devOptions_;
-    N_IO_CmdParse & commandLine_;
-    N_IO_CmdParse tmpCmdLine_;
+    std::string                 netlistFileName_;
+    Circuit::Simulator *        XycePtr_;
+    const DeviceOptions &       devOptions_;
+    IO::CmdParse                tmpCmdLine_;
 };
 
 } // namespace Device

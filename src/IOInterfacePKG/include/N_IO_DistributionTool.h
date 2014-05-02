@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -38,9 +38,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.37.6.2 $
+// Revision Number: $Revision: 1.46.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Date  : $Date: 2014/02/26 20:42:38 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -49,8 +49,6 @@
 #ifndef N_IO_DISTRIBUTIONTOOL_H
 #define N_IO_DISTRIBUTIONTOOL_H
 
-
-//---------- Standard Includes ------------------------------------------------
 #include <vector>
 #include <string>
 
@@ -58,34 +56,30 @@
 using Teuchos::RefCountPtr;
 using Teuchos::rcp;
 
-//---------- Xyce Includes ----------------------------------------------------
+#include <N_IO_fwd.h>
+#include <N_PDS_fwd.h>
 #include <N_IO_CircuitContext.h>
 #include <N_IO_SpiceSeparatedFieldTool.h>
 
-
-//---------- Forward Declarations ---------------------------------------------
-class N_PDS_Comm;
-class N_IO_CircuitBlock;
-class N_IO_CmdParse;
-class N_IO_PkgOptionsMgr;
-
+namespace Xyce {
+namespace IO {
 
 //-----------------------------------------------------------------------------
-// Class          : N_IO_DistributionTool
+// Class          : DistributionTool
 // Purpose        : Buffers and distributes circuit blocks (and related data
 //                  such as option blocks, metadata, etc) for/during parsing.
 //-----------------------------------------------------------------------------
-class N_IO_DistributionTool
+class DistributionTool
 {
 
 public:
   // ctor
-  N_IO_DistributionTool( N_IO_CircuitBlock * cktBlk, 
-                         N_IO_CmdParse & cp, 
-                         N_PDS_Comm * pdsCommPtr );
+  DistributionTool( N_IO_CircuitBlock * cktBlk, 
+                    N_IO_CmdParse & cp, 
+                    N_PDS_Comm * pdsCommPtr );
   
   // dtor
-  ~N_IO_DistributionTool();
+  ~DistributionTool();
 
   // prepare proc 0 to distribute, others receive
   bool start();
@@ -99,23 +93,23 @@ public:
   // send circuit context to all procs
   bool circuitContext( N_IO_CircuitContext * const circuitContexts );
 
-   // stage options for tx
-  bool circuitOptions( const list<N_UTL_OptionBlock> & options );
+  // stage options for tx
+  bool circuitOptions( const std::list<N_UTL_OptionBlock> & options );
 
-void updateCircuitOptions( const list<N_UTL_OptionBlock> & updateOptionList );
+  void updateCircuitOptions( const std::list<N_UTL_OptionBlock> & updateOptionList );
 
   // Send a circuit device line to current proc
   bool circuitDeviceLine(
-   vector< N_IO_SpiceSeparatedFieldTool::StringToken > & deviceLine );
+     std::vector< N_IO_SpiceSeparatedFieldTool::StringToken > & deviceLine );
   void endDeviceLines();
 
   // change current subcircuit context after a new subcircuit is started
-  bool circuitStart( string const & subcircuitName,
-                     list<string> const & nodes,
-                     string const & prefix,
-                     vector<N_DEV_Param> const & params );
+  bool circuitStart( std::string const & subcircuitName,
+                     std::list<std::string> const & nodes,
+                     std::string const & prefix,
+                     std::vector<N_DEV_Param> const & params );
 
-  void setFileName ( string const & fileNameIn );
+  void setFileName ( std::string const & fileNameIn );
   
   // change current subcircuit context to previous context
   bool circuitEnd();
@@ -124,7 +118,7 @@ void updateCircuitOptions( const list<N_UTL_OptionBlock> & updateOptionList );
   bool done();
   
   // Method to register the package options manager
-  bool registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr );
+  bool registerPkgOptionsMgr( N_IO_PkgOptionsMgr *pkgOptPtr );
 
   
 private:
@@ -141,10 +135,10 @@ private:
 #ifdef Xyce_PARALLEL_MPI
 
   // pack subcircuit data into buffer; helper for circuitStart()
-  bool packSubcircuitData( string const & subcircuitName,
-                           list<string> const & nodes,
-                           string const & prefix,
-                           vector<N_DEV_Param> const & params );
+  bool packSubcircuitData( std::string const & subcircuitName,
+                           std::list<std::string> const & nodes,
+                           std::string const & prefix,
+                           std::vector<N_DEV_Param> const & params );
   
   // send options, metatdata, and context to all procs when able
   bool broadcastGlobalData();
@@ -157,7 +151,7 @@ private:
   
 #ifdef PMPDE
   // unpack and parse netlist lines
-  void processReceivedLines( vector<char *>& bufs, vector<int>& bufSize );
+  void processReceivedLines( std::vector<char *>& bufs, std::vector<int>& bufSize );
 #endif
   
   // send circuit context blocks to all procs
@@ -179,7 +173,7 @@ private:
   N_IO_CircuitBlock * cktBlk_;
   
   // package options manager
-  RCP<N_IO_PkgOptionsMgr> pkgOptMgrPtr_;
+  N_IO_PkgOptionsMgr *pkgOptMgrPtr_;
     
   // proc that will receive the next tx
   int currProc_;
@@ -216,10 +210,10 @@ private:
   char * charBuffer_;
   
   // subcircuit data
-  vector<string> subcircuitNames_;
-  vector< list<string> > subcircuitNodes_;
-  vector<string> subcircuitPrefixes_;
-  vector< vector<N_DEV_Param> > subcircuitParams_;
+  std::vector<std::string> subcircuitNames_;
+  std::vector< std::list<std::string> > subcircuitNodes_;
+  std::vector<std::string> subcircuitPrefixes_;
+  std::vector< std::vector<N_DEV_Param> > subcircuitParams_;
   
   // flags for managing global data
   bool circuitContextReady_;
@@ -231,13 +225,17 @@ private:
 
   // global data
   N_IO_CircuitContext * circuitContexts_;
-  list< N_UTL_OptionBlock > options_;
-//  vector< char * > metadataList_;
-  vector< string > metadataList_;
-  vector< int > metadataSizeList_;
+  std::list< Util::OptionBlock > options_;
+  std::vector< std::string > metadataList_;
+  std::vector< int > metadataSizeList_;
 
   N_IO_CmdParse & commandLine_;
-  string fileName_;
+  std::string fileName_;
 };
+
+} // namespace IO
+} // namespace Xyce
+
+typedef Xyce::IO::DistributionTool N_IO_DistributionTool;
 
 #endif //N_IO_DISTRIBUTIONTOOL_H

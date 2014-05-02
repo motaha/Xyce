@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -39,9 +39,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.19.2.2 $
+// Revision Number: $Revision: 1.42.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:39 $
+// Revision Date  : $Date: 2014/03/06 23:33:44 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -53,11 +53,14 @@
 #include <sstream>
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_Xygra.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_DeviceMaster.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Xygra.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
 
 #include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
@@ -68,8 +71,8 @@ namespace Device {
 template<>
 ParametricData<XygraCoilData>::ParametricData()
 {
-  addPar ("NAME", "COIL0", false, &XygraCoilData::name);
-  addPar ("NUMWINDINGS", 1, false, &XygraCoilData::numWindings);
+  addPar ("NAME", "COIL0", &XygraCoilData::name);
+  addPar ("NUMWINDINGS", 1, &XygraCoilData::numWindings);
 }
 
 ParametricData<XygraCoilData> &XygraCoilData::getParametricData() {
@@ -88,11 +91,10 @@ ParametricData<XygraCoilData> &XygraCoilData::getParametricData() {
 // Creation Date : 9/11/2008
 //-----------------------------------------------------------------------------
 XygraCoilData::XygraCoilData()
-  : CompositeParam(),
+  : CompositeParam(getParametricData()),
     name("coil"),
     numWindings(1)
-{
-}
+{}
 
 //-----------------------------------------------------------------------------
 // Function      : XygraCoilData::processParams
@@ -115,51 +117,30 @@ void XygraCoilData::processParams ()
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 9/11/2008
 //-----------------------------------------------------------------------------
-ostream & operator<<(ostream & os, const XygraCoilData & xcd)
+std::ostream & operator<<(std::ostream & os, const XygraCoilData & xcd)
 {
   os << " XygraCoilData for: name = " << xcd.getName() <<
     " numWindings=" << xcd.getNumWindings() <<
-    endl;
+    std::endl;
 
   return os;
 }
 #endif
 
 
-template<>
-ParametricData<Xygra::Instance>::ParametricData()
-{
-  // Set up configuration constants:
-  setNumNodes(2);  // minimum of 2.
-  setNumOptionalNodes(1000); // maximum of 1002.  Bleah.
-  setNumFillNodes(0);
-  setModelRequired(0);
-  setPrimaryParameter("");
-  addModelType("XYGRA");
-
-  addComposite("COIL", XygraCoilData::getParametricData(), &Xygra::Instance::coilDataMap);
-}
-
-template<>
-ParametricData<Xygra::Model>::ParametricData()
-{}
 
 
 namespace Xygra {
 
 
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
+void Traits::loadInstanceParameters(ParametricData<Xygra::Instance> &p)
+{
+  // Set up configuration constants:
+p.addComposite("COIL", XygraCoilData::getParametricData(), &Xygra::Instance::coilDataMap);
 }
 
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
+void Traits::loadModelParameters(ParametricData<Xygra::Model> &p)
+{}
 
 
 // Class Instance
@@ -171,7 +152,7 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Tom Russo
 // Creation Date : 8/18/2008
 //-----------------------------------------------------------------------------
-bool Instance::processParams(string param)
+bool Instance::processParams()
 {
   // If there are any time dependent parameters, set their values at for
   // the current time.
@@ -204,14 +185,13 @@ bool Instance::updateTemperature ( const double & temp)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/18/2008
 //-----------------------------------------------------------------------------
-Instance::Instance(InstanceBlock & IB,
-                   Model & Miter,
-                   MatrixLoadData & mlData1,
-                   SolverState &ss1,
-                   ExternData  &ed1,
-                   DeviceOptions & do1)
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock &         IB,
+  Model &                       Miter,
+  const FactoryBlock &          factory_block)
 
-  : DeviceInstance (IB, mlData1, ss1, ed1, do1),
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(Miter),
     t0_(0),
     t1_(0)
@@ -257,8 +237,8 @@ Instance::Instance(InstanceBlock & IB,
   if (!coilDataVec.empty())
   {
 #ifdef Xyce_DEBUG_DEVICE
-    cout << " We were given a coil spec." << endl;
-    cout << "   There were " << coilDataVec.size() << " coils." << endl;
+    Xyce::dout() << " We were given a coil spec." << std::endl;
+    Xyce::dout() << "   There were " << coilDataVec.size() << " coils." << std::endl;
 #endif
 
     // numExtVars is apparently 0 for the default device (which is never
@@ -267,9 +247,7 @@ Instance::Instance(InstanceBlock & IB,
 
     if ( numExtVars != 0 && numExtVars != coilDataVec.size()*2)
     {
-      ostringstream ost;
-      ost << "Xygra Device " << getName() << "has "<< coilDataVec.size() << " coils  and "  << numExtVars << " external nodes.  Number of external nodes should be twice number of coils." << endl;
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL,ost.str());
+      UserError0(*this) << "Xygra Device " << getName() << "has "<< coilDataVec.size() << " coils  and "  << numExtVars << " external nodes.  Number of external nodes should be twice number of coils.";
     }
 
     nCoils=coilDataVec.size();
@@ -278,7 +256,7 @@ Instance::Instance(InstanceBlock & IB,
     for ( int i = 0; i < nCoils; ++i)
     {
 #ifdef Xyce_DEBUG_DEVICE
-      cout << " Coil["<< i << "] name is " << coilDataVec[i]->getName() << ", has " << coilDataVec[i]->getNumWindings() << " windings. " << endl;
+      Xyce::dout() << " Coil["<< i << "] name is " << coilDataVec[i]->getName() << ", has " << coilDataVec[i]->getNumWindings() << " windings. " << std::endl;
 #endif // Xyce_DEBUG_DEVICE
       totalNumIntVars += coilDataVec[i]->getNumWindings() - 1;
       nWindings[i] = coilDataVec[i]->getNumWindings();
@@ -287,7 +265,7 @@ Instance::Instance(InstanceBlock & IB,
     }
 
 #ifdef Xyce_DEBUG_DEVICE
-    cout << " We would have " << totalNumIntVars << " internal vars " << endl;
+    Xyce::dout() << " We would have " << totalNumIntVars << " internal vars " << std::endl;
 #endif
   }
   else
@@ -299,11 +277,11 @@ Instance::Instance(InstanceBlock & IB,
     totalNumWindings = nCoils;
     if (nCoils*2 != numExtVars)
     {
-      ostringstream ost;
+      std::ostringstream ost;
 
       ost << "Instance::Instance:";
       ost << "Number of nodes given to device " << getName() << "is not even."
-          << endl;
+          << std::endl;
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, ost.str() );
     }
 
@@ -371,19 +349,19 @@ void Instance::setupJacStamp_()
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/18/08
 //-----------------------------------------------------------------------------
-bool Instance::setConductances(const vector< vector<double> > &cM )
+bool Instance::setConductances(const std::vector< std::vector<double> > &cM )
 {
   int numNodes = numExtVars+numIntVars;
   // Sanity check:
   if (cM.size() != numNodes)
   {
-    ostringstream ost;
+    std::ostringstream ost;
 
     ost << "Instance::setConductances:";
     ost << "  Input matrix passed to device " << getName()
         << " (" << cM.size()
         << ") does not have number of rows required by netlist specification ("
-        << numNodes << ")." << endl;
+        << numNodes << ")." << std::endl;
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, ost.str());
   }
   theConductanceMatrix_.resize(numNodes);
@@ -391,23 +369,22 @@ bool Instance::setConductances(const vector< vector<double> > &cM )
   {
     if (cM[i].size() != numNodes)
     {
-      ostringstream ost;
+      std::ostringstream ost;
 
       ost << "Instance::setConductances:";
       ost << "  row " << i << "of matrix passed to device " << getName()
           << " has " << cM[i].size()
           << " columns instead of number required by netlist specification ("
-          << numNodes << ")." << endl;
+          << numNodes << ")." << std::endl;
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, ost.str());
     }
 
 #ifdef Xyce_DEBUG_DEVICE
-    const string dashedline2 = "---------------------";
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << endl << dashedline2 << endl;
-      cout << " Device " << getName()  << " setConductances called for time " << getSolverState().currTime << endl;
-      cout << endl << dashedline2 << endl;
+      Xyce::dout() << std::endl << subsection_divider << std::endl;
+      Xyce::dout() << " Device " << getName()  << " setConductances called for time " << getSolverState().currTime << std::endl;
+      Xyce::dout() << std::endl << subsection_divider << std::endl;
     }
 #endif
 
@@ -425,10 +402,10 @@ bool Instance::setConductances(const vector< vector<double> > &cM )
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/18/08
 //-----------------------------------------------------------------------------
-bool Instance::setK(const vector< vector<double> > &kM ,
+bool Instance::setK(const std::vector< std::vector<double> > &kM ,
                     const double t)
 {
-  vector<vector<double> > * kPtr;
+  std::vector<std::vector<double> > * kPtr;
 
   // Decide which of our two K's we're setting
   if (t==0  || t == getSolverState().currTime)
@@ -448,13 +425,13 @@ bool Instance::setK(const vector< vector<double> > &kM ,
   // Sanity check:
   if (kM.size() != totalNumWindings)
   {
-    ostringstream ost;
+    std::ostringstream ost;
 
     ost << "Instance::setK:";
     ost << "  Input matrix passed to device " << getName()
         << " (" << kM.size()
         << ") does not have number of rows required by netlist specification ("
-        << totalNumWindings << ")." << endl;
+        << totalNumWindings << ")." << std::endl;
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, ost.str());
   }
 
@@ -462,13 +439,13 @@ bool Instance::setK(const vector< vector<double> > &kM ,
   {
     if (kM[i].size() != totalNumWindings)
     {
-      ostringstream ost;
+      std::ostringstream ost;
 
       ost << "Instance::setK:";
       ost << "  row " << i << "of matrix passed to device " << getName()
           << " has " << kM[i].size()
           << " columns instead of number required by netlist specification ("
-          << totalNumWindings << ")." << endl;
+          << totalNumWindings << ")." << std::endl;
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, ost.str());
     }
   }
@@ -485,12 +462,11 @@ bool Instance::setK(const vector< vector<double> > &kM ,
   }
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << endl << dashedline2 << endl;
-    cout << " Device " << getName()  << " setK called for time " << getSolverState().currTime << endl;
-    cout << endl << dashedline2 << endl;
+    Xyce::dout() << std::endl << subsection_divider << std::endl;
+    Xyce::dout() << " Device " << getName()  << " setK called for time " << getSolverState().currTime << std::endl;
+    Xyce::dout() << std::endl << subsection_divider << std::endl;
   }
 #endif
   return true;
@@ -505,7 +481,7 @@ bool Instance::setK(const vector< vector<double> > &kM ,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/18/08
 //-----------------------------------------------------------------------------
-bool Instance::getVoltages( vector< double > &nV )
+bool Instance::getVoltages( std::vector< double > &nV )
 {
   bool bsuccess=true;
   N_LAS_Vector * solVectorPtr = extData.nextSolVectorPtr;
@@ -541,7 +517,7 @@ bool Instance::getVoltages( vector< double > &nV )
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 9/15/08
 //-----------------------------------------------------------------------------
-void Instance::getCoilWindings( vector< int > &cW )
+void Instance::getCoilWindings( std::vector< int > &cW )
 {
   cW = nWindings;
   return;
@@ -556,7 +532,7 @@ void Instance::getCoilWindings( vector< int > &cW )
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 9/29/08
 //-----------------------------------------------------------------------------
-void Instance::getCoilNames( vector< string > &cN )
+void Instance::getCoilNames( std::vector< std::string > &cN )
 {
   cN = coilNames;
   return;
@@ -570,20 +546,19 @@ void Instance::getCoilNames( vector< string > &cN )
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/18/08
 //-----------------------------------------------------------------------------
-bool Instance::setSources(const vector< double > &sV,
+bool Instance::setSources(const std::vector< double > &sV,
                           const double t)
 {
   int numNodes = numExtVars + numIntVars;
 
-  vector<double> * sPtr;
+  std::vector<double> * sPtr;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << endl << dashedline2 << endl;
-    cout << " Device " << getName()  << " setSources called for time " << getSolverState().currTime << " with value t= " << t << endl;
-    cout << endl << dashedline2 << endl;
+    Xyce::dout() << std::endl << subsection_divider << std::endl;
+    Xyce::dout() << " Device " << getName()  << " setSources called for time " << getSolverState().currTime << " with value t= " << t << std::endl;
+    Xyce::dout() << std::endl << subsection_divider << std::endl;
   }
 #endif
 
@@ -595,7 +570,7 @@ bool Instance::setSources(const vector< double > &sV,
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << " setting source s0 for t=" << t << endl;
+      Xyce::dout() << " setting source s0 for t=" << t << std::endl;
     }
 #endif
   }
@@ -609,7 +584,7 @@ bool Instance::setSources(const vector< double > &sV,
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << " setting source s1 for t=" << t << endl;
+      Xyce::dout() << " setting source s1 for t=" << t << std::endl;
     }
 #endif
   }
@@ -617,13 +592,13 @@ bool Instance::setSources(const vector< double > &sV,
   // Sanity check:
   if (sV.size() != totalNumWindings)
   {
-    ostringstream ost;
+    std::ostringstream ost;
 
     ost << "Instance::setSources:";
     ost << "  Input vector passed to device " << getName()
         << " (" << sV.size()
         << ") does not have number of rows required by netlist specification ("
-        << totalNumWindings << ")." << endl;
+        << totalNumWindings << ")." << std::endl;
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, ost.str());
   }
 
@@ -664,12 +639,12 @@ void Instance::interpolateSandK_()
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
         {
-          cout << " interpolated source for t=" << getSolverState().currTime << endl;
-          cout << " source vector is: " << endl;
-          cout << " s0["<<i<<"] = " << s0_[i] << endl;
-          cout << " s1["<<i<<"] = " << s1_[i] << endl;
-          cout << " fac = " << fac << endl;
-          cout << " s["<<i<<"] = " << theSourceVector_[i] << endl;
+          Xyce::dout() << " interpolated source for t=" << getSolverState().currTime << std::endl;
+          Xyce::dout() << " source vector is: " << std::endl;
+          Xyce::dout() << " s0["<<i<<"] = " << s0_[i] << std::endl;
+          Xyce::dout() << " s1["<<i<<"] = " << s1_[i] << std::endl;
+          Xyce::dout() << " fac = " << fac << std::endl;
+          Xyce::dout() << " s["<<i<<"] = " << theSourceVector_[i] << std::endl;
         }
 #endif
       }
@@ -702,42 +677,22 @@ void Instance::interpolateSandK_()
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/18/2008
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs(const vector<int> & intLIDVecRef,
-                            const vector<int> & extLIDVecRef)
+void Instance::registerLIDs(const std::vector<int> & intLIDVecRef,
+                            const std::vector<int> & extLIDVecRef)
 {
-  string msg;
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "-------------------------------------------------------------------------"
-    "----";
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl << dashedline << endl;
-    cout << "  Instance::registerLIDs" << endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "  Instance::registerLIDs" << std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
 
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
   int numNodes = numExtVars + numIntVars;
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -794,7 +749,7 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
       {
         negNode=coilIntStart[coil]+coilWinding;
       }
-      windingNodes[globalWinding++] = pair<int,int>(posNode,negNode);
+      windingNodes[globalWinding++] = std::pair<int,int>(posNode,negNode);
     }
   }
 
@@ -803,14 +758,14 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
   {
     for (int i=0; i<numNodes; ++i)
     {
-      cout << "  li_Nodes_[" <<i << "] = " << li_Nodes_[i] << endl;
+      Xyce::dout() << "  li_Nodes_[" <<i << "] = " << li_Nodes_[i] << std::endl;
     }
 
     for (int winding=0; winding<totalNumWindings; winding++)
     {
-      cout << "Winding " << winding << " between node "
+      Xyce::dout() << "Winding " << winding << " between node "
            << windingNodes[winding].first << " and "
-           << windingNodes[winding].second << endl;
+           << windingNodes[winding].second << std::endl;
     }
   }
 #endif
@@ -818,7 +773,7 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 }
@@ -831,15 +786,15 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/18/2008
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
 
   if (intNameMap.empty() && numIntVars != 0)
   {
-    string tmpstr;
+    std::string tmpstr;
     // set up the internal name map
-    ostringstream ost;
+    std::ostringstream ost;
 
     for (int coil = 0; coil< nCoils; ++coil)
     {
@@ -871,20 +826,9 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/18/2008
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
   // copy over the global ID lists.
   staLIDVec = staLIDVecRef;
@@ -898,7 +842,7 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/18/2008
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp_;
 }
@@ -911,7 +855,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/18/2008
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
   int numNodes=numExtVars+numIntVars;
@@ -942,7 +886,7 @@ bool Instance::updatePrimaryState()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Instance::updatePrimaryState" <<endl;
+    Xyce::dout() << "Instance::updatePrimaryState" <<std::endl;
   }
 #endif
   bsuccess = updateIntermediateVars();
@@ -982,13 +926,12 @@ bool Instance::updateIntermediateVars ()
 
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
 
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "Instance::updateIntermediateVars "<<endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "Instance::updateIntermediateVars "<<std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
 
@@ -1040,7 +983,7 @@ bool Instance::updateIntermediateVars ()
     solutionVars[node] = (*solVectorPtr)[li_Nodes_[node]];
     solutionVars[node].diff(node,numNodes);
 #ifdef Xyce_DEBUG_DEVICE
-    cout << "solutionVar[" << node << "] = " << solutionVars[node] << endl;
+    Xyce::dout() << "solutionVar[" << node << "] = " << solutionVars[node] << std::endl;
 #endif
   }
 
@@ -1076,25 +1019,25 @@ bool Instance::updateIntermediateVars ()
     int posNode=windingNodes[winding].first;
     int negNode=windingNodes[winding].second;
 #ifdef Xyce_DEBUG_DEVICE
-    cout <<  "Winding " << winding << " adding " << windingCurrents[winding]
+    Xyce::dout() <<  "Winding " << winding << " adding " << windingCurrents[winding]
          << "to  contribution to node " << posNode << " and subtracting same "
-         << " from node " << negNode << endl;
+         << " from node " << negNode << std::endl;
 #endif
     fContributions[posNode] += windingCurrents[winding];
     fContributions[negNode] -= windingCurrents[winding];
   }
 
 #ifdef Xyce_DEBUG_DEVICE
-  cout << " Contributions for device " << getName() << endl;
+  Xyce::dout() << " Contributions for device " << getName() << std::endl;
   for (int node=0; node<numNodes; ++node)
   {
-    cout << "   F[" << node << "] = " << fContributions[node] << endl;
+    Xyce::dout() << "   F[" << node << "] = " << fContributions[node] << std::endl;
   }
-  cout << "Winding potential drops and currents: " << endl;
+  Xyce::dout() << "Winding potential drops and currents: " << std::endl;
   for (int winding=0; winding<totalNumWindings; ++winding)
   {
-    cout << "  dV[" << winding << "] = " << dV[winding] << endl;
-    cout << "   I[" << winding << "] = " << windingCurrents[winding] << endl;
+    Xyce::dout() << "  dV[" << winding << "] = " << dV[winding] << std::endl;
+    Xyce::dout() << "   I[" << winding << "] = " << windingCurrents[winding] << std::endl;
   }
 #endif
 
@@ -1148,13 +1091,12 @@ bool Instance::loadDAEFVector ()
   int numNodes = numExtVars+numIntVars;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
 
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "Instance::loadDAEFVector "<<endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "Instance::loadDAEFVector "<<std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
 
@@ -1162,9 +1104,9 @@ bool Instance::loadDAEFVector ()
   {
     (*daeFVecPtr)[li_Nodes_[node]] += fContributions[node].val();
 #ifdef Xyce_DEBUG_DEVICE
-    cout << "  fVec[" << node << "] += "
-         << fContributions[node].val() << endl;
-    cout << "   loaded into local ID " << li_Nodes_[node] << endl;
+    Xyce::dout() << "  fVec[" << node << "] += "
+         << fContributions[node].val() << std::endl;
+    Xyce::dout() << "   loaded into local ID " << li_Nodes_[node] << std::endl;
 #endif
   }
 
@@ -1213,13 +1155,12 @@ bool Instance::loadDAEdFdx ()
 
   int numNodes = numExtVars+numIntVars;
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
 
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "Instance::loadDAEdFdx "<<endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "Instance::loadDAEdFdx "<<std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
 
@@ -1254,8 +1195,8 @@ bool Instance::loadDAEdFdx ()
         (*dFdxMatPtr)[li_Nodes_[equ]][A_Equ_NodeOffsets_[equ][node]]
           += fContributions[equ].dx(node);
 #ifdef Xyce_DEBUG_DEVICE
-        cout << " dFdX[" << equ << "]["<<node<<"] += "
-             << fContributions[equ].dx(node) << endl;
+        Xyce::dout() << " dFdX[" << equ << "]["<<node<<"] += "
+             << fContributions[equ].dx(node) << std::endl;
 #endif
       }
     }
@@ -1287,7 +1228,7 @@ bool Instance::setIC ()
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/18/2008
 //-----------------------------------------------------------------------------
-void Instance::varTypes( vector<char> & varTypeVec )
+void Instance::varTypes( std::vector<char> & varTypeVec )
 {
   //varTypeVec.resize(1);
   //varTypeVec[0] = 'I';
@@ -1301,8 +1242,7 @@ void Instance::varTypes( vector<char> & varTypeVec )
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 9/11/2008
 //-----------------------------------------------------------------------------
-CompositeParam *Instance::constructComposite
-(string & cName, string & pName)
+CompositeParam *Instance::constructComposite(const std::string & cName, const std::string & pName)
 {
   if (cName == "COIL")
   {
@@ -1312,7 +1252,7 @@ CompositeParam *Instance::constructComposite
   }
   else
   {
-    string msg =
+    std::string msg =
       "Instance::constructComposite: unrecognized composite name: ";
     msg += cName;
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
@@ -1329,7 +1269,7 @@ CompositeParam *Instance::constructComposite
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/18/2008
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   return true;
 }
@@ -1342,12 +1282,12 @@ bool Model::processParams (string param)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/18/2008
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1365,10 +1305,11 @@ bool Model::processInstanceParams(string param)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/18/2008
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-              SolverState & ss1,
-              DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1)
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block)
 {
 
   // // Set up mapping from param names to class variables:
@@ -1406,9 +1347,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1429,26 +1370,60 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i, isize;
   isize = instanceContainer.size();
 
-  os << endl;
-  os << "Number of Xygra instances: " << isize << endl;
-  os << "    name=\t\tmodelName\tParameters" << endl;
+  os << std::endl;
+  os << "Number of Xygra instances: " << isize << std::endl;
+  os << "    name=\t\tmodelName\tParameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new DeviceMaster<Traits>(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("xygra", 1)
+    .registerModelType("xygra", 1);
 }
 
 } // namespace Xygra

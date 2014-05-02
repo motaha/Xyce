@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.7.2.2 $
+// Revision Number: $Revision: 1.12 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:50 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,49 +46,47 @@
 #ifndef N_TOP_CktGraphCreator_h
 #define N_TOP_CktGraphCreator_h 1
 
-// ---------- Standard Includes ----------
+#include <string>
+#include <list>
 
-#include<string>
-#include<list>
+#include <N_TOP_fwd.h>
+#include <N_TOP_Misc.h>
 
-// ------------ Xyce Includes ------------
-
-#include<N_UTL_Xyce.h>
-#include<N_TOP_Misc.h>
-
-// ---------- Forward Declarations ----------
-
-class N_TOP_CktGraph;
-
+namespace Xyce {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Class         : N_DEV_CktGraphCreator
+// Class         : CktGraphCreator
 // Purpose       :
 // Special Notes :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-class N_TOP_CktGraphCreator
+class CktGraphCreator
 {
 
 public:
 
   // Default constructor.
-  N_TOP_CktGraphCreator() { }
+  CktGraphCreator() { }
 
   // Copy constructor.
-  N_TOP_CktGraphCreator(const N_TOP_CktGraphCreator & right) { }
+  CktGraphCreator(const CktGraphCreator & right) { }
 
   // Destructor
-  virtual ~N_TOP_CktGraphCreator() { }
+  virtual ~CktGraphCreator() { }
 
   // Method to create a new circuit graph (abstract).
-  virtual N_TOP_CktGraph * create(const string & cgID) = 0;
+  virtual CktGraph * create(const std::string & cgID) = 0;
 
   // Method to create a new circuit graph (abstract).
-  virtual N_TOP_CktGraph * create(const string & cgID,
-                                  const list <NodeID> & nodeList) = 0;
+  virtual CktGraph * create(const std::string & cgID, const std::list<NodeID> & nodeList) = 0;
 
 };
+
+} // namespace Topo
+} // namespace Xyce
+
+typedef Xyce::Topo::CktGraphCreator N_TOP_CktGraphCreator;
 
 #endif

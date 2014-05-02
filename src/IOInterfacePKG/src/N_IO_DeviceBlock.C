@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -40,20 +40,20 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.153.2.2 $
+// Revision Number: $Revision: 1.179.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:43 $
+// Revision Date  : $Date: 2014/03/10 16:15:21 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: dgbaur $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-#include <N_UTL_Misc.h>
-
+#include <algorithm>
+#include <sstream>
 #include <iostream>
+
+#include <N_UTL_Misc.h>
 
 #ifdef HAVE_CASSERT
  #include <cassert>
@@ -61,26 +61,11 @@
  #include <assert.h>
 #endif
 
-#ifdef HAVE_ALGORITHM
-#include <algorithm>
-#else
-#ifdef HAVE_ALGO_H
-#include <algo.h>
-#else
-#error Must have either <algorithm> or <algo.h>!
-#endif
-#endif
-
-#include <sstream>
-
-#include <stdio.h>
-
-// ----------   Xyce Includes   ----------
-
 #include <N_IO_CircuitContext.h>
 #include <N_IO_CircuitMetadata.h>
 #include <N_IO_DeviceBlock.h>
 #include <N_IO_ParameterBlock.h>
+#include <N_IO_Report.h>
 
 #include <N_ERH_ErrorMgr.h>
 #include <N_TOP_NodeDevBlock.h>
@@ -90,13 +75,8 @@
 
 #include <N_DEV_SourceData.h>
 
-// ----------   Macro Definitions ---------
-
-#define RETURN_ON_FAILURE(result) \
-   if ( false == (result) )       \
-   {                              \
-      return false;               \
-   }
+namespace Xyce {
+namespace IO {
 
 //--------------------------------------------------------------------------
 // Purpose       : Constructor
@@ -107,45 +87,44 @@
 //
 // Creation Date : 09/09/2001
 //--------------------------------------------------------------------------
-N_IO_DeviceBlock::N_IO_DeviceBlock(
-  N_IO_CircuitContext & cc,
-  N_IO_CircuitMetadata & md )
+DeviceBlock::DeviceBlock(
+  CircuitContext & cc,
+  CircuitMetadata & md )
   : circuitContext_(cc),
     metadata_(md)
 {
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::N_IO_DeviceBlock
+// Function      : DeviceBlock::DeviceBlock
 // Purpose       : constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/10/2001
 //-----------------------------------------------------------------------------
-N_IO_DeviceBlock::N_IO_DeviceBlock(
-    N_IO_CircuitContext & cc,
-    N_IO_CircuitMetadata & md,
-    string const& fileName,
-    vector<N_IO_SpiceSeparatedFieldTool::StringToken> const& parsedInputLine)
+DeviceBlock::DeviceBlock(
+    CircuitContext & cc,
+    CircuitMetadata & md,
+    std::string const& fileName,
+    std::vector<SpiceSeparatedFieldTool::StringToken> const& parsedInputLine)
 : netlistFileName_(fileName),
   parsedLine_(parsedInputLine),
   subcircuitInstance_(false),
   circuitContext_(cc),
   metadata_(md),
   extracted_(false)
-{
-}
+{}
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::N_IO_DeviceBlock
+// Function      : DeviceBlock::DeviceBlock
 // Purpose       : copy constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/10/2001
 //-----------------------------------------------------------------------------
-N_IO_DeviceBlock::N_IO_DeviceBlock(N_IO_DeviceBlock const& rhsDB)
+DeviceBlock::DeviceBlock(DeviceBlock const& rhsDB)
   : netlistFileName_(rhsDB.netlistFileName_),
     parsedLine_(rhsDB.parsedLine_),
     netlistType_(rhsDB.netlistType_),
@@ -154,95 +133,78 @@ N_IO_DeviceBlock::N_IO_DeviceBlock(N_IO_DeviceBlock const& rhsDB)
     extracted_(rhsDB.extracted_),
     circuitContext_(rhsDB.circuitContext_),
     metadata_(rhsDB.metadata_)
-{
-}
+{}
+
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::N_IO_DeviceBlock
-// Purpose       : Destructor
-// Special Notes :
-// Scope         : public
-// Creator       : Lon Waters, SNL
-// Creation Date : 02/22/2001
-//-----------------------------------------------------------------------------
-N_IO_DeviceBlock::~N_IO_DeviceBlock()
-{
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::print
+// Function      : DeviceBlock::print
 // Purpose       : Output the details of a device block to standard out.
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/10/2001
 //-----------------------------------------------------------------------------
-void N_IO_DeviceBlock::print()
+void DeviceBlock::print()
 {
-  const string dashedline("-----------------------------------------------------------------------------");
-  cout << endl << dashedline << endl;
-  cout << "N_IO_DeviceBlock::print" << endl;
-  cout << endl;
-  cout << endl;
-  cout << "Device Information" << endl;
-  cout << "------------------" << endl;
-
-  cout << "device line:" << endl;
+  Xyce::dout() << std::endl << Xyce::section_divider << std::endl
+               << "Device Information" << std::endl
+               << "------------------" << std::endl
+               << "device line:" << std::endl;
   int numFields = parsedLine_.size();
   int i;
   for ( i = 0; i < numFields; ++i )
   {
-    cout << "  " << parsedLine_[i].string_;
+    Xyce::dout() << "  " << parsedLine_[i].string_;
   }
-  cout << endl;
-  cout << "  name: " << getName() << endl;
+  Xyce::dout() << std::endl;
+  Xyce::dout() << "  name: " << getName() << std::endl;
 
-  cout << "  nodes: ";
+  Xyce::dout() << "  nodes: ";
   int numNodes = getNumberOfNodes();
   for ( i = 0; i < numNodes; ++i )
   {
-    cout << "Node " << i+1 << ": ";
-    cout << getNodeValue(i) << "  ";
+    Xyce::dout() << "Node " << i+1 << ": ";
+    Xyce::dout() << getNodeValue(i) << "  ";
   }
-  cout << endl;
+  Xyce::dout() << std::endl;
 
   if ( getModelName() != "" )
   {
-    cout << "  model name: " << getModelName() << endl;
+    Xyce::dout() << "  model name: " << getModelName() << std::endl;
   }
-  cout << endl;
+  Xyce::dout() << std::endl;
 
   if ( getNumberOfInstanceParameters() > 0 )
   {
-    cout << "  Instance Parameters:" << endl;
+    Xyce::dout() << "  Instance Parameters:" << std::endl;
     size_t numParams = getNumberOfInstanceParameters();
     for ( size_t k = 0; k < numParams; ++k )
     {
-      cout << "    " << getInstanceParameter(k).uTag();
-      cout << "    " << getInstanceParameter(k).sVal();
+      Xyce::dout() << "    " << getInstanceParameter(k).uTag();
+      Xyce::dout() << "    " << getInstanceParameter(k).stringValue();
 
       if ( getInstanceParameter(k).given() )
       {
-         cout << "    given";
+         Xyce::dout() << "    given";
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
     }
-    cout << endl;
+    Xyce::dout() << std::endl;
   }
 
-  cout << endl << dashedline << endl;
-  cout << endl;
+  Xyce::dout() << std::endl << Xyce::section_divider << std::endl;
+  Xyce::dout() << std::endl;
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_DeviceBlock::clear
+// Function       : DeviceBlock::clear
 // Purpose        : Reset all attributes to their defaults.
 // Special Notes  :
 // Scope          : public
 // Creator        : Lon Waters
 // Creation Date  : 08/06/2003
 //----------------------------------------------------------------------------
-void N_IO_DeviceBlock::clear()
+void DeviceBlock::clear()
 {
   netlistFileName_ = "";
   parsedLine_.clear();
@@ -250,14 +212,11 @@ void N_IO_DeviceBlock::clear()
   subcircuitInstance_ = false;
 
   setModelName("");
-  // deviceData_.getDevBlock().params.clear();
-  // deviceData_.getNodeBlock().set_NodeList(list<tagged_param>());
-  // deviceData_.getDevBlock().bsourceFlag = false;
   deviceData_.clear();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::extractData
+// Function      : DeviceBlock::extractData
 // Purpose       : Extract the device data from parsed line. Use device
 //                 metadata to determine device type, number of nodes, etc.
 // Special Notes :
@@ -265,10 +224,8 @@ void N_IO_DeviceBlock::clear()
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/10/2001
 //-----------------------------------------------------------------------------
-bool N_IO_DeviceBlock::extractData()
+bool DeviceBlock::extractData()
 {
-  bool result;
-
   // Set the device name and netlist type.
   ExtendedString deviceName(parsedLine_[0].string_);
   deviceName.toUpper();
@@ -278,11 +235,12 @@ bool N_IO_DeviceBlock::extractData()
 
   if (!isValidDeviceType(getNetlistDeviceType()))
   {
-    string msg("Invalid device type for device ");
-    msg += deviceName + "\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-        netlistFileName_, parsedLine_[0].lineNumber_);
+    Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+      << "Invalid device type for device " << deviceName;
+    return false;
   }
+
+  bool result = false;
 
   // Invoke appropriate method to handle the rest of the line. Independent
   // sources and mutual inductances need to be handled differently than
@@ -313,6 +271,10 @@ bool N_IO_DeviceBlock::extractData()
   {
     result = extractYDeviceData();
   }
+  else if ( getNetlistDeviceType() == "U" )
+  {
+    result = extractUDeviceData();
+  } 
   else
   {
     result = extractBasicDeviceData();
@@ -320,12 +282,11 @@ bool N_IO_DeviceBlock::extractData()
 
   // Check the status and extracting device data
   // and return if something went wrong.
-  if ( false == result )
+  if ( !result )
   {
-    string msg("Incomprehensible syntax for device ");
-    msg += deviceName + "\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-        netlistFileName_, parsedLine_[0].lineNumber_);
+    Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+      << "Incomprehensible syntax for device " << deviceName;
+    return false;
   }
 
   //allows testing later to avoid "reextracting" data
@@ -339,7 +300,7 @@ bool N_IO_DeviceBlock::extractData()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::extractSubcircuitInstanceData
+// Function      : DeviceBlock::extractSubcircuitInstanceData
 // Purpose       : Extract the subcircuit instance data given on a netlist 'X'
 //                 line.
 // Special Notes :
@@ -347,7 +308,7 @@ bool N_IO_DeviceBlock::extractData()
 // Creator       : Lon Waters, SNL
 // Creation Date : 12/28/2001
 //-----------------------------------------------------------------------------
-bool N_IO_DeviceBlock::extractSubcircuitInstanceData()
+bool DeviceBlock::extractSubcircuitInstanceData()
 {
   // Set the flag indicating this device is a subcircuit instance.
   subcircuitInstance_ = true;
@@ -407,28 +368,22 @@ bool N_IO_DeviceBlock::extractSubcircuitInstanceData()
   if ( parameterPosition > 0 )
   {
     size_t i = parameterPosition;
-    N_DEV_Param parameter("","");
+    Device::Param parameter("","");
     while ( i < numFields )
     {
       fieldES =  parsedLine_[i].string_;
       fieldES.toUpper();
       if (!fieldES.possibleParam())
       {
-        string msg("Parameter name ");
-        msg += parameter.uTag();
-        msg += " contains illegal character(s)";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-            netlistFileName_, parsedLine_[i].lineNumber_);
+        Report::UserError0().at(netlistFileName_, parsedLine_[i].lineNumber_)
+          << "Parameter name " << parameter.uTag() << " contains illegal character(s)";
       }
       parameter.setTag( fieldES );
 
       if ( parsedLine_[i+1].string_ != "=" )
       {
-        string msg("Equal sign required between parameter and value in\n");
-        msg += "subcircuit parameter list for subcircuit instance ";
-        msg += getName() + "\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-            netlistFileName_, parsedLine_[i].lineNumber_);
+        Report::UserError().at(netlistFileName_, parsedLine_[i].lineNumber_)
+          << "Equal sign required between parameter and value in subcircuit parameter list for subcircuit instance " << getName();
       }
 
       i+=2; // Advance past "=" sign
@@ -450,7 +405,7 @@ bool N_IO_DeviceBlock::extractSubcircuitInstanceData()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::extractBasicDeviceData
+// Function      : DeviceBlock::extractBasicDeviceData
 // Purpose       : Extract the device data from parsedLine for devices other
 //                 than independent sources, mutual inductances and "Y" devices.
 //                 These devices are exected to have input lines of the
@@ -471,7 +426,7 @@ bool N_IO_DeviceBlock::extractSubcircuitInstanceData()
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/24/2001
 //-----------------------------------------------------------------------------
-bool N_IO_DeviceBlock::extractBasicDeviceData()
+bool DeviceBlock::extractBasicDeviceData()
 {
   bool result;
   int i, n_start, n_end, n_req, n_opt, n_fill;
@@ -484,9 +439,8 @@ bool N_IO_DeviceBlock::extractBasicDeviceData()
   // Extract the model name from parsedLine if one exists. If
   // a model name was found, find its type.
   int modelLevel, modelNamePosition;
-  string modelType;
-  bool modelFound = extractModelName( modelType, modelLevel,
-                                      modelNamePosition );
+  std::string modelType;
+  bool modelFound = extractModelName( modelType, modelLevel, modelNamePosition );
   if (!modelFound)
     modelLevel = -1;
 
@@ -495,23 +449,21 @@ bool N_IO_DeviceBlock::extractBasicDeviceData()
 
   if (metadata_.isModelRequired(getNetlistDeviceType(), modelLevel) && !modelFound)
   {
-    string msg("Did not find required model for device ");
-    msg += getName() + "\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-        netlistFileName_, parsedLine_[0].lineNumber_);
+    Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+      << "Did not find required model for device " << getName();
+    return false;
   }
 
-  string netlistModelType("");
+  std::string netlistModelType("");
   if ( modelFound && modelNamePosition < numFields)
   {
     // Query the metadata for the validity of the device model.
     if (!metadata_.isModelTypeValid(getNetlistDeviceType(), modelType, modelLevel))
     {
-      string msg("Model type \"" + modelType + "\" not valid for");
-      msg += " device " + getName() + " of type " + getNetlistDeviceType();
-      msg += "\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-          netlistFileName_, parsedLine_[modelNamePosition].lineNumber_);
+      Report::UserError().at(netlistFileName_, parsedLine_[modelNamePosition].lineNumber_)
+        << "Model type \"" << modelType << "\" not valid for device "
+        << getName() << " of type " << getNetlistDeviceType();
+      return false;
     }
 
     netlistModelType = modelType;
@@ -524,13 +476,14 @@ bool N_IO_DeviceBlock::extractBasicDeviceData()
 
   // Extract the device nodes from parsedLine_.
   result = extractNodes(modelLevel, modelNamePosition);
-  RETURN_ON_FAILURE(result);
+  if (!result)
+    return result;
 
   // Process optional nodes
   n_req = metadata_.getNumberOfNodes(getNetlistDeviceType(), modelLevel);
   int nodesFound = n_req;
   n_opt = metadata_.getNumberOfOptionalNodes(getNetlistDeviceType(), modelLevel);
-  string primaryDeviceParameter(
+  std::string primaryDeviceParameter(
     metadata_.getPrimaryParameter(getNetlistDeviceType(), modelLevel));
 
   if (n_opt > 0)
@@ -569,7 +522,7 @@ bool N_IO_DeviceBlock::extractBasicDeviceData()
 
   // Check for value field and set position of start of instance
   // parameters on the line.
-  N_DEV_Param primaryParameter( "", "" );
+  Device::Param primaryParameter( "", "" );
   int parameterStartPosition;
   if ( primaryDeviceParameter != "" )
   {
@@ -604,13 +557,13 @@ bool N_IO_DeviceBlock::extractBasicDeviceData()
                        parsedLine_[getNumberOfNodes()+1+offsetUntaggedParamAfterModel].string_ );
 
         // The value field must either be a valid number or an expression.
-        if (primaryParameter.getType() == STR && !primaryParameter.isNumeric())
+        if (primaryParameter.getType() == Xyce::Util::STR && !primaryParameter.isNumeric())
         {
-          ExtendedString p_orig(primaryParameter.sVal());
+          ExtendedString p_orig(primaryParameter.stringValue());
           p_orig.toUpper();
           if (p_orig.possibleParam())
           {
-            primaryParameter.setVal(string("{" + p_orig + "}"));
+            primaryParameter.setVal(std::string("{" + p_orig + "}"));
             if (!circuitContext_.resolveParameter(primaryParameter))
               primaryParameter.setVal(p_orig);
           }
@@ -618,10 +571,8 @@ bool N_IO_DeviceBlock::extractBasicDeviceData()
         if ( !primaryParameter.isNumeric() &&
              !primaryParameter.hasExpressionValue() )
         {
-          string msg("Illegal value found for device ");
-          msg += getName() + "\n";
-          N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-              netlistFileName_, parsedLine_[getNumberOfNodes()+1+offsetUntaggedParamAfterModel].lineNumber_);
+          Report::UserError().at(netlistFileName_, parsedLine_[getNumberOfNodes()+1+offsetUntaggedParamAfterModel].lineNumber_)
+            << "Illegal value found for device " <<  getName();
         }
 
         if ( modelFound )
@@ -641,11 +592,8 @@ bool N_IO_DeviceBlock::extractBasicDeviceData()
     }
     else if ( getNumberOfNodes()+1 >= numFields )
     {
-      string msg("Expected value field for device ");
-      msg += getName() + "\n";
-      msg += "Continuing with value of 0\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING_0, msg,
-          netlistFileName_, parsedLine_[getNumberOfNodes()].lineNumber_);
+      Report::UserWarning0().at(netlistFileName_, parsedLine_[getNumberOfNodes()].lineNumber_)
+        << "Expected value field for device " << getName() << ", continuing with value of 0";
 
       // There are no instance parameters given for this device,
       // set this variable for consistency.
@@ -677,17 +625,18 @@ bool N_IO_DeviceBlock::extractBasicDeviceData()
   // If the primary device parameter was found, reset its value.
   if ( primaryParameter.tag() != "" )
   {
-    N_DEV_Param* parameterPtr = findInstanceParameter( primaryParameter );
+    Device::Param *parameterPtr = findInstanceParameter( primaryParameter );
     if (parameterPtr)
     {
-      parameterPtr->setVal( primaryParameter );
+      // parameterPtr->setVal( static_cast<Util::Param &>(primaryParameter));
+      setParamValue(*parameterPtr, primaryParameter);
       parameterPtr->setGiven( true );
     }
     else
     {
       if ( getNetlistDeviceType() == "L")
       {
-        addInstanceParameter( N_DEV_Param (primaryParameter.tag(), parsedLine_[modelNamePosition-1].string_));
+        addInstanceParameter( Device::Param (primaryParameter.tag(), parsedLine_[modelNamePosition-1].string_));
       }
     }
   }
@@ -702,8 +651,8 @@ bool N_IO_DeviceBlock::extractBasicDeviceData()
     field.toUpper();
     if ( field != "ON" && field != "OFF" && field != "IC" && field != "TEMP"  )
     {
-      N_DEV_Param* parameterPtr =
-        findInstanceParameter( N_DEV_Param("AREA", "") );
+      Device::Param* parameterPtr =
+        findInstanceParameter( Device::Param("AREA", "") );
       if ( parameterPtr != NULL )
       {
         parameterPtr->setVal( parsedLine_[linePosition].string_ );
@@ -727,8 +676,8 @@ bool N_IO_DeviceBlock::extractBasicDeviceData()
     field.toUpper();
     if ( field == "ON" )
     {
-      N_DEV_Param* parameterPtr =
-        findInstanceParameter( N_DEV_Param("ON", "") );
+      Device::Param* parameterPtr =
+        findInstanceParameter( Device::Param("ON", "") );
       if ( parameterPtr != NULL )
       {
         parameterPtr->setVal( 1.0 );
@@ -749,8 +698,8 @@ bool N_IO_DeviceBlock::extractBasicDeviceData()
     field.toUpper();
     if ( field == "OFF" )
     {
-      N_DEV_Param* parameterPtr =
-        findInstanceParameter( N_DEV_Param("OFF", "") );
+      Device::Param* parameterPtr =
+        findInstanceParameter( Device::Param("OFF", "") );
       if ( parameterPtr != NULL )
       {
         parameterPtr->setVal( 1.0 );
@@ -773,8 +722,8 @@ bool N_IO_DeviceBlock::extractBasicDeviceData()
     if ( field == "TEMP" )
     {
       linePosition += 2; // advance past "=" sign
-      N_DEV_Param* parameterPtr =
-        findInstanceParameter( N_DEV_Param("TEMP", "") );
+      Device::Param* parameterPtr =
+        findInstanceParameter( Device::Param("TEMP", "") );
       if ( parameterPtr != NULL )
       {
         parameterPtr->setVal( parsedLine_[linePosition].string_ );
@@ -792,10 +741,8 @@ bool N_IO_DeviceBlock::extractBasicDeviceData()
   // Issue fatal error if there are more fields on the line.
   if ( linePosition < numFields )
   {
-    string msg("Unrecognized fields for device ");
-    msg += getName() + "\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-        netlistFileName_, parsedLine_[linePosition+1].lineNumber_);
+    Report::UserError0().at(netlistFileName_, parsedLine_[linePosition+1].lineNumber_)
+      << "Unrecognized fields for device " << getName();
   }
 
   return true; // Only get here on success.
@@ -803,7 +750,7 @@ bool N_IO_DeviceBlock::extractBasicDeviceData()
 
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_DeviceBlock::extractBehavioralDeviceData
+// Function       : DeviceBlock::extractBehavioralDeviceData
 // Purpose        : Extract the device data for a "E", "F", "G", and "H" devices. If
 //                  the usage of these devices is as a PSpice style behavioral
 //                  device (i.e. a dependent source device), convert the device
@@ -813,7 +760,7 @@ bool N_IO_DeviceBlock::extractBasicDeviceData()
 // Creator        : Lon Waters
 // Creation Date  : 12/09/2002
 //----------------------------------------------------------------------------
-bool N_IO_DeviceBlock::extractBehavioralDeviceData()
+bool DeviceBlock::extractBehavioralDeviceData()
 {
   bool result;
 
@@ -841,7 +788,7 @@ bool N_IO_DeviceBlock::extractBehavioralDeviceData()
   // For all other cases, convert the device to a B-source.
 
   // Get the device type.
-  string deviceType(getNetlistDeviceType());
+  std::string deviceType(getNetlistDeviceType());
 
   // Change the type of the device to a B-source.
   setNetlistType ( 'B' );
@@ -849,9 +796,10 @@ bool N_IO_DeviceBlock::extractBehavioralDeviceData()
 
   // Extract the device nodes from parsedLine_.
   result = extractNodes(-1, 0);
-  RETURN_ON_FAILURE(result);
+  if (!result)
+    return result;
 
-  string expression("");
+  std::string expression("");
   if ((deviceType == "E" || deviceType == "G") && typeField != "POLY")
   {
     // Get the expression from the line. The expression may need to be
@@ -880,14 +828,13 @@ bool N_IO_DeviceBlock::extractBehavioralDeviceData()
       if ( equalPos == numFields )
       {
         // Problem, did not find expected "=" sign.
-        string msg("Required \"=\" sign missing after the expression\n");
-        msg += "in the TABLE for device " + getName() + "\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-            netlistFileName_, parsedLine_[0].lineNumber_);
+        Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+          << "Required \"=\" sign missing after the expression in the TABLE for device " << getName();
+        return false;
       }
 
       // Get the table expression.
-      string tableExpression("");
+      std::string tableExpression("");
       for ( int i = 4; i < equalPos; ++i )
       {
         tableExpression += parsedLine_[i].string_;
@@ -917,37 +864,35 @@ bool N_IO_DeviceBlock::extractBehavioralDeviceData()
     // Get the dimension of the polynomial.
     if (parsedLine_.size() < 6)
     {
-      string msg("Not enough fields on input line for device ");
-      msg += getName() + "\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-          netlistFileName_, parsedLine_[0].lineNumber_);
+      Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+        << "Not enough fields on input line for device " << getName();
+      return false;
     }
 
-    N_DEV_Param dimensionParam("dim", parsedLine_[5].string_);
-    int dimension = dimensionParam.iVal();
+    Device::Param dimensionParam("dim", parsedLine_[5].string_);
+    int dimension = dimensionParam.getImmutableValue<int>();
 
     // Build up the B-source POLY expression, some fields need to
     // be manipulated depending on the device type.
     expression = "POLY(";
-    expression += dimensionParam.sVal() + ")";
+    expression += dimensionParam.stringValue() + ")";
 
     int linePosition = 7;
     if (deviceType == "E" || deviceType == "G")
     {
       if (parsedLine_.size() < 7+2*dimension)
       {
-        string msg("Not enough fields on input line for device ");
-        msg += getName() + "\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-            netlistFileName_, parsedLine_[0].lineNumber_);
+        Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+          << "Not enough fields on input line for device " << getName();
+        return false;
       }
 
       // Get the POLY controlling nodes, there should be as many pairs
       // of these as the dimension of the polynomial.
       for (int i = 0; i < dimension; ++i, linePosition += 2)
       {
-        string cnode1(parsedLine_[linePosition].string_);
-        string cnode2(parsedLine_[linePosition+1].string_);
+        std::string cnode1(parsedLine_[linePosition].string_);
+        std::string cnode2(parsedLine_[linePosition+1].string_);
 
         if (cnode2 == "0")
         {
@@ -964,17 +909,16 @@ bool N_IO_DeviceBlock::extractBehavioralDeviceData()
       // This is an F or an H device.
       if (parsedLine_.size() < 7+dimension)
       {
-        string msg("Not enough fields on input line for device ");
-        msg += getName() + "\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-            netlistFileName_, parsedLine_[0].lineNumber_);
+        Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+          << "Not enough fields on input line for device " << getName();
+        return false;
       }
 
       // Get the controlling sources, there should be as many of these as
       // as the dimenstion of the polynomial.
       for (int i = 0; i < dimension; ++i, ++linePosition)
       {
-        string csource(parsedLine_[linePosition].string_);
+        std::string csource(parsedLine_[linePosition].string_);
 
         expression += " I(" + csource + ")";
       }
@@ -991,15 +935,14 @@ bool N_IO_DeviceBlock::extractBehavioralDeviceData()
     // Linear F or H conversion to B-source.
     if (parsedLine_.size() < 5)
     {
-      string msg("Not enough fields on input line for device ");
-      msg += getName() + "\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-          netlistFileName_, parsedLine_[0].lineNumber_);
+      Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+        << "Not enough fields on input line for device " << getName();
+      return false;
     }
 
     // Get the source and value.
-    string source(parsedLine_[3].string_);
-    string value(parsedLine_[4].string_);
+    std::string source(parsedLine_[3].string_);
+    std::string value(parsedLine_[4].string_);
 
     expression = value + " * I(" + source + ")";
   }
@@ -1016,7 +959,7 @@ bool N_IO_DeviceBlock::extractBehavioralDeviceData()
   }
 
   // Set the device parameter
-  N_DEV_Param parameter( "", "" );
+  Device::Param parameter( "", "" );
   if ( deviceType == "E" || deviceType == "H" )
   {
     parameter.setTag( "V" );
@@ -1048,7 +991,7 @@ bool N_IO_DeviceBlock::extractBehavioralDeviceData()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::extractYDeviceData
+// Function      : DeviceBlock::extractYDeviceData
 // Purpose       : Extract the device data from parsedLine for "Y" devices.
 //                 These devices are exected to have input lines of the following
 //                 format:
@@ -1067,7 +1010,7 @@ bool N_IO_DeviceBlock::extractBehavioralDeviceData()
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/24/2001
 //-----------------------------------------------------------------------------
-bool N_IO_DeviceBlock::extractYDeviceData()
+bool DeviceBlock::extractYDeviceData()
 {
   bool result;
 
@@ -1075,10 +1018,9 @@ bool N_IO_DeviceBlock::extractYDeviceData()
 
   if ( numFields < 2 )
   {
-    string msg("Not enough fields on input line for device ");
-    msg += getName() + "\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-        netlistFileName_, parsedLine_[0].lineNumber_);
+    Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+      << "Not enough fields on input line for device " << getName();
+    return false;
   }
 
   // Reset the device name and type which were set by extractData based on
@@ -1106,9 +1048,124 @@ bool N_IO_DeviceBlock::extractYDeviceData()
 
 }
 
+//-----------------------------------------------------------------------------
+// Function      : DeviceBlock::extractUDeviceData
+// Purpose       : Extract the device data from parsedLine for "U" devices.
+//                 These devices are exected to have input lines of the following
+//                 format:
+//
+//                 Uname type(N) node [node]* [Value] [model-name] [param=Value]*
+//
+//                 where fields enclosed in [] indicates are optional, *
+//                 indicates a field that may be reapeated 0 or more times,
+//                 fields given in all lower case a string is expected, fields
+//                 starting with a capital letter indicate a numerical value
+//                 is expected, and fields in all upper case are expected
+//                 literally.  Some digital devices (e.g., NAND, AND, OR and
+//                 NOR) may have a variable number of inputs.  In that case,
+//                 the number of inputs is denoted by (for example) AND(N),
+//                 where N is an integer.  Other gates (e.g, INV) have a fixed
+//                 number of inputs, and their type is (for example) INV.
+//
+// Special Notes : The Xyce U device is intended to be similar to the PSpice U 
+//                 digital devices, rather than the SPICE3F5 U device which is
+//                 the "uniform RC transmission line".  
+// Scope         : public
+// Creator       : Pete Sholander, SNL
+// Creation Date : 02/14/2014
+//-----------------------------------------------------------------------------
+bool DeviceBlock::extractUDeviceData()
+{
+  bool noError = true;
+
+  int numFields = parsedLine_.size();
+
+  if ( numFields < 2 )
+  {
+    Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+      << "Not enough fields on input line for U device " << getName();
+    noError = false;
+  }
+
+  // Parse AND(N) syntax where AND is the gate type, and N is the number
+  // of inputs.  Error handling for N not being an integer, N missing or
+  // trailing ')' missing.
+  std::string numInputs = "";
+  if ( numFields >=5)
+  {
+    if ( parsedLine_[2].string_ == "(" )
+    {
+      if ( parsedLine_[4].string_ == ")" )
+      {
+        // found possible (N) syntax
+        numInputs = parsedLine_[3].string_;
+        if (!Util::isInt(numInputs))
+	{
+          Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+            << "Found (N) syntax in U device " << getName() << " but N not an integer";
+          noError = false;
+        }
+        else
+	{
+          // found valid (N) syntax.  Remove (N) from parsed line so that
+          // extractBasicDeviceData() function works correctly
+          parsedLine_.erase(parsedLine_.begin()+2,parsedLine_.begin()+5);
+	}
+      }
+      else
+      {
+        Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+          << "Apparent error parsing number of inputs, (N) syntax, for U device " << getName();
+        noError = false;
+      }
+    } 
+  }
+
+  // Reset the device name and type which were set by extractData based on
+  // the standard rules for netlist devices.  Note that the order of the
+  // deviceType and deviceName are reversed from the Y-device syntax
+  ExtendedString deviceType(parsedLine_[1].string_);
+  deviceType.toUpper();
+  ExtendedString deviceName( parsedLine_[0].string_.substr(1,parsedLine_[0].string_.size()) );
+  deviceName.toUpper();
+  // U devices are not allowed to have a '%' character in them because it hoses
+  // subsequent processing in the digital-device constructor.
+  if ( (deviceType.find_first_of('%') != std::string::npos) || 
+       (deviceName.find_first_of('%') != std::string::npos) )
+  {
+    Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+      << "U device name: " << deviceName << " or type: " << deviceType <<  " should not have % character.";
+    noError = false;  
+  }
+  setNetlistType( deviceType );
+  if (numInputs == "")
+  {
+    // name string format for U devices with a fixed number of inputs
+    setName( "U%" + deviceType + "%" + deviceName );
+  }
+  else
+  {
+    // name string format for U devices with a variable number of inputs
+    setName( "U%" + deviceType + "%" + deviceName + "%" + numInputs);
+  }
+
+  // drop the second element of the parsed line vector, which is the
+  // gate type, and treat this like a basic device.  Previous statement 
+  // already had warning message: "not enough fields on input line for device"
+  if ( numFields >= 2 )
+  {
+    parsedLine_.erase(parsedLine_.begin()+1);
+  }
+
+  // remove the U from the device name, before extracting the device data.
+  // this mimics the Y device parsing
+  parsedLine_[0].string_ = parsedLine_[0].string_.substr(1,parsedLine_[0].string_.size()); 
+
+  return (noError == true) ? extractBasicDeviceData() : false;
+}
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::extractSourceData
+// Function      : DeviceBlock::extractSourceData
 // Purpose       : Extract the device data from parsedLine for independent
 //                 source devices.
 //
@@ -1147,7 +1204,7 @@ bool N_IO_DeviceBlock::extractYDeviceData()
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/25/2001
 //-----------------------------------------------------------------------------
-bool N_IO_DeviceBlock::extractSourceData()
+bool DeviceBlock::extractSourceData()
 {
   int numFields = parsedLine_.size();
   bool tranGiven=false;
@@ -1159,11 +1216,11 @@ bool N_IO_DeviceBlock::extractSourceData()
 
 
   // Set up the "primary" parameter.  (for vsrc's this is V0 by default, and is DC)
-  N_DEV_Param primaryParameter( "", "" );
-  string primaryDeviceParameter(metadata_.getPrimaryParameter(getNetlistDeviceType(), -1));
+  Util::Param primaryParameter( "", "" );
+  std::string primaryDeviceParameter(metadata_.getPrimaryParameter(getNetlistDeviceType(), -1));
   primaryParameter.setTag(primaryDeviceParameter);
   primaryParameter.setVal("0");
-  int tranSourceType=_DC_DATA;
+  int tranSourceType = _DC_DATA;
 
   // Set position on line to first field after the nodes.
   int linePosition = getNumberOfNodes() + 1;
@@ -1202,10 +1259,8 @@ bool N_IO_DeviceBlock::extractSourceData()
         // generate error message if DC value is invalid
         if( !( primaryParameter.isNumeric() || primaryParameter.hasExpressionValue() ) )
         {
-          string msg("Invalid DC value \"" + primaryParameter.sVal()
-           + "\" for device " + getName() + "\n");
-          N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL, msg,
-              netlistFileName_, parsedLine_[0].lineNumber_);
+          Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+            << "Invalid DC value \"" << primaryParameter.stringValue() << "\" for device " << getName();
         }
       }
     }
@@ -1218,8 +1273,8 @@ bool N_IO_DeviceBlock::extractSourceData()
   // Find the positions of the "AC", "DISTOF1", "DISTOF2", and source
   // function fields in parsedLine_. Save names and positions of the
   // fields that appear in parsedLine in fieldNames and fieldPositions.
-  vector<string> fieldNames;
-  vector<int> fieldPositions;
+  std::vector<std::string> fieldNames;
+  std::vector<int> fieldPositions;
 
   int fieldPosition = findSourceFieldPosition( "AC", linePosition );
   if ( fieldPosition > 0 )
@@ -1261,9 +1316,9 @@ bool N_IO_DeviceBlock::extractSourceData()
   }
 
   // Set the type(s) of the source.
-  N_DEV_Param tranSourceTypeParameter( "TRANSIENTSOURCETYPE", tranSourceType );
-  N_DEV_Param acSourceTypeParameter( "ACSOURCETYPE", _AC_DATA);
-  N_DEV_Param dcSourceTypeParameter( "DCSOURCETYPE", _DC_DATA);
+  Util::Param tranSourceTypeParameter( "TRANSIENTSOURCETYPE", tranSourceType );
+  Util::Param acSourceTypeParameter( "ACSOURCETYPE", (int) _AC_DATA);
+  Util::Param dcSourceTypeParameter( "DCSOURCETYPE", (int) _DC_DATA);
 
   // Add the device instance parameters and their default values
   // to instanceParameters and extract instance parameters from
@@ -1292,7 +1347,7 @@ bool N_IO_DeviceBlock::extractSourceData()
   {
     int j = i;
     int temp = fieldPositions[j];
-    string tmpName =  fieldNames[j];
+    std::string tmpName =  fieldNames[j];
     while (j > 0 && (fieldPositions[j-1] > temp))
     {
       fieldPositions[j] = fieldPositions[j-1];
@@ -1312,7 +1367,7 @@ bool N_IO_DeviceBlock::extractSourceData()
   }
 
   // Set the DC value.
-  N_DEV_Param* parameterPtr;
+  Device::Param* parameterPtr;
   if ( primaryParameter.tag() != "" )
   {
     parameterPtr = findInstanceParameter( primaryParameter );
@@ -1339,7 +1394,7 @@ bool N_IO_DeviceBlock::extractSourceData()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::findSourceFieldPosition
+// Function      : DeviceBlock::findSourceFieldPosition
 // Purpose       : Find the position of a given field of an independent source
 //                 in parsedLine_. Return the position if the field is found,
 //                 otherwise return 0.
@@ -1348,7 +1403,7 @@ bool N_IO_DeviceBlock::extractSourceData()
 // Creator       : Lon Waters, SNL
 // Creation Date : 10/02/2001
 //-----------------------------------------------------------------------------
-int N_IO_DeviceBlock::findSourceFieldPosition( string const& fieldToFind,
+int DeviceBlock::findSourceFieldPosition( std::string const& fieldToFind,
                                           int startPosition )
 {
   size_t numFields = parsedLine_.size();
@@ -1391,7 +1446,7 @@ int N_IO_DeviceBlock::findSourceFieldPosition( string const& fieldToFind,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::extractSourceFields
+// Function      : DeviceBlock::extractSourceFields
 //
 // Purpose       : This function loops through the fields on a source instance
 //                 line, processes them, adding defaults when necessary, and
@@ -1418,8 +1473,8 @@ int N_IO_DeviceBlock::findSourceFieldPosition( string const& fieldToFind,
 // Creator       : Lon Waters, SNL
 // Creation Date : 10/03/2001
 //-----------------------------------------------------------------------------
-bool N_IO_DeviceBlock::extractSourceFields( vector<string> const& fieldNames,
-                                       vector<int> const& fieldPositions )
+bool DeviceBlock::extractSourceFields( std::vector<std::string> const& fieldNames,
+                                       std::vector<int> const& fieldPositions )
 {
   if ( fieldNames[0] == "PARAMS" )
   {
@@ -1440,13 +1495,13 @@ bool N_IO_DeviceBlock::extractSourceFields( vector<string> const& fieldNames,
     {
       // The code here inserts instance parameters for magnitude and phase
       // of AC stimulus.
-      N_DEV_Param mag("", "");
-      N_DEV_Param phase("", "");
+      Device::Param mag("", "");
+      Device::Param phase("", "");
 
       int numTerms = fieldPositions[i+1] - fieldPositions[i] - 1;
 
-      string magName(fieldNames[i] + "MAG");
-      string phaseName(fieldNames[i] + "PHASE");
+      std::string magName(fieldNames[i] + "MAG");
+      std::string phaseName(fieldNames[i] + "PHASE");
       mag.set( magName, "1.0" );
       phase.set( phaseName, "0.0" );
 
@@ -1494,29 +1549,24 @@ bool N_IO_DeviceBlock::extractSourceFields( vector<string> const& fieldNames,
       sourceFunctionParamStart = fieldPositions[i] + offset;
       sourceFunctionParamEnd = fieldPositions[i + 1] - offset;
 
-
-      // Set the number of parameters for this source function on
-      // the input line.
-      size_t numInputSourceFunctionParams =
-        sourceFunctionParamEnd - sourceFunctionParamStart + 1;
-
       if ( sourceFunction != "PWL" )
       {
         // Get the source function parameters from metadata, set their
         // values to the given input value and add to the device instance
         // parameter list.
-        N_DEV_Param parameter("", 0.0);
-        vector<N_DEV_Param> sourceFunctionParameters;
-        metadata_.getSourceFunctionParameters(
-            sourceFunction, sourceFunctionParameters);
 
-        size_t numSourceFunctionParameters = sourceFunctionParameters.size();
-        for ( size_t k = 0; k < numSourceFunctionParameters; ++k )
+        // Set the number of parameters for this source function on
+        // the input line.
+        size_t numInputSourceFunctionParams = sourceFunctionParamEnd - sourceFunctionParamStart + 1;
+
+        const std::vector<Device::Param> &sourceFunctionParameters = metadata_.getSourceFunctionParameters(sourceFunction);
+        for ( size_t k = 0; k < sourceFunctionParameters.size(); ++k )
         {
+          Device::Param parameter("", 0.0);
           parameter.setTag( sourceFunctionParameters[k].uTag() );
           if ( k < numInputSourceFunctionParams )
           {
-            parameter.setVal( parsedLine_[sourceFunctionParamStart+k].string_ );
+            parameter.setVal( parsedLine_[sourceFunctionParamStart + k].string_ );
             parameter.setGiven( true );
             addInstanceParameter( parameter );
           }
@@ -1528,8 +1578,8 @@ bool N_IO_DeviceBlock::extractSourceFields( vector<string> const& fieldNames,
         {
           // Xyce expects the "R" parameter to be tagged "REPEATTIME". Find
           // that parameter and rename it.
-          N_DEV_Param* parameterPtr =
-            findInstanceParameter( N_DEV_Param("R", "") );
+          Device::Param* parameterPtr =
+            findInstanceParameter( Device::Param("R", "") );
           assert(parameterPtr != NULL);
           parameterPtr->setTag( "REPEATTIME" );
 
@@ -1542,10 +1592,10 @@ bool N_IO_DeviceBlock::extractSourceFields( vector<string> const& fieldNames,
             // the PWL source function is periodic) to 1, aka true.
             if ( parsedLine_[timeValPairStart].string_ == "R" )
             {
-              N_DEV_Param* parameterPtr =
-                findInstanceParameter( N_DEV_Param("REPEAT", "") );
+              Device::Param* parameterPtr =
+                findInstanceParameter( Device::Param("REPEAT", "") );
               assert(parameterPtr != NULL);
-              parameterPtr->setVal( 1 );
+              parameterPtr->setVal( true );
               parameterPtr->setGiven( true );
             }
 
@@ -1571,8 +1621,8 @@ bool N_IO_DeviceBlock::extractSourceFields( vector<string> const& fieldNames,
           // reset the parameter ("NUM") that indicates the number of
           // such pairs and "REPEAT" which is a boolean that indicates
           // that PWL function is periodic.
-          N_DEV_Param time( "T", "" );
-          N_DEV_Param value( "V", "" );
+          Device::Param time( "T", "" );
+          Device::Param value( "V", "" );
           int numTimeValuePairs = 0;
           int i = timeValPairStart;
           while ( i < sourceFunctionParamEnd )
@@ -1592,8 +1642,8 @@ bool N_IO_DeviceBlock::extractSourceFields( vector<string> const& fieldNames,
 
           if ( numTimeValuePairs > 0 )
           {
-            N_DEV_Param* parameterPtr =
-              findInstanceParameter( N_DEV_Param("NUM", "") );
+            Device::Param* parameterPtr =
+              findInstanceParameter( Device::Param("NUM", "") );
             assert(parameterPtr != NULL);
             parameterPtr->setVal( numTimeValuePairs );
             parameterPtr->setGiven( true );
@@ -1602,37 +1652,34 @@ bool N_IO_DeviceBlock::extractSourceFields( vector<string> const& fieldNames,
           {
             // no FILE parameter given (that's the next else block)
             // so there should have been some time, value pairs given
-            // however, numTimeValueParis == 0.  Throw an error and abort.
-            string msg("Could not parse time/value pairs for piecewise linear function in device: ");
-            msg += getName();
-            N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg, netlistFileName_, parsedLine_[0].lineNumber_  );
+            // however, numTimeValueParis == 0.
+            Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+              << "Could not parse time/value pairs for piecewise linear function in device: " << getName();
           }
         }
         else
         {
           // PWL time value pairs are given in specified file. Get the
           // file name, open and read (time, value) pairs.
-          string tvFileNameIN(parsedLine_[sourceFunctionParamStart+1].string_);
+          std::string tvFileNameIN(parsedLine_[sourceFunctionParamStart+1].string_);
 
           // If the file name is enclosed in double quotes, strip them.
-          string tvFileName;
+          std::string tvFileName;
           if (tvFileNameIN[0] == '"' &&
               tvFileNameIN[tvFileNameIN.length()-1] =='"')
           {
             tvFileName = tvFileNameIN.substr(1, tvFileNameIN.length()-2);
           }
 
-          ifstream tvDataIn;
-          tvDataIn.open(tvFileName.c_str(), ios::in);
+          std::ifstream tvDataIn;
+          tvDataIn.open(tvFileName.c_str(), std::ios::in);
           if ( !tvDataIn.is_open() )
           {
-            string msg("Could not find file ");
-            msg += tvFileName + "\n";
-            N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+            Report::UserError() << "Could not find file " << tvFileName;
           }
 
-          N_DEV_Param time( "T", "" );
-          N_DEV_Param value( "V", "" );
+          Device::Param time( "T", "" );
+          Device::Param value( "V", "" );
 
           int numTimeValuePairs = 0;
           double timeIn;
@@ -1656,11 +1703,9 @@ bool N_IO_DeviceBlock::extractSourceFields( vector<string> const& fieldNames,
             }
             else
             {
-              string msg("Problem reading file " + tvFileName + "\n");
-              msg += "File format must be comma, tab or space separated ";
-              msg += "value. There should be no extra spaces or tabs ";
-              msg += "around the comma if it is used as the separator.";
-              N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+              Report::UserError() << "Problem reading " << tvFileName << std::endl
+                                  << "File format must be comma, tab or space separated value. There should be no extra spaces or tabs "
+                                  << "around the comma if it is used as the separator.";
             }
           }
 
@@ -1668,8 +1713,8 @@ bool N_IO_DeviceBlock::extractSourceFields( vector<string> const& fieldNames,
 
           if ( numTimeValuePairs > 0 )
           {
-            N_DEV_Param* parameterPtr =
-              findInstanceParameter( N_DEV_Param("NUM", "") );
+            Device::Param* parameterPtr =
+              findInstanceParameter( Device::Param("NUM", "") );
             assert(parameterPtr != NULL);
             parameterPtr->setVal( numTimeValuePairs );
             parameterPtr->setGiven( true );
@@ -1677,8 +1722,7 @@ bool N_IO_DeviceBlock::extractSourceFields( vector<string> const& fieldNames,
 
           else
           {
-            string msg("Failed to successfully read contents of " + tvFileName + "\n");
-            N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg);
+            Report::UserError() << "Failed to successfully read " << tvFileName;
           }
         }
       }
@@ -1689,7 +1733,7 @@ bool N_IO_DeviceBlock::extractSourceFields( vector<string> const& fieldNames,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::extractMutualInductanceData
+// Function      : DeviceBlock::extractMutualInductanceData
 // Purpose       : Extract the device data from parsedLine for mutual
 //                 inductances.
 // Special Notes :
@@ -1697,14 +1741,14 @@ bool N_IO_DeviceBlock::extractSourceFields( vector<string> const& fieldNames,
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/25/2001
 //-----------------------------------------------------------------------------
-bool N_IO_DeviceBlock::extractMutualInductanceData( )
+bool DeviceBlock::extractMutualInductanceData( )
 {
   int numFields = parsedLine_.size();
   bool kequals = false;
 
   // Extract the inductor names.
   int numInductors = 0;
-  N_DEV_Param parameter( "", "" );
+  Device::Param parameter( "", "" );
   while ( parsedLine_[numInductors+1].string_[0] == 'L' ||
           parsedLine_[numInductors+1].string_[0] == 'l' ||
           parsedLine_[numInductors+1].string_[0] == 'X' ||
@@ -1720,10 +1764,8 @@ bool N_IO_DeviceBlock::extractMutualInductanceData( )
     {
       //For now, we're just not going to allow this.  Fix later with a new
       //parser, hopefullY:
-      string msg("Subcircuit calls ('X' devices) are not allowed in mutual inductor definitions.\n");
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-          netlistFileName_, parsedLine_[0].lineNumber_);
-
+      Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+        << "Subcircuit calls ('X' devices) are not allowed in mutual inductor definitions.";
     }
     else
     {
@@ -1740,9 +1782,9 @@ bool N_IO_DeviceBlock::extractMutualInductanceData( )
   //Have to check whether coupling is present in the form "k = {coupling}"
 
   if ((parsedLine_[numInductors + 1].string_ == "K") ||
-       (parsedLine_[numInductors + 1].string_ == "k")
-      && (parsedLine_[numInductors + 2].string_ == "=")
-      && (numInductors + 3 < numFields))
+      ( (parsedLine_[numInductors + 1].string_ == "k")
+        && (parsedLine_[numInductors + 2].string_ == "=")
+        && (numInductors + 3 < numFields) ) )
   {
     kequals = true;
     parameter.setVal( parsedLine_[numInductors + 3].string_ );
@@ -1754,13 +1796,9 @@ bool N_IO_DeviceBlock::extractMutualInductanceData( )
 
   addInstanceParameter( parameter );
 
-
-
   int modelLevel, modelNamePosition;
-  string modelType;
-  bool modelFound = extractModelName( modelType, modelLevel,
-                                      modelNamePosition );
-
+  std::string modelType;
+  bool modelFound = extractModelName( modelType, modelLevel, modelNamePosition );
 
   // check format for errors; bogus Lnames are handled later
   if ( modelFound )
@@ -1770,9 +1808,8 @@ bool N_IO_DeviceBlock::extractMutualInductanceData( )
       if ( ( modelNamePosition != ( numInductors + 4 ) ) ||
            ( modelNamePosition != ( numFields - 1 ) ) )
       {
-        string msg("Malformed line for device " + getName() + "\n");
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-                                 netlistFileName_, parsedLine_[0].lineNumber_);
+        Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+          << "Malformed line for device " << getName();
       }
     }
     else
@@ -1780,9 +1817,8 @@ bool N_IO_DeviceBlock::extractMutualInductanceData( )
       if ( ( modelNamePosition != ( numInductors + 2 ) ) ||
            ( modelNamePosition != ( numFields - 1 ) ) )
       {
-        string msg("Malformed line for device " + getName() + "\n");
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-                                 netlistFileName_, parsedLine_[0].lineNumber_);
+        Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+          << "Malformed line for device " << getName();
       }
     }
   }
@@ -1792,18 +1828,16 @@ bool N_IO_DeviceBlock::extractMutualInductanceData( )
     {
       if ( ( numInductors + 3 ) != ( numFields - 1 ) )
       {
-        string msg("Specified model not found for device " + getName() + "\n");
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-                                 netlistFileName_, parsedLine_[0].lineNumber_);
+        Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+          << "Specified model not found for device " << getName();
       }
     }
     else
     {
       if ( ( numInductors + 1 ) != ( numFields - 1 ) )
       {
-        string msg("Specified model not found for device " + getName() + "\n");
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-                                 netlistFileName_, parsedLine_[0].lineNumber_);
+        Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+          << "Specified model not found for device " << getName();
       }
     }
   }
@@ -1812,7 +1846,7 @@ bool N_IO_DeviceBlock::extractMutualInductanceData( )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::extractSwitchDeviceData
+// Function      : DeviceBlock::extractSwitchDeviceData
 // Purpose       : Convert SPICE switch formats to general expression controlled
 //                 switch
 // Special Notes :
@@ -1820,11 +1854,11 @@ bool N_IO_DeviceBlock::extractMutualInductanceData( )
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 12/16/04
 //-----------------------------------------------------------------------------
-bool N_IO_DeviceBlock::extractSwitchDeviceData( )
+bool DeviceBlock::extractSwitchDeviceData( )
 {
   bool result, modelFound;
   int modelLevel, modelNamePosition, controlPosition;
-  string modelType, expression;
+  std::string modelType, expression;
   int numFields = parsedLine_.size();
   int i, parameterStartPosition, parameterEndPosition;
   bool is_w=false;
@@ -1835,14 +1869,14 @@ bool N_IO_DeviceBlock::extractSwitchDeviceData( )
     setNetlistType ( 'S' );
   }
 
-  modelFound = extractModelName( modelType, modelLevel,
-                                 modelNamePosition );
+  modelFound = extractModelName( modelType, modelLevel, modelNamePosition );
   if (!modelFound)
   {
-    string msg("N_IO_DeviceBlock::extractSwitchDeviceData: no model found in:\n");
+    Report::UserError message;
+
+    message << "No model found in ";
     for (int k=0 ; k<numFields ; ++k)
-      msg += parsedLine_[k].string_ + " ";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+      message << parsedLine_[k].string_ << " ";
   }
   controlPosition = 0;
   for (i=modelNamePosition+1 ; i<numFields ; ++i)
@@ -1858,14 +1892,13 @@ bool N_IO_DeviceBlock::extractSwitchDeviceData( )
   {
     if (modelNamePosition != 4 || controlPosition != 0)
     {
-      string msg;
+      Report::UserError msg;
       if (modelNamePosition != 4)
-        msg = "N_IO_DeviceBlock::extractSwitchDeviceData: wrong number of nodes in:\n";
+        msg << "Wrong number of nodes in ";
       else
-        msg = "N_IO_DeviceBlock::extractSwitchDeviceData: control param in:\n";
+        msg << "Control param in:\n";
       for (int k=0 ; k<numFields ; ++k)
-        msg += parsedLine_[k].string_ + " ";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+        msg << parsedLine_[k].string_ << " ";
     }
     setNetlistType ( 'S' );
     expression = "{I(" + parsedLine_[modelNamePosition-1].string_ + ")}";
@@ -1875,10 +1908,10 @@ bool N_IO_DeviceBlock::extractSwitchDeviceData( )
     if ((modelNamePosition != 3 && controlPosition > 0) ||
         (modelNamePosition != 5 && controlPosition == 0))
     {
-      string msg("N_IO_DeviceBlock::extractSwitchDeviceData: wrong number of nodes in:\n");
+      Report::UserError msg;
+      msg << "Wrong number of nodes in ";
       for (int k=0 ; k<numFields ; ++k)
-        msg += parsedLine_[k].string_ + " ";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+        msg << parsedLine_[k].string_ << " ";
     }
     if (modelNamePosition == 5)
       expression = "{V(" + parsedLine_[3].string_ + ")-V(" +parsedLine_[4].string_ + ")}";
@@ -1895,7 +1928,7 @@ bool N_IO_DeviceBlock::extractSwitchDeviceData( )
 
   if (controlPosition == 0)
   {
-    N_DEV_Param parameter;
+    Device::Param parameter;
     int numParameters = getNumberOfInstanceParameters();
     for ( i = 0; i < numParameters; ++i )
     {
@@ -1913,14 +1946,14 @@ bool N_IO_DeviceBlock::extractSwitchDeviceData( )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::extractNodes
+// Function      : DeviceBlock::extractNodes
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/27/2001
 //-----------------------------------------------------------------------------
-bool N_IO_DeviceBlock::extractNodes(int modelLevel, int modelNamePosition)
+bool DeviceBlock::extractNodes(int modelLevel, int modelNamePosition)
 {
   size_t numFields = parsedLine_.size();
   int numNodes;
@@ -1929,28 +1962,29 @@ bool N_IO_DeviceBlock::extractNodes(int modelLevel, int modelNamePosition)
   if (numNodes == -1)
     return false;
 
-  int nodeStartPos = 1;
+  const size_t nodeStartPos = 1;
+  const size_t nodeEndPos = nodeStartPos + numNodes - 1;
 
-  // Set the node end location.
-  int nodeEndPos = nodeStartPos + numNodes - 1;
-
-  if ( modelNamePosition > 0 && nodeEndPos >= modelNamePosition)
+  if ( modelNamePosition > 0 && modelNamePosition <= nodeEndPos)
   {
-    string msg("Insufficient number of nodes for device: ");
-    msg += getName();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-        netlistFileName_, parsedLine_[0].lineNumber_);
+    if (metadata_.isModelTypeValid(getNetlistDeviceType(), parsedLine_[modelNamePosition].string_, modelLevel))
+      Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+        << "Insufficient nodes specified or node name '" << parsedLine_[modelNamePosition].string_ << "' matches one of this device's model name";
+    else
+      Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+      << "Insufficient number of nodes specified";
+
+    return false;
   }
 
-  if ( numFields < size_t (nodeEndPos + 1) )
+  if ( numFields < nodeEndPos + 1)
   {
-    string msg("Not enough fields on input line for device ");
-    msg += getName();
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-        netlistFileName_, parsedLine_[0].lineNumber_);
+    Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+      << "Not enough fields on input line for device " << getName();
+    return false;
   }
 
-  list<tagged_param> nodeValues;
+  std::list<tagged_param> nodeValues;
   for ( int i = nodeStartPos; i <= nodeEndPos; ++i )
   {
     nodeValues.push_back(
@@ -1962,7 +1996,7 @@ bool N_IO_DeviceBlock::extractNodes(int modelLevel, int modelNamePosition)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::extractModelName
+// Function      : DeviceBlock::extractModelName
 // Purpose       : Check parsedLine for existance of model name. If a model
 //                 name exists, set its position in parsedLine and the device
 //                 model name and return true, otherwise return false.
@@ -1971,35 +2005,59 @@ bool N_IO_DeviceBlock::extractNodes(int modelLevel, int modelNamePosition)
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/27/2001
 //-----------------------------------------------------------------------------
-bool N_IO_DeviceBlock::extractModelName(
-    string & modelType,
-    int & modelLevel,
-    int & modelNamePosition )
+bool DeviceBlock::extractModelName(
+  std::string & modelType,
+  int &         modelLevel,
+  int &         modelNamePosition )
 {
-  // Check for model name on device line by looking for it in the circuit
-  // context.
-  bool modelFound = false;
+  modelType = "";
   modelNamePosition = 0;
   modelLevel = 0;
-  int numFields = parsedLine_.size();
-  int i;
 
-  for ( i = 1; i < numFields; ++i )
+  const std::string &device_type = getNetlistDeviceType();
+
+  const DeviceMetadata &model_group_metadata = metadata_.getDeviceMetadata(device_type, -1);
+
+  size_t model_search_begin_index = model_group_metadata.numNodes + 1;
+  // size_t model_search_end_index = std::min(parsedLine_.size(), model_search_begin_index + model_group_metadata.numFillNodes + model_group_metadata.numOptionalNodes + 1);
+  // size_t model_search_begin_index = 1;
+  size_t model_search_end_index = parsedLine_.size();
+
+  bool modelFound = false;
+  for (size_t i = model_search_begin_index; i < model_search_end_index; ++i )
   {
-    ExtendedString es ( parsedLine_[i].string_ );
-    es.toUpper();
-    string name(es);
+    const std::string &model_name = parsedLine_[i].string_;
+    if (device_type == "K") {
+      if (model_name == "=" && !equal_nocase(parsedLine_[i - 1].string_, "K"))
+        break;
+    }
+    else {
+      if (model_name == "=") // equal sign implies parameter is being parsed, we've gone to far
+        break;
+    }
 
-    N_IO_ParameterBlock* modelPtr;
-    if (circuitContext_.findModel(name, modelPtr))
+    ParameterBlock* modelPtr;
+    if (circuitContext_.findModel(model_name, modelPtr))
     {
-      setModelName(name);
+      setModelName(model_name);
       modelNamePosition = i;
+
       modelType = modelPtr->getType();
       modelLevel = modelPtr->getLevel();
-      if ( getNetlistDeviceType() != "K")
+      if ( device_type != "K")
       {
-        (void) metadata_.findDeviceMetadata(getNetlistDeviceType(), modelLevel);
+        const DeviceMetadata &model_metadata = metadata_.getDeviceMetadata(device_type, modelLevel);
+        if (!model_metadata.isModelLevelValid() )
+        {
+          Report::UserError() << "Model type \"" << modelType << "\" does not have level " << modelLevel << " defined";
+          return false;
+        }
+        if (!model_metadata.isModelTypeValid(modelType))
+        {
+          Report::UserError() << "Model type \"" << modelType << "\" not valid for device " << getName() << " of type " << device_type;
+          return false;
+        }
+
         modelPtr->addDefaultModelParameters(metadata_);
       }
       modelFound = true;
@@ -2011,17 +2069,17 @@ bool N_IO_DeviceBlock::extractModelName(
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::extractInstanceParameters
+// Function      : DeviceBlock::extractInstanceParameters
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 09/27/2001
 //-----------------------------------------------------------------------------
-void N_IO_DeviceBlock::extractInstanceParameters( int searchStartPosition,
+void DeviceBlock::extractInstanceParameters( int searchStartPosition,
                                              int & parameterStartPosition,
                                              int & parameterEndPosition,
-                                             string const& action,
+                                             std::string const& action,
                                              int modelLevel )
 {
   addDefaultInstanceParameters(modelLevel);
@@ -2033,12 +2091,12 @@ void N_IO_DeviceBlock::extractInstanceParameters( int searchStartPosition,
   int numFields = parsedLine_.size();
   parameterStartPosition = numFields; // Default in case there are no
                                       // parameters on the line.
-  N_DEV_Param paramToFind;
+  Device::Param paramToFind;
   while (linePosition < numFields)
   {
     // Look for the parameter in the instance parameter list.
     paramToFind.setTag(parsedLine_[linePosition].string_);
-    N_DEV_Param* parameterPtr = findInstanceParameter(paramToFind);
+    Device::Param* parameterPtr = findInstanceParameter(paramToFind);
 
     if ( parameterPtr != NULL )
     {
@@ -2071,11 +2129,8 @@ void N_IO_DeviceBlock::extractInstanceParameters( int searchStartPosition,
       if ( linePosition >= numFields )
       {
         // Hit end of line unexpectedly.
-        string msg("Unexpectedly reached end of line while looking for\n");
-        msg += " parameters for device ";
-        msg += getName() + "\n";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-            netlistFileName_, parsedLine_[linePosition-1].lineNumber_);
+        Report::UserError().at(netlistFileName_, parsedLine_[linePosition-1].lineNumber_)
+          << "Unexpectedly reached end of line while looking for parameters for device " << getName();
       }
 
       if ( parsedLine_[linePosition].string_ == "=" )
@@ -2083,52 +2138,48 @@ void N_IO_DeviceBlock::extractInstanceParameters( int searchStartPosition,
         ++linePosition; // if field is "=", advance to next field
       }
 
-      if (parameterPtr->sVal() != "VECTOR" &&
-          parameterPtr->sVal() != "VECTOR-COMPOSITE")
+      if (parameterPtr->stringValue() != "VECTOR" &&
+          parameterPtr->stringValue() != "VECTOR-COMPOSITE")
       {
         if ( linePosition >= numFields )
         {
           // Hit end of line unexpectedly.
-          string msg("Unexpectedly reached end of line while looking for\n");
-          msg += " parameters for device ";
-          msg += getName() + "\n";
-          N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-              netlistFileName_, parsedLine_[linePosition-1].lineNumber_);
+          Report::UserError().at(netlistFileName_, parsedLine_[linePosition-1].lineNumber_)
+            << "Unexpectedly reached end of line while looking for parameters for device " << getName();
         }
 
-#ifdef Xyce_DEBUG_IO
-        cout << " Setting parameter " << parameterPtr->uTag()
-             << "to value " << parsedLine_[linePosition].string_ << endl;
-#endif
+        if (DEBUG_IO)
+          Xyce::dout() << " Setting parameter " << parameterPtr->uTag()
+                       << "to value " << parsedLine_[linePosition].string_ << std::endl;
 
         // Set the parameter value.
-        if (parameterPtr->getType() == DBLE)
+        if (parameterPtr->getType() == Xyce::Util::DBLE)
         {
-          string & tmpStr = (parsedLine_[linePosition].string_);
-          if (N_UTL::possibleParam(tmpStr))
+          std::string & tmpStr = (parsedLine_[linePosition].string_);
+          if (Util::possibleParam(tmpStr))
           {
             parameterPtr->setVal( "{" + parsedLine_[linePosition].string_ + "}" );
           }
-          else if (N_UTL::isValue(tmpStr))
+          else if (Util::isValue(tmpStr))
           {
-            parameterPtr->setVal( N_UTL::Value(tmpStr) );
+            parameterPtr->setVal( Util::Value(tmpStr) );
           }
           else
           {
             parameterPtr->setVal( parsedLine_[linePosition].string_ );
           }
         }
-        else if (parameterPtr->getType() == INT)
+        else if (parameterPtr->getType() == Xyce::Util::INT)
         {
-          string & tmpStr = (parsedLine_[linePosition].string_);
+          std::string & tmpStr = (parsedLine_[linePosition].string_);
 
-          if (N_UTL::possibleParam(tmpStr))
+          if (Util::possibleParam(tmpStr))
           {
             parameterPtr->setVal( "{" + parsedLine_[linePosition].string_ + "}");
           }
-          else if (N_UTL::isInt(tmpStr))
+          else if (Util::isInt(tmpStr))
           {
-            parameterPtr->setVal( N_UTL::Ival(tmpStr) );
+            parameterPtr->setVal( Util::Ival(tmpStr) );
           }
           else
           {
@@ -2143,19 +2194,19 @@ void N_IO_DeviceBlock::extractInstanceParameters( int searchStartPosition,
 
         ++linePosition; // Advance to next field.
       }
-      else if (parameterPtr->sVal() == "VECTOR")
+      else if (parameterPtr->stringValue() == "VECTOR")
       {
-        ostringstream paramName;
-        N_DEV_Param parameter;
-        string paramBaseName(parameterPtr->uTag());
+        std::ostringstream paramName;
+        Device::Param parameter;
+        std::string paramBaseName(parameterPtr->uTag());
         int j = 1;
         paramName << paramBaseName << j;
         parameter.set(paramName.str(), parsedLine_[linePosition].string_);
-        ExtendedString p_orig(parameter.sVal());
+        ExtendedString p_orig(parameter.stringValue());
         p_orig.toUpper();
         if (p_orig.possibleParam())
         {
-          parameter.setVal(string("{" + p_orig + "}"));
+          parameter.setVal(std::string("{" + p_orig + "}"));
           if (!circuitContext_.resolveParameter(parameter))
             parameter.setVal(p_orig);
         }
@@ -2170,11 +2221,11 @@ void N_IO_DeviceBlock::extractInstanceParameters( int searchStartPosition,
           ++linePosition;
           paramName << paramBaseName << j;
           parameter.set(paramName.str(), parsedLine_[linePosition].string_);
-          ExtendedString p_orig(parameter.sVal());
+          ExtendedString p_orig(parameter.stringValue());
           p_orig.toUpper();
           if (p_orig.possibleParam())
           {
-            parameter.setVal(string("{" + p_orig + "}"));
+            parameter.setVal(std::string("{" + p_orig + "}"));
             if (!circuitContext_.resolveParameter(parameter))
               parameter.setVal(p_orig);
           }
@@ -2183,29 +2234,25 @@ void N_IO_DeviceBlock::extractInstanceParameters( int searchStartPosition,
           ++linePosition;
         }
       }
-      else if (parameterPtr->sVal() == "VECTOR-COMPOSITE")
+      else if (parameterPtr->stringValue() == "VECTOR-COMPOSITE")
       {
-        ostringstream paramName;
+        std::ostringstream paramName;
         // Get the components from metadata.
-        vector<N_DEV_Param> components;
+        std::vector<Device::Param> components;
         metadata_.getInstanceCompositeComponents(
             getNetlistDeviceType(),
             parameterPtr->uTag(), modelLevel,
             components);
 
-#ifdef Xyce_DEBUG_IO
-        cout << " Processing composite for parameter " << parameterPtr->uTag() << endl;
+        if (DEBUG_IO) {
+          Xyce::dout() << " Processing composite for parameter " << parameterPtr->uTag() << std::endl;
 
-#endif
-
-#ifdef Xyce_DEBUG_IO
-        int sizeComp = components.size();
-        for (int ieric=0;ieric<sizeComp;++ieric)
-        {
-          N_DEV_Param tmpPar = components[ieric];
-           cout << "tag["<<ieric<<"] = " << tmpPar.uTag() << "  val = " << tmpPar.sVal() << endl;
+          for (int ieric=0; ieric < components.size(); ++ieric)
+          {
+            Xyce::dout() << "tag[" << ieric << "] = " << components[ieric].uTag() << "  val = " << components[ieric].stringValue() << std::endl;
+          }
         }
-#endif
+
         // Do some error checking.
         // find the right curly brace, if it exists.
         // This is not a perfect test.  It just finds the first one.
@@ -2213,63 +2260,55 @@ void N_IO_DeviceBlock::extractInstanceParameters( int searchStartPosition,
         int rightBracePosition = linePosition;
         int ipos1;
 
-#ifdef Xyce_DEBUG_IO
-        cout << "    Doing error checking for vector-composite..." << endl;
-#endif
+        if (DEBUG_IO)
+          Xyce::dout() << "    Doing error checking for vector-composite..." << std::endl;
+
         for (ipos1=linePosition;ipos1<numFields;++ipos1)
         {
-#ifdef Xyce_DEBUG_IO
-          cout << "    position..." << ipos1 << " string is "
-               << parsedLine_[ipos1].string_ ;
-#endif
+          if (DEBUG_IO)
+            Xyce::dout() << "    position..." << ipos1 << " string is "
+                         << parsedLine_[ipos1].string_ ;
+
           if (parsedLine_[ipos1].string_ == "}")
           {
             foundRightB = true;
             rightBracePosition = ipos1;
-#ifdef Xyce_DEBUG_IO
-            cout << "    found right brace!" ;
-#endif
+            if (DEBUG_IO)
+              Xyce::dout() << "    found right brace!" ;
           }
-#ifdef Xyce_DEBUG_IO
-          cout << endl;
-#endif
+          if (DEBUG_IO)
+            Xyce::dout() << std::endl;
         }
 
-#ifdef Xyce_DEBUG_IO
-        cout << "String at line position is " << parsedLine_[linePosition].string_ << endl ;
-#endif
+        if (DEBUG_IO)
+          Xyce::dout() << "String at line position is " << parsedLine_[linePosition].string_ << std::endl ;
 
         if (parsedLine_[linePosition].string_ != "{" || !foundRightB)
         {
           // Expect components of VECTOR-COMPOSITE to be enclosed in braces.
-            string msg("Composite parameter " + parameterPtr->uTag());
-            msg += " must be enclosed in braces {} \n";
-            N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-                netlistFileName_, parsedLine_[linePosition].lineNumber_);
+          Report::UserError().at(netlistFileName_, parsedLine_[linePosition].lineNumber_)
+            << "Composite parameter " << parameterPtr->uTag() << " must be enclosed in braces {}";
         }
         ++linePosition;
 
-        N_DEV_Param parameter( "", "" );
-        string paramBase(parameterPtr->uTag());
+        Device::Param parameter( "", "" );
+        std::string paramBase(parameterPtr->uTag());
         int numComponents = 0;
         while (parsedLine_[linePosition].string_ != "}")
         {
           ExtendedString component ( parsedLine_[linePosition].string_ );
           component.toUpper();
-          vector<N_DEV_Param>::iterator paramIter =
-            find(components.begin(),
-                components.end(),
-                N_DEV_Param(component, ""));
+          std::vector<Device::Param>::iterator paramIter =
+            std::find(components.begin(), components.end(), Device::Param(component, ""));
           if (paramIter == components.end())
           {
-            string msg("Found unexpected component \"" + component + "\" ");
-            msg += "for composite parameter " + paramBase + "\n";
-            N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-                netlistFileName_, parsedLine_[linePosition].lineNumber_);
+            Report::UserError().at(netlistFileName_, parsedLine_[linePosition].lineNumber_)
+              << "Found unexpected component \"" << component << "\" for composite parameter " << paramBase;
           }
-#ifdef Xyce_DEBUG_IO
-          cout << " Found component " << paramIter->uTag() << endl;
-#endif
+
+          if (DEBUG_IO)
+            Xyce::dout() << " Found component " << paramIter->uTag() << std::endl;
+
           linePosition += 2;
 
           // Mark the component as given in components. Later we will
@@ -2287,7 +2326,7 @@ void N_IO_DeviceBlock::extractInstanceParameters( int searchStartPosition,
 
             ExtendedString value ( parsedLine_[linePosition].string_ );
             // Commented out by TVR on 9 Nov 2010
-            // See similar comment in N_IO_ParameterBlock::extractModelData
+            // See similar comment in ParameterBlock::extractModelData
             // It is unreasonable to up-case parameter values here, because
             // the possibility exists that the string parameter value is
             // intended as a file name, and this will break on any system with
@@ -2300,7 +2339,8 @@ void N_IO_DeviceBlock::extractInstanceParameters( int searchStartPosition,
 
             if (value == "DEFAULT")
             {
-              parameter.set(paramName.str(), *paramIter);
+              // parameter.set(paramName.str(), static_cast<Util::Param &>(*paramIter));
+              setParam(parameter, paramName.str(), *paramIter);
             }
             else
             {
@@ -2321,8 +2361,8 @@ void N_IO_DeviceBlock::extractInstanceParameters( int searchStartPosition,
         // Now find the components not given in the netlist and
         // add them with their defaults.
         parameter.setGiven(false);
-        vector<N_DEV_Param>::iterator paramIter = components.begin();
-        vector<N_DEV_Param>::iterator paramEnd = components.end();
+        std::vector<Device::Param>::iterator paramIter = components.begin();
+        std::vector<Device::Param>::iterator paramEnd = components.end();
         for (; paramIter != paramEnd; ++paramIter)
         {
           if (!paramIter->given())
@@ -2330,7 +2370,8 @@ void N_IO_DeviceBlock::extractInstanceParameters( int searchStartPosition,
             for (int j = 0; j < numComponents; ++j)
             {
               paramName << paramBase << j << "." << paramIter->uTag();
-              parameter.set(paramName.str(), *paramIter);
+              // parameter.set(paramName.str(), static_cast<Util::Param &>(*paramIter));
+              setParam(parameter, paramName.str(), *paramIter);
               addInstanceParameter(parameter);
               paramName.str("");
             }
@@ -2369,23 +2410,20 @@ void N_IO_DeviceBlock::extractInstanceParameters( int searchStartPosition,
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_DeviceBlock::addDefaultInstanceParameters
+// Function       : DeviceBlock::addDefaultInstanceParameters
 // Purpose        :
 // Special Notes  :
 // Scope          : private
 // Creator        : Lon Waters
 // Creation Date  : 08/11/2003
 //----------------------------------------------------------------------------
-void N_IO_DeviceBlock::addDefaultInstanceParameters(int modelLevel)
+void DeviceBlock::addDefaultInstanceParameters(int modelLevel)
 {
-  vector<N_DEV_Param> * instanceParameterPtr =
-    metadata_.getPtrToInstanceParameters(getNetlistDeviceType(), modelLevel);
-
-  addInstanceParameters(*instanceParameterPtr);
+  addInstanceParameters(metadata_.getInstanceParameters(getNetlistDeviceType(), modelLevel));
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::issueUnrecognizedParameterError
+// Function      : DeviceBlock::issueUnrecognizedParameterError
 // Purpose       : Use the Xyce error manager to issue an error message to
 //                 the user and exit the program.
 // Special Notes :
@@ -2393,17 +2431,15 @@ void N_IO_DeviceBlock::addDefaultInstanceParameters(int modelLevel)
 // Creator       : Lon Waters, SNL
 // Creation Date : 10/01/2001
 //-----------------------------------------------------------------------------
-void N_IO_DeviceBlock::issueUnrecognizedParameterError(
-   string const& parameterName)
+void DeviceBlock::issueUnrecognizedParameterError(
+   std::string const& parameterName)
 {
-  string msg("Unrecognized parameter " + parameterName + " for device ");
-  msg += getName() + "\n";
-  N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-      netlistFileName_, parsedLine_[0].lineNumber_);
+  Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+    << "Unrecognized parameter " << parameterName << " for device " << getName();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::setParameterValues
+// Function      : DeviceBlock::setParameterValues
 // Purpose       : Look for expression valued parameters in the parameter
 //                 list, evaluate expressions found and reset the parameter
 //                 value accordingly.
@@ -2412,13 +2448,13 @@ void N_IO_DeviceBlock::issueUnrecognizedParameterError(
 // Creator       : Lon Waters, SNL
 // Creation Date : 12/31/2001
 //-----------------------------------------------------------------------------
-bool N_IO_DeviceBlock::setParameterValues()
+bool DeviceBlock::setParameterValues()
 {
-  N_DEV_Param parameter( "", "" );
+  Device::Param parameter( "", "" );
   int numParameters = getNumberOfInstanceParameters();
   int i;
-  vector<string> strings;
-  vector<string> funcs;
+  std::vector<std::string> strings;
+  std::vector<std::string> funcs;
 
   for ( i = 0; i < numParameters; ++i )
   {
@@ -2427,17 +2463,17 @@ bool N_IO_DeviceBlock::setParameterValues()
     {
       if (!circuitContext_.resolveParameter(parameter))
       {
-        string msg("Parameter " + parameter.uTag() + " for device ");
+        std::string msg("Parameter " + parameter.uTag() + " for device ");
         msg += getName() + " contains unrecognized symbol";
-        if (parameter.getType() == EXPR)
+        if (parameter.getType() == Xyce::Util::EXPR)
         {
-          N_UTL_Expression *e = parameter.ePtr();
-          vector<string>::iterator s;
+          Util::Expression &e = parameter.getValue<Util::Expression>();
+          std::vector<std::string>::iterator s;
 
           strings.clear();
           funcs.clear();
-          e->get_names(XEXP_STRING, strings);
-          e->get_names(XEXP_FUNCTION, funcs);
+          e.get_names(XEXP_STRING, strings);
+          e.get_names(XEXP_FUNCTION, funcs);
           if (strings.size() + funcs.size() == 1)
             msg += ":";
           else if (strings.size() + funcs.size() > 1)
@@ -2449,25 +2485,25 @@ bool N_IO_DeviceBlock::setParameterValues()
         }
         else
         {
-          msg += "(s): " + parameter.sVal();
+          msg += "(s): " + parameter.stringValue();
         }
         if (strings.size() + funcs.size() > 0)
         {
-          N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg,
-              netlistFileName_, parsedLine_[0].lineNumber_);
+          Report::UserError().at(netlistFileName_, parsedLine_[0].lineNumber_)
+            << msg;
         }
       }
       setInstanceParameter( i, parameter );
     }
     else
     {
-      if ( parameter.getType() == STR && !(parameter.isNumeric()) )
+      if ( parameter.getType() == Xyce::Util::STR && !(parameter.isNumeric()) )
       {
-        if (N_UTL::possibleParam(parameter.sVal()))
+        if (Util::possibleParam(parameter.stringValue()))
         {
-          ExtendedString p_orig(parameter.sVal()); p_orig.toUpper();
+          ExtendedString p_orig(parameter.stringValue()); p_orig.toUpper();
 
-          parameter.setVal(string("{" + p_orig + "}"));
+          parameter.setVal(std::string("{" + p_orig + "}"));
           if (!circuitContext_.resolveParameter(parameter))
             parameter.setVal(p_orig);
         }
@@ -2481,16 +2517,16 @@ bool N_IO_DeviceBlock::setParameterValues()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::findInstanceParameter
+// Function      : DeviceBlock::findInstanceParameter
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/04/2001
 //-----------------------------------------------------------------------------
-N_DEV_Param* N_IO_DeviceBlock::findInstanceParameter( N_DEV_Param const& parameter )
+Device::Param* DeviceBlock::findInstanceParameter( Util::Param const& parameter )
 {
-  vector<N_DEV_Param>::iterator paramIter;
+  std::vector<Device::Param>::iterator paramIter;
 
   paramIter = find( deviceData_.getDevBlock().params.begin(),
                     deviceData_.getDevBlock().params.end(),
@@ -2507,50 +2543,41 @@ N_DEV_Param* N_IO_DeviceBlock::findInstanceParameter( N_DEV_Param const& paramet
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::findInstanceParameter
+// Function      : DeviceBlock::findInstanceParameter
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 01/04/2001
 //-----------------------------------------------------------------------------
-N_DEV_Param* N_IO_DeviceBlock::findInstanceParameter(
-      string const& parameterName )
+Device::Param* DeviceBlock::findInstanceParameter(
+      std::string const& parameterName )
 {
-  N_DEV_Param parameter( parameterName, "" );
+  Device::Param parameter( parameterName, "" );
 
   return findInstanceParameter( parameter );
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_DeviceBlock::getInstanceParameters
+// Function       : DeviceBlock::getInstanceParameters
 // Purpose        :
 // Special Notes  :
 // Scope          :
 // Creator        : Lon Waters
 // Creation Date  : 02/10/2003
 //----------------------------------------------------------------------------
-void N_IO_DeviceBlock::getInstanceParameters(
-    vector<N_DEV_Param>& parameters)
+void DeviceBlock::getInstanceParameters(
+    std::vector<Device::Param>& parameters)
 {
   parameters.reserve(deviceData_.getDevBlock().params.size());
 
-#ifdef HAVE_FLEXIBLE_INSERT
   parameters.insert(parameters.end(),
                     deviceData_.getDevBlock().params.begin(),
                     deviceData_.getDevBlock().params.end());
-#else
-  vector<N_DEV_Param>::const_iterator iterIL =
-    deviceData_.getDevBlock().params.begin();
-  vector<N_DEV_Param>::const_iterator iterEnd =
-    deviceData_.getDevBlock().params.end();
-  for (; iterIL != iterEnd; ++iterIL)
-    parameters.push_back( *iterIL);
-#endif
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::extractMIDeviceData
+// Function      : DeviceBlock::extractMIDeviceData
 // Purpose       : Extract the device data from parsedLine for YMIL/YMIN device
 //
 //                  Y%type%name inductor_list coupling_list model params
@@ -2580,7 +2607,7 @@ void N_IO_DeviceBlock::getInstanceParameters(
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_IO_DeviceBlock::extractMIDeviceData()
+bool DeviceBlock::extractMIDeviceData()
 {
   // The device name has been extracted by extractData. The
   // remaining data in parsedLine is extracted here.
@@ -2589,7 +2616,7 @@ bool N_IO_DeviceBlock::extractMIDeviceData()
   // Extract the model name from parsedLine if one exists. If
   // a model name was found, find its type.
   int modelLevel, modelNamePosition;
-  string modelType;
+  std::string modelType;
   bool modelFound = extractModelName( modelType, modelLevel, modelNamePosition );
   if( !modelFound ) modelLevel = -1;
 
@@ -2598,29 +2625,26 @@ bool N_IO_DeviceBlock::extractMIDeviceData()
   if( metadata_.isModelRequired(getNetlistDeviceType(), modelLevel ) &&
    !modelFound )
   {
-    string msg("Did not find required model for device ");
-    msg += getName() + "\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+    Report::UserError() << "Did not find required model for device " << getName();
+    return false;
   }
 
-  if( modelFound )
+  if (modelFound)
   {
     // Query the metadata for the validity of the device model.  Note that the
     // YMIL/YMIN model metadata is extracted from the K model metadata
     if( !metadata_.isModelTypeValid(getNetlistDeviceType(), modelType, modelLevel ) )
     {
-      string msg("Model type \"" + modelType + "\" not valid for");
-      msg += " device " + getName() + " of type " + getNetlistDeviceType();
-      msg += "\n";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+      Report::UserError() << "Model type \"" << modelType << "\" not valid for device " << getName() << " of type " << getNetlistDeviceType();
+      return false;
     }
   }
 
-  set< string > inductors;
-  N_DEV_Param param;
+  std::set< std::string > inductors;
+  Device::Param param;
 
   // parameters names differ between YMIL and YMIN
-  string tmpDiff;
+  std::string tmpDiff;
   if( modelFound )
   {
     param.setTag( "NONLINEARCOUPLING" );
@@ -2635,11 +2659,11 @@ bool N_IO_DeviceBlock::extractMIDeviceData()
   }
 
   // Extract the device nodes from parsedLine_.
-  list<tagged_param> nodeValues;
+  std::list<tagged_param> nodeValues;
   int nodesFound = 0, i = 1;
 
   // stop when first inductor name is seen again == start of coupling list
-  string couplingListFlag(parsedLine_[i].string_);
+  std::string couplingListFlag(parsedLine_[i].string_);
 
   do
   {
@@ -2696,17 +2720,14 @@ bool N_IO_DeviceBlock::extractMIDeviceData()
     {
       // add coupling list
       param.setTag( "COUPLING" );
-      string &  coup = ((parsedLine_[i].string_));
-      //ExtendedString coup ((parsedLine_[i].string_).c_str());
-      //if (coup.isValue())
-      if (N_UTL::isValue(coup))
+      std::string &  coup = ((parsedLine_[i].string_));
+      if (Util::isValue(coup))
       {
-        //param.setVal(coup.Value());
-        param.setVal(N_UTL::Value(coup));
+        param.setVal(Util::Value(coup));
       }
       else
       {
-        string exp("{"+ parsedLine_[i].string_ + "}");
+        std::string exp("{"+ parsedLine_[i].string_ + "}");
         param.setVal(exp);
       }
 
@@ -2750,8 +2771,8 @@ bool N_IO_DeviceBlock::extractMIDeviceData()
   // Issue warning if there are more fields on the line.
   if( pEnd + 1 < numFields )
   {
-    string msg("Unrecognized fields for device " + getName() + "\n");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg );
+    Report::UserError() << "Unrecognized fields for device " << getName();
+    return false;
   }
 
   return true;  // Only get here on success.
@@ -2759,7 +2780,7 @@ bool N_IO_DeviceBlock::extractMIDeviceData()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_DeviceBlock::isValidDeviceType
+// Function      : DeviceBlock::isValidDeviceType
 // Purpose       : Given a device type (a letter) return false
 //                 if that letter represents  an  illegal, unimplemented
 //                 device type
@@ -2769,14 +2790,13 @@ bool N_IO_DeviceBlock::extractMIDeviceData()
 // Creator       : Tom Russo
 // Creation Date : 06/20/2008
 //-----------------------------------------------------------------------------
-bool N_IO_DeviceBlock::isValidDeviceType(const string & deviceType)
+bool DeviceBlock::isValidDeviceType(const std::string & deviceType)
 {
 
   bool retcode;
   if (deviceType == "A" ||
       deviceType == "N" ||
-      deviceType == "P" ||
-      deviceType == "U")
+      deviceType == "P" ) 
   {
     retcode=false;
   }
@@ -2787,3 +2807,151 @@ bool N_IO_DeviceBlock::isValidDeviceType(const string & deviceType)
 
   return (retcode);
 }
+
+//-----------------------------------------------------------------------------
+// Function      : DeviceBlock::getNodeValue
+// Purpose       :
+// Special Notes : It is assumed that getNumberOfNodes was called to ensure
+//                 that i is in range.
+// Scope         : public
+// Creator       : Lon Waters, SNL
+// Creation Date : 01/04/2002
+//-----------------------------------------------------------------------------
+const std::string &DeviceBlock::getNodeValue( int i ) const
+{
+  std::list<tagged_param>::const_iterator paramIter;
+  paramIter = (deviceData_.getNodeBlock().get_NodeList()).begin();
+  for ( int j = 0; j < i; j++ )
+  {
+    paramIter++;
+  }
+  return paramIter->tag;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : DeviceBlock::getAllNodeNames
+// Purpose       :
+// Special Notes :
+// Scope         :
+// Creator       :
+// Creation Date :
+//-----------------------------------------------------------------------------
+void DeviceBlock::getAllNodeNames( std::list< std::string > & nodeNames )
+{
+  std::list<tagged_param>::const_iterator paramIter, paramEnd;
+
+  paramIter = ( deviceData_.getNodeBlock().get_NodeList() ).begin();
+  paramEnd  = ( deviceData_.getNodeBlock().get_NodeList() ).end();
+
+  nodeNames.clear();
+
+  for ( ; paramIter != paramEnd; ++paramIter )
+  {
+    nodeNames.push_back( paramIter->tag );
+  }
+}
+
+//-----------------------------------------------------------------------------
+// Function      : DeviceBlock::setNodeValue
+// Purpose       :
+// Special Notes : It is assumed getNumberOfNodes was called to ensure
+//                 that i is in range.
+// Scope         : public
+// Creator       : Lon Waters, SNL
+// Creation Date : 01/04/2002
+//-----------------------------------------------------------------------------
+void DeviceBlock::setNodeValue(int const& i, std::string const& nodeValue )
+{
+  std::list<tagged_param>::const_iterator paramIter;
+  paramIter = deviceData_.getNodeBlock().get_NodeList().begin();
+  for ( int j = 0; j < i; j++ )
+  {
+    paramIter++;
+  }
+  tagged_param* paramPtr = const_cast<tagged_param*> (&(*paramIter));
+  paramPtr->tag = nodeValue;
+}
+
+//----------------------------------------------------------------------------
+// Function       : DeviceBlock::setNodeValues
+// Purpose        :
+// Special Notes  :
+// Scope          : public
+// Creator        : Lon Waters
+// Creation Date  : 08/12/2003
+//----------------------------------------------------------------------------
+void DeviceBlock::setNodeValues(std::list<tagged_param> const& nodeValues)
+{
+  std::list<tagged_param>::const_iterator n=nodeValues.begin() ;
+  std::list<tagged_param>::const_iterator nEnd=nodeValues.end() ;
+  for ( ; n != nEnd ; ++n)
+  {
+    checkNode(n->tag);
+  }
+
+  deviceData_.getNodeBlock().set_NodeList(nodeValues);
+}
+
+//----------------------------------------------------------------------------
+// Function       : DeviceBlock::checkNode
+// Purpose        :
+// Special Notes  :
+// Scope          : public
+// Creator        :
+// Creation Date  :
+//----------------------------------------------------------------------------
+void
+DeviceBlock::checkNode (std::string const& n)
+{
+
+/* DEBUG_ELR_PROFILE - FIXME remove this block; mostly done in pass 2
+
+  CircuitContext* myContext = circuitContext_.getCurrentContextPtr();
+
+  if (!(myContext->devMap.empty()))
+  {
+    if (myContext->devMap.find(n) != myContext->devMap.end())
+    {
+      std::string msg("Device and node share the same name: " + n);
+      if (myContext->getName() != "")
+	msg += " in subcircuit: " + myContext->getName();
+      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+    }
+  }
+
+  if ( !(myContext->modMap.empty()) )
+  {
+    if (myContext->modMap.find(n) != myContext->modMap.end())
+    {
+      std::string msg("Model and node share the same name: " + n);
+      if (myContext->getName() != "")
+	msg += " in subcircuit: " + myContext->getName();
+      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+    }
+  }
+
+*/
+
+}
+
+//-----------------------------------------------------------------------------
+// Function      : DeviceBlock::setInstanceParamter
+// Purpose       :
+// Special Notes : It assumed that getNumberOfInstanceParameters was called
+//                 to ensure that i is in range.
+// Scope         : public
+// Creator       : Lon Waters, SNL
+// Creation Date : 01/04/2002
+//-----------------------------------------------------------------------------
+void
+DeviceBlock::setInstanceParameter(
+  int                   i,
+  Device::Param &       parameter )
+{
+  // deviceData_.getDevBlock().params[i].setVal(static_cast<Util::Param &>(parameter));
+  setParamValue(deviceData_.getDevBlock().params[i], parameter);
+  deviceData_.getDevBlock().params[i].setGiven( parameter.given() );
+}
+
+} // namespace IO
+} // namespace Xyce

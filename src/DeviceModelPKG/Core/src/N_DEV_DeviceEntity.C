@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,34 +36,28 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.193.2.4 $
+// Revision Number: $Revision: 1.223.2.3 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/12 16:50:27 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: dgbaur $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
 #include <string>
 #include <iostream>
 #include <map>
 
-// ----------   Xyce Includes   ----------
 #include <N_DEV_fwd.h>
-#include <N_DEV_DeviceEntity.h>
-#include <N_DEV_DeviceModel.h>
-#include <N_DEV_DeviceInstance.h>
-#include <N_DEV_DeviceBlock.h>
-#include <N_DEV_DeviceOptions.h>
-#include <N_DEV_Units.h>
+#include <N_DEV_CompositeParam.h>
 #include <N_DEV_Const.h>
+#include <N_DEV_DeviceEntity.h>
+#include <N_DEV_DeviceOptions.h>
+#include <N_DEV_Message.h>
 #include <N_DEV_Param.h>
 #include <N_DEV_SolverState.h>
-#include <N_DEV_CompositeParam.h>
-
+#include <N_UTL_BreakPoint.h>
 #include <N_UTL_Expression.h>
 
 
@@ -79,20 +73,20 @@ namespace Device {
 // Creation Date : 12/13/04
 //-----------------------------------------------------------------------------
 DeviceEntity::DeviceEntity(
-  SolverState &         solver_state,
-  DeviceOptions &       device_options,
-  const std::string &   device_name,
-  const std::string &   net_list_file_path,
-  int                   net_list_file_line_number)
-  : solState(solver_state),
-    devOptions(device_options),
-    commandLine(device_options.commandLine),
-    paramNew(0.0),
-    paramOld(0.0),
+  const char * const            entity_type,
+  const std::string &           device_name,
+  ParametricData<void> &        parametric_data,
+  const SolverState &           solver_state,
+  const DeviceOptions &         device_options,
+  const std::string &           netlist_path,
+  int                           netlist_line)
+  : entityType_(entity_type),
     name_(device_name),
-    defaultParamName(""),
-    netlistFileName_(net_list_file_path),
-    lineNumber_(net_list_file_line_number)
+    parametricData_(parametric_data),
+    solState_(solver_state),
+    devOptions_(device_options),
+    defaultParamName_(),
+    netlistLocation_(netlist_path, netlist_line)
 {}
 
 //-----------------------------------------------------------------------------
@@ -105,8 +99,8 @@ DeviceEntity::DeviceEntity(
 //-----------------------------------------------------------------------------
 DeviceEntity::~DeviceEntity()
 {
-  vector<Depend>::iterator d = dependentParams.begin();
-  vector<Depend>::iterator end = dependentParams.end();
+  std::vector<Depend>::iterator d = dependentParams.begin();
+  std::vector<Depend>::iterator end = dependentParams.end();
   for ( ; d != end; ++d)
   {
     delete d->expr;
@@ -114,66 +108,10 @@ DeviceEntity::~DeviceEntity()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : DeviceEntity::processInstanceParams
-// Purpose       : Generate error for virtual method
-// Special Notes :
-// Scope         : public
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 04/25/06
-//-----------------------------------------------------------------------------
-bool DeviceEntity::processInstanceParams(string s)
-{
-  string msg("DeviceEntity::processInstanceParams: method not found for: ");
-  msg += getName();
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  return true;
-}
-
-#if 0
-//-----------------------------------------------------------------------------
-// Function      : DeviceEntity::perturbSensParam
-// Purpose       :
-// Special Notes :
-// Scope         : public
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 05/02/03
-//-----------------------------------------------------------------------------
-bool DeviceEntity::perturbSensParam (Param & ndParam)
-{
-  if ( !ndParam.isTimeDependent() )
-  {
-    paramOld = ndParam.dVal();
-    getDeviceOptions().deviceSens_dp = getDeviceOptions().testJac_SqrtEta * (1.0 + fabs(ndParam.dVal()));
-    paramNew = paramOld + getDeviceOptions().deviceSens_dp;
-
-    ndParam.setVal (paramNew);
-  }
-  else
-  {
-    string msg("DeviceEntity::perturbSensParam\n");
-    msg += "\t time dependent parameter (" + ndParam.uTag();
-    msg += ") not allowed as a sensitivity parameter.\n";
-    msg += "Continuing analysis without perturubing this parameter.";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_WARNING_0,msg);
-  }
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << "DeviceEntity::perturbSensParams" << endl;
-    cout << "paramNew = " << paramNew <<endl;
-    cout << "paramOld = " << paramOld <<endl;
-    cout << "dp    = " << getDeviceOptions().deviceSens_dp << endl;
-  }
-#endif
-  return true;
-}
-#endif
-
-//-----------------------------------------------------------------------------
 // Function      : DeviceEntity::scaleParam
 //
 // Purpose : Scales the original value of the specified parameter by the specified value.
+// The parameter is never specified by the user so errors are developer caused.
 //
 // Special Notes :
 //
@@ -183,40 +121,33 @@ bool DeviceEntity::perturbSensParam (Param & ndParam)
 //-----------------------------------------------------------------------------
 bool DeviceEntity::scaleParam( const std::string & paramName, double val, double val0)
 {
-  ExtendedString tmpName(paramName);
-  tmpName.toUpper ();
+  ParameterMap::const_iterator p_i = getParameterMap().find(paramName);
+  if (p_i == getParameterMap().end())
+  {
+    DevelFatal(*this).in("DeviceEntity::scaleParam") << "Unrecognized parameter " << paramName;
+    return false;
+  }
 
-  ParameterMap::const_iterator p_i = (*getPMap()).find(tmpName);
-  if (p_i != (*getPMap()).end())
+  const Descriptor &param = *(*p_i).second;
+  if (!param.hasOriginalValueStored())
   {
-    const Pars &param = static_cast<const Pars &>(*(*p_i).second);
-    if (param.getOriginalValueIndex() >= 0)
-    {
-      if (param.isType<double>())
-        setValue<double, DeviceEntity>(*this, param, getOriginalValue(this, param.getOriginalValueIndex())*val + val0*(1.0-val));
-      else
-      {
-        string msg("DeviceEntity::scaleParam: can scale only double parameters: ");
-        msg += paramName;
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-      }
-    }
-    else
-    {
-      string msg("DeviceEntity::scaleParam: original value not available for: ");
-      msg += paramName;
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-    }
-    if (param.hasGivenMember())
-      param.setGiven(*this, true);
-    setValueGiven(this, param.getSerialNumber(), true);
+    DevelFatal(*this).in("DeviceEntity::scaleParam") << "Original value not available for parameter " << paramName;
+    return false;
   }
-  else
+
+  if (!param.isType<double>())
   {
-    string msg("DeviceEntity::scaleParam: unrecognized param: ");
-    msg += paramName;
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
+    DevelFatal(*this).in("DeviceEntity::scaleParam") << "Can scale only double parameters, parameter " << paramName << " is not double";
+    return false;
   }
+
+  // Scale the parameter
+  setValue<double, DeviceEntity>(*this, param, Xyce::Device::getOriginalValue(*this, param.getSerialNumber())*val + val0*(1.0-val));
+
+  if (param.hasGivenMember())
+    param.setGiven(*this, true);
+
+  Xyce::Device::setValueGiven(*this, param.getSerialNumber(), true);
 
   return true;
 }
@@ -225,6 +156,7 @@ bool DeviceEntity::scaleParam( const std::string & paramName, double val, double
 // Function      : DeviceEntity::scaleParam
 //
 // Purpose       : Scales the specified parameter by a specified value.
+// The parameter is never specified by the user so errors are developer caused.
 //
 // Special Notes :
 //
@@ -232,39 +164,35 @@ bool DeviceEntity::scaleParam( const std::string & paramName, double val, double
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 02/21/04
 //-----------------------------------------------------------------------------
-bool DeviceEntity::scaleParam ( const std::string & paramName, double val)
+bool DeviceEntity::scaleParam( const std::string & paramName, double val)
 {
-  ParameterMap::const_iterator p_i = (*getPMap()).find(paramName);
-  if (p_i != (*getPMap()).end())
+  ParameterMap::const_iterator p_i = getParameterMap().find(paramName);
+  if (p_i == getParameterMap().end())
   {
-    const Pars &param = static_cast<const Pars &>(*(*p_i).second);
-    if (param.getOriginalValueIndex() >= 0)
-    {
-      if (param.isType<double>())
-        param.value<double>(*this) = getOriginalValue(this, param.getOriginalValueIndex())*val;
-      else
-      {
-        string msg("DeviceEntity::scaleParam: can only scale double parameter: ");
-        msg += paramName;
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-      }
-    }
-    else
-    {
-      string msg("DeviceEntity::scaleParam: original value not available for: ");
-      msg += paramName;
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-    }
-    if (param.hasGivenMember())
-      param.setGiven(*this, true);
-    setValueGiven(this, param.getSerialNumber(), true);
+    DevelFatal(*this).in("DeviceEntity::scaleParam") << "Unrecognized parameter " << paramName;
+    return false;
   }
-  else
+
+  const Descriptor &param = *(*p_i).second;
+  if (!param.hasOriginalValueStored())
   {
-    string msg("DeviceEntity::scaleParam: unrecognized param: ");
-    msg += paramName;
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
+    DevelFatal(*this).in("DeviceEntity::scaleParam") << "Original value not available for parameter " << paramName;
+    return false;
   }
+
+  if (!param.isType<double>())
+  {
+    DevelFatal(*this).in("DeviceEntity::scaleParam") << "Can scale only double parameters, parameter " << paramName << " is not double";
+    return false;
+  }
+
+  // Scale the parameter
+  param.value<double>(*this) = Xyce::Device::getOriginalValue(*this, param.getSerialNumber())*val;
+
+  if (param.hasGivenMember())
+    param.setGiven(*this, true);
+
+  Xyce::Device::setValueGiven(*this, param.getSerialNumber(), true);
 
   return true;
 }
@@ -272,21 +200,21 @@ bool DeviceEntity::scaleParam ( const std::string & paramName, double val)
 //-----------------------------------------------------------------------------
 // Function      : DeviceEntity::scaleDefaultParam
 // Purpose       :
+// The parameter is never specified by the user so errors are developer caused.
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 50/19/05
 //-----------------------------------------------------------------------------
-bool DeviceEntity::scaleDefaultParam (double val)
+bool DeviceEntity::scaleDefaultParam(double val)
 {
-  if (defaultParamName == "")
+  if (defaultParamName_.empty())
   {
-    string msg("DeviceEntity::scaleDefaultParam. ");
-    msg += getName() + " does not have a default parameter";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg);
+    DevelFatal(*this).in("DeviceEntity::scaleDefaultParam") << "Device " << getName() << " does not have a default parameter";
+    return false;
   }
 
-  return scaleParam(defaultParamName, val);
+  return scaleParam(defaultParamName_, val);
 }
 
 //-----------------------------------------------------------------------------
@@ -308,41 +236,32 @@ bool DeviceEntity::scaleDefaultParam (double val)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 07/25/03
 //-----------------------------------------------------------------------------
-bool DeviceEntity::setParam ( const string & paramName, double val)
+bool DeviceEntity::setParam(const std::string & paramName, double val)
 {
-  ExtendedString tmpName(paramName);
-  tmpName.toUpper ();
-
-  ParameterMap::const_iterator p_i = (*getPMap()).find(tmpName);
-  if (p_i != (*getPMap()).end())
-  {
-    if (tmpName == "TEMP" || tmpName == "TNOM")
-      val += CONSTCtoK;
-    const Pars &param = static_cast<const Pars &>(*(*p_i).second);
-    if (param.isType<double>())
-      param.value<double>(*this) = val;
-    else if (param.isType<int>())
-      param.value<int>(*this) = static_cast <int> (val);
-    else if (param.isType<long>())
-      param.value<long>(*this) =  static_cast <long> (val);
-    else if (param.isType<bool>())
-      param.value<bool>(*this) = (val != 0);
-    else
-    {
-      string msg("DeviceEntity::setParam: illegal type for param: ");
-      msg += paramName;
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, oss.str());
-    }
-    if (param.hasGivenMember())
-      param.setGiven(*this, true);
-    setValueGiven(this, param.getSerialNumber(), true);
-  }
-  else
-  {
+  ParameterMap::const_iterator p_i = getParameterMap().find(paramName);
+  if (p_i == getParameterMap().end())
     return false;
-  }
+
+  if (isTempParam(paramName))
+    val += CONSTCtoK;
+
+  const Descriptor &param = *(*p_i).second;
+
+  if (param.isType<double>())
+    param.value<double>(*this) = val;
+  else if (param.isType<int>())
+    param.value<int>(*this) = static_cast <int> (val);
+  else if (param.isType<long>())
+    param.value<long>(*this) =  static_cast <long> (val);
+  else if (param.isType<bool>())
+    param.value<bool>(*this) = (val != 0);
+  else
+    DevelFatal0(*this) << "Illegal type for parameter " << paramName;
+
+  if (param.hasGivenMember())
+    param.setGiven(*this, true);
+
+  Xyce::Device::setValueGiven(*this, param.getSerialNumber(), true);
 
   return true;
 }
@@ -361,19 +280,16 @@ bool DeviceEntity::setParam ( const string & paramName, double val)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 07/25/03
 //-----------------------------------------------------------------------------
-bool DeviceEntity::getParam ( const string & paramName, double & result)
+bool DeviceEntity::getParam ( const std::string & paramName, double & result)
 {
   double val = 0.0;
   bool found = false;
 
-  ExtendedString tmpName(paramName);
-  tmpName.toUpper ();
-
-  ParameterMap::const_iterator p_i = (*getPMap()).find(paramName);
-  if (p_i != (*getPMap()).end())
+  ParameterMap::const_iterator p_i = getParameterMap().find(paramName);
+  if (p_i != getParameterMap().end())
   {
     found = true;
-    const Pars &param = static_cast<const Pars &>(*(*p_i).second);
+    const Descriptor &param = *(*p_i).second;
     if (param.isType<double>())
       val = param.value<double>(*this);
     else if (param.isType<int>())
@@ -389,13 +305,9 @@ bool DeviceEntity::getParam ( const string & paramName, double & result)
     }
     else
     {
-      string msg("DeviceEntity::getParam: illegal type for param: ");
-      msg += paramName;
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, oss.str());
+      DevelFatal(*this).in("DeviceEntity::getParam") << "Illegal type for parameter " << paramName;
     }
-    if (tmpName == "TEMP" || tmpName == "TNOM")
+    if (isTempParam(paramName))
       val -= CONSTCtoK;
   }
   else
@@ -417,16 +329,12 @@ bool DeviceEntity::getParam ( const string & paramName, double & result)
 //-----------------------------------------------------------------------------
 bool DeviceEntity::setDefaultParam (double val)
 {
-  if (defaultParamName == "")
+  if (defaultParamName_.empty())
   {
-    string msg("DeviceEntity::setDefaultParam. ");
-    msg += getName() + " does not have a default parameter";
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, oss.str());
+    DevelFatal(*this).in("DeviceEntity::setDefaultParam") << getName() << " does not have a default parameter";
   }
 
-  return setParam(defaultParamName, val);
+  return setParam(defaultParamName_, val);
 }
 
 //-----------------------------------------------------------------------------
@@ -439,14 +347,14 @@ bool DeviceEntity::setDefaultParam (double val)
 //-----------------------------------------------------------------------------
 double DeviceEntity::getDefaultParam ()
 {
-  if (defaultParamName == "")
+  if (defaultParamName_.empty())
   {
     return 0.0;
   }
 
   double result = 0.0;
 
-  getParam(defaultParamName, result);
+  getParam(defaultParamName_, result);
 
   return result;
 }
@@ -460,13 +368,13 @@ double DeviceEntity::getDefaultParam ()
 // Creator       : Tom Russo
 // Creation Date : 6 Nov 07
 //-----------------------------------------------------------------------------
-double DeviceEntity::setDependentParameter (N_UTL_Param & par,
+double DeviceEntity::setDependentParameter (Util::Param & par,
                                             double *res,
                                             ParameterType::ExprAccess depend)
 
 {
   Depend dependentParam;
-  setDependentParameter(par,dependentParam, depend);
+  setDependentParameter(par, dependentParam, depend);
 
   dependentParam.resultU.result = res;
   dependentParam.vectorIndex = -1;
@@ -489,7 +397,7 @@ double DeviceEntity::setDependentParameter (N_UTL_Param & par,
 // Creator       : Tom Russo
 // Creation Date : 6 Nov 07
 //-----------------------------------------------------------------------------
-double DeviceEntity::setDependentParameter (N_UTL_Param & par,
+double DeviceEntity::setDependentParameter (Util::Param & par,
                                             std::vector<double> *res,
                                             int ind,
                                             ParameterType::ExprAccess depend)
@@ -518,21 +426,21 @@ double DeviceEntity::setDependentParameter (N_UTL_Param & par,
 // Creation Date : 11/18/04
 //-----------------------------------------------------------------------------
 
-void DeviceEntity::setDependentParameter (N_UTL_Param & par,
+void DeviceEntity::setDependentParameter (Util::Param & par,
                                           Depend & dependentParam,
                                           ParameterType::ExprAccess depend)
 {
-  vector<string> instances, leads, names, variables;
+  std::vector<std::string> instances, leads, names, variables;
 
   dependentParam.name = par.tag();
-  if (par.tag() == "TEMP" || par.tag() == "TNOM")
+  if (isTempParam(par.tag()))
   {
-    dependentParam.expr = new N_UTL_Expression ("(" + par.sVal() + ")+CONSTCtoK");
-    dependentParam.expr->make_constant (string("CONSTCTOK"), CONSTCtoK);
+    dependentParam.expr = new Util::Expression ("(" + par.stringValue() + ")+CONSTCtoK");
+    dependentParam.expr->make_constant (std::string("CONSTCTOK"), CONSTCtoK);
   }
   else
   {
-    dependentParam.expr = new N_UTL_Expression (par.eVal());
+    dependentParam.expr = new Util::Expression (par.getValue<Util::Expression>());
   }
 
   names.clear();
@@ -545,30 +453,22 @@ void DeviceEntity::setDependentParameter (N_UTL_Param & par,
   dependentParam.expr->get_names(XEXP_INSTANCE, instances);
   dependentParam.expr->get_names(XEXP_VARIABLE, variables);
 
-  //vector<string>::iterator s;
-  vector<string>::iterator iterS;
+  //std::vector<std::string>::iterator s;
+  std::vector<std::string>::iterator iterS;
 
   if (!(depend & ParameterType::SOLN_DEP))
   {
     if (names.size() > 0 || instances.size() > 0)
     {
-      string msg("In device: " + getName() + ", Parameter: ");
-      msg += par.tag();
-      msg += " is not allowed to depend on voltage/current values";
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+      UserError0(*this) << "Parameter " << par.tag() << " is not allowed to depend on voltage/current values";
+      return;
     }
     if (depend & ParameterType::NO_DEP)
     {
       if (dependentParam.expr->get_num(XEXP_SPECIAL) > 0)
       {
-        string msg("In device: " + getName() + ", Parameter: ");
-        msg += par.tag();
-        msg += " is not allowed to depend on time";
-        std::ostringstream oss;
-        oss << "Error in " << netlistLocation() << "\n" << msg;
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+        UserError0(*this) << "Parameter " << par.tag() << " is not allowed to depend on time";
+        return;
       }
     }
   }
@@ -577,24 +477,18 @@ void DeviceEntity::setDependentParameter (N_UTL_Param & par,
   {
     char type;
     int index;
-    vector<string>::iterator n_i=leads.begin();
-    vector<string>::iterator n_end=leads.end();
-    for ( ; n_i != n_end; ++n_i)
+    for (std::vector<std::string>::const_iterator n_i=leads.begin(); n_i != leads.end(); ++n_i)
     {
       index = n_i->find_last_of(":");
-      if (index == string::npos )
+      if (index == std::string::npos )
         type = (*n_i)[0];
       else
         type = (*n_i)[index+1];
+
       if (type != 'B' && type != 'E' && type != 'H')
       {
-        string msg("In device: " + getName() + ", Parameter: ");
-        msg += par.tag();
-        msg += ", Illegal use of lead current specification in expression: ";
-        msg += dependentParam.expr->get_expression();
-        std::ostringstream oss;
-        oss << "Error in " << netlistLocation() << "\n" << msg;
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, oss.str());
+        UserError(*this) << "Illegal use of lead current specification in expression '" << dependentParam.expr->get_expression()
+                         << "' in parameter " << par.tag();
       }
     }
     names.insert( names.end(), leads.begin(), leads.end() );
@@ -624,7 +518,7 @@ void DeviceEntity::setDependentParameter (N_UTL_Param & par,
 
   if (dependentParam.n_vars > 0)
   {
-    vector<double> zeros;
+    std::vector<double> zeros;
     zeros.resize(dependentParam.n_vars);
     for (int i=0 ; i<dependentParam.n_vars ; ++i)
       zeros[i] = 0;
@@ -638,16 +532,14 @@ void DeviceEntity::setDependentParameter (N_UTL_Param & par,
     {
       if (getSolverState().global_params.find(*iterS) == getSolverState().global_params.end())
       {
-        string msg("In device: " + getName() + ", Global parameter: " + *iterS +" not found");
-        std::ostringstream oss;
-        oss << "Error in " << netlistLocation() << "\n" << msg;
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+        UserError0(*this) << "Global parameter " << *iterS << " not found";
       }
-      dependentParam.expr->set_var(*iterS,getSolverState().global_params[*iterS]);
-      dependentParam.global_params.push_back(*iterS);
+      else {
+        dependentParam.expr->set_var(*iterS, getSolverState().global_params[*iterS]);
+        dependentParam.global_params.push_back(*iterS);
+      }
     }
   }
-
 }
 
 //-----------------------------------------------------------------------------
@@ -660,8 +552,8 @@ void DeviceEntity::setDependentParameter (N_UTL_Param & par,
 //-----------------------------------------------------------------------------
 bool DeviceEntity::updateDependentParameters(N_LAS_Vector & vars)
 {
-  vector<Depend>::iterator dpIter = dependentParams.begin();
-  vector<Depend>::iterator end = dependentParams.end();
+  std::vector<Depend>::iterator dpIter = dependentParams.begin();
+  std::vector<Depend>::iterator end = dependentParams.end();
   double rval(0.0);
   int i, hi;
   bool changed = false;
@@ -700,10 +592,10 @@ bool DeviceEntity::updateDependentParameters(N_LAS_Vector & vars)
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 11/17/05
 //-----------------------------------------------------------------------------
-bool DeviceEntity::updateGlobalParameters(map<string,double> & global_map)
+bool DeviceEntity::updateGlobalParameters(std::map<std::string,double> & global_map)
 {
-  vector<Depend>::iterator dpIter = dependentParams.begin();
-  vector<Depend>::iterator end = dependentParams.end();
+  std::vector<Depend>::iterator dpIter = dependentParams.begin();
+  std::vector<Depend>::iterator end = dependentParams.end();
   double rval;
   int i, hi;
   bool changed = false;
@@ -712,15 +604,13 @@ bool DeviceEntity::updateGlobalParameters(map<string,double> & global_map)
   {
     if (!dpIter->global_params.empty())
     {
-      vector<string>::iterator gp=dpIter->global_params.begin();
-      vector<string>::iterator gend=dpIter->global_params.end();
+      std::vector<std::string>::iterator gp=dpIter->global_params.begin();
+      std::vector<std::string>::iterator gend=dpIter->global_params.end();
       for ( ; gp != gend; ++gp)
       {
         if (global_map.find(*gp) == global_map.end())
         {
-          string msg("Failed to find global param in map: ");
-          msg += *gp;
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
+          DevelFatal(*this).in("DeviceEntity::updateGlobalParameters") << "Failed to find global parameter " << *gp;
         }
         if (dpIter->expr->set_var(*gp, global_map[*gp]))
           changed = true;
@@ -744,8 +634,8 @@ bool DeviceEntity::updateDependentParameters()
   double rval;
   bool changed = false;
 
-  vector<Depend>::iterator dpIter = dependentParams.begin();
-  vector<Depend>::iterator end = dependentParams.end();
+  std::vector<Depend>::iterator dpIter = dependentParams.begin();
+  std::vector<Depend>::iterator end = dependentParams.end();
   for ( ; dpIter != end; ++dpIter)
   {
     if (dpIter->expr->set_sim_time( getSolverState().currTime ))
@@ -774,8 +664,8 @@ bool DeviceEntity::updateDependentParameters(double tempIn)
   double rval;
   bool changed = false;
 
-  vector<Depend>::iterator dpIter = dependentParams.begin();
-  vector<Depend>::iterator end = dependentParams.end();
+  std::vector<Depend>::iterator dpIter = dependentParams.begin();
+  std::vector<Depend>::iterator end = dependentParams.end();
   for ( ; dpIter != end; ++dpIter)
   {
     if (dpIter->expr->set_sim_time( getSolverState().currTime ) || dpIter->expr->set_temp(tempIn))
@@ -799,12 +689,12 @@ bool DeviceEntity::updateDependentParameters(double tempIn)
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 11/18/04
 //-----------------------------------------------------------------------------
-bool DeviceEntity::getParamBreakpoints( vector<N_UTL_BreakPoint> & breakPointTimes )
+bool DeviceEntity::getParamBreakpoints( std::vector<Util::BreakPoint> & breakPointTimes )
 {
   double bTime;
 
-  vector<Depend>::iterator dpIter = dependentParams.begin();
-  vector<Depend>::iterator end = dependentParams.end();
+  std::vector<Depend>::iterator dpIter = dependentParams.begin();
+  std::vector<Depend>::iterator end = dependentParams.end();
   for ( ; dpIter != end; ++dpIter)
   {
     bTime = dpIter->expr->get_break_time();
@@ -816,54 +706,24 @@ bool DeviceEntity::getParamBreakpoints( vector<N_UTL_BreakPoint> & breakPointTim
 }
 
 //-----------------------------------------------------------------------------
-// Function      : DeviceEntity::setDefaultParams
-// Purpose       : Set parameters according to default values
-// Special Notes : Normally called before setParams
+// Function      : DeviceEntity::given
+// Purpose       : Return whether param was given
+// Special Notes :
 // Scope         : protected
 // Creator       : Dave Shirley, PSSI
-// Creation Date : 12/14/04
+// Creation Date : 11/23/04
 //-----------------------------------------------------------------------------
-void DeviceEntity::setDefaultParams ( )
+bool DeviceEntity::given( const std::string & parameter_name ) const
 {
-// First, allocate and zero out original and given vals
-  ParameterMap::const_iterator par_i = (*getPMap()).begin();
-  ParameterMap::const_iterator par_end = (*getPMap()).end();
-  for ( ; par_i != par_end; ++par_i)
-  {
-    Pars &param = static_cast<Pars &>(*(*par_i).second);
-    if (param.hasGivenMember())
-      param.setGiven(*this, false);
+  ParameterMap::const_iterator it = getParameterMap().find(parameter_name);
+  if (it == getParameterMap().end())
+    DevelFatal0(*this).in("DeviceEntity::given") << "Unrecognized parameter " << parameter_name;
 
-    if (param.isType<double>()) {
-      if (param.getExpressionAccess() & MIN_RES)
-      {
-        setDefaultValue<double>(param, devOptions.minRes);
-      }
-      else if (param.getExpressionAccess() & MIN_CAP)
-      {
-        setDefaultValue<double>(param, devOptions.minCap);
-      }
-      param.value<double>(*this) = getDefaultValue<double>(param);
-    }
-    else if (param.isType<bool>())
-      param.value<bool>(*this) = getDefaultValue<bool>(param);
-    else if (param.isType<int>())
-      param.value<int>(*this) = getDefaultValue<int>(param);
-    else if (param.isType<long>())
-      param.value<long>(*this) = getDefaultValue<long>(param);
-    else if (param.isType<std::string>())
-      param.value<std::string>(*this) = getDefaultValue<std::string>(param);
-    else if (param.isType<std::vector<int> >())
-      (param.value<std::vector<int> >(*this)).clear();
-    else if (param.isType<std::vector<double> >())
-      (param.value<std::vector<double> >(*this)).clear();
-    else if (param.isType<std::vector<std::string> >())
-      (param.value<std::vector<std::string> >(*this)).clear();
-  }
+  return Xyce::Device::wasValueGiven(*this, (*it).second->getSerialNumber());
 }
 
 //-----------------------------------------------------------------------------
-// Function      : DeviceEntity::setParams
+// Function      : setParameters
 // Purpose       : Set parameters according to a vector of params.  Used to
 //                 set instance or model parameter sets to netlist values
 // Special Notes :
@@ -871,283 +731,229 @@ void DeviceEntity::setDefaultParams ( )
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 11/20/04
 //-----------------------------------------------------------------------------
-void DeviceEntity::setParams(vector<Param> & params)
+void setParameters(DeviceEntity &entity, std::vector<Param>::const_iterator begin, std::vector<Param>::const_iterator end, const DeviceOptions &device_options)
 {
-  vector<string> vecCompStrings;
-  map <string,vector<CompositeParam *> > compList;
-  vector<CompositeParam *>::iterator compVecIter;
-  bool vc_stat;
-  int ipar=0;
-  int iparSize=params.size();
+  std::vector<std::string> composite_name_list;
+  std::map<std::string, std::vector<CompositeParam *>, LessNoCase> composite_parameter_map;
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0)
+  if (DEBUG_DEVICE && device_options.debugLevel > 0)
   {
-    cout << endl << "In DeviceEntity::setParams, for ";
-    if (dynamic_cast<DeviceModel * const>(this))
+    Xyce::dout() << std::endl << "In DeviceEntity::setParams, for " << entity.getEntityType()
+                 << ": " << entity.getName() << " parameters are:" << std::endl;
+    for (std::vector<Param>::const_iterator it = begin; it != end; ++it)
     {
-      cout << "device model";
-    }
-    else if (dynamic_cast<DeviceInstance * const>(this))
-    {
-      cout << "device instance";
-    }
-    else
-    {
-      cout << "unknown entity";
-    }
-    cout << ": " << getName();
-    if (lineNumber_ > 0)
-    {
-      cout << " from file: " << netlistFileName_ << " at line: " << lineNumber_;
-    }
-    cout << " parameters are:" << endl;
-    for (ipar=0;ipar<iparSize;++ipar)
-    {
-      const Param & param = params[ipar];
-      cout << "Param = " << param.tag() << ", Type = ";
+      const Param &param = *it;
+      Xyce::dout() << "Param = " << param.tag() << ", Type = ";
       int tmpType = param.getType();
       switch (tmpType)
       {
-        case STR:
-          cout << "STR";
+        case Util::STR:
+          Xyce::dout() << "STR";
           break;
-        case DBLE:
-          cout << "DBLE";
+        case Util::DBLE:
+          Xyce::dout() << "DBLE";
           break;
-        case INT:
-          cout << "INT";
+        case Util::INT:
+          Xyce::dout() << "INT";
           break;
-        case LNG:
-          cout << "LNG";
+        case Util::LNG:
+          Xyce::dout() << "LNG";
           break;
-        case EXPR:
-          cout << "EXPR";
+        case Util::EXPR:
+          Xyce::dout() << "EXPR";
           break;
-        case BOOL:
-          cout << "BOOL";
+        case Util::BOOL:
+          Xyce::dout() << "BOOL";
           break;
-        case STR_VEC:
-          cout << "STR_VEC";
+        case Util::STR_VEC:
+          Xyce::dout() << "STR_VEC";
           break;
-        case INT_VEC:
-          cout << "INT_VEC";
+        case Util::INT_VEC:
+          Xyce::dout() << "INT_VEC";
           break;
-        case DBLE_VEC:
-          cout << "DBLE_VEC";
+        case Util::DBLE_VEC:
+          Xyce::dout() << "DBLE_VEC";
           break;
-        case DBLE_VEC_IND:
-          cout << "DBLE_VEC_IND";
+        case Util::DBLE_VEC_IND:
+          Xyce::dout() << "DBLE_VEC_IND";
           break;
-        case COMPOSITE:
-          cout << "COMPOSITE";
+        case Util::COMPOSITE:
+          Xyce::dout() << "COMPOSITE";
           break;
         default:
-          cout << "Unknown";
+          Xyce::dout() << "Unknown";
       }
-      cout << ", Value = " << param.sVal();
+      Xyce::dout() << ", Value = " << param.stringValue();
 
       if (param.given())
       {
-        cout << "  given=TRUE";
+        Xyce::dout() << "  given=TRUE";
       }
       else
       {
-        cout << "  given=FALSE";
+        Xyce::dout() << "  given=FALSE";
       }
 
       if (param.default_val())
       {
-        cout << "  default=TRUE" << endl;
+        Xyce::dout() << "  default=TRUE" << std::endl;
       }
       else
       {
-        cout << "  default=FALSE" << endl;
+        Xyce::dout() << "  default=FALSE" << std::endl;
       }
     }
-    cout << endl;
+    Xyce::dout() << std::endl;
   }
-#endif
 
-  for (ipar=0;ipar<iparSize;++ipar)
+  for (std::vector<Param>::const_iterator param_it = begin; param_it != end; ++param_it)
   {
-    Param &param = params[ipar];
-    ExtendedString tagES(param.tag());
-    Param ndParam(param); // erk: not sure what ndParam is for...
+    Param &param = const_cast<Param &>(*param_it);
 
-    ParameterMap::const_iterator nParametricDataIter = (*getPMap()).find(tagES);
-    if (nParametricDataIter != (*getPMap()).end())
+    const std::string &tag = param.tag();
+
+    // Is this parameter in the Entity?
+    ParameterMap::const_iterator entity_parameter_it = entity.getParameterMap().find(tag);
+    if (entity_parameter_it != entity.getParameterMap().end())
     {
-      const Pars &npar = static_cast<const Pars &>(*(*nParametricDataIter).second);
-      if (npar.getExpressionAccess() & ParameterType::NO_INPUT)
+      const Descriptor &descriptor = *(*entity_parameter_it).second;
+      if (descriptor.hasGivenMember())
       {
-        string msg("DeviceEntity::setParams: parameter: ");
-        msg += tagES;
-        msg += " cannot be initialized";
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-      }
-      if (npar.hasGivenMember())
-      {
-        if (ndParam.given())
+        if (param.given())
         {
-          npar.setGiven(*this, true);
+          descriptor.setGiven(entity, true);
         }
-        else if (npar.getGiven(*this))
+        else if (descriptor.getGiven(entity))
         {
           continue;
         }
       }
-      setValueGiven(this, npar.getSerialNumber(), ndParam.given());
-      if (ndParam.given() || ndParam.default_val())
+
+      Xyce::Device::setValueGiven(entity, descriptor.getSerialNumber(), param.given());
+      if (param.given() || param.default_val())
       {
-        if ( ndParam.getType() == EXPR )
+        if ( param.getType() == Util::EXPR )
         {
-          if (npar.isType<double>())
+          if (descriptor.isType<double>())
           {
-            double val = setDependentParameter (ndParam, &(npar.value<double>(*this)), npar.getExpressionAccess());
+            double val = entity.setDependentParameter(param, &(descriptor.value<double>(entity)), descriptor.getExpressionAccess());
             param.setVal(val);
           }
-          else if (npar.isType<std::vector<double> >())
+          else if (descriptor.isType<std::vector<double> >())
           {
-            int ind = (npar.value<std::vector<double> >(*this)).size();
-            double val = setDependentParameter (ndParam, &(npar.value<std::vector<double> >(*this)), ind, npar.getExpressionAccess());
-            (npar.value<std::vector<double> >(*this)).push_back(val);
+            int ind = (descriptor.value<std::vector<double> >(entity)).size();
+            double val = entity.setDependentParameter (param, &(descriptor.value<std::vector<double> >(entity)), ind, descriptor.getExpressionAccess());
+            (descriptor.value<std::vector<double> >(entity)).push_back(val);
           }
           else
           {
-            string msg("DeviceEntity::setParams: non double param: ");
-            msg += tagES;
-            msg += " cannot be set to expression";
-            N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
+            DevelFatal(entity).in("DeviceEntity::setParams") << "Non double param " <<  tag << " cannot be set to expression";
           }
         }
         else
         {
-          if (npar.isType<double>())
+          if (descriptor.isType<double>())
           {
-            if (!ndParam.isNumeric())
+            if (!param.isNumeric())
             {
-              string msg("Cannot convert parameter: ");
-              msg += tagES;
-              msg += " to a numeric value, with input value of: ";
-              msg += param.sVal();
-              std::ostringstream oss;
-              oss << "Error in " << netlistLocation() << "\n" << msg;
-              N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, oss.str());
+              UserFatal(entity) << "Cannot convert parameter " << tag <<  " to a numeric value from " << param.stringValue();
             }
-            npar.value<double>(*this) = ndParam.dVal();
-            if (tagES == "TNOM" || tagES == "TEMP")
+
+            descriptor.value<double>(entity) = param.getImmutableValue<double>();
+            if (isTempParam(tag))
             {
-              npar.value<double>(*this) += CONSTCtoK;
+              descriptor.value<double>(entity) += CONSTCtoK;
             }
-            if (npar.getOriginalValueIndex() >= 0)
+            if (descriptor.hasOriginalValueStored())
             {
-              setOriginalValue(this, npar.getOriginalValueIndex(), npar.value<double>(*this));
+              Xyce::Device::setOriginalValue(entity, descriptor.getSerialNumber(), descriptor.value<double>(entity));
             }
           }
-          else if (npar.isType<std::string>())
+          else if (descriptor.isType<std::string>())
           {
-            npar.value<std::string>(*this) = ndParam.sVal();
+            descriptor.value<std::string>(entity) = param.stringValue();
           }
-          else if (npar.isType<int>())
+          else if (descriptor.isType<int>())
           {
-            if (!ndParam.isInteger())
+            if (!param.isInteger())
             {
-              string msg("Cannot convert parameter: ");
-              msg += tagES;
-              msg += " to an integer value, with input value of: ";
-              msg += param.sVal();
-              std::ostringstream oss;
-              oss << "Error in " << netlistLocation() << "\n" << msg;
-              N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, oss.str());
+              UserFatal(entity) << "Cannot convert parameter " << tag << " to an integer value from " << param.stringValue();
             }
-            npar.value<int>(*this) = ndParam.iVal();
-            if (npar.getOriginalValueIndex() >= 0)
+            descriptor.value<int>(entity) = param.getImmutableValue<int>();
+            if (descriptor.hasOriginalValueStored())
             {
-              setOriginalValue(this, npar.getOriginalValueIndex(), static_cast<double> (npar.value<int>(*this)));
+              Xyce::Device::setOriginalValue(entity, descriptor.getSerialNumber(), static_cast<double> (descriptor.value<int>(entity)));
             }
           }
-          else if (npar.isType<long>())
+          else if (descriptor.isType<long>())
           {
-            if (!ndParam.isInteger())
+            if (!param.isInteger())
             {
-              string msg("Cannot convert parameter: ");
-              msg += tagES;
-              msg += " to an integer value, with input value of: ";
-              msg += param.sVal();
-              std::ostringstream oss;
-              oss << "Error in " << netlistLocation() << "\n" << msg;
-              N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, oss.str());
+              UserFatal(entity) << "Cannot convert parameter " << tag << " to an integer value from " << param.stringValue();
             }
-            npar.value<long>(*this) = ndParam.lVal();
-            if (npar.getOriginalValueIndex() >= 0)
+            descriptor.value<long>(entity) = param.getImmutableValue<long>();
+            if (descriptor.hasOriginalValueStored())
             {
-              setOriginalValue(this, npar.getOriginalValueIndex(), static_cast<double> (npar.value<long>(*this)));
+              Xyce::Device::setOriginalValue(entity, descriptor.getSerialNumber(), static_cast<double> (descriptor.value<long>(entity)));
             }
           }
-          else if (npar.isType<bool>())
+          else if (descriptor.isType<bool>())
           {
-            if (!ndParam.isBool())
+            if (!param.isBool())
             {
-              string msg("Cannot convert parameter: " + tagES);
-              msg += " to a logical value, with input value of: ";
-              msg += param.sVal();
-              std::ostringstream oss;
-              oss << "Error in " << netlistLocation() << "\n" << msg;
-              N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, oss.str());
+              UserFatal(entity) << "Cannot convert parameter " << tag << " to a logical value from " << param.stringValue();
             }
-            npar.value<bool>(*this) = ndParam.bVal();
-            if (npar.getOriginalValueIndex() >= 0)
+            descriptor.value<bool>(entity) = param.getImmutableValue<bool>();
+            if (descriptor.hasOriginalValueStored())
             {
-              if (npar.value<bool>(*this))
+              if (descriptor.value<bool>(entity))
               {
-                setOriginalValue(this, npar.getOriginalValueIndex(), 1.0);
+                Xyce::Device::setOriginalValue(entity, descriptor.getSerialNumber(), 1.0);
               }
               else
               {
-                setOriginalValue(this, npar.getOriginalValueIndex(), 0.0);
+                Xyce::Device::setOriginalValue(entity, descriptor.getSerialNumber(), 0.0);
               }
             }
           }
-          else if (npar.isType<std::vector<int> >())
+          else if (descriptor.isType<std::vector<int> >())
           {
-            if (ndParam.getType() == INT_VEC)
+            if (param.getType() == Util::INT_VEC)
             {
-              (npar.value<std::vector<int> >(*this)) = ndParam.iVecVal();
+              (descriptor.value<std::vector<int> >(entity)) = param.getValue<std::vector<int> >();
             }
-            else if (ndParam.getType() == INT)
+            else if (param.getType() == Util::INT)
             {
-              (npar.value<std::vector<int> >(*this)).push_back(ndParam.iVal());
+              (descriptor.value<std::vector<int> >(entity)).push_back(param.getImmutableValue<int>());
             }
           }
-          else if (npar.isType<std::vector<double> >())
+          else if (descriptor.isType<std::vector<double> >())
           {
-            if (ndParam.getType() == DBLE_VEC)
+            if (param.getType() == Util::DBLE_VEC)
             {
-              (npar.value<std::vector<double> >(*this)) = ndParam.dVecVal();
+              (descriptor.value<std::vector<double> >(entity)) = param.getValue<std::vector<double> >();
             }
-            else if (ndParam.getType() == DBLE)
+            else if (param.getType() == Util::DBLE)
             {
-              (npar.value<std::vector<double> >(*this)).push_back(ndParam.dVal());
+              (descriptor.value<std::vector<double> >(entity)).push_back(param.getImmutableValue<double>());
             }
           }
-          else if (npar.isType<std::vector<std::string> >())
+          else if (descriptor.isType<std::vector<std::string> >())
           {
-            if (ndParam.getType() == STR_VEC)
+            if (param.getType() == Util::STR_VEC)
             {
-              (npar.value<std::vector<std::string> >(*this)) = ndParam.sVecVal();
+              (descriptor.value<std::vector<std::string> >(entity)) = param.getValue<std::vector<std::string> >();
             }
-            else if (ndParam.getType() == STR)
+            else if (param.getType() == Util::STR)
             {
-              (npar.value<std::vector<std::string> >(*this)).push_back(ndParam.sVal());
+              (descriptor.value<std::vector<std::string> >(entity)).push_back(param.stringValue());
             }
           }
-          else if (npar.isType<CompositeMap>())
+          else if (descriptor.isComposite())
           {
-            compList[tagES].clear();
-            vecCompStrings.push_back(tagES);
+            composite_parameter_map[tag].clear();
+            composite_name_list.push_back(tag);
 
-#ifdef Xyce_DEBUG_DEVICE
             // Note: ERK.  This push-back is done to process the base-param tag of a vector composite.
             // For example, if the composite parameters are things like REGION0.XWIDTH, where REGION
             // is the base parameter tag, 0 is the index, and XWIDTH is the subcomponent, the
@@ -1157,128 +963,323 @@ void DeviceEntity::setParams(vector<Param> & params)
             // subcomponent parameters.  So REGION (alone) should preceed REGION0.XWIDTH in  the
             // STL vector params that is passed into this function.  If it doesn't then vc_stat will
             // stay false and a fatal error will get thrown.
-            if (getDeviceOptions().debugLevel > 0)
+            if (DEBUG_DEVICE && device_options.debugLevel > 0)
             {
-              cout << "pushing back composite: tagES = " << tagES << endl;
+              Xyce::dout() << "pushing back composite " << tag << std::endl;
             }
-#endif
           }
           else
           {
-            string msg("DeviceEntity::setParams: unknown type");
-            N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
+            DevelFatal(entity).in("DeviceEntity::setParams") << "Unknown type";
           }
         }
       }
     }
+
+    // Is it a vector (why do nothing?)
+    else if (param.stringValue() == "VECTOR")
+    {
+    }
+
+    // Must be a composite
     else
     {
-      if (param.sVal() == "VECTOR")
-      {
-      }
-      else
-      {
-        vc_stat = false;
-        std::string::size_type dot = tagES.find_first_of('.');
-#ifdef Xyce_DEBUG_DEVICE
-        if (getDeviceOptions().debugLevel > 0)
-        {
-          cout << "Inside of VECTOR-COMPOSITE: tagES = " << tagES ;
-          cout << "  size of vecCompStrings = " << vecCompStrings.size();
+      bool vc_stat = false;
 
-          cout << "  Result of dot find: ";
-          if (dot != string::npos)
-          {
-            cout << "Found it";
-          }
-          else
-          {
-            cout << "Not found";
-          }
-          cout << endl;
-        }
-#endif
-        if (dot != string::npos)
+      std::string::size_type dot = tag.find_first_of('.');
+      if (dot != std::string::npos)
+      {
+        for (std::vector<std::string>::const_iterator it = composite_name_list.begin(); it != composite_name_list.end(); ++it)
         {
-          int ivc=0;
-          for (ivc=0;ivc<vecCompStrings.size();++ivc)
-          {
-            string & vcs = vecCompStrings[ivc];
+          const std::string &composite_name = *it;
 
-            if (tagES.find(vcs) == 0)
+          if (tag.find(composite_name) == 0) // Tag starts with the composite parameter name
+          {
+            std::string param_name(tag.begin() + dot + 1, tag.end());
+
+            vc_stat = true;
+
+            int n = 0;
             {
-              string numString(tagES,(vcs).size(),dot-(vcs).size());
-              string paramName(tagES,dot+1,tagES.size()-dot);
-
-              vc_stat = true;
-
-              int i=0, n=0;
-              for (i=0 ; i<numString.size() ; ++i)
-              {
-                n *= 10;
-                char c = numString[i];
-                n += (static_cast<int> (c)) - (static_cast<int> ('0'));
-              }
-              if (paramName == "NAME")
-              {
-                if (n != compList[vcs].size())
-                {
-                  string msg("DeviceEntity::setParams: internal error filling 'NAME' vector");
-                  msg += " (param: ";
-                  msg += vcs;
-                  msg += ")";
-                  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-                }
-
-                string tmpStr(ndParam.sVal());
-                compList[vcs].push_back(constructComposite(vcs, tmpStr));
-                compList[vcs][n]->setDefaultParams();
-                Pars &nparComp = static_cast<Pars &>(*const_cast<ParameterMap &>(*getPMap())[vcs]);
-                nparComp.value<CompositeMap>(*this)[tmpStr] = compList[vcs][n];
-              }
-              else
-              {
-                if (n >= compList[vcs].size())
-                {
-                  string msg("DeviceEntity::setParams: internal error in ");
-                  msg += "vector-composite, 'NAME' must come first (param: ";
-                  msg += vcs;
-                  msg += ")";
-                  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-                }
-              }
-              compList[vcs][n]->setParams(paramName, ndParam);
+              std::istringstream is(std::string(tag.begin() + composite_name.size(), tag.begin() + dot));
+              is >> n;
             }
+
+            if (param_name == "NAME")
+            {
+              if (n != composite_parameter_map[composite_name].size())
+              {
+                DevelFatal(entity).in("DeviceEntity::setParams") << "Error filling 'NAME' vector param " <<  composite_name;
+              }
+
+              std::string name = param.stringValue();
+              CompositeParam *composite = entity.constructComposite(composite_name, name);
+              composite_parameter_map[composite_name].push_back(composite);
+              setDefaultParameters(*composite, composite->getParameterMap().begin(), composite->getParameterMap().end(), device_options);
+            }
+            else
+            {
+              if (n >= composite_parameter_map[composite_name].size())
+              {
+                DevelFatal(entity).in("DeviceEntity::setParams") << "Internal error in vector-composite, 'NAME' must come first " << composite_name;
+              }
+            }
+            Xyce::Device::setParameters(*composite_parameter_map[composite_name][n], param_name, param);
           }
         }
-        if (!vc_stat)
-        {
-          string msg("DeviceEntity::setParams: undefined parameter: ");
-          msg += tagES;
-          msg += "\nThis parameter is in metadata, but not recognized in constructor";
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-        }
+      }
+      if (!vc_stat)
+      {
+        UserError(entity) << "Undefined parameter " << tag << ", this parameter is in metadata, but not recognized in constructor";
       }
     }
   }
-  if (!vecCompStrings.empty())
-  {
-    int ivc=0;
-    for (ivc=0;ivc<vecCompStrings.size();++ivc)
-    {
-      string & vcs = vecCompStrings[ivc];
 
-      compVecIter = compList[vcs].begin();
-      for ( ; compVecIter != compList[vcs].end() ; ++compVecIter)
+  if (!composite_name_list.empty())
+  {
+    for (std::vector<std::string>::const_iterator name_it = composite_name_list.begin(); name_it != composite_name_list.end(); ++name_it)
+    {
+      const std::string &vcs = *name_it;
+
+      for (std::vector<CompositeParam *>::iterator it =  composite_parameter_map[vcs].begin(); it != composite_parameter_map[vcs].end(); ++it)
       {
-        (*compVecIter)->processParams();
+        (*it)->processParams();
       }
     }
   }
 }
 
+
 //-----------------------------------------------------------------------------
-// Function      : DeviceEntity::printFormattedOutputParam
+// Function      : setParameters
+// Purpose       : Set parameter according to input Param.  Used to
+//                 set instance or model parameter sets to netlist values
+// Special Notes :
+// Scope         : public
+// Creator       : Dave Shirley, PSSI
+// Creation Date : 05/06/05
+//-----------------------------------------------------------------------------
+
+void setParameters(CompositeParam &composite_param, const std::string & pName, const Param & ndParam )
+{
+  ParameterMap::const_iterator p_i = composite_param.getParameterMap().find(pName);
+  if (p_i != composite_param.getParameterMap().end())
+  {
+    const Descriptor &p = *(*p_i).second;
+    if (p.hasGivenMember())
+    {
+      if (ndParam.given())
+        p.setGiven(composite_param, true);
+      else if (p.getGiven(composite_param))
+        return;
+    }
+    Xyce::Device::setValueGiven(composite_param, p.getSerialNumber(), ndParam.given());
+    if (ndParam.given() || ndParam.default_val())
+    {
+      if (p.isType<double>())
+      {
+        p.value<double>(composite_param) = ndParam.getImmutableValue<double>();
+        if (isTempParam(pName))
+          p.value<double>(composite_param) += CONSTCtoK;
+        if (p.hasOriginalValueStored())
+          Xyce::Device::setOriginalValue(composite_param, p.getSerialNumber(), p.value<double>(composite_param));
+      }
+      else if (p.isType<std::string>())
+      {
+        p.value<std::string>(composite_param) = ndParam.stringValue();
+      }
+      else if (p.isType<int>())
+      {
+        p.value<int>(composite_param) = ndParam.getImmutableValue<int>();
+        if (p.hasOriginalValueStored())
+          Xyce::Device::setOriginalValue(composite_param, p.getSerialNumber(), static_cast<double>(p.value<int>(composite_param)));
+      }
+      else if (p.isType<long>())
+      {
+        p.value<long>(composite_param) = ndParam.getImmutableValue<long>();
+        if (p.hasOriginalValueStored())
+          Xyce::Device::setOriginalValue(composite_param, p.getSerialNumber(), static_cast<double>(p.value<long>(composite_param)));
+      }
+      else if (p.isType<bool>())
+      {
+        p.value<bool>(composite_param) = (ndParam.getImmutableValue<double>() != 0.0);
+        if (p.hasOriginalValueStored())
+        {
+          if (p.value<bool>(composite_param))
+            Xyce::Device::setOriginalValue(composite_param, p.getSerialNumber(), 1.0);
+          else
+            Xyce::Device::setOriginalValue(composite_param, p.getSerialNumber(), 0.0);
+        }
+      }
+      else if (p.isType<std::vector<double> >())
+      {
+       (p.value<std::vector<double> >(composite_param)).push_back(ndParam.getImmutableValue<double>());
+      }
+      else if (p.isType<std::vector<std::string> >())
+      {
+        p.value<std::vector<std::string> >(composite_param).push_back(ndParam.stringValue());
+      }
+      else
+      {
+        Report::DevelFatal().in("CompositeParam::setParams") << "Unknown parameter type for " << pName;
+      }
+    }
+  }
+  else
+  {
+    Report::DevelFatal().in("CompositeParam::setParams") << "Undefined parameter " <<  pName << std::endl
+                                                       << "This parameter is in metadata, but not recognized in constructor";
+  }
+}
+
+
+void populateParams(const ParameterMap &parameter_map, std::vector<Param> &param_list, CompositeParamMap &composite_param_map)
+{
+  for (ParameterMap::const_iterator it = parameter_map.begin(); it != parameter_map.end(); ++it)
+  {
+    const Descriptor &param = *(*it).second;
+
+    if (param.isType<double>())
+    {
+      if (param.getVec() == 0)
+      {
+        double val;
+        if (isTempParam((*it).first))
+          val = getDefaultValue<double>(param) - CONSTCtoK;
+        else
+          val = getDefaultValue<double>(param);
+        param_list.push_back(Param((*it).first, val));
+      }
+      else if (param.getVec() > 0)
+      {
+        if (param.getVec() == 1)
+        {
+          // This converts parameters link IC1, IC2 to just IC and type vector
+          std::string vPar((*it).first.substr(0, (*it).first.size()-1));
+          param_list.push_back(Param(vPar, "VECTOR"));
+        }
+        // We will also output IC1, IC2 as type double so they can
+        // be specified as individual elements
+        // This allows TC=a, b to also be specified as TC1=a TC2=b
+        double val = getDefaultValue<double>(param);
+        param_list.push_back(Param((*it).first, val));
+      }
+    }
+    else if (param.isType<bool>())
+    {
+      if (param.getVec() == 0)
+        param_list.push_back(Param((*it).first, getDefaultValue<bool>(param)));
+      else if (param.getVec() > 0)
+      {
+        if (param.getVec() == 1)
+        {
+          std::string vPar((*it).first.substr(0, (*it).first.size()-1));
+          param_list.push_back(Param(vPar, "VECTOR"));
+        }
+        // We will also output IC1, IC2 as type double so they can
+        // be specified as individual elements
+        // This allows TC=a, b to also be specified as TC1=a TC2=b
+        bool val = getDefaultValue<bool>(param);
+        param_list.push_back(Param((*it).first, val));
+      }
+    }
+    else if (param.isType<int>())
+    {
+      if (param.getVec() == 0)
+        param_list.push_back(Param((*it).first, getDefaultValue<int>(param)));
+      else if (param.getVec() > 0)
+      {
+        if (param.getVec() == 1)
+        {
+          std::string vPar((*it).first.substr(0, (*it).first.size()-1));
+          param_list.push_back(Param(vPar, "VECTOR"));
+        }
+        int val = getDefaultValue<int>(param);
+        param_list.push_back(Param((*it).first, val));
+      }
+    }
+    else if (param.isType<std::string>())
+    {
+      if (param.getVec() == 0)
+        param_list.push_back(Param((*it).first, getDefaultValue<std::string>(param)));
+      else if (param.getVec() > 0)
+      {
+        if (param.getVec() == 1)
+        {
+          std::string vPar((*it).first.substr(0, (*it).first.size()-1));
+          param_list.push_back(Param(vPar, "VECTOR"));
+        }
+        std::string val = getDefaultValue<std::string>(param);
+        param_list.push_back(Param((*it).first, val));
+      }
+    }
+    else if (param.isType<std::vector<std::string> >())
+    {
+      Param vc((*it).first, std::vector<std::string>()); // param.value<std::vector<std::string> >(entity));
+      param_list.push_back(vc);
+    }
+    else if (param.isType<std::vector<double> >())
+    {
+      Param vc((*it).first, std::vector<double>()); // param.value<std::vector<double> >(entity));
+      param_list.push_back(vc);
+    }
+    else if (param.isComposite())
+    {
+      Param vc2((*it).first, "VECTOR-COMPOSITE");
+      vc2.setDefault(true);
+      param_list.push_back(vc2);
+
+      std::vector<Param> compositeParams;
+      const ParametricData<CompositeParam> *c = param.getCompositeParametricData<CompositeParam>();
+
+      if (c == 0)
+      {
+        Report::DevelFatal().in("populateParams") << "Vector-composite map for device type entity empty.";
+      }
+
+      // TODO: [DGB] I think when the Descriptor is refactored this will be clearer.  But this basically adds the
+      //   type to the composite list with 'NAME' first.
+      const ParametricData<CompositeParam> &d = *c;
+      const ParameterMap &e = d.getMap();
+
+      for (ParameterMap::const_iterator it4 = e.find("NAME"); it4 != e.end();) {
+        const Descriptor &p = *(*it4).second;
+        if (p.isType<double>())
+          compositeParams.push_back(Param((*it4).first, getDefaultValue<double>(p)));
+        else if (p.isType<bool>())
+          compositeParams.push_back(Param((*it4).first, getDefaultValue<bool>(p)));
+        else if (p.isType<int>())
+          compositeParams.push_back(Param((*it4).first, getDefaultValue<int>(p)));
+        else if (p.isType<std::string>())
+          compositeParams.push_back(Param((*it4).first, getDefaultValue<std::string>(p)));
+        if ((*it4).first == "NAME")
+          it4 = e.begin();
+        else
+          it4++;
+        if (it4 != e.end() && (*it4).first == "NAME")
+          it4++;
+      }
+
+      composite_param_map[(*it).first] = compositeParams;
+    }
+    else
+    {
+//        Just skip these, like list of coupled inductors because not needed for metadata
+//        std::string msg("DeviceEntity::getParams: Type not supported");
+//        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
+      Xyce::dout() << "In final else clause of DeviceEntity::getParams().";
+      if( param.isType<std::vector<std::string> >() )
+        Xyce::dout() << " type is STR_VEC ";
+      if( param.isType<std::vector<double> >() )
+        Xyce::dout() << " type is DBLE_VEC ";
+      Xyce::dout() << it->first << " this item is NOT being added to default parameter list." << std::endl;
+    }
+  }
+}
+
+
+//-----------------------------------------------------------------------------
+// Function      : printParameter
 //
 // Purpose       : This function finds a parameter in the par table, and then
 //                 formats its value in a string.
@@ -1288,269 +1289,168 @@ void DeviceEntity::setParams(vector<Param> & params)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/4/12
 //-----------------------------------------------------------------------------
-std::ostream &DeviceEntity::printFormattedOutputParam(std::ostream &os, const string & paramName) const
+std::ostream &printParameter(std::ostream &os, const DeviceEntity &entity, const std::string &name, const Descriptor &param)
 {
-  vector<int>::const_iterator v_i;
-  string description;
-
-  ExtendedString tmpName(paramName);
-  tmpName.toUpper ();
-
-  ParameterMap::const_iterator paramIter = (*getPMap()).find(tmpName);
-
-  ExtendedString myName(getName());
-  ExtendedString type("Unknown");
-  string label;
-
-  if (paramIter != (*getPMap()).end())
+  if (param.isType<double>())
   {
-    string fstring((*paramIter).first);
-
-    const Pars &param = static_cast<const Pars &>(*(*paramIter).second);
-
-    //if ( !(param.getExpressionAccess() & Pars::NO_INPUT) )
+    if (isTempParam(name))
     {
-      if (param.isType<double>())
+      os << param.value<double>(entity) - CONSTCtoK;
+    }
+    else
+    {
+      os << param.value<double>(entity);
+    }
+  }
+  else if (param.isType<bool>())
+  {
+    os << param.value<bool>(entity);
+  }
+  else if (param.isType<int>())
+  {
+    os << param.value<int>(entity);
+  }
+  else if (param.isType<long>())
+  {
+    os << param.value<long>(entity);
+  }
+  else if (param.isType<std::string>())
+  {
+    os << param.value<std::string>(entity);
+  }
+  else if (param.isType<std::vector<std::string> >())
+  {
+    os << " (string vector) : ";
+    os << "length = " << (param.value<std::vector<std::string> >(entity)).size();
+    if ((param.value<std::vector<std::string> >(entity)).size() > 0)
+    {
+      os << " :";
+      std::vector<std::string>::const_iterator iterStringVec = (param.value<std::vector<std::string> >(entity)).begin();
+      for ( ; iterStringVec != (param.value<std::vector<std::string> >(entity)).end() ; ++iterStringVec)
       {
-        if (fstring == "TNOM" || fstring == "TEMP")
-        {
-          os << param.value<double>(*this)-CONSTCtoK;
-        }
-        else
-        {
-          os << param.value<double>(*this);
-        }
-      }
-      else if (param.isType<bool>())
-      {
-        os << param.value<bool>(*this);
-      }
-      else if (param.isType<int>())
-      {
-        os << param.value<int>(*this);
-      }
-      else if (param.isType<long>())
-      {
-        os << param.value<long>(*this);
-      }
-      else if (param.isType<std::string>())
-      {
-        os << param.value<std::string>(*this);
-      }
-      else if (param.isType<std::vector<std::string> >())
-      {
-        os << " (string vector) : ";
-        os << "length = " << (param.value<std::vector<std::string> >(*this)).size();
-        if ((param.value<std::vector<std::string> >(*this)).size() > 0)
-        {
-          os << " :";
-          vector<string>::const_iterator iterStringVec;
-          iterStringVec = (param.value<std::vector<std::string> >(*this)).begin();
-          for ( ; iterStringVec != (param.value<std::vector<std::string> >(*this)).end() ; ++iterStringVec)
-          {
-            os << "  " << *iterStringVec;
-          }
-        }
-      }
-      else if (param.isType<std::vector<int> >())
-      {
-        os << " (int vector) : ";
-        os << "length = " << (param.value<std::vector<int> >(*this)).size();
-        if ((param.value<std::vector<int> >(*this)).size() > 0)
-        {
-          os << " :";
-          v_i = (param.value<std::vector<int> >(*this)).begin();
-          for ( ; v_i != (param.value<std::vector<int> >(*this)).end() ; ++v_i)
-          {
-            os << "  " << *v_i;
-          }
-        }
-      }
-      else if (param.isType<std::vector<double> >())
-      {
-        os << " (double vector) : ";
-        os << "length = " << (param.value<std::vector<double> >(*this)).size();
-        if ((param.value<std::vector<double> >(*this)).size() > 0)
-        {
-          os << " :";
-          vector<double>::const_iterator iterDoubleVec;
-          iterDoubleVec = (param.value<std::vector<double> >(*this)).begin();
-          for ( ; iterDoubleVec != (param.value<std::vector<double> >(*this)).end() ; ++iterDoubleVec)
-          {
-            os << "  " << *iterDoubleVec;
-          }
-        }
-      }
-      else if (param.isType<CompositeMap>())
-      {
-        os << " (composite) : " << (param.value<CompositeMap>(*this)).size();
-        if ((param.value<CompositeMap>(*this)).size() > 0)
-        {
-          map <string,CompositeParam *>::const_iterator c_i;
-          c_i = (param.value<CompositeMap>(*this)).begin();
-          (*c_i).second->printParams(os);
-        }
+        os << "  " << *iterStringVec;
       }
     }
   }
+  else if (param.isType<std::vector<int> >())
+  {
+    os << " (int vector) : ";
+    os << "length = " << (param.value<std::vector<int> >(entity)).size();
+    if ((param.value<std::vector<int> >(entity)).size() > 0)
+    {
+      os << " :";
+      std::vector<int>::const_iterator v_i = (param.value<std::vector<int> >(entity)).begin();
+      for ( ; v_i != (param.value<std::vector<int> >(entity)).end() ; ++v_i)
+      {
+        os << "  " << *v_i;
+      }
+    }
+  }
+  else if (param.isType<std::vector<double> >())
+  {
+    os << " (double vector) : ";
+    os << "length = " << (param.value<std::vector<double> >(entity)).size();
+    if ((param.value<std::vector<double> >(entity)).size() > 0)
+    {
+      os << " :";
+      std::vector<double>::const_iterator iterDoubleVec = (param.value<std::vector<double> >(entity)).begin();
+      for ( ; iterDoubleVec != (param.value<std::vector<double> >(entity)).end() ; ++iterDoubleVec)
+      {
+        os << "  " << *iterDoubleVec;
+      }
+    }
+  }
+  else if (param.isComposite())
+  {
+    os << " (composite) : " << (param.value<CompositeMap>(entity)).size();
+    if ((param.value<CompositeMap>(entity)).size() > 0)
+    {
+      std::map<std::string, CompositeParam *>::const_iterator c_i = (param.value<CompositeMap>(entity)).begin();
+      // (*c_i).second->printParams(os);
+      printCompositeParameters(os, *(*c_i).second);
+    }
+  }
+    
   return os;
 }
 
-//-----------------------------------------------------------------------------
-// Function      : DeviceEntity::given
-// Purpose       : Return whether param was given
-// Special Notes :
-// Scope         : protected
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 11/23/04
-//-----------------------------------------------------------------------------
-bool DeviceEntity::given( const string & parameter_name )
+std::ostream &printCompositeParameters(std::ostream &os, const CompositeParam &composite)
 {
-  ParameterMap::const_iterator it = (*getPMap()).find(parameter_name);
-  if (it == (*getPMap()).end())
+  for (ParameterMap::const_iterator it_parameter = composite.getParameterMap().find("NAME"); it_parameter != composite.getParameterMap().end() ; )
   {
-    string msg("DeviceEntity::Given: unrecognized param: ");
-    msg += parameter_name;
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
-
-  return wasValueGiven(this, (*it).second->getSerialNumber());
-}
-
-void populateParams(const DeviceEntity::ParameterMap &parameter_map, vector<Param> & param_list, DeviceParamMap &composite_param_list)
-{
-  for (DeviceEntity::ParameterMap::const_iterator it = parameter_map.begin(); it != parameter_map.end(); ++it)
-  {
-    const DeviceEntity::Pars &param = static_cast<const DeviceEntity::Pars &>(*(*it).second);
-
-    if (!(param.getExpressionAccess() & ParameterType::NO_INPUT))
+    os << std::endl << "   " <<(*it_parameter).first << " ";
+    const Descriptor &p = *(*it_parameter).second;
+    if (p.isType<double>())
+      os << "(double) : " << p.value<double>(composite);
+    else if (p.isType<bool>())
+      os << "(bool) : " << p.value<bool>(composite);
+    else if (p.isType<int>())
+      os << "(int) : " << p.value<int>(composite);
+    else if (p.isType<long>())
+      os << "(long) : " << p.value<long>(composite);
+    else if (p.isType<std::string>())
+      os << "(string) : " << p.value<std::string>(composite);
+    else if (p.isType<std::vector<std::string> >())
     {
-      if (param.isType<double>())
-      {
-        if (param.getVec() == 0)
-        {
-          double val;
-          if ((*it).first == "TNOM" || (*it).first == "TEMP")
-            val = getDefaultValue<double>(param) - CONSTCtoK;
-          else
-            val = getDefaultValue<double>(param);
-          param_list.push_back(Param((*it).first, val));
-        }
-        else if (param.getVec() > 0)
-        {
-          if (param.getVec() == 1)
-          {
-            // This converts parameters link IC1, IC2 to just IC and type vector
-            string vPar((*it).first.substr(0, (*it).first.size()-1));
-            param_list.push_back(Param(vPar, "VECTOR"));
-          }
-          // We will also output IC1, IC2 as type double so they can
-          // be specified as individual elements
-          // This allows TC=a, b to also be specified as TC1=a TC2=b
-          double val = getDefaultValue<double>(param);
-          param_list.push_back(Param((*it).first, val));
-        }
-      }
-      else if (param.isType<bool>())
-      {
-        if (param.getVec() == 0)
-          param_list.push_back(Param((*it).first, getDefaultValue<bool>(param)));
-        else if (param.getVec() == 1)
-        {
-          string vPar((*it).first.substr(0, (*it).first.size()-1));
-          param_list.push_back(Param(vPar, "VECTOR"));
-        }
-      }
-      else if (param.isType<int>())
-      {
-        if (param.getVec() == 0)
-          param_list.push_back(Param((*it).first, getDefaultValue<int>(param)));
-        else if (param.getVec() == 1)
-        {
-          string vPar((*it).first.substr(0, (*it).first.size()-1));
-          param_list.push_back(Param(vPar, "VECTOR"));
-        }
-      }
-      else if (param.isType<std::string>())
-      {
-        if (param.getVec() == 0)
-          param_list.push_back(Param((*it).first, getDefaultValue<std::string>(param)));
-        else if (param.getVec() == 1)
-        {
-          string vPar((*it).first.substr(0, (*it).first.size()-1));
-          param_list.push_back(Param(vPar, "VECTOR"));
-        }
-      }
-      else if (param.isType<std::vector<std::string> >())
-      {
-        Param vc((*it).first, std::vector<std::string>()); // param.value<std::vector<std::string> >(entity));
-        param_list.push_back(vc);
-      }
-      else if (param.isType<std::vector<double> >())
-      {
-        Param vc((*it).first, std::vector<double>()); // param.value<std::vector<double> >(entity));
-        param_list.push_back(vc);
-      }
-      else if (param.isType<CompositeMap>())
-      {
-        Param vc2((*it).first, "VECTOR-COMPOSITE");
-        vc2.setDefault(true);
-        param_list.push_back(vc2);
+      const std::vector<std::string> &string_vector = p.value<std::vector<std::string> >(composite);
 
-        vector<Param> compositeParams;
-        const ParametricData<CompositeParam> *c = param.getCompositeParametricData<CompositeParam>();
-
-        if (c == 0)
-        {
-          string msg("Error: vector-composite map for device type entity empty.  You need to modify the device factory.");
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg );
-        }
-
-        // TODO: [DGB] I think when the Pars is refactored this will be clearer.  But this basically adds the
-        //   type to the composite list with 'NAME' first.
-        const ParametricData<CompositeParam> &d = *c;
-        const ParametricData<CompositeParam>::ParameterMap &e = d.getMap();
-
-        for (ParametricData<CompositeParam>::ParameterMap::const_iterator it4 = e.find("NAME"); it4 != e.end();) {
-          const Descriptor &p = static_cast<const Descriptor &>(*(*it4).second);
-          if (p.isType<double>())
-            compositeParams.push_back(Param((*it4).first, getDefaultValue<double>(p)));
-          else if (p.isType<bool>())
-            compositeParams.push_back(Param((*it4).first, getDefaultValue<bool>(p)));
-          else if (p.isType<int>())
-            compositeParams.push_back(Param((*it4).first, getDefaultValue<int>(p)));
-          else if (p.isType<std::string>())
-            compositeParams.push_back(Param((*it4).first, getDefaultValue<std::string>(p)));
-          if ((*it4).first == "NAME")
-            it4 = e.begin();
-          else
-            it4++;
-          if (it4 != e.end() && (*it4).first == "NAME")
-            it4++;
-        }
-
-        composite_param_list[(*it).first] = compositeParams;
-      }
-      else
-      {
-//        Just skip these, like list of coupled inductors because not needed for metadata
-//        string msg("DeviceEntity::getParams: Type not supported");
-//        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-        std::cout << "In final else clause of DeviceEntity::getParams().";
-        if( param.isType<std::vector<std::string> >() )
-          std::cout << " type is STR_VEC ";
-        if( param.isType<std::vector<double> >() )
-          std::cout << " type is DBLE_VEC ";
-        std::cout << it->first << " this item is NOT being added to default parameter list." << std::endl;
-
-      }
+      for (std::vector<std::string>::const_iterator it = string_vector.begin(); it != string_vector.end(); ++it)
+        os << "  " << *it;
     }
+    else if (p.isType<std::vector<double> >())
+    {
+      const std::vector<double> &string_vector = p.value<std::vector<double> >(composite);
+
+      for (std::vector<double>::const_iterator it = string_vector.begin(); it != string_vector.end(); ++it)
+        os << "  " << *it;
+    }
+
+    if ((*it_parameter).first == "NAME")
+      it_parameter = composite.getParameterMap().begin();
+    else
+      it_parameter++;
+
+    if (it_parameter != composite.getParameterMap().end() && (*it_parameter).first == "NAME")
+      it_parameter++;
   }
+
+  return os;
 }
 
-netlistLocation_ DeviceEntity::netlistLocation() const {
-  return netlistLocation_(netlistFileName_, lineNumber_);
-}
+// //-----------------------------------------------------------------------------
+// // Function      : DeviceEntity::perturbSensParam
+// // Purpose       :
+// // Special Notes :
+// // Scope         : public
+// // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
+// // Creation Date : 05/02/03
+// //-----------------------------------------------------------------------------
+// bool DeviceEntity::perturbSensParam (Param & ndParam)
+// {
+//   if ( !ndParam.isTimeDependent() )
+//   {
+//     double paramOld = ndParam.dVal();
+//     getDeviceOptions().deviceSens_dp = getDeviceOptions().testJac_SqrtEta * (1.0 + fabs(ndParam.dVal()));
+//     double paramNew = paramOld + getDeviceOptions().deviceSens_dp;
+
+//     ndParam.setVal (paramNew);
+//   }
+//   else
+//   {
+//     UserWarning0(*this) << "Time dependent parameter (" << ndParam.uTag()
+//                         << ") not allowed as a sensitivity parameter, continuing analysis without perturubing this parameter.";
+//   }
+
+//   if (Xyce::DEBUG_DEVICE && getDeviceOptions().debugLevel > 0)
+//   {
+//     Xyce::dout() << "DeviceEntity::perturbSensParams" << std::endl
+//                  << "paramNew = " << paramNew <<std::endl
+//                  << "paramOld = " << paramOld <<std::endl
+//                  << "dp    = " << getDeviceOptions().deviceSens_dp << std::endl;
+//   }
+
+//   return true;
+// }
 
 } // namespace Device
 } // namespace Xyce

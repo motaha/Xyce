@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.30.2.2 $
+// Revision Number: $Revision: 1.41 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/24 23:49:18 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -48,7 +48,11 @@
 
 // ---------- Standard Includes ----------
 
-#include <N_UTL_Misc.h>
+
+#include <algorithm>
+#include <iostream>
+#include <map>
+#include <string>
 
 #ifdef HAVE_CSTRING
 #include <cstring>
@@ -68,25 +72,8 @@
 #include <math.h>
 #endif
 
-#include<map>
-
-#ifdef HAVE_ALGORITHM
-#include <algorithm>
-#else
-#ifdef HAVE_ALGO_H
-#include <algo.h>
-#else
-#error Must have either <algorithm> or <algo.h>!
-#endif
-#endif
-
-#include <string>
-#include <iostream>
-
-// ----------   Xyce Includes   ----------
 #include <N_DEV_fwd.h>
 #include <N_DEV_PDE_2DMesh.h>
-#include <N_UTL_Misc.h>
 #include <N_ERH_ErrorMgr.h>
 #include <N_DEV_DeviceOptions.h>
 
@@ -101,7 +88,7 @@ namespace Device {
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/21/02
 //-----------------------------------------------------------------------------
-PDE_2DMesh::PDE_2DMesh (DeviceOptions & do1, int sgplotLevel1):
+PDE_2DMesh::PDE_2DMesh (const DeviceOptions & do1, int sgplotLevel1):
     xMax      (0.0),
     yMax      (0.0),
     xMin      (0.0),
@@ -136,7 +123,7 @@ PDE_2DMesh::PDE_2DMesh (DeviceOptions & do1, int sgplotLevel1):
     nodeIndices(NULL),
     edgeIndices(NULL),
     cellIndices(NULL),
-    devOptions_(do1),
+    devOptions_(&do1),
     aiBegin(NULL),
     aiEnd(NULL),
     adjInfoAllocFlag(false),
@@ -436,7 +423,7 @@ PDE_2DMesh::~PDE_2DMesh ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/21/02
 //-----------------------------------------------------------------------------
-bool PDE_2DMesh::initializeMesh (string & meshFileName_tmp)
+bool PDE_2DMesh::initializeMesh (const std::string & meshFileName_tmp)
 {
   bool bsuccess = true;
   bool tmpBool = true;
@@ -465,7 +452,7 @@ bool PDE_2DMesh::initializeMesh (string & meshFileName_tmp)
   visitCellFlagVec.resize(numCells,0);
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 1) dumpMesh ();
+  if (devOptions_->debugLevel > 1) dumpMesh ();
 #endif
 
   return bsuccess;
@@ -484,7 +471,7 @@ bool PDE_2DMesh::initializeMesh (string & meshFileName_tmp)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/21/02
 //-----------------------------------------------------------------------------
-bool PDE_2DMesh::readSGFMeshFile (string & meshFileName_tmp)
+bool PDE_2DMesh::readSGFMeshFile (const std::string & meshFileName_tmp)
 {
   MESHHEAD meshhead;
 
@@ -493,7 +480,7 @@ bool PDE_2DMesh::readSGFMeshFile (string & meshFileName_tmp)
 
   if (nFile == NULL)
   {
-      string msg("PDE_2DMesh::readSGFMeshFile - ");
+      std::string msg("PDE_2DMesh::readSGFMeshFile - ");
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg + meshFileName_tmp +
                            " file not found.");
   }
@@ -513,8 +500,8 @@ bool PDE_2DMesh::readSGFMeshFile (string & meshFileName_tmp)
 
   numLabels = cLabel;
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
-    cout << "About to read label lists:  cLabel = " << cLabel << endl;
+  if (devOptions_->debugLevel > 0)
+    Xyce::dout() << "About to read label lists:  cLabel = " << cLabel << std::endl;
 #endif
 
   for(i = 0; i < cLabel; ++i)
@@ -523,19 +510,19 @@ bool PDE_2DMesh::readSGFMeshFile (string & meshFileName_tmp)
     mLabel xLabel;
 
     fread(&xlatlabel, sizeof(XLATLABEL),1,nFile);
-    xLabel.name = string(xlatlabel.szName);
+    xLabel.name = std::string(xlatlabel.szName);
     xLabel.iIndex = xlatlabel.iIndex;
     xLabel.uType  = xlatlabel.uType;
     xLabel.cNode  = xlatlabel.cNode;
 
 #ifdef Xyce_DEBUG_DEVICE
-    if (devOptions_.debugLevel > 0)
+    if (devOptions_->debugLevel > 0)
     {
-      cout << "i = " << i ;
-      cout << "  iIndex = " << xLabel.iIndex;
-      cout << "  uType = " << xLabel.uType;
-      cout << "  cNode = " << xLabel.cNode;
-      cout << "  label name = " << xLabel.name << endl;
+      Xyce::dout() << "i = " << i ;
+      Xyce::dout() << "  iIndex = " << xLabel.iIndex;
+      Xyce::dout() << "  uType = " << xLabel.uType;
+      Xyce::dout() << "  cNode = " << xLabel.cNode;
+      Xyce::dout() << "  label name = " << xLabel.name << std::endl;
     }
 #endif
 
@@ -569,8 +556,8 @@ bool PDE_2DMesh::readSGFMeshFile (string & meshFileName_tmp)
   UINT cArray;
   fread(&cArray, sizeof(UINT),1,nFile);
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
-    cout << "About to read in the arrays.  cArray = " << cArray << endl;
+  if (devOptions_->debugLevel > 0)
+    Xyce::dout() << "About to read in the arrays.  cArray = " << cArray << std::endl;
 #endif
 
   // the first two arrays are x and y...
@@ -582,7 +569,7 @@ bool PDE_2DMesh::readSGFMeshFile (string & meshFileName_tmp)
     ExtendedString tmpName(szArrayName);
     tmpName.toUpper ();
 #ifdef Xyce_DEBUG_DEVICE
-    cout << "i=" <<i<< "  name = " << tmpName << endl;
+    Xyce::dout() << "i=" <<i<< "  name = " << tmpName << std::endl;
 #endif
 
     if (tmpName == "X")
@@ -606,10 +593,10 @@ bool PDE_2DMesh::readSGFMeshFile (string & meshFileName_tmp)
   }
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
+  if (devOptions_->debugLevel > 0)
   {
-    cout << "Done reading x and y arrays.";
-    cout << "  Reading the others, if they exist." << endl;
+    Xyce::dout() << "Done reading x and y arrays.";
+    Xyce::dout() << "  Reading the others, if they exist." << std::endl;
   }
 #endif
 
@@ -617,8 +604,8 @@ bool PDE_2DMesh::readSGFMeshFile (string & meshFileName_tmp)
   if (meshhead.cArray > 2)
   {
 #ifdef Xyce_DEBUG_DEVICE
-    if (devOptions_.debugLevel > 0)
-      cout << "reading extra arrays..." << endl;
+    if (devOptions_->debugLevel > 0)
+      Xyce::dout() << "reading extra arrays..." << std::endl;
 #endif
     for(i = 2; i < meshhead.cArray; ++i)
     {
@@ -654,8 +641,8 @@ bool PDE_2DMesh::readSGFMeshFile (string & meshFileName_tmp)
   numRegLabels  = meshhead.cRegLabel;
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
-    cout << "About to read the nodes.  cNodes = " << cNodes << endl;
+  if (devOptions_->debugLevel > 0)
+    Xyce::dout() << "About to read the nodes.  cNodes = " << cNodes << std::endl;
 #endif
 
   for (i=0;i<cNodes;++i)
@@ -676,8 +663,8 @@ bool PDE_2DMesh::readSGFMeshFile (string & meshFileName_tmp)
   numEdges = cEdge;
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
-    cout << "About to read the edges.  cEdge = " << cEdge << endl;
+  if (devOptions_->debugLevel > 0)
+    Xyce::dout() << "About to read the edges.  cEdge = " << cEdge << std::endl;
 #endif
 
   for (i=0; i< cEdge; ++i)
@@ -710,8 +697,8 @@ bool PDE_2DMesh::readSGFMeshFile (string & meshFileName_tmp)
   numCells = cTriangle;
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
-    cout << "About to read the cells.  numCells = " << numCells  << endl;
+  if (devOptions_->debugLevel > 0)
+    Xyce::dout() << "About to read the cells.  numCells = " << numCells  << std::endl;
 #endif
   for (i=0;i<cTriangle;++i)
   {
@@ -740,8 +727,8 @@ bool PDE_2DMesh::readSGFMeshFile (string & meshFileName_tmp)
   numAdj = cAdj;
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
-    cout << "About to read the adjacency info.  cAdj = " << cAdj << endl;
+  if (devOptions_->debugLevel > 0)
+    Xyce::dout() << "About to read the adjacency info.  cAdj = " << cAdj << std::endl;
 #endif
   // Set up scaling factors for geometry.
   double rDistScale = 1.0;
@@ -753,10 +740,10 @@ bool PDE_2DMesh::readSGFMeshFile (string & meshFileName_tmp)
 
   cylGeom = meshhead.fCylGeom;
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
+  if (devOptions_->debugLevel > 0)
   {
-    if (meshhead.fCylGeom) cout << "Cylindrical Geometry\n\n";
-    else                   cout << "Cartesian Geometry\n\n";
+    if (meshhead.fCylGeom) Xyce::dout() << "Cylindrical Geometry\n\n";
+    else                   Xyce::dout() << "Cartesian Geometry\n\n";
   }
 #endif
 
@@ -842,7 +829,7 @@ bool PDE_2DMesh::readSGFMeshFile (string & meshFileName_tmp)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 10/04/02
 //-----------------------------------------------------------------------------
-bool PDE_2DMesh::writeSGFMeshFile (string & meshFileName_tmp)
+bool PDE_2DMesh::writeSGFMeshFile (const std::string & meshFileName_tmp)
 {
   MESHHEAD meshhead;
   int i,j;
@@ -1017,8 +1004,8 @@ bool PDE_2DMesh::initializeInternalMesh
      double xlength,
      double ylength,
      int numElectrodes,
-     string & outputMeshFileName,
-     map<string,PDE_2DElectrode*> & elMap,
+     std::string & outputMeshFileName,
+     std::map<std::string,PDE_2DElectrode*> & elMap,
      bool cylFlag)
 {
   bool bsuccess = true;
@@ -1067,7 +1054,7 @@ bool PDE_2DMesh::initializeInternalMesh
   visitCellFlagVec.resize(numCells,0);
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 1)
+  if (devOptions_->debugLevel > 1)
   {
     dumpMesh ();
   }
@@ -1102,9 +1089,9 @@ bool PDE_2DMesh::resizeMesh(double xlength, double ylength)
 {
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
+  if (devOptions_->debugLevel > 0)
   {
-    cout << "In PDE_2DMesh:resizeMesh." << endl;
+    Xyce::dout() << "In PDE_2DMesh:resizeMesh." << std::endl;
   }
 #endif
 
@@ -1119,10 +1106,10 @@ bool PDE_2DMesh::resizeMesh(double xlength, double ylength)
   yMax = yMin + ylength;
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
+  if (devOptions_->debugLevel > 0)
   {
-    cout << " xMax = " << xMax << endl;
-    cout << " yMax = " << yMax << endl;
+    Xyce::dout() << " xMax = " << xMax << std::endl;
+    Xyce::dout() << " yMax = " << yMax << std::endl;
   }
 #endif
 
@@ -1142,10 +1129,10 @@ bool PDE_2DMesh::resizeMesh(double xlength, double ylength)
     mNodeVector[i].y = yVector[i];
 
 #ifdef Xyce_DEBUG_DEVICE
-    if (devOptions_.debugLevel > 0)
+    if (devOptions_->debugLevel > 0)
     {
-      cout << "\txVec["<<i<<"] = " << xVector[i];
-      cout << "\tyVec["<<i<<"] = " << yVector[i] << endl;
+      Xyce::dout() << "\txVec["<<i<<"] = " << xVector[i];
+      Xyce::dout() << "\tyVec["<<i<<"] = " << yVector[i] << std::endl;
     }
 #endif
   }
@@ -1154,9 +1141,9 @@ bool PDE_2DMesh::resizeMesh(double xlength, double ylength)
   calcAdjacencyInfo ();
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
+  if (devOptions_->debugLevel > 0)
   {
-    cout << "Done with PDE_2DMesh:resizeMesh." << endl;
+    Xyce::dout() << "Done with PDE_2DMesh:resizeMesh." << std::endl;
   }
 #endif
 
@@ -1194,8 +1181,8 @@ bool PDE_2DMesh::setupInternalMesh (
   numRegLabels = 1;
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
-    cout << "In setupInternalMesh"<<endl;
+  if (devOptions_->debugLevel > 0)
+    Xyce::dout() << "In setupInternalMesh"<<std::endl;
 #endif
 
   xMax = xlength; xMin = 0.0;
@@ -1245,9 +1232,9 @@ bool PDE_2DMesh::setupInternalMesh (
   }
   numNodes = nodeIndex;
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
+  if (devOptions_->debugLevel > 0)
   {
-    cout << "\nDone with Node vector" << endl;
+    Xyce::dout() << "\nDone with Node vector" << std::endl;
   }
 #endif
 
@@ -1294,8 +1281,8 @@ bool PDE_2DMesh::setupInternalMesh (
         if (edge1.inodeA == -1 || edge1.inodeB == -1)
         {
 #ifdef Xyce_DEBUG_DEVICE
-           cout << " edge1.inodeA = " << edge1.inodeA;
-           cout << "  edge1.inodeB = " << edge1.inodeB <<endl;
+           Xyce::dout() << " edge1.inodeA = " << edge1.inodeA;
+           Xyce::dout() << "  edge1.inodeB = " << edge1.inodeB <<std::endl;
 #endif
            exit(0);
         }
@@ -1332,8 +1319,8 @@ bool PDE_2DMesh::setupInternalMesh (
         if (edge2.inodeA == -1 || edge2.inodeB == -1)
         {
 #ifdef Xyce_DEBUG_DEVICE
-          cout << " edge2.inodeA = " << edge2.inodeA;
-          cout << "  edge2.inodeB = " << edge2.inodeB <<endl;
+          Xyce::dout() << " edge2.inodeA = " << edge2.inodeA;
+          Xyce::dout() << "  edge2.inodeB = " << edge2.inodeB <<std::endl;
 #endif
           exit(0);
         }
@@ -1349,9 +1336,9 @@ bool PDE_2DMesh::setupInternalMesh (
 
   numEdges = edgeIndex;
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
+  if (devOptions_->debugLevel > 0)
   {
-    cout << "Done with Edge vector" << endl;
+    Xyce::dout() << "Done with Edge vector" << std::endl;
   }
 #endif
 
@@ -1410,9 +1397,9 @@ bool PDE_2DMesh::setupInternalMesh (
   }
   numCells = cellIndex;
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
+  if (devOptions_->debugLevel > 0)
   {
-    cout << "Done with Cell vector" << endl;
+    Xyce::dout() << "Done with Cell vector" << std::endl;
   }
 #endif
 
@@ -1431,9 +1418,9 @@ bool PDE_2DMesh::setupInternalMesh (
     }
   }
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
+  if (devOptions_->debugLevel > 0)
   {
-    cout << "Done with Cell neighbors." << endl;
+    Xyce::dout() << "Done with Cell neighbors." << std::endl;
   }
 #endif
 
@@ -1459,9 +1446,9 @@ bool PDE_2DMesh::setupInternalMesh (
   calcAdjacencyInfo ();
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
+  if (devOptions_->debugLevel > 0)
   {
-    cout << "Done with setupInternalMesh\n";
+    Xyce::dout() << "Done with setupInternalMesh\n";
   }
 #endif
 
@@ -1488,7 +1475,7 @@ bool PDE_2DMesh::setupInternalAdjacencyInfo ()
   int i,j;
 
 #ifdef Xyce_DEBUG_DEVICE
-  cout << "In PDE_2DMesh::setupInternalAdjacencyInfo." << endl;
+  Xyce::dout() << "In PDE_2DMesh::setupInternalAdjacencyInfo." << std::endl;
 #endif
 
   // first do some of the edge information.
@@ -1526,7 +1513,7 @@ bool PDE_2DMesh::setupInternalAdjacencyInfo ()
   // Get nearest neighbor node information, edgeinfo array stuff, etc.:
   // Set the area of the integration box as well.
 #ifdef Xyce_DEBUG_DEVICE
-  cout << "About to do the edgeinfo:" << endl;
+  Xyce::dout() << "About to do the edgeinfo:" << std::endl;
 #endif
 
   for (i=0;i<ixMax;++i)
@@ -1605,7 +1592,7 @@ bool PDE_2DMesh::setupInternalAdjacencyInfo ()
     } // j
   } // i
 #ifdef Xyce_DEBUG_DEVICE
-  cout << "Done doing the edgeinfo:" << endl;
+  Xyce::dout() << "Done doing the edgeinfo:" << std::endl;
 #endif
 
   return true;
@@ -1624,7 +1611,7 @@ bool PDE_2DMesh::setupInternalAdjacencyInfo ()
 // Creation Date : 08/18/03
 //-----------------------------------------------------------------------------
 bool PDE_2DMesh::errorCheckElectrodes
-  (int numElectrodes, map<string,PDE_2DElectrode*> & elMap)
+  (int numElectrodes, std::map<std::string,PDE_2DElectrode*> & elMap)
 {
   bool bsuccess = true;
 
@@ -1632,7 +1619,7 @@ bool PDE_2DMesh::errorCheckElectrodes
   if (numElectrodes != elMap.size())
   {
     bsuccess = false;
-    string msg("Number of electrodes and number of nodes are not equal.\n");
+    std::string msg("Number of electrodes and number of nodes are not equal.\n");
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   }
 
@@ -1647,9 +1634,9 @@ bool PDE_2DMesh::errorCheckElectrodes
   bool allNotSet = true;
   useDefaultLabels = false;
 
-  map<string, PDE_2DElectrode*>::iterator mapIter;
-  map<string, PDE_2DElectrode*>::iterator mapStart = elMap.begin();
-  map<string, PDE_2DElectrode*>::iterator mapEnd = elMap.end();
+  std::map<std::string, PDE_2DElectrode*>::iterator mapIter;
+  std::map<std::string, PDE_2DElectrode*>::iterator mapStart = elMap.begin();
+  std::map<std::string, PDE_2DElectrode*>::iterator mapEnd = elMap.end();
 
   for ( mapIter = mapStart; mapIter != mapEnd; ++mapIter )
   {
@@ -1663,7 +1650,7 @@ bool PDE_2DMesh::errorCheckElectrodes
   if (!allSet && !allNotSet)
   {
     bsuccess = false;
-    string msg("Some electrodes have start, end and side specified,\nsome don't.  ");
+    std::string msg("Some electrodes have start, end and side specified,\nsome don't.  ");
     msg +=     "Either specify start, end and side for\nall electrodes, or none.\n";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   }
@@ -1764,13 +1751,13 @@ bool PDE_2DMesh::setupDefaultLabels(int numberElectrodes)
 
 #if 0
 #ifdef Xyce_DEBUG_DEVICE
-    if (devOptions_.debugLevel > 0)
+    if (devOptions_->debugLevel > 0)
     {
-      cout << "Right before pushing back the ANODE label." << endl;
+      Xyce::dout() << "Right before pushing back the ANODE label." << std::endl;
       for (i=0;i<xLabel.mNodeVector.size();++i)
       {
 	cout << "Node: " << i << " = " << xLabel.mNodeVector[i];
-	cout << endl;
+	cout << std::endl;
       }
     }
 #endif
@@ -1801,13 +1788,13 @@ bool PDE_2DMesh::setupDefaultLabels(int numberElectrodes)
 
 #if 0
 #ifdef Xyce_DEBUG_DEVICE
-    if (devOptions_.debugLevel > 0)
+    if (devOptions_->debugLevel > 0)
     {
-      cout << "Right before pushing back the CATHODE label." << endl;
+      Xyce::dout() << "Right before pushing back the CATHODE label." << std::endl;
       for (i=0;i<xLabel.mNodeVector.size();++i)
       {
 	cout << "Node: " << i << " = " << xLabel.mNodeVector[i];
-	cout << endl;
+	cout << std::endl;
       }
     }
 #endif
@@ -1846,13 +1833,13 @@ bool PDE_2DMesh::setupDefaultLabels(int numberElectrodes)
 
 #if 0
 #ifdef Xyce_DEBUG_DEVICE
-    if (devOptions_.debugLevel > 0)
+    if (devOptions_->debugLevel > 0)
     {
-      cout << "Right before pushing back the NOFLUX label." << endl;
+      Xyce::dout() << "Right before pushing back the NOFLUX label." << std::endl;
       for (i=0;i<xLabel.mNodeVector.size();++i)
       {
-	cout << "Node: " << i << " = " << xLabel.mNodeVector[i];
-	cout << endl;
+        Xyce::dout() << "Node: " << i << " = " << xLabel.mNodeVector[i];
+        Xyce::dout() << std::endl;
       }
     }
 #endif
@@ -2238,12 +2225,12 @@ bool PDE_2DMesh::setupDefaultLabels(int numberElectrodes)
      numLabels = 6; // SI, SOURCE, GATE, DRAIN, SUB, NOFLUX
 
 #ifdef Xyce_DEBUG_DEVICE
-     cout << "iA = "<< iA << endl;
-     cout << "iB = "<< iB << endl;
-     cout << "iC = "<< iC << endl;
-     cout << "iD = "<< iD << endl;
-     cout << "iE = "<< iE << endl;
-     cout << "iF = "<< iF << endl;
+     Xyce::dout() << "iA = "<< iA << std::endl;
+     Xyce::dout() << "iB = "<< iB << std::endl;
+     Xyce::dout() << "iC = "<< iC << std::endl;
+     Xyce::dout() << "iD = "<< iD << std::endl;
+     Xyce::dout() << "iE = "<< iE << std::endl;
+     Xyce::dout() << "iF = "<< iF << std::endl;
 #endif
 
      // do the source.  This goes from A to B, inclusive of both A and B.
@@ -2489,8 +2476,8 @@ bool PDE_2DMesh::setupDefaultLabels(int numberElectrodes)
   else
   {
 #ifdef Xyce_DEBUG_DEVICE
-    cout << "Sorry, the internal mesh generator can't";
-    cout << "  handle anything greater than 4 electrodes." << endl;
+    Xyce::dout() << "Sorry, the internal mesh generator can't";
+    Xyce::dout() << "  handle anything greater than 4 electrodes." << std::endl;
 #endif
   }
 
@@ -2512,7 +2499,7 @@ bool PDE_2DMesh::setupDefaultLabels(int numberElectrodes)
 // Creation Date : 04/23/02
 //-----------------------------------------------------------------------------
 bool PDE_2DMesh::setupInternalLabels(int numberElectrodes,
-	    map<string,PDE_2DElectrode*> & elMap)
+	    std::map<std::string,PDE_2DElectrode*> & elMap)
 {
 
   // Region labels of nodes-------------------------------------------------
@@ -2549,13 +2536,13 @@ bool PDE_2DMesh::setupInternalLabels(int numberElectrodes,
 
   // Edge labels of nodes----------------------------------------------------
   // Now do the edge labels, using the electrode Map.
-  vector<int> done;
+  std::vector<int> done;
   done.resize(numNodes, 0);
 
-  map<string, PDE_2DElectrode*>::iterator mapIter;
-  map<string, PDE_2DElectrode*>::iterator mapStart =
+  std::map<std::string, PDE_2DElectrode*>::iterator mapIter;
+  std::map<std::string, PDE_2DElectrode*>::iterator mapStart =
     elMap.begin();
-  map<string, PDE_2DElectrode*>::iterator mapEnd =
+  std::map<std::string, PDE_2DElectrode*>::iterator mapEnd =
     elMap.end();
 
   numLabels = 1; // SI so far...
@@ -2720,7 +2707,7 @@ bool PDE_2DMesh::setupInternalLabels(int numberElectrodes,
     }
     else
     {
-      string msg("electrode side specification not recognized.\n");
+      std::string msg("electrode side specification not recognized.\n");
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
     }
   } // end of map loop:
@@ -2789,14 +2776,14 @@ bool PDE_2DMesh::setupInternalLabels(int numberElectrodes,
   xLabel.cNode = xLabel.mNodeVector.size ();
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 1)
+  if (devOptions_->debugLevel > 1)
   {
-    cout << "NOFLUX nodes:" << endl;
+    Xyce::dout() << "NOFLUX nodes:" << std::endl;
     for (int nodeIndex=0;nodeIndex<xLabel.mNodeVector.size();++nodeIndex)
     {
       int iNode = xLabel.mNodeVector[nodeIndex];
-      cout << "node="<<iNode<<" x=" << xVector[iNode];
-      cout << " y="<<yVector[iNode] <<endl;
+      Xyce::dout() << "node="<<iNode<<" x=" << xVector[iNode];
+      Xyce::dout() << " y="<<yVector[iNode] <<std::endl;
     }
   }
 #endif
@@ -2811,7 +2798,7 @@ bool PDE_2DMesh::setupInternalLabels(int numberElectrodes,
   // Note:  labels were already assigned to the cells in mCellVector, up
   //        in setupInternalMesh.
   //        Also, nodes don't get labels.
-  vector<int> edgeDone;
+  std::vector<int> edgeDone;
   edgeDone.resize(numEdges, 0);
 
   for ( mapIter = mapStart; mapIter != mapEnd; ++mapIter )
@@ -2876,7 +2863,7 @@ bool PDE_2DMesh::setupInternalLabels(int numberElectrodes,
     }
     else
     {
-      string msg("electrode side specification not recognized.\n");
+      std::string msg("electrode side specification not recognized.\n");
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
     }
   }
@@ -2939,9 +2926,9 @@ bool PDE_2DMesh::setupInternalLabels(int numberElectrodes,
   }
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 1)
+  if (devOptions_->debugLevel > 1)
   {
-    cout << "EDGEs:"<<endl;
+    Xyce::dout() << "EDGEs:"<<std::endl;
     j=0;
     for (i=1;i<ixMax;++i)
     {
@@ -2949,15 +2936,15 @@ bool PDE_2DMesh::setupInternalLabels(int numberElectrodes,
       int n2 = nodeIndices[i-1][j ];
       int e1 = edgeIndices[n1 ][n2];
 
-      cout << "edge: " << e1;
-      cout << " x(A)="<<xVector[mEdgeVector[e1].inodeA];
-      cout << " y(A)="<<yVector[mEdgeVector[e1].inodeA];
-      cout << " x(B)="<<xVector[mEdgeVector[e1].inodeB];
-      cout << " y(B)="<<yVector[mEdgeVector[e1].inodeB];
-      cout << " label = " << mEdgeVector[e1].uLabel;
-      cout << endl;
+      Xyce::dout() << "edge: " << e1;
+      Xyce::dout() << " x(A)="<<xVector[mEdgeVector[e1].inodeA];
+      Xyce::dout() << " y(A)="<<yVector[mEdgeVector[e1].inodeA];
+      Xyce::dout() << " x(B)="<<xVector[mEdgeVector[e1].inodeB];
+      Xyce::dout() << " y(B)="<<yVector[mEdgeVector[e1].inodeB];
+      Xyce::dout() << " label = " << mEdgeVector[e1].uLabel;
+      Xyce::dout() << std::endl;
     }
-    cout << endl;
+    Xyce::dout() << std::endl;
 
     j=iyMax-1;
     for (i=1;i<ixMax;++i)
@@ -2966,15 +2953,15 @@ bool PDE_2DMesh::setupInternalLabels(int numberElectrodes,
       int n2 = nodeIndices[i-1][j ];
       int e1 = edgeIndices[n1 ][n2];
 
-      cout << "edge: " << e1;
-      cout << " x(A)="<<xVector[mEdgeVector[e1].inodeA];
-      cout << " y(A)="<<yVector[mEdgeVector[e1].inodeA];
-      cout << " x(B)="<<xVector[mEdgeVector[e1].inodeB];
-      cout << " y(B)="<<yVector[mEdgeVector[e1].inodeB];
-      cout << " label = " << mEdgeVector[e1].uLabel;
-      cout << endl;
+      Xyce::dout() << "edge: " << e1;
+      Xyce::dout() << " x(A)="<<xVector[mEdgeVector[e1].inodeA];
+      Xyce::dout() << " y(A)="<<yVector[mEdgeVector[e1].inodeA];
+      Xyce::dout() << " x(B)="<<xVector[mEdgeVector[e1].inodeB];
+      Xyce::dout() << " y(B)="<<yVector[mEdgeVector[e1].inodeB];
+      Xyce::dout() << " label = " << mEdgeVector[e1].uLabel;
+      Xyce::dout() << std::endl;
     }
-    cout << endl;
+    Xyce::dout() << std::endl;
 
     i=0;
     for (j=1;j<iyMax;++j)
@@ -2983,15 +2970,15 @@ bool PDE_2DMesh::setupInternalLabels(int numberElectrodes,
       int n2 = nodeIndices[i  ][j-1];
       int e1 = edgeIndices[n1 ][n2 ];
 
-      cout << "edge: " << e1;
-      cout << " x(A)="<<xVector[mEdgeVector[e1].inodeA];
-      cout << " y(A)="<<yVector[mEdgeVector[e1].inodeA];
-      cout << " x(B)="<<xVector[mEdgeVector[e1].inodeB];
-      cout << " y(B)="<<yVector[mEdgeVector[e1].inodeB];
-      cout << " label = " << mEdgeVector[e1].uLabel;
-      cout << endl;
+      Xyce::dout() << "edge: " << e1;
+      Xyce::dout() << " x(A)="<<xVector[mEdgeVector[e1].inodeA];
+      Xyce::dout() << " y(A)="<<yVector[mEdgeVector[e1].inodeA];
+      Xyce::dout() << " x(B)="<<xVector[mEdgeVector[e1].inodeB];
+      Xyce::dout() << " y(B)="<<yVector[mEdgeVector[e1].inodeB];
+      Xyce::dout() << " label = " << mEdgeVector[e1].uLabel;
+      Xyce::dout() << std::endl;
     }
-    cout << endl;
+    Xyce::dout() << std::endl;
 
     i=ixMax-1;
     for (j=1;j<iyMax;++j)
@@ -3000,15 +2987,15 @@ bool PDE_2DMesh::setupInternalLabels(int numberElectrodes,
       int n2 = nodeIndices[i  ][j-1];
       int e1 = edgeIndices[n1 ][n2 ];
 
-      cout << "edge: " << e1;
-      cout << " x(A)="<<xVector[mEdgeVector[e1].inodeA];
-      cout << " y(A)="<<yVector[mEdgeVector[e1].inodeA];
-      cout << " x(B)="<<xVector[mEdgeVector[e1].inodeB];
-      cout << " y(B)="<<yVector[mEdgeVector[e1].inodeB];
-      cout << " label = " << mEdgeVector[e1].uLabel;
-      cout << endl;
+      Xyce::dout() << "edge: " << e1;
+      Xyce::dout() << " x(A)="<<xVector[mEdgeVector[e1].inodeA];
+      Xyce::dout() << " y(A)="<<yVector[mEdgeVector[e1].inodeA];
+      Xyce::dout() << " x(B)="<<xVector[mEdgeVector[e1].inodeB];
+      Xyce::dout() << " y(B)="<<yVector[mEdgeVector[e1].inodeB];
+      Xyce::dout() << " label = " << mEdgeVector[e1].uLabel;
+      Xyce::dout() << std::endl;
     }
-    cout << endl;
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -3036,9 +3023,9 @@ bool PDE_2DMesh::setupGeometry ()
   //      is clear-cut if dealing with cylindrical coord., but less so for cartesian.)
   //   -  the total surface area (surface length?) of the mesh. (not done yet)
   //
-  vector<mNode>::iterator first = mNodeVector.begin ();
-  vector<mNode>::iterator last  = mNodeVector.end   ();
-  vector<mNode>::iterator iter;
+  std::vector<mNode>::iterator first = mNodeVector.begin ();
+  std::vector<mNode>::iterator last  = mNodeVector.end   ();
+  std::vector<mNode>::iterator iter;
 
   maxNodeNN = -999;
   vol = 0.0;
@@ -3057,17 +3044,17 @@ bool PDE_2DMesh::setupGeometry ()
   //   - the total area(volume) of each region.
   //   - the surface length(area) of each region. (not done yet)
 
-  map<string, mLabel>::iterator firstL = mLabelMap.begin ();
-  map<string, mLabel>::iterator lastL  = mLabelMap.end   ();
-  map<string, mLabel>::iterator iterL;
+  std::map<std::string, mLabel>::iterator firstL = mLabelMap.begin ();
+  std::map<std::string, mLabel>::iterator lastL  = mLabelMap.end   ();
+  std::map<std::string, mLabel>::iterator iterL;
 
   for (iterL=firstL; iterL!=lastL; ++iterL)
   {
     if (iterL->second.uType == TYPE_EDGE) continue;
 
-    vector<int>::iterator firstN = iterL->second.mNodeVector.begin ();
-    vector<int>::iterator lastN  = iterL->second.mNodeVector.end   ();
-    vector<int>::iterator iterN;
+    std::vector<int>::iterator firstN = iterL->second.mNodeVector.begin ();
+    std::vector<int>::iterator lastN  = iterL->second.mNodeVector.end   ();
+    std::vector<int>::iterator iterN;
 
     iterL->second.vol = 0.0;
 
@@ -3102,33 +3089,16 @@ bool PDE_2DMesh::setupGeometry ()
 //-----------------------------------------------------------------------------
 void PDE_2DMesh::dumpMesh ()
 {
-
   // open output file
-  int i;
-  char sz[64];
-  for (i=0;i<64;++i) sz[i] = static_cast<char>(0);
-
-#if 0
-  if (externalMeshFlag)
-    sprintf(sz, "debugMesh.txt");
-  else
-    sprintf(sz, "%s.txt",meshFileName.c_str());
-
-  FILE *file = fopen(sz, "wt");
-#else
-
-  int l1 = meshFileName.size();
-  string dbFileName = string(strncpy(sz,meshFileName.c_str(),l1-4)) + "mesh_debug.txt";
-
+  std::string dbFileName = meshFileName.substr(0, meshFileName.size() - 4) + "mesh_debug.txt";
   FILE *file = fopen(dbFileName.c_str(), "wt");
-#endif
 
   fprintf(file, "CELLS\n");
   fprintf(file, "      |     |          EDGES                     CELLS        \n");
   fprintf(file, "  i   |  u  |   AB    BC  AC/CD   AD     AB    BC  AC/CD   AD \n");
   fprintf(file, "----- | --- | ----- ----- ----- -----  ----- ----- ----- -----\n");
 
-  for(i = 0; i < numCells; ++i)
+  for(int i = 0; i < numCells; ++i)
   {
     mCell c1 = mCellVector[i];
 
@@ -3170,7 +3140,7 @@ void PDE_2DMesh::dumpMesh ()
   fprintf(file, "  i   |  u  |   A     B   |     ilen     |      elen    |   Area1      |   Area2      |\n");
   fprintf(file, "----- | --- | ----- ----- | ------------ | ------------ | ------------ | ------------ |\n");
 
-  for(i = 0; i < numEdges; ++i)
+  for(int i = 0; i < numEdges; ++i)
   {
     mEdge e1 = mEdgeVector[i];
     fprintf(file, "%5u | ", i);
@@ -3185,7 +3155,7 @@ void PDE_2DMesh::dumpMesh ()
   fprintf(file, "  i   |       x           y       |      Area    |\n");
   fprintf(file, "----- | ------------ ------------ | ------------ |\n");
 
-  for(i = 0; i < numNodes; ++i)
+  for(int i = 0; i < numNodes; ++i)
   {
     mNode n1 = mNodeVector[i];
     fprintf(file, "%5u | ", i);
@@ -3193,7 +3163,7 @@ void PDE_2DMesh::dumpMesh ()
   }
 
   fprintf(file, "\nNodeEdgeInfo\n");
-  for(i = 0; i < numNodes; ++i)
+  for(int i = 0; i < numNodes; ++i)
   {
     fprintf(file, "------\n");
     fprintf(file, "  node index = %d\n", i);
@@ -3233,29 +3203,29 @@ void PDE_2DMesh::printLabels ()
 {
   int i;
 
-  map<string,mLabel>::iterator first = mLabelMap.begin ();
-  map<string,mLabel>::iterator last  = mLabelMap.end   ();
-  map<string,mLabel>::iterator iter  = mLabelMap.end   ();
+  std::map<std::string,mLabel>::iterator first = mLabelMap.begin ();
+  std::map<std::string,mLabel>::iterator last  = mLabelMap.end   ();
+  std::map<std::string,mLabel>::iterator iter  = mLabelMap.end   ();
 
-  cout << endl;
-  cout << "Mesh Labels:" <<endl;
-  cout << "   Index   # nodes      Type   Label";
-  cout << endl;
+  Xyce::dout() << std::endl;
+  Xyce::dout() << "Mesh Labels:" <<std::endl;
+  Xyce::dout() << "   Index   # nodes      Type   Label";
+  Xyce::dout() << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
-    cout.width(8);
-    cout << iter->second.iIndex;
-    cout.width(10);
-    cout << iter->second.cNode;
+    Xyce::dout().width(8);
+    Xyce::dout() << iter->second.iIndex;
+    Xyce::dout().width(10);
+    Xyce::dout() << iter->second.cNode;
 
-    if (iter->second.uType == TYPE_EDGE)  cout << "  Edge    ";
-    else                                  cout << "  Region  ";
+    if (iter->second.uType == TYPE_EDGE)  Xyce::dout() << "  Edge    ";
+    else                                  Xyce::dout() << "  Region  ";
 
-    cout << "   ";
-    cout.width(15);
-    cout << iter->second.name << endl;
+    Xyce::dout() << "   ";
+    Xyce::dout().width(15);
+    Xyce::dout() << iter->second.name << std::endl;
   }
-  cout << endl;
+  Xyce::dout() << std::endl;
 
 }
 
@@ -3356,30 +3326,30 @@ bool PDE_2DMesh::computeIntPB
   }
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 1)
+  if (devOptions_->debugLevel > 1)
   {
-    cout << "In computeIntPB:\n";
-    cout << " inodeA = " << inodeA;
-    cout << " inodeB = " << inodeB;
-    cout << " inodeC = " << inodeC << endl;
-    cout << " x1 = " << x1;
-    cout << " y1 = " << y1 <<endl;
+    Xyce::dout() << "In computeIntPB:\n";
+    Xyce::dout() << " inodeA = " << inodeA;
+    Xyce::dout() << " inodeB = " << inodeB;
+    Xyce::dout() << " inodeC = " << inodeC << std::endl;
+    Xyce::dout() << " x1 = " << x1;
+    Xyce::dout() << " y1 = " << y1 <<std::endl;
 
-    cout << " x2 = " << x2;
-    cout << " y2 = " << y2 <<endl;
+    Xyce::dout() << " x2 = " << x2;
+    Xyce::dout() << " y2 = " << y2 <<std::endl;
 
-    cout << " x3 = " << x3;
-    cout << " y3 = " << y3 <<endl;
+    Xyce::dout() << " x3 = " << x3;
+    Xyce::dout() << " y3 = " << y3 <<std::endl;
 
-    cout << " iSmallest = " << iSmallest << endl;
-    cout << " iLargest  = " << iLargest  << endl;
+    Xyce::dout() << " iSmallest = " << iSmallest << std::endl;
+    Xyce::dout() << " iLargest  = " << iLargest  << std::endl;
 
-    cout << " m12 = " << m12 << endl;
-    cout << " m23 = " << m23 << endl;
-    cout << " m13 = " << m13 << endl;
+    Xyce::dout() << " m12 = " << m12 << std::endl;
+    Xyce::dout() << " m23 = " << m23 << std::endl;
+    Xyce::dout() << " m13 = " << m13 << std::endl;
 
-    cout << " x   = " << x << endl;
-    cout << " y   = " << y << endl;
+    Xyce::dout() << " x   = " << x << std::endl;
+    Xyce::dout() << " y   = " << y << std::endl;
   }
 #endif
 
@@ -3513,9 +3483,9 @@ bool PDE_2DMesh::cellNodes ()
 {
 
   // set up cell Node lists:
-  vector<mCell>::iterator first = mCellVector.begin();
-  vector<mCell>::iterator last  = mCellVector.end ();
-  vector<mCell>::iterator iter;
+  std::vector<mCell>::iterator first = mCellVector.begin();
+  std::vector<mCell>::iterator last  = mCellVector.end ();
+  std::vector<mCell>::iterator iter;
 
   int i;
   for (i=0,iter=first; iter!=last ; ++i, ++iter)
@@ -3886,9 +3856,9 @@ void PDE_2DMesh::calcAdjacencyInfo ()
   int i, j, k;
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
+  if (devOptions_->debugLevel > 0)
   {
-    cout << "In PDE_2DMesh::calcAdjacencyInfo" << endl;
+    Xyce::dout() << "In PDE_2DMesh::calcAdjacencyInfo" << std::endl;
   }
 #endif
 
@@ -4233,9 +4203,9 @@ void PDE_2DMesh::calcAdjacencyInfo ()
   } // loop over cells.
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
+  if (devOptions_->debugLevel > 0)
   {
-    cout << "Done with PDE_2DMesh::calcAdjacencyInfo" << endl;
+    Xyce::dout() << "Done with PDE_2DMesh::calcAdjacencyInfo" << std::endl;
   }
 #endif
 
@@ -4250,7 +4220,7 @@ void PDE_2DMesh::calcAdjacencyInfo ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/22/02
 //-----------------------------------------------------------------------------
-bool PDE_2DMesh::labelNameExist (string & labelName)
+bool PDE_2DMesh::labelNameExist (std::string & labelName)
 {
   bool bsuccess = false;
 
@@ -4271,7 +4241,7 @@ bool PDE_2DMesh::labelNameExist (string & labelName)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/22/02
 //-----------------------------------------------------------------------------
-bool PDE_2DMesh::labelEdgeType  (string & labelName)
+bool PDE_2DMesh::labelEdgeType  (std::string & labelName)
 {
   ExtendedString tmpName = labelName;
   tmpName.toUpper ();
@@ -4293,7 +4263,7 @@ bool PDE_2DMesh::labelEdgeType  (string & labelName)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/22/02
 //-----------------------------------------------------------------------------
-bool PDE_2DMesh::getDopingVector (vector<double> & cvec_tmp)
+bool PDE_2DMesh::getDopingVector (std::vector<double> & cvec_tmp)
 {
   cvec_tmp.resize(dopingVector.size(), 0.0);
   copy(dopingVector.begin(),dopingVector.end(),cvec_tmp.begin());
@@ -4308,7 +4278,7 @@ bool PDE_2DMesh::getDopingVector (vector<double> & cvec_tmp)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/22/02
 //-----------------------------------------------------------------------------
-bool PDE_2DMesh::getXVector (vector<double> & xvec_tmp)
+bool PDE_2DMesh::getXVector (std::vector<double> & xvec_tmp)
 {
   xvec_tmp.resize(xVector.size(), 0.0);
   copy(xVector.begin(),xVector.end(),xvec_tmp.begin());
@@ -4323,7 +4293,7 @@ bool PDE_2DMesh::getXVector (vector<double> & xvec_tmp)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/22/02
 //-----------------------------------------------------------------------------
-bool PDE_2DMesh::getYVector (vector<double> & yvec_tmp)
+bool PDE_2DMesh::getYVector (std::vector<double> & yvec_tmp)
 {
   yvec_tmp.resize(yVector.size(), 0.0);
   copy(yVector.begin(),yVector.end(),yvec_tmp.begin());
@@ -4338,7 +4308,7 @@ bool PDE_2DMesh::getYVector (vector<double> & yvec_tmp)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/27/02
 //-----------------------------------------------------------------------------
-mLabel * PDE_2DMesh::getLabel (string & labelName)
+mLabel * PDE_2DMesh::getLabel (std::string & labelName)
 {
 
   ExtendedString tmpName = labelName;
@@ -4389,16 +4359,14 @@ bool PDE_2DMesh::scaleMesh (double xScale)
   else         { scaleILEN = X0_1; scaleArea = X0_2; }
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-    "---------------------------";
-  if (devOptions_.debugLevel > 0)
+  if (devOptions_->debugLevel > 0)
   {
-    cout << dashedline << endl;
-    cout << " In PDE_2DMesh::scaleMesh"<<endl;
-    cout << "  scaleELEN = " << scaleELEN <<endl;
-    cout << "  scaleILEN = " << scaleILEN <<endl;
-    cout << "  scaleArea = " << scaleArea <<endl;
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << " In PDE_2DMesh::scaleMesh"<<std::endl;
+    Xyce::dout() << "  scaleELEN = " << scaleELEN <<std::endl;
+    Xyce::dout() << "  scaleILEN = " << scaleILEN <<std::endl;
+    Xyce::dout() << "  scaleArea = " << scaleArea <<std::endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -4412,9 +4380,9 @@ bool PDE_2DMesh::scaleMesh (double xScale)
   {
     mNodeVector[i].area *= scaleArea;
 
-    vector<EDGEINFO>::iterator firstEI = mNodeVector[i].edgeInfoVector.begin ();
-    vector<EDGEINFO>::iterator lastEI  = mNodeVector[i].edgeInfoVector.end ();
-    vector<EDGEINFO>::iterator iterEI;
+    std::vector<EDGEINFO>::iterator firstEI = mNodeVector[i].edgeInfoVector.begin ();
+    std::vector<EDGEINFO>::iterator lastEI  = mNodeVector[i].edgeInfoVector.end ();
+    std::vector<EDGEINFO>::iterator iterEI;
     for (iterEI=firstEI;iterEI!=lastEI;++iterEI)
     {
       iterEI->ilen  *= scaleILEN;
@@ -4438,9 +4406,9 @@ bool PDE_2DMesh::scaleMesh (double xScale)
     mLabelVector[i].surfArea *= scaleILEN;
   }
 
-  map<string, mLabel>::iterator firstL = mLabelMap.begin ();
-  map<string, mLabel>::iterator lastL  = mLabelMap.end   ();
-  map<string, mLabel>::iterator iterL;
+  std::map<std::string, mLabel>::iterator firstL = mLabelMap.begin ();
+  std::map<std::string, mLabel>::iterator lastL  = mLabelMap.end   ();
+  std::map<std::string, mLabel>::iterator iterL;
 
   for (iterL=firstL; iterL!=lastL; ++iterL)
   {
@@ -4762,51 +4730,51 @@ bool PDE_2DMesh::interpVector (
          z >= (ztest-ztol) && z <= (ztest+ztol))
      )
   {
-    cout << "------------------------------------------" << endl;
-    cout << "Vector Interpolation failed!" << endl;
-    cout << endl;
-    cout << "  iCell  = " << iCell << endl;
-    cout << "  alpha  = " << alpha << endl;
-    cout << "  number of cells on mesh: " << numCells << endl;
-    cout << "  r      = " << r << endl;
-    cout << "  z      = " << z << endl;
-    cout << endl;
-    cout << "  xvec   = " << xvec << endl;
-    cout << "  yvec   = " << yvec << endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() << "Vector Interpolation failed!" << std::endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "  iCell  = " << iCell << std::endl;
+    Xyce::dout() << "  alpha  = " << alpha << std::endl;
+    Xyce::dout() << "  number of cells on mesh: " << numCells << std::endl;
+    Xyce::dout() << "  r      = " << r << std::endl;
+    Xyce::dout() << "  z      = " << z << std::endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "  xvec   = " << xvec << std::endl;
+    Xyce::dout() << "  yvec   = " << yvec << std::endl;
 
-    cout << "  inodeA = " << iA << endl;
-    cout << "  inodeB = " << iB << endl;
-    cout << "  inodeC = " << iC << endl;
-    cout << "  inodeD = " << iD << endl;
+    Xyce::dout() << "  inodeA = " << iA << std::endl;
+    Xyce::dout() << "  inodeB = " << iB << std::endl;
+    Xyce::dout() << "  inodeC = " << iC << std::endl;
+    Xyce::dout() << "  inodeD = " << iD << std::endl;
 
-    cout << "  nodeA (x,y) = ("<<mNodeVector[iA].x<<", "<<mNodeVector[iA].y<<")"<<endl;
-    cout << "  nodeB (x,y) = ("<<mNodeVector[iB].x<<", "<<mNodeVector[iB].y<<")"<<endl;
-    cout << "  nodeC (x,y) = ("<<mNodeVector[iC].x<<", "<<mNodeVector[iC].y<<")"<<endl;
+    Xyce::dout() << "  nodeA (x,y) = ("<<mNodeVector[iA].x<<", "<<mNodeVector[iA].y<<")"<<std::endl;
+    Xyce::dout() << "  nodeB (x,y) = ("<<mNodeVector[iB].x<<", "<<mNodeVector[iB].y<<")"<<std::endl;
+    Xyce::dout() << "  nodeC (x,y) = ("<<mNodeVector[iC].x<<", "<<mNodeVector[iC].y<<")"<<std::endl;
     if (iD != -1)
-    cout << "  nodeD (x,y) = ("<<mNodeVector[iD].x<<", "<<mNodeVector[iD].y<<")"<<endl;
+    Xyce::dout() << "  nodeD (x,y) = ("<<mNodeVector[iD].x<<", "<<mNodeVector[iD].y<<")"<<std::endl;
 
     double pi = M_PI;
-    cout << "  ABangle = " << ABangle << " = " <<(ABangle/pi)<< " * PI" << endl;
-    cout << "  BCangle = " << BCangle << " = " <<(BCangle/pi)<< " * PI" << endl;
-    cout << "  CDangle = " << CDangle << " = " <<(CDangle/pi)<< " * PI" << endl;
+    Xyce::dout() << "  ABangle = " << ABangle << " = " <<(ABangle/pi)<< " * PI" << std::endl;
+    Xyce::dout() << "  BCangle = " << BCangle << " = " <<(BCangle/pi)<< " * PI" << std::endl;
+    Xyce::dout() << "  CDangle = " << CDangle << " = " <<(CDangle/pi)<< " * PI" << std::endl;
     if (iD != -1)
-    cout << "  DAangle = " << DAangle << " = " <<(DAangle/pi)<< " * PI" << endl;
+    Xyce::dout() << "  DAangle = " << DAangle << " = " <<(DAangle/pi)<< " * PI" << std::endl;
 
-    cout << "  ABFx = " << ABFx << endl;
-    cout << "  ABFy = " << ABFy << endl;
-    cout << "  BCFx = " << BCFx << endl;
-    cout << "  BCFy = " << BCFy << endl;
-    cout << "  CDFx = " << CDFx << endl;
-    cout << "  CDFy = " << CDFy << endl;
-    cout << "  DAFx = " << DAFx << endl;
-    cout << "  DAFy = " << DAFy << endl;
+    Xyce::dout() << "  ABFx = " << ABFx << std::endl;
+    Xyce::dout() << "  ABFy = " << ABFy << std::endl;
+    Xyce::dout() << "  BCFx = " << BCFx << std::endl;
+    Xyce::dout() << "  BCFy = " << BCFy << std::endl;
+    Xyce::dout() << "  CDFx = " << CDFx << std::endl;
+    Xyce::dout() << "  CDFy = " << CDFy << std::endl;
+    Xyce::dout() << "  DAFx = " << DAFx << std::endl;
+    Xyce::dout() << "  DAFy = " << DAFy << std::endl;
 
-    cout << "  F[iEdgeAB] = " << F[iEdgeAB] <<endl;
-    cout << "  F[iEdgeBC] = " << F[iEdgeBC] <<endl;
-    cout << "  F[iEdgeCD] = " << F[iEdgeCD] <<endl;
+    Xyce::dout() << "  F[iEdgeAB] = " << F[iEdgeAB] <<std::endl;
+    Xyce::dout() << "  F[iEdgeBC] = " << F[iEdgeBC] <<std::endl;
+    Xyce::dout() << "  F[iEdgeCD] = " << F[iEdgeCD] <<std::endl;
     if (iEdgeDA != -1)
-    cout << "  F[iEdgeDA] = " << F[iEdgeDA] <<endl;
-    cout << "------------------------------------------" << endl;
+    Xyce::dout() << "  F[iEdgeDA] = " << F[iEdgeDA] <<std::endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
 
     exit(0);
   }
@@ -5030,40 +4998,40 @@ void PDE_2DMesh::findCell(
            // This cell doesn't exist, so exit.
       {
 #ifdef Xyce_DEBUG_DEVICE
-        if (devOptions_.debugLevel > 0)
+        if (devOptions_->debugLevel > 0)
         {
-          cout << endl;
-          cout << "iCell = " << iCell << endl;
-          cout << "r = " << r << "   z = " << z << endl;
-          cout << "curr_min = " << curr_min << endl;
-          cout << endl;
+          Xyce::dout() << std::endl;
+          Xyce::dout() << "iCell = " << iCell << std::endl;
+          Xyce::dout() << "r = " << r << "   z = " << z << std::endl;
+          Xyce::dout() << "curr_min = " << curr_min << std::endl;
+          Xyce::dout() << std::endl;
 
           if (AB_iC  != -1)
           {
-            cout << "AB_iC = " << AB_iC;
-            cout << "  ABmin = " << ABmin;
-            cout << "  visit = " << visitCellFlagVec[AB_iC] << endl;
+            Xyce::dout() << "AB_iC = " << AB_iC;
+            Xyce::dout() << "  ABmin = " << ABmin;
+            Xyce::dout() << "  visit = " << visitCellFlagVec[AB_iC] << std::endl;
           }
 
           if (BC_iC  != -1)
           {
-            cout << "BC_iC = " << BC_iC;
-            cout << "  BCmin = " << BCmin;
-            cout << "  visit = " << visitCellFlagVec[BC_iC] << endl;
+            Xyce::dout() << "BC_iC = " << BC_iC;
+            Xyce::dout() << "  BCmin = " << BCmin;
+            Xyce::dout() << "  visit = " << visitCellFlagVec[BC_iC] << std::endl;
           }
 
           if (CD_iC  != -1)
           {
-            cout << "CD_iC = " << CD_iC;
-            cout << "  CDmin = " << CDmin;
-            cout << "  visit = " << visitCellFlagVec[CD_iC] << endl;
+            Xyce::dout() << "CD_iC = " << CD_iC;
+            Xyce::dout() << "  CDmin = " << CDmin;
+            Xyce::dout() << "  visit = " << visitCellFlagVec[CD_iC] << std::endl;
           }
 
           if (DA_iC  != -1)
           {
-            cout << "DA_iC = " << DA_iC;
-            cout << "  DAmin = " << DAmin;
-            cout << "  visit = " << visitCellFlagVec[DA_iC] << endl;
+            Xyce::dout() << "DA_iC = " << DA_iC;
+            Xyce::dout() << "  DAmin = " << DAmin;
+            Xyce::dout() << "  visit = " << visitCellFlagVec[DA_iC] << std::endl;
           }
         }
 #endif

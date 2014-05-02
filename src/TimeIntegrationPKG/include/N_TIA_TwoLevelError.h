@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -34,9 +34,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.9.4.2 $
+// Revision Number: $Revision: 1.13 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -44,13 +44,7 @@
 #ifndef Xyce_N_TIA_TWO_LEVEL_ERROR_H
 #define Xyce_N_TIA_TWO_LEVEL_ERROR_H
 
-// ---------- Standard Declarations ----------
-#ifdef Xyce_DEBUG_TIME
-#include <iostream>
-#endif
-
-// ---------- Forward Declarations ----------
-
+#include <iosfwd>
 
 //-----------------------------------------------------------------------------
 // Class         : N_TIA_TwoLevelError
@@ -92,7 +86,6 @@ public:
   double q1HistorySum;
 };
 
-#ifdef Xyce_DEBUG_TIME
 //-----------------------------------------------------------------------------
 // Function      : operator<<
 // Purpose       : "<<" operator for two level error class.
@@ -101,24 +94,7 @@ public:
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 10/17/05
 //-----------------------------------------------------------------------------
-inline std::ostream & operator<<(std::ostream & os, const N_TIA_TwoLevelError & tlerror)
-{
-  os.width(20);os.precision(12);os.setf(std::ios::scientific);
-  os << "\n-----------------------------------------\n";
-  os << "\tTwoLevelError:\n";
-  os << "\t    innerSize:\t" << tlerror.innerSize << std::endl;
-  os << "\t    xErrorSum:\t" << tlerror.xErrorSum << std::endl;
-  os << "\t    qErrorSum:\t" << tlerror.qErrorSum << std::endl;
-  os << "\t xErrorSum_m1:\t" << tlerror.xErrorSum_m1 << std::endl;
-  os << "\t xErrorSum_m2:\t" << tlerror.xErrorSum_m2 << std::endl;
-  os << "\t xErrorSum_p1:\t" << tlerror.xErrorSum_p1 << std::endl;
-  os << "\t q1HistorySum:\t" << tlerror.q1HistorySum << std::endl;
-  os << "-----------------------------------------\n";
-  os << std::endl;
-
-  return os;
-}
-#endif // debug time
+std::ostream & operator<<(std::ostream & os, const N_TIA_TwoLevelError & tlerror);
 
 #endif // Xyce_N_TIA_TWO_LEVEL_ERROR_H
 

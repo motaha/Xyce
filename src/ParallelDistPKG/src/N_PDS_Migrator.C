@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.17.6.2 $
+// Revision Number: $Revision: 1.21 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -111,16 +111,16 @@ N_PDS_Migrator::~N_PDS_Migrator()
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/01
 //-----------------------------------------------------------------------------
-void N_PDS_Migrator::migratePackable( const vector<int> & procVec,
-				      const vector<Packable *> & exportVec,
-				      vector<Packable *> & importVec )
+void N_PDS_Migrator::migratePackable( const std::vector<int> & procVec,
+				      const std::vector<Packable *> & exportVec,
+				      std::vector<Packable *> & importVec )
 {
   int exportCount = procVec.size();
 
   Epetra_MpiDistributor distributor( *(dynamic_cast<Epetra_MpiComm*>(pdsComm_->petraComm())) );
 
-  vector<int> assign( procVec );
-  vector<Packable*> exportV( exportVec );
+  std::vector<int> assign( procVec );
+  std::vector<Packable*> exportV( exportVec );
 
   if( !IsSorted( assign ) ) SortContainer2( assign, exportV );
 
@@ -136,7 +136,7 @@ void N_PDS_Migrator::migratePackable( const vector<int> & procVec,
   pdsComm_->maxAll( &d_max_size, &d_max_all, 1 );
   int max_all = (int)d_max_all;
 
-  vector<char> exports( max_all * exportCount );
+  std::vector<char> exports( max_all * exportCount );
   char * imports = new char[ max_all * importCount ];
 
   int pos;
@@ -168,16 +168,16 @@ void N_PDS_Migrator::migratePackable( const vector<int> & procVec,
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/01
 //-----------------------------------------------------------------------------
-void N_PDS_Migrator::reverseMigratePackable( const vector<int> & procVec,
-				      const vector<Packable *> & exportVec,
-				      vector<Packable *> & importVec )
+void N_PDS_Migrator::reverseMigratePackable( const std::vector<int> & procVec,
+				      const std::vector<Packable *> & exportVec,
+				      std::vector<Packable *> & importVec )
 {
   int importCount = procVec.size();
 
   Epetra_MpiDistributor distributor(
                  *(dynamic_cast<Epetra_MpiComm*>(pdsComm_->petraComm())) );
 
-  vector<int> assign( procVec );
+  std::vector<int> assign( procVec );
   sort( assign.begin(), assign.end() );
 
   int exportCount;
@@ -195,7 +195,7 @@ void N_PDS_Migrator::reverseMigratePackable( const vector<int> & procVec,
   pdsComm_->maxAll( &d_max_size, &d_max_all, 1 );
   int max_all = (int)d_max_all;
 
-  vector<char> exports( max_all * exportCount );
+  std::vector<char> exports( max_all * exportCount );
   char * imports = new char[ max_all * importCount ];
 
   int pos;
@@ -227,16 +227,16 @@ void N_PDS_Migrator::reverseMigratePackable( const vector<int> & procVec,
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/01
 //-----------------------------------------------------------------------------
-void N_PDS_Migrator::migrateString( const vector<int> & procVec,
-				    const vector<string> & exportVec,
-				    vector<string> & importVec )
+void N_PDS_Migrator::migrateString( const std::vector<int> & procVec,
+				    const std::vector<std::string> & exportVec,
+				    std::vector<std::string> & importVec )
 {
   int exportCount = procVec.size();
 
   Epetra_MpiDistributor distributor( *(dynamic_cast<Epetra_MpiComm*>(pdsComm_->petraComm())) );
 
-  vector<int> assign( procVec );
-  vector<string> exportV( exportVec );
+  std::vector<int> assign( procVec );
+  std::vector<std::string> exportV( exportVec );
 
   if( !IsSorted( assign ) ) SortContainer2( assign, exportV );
 
@@ -251,7 +251,7 @@ void N_PDS_Migrator::migrateString( const vector<int> & procVec,
   pdsComm_->maxAll( &d_max_size, &d_max_all, 1 );
   int max_all = static_cast<int> (d_max_all);
 
-  vector<char> exports( max_all * exportCount );
+  std::vector<char> exports( max_all * exportCount );
   char * imports = new char[ max_all * importCount ];
 
   int pos;
@@ -262,7 +262,7 @@ void N_PDS_Migrator::migrateString( const vector<int> & procVec,
     pos = max_all * i;
     length = exportV[i].length();
     pdsComm_->pack( &length, 1, &(exports[0]), max_all * exportCount, pos );
-    exportVec[i].copy( charBuf, string::npos );
+    exportVec[i].copy( charBuf, std::string::npos );
     pdsComm_->pack( charBuf, length, &(exports[0]), max_all * exportCount, pos );
   }
 
@@ -275,7 +275,7 @@ void N_PDS_Migrator::migrateString( const vector<int> & procVec,
     pos = max_all * i;
     pdsComm_->unpack( &(imports[0]), max_all * importCount, pos, &length, 1 );
     pdsComm_->unpack( &(imports[0]), max_all * importCount, pos, charBuf, length );
-    importVec[i] = string( charBuf, length );
+    importVec[i] = std::string( charBuf, length );
   }
 
   delete [] charBuf;
@@ -292,16 +292,16 @@ void N_PDS_Migrator::migrateString( const vector<int> & procVec,
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/01
 //-----------------------------------------------------------------------------
-void N_PDS_Migrator::migrateInt( const vector<int> & procVec,
-			         const vector< pair<string,int> > & exportVec,
-				 vector< pair<string,int> > & importVec )
+void N_PDS_Migrator::migrateInt( const std::vector<int> & procVec,
+			         const std::vector< std::pair<std::string,int> > & exportVec,
+				 std::vector< std::pair<std::string,int> > & importVec )
 {
   int exportCount = procVec.size();
 
   Epetra_MpiDistributor distributor( *(dynamic_cast<Epetra_MpiComm*>(pdsComm_->petraComm())) );
 
-  vector<int> assign( procVec );
-  vector< pair<string,int> > exportV( exportVec );
+  std::vector<int> assign( procVec );
+  std::vector< std::pair<std::string,int> > exportV( exportVec );
 
   if( !IsSorted( assign ) ) SortContainer2( assign, exportV );
 
@@ -316,7 +316,7 @@ void N_PDS_Migrator::migrateInt( const vector<int> & procVec,
   pdsComm_->maxAll( &d_max_size, &d_max_all, 1 );
   int max_all = static_cast<int> (d_max_all);
 
-  vector<char> exports( max_all * exportCount );
+  std::vector<char> exports( max_all * exportCount );
   char * imports = new char[ max_all * importCount ];
 
   int pos, val;
@@ -327,7 +327,7 @@ void N_PDS_Migrator::migrateInt( const vector<int> & procVec,
     pos = max_all * i;
     length = exportV[i].first.length();
     pdsComm_->pack( &length, 1, &(exports[0]), max_all * exportCount, pos );
-    exportVec[i].first.copy( charBuf, string::npos );
+    exportVec[i].first.copy( charBuf, std::string::npos );
     pdsComm_->pack( charBuf, length, &(exports[0]), max_all * exportCount, pos );
     val = exportV[i].second;
     pdsComm_->pack( &val, 1, &(exports[0]), max_all * exportCount, pos );
@@ -342,7 +342,7 @@ void N_PDS_Migrator::migrateInt( const vector<int> & procVec,
     pos = max_all * i;
     pdsComm_->unpack( &(imports[0]), max_all * importCount, pos, &length, 1 );
     pdsComm_->unpack( &(imports[0]), max_all * importCount, pos, charBuf, length );
-    importVec[i].first = string( charBuf, length );
+    importVec[i].first = std::string( charBuf, length );
     pdsComm_->unpack( &(imports[0]), max_all * importCount, pos, &(importVec[i].second), 1 );
   }
 
@@ -358,9 +358,9 @@ void N_PDS_Migrator::migrateInt( const vector<int> & procVec,
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/01
 //-----------------------------------------------------------------------------
-void N_PDS_Migrator::reverseMigrateInt( const vector<int> & procVec,
-			                const vector< pair<string,int> > & exportVec,
-			                vector< pair<string,int> > & importVec )
+void N_PDS_Migrator::reverseMigrateInt( const std::vector<int> & procVec,
+			                const std::vector< std::pair<std::string,int> > & exportVec,
+			                std::vector< std::pair<std::string,int> > & importVec )
 {
   int pid = pdsComm_->procID();
 
@@ -368,7 +368,7 @@ void N_PDS_Migrator::reverseMigrateInt( const vector<int> & procVec,
 
   Epetra_MpiDistributor distributor( *(dynamic_cast<Epetra_MpiComm*>(pdsComm_->petraComm())) );
 
-  vector<int> assign( procVec );
+  std::vector<int> assign( procVec );
   sort( assign.begin(), assign.end() );
 
   int exportCount;
@@ -387,7 +387,7 @@ void N_PDS_Migrator::reverseMigrateInt( const vector<int> & procVec,
   pdsComm_->maxAll( &d_max_size, &d_max_all, 1 );
   int max_all = static_cast<int>(d_max_all);
 
-  vector<char> exports( max_all * exportCount );
+  std::vector<char> exports( max_all * exportCount );
   char * imports = new char[ max_all * importCount ];
 
   int pos, val, length;
@@ -397,7 +397,7 @@ void N_PDS_Migrator::reverseMigrateInt( const vector<int> & procVec,
     pos = max_all * i;
     length = exportVec[i].first.length();
     pdsComm_->pack( &length, 1, &(exports[0]), max_all * exportCount, pos );
-    exportVec[i].first.copy( charBuf, string::npos );
+    exportVec[i].first.copy( charBuf, std::string::npos );
     pdsComm_->pack( charBuf, length, &(exports[0]), max_all * exportCount, pos );
     val = exportVec[i].second;
     pdsComm_->pack( &val, 1, &(exports[0]), max_all * exportCount, pos );
@@ -412,7 +412,7 @@ void N_PDS_Migrator::reverseMigrateInt( const vector<int> & procVec,
     pos = max_all * i;
     pdsComm_->unpack( &(imports[0]), max_all * importCount, pos, &length, 1 );
     pdsComm_->unpack( &(imports[0]), max_all * importCount, pos, charBuf, length );
-    importVec[i].first = string( charBuf, length );
+    importVec[i].first = std::string( charBuf, length );
     pdsComm_->unpack( &(imports[0]), max_all * importCount, pos, &(importVec[i].second), 1 );
   }
 
@@ -430,16 +430,16 @@ void N_PDS_Migrator::reverseMigrateInt( const vector<int> & procVec,
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/01
 //-----------------------------------------------------------------------------
-void N_PDS_Migrator::migrateIntVec( const vector<int> & procVec,
-	            const vector< pair< string,vector<int> > > & exportVec,
-		    vector< pair< string,vector<int> > > & importVec )
+void N_PDS_Migrator::migrateIntVec( const std::vector<int> & procVec,
+	            const std::vector< std::pair< std::string,std::vector<int> > > & exportVec,
+		    std::vector< std::pair< std::string,std::vector<int> > > & importVec )
 {
   int exportCount = procVec.size();
 
   Epetra_MpiDistributor distributor( *(dynamic_cast<Epetra_MpiComm*>(pdsComm_->petraComm())) );
 
-  vector<int> assign( procVec );
-  vector< pair< string,vector<int> > > exportV( exportVec );
+  std::vector<int> assign( procVec );
+  std::vector< std::pair< std::string,std::vector<int> > > exportV( exportVec );
 
   if( !IsSorted( assign ) ) SortContainer2( assign, exportV );
 
@@ -455,7 +455,7 @@ void N_PDS_Migrator::migrateIntVec( const vector<int> & procVec,
   pdsComm_->maxAll( &d_max_size, &d_max_all, 1 );
   int max_all = static_cast<int>(d_max_all);
 
-  vector<char> exports( max_all * exportCount );
+  std::vector<char> exports( max_all * exportCount );
   char * imports = new char[ max_all * importCount ];
 
   int pos, length, val;
@@ -465,7 +465,7 @@ void N_PDS_Migrator::migrateIntVec( const vector<int> & procVec,
     pos = max_all * i;
     length = exportV[i].first.length();
     pdsComm_->pack( &length, 1, &(exports[0]), max_all * exportCount, pos );
-    exportV[i].first.copy( charBuf, string::npos );
+    exportV[i].first.copy( charBuf, std::string::npos );
     pdsComm_->pack( charBuf, length, &(exports[0]), max_all * exportCount, pos );
     length = exportV[i].second.size();
     pdsComm_->pack( &length, 1, &(exports[0]), max_all * exportCount, pos );
@@ -485,7 +485,7 @@ void N_PDS_Migrator::migrateIntVec( const vector<int> & procVec,
     pos = max_all * i;
     pdsComm_->unpack( &(imports[0]), max_all * importCount, pos, &length, 1 );
     pdsComm_->unpack( &(imports[0]), max_all * importCount, pos, charBuf, length );
-    importVec[i].first = string( charBuf, length );
+    importVec[i].first = std::string( charBuf, length );
     pdsComm_->unpack( &(imports[0]), max_all * importCount, pos, &length, 1 );
     importVec[i].second.resize( length );
     for( int j = 0; j < length; ++j )
@@ -507,15 +507,15 @@ void N_PDS_Migrator::migrateIntVec( const vector<int> & procVec,
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/20/01
 //-----------------------------------------------------------------------------
-void N_PDS_Migrator::reverseMigrateIntVec( const vector<int> & procVec,
-	            const vector< pair< string,vector<int> > > & exportVec,
-		    vector< pair< string,vector<int> > > & importVec )
+void N_PDS_Migrator::reverseMigrateIntVec( const std::vector<int> & procVec,
+	            const std::vector< std::pair< std::string,std::vector<int> > > & exportVec,
+		    std::vector< std::pair< std::string,std::vector<int> > > & importVec )
 {
   int importCount = procVec.size();
 
   Epetra_MpiDistributor distributor( *(dynamic_cast<Epetra_MpiComm*>(pdsComm_->petraComm())) );
 
-  vector<int> assign( procVec );
+  std::vector<int> assign( procVec );
   sort( assign.begin(), assign.end() );
 
   int exportCount;
@@ -534,7 +534,7 @@ void N_PDS_Migrator::reverseMigrateIntVec( const vector<int> & procVec,
   pdsComm_->maxAll( &d_max_size, &d_max_all, 1 );
   int max_all = static_cast<int>(d_max_all);
 
-  vector<char> exports( max_all * exportCount );
+  std::vector<char> exports( max_all * exportCount );
   char * imports = new char[ max_all * importCount ];
 
   int pos, length, val;
@@ -544,7 +544,7 @@ void N_PDS_Migrator::reverseMigrateIntVec( const vector<int> & procVec,
     pos = max_all * i;
     length = exportVec[i].first.length();
     pdsComm_->pack( &length, 1, &(exports[0]), max_all * exportCount, pos );
-    exportVec[i].first.copy( charBuf, string::npos );
+    exportVec[i].first.copy( charBuf, std::string::npos );
     pdsComm_->pack( charBuf, length, &(exports[0]), max_all * exportCount, pos );
     length = exportVec[i].second.size();
     pdsComm_->pack( &length, 1, &(exports[0]), max_all * exportCount, pos );
@@ -564,7 +564,7 @@ void N_PDS_Migrator::reverseMigrateIntVec( const vector<int> & procVec,
     pos = max_all * i;
     pdsComm_->unpack( &(imports[0]), max_all * importCount, pos, &length, 1 );
     pdsComm_->unpack( &(imports[0]), max_all * importCount, pos, charBuf, length );
-    importVec[i].first = string( charBuf, length );
+    importVec[i].first = std::string( charBuf, length );
     pdsComm_->unpack( &(imports[0]), max_all * importCount, pos, &length, 1 );
     importVec[i].second.resize( length );
     for( int j = 0; j < length; ++j )

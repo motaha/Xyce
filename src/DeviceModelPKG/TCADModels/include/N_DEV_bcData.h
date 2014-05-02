@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.9.6.2 $
+// Revision Number: $Revision: 1.17.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/26 20:16:31 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -65,153 +65,153 @@
 //-----------------------------------------------------------------------------
 class bcData
 {
-  private:
-  protected:
-  public:
-    bcData ():
-     eName(""),
-     nName(""),
-     type("ntype"),
-     index(-1),
-     Vequ(0.0),
-     VequGiven(false),
-     Vckt(0.0), 
-     Vckt_orig(0.0),
-     gid(-1), 
-     lid(-1),          // local ID of the circuit node.
-     lidOffset(-1),    // diagonal col in the ckt node matrix row. DMA only.
-     lidlidPtr(0),     // diagonal matrix pointer.
-     colArray(),
-     li_colArray(),
-     crossOffsets(),
-     given(false),
-     area(1.0),
-     areaGiven(false),
-     currentSum(0.0), elecCurrent(0.0), holeCurrent(0.0),
-     stateC(-1), stateC_owned(true), 
-     li_stateC(-1),
-     meshIndex(0),
-     neighborNode(1),
-     dIdVckt(0.0),
-     dFdVckt(),
-     dIdX(),
-     dIdXcols(),
-     dIdXoffset(),
-     numCrossTerms(0),
-     Vbc(0.0),
-     nnbc(0.0),
-     npbc(0.0),
-     dxdvPtr(0),
-     dxdvAllocated(false),
-     Vckt_old(0.0), Vckt_final(0.0), 
-     Vckt_delta(0.0),
-     Vckt_deltaC(0.0),
-     Vckt_ramp(0.0), Vckt_ramp_old(0.0),
-     displCurrent(0.0),
-     material ("neutral"),
-     materialGiven(false),
-     oxideBndryFlag(false)
-      {};
+private:
+protected:
+public:
+  bcData ():
+    eName(""),
+    nName(""),
+    type("ntype"),
+    index(-1),
+    Vequ(0.0),
+    VequGiven(false),
+    Vckt(0.0),
+    Vckt_orig(0.0),
+    gid(-1),
+    lid(-1),          // local ID of the circuit node.
+    lidOffset(-1),    // diagonal col in the ckt node matrix row. DMA only.
+    lidlidPtr(0),     // diagonal matrix pointer.
+    colArray(),
+    li_colArray(),
+    crossOffsets(),
+    given(false),
+    area(1.0),
+    areaGiven(false),
+    currentSum(0.0), elecCurrent(0.0), holeCurrent(0.0),
+    stateC(-1), stateC_owned(true),
+    li_stateC(-1),
+    meshIndex(0),
+    neighborNode(1),
+    dIdVckt(0.0),
+    dFdVckt(),
+    dIdX(),
+    dIdXcols(),
+    dIdXoffset(),
+    numCrossTerms(0),
+    Vbc(0.0),
+    nnbc(0.0),
+    npbc(0.0),
+    dxdvPtr(0),
+    dxdvAllocated(false),
+    Vckt_old(0.0), Vckt_final(0.0),
+    Vckt_delta(0.0),
+    Vckt_deltaC(0.0),
+    Vckt_ramp(0.0), Vckt_ramp_old(0.0),
+    displCurrent(0.0),
+    material ("neutral"),
+    materialGiven(false),
+    oxideBndryFlag(false)
+  {};
 
-  private:
-  protected:
-  public:
-    // electrode name
-    string eName;     // device electrode name.  Should be in all upper case.
-    string nName;     // circuit node name.
-    string type;      // string to indicate ntype or ptype.
+private:
+protected:
+public:
+  // electrode name
+  std::string eName;     // device electrode name.  Should be in all upper case.
+  std::string nName;     // circuit node name.
+  std::string type;      // std::string to indicate ntype or ptype.
 
-    int    index;     // index w.r.t. the order it was listed in the netlist.
+  int    index;     // index w.r.t. the order it was listed in the netlist.
 
-    // Equilibrium voltage
-    double Vequ;
-    bool   VequGiven;
+  // Equilibrium voltage
+  double Vequ;
+  bool   VequGiven;
 
-    // Circuit node voltage
-    double Vckt;
+  // Circuit node voltage
+  double Vckt;
 
-    // Vckt, before voltage limiting.
-    double Vckt_orig;
+  // Vckt, before voltage limiting.
+  double Vckt_orig;
 
-    int    gid;       // global ID of the circuit node.  This is the global
-                      // solution vector index.  (used like a Vrowarray entry)
+  int    gid;       // global ID of the circuit node.  This is the global
+  // solution vector index.  (used like a Vrowarray entry)
 
-    int lid;            // local ID of the circuit node.
-    int lidOffset;      // diagonal col in the ckt node matrix row. DMA only.
-    double * lidlidPtr; // lid matrix diagonal pointer.
+  int lid;            // local ID of the circuit node.
+  int lidOffset;      // diagonal col in the ckt node matrix row. DMA only.
+  double * lidlidPtr; // lid matrix diagonal pointer.
 
-    vector<int> colArray;    // matrix col array for the KCL equation.
-    vector<int> li_colArray; // matrix col array for the KCL equation, dma
-    
-    vector<int> crossOffsets; // columns for the other ckt nodes.
+  std::vector<int> colArray;    // matrix col array for the KCL equation.
+  std::vector<int> li_colArray; // matrix col array for the KCL equation, dma
 
-    bool   given;     // did the user specify this node or not.  If not, the
-                      // device electrode with be (probably) connected to gnd.
+  std::vector<int> crossOffsets; // columns for the other ckt nodes.
 
-    // geometrical stuff:
-    double area;                // total area for the edge.
-    bool   areaGiven;           // given boolean.
+  bool   given;     // did the user specify this node or not.  If not, the
+  // device electrode with be (probably) connected to gnd.
 
-    // state variable stuff:
-    double currentSum;    // sum of currents, to be stored as a state variable.
-    double elecCurrent;   // electron current
-    double holeCurrent;   // hole     current
+  // geometrical stuff:
+  double area;                // total area for the edge.
+  bool   areaGiven;           // given boolean.
 
-    int    stateC;        // state variable index, current.
-    bool   stateC_owned;
+  // state variable stuff:
+  double currentSum;    // sum of currents, to be stored as a state variable.
+  double elecCurrent;   // electron current
+  double holeCurrent;   // hole     current
 
-    //local id's (offsets)
-    int li_stateC;
+  int    stateC;        // state variable index, current.
+  bool   stateC_owned;
 
-    // mesh index of this electrode:
-    int meshIndex;
-    int neighborNode;  // node neighboring this boundary.
+  //local id's (offsets)
+  int li_stateC;
 
-    // information needed for the 2-level Newton.
-    double dIdVckt; // derivative of currentSum w.r.t. Vckt.
+  // mesh index of this electrode:
+  int meshIndex;
+  int neighborNode;  // node neighboring this boundary.
 
-    vector<double> dFdVckt;         // deriv. of residual w.r.t. Vckt.
+  // information needed for the 2-level Newton.
+  double dIdVckt; // derivative of currentSum w.r.t. Vckt.
 
-    vector<double> dIdX;     // deriv. of currentSum w.r.t. PDE solution vars.
-    vector<int>    dIdXcols; // nodes neighboring this boundary.
-                             // (this may be the same as colArray, in which
-			     // case one of them will be removed...)
+  std::vector<double> dFdVckt;         // deriv. of residual w.r.t. Vckt.
 
-    vector<int>    dIdXoffset; // If running with DMA, use this instead of
-                               // dIdXcols.
+  std::vector<double> dIdX;     // deriv. of currentSum w.r.t. PDE solution vars.
+  std::vector<int>    dIdXcols; // nodes neighboring this boundary.
+  // (this may be the same as colArray, in which
+  // case one of them will be removed...)
 
-    int numCrossTerms;
+  std::vector<int>    dIdXoffset; // If running with DMA, use this instead of
+  // dIdXcols.
 
-    // boundary conditions to be imposed on V,n and p.
-    double Vbc;
-    double nnbc;
-    double npbc;
+  int numCrossTerms;
 
-    // dxdv vector:
-    N_LAS_Vector * dxdvPtr;
-    bool dxdvAllocated;
+  // boundary conditions to be imposed on V,n and p.
+  double Vbc;
+  double nnbc;
+  double npbc;
 
-    // These BC variables are only used for Continuation NL solves.
-    // first 3 are w.r.t change in Vckt between ckt iterations.  Big change
-    double Vckt_old;    // ckt value from the previous Newton solve.
-    double Vckt_final;  // eventual ckt voltage value for the current solve.
-    double Vckt_delta;  // total change in the Vckt. (Vckt_final-Vckt_old)
+  // dxdv vector:
+  N_LAS_Vector * dxdvPtr;
+  bool dxdvAllocated;
 
-    // next 3, w.r.t change between continuation solves. small change
-    double Vckt_deltaC;  // incremental, intermediate change in the Vckt.
-    double Vckt_ramp;   // current intermediate value of Vckt used during
-                        // continuation.
-    double Vckt_ramp_old;   // old intermediate value of Vckt used during
-                            // continuation.
+  // These BC variables are only used for Continuation NL solves.
+  // first 3 are w.r.t change in Vckt between ckt iterations.  Big change
+  double Vckt_old;    // ckt value from the previous Newton solve.
+  double Vckt_final;  // eventual ckt voltage value for the current solve.
+  double Vckt_delta;  // total change in the Vckt. (Vckt_final-Vckt_old)
 
-    double displCurrent;
+  // next 3, w.r.t change between continuation solves. small change
+  double Vckt_deltaC;  // incremental, intermediate change in the Vckt.
+  double Vckt_ramp;   // current intermediate value of Vckt used during
+  // continuation.
+  double Vckt_ramp_old;   // old intermediate value of Vckt used during
+  // continuation.
 
-    // material information:
-    string material;
-    bool   materialGiven;
-    bool   oxideBndryFlag;
+  double displCurrent;
 
-    vector<int> volIndices;
+  // material information:
+  std::string material;
+  bool   materialGiven;
+  bool   oxideBndryFlag;
+
+  std::vector<int> volIndices;
 
 };
 // inline functions
@@ -224,9 +224,9 @@ class bcData
 // Creation Date : 11/04/10
 //-----------------------------------------------------------------------------
 
-inline ostream & operator<<(ostream & os, const bcData & bc)
+inline std::ostream & operator<<(std::ostream & os, const bcData & bc)
 {
-  os << "------------------------------------------\n";
+  os << Xyce::section_divider << std::endl;
   os << "electrode name = " << bc.eName << "\n";
   os << "node      name = " << bc.nName << "\n";
   os << "         index = " << bc.index << "\n";
@@ -234,11 +234,11 @@ inline ostream & operator<<(ostream & os, const bcData & bc)
   os << " Vequ = " << bc.Vequ << "\n";
   if (bc.VequGiven)
   {
-  os << " VequGiven = true\n";
+    os << " VequGiven = true\n";
   }
   else
   {
-  os << " VequGiven = false\n";
+    os << " VequGiven = false\n";
   }
 
   os << " Vckt = " << bc.Vckt << "\n";
@@ -251,11 +251,11 @@ inline ostream & operator<<(ostream & os, const bcData & bc)
 
   if (bc.areaGiven)
   {
-  os << " areaGiven = true\n";
+    os << " areaGiven = true\n";
   }
   else
   {
-  os << " areaGiven = false\n";
+    os << " areaGiven = false\n";
   }
 
   os << " currentSum = " << bc.currentSum << "\n";
@@ -281,19 +281,19 @@ inline ostream & operator<<(ostream & os, const bcData & bc)
 
   if (bc.materialGiven)
   {
-  os << "materialGiven = true\n";
+    os << "materialGiven = true\n";
   }
   else
   {
-  os << "materialGiven = false\n";
+    os << "materialGiven = false\n";
   }
   if (bc.oxideBndryFlag)
   {
-  os << "oxideBndrFlag = true\n";
+    os << "oxideBndrFlag = true\n";
   }
   else
   {
-  os << "oxideBndrFlag = false\n";
+    os << "oxideBndrFlag = false\n";
   }
 
   os << " Vckt_old = " << bc.Vckt_old << "\n";
@@ -317,35 +317,35 @@ inline ostream & operator<<(ostream & os, const bcData & bc)
   int i=0;
   for (i=0;i<bc.dFdVckt.size();++i)
   {
-    cout << " dFdVckt["<<i<<"] = " << bc.dFdVckt[i] << "\n";
+    Xyce::dout() << " dFdVckt["<<i<<"] = " << bc.dFdVckt[i] << "\n";
   }
   for (i=0;i<bc.dIdX.size();++i)
   {
-    cout << " dIdX["<<i<<"] = " << bc.dIdX[i] << "\n";
+    Xyce::dout() << " dIdX["<<i<<"] = " << bc.dIdX[i] << "\n";
   }
   for (i=0;i<bc.dIdXcols.size();++i)
   {
-    cout << " dIdXcols["<<i<<"] = " << bc.dIdXcols[i] << "\n";
+    Xyce::dout() << " dIdXcols["<<i<<"] = " << bc.dIdXcols[i] << "\n";
   }
   for (i=0;i<bc.dIdXoffset.size();++i)
   {
-    cout << " dIdXoffset["<<i<<"] = " << bc.dIdXoffset[i] << "\n";
+    Xyce::dout() << " dIdXoffset["<<i<<"] = " << bc.dIdXoffset[i] << "\n";
   }
   for (i=0;i<bc.colArray.size();++i)
   {
-    cout << " collArray["<<i<<"] = " << bc.colArray[i] << "\n";
+    Xyce::dout() << " collArray["<<i<<"] = " << bc.colArray[i] << "\n";
   }
   for (i=0;i<bc.li_colArray.size();++i)
   {
-    cout << " li_collArray["<<i<<"] = " << bc.li_colArray[i] << "\n";
+    Xyce::dout() << " li_collArray["<<i<<"] = " << bc.li_colArray[i] << "\n";
   }
   for (i=0;i<bc.crossOffsets.size();++i)
   {
-    cout << " crossOffsets["<<i<<"] = " << bc.crossOffsets[i] << "\n";
+    Xyce::dout() << " crossOffsets["<<i<<"] = " << bc.crossOffsets[i] << "\n";
   }
 
-  os << "------------------------------------------\n";
-  os << endl;
+  os << Xyce::section_divider << std::endl;
+  os << std::endl;
 
   return os;
 }

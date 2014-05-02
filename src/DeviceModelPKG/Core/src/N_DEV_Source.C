@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.22.2.2 $
+// Revision Number: $Revision: 1.29 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/02/24 23:49:15 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -67,19 +67,15 @@ namespace Device {
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
 SourceInstance::SourceInstance(
-  InstanceBlock & IB,
-     N_DEV_MatrixLoadData & mlData1,
-     SolverState &ss1,
-     ExternData  &ed1,
-     DeviceOptions & do1)
- : DeviceInstance(IB,mlData1,ss1,ed1,do1),
+  const InstanceBlock &               IB,
+  ParametricData<void> &        parametric_data,
+  const FactoryBlock &          factory_block)
+  : DeviceInstance(IB, parametric_data, factory_block),
    Data_ptr(0),
    acData_ptr(0),
    dcData_ptr(0),
    sourceType(_SIN_DATA)
-{
-
-}
+{}
 
 
 //-----------------------------------------------------------------------------
@@ -91,9 +87,7 @@ SourceInstance::SourceInstance(
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
 SourceInstance::~SourceInstance()
-{
-
-}
+{}
 
 
 //-----------------------------------------------------------------------------
@@ -174,7 +168,7 @@ bool SourceInstance::getResetFlag ()
 // Creation Date : 02/05/06
 //-----------------------------------------------------------------------------
 bool SourceInstance::getInstanceBreakPoints
-   (vector<N_UTL_BreakPoint> &breakPointTimes)
+   (std::vector<N_UTL_BreakPoint> &breakPointTimes)
 {
   bool fastSourceFlag = false;
 

@@ -36,11 +36,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.10.2.1 $
+// Revision Number: $Revision: 1.16 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:33 $
+// Revision Date  : $Date: 2014/01/30 15:18:42 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: dgbaur $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
@@ -69,9 +69,9 @@ namespace Device {
 // Creator       : Christy Warrender, Cognitive Modeling & Richard Schiek Elec. Sys. Modeling
 // Creation Date : 12/14/2010
 //-----------------------------------------------------------------------------
-MembraneUserDefined::MembraneUserDefined(SolverState & ss1, double cMem, double gMem, double vRest,
-    	vector<string> & currentEqus, vector<string> & indepVars, vector<string> & fEqs,
-    	vector<string> & qEqs, vector<string> & extraFunctions, vector<string> & extraParameters) :
+MembraneUserDefined::MembraneUserDefined(const SolverState & ss1, double cMem, double gMem, double vRest,
+    	std::vector<std::string> & currentEqus, std::vector<std::string> & indepVars, std::vector<std::string> & fEqs,
+    	std::vector<std::string> & qEqs, std::vector<std::string> & extraFunctions, std::vector<std::string> & extraParameters) :
     MembraneModel(ss1),
     gMem_(gMem),
     cMem_(cMem),
@@ -109,7 +109,7 @@ MembraneUserDefined::MembraneUserDefined(SolverState & ss1, double cMem, double 
 // Creation Date : 12/14/2010
 //-----------------------------------------------------------------------------
 void MembraneUserDefined::setJacStamp( int numExtVars, int segmentNumber, int vOffset,
-                                             vector< vector< int > > & segmentJacStamp )
+                                             std::vector< std::vector< int > > & segmentJacStamp )
 {
   // caller sets up size of row of jac stamp to numIndependentVars_ + extra's needed for
   // its modeling.  So for a cable based device this is Vpre, Vseg, (other membrane vars), Vnext.
@@ -130,12 +130,12 @@ void MembraneUserDefined::setJacStamp( int numExtVars, int segmentNumber, int vO
   //
   // need to parse user-defined equations to determine dependence of each internal variable on the
   // others
-  map<string,int>::iterator currVarOffset = indepVarOffset_.begin();
-  map<string,int>::iterator endVarOffset = indepVarOffset_.end();
+  std::map<std::string,int>::iterator currVarOffset = indepVarOffset_.begin();
+  std::map<std::string,int>::iterator endVarOffset = indepVarOffset_.end();
 
   while( currVarOffset != endVarOffset )
   {
-    set<string> depVarNames;
+    std::set<std::string> depVarNames;
     depVarNames.clear();
     if( currVarOffset->first == "V" )
     {
@@ -168,9 +168,9 @@ void MembraneUserDefined::setJacStamp( int numExtVars, int segmentNumber, int vO
     //{
       //voltageOffset=vOffset;
     //}
-    set<string>::iterator depVarNamesEnd = depVarNames.end();
+    std::set<std::string>::iterator depVarNamesEnd = depVarNames.end();
     int numEnteries = offsetToIndepVar_.size();
-    map< string, int > tmpIndVarMap;
+    std::map< std::string, int > tmpIndVarMap;
     int numFound = 0;
     for( int i=0; i<numEnteries; i++)
     {
@@ -178,16 +178,16 @@ void MembraneUserDefined::setJacStamp( int numExtVars, int segmentNumber, int vO
       {
         //tmpIndVarMap[ offsetToIndepVar_[i] ] = voltageOffset + numFound++;
         tmpIndVarMap[ offsetToIndepVar_[i] ] = numFound++;
-        std::cout << "Assigned tmpIndVarMap[ " << offsetToIndepVar_[i] << " ]= " << (numFound-1) << std::endl;
+        Xyce::dout() << "Assigned tmpIndVarMap[ " << offsetToIndepVar_[i] << " ]= " << (numFound-1) << std::endl;
       }
     }
 
     systemJacOffset_[currVarOffset->second ]= tmpIndVarMap;
-    cout << "tmpIndVarMap assigned to variable " << currVarOffset->first << endl;
+    Xyce::dout() << "tmpIndVarMap assigned to variable " << currVarOffset->first << std::endl;
 
     // get the number of things on this row
     int numvars = systemJacOffset_[currVarOffset->second].size();
-    // std::cout << "systemJacOffset_[ " << currVarOffset->second << "].size() = " << numvars << std::endl;
+    // Xyce::dout() << "systemJacOffset_[ " << currVarOffset->second << "].size() = " << numvars << std::endl;
 
     // the owning device allocates this row for us in the case of V
     // so don't resize it in that case
@@ -197,7 +197,7 @@ void MembraneUserDefined::setJacStamp( int numExtVars, int segmentNumber, int vO
     }
 
     // now loop over the set of independent vars to set jacStamp dependance
-    set<string>::iterator depVarNamesCurr = depVarNames.begin();
+    std::set<std::string>::iterator depVarNamesCurr = depVarNames.begin();
     while( depVarNamesCurr != depVarNamesEnd )
     {
       if( currVarOffset->first == "V" )
@@ -215,36 +215,36 @@ void MembraneUserDefined::setJacStamp( int numExtVars, int segmentNumber, int vO
 
   // print out jacstamp for debugging
 
-  cout << "MembraneUserDefined::setJacStamp() jacStamp = " << endl;
+  Xyce::dout() << "MembraneUserDefined::setJacStamp() jacStamp = " << std::endl;
   for( int i = 0; i<segmentJacStamp.size(); ++i )
   {
-    cout << "jacStamp[ " << i << " ] = { ";
+    Xyce::dout() << "jacStamp[ " << i << " ] = { ";
     for( int j=0; j<segmentJacStamp[i].size(); ++j)
     {
-       cout << segmentJacStamp[i][j];
+       Xyce::dout() << segmentJacStamp[i][j];
       if( j != ( segmentJacStamp[i].size() -1 ) )
       {
-        cout << ", ";
+        Xyce::dout() << ", ";
       }
     }
-    cout << " }" << endl;
+    Xyce::dout() << " }" << std::endl;
   }
-  cout << "------------------------------" << std::endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
 
-  cout << "MembraneUserDefined::setJacStamp() systemJacOffset_ = " << endl;
+  Xyce::dout() << "MembraneUserDefined::setJacStamp() systemJacOffset_ = " << std::endl;
   for( int i = 0; i<systemJacOffset_.size(); ++i )
   {
-    cout << "systemJacOffset[ " << i << " ] = { ";
-    map<string,int>::iterator currVarOffset = systemJacOffset_[i].begin();
-    map<string,int>::iterator endVarOffset = systemJacOffset_[i].end();
+    Xyce::dout() << "systemJacOffset[ " << i << " ] = { ";
+    std::map<std::string,int>::iterator currVarOffset = systemJacOffset_[i].begin();
+    std::map<std::string,int>::iterator endVarOffset = systemJacOffset_[i].end();
     while( currVarOffset != endVarOffset )
     {
-        cout << currVarOffset->first << ", " << currVarOffset->second << endl;
+        Xyce::dout() << currVarOffset->first << ", " << currVarOffset->second << std::endl;
         currVarOffset++;
     }
-    cout << " }" << endl;
+    Xyce::dout() << " }" << std::endl;
   }
-  cout << "------------------------------" << std::endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
 
 
 
@@ -259,7 +259,7 @@ void MembraneUserDefined::setJacStamp( int numExtVars, int segmentNumber, int vO
 // Creation Date : 12/14/2010
 //-----------------------------------------------------------------------------
 void MembraneUserDefined::loadDAEQVector( int segmentNumber,
-                                                     vector< int > & lidIndexVector,
+                                                     std::vector< int > & lidIndexVector,
                                                      N_LAS_Vector * solnVecPtr,
                                                      N_LAS_Vector * daeQVecPtr,
                                                      double segArea)
@@ -269,7 +269,7 @@ void MembraneUserDefined::loadDAEQVector( int segmentNumber,
   // contribution of membrane capacitance to segment voltage
   (*daeQVecPtr)[lidIndexVector[index]] += cMem_ * segArea * (*solnVecPtr)[lidIndexVector[index]];
   int numCurrentExp = currentEqusExpRCP_.size();
-  cout << "loadDAEQVector:  entry for index " << index << " : " << cMem_ * segArea * (*solnVecPtr)[lidIndexVector[index]] << endl;
+  Xyce::dout() << "loadDAEQVector:  entry for index " << index << " : " << cMem_ * segArea * (*solnVecPtr)[lidIndexVector[index]] << std::endl;
 
   // add Q terms for user-defined vars
   int numExp = qEqsExpRCP_.size();
@@ -291,8 +291,8 @@ void MembraneUserDefined::loadDAEQVector( int segmentNumber,
     //  but how do I get ver name at this level?
     int lidIndexVectorIndex = index + i + 1;	// +1 for V
     (*daeQVecPtr)[lidIndexVector[lidIndexVectorIndex]] += resultValue;
-    cout << "loadDAEQVector:  entry for LID index " << lidIndexVectorIndex
-    	<< ", varname " << offsetToIndepVar_[lidIndexVectorIndex-index] << " : " << resultValue << endl;
+    Xyce::dout() << "loadDAEQVector:  entry for LID index " << lidIndexVectorIndex
+    	<< ", varname " << offsetToIndepVar_[lidIndexVectorIndex-index] << " : " << resultValue << std::endl;
   }
 }
 
@@ -307,12 +307,12 @@ void MembraneUserDefined::loadDAEQVector( int segmentNumber,
 // Creation Date : 12/14/2010
 //-----------------------------------------------------------------------------
 void MembraneUserDefined::loadDAEFVector( int segmentNumber,
-                                                     vector< int > & lidIndexVector,
+                                                     std::vector< int > & lidIndexVector,
                                                      N_LAS_Vector * solnVecPtr,
                                                      N_LAS_Vector * daeFVecPtr,
                                                      double segArea)
 {
-  cout << "loadDAEFVector" << endl;
+  Xyce::dout() << "loadDAEFVector" << std::endl;
 
   int index = segmentNumber * numIndependentVars_;
 
@@ -326,18 +326,18 @@ void MembraneUserDefined::loadDAEFVector( int segmentNumber,
   int numCurrentExp = currentEqusExpRCP_.size();
   for( int i=0; i<numCurrentExp; i++)
   {
-    cout << "membrane V equation contribution from current equation # " << i << endl;
+    Xyce::dout() << "membrane V equation contribution from current equation # " << i << std::endl;
     // get the number of vars in this expression and update their values
     int numvars = currentEqusVarNames_[i].size();
     for( int j=0; j<numvars; j++)
     {
       currentEqusVarValues_[i][j]=(*solnVecPtr)[ lidIndexVector[index + indepVarOffset_[ currentEqusVarNames_[i][j] ] ] ];
-      std::cout << "Segment " << segmentNumber << " current load  variable = " << currentEqusVarNames_[i][j] << " value = " << currentEqusVarValues_[i][j] << std::endl;
+      Xyce::dout() << "Segment " << segmentNumber << " current load  variable = " << currentEqusVarNames_[i][j] << " value = " << currentEqusVarValues_[i][j] << std::endl;
     }
     // evaluate the expression
     double resultValue=0.0;
     currentEqusExpRCP_[i]->evaluateFunction( resultValue, currentEqusVarValues_[i] );
-    std::cout << "Segment " << segmentNumber << " current equ F = " << resultValue << std::endl;
+    Xyce::dout() << "Segment " << segmentNumber << " current equ F = " << resultValue << std::endl;
 
     // add it to the F vector
     // cew - need to multiply by segArea, assuming current specified as current density
@@ -348,13 +348,13 @@ void MembraneUserDefined::loadDAEFVector( int segmentNumber,
   int numExp = fEqsExpRCP_.size();
   for( int i=0; i<numExp; i++)
   {
-    cout << "F terms from f equation # " << i << endl;
+    Xyce::dout() << "F terms from f equation # " << i << std::endl;
     // get the number of vars in this expression and update their values
     int numvars = fEqsEqusVarNames_[i].size();
     for( int j=0; j<numvars; j++)
     {
       fEqsEqusVarValues_[i][j]=(*solnVecPtr)[ lidIndexVector[index + indepVarOffset_[ fEqsEqusVarNames_[i][j] ] ] ];
-      std::cout << "Segment " << segmentNumber << " extra var load variable = " << fEqsEqusVarNames_[i][j] << " value = " << fEqsEqusVarValues_[i][j] << std::endl;
+      Xyce::dout() << "Segment " << segmentNumber << " extra var load variable = " << fEqsEqusVarNames_[i][j] << " value = " << fEqsEqusVarValues_[i][j] << std::endl;
     }
     // evaluate the expression
     double resultValue=0.0;
@@ -364,7 +364,7 @@ void MembraneUserDefined::loadDAEFVector( int segmentNumber,
     //int lidIndexVectorIndex = index + numCurrentExp + i;
     int lidIndexVectorIndex = index + i + 1;	// +1 for V
     (*daeFVecPtr)[lidIndexVector[lidIndexVectorIndex]] += resultValue;
-    std::cout << "Segment " << segmentNumber << " LID index " << lidIndexVectorIndex
+    Xyce::dout() << "Segment " << segmentNumber << " LID index " << lidIndexVectorIndex
     	<< ", extra vars equ F = " << resultValue << std::endl;
   }
 
@@ -379,13 +379,13 @@ void MembraneUserDefined::loadDAEFVector( int segmentNumber,
 // Creation Date : 12/14/2010
 //-----------------------------------------------------------------------------
 void MembraneUserDefined::loadDAEdQdx( int segmentNumber, int vOffset,
-                                                vector< int > & lidIndexVector,
-                                                vector< vector< int > > & jacobianOffsets,
+                                                std::vector< int > & lidIndexVector,
+                                                std::vector< std::vector< int > > & jacobianOffsets,
                                                 N_LAS_Vector * solnVecPtr,
                                                 N_LAS_Matrix * dQdxMatPtr,
                                                 double segArea)
 {
-  cout << "loadDAEdQdx" << endl;
+  Xyce::dout() << "loadDAEdQdx" << std::endl;
 
   // while lidIndexVector lists LID's for just the segment variables (just V in the case
   // of a passive cable). The jacobianOffsets includes the Vin and Vout as the first
@@ -408,35 +408,35 @@ void MembraneUserDefined::loadDAEdQdx( int segmentNumber, int vOffset,
   int numExp = qEqsExpRCP_.size();
   for( int i=0; i<numExp; i++)
   {
-    string targetVarName = offsetToIndepVar_[i+1];	// +1 because offsetToIndepVar includes V, but numExp doesn't
-    cout << "Q terms for q equation " << i << "; assumed to be for variable " << targetVarName << endl;
+    std::string targetVarName = offsetToIndepVar_[i+1];	// +1 because offsetToIndepVar includes V, but numExp doesn't
+    Xyce::dout() << "Q terms for q equation " << i << "; assumed to be for variable " << targetVarName << std::endl;
     // get the number of vars in this expression and update their values
     int numvars = qEqsEqusVarNames_[i].size();
     for( int j=0; j<numvars; j++)
     {
       qEqsEqusVarValues_[i][j]=(*solnVecPtr)[ lidIndexVector[index + indepVarOffset_[ qEqsEqusVarNames_[i][j] ] ]];
-      cout << "contribution from " << qEqsEqusVarNames_[i][j] << ": " << qEqsEqusVarValues_[i][j] << endl;
+      Xyce::dout() << "contribution from " << qEqsEqusVarNames_[i][j] << ": " << qEqsEqusVarValues_[i][j] << std::endl;
     }
     // evaluate the expression
     double resultValue=0.0;
-    vector<double> derivValues;
+    std::vector<double> derivValues;
     derivValues.resize( numvars );
     qEqsExpRCP_[i]->evaluate( resultValue, derivValues, qEqsEqusVarValues_[i] );
-    cout << "expression result:  " << resultValue << endl;
+    Xyce::dout() << "expression result:  " << resultValue << std::endl;
 
     // add it to the dQdx matrix
     for( int j=0; j<numvars; j++)
     {
-      string varName = qEqsEqusVarNames_[i][j];
-      cout << "contribution of variable " << j << "(" << varName << ")" << endl;
+      std::string varName = qEqsEqusVarNames_[i][j];
+      Xyce::dout() << "contribution of variable " << j << "(" << varName << ")" << std::endl;
       int targetVarOffset = indepVarOffset_[targetVarName];
       int targetVarIndex = index + targetVarOffset;
       int targetVarRow = row + targetVarOffset;
       int jacOffsetsCol = systemJacOffset_[targetVarOffset][varName];
-      cout << "targerVarOffset: " << targetVarOffset << ", targetVarIndex:  " << targetVarIndex
-          << ", jacobianRow: " << targetVarRow << ", jacobianCol: " << jacOffsetsCol << endl;
+      Xyce::dout() << "targerVarOffset: " << targetVarOffset << ", targetVarIndex:  " << targetVarIndex
+          << ", jacobianRow: " << targetVarRow << ", jacobianCol: " << jacOffsetsCol << std::endl;
       (*dQdxMatPtr)[lidIndexVector[targetVarIndex]][jacobianOffsets[targetVarRow][jacOffsetsCol]] += derivValues[j];
-      std::cout << "adding (*dQdxMatPtr)[ " << lidIndexVector[targetVarIndex] << " ][ " << jacobianOffsets[targetVarRow][jacOffsetsCol] << " ] = " << derivValues[j] << std::endl;
+      Xyce::dout() << "adding (*dQdxMatPtr)[ " << lidIndexVector[targetVarIndex] << " ][ " << jacobianOffsets[targetVarRow][jacOffsetsCol] << " ] = " << derivValues[j] << std::endl;
     }
   }
 }
@@ -450,13 +450,13 @@ void MembraneUserDefined::loadDAEdQdx( int segmentNumber, int vOffset,
 // Creation Date : 12/14/2010
 //-----------------------------------------------------------------------------
 void MembraneUserDefined::loadDAEdFdx( int segmentNumber, int vOffset,
-                                             vector< int > & lidIndexVector,
-                                             vector< vector< int > > & jacobianOffsets,
+                                             std::vector< int > & lidIndexVector,
+                                             std::vector< std::vector< int > > & jacobianOffsets,
                                              N_LAS_Vector * solnVecPtr,
                                              N_LAS_Matrix * dFdxMatPtr,
                                              double segArea)
 {
-  cout << "loadDAEdFdx" << endl;
+  Xyce::dout() << "loadDAEdFdx" << std::endl;
 
   // while lidIndexVector lists LID's for just the segment variables (just V in the case
   // of a passive cable). The jacobianOffsets includes the Vin and Vout as the first
@@ -471,8 +471,8 @@ void MembraneUserDefined::loadDAEdFdx( int segmentNumber, int vOffset,
 
   // leak contribution
   (*dFdxMatPtr)[lidIndexVector[index]][jacobianOffsets[row][vOffset]] += gMem_ * segArea;
-  cout << "leak current dFdx:  " << "vOffset = " << vOffset << " row = " << row << std::endl;
-  std::cout << "adding (*dFdxMatPtr)[ " << lidIndexVector[index] << " ][ " << jacobianOffsets[row][vOffset ] << " ] = " << gMem_ * segArea << endl;
+  Xyce::dout() << "leak current dFdx:  " << "vOffset = " << vOffset << " row = " << row << std::endl;
+  Xyce::dout() << "adding (*dFdxMatPtr)[ " << lidIndexVector[index] << " ][ " << jacobianOffsets[row][vOffset ] << " ] = " << gMem_ * segArea << std::endl;
 
   // add contribution from current equation
   int numCurrentEq = currentEqusExpRCP_.size();
@@ -486,7 +486,7 @@ void MembraneUserDefined::loadDAEdFdx( int segmentNumber, int vOffset,
     }
     // evaluate the expression
     double resultValue=0.0;
-    vector<double> derivValues;
+    std::vector<double> derivValues;
     derivValues.resize( numvars );
     currentEqusExpRCP_[i]->evaluate( resultValue, derivValues, currentEqusVarValues_[i] );
 
@@ -494,15 +494,15 @@ void MembraneUserDefined::loadDAEdFdx( int segmentNumber, int vOffset,
     // need to convert variable names to the appropriate indices into jacobianOffsets
     for( int j=0; j<numvars; j++)	// this loops through the variables AS THEY APPEAR in the current equation
     {
-      string varName = currentEqusVarNames_[i][j];
-      cout << "contribution of variable " << j << "(" << varName << ") to V" << endl;
+      std::string varName = currentEqusVarNames_[i][j];
+      Xyce::dout() << "contribution of variable " << j << "(" << varName << ") to V" << std::endl;
       // cew jacOffsetsCol comes from the first row of systemJacOffset_ (for V) and the name of this variable
       // here, we have to allow for the fact that nonzero entries may be shifted by vOffset
       int jacOffsetsCol = systemJacOffset_[0][varName] + vOffset;
-      cout << " jacOffsetsRow: " << row << " jacOffsetsCol: " << jacOffsetsCol << endl;
+      Xyce::dout() << " jacOffsetsRow: " << row << " jacOffsetsCol: " << jacOffsetsCol << std::endl;
       // cew need to multiply these terms by segArea
       (*dFdxMatPtr)[lidIndexVector[index]][ jacobianOffsets[row][jacOffsetsCol] ] += segArea*derivValues[j];
-      std::cout << "adding (*dFdxMatPtr)[ " << lidIndexVector[index] << " ][ " << jacobianOffsets[row][jacOffsetsCol] << " ] = " << segArea*derivValues[j] << std::endl;
+      Xyce::dout() << "adding (*dFdxMatPtr)[ " << lidIndexVector[index] << " ][ " << jacobianOffsets[row][jacOffsetsCol] << " ] = " << segArea*derivValues[j] << std::endl;
     }
   }
 
@@ -510,8 +510,8 @@ void MembraneUserDefined::loadDAEdFdx( int segmentNumber, int vOffset,
   int numExp = fEqsExpRCP_.size();
   for( int i=0; i<numExp; i++)
   {
-    string targetVarName = offsetToIndepVar_[i+1];
-    cout << "F terms for f equation " << i << "; assumed to be for variable " << targetVarName << endl;
+    std::string targetVarName = offsetToIndepVar_[i+1];
+    Xyce::dout() << "F terms for f equation " << i << "; assumed to be for variable " << targetVarName << std::endl;
     // get the number of vars in this expression and update their values
     int numvars = fEqsEqusVarNames_[i].size();
     for( int j=0; j<numvars; j++)
@@ -520,23 +520,23 @@ void MembraneUserDefined::loadDAEdFdx( int segmentNumber, int vOffset,
     }
     // evaluate the expression
     double resultValue=0.0;
-    vector<double> derivValues;
+    std::vector<double> derivValues;
     derivValues.resize( numvars );
     fEqsExpRCP_[i]->evaluate( resultValue, derivValues, fEqsEqusVarValues_[i] );
 
     // add it to the F vector
     for( int j=0; j<numvars; j++)	// this loops through variables AS THEY APPEAR in F eqn i
     {
-      string varName = fEqsEqusVarNames_[i][j];
-      cout << "contribution of variable " << j << "(" << varName << ")" << endl;
+      std::string varName = fEqsEqusVarNames_[i][j];
+      Xyce::dout() << "contribution of variable " << j << "(" << varName << ")" << std::endl;
       int targetVarOffset = indepVarOffset_[targetVarName];
       int targetVarIndex = index + targetVarOffset;
       int targetVarRow = row + targetVarOffset;
       int jacOffsetsCol = systemJacOffset_[targetVarOffset][varName];
-      cout << "targetVarOffset: " << targetVarOffset << " targetVarIndex: " << targetVarIndex
-          << ", jacOffsetsRow: " << targetVarRow << " jacOffsetsCol: " << jacOffsetsCol << endl;
+      Xyce::dout() << "targetVarOffset: " << targetVarOffset << " targetVarIndex: " << targetVarIndex
+          << ", jacOffsetsRow: " << targetVarRow << " jacOffsetsCol: " << jacOffsetsCol << std::endl;
       (*dFdxMatPtr)[lidIndexVector[targetVarIndex]][ jacobianOffsets[targetVarRow][jacOffsetsCol] ] += derivValues[j];
-      std::cout << "Adding (*dFdxMatPtr)[ " << lidIndexVector[targetVarIndex] << " ][ " <<  jacobianOffsets[targetVarRow][jacOffsetsCol] << " ] = " << derivValues[j] << std::endl;
+      Xyce::dout() << "Adding (*dFdxMatPtr)[ " << lidIndexVector[targetVarIndex] << " ][ " <<  jacobianOffsets[targetVarRow][jacOffsetsCol] << " ] = " << derivValues[j] << std::endl;
     }
   }
 }
@@ -549,22 +549,22 @@ void MembraneUserDefined::loadDAEdFdx( int segmentNumber, int vOffset,
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 09/08/2011
 //-----------------------------------------------------------------------------
-void MembraneUserDefined::convertStringsToExpression( vector< string > & stringInput, vector<RefCountPtr<N_UTL_Expression> > & expRCPOut )
+void MembraneUserDefined::convertStringsToExpression( std::vector< std::string > & stringInput, std::vector<RefCountPtr<N_UTL_Expression> > & expRCPOut )
 {
   int numStrings = stringInput.size();
   for( int i=0; i<numStrings; i++ )
   {
-    //std::cout << "Making expression from :" << stringInput.at(i) << std::endl;
-    expRCPOut.push_back( rcp( new N_UTL_Expression( stringInput.at(i) ) ) );
+    //Xyce::dout() << "Making expression from :" << stringInput.at(i) << std::endl;
+    expRCPOut.push_back( rcp( new Util::Expression( stringInput.at(i) ) ) );
     /*
     int type=0;
-    vector<string> names;
+    std::vector<string> names;
     expRCPOut.at(i)->get_names(type, names);
 
-    std::cout << " type = " << type << std::endl;
+    Xyce::dout() << " type = " << type << std::endl;
     for( int j=0; j<names.size(); j++)
     {
-      std::cout << "name[ " << j << " ] = " << names.at(j) << std::endl;
+      Xyce::dout() << "name[ " << j << " ] = " << names.at(j) << std::endl;
     }
     */
 
@@ -587,12 +587,12 @@ void MembraneUserDefined::consolidateExpressions()
   int numParams = extraParametersExpRCP_.size();
   for( int i=0; i<numParams; i+=2)
   {
-    vector<string> names;
+    std::vector<std::string> names;
     int type=0;
     extraParametersExpRCP_.at(i)->get_names(type, names);
     if( names.size() > 1 )
     {
-      std::cout << "Warning MembraneUserDefined::consolidateExpressions() parameter name vec longer than expected." << names.size() << std::endl;
+      Xyce::dout() << "Warning MembraneUserDefined::consolidateExpressions() parameter name vec longer than expected." << names.size() << std::endl;
     }
     paramNames_.push_back( names[0] );
     double value=0;
@@ -604,7 +604,7 @@ void MembraneUserDefined::consolidateExpressions()
   int numFuncs = extraFunctionsExpRCP_.size();
   for( int i=0; i<numFuncs; i+=2 )
   {
-    vector<string> names;
+    std::vector<std::string> names;
     int type=0;
     extraFunctionsExpRCP_.at(i)->get_names(type, names);
     funcNames_.push_back(names[0]);
@@ -633,28 +633,28 @@ void MembraneUserDefined::consolidateExpressions()
   // debugging output
   for( int i=0; i<paramNames_.size(); i++ )
   {
-    std::cout << "Param \"" << paramNames_.at(i) << "\" = " << paramValues_.at(i) << std::endl;
+    Xyce::dout() << "Param \"" << paramNames_.at(i) << "\" = " << paramValues_.at(i) << std::endl;
   }
 
   for( int i=0; i<funcNames_.size(); i++ )
   {
-    std::cout << "Func \"" << funcNames_.at(i) << "\" = " << funcExpRCP_.at(i)->get_expression() << " num_args = " << funcNumArgs_.at(i)  << std::endl;
+    Xyce::dout() << "Func \"" << funcNames_.at(i) << "\" = " << funcExpRCP_.at(i)->get_expression() << " num_args = " << funcNumArgs_.at(i)  << std::endl;
   }
 
   for( int i=0; i<currentEqusExpRCP_.size(); i++ )
   {
-    std::cout << "Currentequ = " << currentEqusExpRCP_.at(i)->get_expression() << std::endl;
+    Xyce::dout() << "Currentequ = " << currentEqusExpRCP_.at(i)->get_expression() << std::endl;
   }
 
   for( int i=0; i<fEqsExpRCP_.size(); i++ )
   {
-    std::cout << "F: " << fEqsExpRCP_.at(i)->get_expression() << " Q: " << qEqsExpRCP_.at(i)->get_expression() << std::endl;
+    Xyce::dout() << "F: " << fEqsExpRCP_.at(i)->get_expression() << " Q: " << qEqsExpRCP_.at(i)->get_expression() << std::endl;
     double fval=0, qval=0;
-    vector<double> fargs, qargs;
+    std::vector<double> fargs, qargs;
     fargs.push_back(0.2); fargs.push_back(-0.015);  qargs.push_back(0.2);
     fEqsExpRCP_.at(i)->evaluateFunction(fval, fargs);
     qEqsExpRCP_.at(i)->evaluateFunction(qval, qargs);
-    std::cout << "F(V=-0.015,n/m/h=0.2) = " << fval << " Q(V=-0.015,n/m/h=0.2) = " << qval << std::endl;
+    Xyce::dout() << "F(V=-0.015,n/m/h=0.2) = " << fval << " Q(V=-0.015,n/m/h=0.2) = " << qval << std::endl;
   }
 
 
@@ -671,7 +671,7 @@ void MembraneUserDefined::consolidateExpressions()
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 09/08/2011
 //-----------------------------------------------------------------------------
-void MembraneUserDefined::substituteParameters( vector<RefCountPtr<N_UTL_Expression> > & expRCP_ )
+void MembraneUserDefined::substituteParameters( std::vector<RefCountPtr<N_UTL_Expression> > & expRCP_ )
 {
   int numParams = paramNames_.size();
   for( int i=0; i<numParams; i++)
@@ -693,7 +693,7 @@ void MembraneUserDefined::substituteParameters( vector<RefCountPtr<N_UTL_Express
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 09/08/2011
 //-----------------------------------------------------------------------------
-void MembraneUserDefined::substituteFunctions( vector<RefCountPtr<N_UTL_Expression> > & expRCP_ )
+void MembraneUserDefined::substituteFunctions( std::vector<RefCountPtr<N_UTL_Expression> > & expRCP_ )
 {
   int numFuncs = funcNames_.size();
   for( int i=0; i<numFuncs; i++)
@@ -727,12 +727,12 @@ void MembraneUserDefined::makeSymbolSet()
   int numIndependentVars = indepVarsExpRCP_.size();		// cew 1 less than numIndependentVars_, which includes V
   for( int i=0; i<numIndependentVars; i++ )
   {
-    vector<string> expNames;
+    std::vector<std::string> expNames;
     indepVarsExpRCP_.at(i)->get_names( type, expNames );
     int numExpNames=expNames.size();
     for( int j=0; j<numExpNames; j++ )					// cew ? isn't there just one name per independent var?
     {
-      cout << "makeSymbolSet, i=" <<i << ", j="<<j << ":  adding " << expNames.at(j) << " to userDefinedNames" << endl;
+      Xyce::dout() << "makeSymbolSet, i=" <<i << ", j="<<j << ":  adding " << expNames.at(j) << " to userDefinedNames" << std::endl;
       userDefinedNames_.push_back( expNames.at(j) );
     }
   }
@@ -746,8 +746,8 @@ void MembraneUserDefined::makeSymbolSet()
   // assign them unique offsets so that we can consistently index them in
   // the solution, F, Q and jacobian.
 
-  vector<string>::iterator currName = userDefinedNames_.begin();
-  vector<string>::iterator endName = userDefinedNames_.end();
+  std::vector<std::string>::iterator currName = userDefinedNames_.begin();
+  std::vector<std::string>::iterator endName = userDefinedNames_.end();
   int offsetCount=0;
   while( currName != endName )
   {
@@ -763,19 +763,19 @@ void MembraneUserDefined::makeSymbolSet()
   offsetToIndepVar_[0]="V";
 
   // debugging output
-  std::cout << "MembraneUserDefined::makeSymbolSet() Independent var offset map : " << std::endl;
-  map<string,int>::iterator currVarOffset = indepVarOffset_.begin();
-  map<string,int>::iterator endVarOffset = indepVarOffset_.end();
+  Xyce::dout() << "MembraneUserDefined::makeSymbolSet() Independent var offset map : " << std::endl;
+  std::map<std::string,int>::iterator currVarOffset = indepVarOffset_.begin();
+  std::map<std::string,int>::iterator endVarOffset = indepVarOffset_.end();
   while( currVarOffset != endVarOffset )
   {
-    std::cout << "map[ " << currVarOffset->first << " ] = " << currVarOffset->second << std::endl;
+    Xyce::dout() << "map[ " << currVarOffset->first << " ] = " << currVarOffset->second << std::endl;
     currVarOffset++;
   }
-  map<int,string>::iterator currOffset = offsetToIndepVar_.begin();
-  map<int,string>::iterator endOffset = offsetToIndepVar_.end();
+  std::map<int,std::string>::iterator currOffset = offsetToIndepVar_.begin();
+  std::map<int,std::string>::iterator endOffset = offsetToIndepVar_.end();
   while( currOffset != endOffset )
   {
-    std::cout << "inv-map[ " << currOffset->first << " ] = " << currOffset->second << std::endl;
+    Xyce::dout() << "inv-map[ " << currOffset->first << " ] = " << currOffset->second << std::endl;
     currOffset++;
   }
 
@@ -792,10 +792,10 @@ void MembraneUserDefined::makeSymbolSet()
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 09/08/2011
 //-----------------------------------------------------------------------------
-void MembraneUserDefined::convertSymbolsToVars( vector<RefCountPtr<N_UTL_Expression> > & expRCP, vector< vector<string> > & expNamesVec, vector< vector<double> > & expValsVec )
+void MembraneUserDefined::convertSymbolsToVars( std::vector<RefCountPtr<N_UTL_Expression> > & expRCP, std::vector< std::vector<std::string> > & expNamesVec, std::vector< std::vector<double> > & expValsVec )
 {
   int type=0;
-  vector<string>::iterator endName = userDefinedNames_.end();
+  std::vector<std::string>::iterator endName = userDefinedNames_.end();
   int numExp = expRCP.size();
   if( numExp > 0 )
   {
@@ -805,7 +805,7 @@ void MembraneUserDefined::convertSymbolsToVars( vector<RefCountPtr<N_UTL_Express
   for( int i=0; i<numExp; i++ )
   {
     // get the remaining symbol names in the expression
-    vector<string> expNamesTmp;
+    std::vector<std::string> expNamesTmp;
     expRCP.at(i)->get_names( type, expNamesTmp );
     int numExpNames=expNamesTmp.size();
     for( int j=0; j<numExpNames; j++ )
@@ -813,31 +813,31 @@ void MembraneUserDefined::convertSymbolsToVars( vector<RefCountPtr<N_UTL_Express
       // if expNames[j] is in our set of known symbols that
       // are variables, then set its type to variable.  Otherwise
       // issue a warning.
-      vector<string>::iterator findResult = find( userDefinedNames_.begin(), userDefinedNames_.end(), expNamesTmp.at(j) );
+      std::vector<std::string>::iterator findResult = find( userDefinedNames_.begin(), userDefinedNames_.end(), expNamesTmp.at(j) );
       if( findResult != endName )
       {
         // found this one in the set so make it a variable
         expRCP.at(i)->make_var( expNamesTmp.at(j) );
-        // save it in a vector<string> so we can quickly load values into a vector<double> to evaluate the expression.
+        // save it in a std::vector<std::string> so we can quickly load values into a std::vector<double> to evaluate the expression.
         expNamesVec[i].push_back( expNamesTmp.at(j) );
       }
       else
       {
-        std::cout << "Warning symbol \"" << expNamesTmp.at(j) << "\" not listed in independent variables.  Ignoring for now." << std::endl;
+        Xyce::dout() << "Warning symbol \"" << expNamesTmp.at(j) << "\" not listed in independent variables.  Ignoring for now." << std::endl;
       }
     }
     // make the values vec the same size as the names vec.
     expValsVec[i].resize( expNamesVec[i].size() );
 
-    std::cout << "MembraneUserDefined::convertSymbolsToVars: expression " << expRCP.at(i)->get_expression() << " Has vars: ";
-    vector<string>::iterator cni = expNamesVec[i].begin();
-    vector<string>::iterator eni = expNamesVec[i].end();
+    Xyce::dout() << "MembraneUserDefined::convertSymbolsToVars: expression " << expRCP.at(i)->get_expression() << " Has vars: ";
+    std::vector<std::string>::iterator cni = expNamesVec[i].begin();
+    std::vector<std::string>::iterator eni = expNamesVec[i].end();
     while( cni != eni )
     {
-      std::cout << *cni << ", ";
+      Xyce::dout() << *cni << ", ";
       cni++;
     }
-    std::cout << std::endl;
+    Xyce::dout() << std::endl;
 
   }
 }

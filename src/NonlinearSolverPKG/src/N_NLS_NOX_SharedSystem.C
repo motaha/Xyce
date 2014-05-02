@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.31.2.2 $
+// Revision Number: $Revision: 1.35 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -380,7 +380,7 @@ bool SharedSystem::applyRightPreconditioning(bool useTranspose,
 					     Vector& result)
 {
   if (ifpackPreconditionerPtr_ == 0) {
-    const string message = "ERROR:N_NLS_NOX::SharedSystem::applyRightPreconditioning - Preconditioner is 0!";
+    const string message = "N_NLS_NOX::SharedSystem::applyRightPreconditioning - Preconditioner is 0!";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
   }
 
@@ -489,7 +489,7 @@ N_NLS_NOX::Vector* SharedSystem::cloneSolutionVector() const
 
   if (tmpVectorPtr == 0) {
     const string message = 
-      "ERROR:N_NLS_NOX::SharedSystem::cloneSolutionVector() - dynamic cast/ memory allocation failure!";
+      "N_NLS_NOX::SharedSystem::cloneSolutionVector() - dynamic cast/ memory allocation failure!";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, message);
   }
 

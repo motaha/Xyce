@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,11 +36,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.241.2.4 $
+// Revision Number: $Revision: 1.276.2.3 $
 //
-// Revision Date  : $Date: 2014/01/29 18:42:08 $
+// Revision Date  : $Date: 2014/03/10 16:15:20 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: dgbaur $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
@@ -53,23 +53,25 @@
 #include <fstream>
 #include <string>
 #include <cassert>
+#include <stdexcept>
 
 // ----------   Xyce Includes   ----------
 
 #include <N_CIR_Xyce.h>
 
 #include <N_DEV_fwd.h>
+#include <N_DEV_RegisterDevices.h>
 #include <N_DEV_DeviceInterface.h>
 #include <N_DEV_DAC.h>
 #include <N_DEV_SolverState.h>
 #include <N_DEV_ExternalSimulationData.h>
+#include <N_DEV_Print.h>
 
 #include <N_ERH_ErrorMgr.h>
 
 #include <N_IO_NetlistImportTool.h>
 
 #include <N_IO_OutputMgr.h>
-#include <N_IO_CmdParse.h>
 #include <N_IO_RestartMgr.h>
 #include <N_IO_PkgOptionsMgr.h>
 
@@ -98,6 +100,7 @@
 #include <N_UTL_Timer.h>
 #include <N_UTL_Xyce.h>
 #include <N_UTL_Expression.h>
+#include <N_UTL_LogStream.h>
 
 #include <N_UTL_Version.h>
 #include <N_UTL_BreakPoint.h>
@@ -106,33 +109,27 @@
 //--------  Forward Declarations ------------
 
 class N_LAS_QueryUtil;
-class N_TOP_TopoLSUtil;
 
 class N_LAS_MultiVector;
 
-//--------  Global Declarations ------------
+namespace Xyce {
+namespace Circuit {
 
-// Create a global instance of the command line parser that can be
-// accessed from anywhere in Xyce.
-//N_IO_CmdParse commandLine;
+//--------  Global Declarations ------------
+void report_handler(const char *message, unsigned report_mask);
 
 //-----------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::N_CIR_Xyce
+// Function      : Simulator::Simulator
 // Purpose       : constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/27/00
 //-----------------------------------------------------------------------------
-N_CIR_Xyce::N_CIR_Xyce(
-#ifdef Xyce_PARALLEL_MPI
-                       MPI_Comm * comm
-#endif
-                      )
-: devIntPtr_(0),
-#ifdef Xyce_PARALLEL_MPI
-  commPtr_(comm),
-#endif
+Simulator::Simulator(Xyce::Parallel::Machine comm)
+:
+  comm_(comm),
+  devIntPtr_(0),
   topPtr_(0),
   topMgrPtr_(0),
   netlistImportToolPtr_(0),
@@ -152,23 +149,26 @@ N_CIR_Xyce::N_CIR_Xyce(
   numThreads_(0),
   initializeAllFlag_(false)
 {
+  previousReportHandler_ = Xyce::set_report_handler(report_handler);
+
   Xyce::Device::registerDevices();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::~N_CIR_Xyce
+// Function      : Xyce::~Xyce
 // Purpose       : destructor
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/27/00
 //-----------------------------------------------------------------------------
-N_CIR_Xyce::~N_CIR_Xyce()
+Simulator::~Simulator()
 {
+  Xyce::set_report_handler(previousReportHandler_);
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::setNetlistParameters
+// Function      : Simulator::setNetlistParameters
 // Purpose       : This passes a vector of pairs "key" "value" that will
 //                 be substituted during the processing of the netlist.  This
 //                 more easily allows Dakota to change any netlist parameter
@@ -178,13 +178,13 @@ N_CIR_Xyce::~N_CIR_Xyce()
 // Creator       : Richard Schiek, Electrical and MEMS Modeling
 // Creation Date : 10/9/2008
 //---------------------------------------------------------------------------
-void N_CIR_Xyce::setNetlistParameters( const vector< pair< string, string > > & externalParams )
+void Simulator::setNetlistParameters( const std::vector< std::pair< std::string, std::string > > & externalParams )
 {
   externalNetlistParams_ = externalParams;
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::setNetlistParameters
+// Function      : Simulator::setNetlistParameters
 // Purpose       : Call through to the output manager to set the suffix to
 //                 be used on the output file, as in circuit + suffix + prn
 //                 This is useful in Dakota controlled runs to keep each
@@ -194,7 +194,7 @@ void N_CIR_Xyce::setNetlistParameters( const vector< pair< string, string > > & 
 // Creator       : Richard Schiek, Electrical and MEMS Modeling
 // Creation Date : 10/9/2008
 //---------------------------------------------------------------------------
-void N_CIR_Xyce::setOutputFileSuffix( const string newSuffix )
+void Simulator::setOutputFileSuffix( const std::string newSuffix )
 {
   if( outMgrPtr_ )
   {
@@ -202,54 +202,52 @@ void N_CIR_Xyce::setOutputFileSuffix( const string newSuffix )
   }
 }
 //-----------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::setupParMgr_
+// Function      : Simulator::setupParMgr_
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Scott A. Hutchinson, SNL, Parallel Computational Sciences
 // Creation Date : 6/21/00
 //-----------------------------------------------------------------------------
-bool N_CIR_Xyce::setupParMgr_( int iargs, char *cargs[] )
+bool Simulator::setupParMgr_( int iargs, char **cargs)
 {
   bool bsuccess = true;
 
   // Setup the Parallel Mgr. with a default load-balance based on the numProc
   // value.
-  parMgrPtr_ = new N_PDS_Manager( isSerialFlag_, procZeroFlag_, iargs, cargs
-#ifdef Xyce_PARALLEL_MPI
-                                  , commPtr_
-#endif
-                                );
+  parMgrPtr_ = new N_PDS_Manager( isSerialFlag_, procZeroFlag_, iargs, cargs, comm_);
+  if (comm_ == 0)
+    comm_ = parMgrPtr_->getPDSComm()->comm();
 
   return bsuccess;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::doAllocations_
+// Function      : Simulator::doAllocations_
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/27/00
 //-----------------------------------------------------------------------------
-bool N_CIR_Xyce::doAllocations_()
+bool Simulator::doAllocations_()
 
 {
   bool bsuccess;
 
-  string topotype = "Basic";
+  std::string topotype = "Basic";
 
   // Allocate device manager:
-  devIntPtr_  = N_DEV_DeviceInterface::factory(commandLine);
+  devIntPtr_  = Xyce::Device::DeviceInterface::factory(commandLine);
 
   // Allocate Topology:
-  topMgrPtr_ = Xyce::Topology::Manager::instance();
-  Xyce::Topology::Manager & topMgr = (*topMgrPtr_);
+  topMgrPtr_ = Xyce::Topo::Manager::instance();
+  Xyce::Topo::Manager & topMgr = (*topMgrPtr_);
 
   topPtr_ = topMgrPtr_->createTopology(commandLine);
 
   // Allocate distribution mgr:
-  netlistImportToolPtr_ = NetlistImportTool::factory(commandLine, topMgr);
+  netlistImportToolPtr_ = Xyce::IO::NetlistImportTool::factory(commandLine, topMgr);
 
   // Allocate output mgr:
   outMgrPtr_ = N_IO_OutputMgr::factory(commandLine);
@@ -273,7 +271,7 @@ bool N_CIR_Xyce::doAllocations_()
   cktLoaderPtr_ = loaderMgrPtr_->createCktLoader();
   nonlinearEquationLoaderPtr_ = loaderMgrPtr_->createNonlinearEquationLoader();
 
-  pkgOptionsMgrPtr_ = rcp( new N_IO_PkgOptionsMgr() );
+  pkgOptionsMgrPtr_ = new N_IO_PkgOptionsMgr();
 
   bsuccess = true;
   bsuccess = bsuccess && (devIntPtr_ != 0);
@@ -297,62 +295,53 @@ bool N_CIR_Xyce::doAllocations_()
 
   bsuccess = bsuccess && (parMgrPtr_ != 0);
 
-  bsuccess = bsuccess && ( !(Teuchos::is_null(pkgOptionsMgrPtr_)) );
+  bsuccess = bsuccess && (pkgOptionsMgrPtr_ != 0);
 
   return bsuccess;
 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::doDeAllocations_
+// Function      : Simulator::doDeAllocations_
 // Purpose       :
 // Special Notes :
 // Scope         : private
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/27/00
 //-----------------------------------------------------------------------------
-bool N_CIR_Xyce::doDeAllocations_()
+bool Simulator::doDeAllocations_()
 
 {
   // de-allocate the device manager:
 
-  if (devIntPtr_       != 0) delete devIntPtr_;
-
-
-  if (nlsMgrPtr_       != 0) delete nlsMgrPtr_;
-  if (anaIntPtr_       != 0) delete anaIntPtr_;
-
-  if (loaderMgrPtr_    != 0) delete loaderMgrPtr_;
-  if (cktLoaderPtr_    != 0) delete cktLoaderPtr_;
-  if (nonlinearEquationLoaderPtr_    != 0) delete nonlinearEquationLoaderPtr_;
-  if (outMgrPtr_       != 0) delete outMgrPtr_;
-  if (lasSysPtr_       != 0) delete lasSysPtr_;
-  if (lasBuilderPtr_   != 0) delete lasBuilderPtr_;
-  if (XyceTimerPtr_    != 0) delete XyceTimerPtr_;
-  if (ElapsedTimerPtr_ != 0) delete ElapsedTimerPtr_;
-  if (parMgrPtr_       != 0) delete parMgrPtr_;
-
-  if (N_ERH_ErrorMgr::output != 0) delete N_ERH_ErrorMgr::output;
-
-  if (topMgrPtr_       != 0) delete topMgrPtr_;
-
-  if (resMgrPtr_       != 0) delete resMgrPtr_;
-
-  pkgOptionsMgrPtr_ = Teuchos::null;
+  delete devIntPtr_;
+  delete nlsMgrPtr_;
+  delete anaIntPtr_;
+  delete loaderMgrPtr_;
+  delete cktLoaderPtr_;
+  delete nonlinearEquationLoaderPtr_;
+  delete outMgrPtr_;
+  delete lasSysPtr_;
+  delete lasBuilderPtr_;
+  delete XyceTimerPtr_;
+  delete ElapsedTimerPtr_;
+  delete parMgrPtr_;
+  delete topMgrPtr_;
+  delete resMgrPtr_;
+  delete pkgOptionsMgrPtr_;
 
   return true;
-
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::doRegistrations_
+// Function      : Simulator::doRegistrations_
 // Purpose       :
 // Special Notes :
 // Scope         : private
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/27/00
 //-----------------------------------------------------------------------------
-bool N_CIR_Xyce::doRegistrations_()
+bool Simulator::doRegistrations_()
 
 {
   bool bsuccess = true;
@@ -377,12 +366,9 @@ bool N_CIR_Xyce::doRegistrations_()
   bs1 = topPtr_->registeranaInt(anaIntPtr_);          bsuccess = bsuccess && bs1;
   bs1 = topPtr_->registerPkgOptionsMgr( pkgOptionsMgrPtr_ ); bsuccess = bsuccess && bs1;
 
-
-#ifdef Xyce_PARALLEL_MPI
   // Distribution manager registrations:
   bs1 = netlistImportToolPtr_->registerParallelServices(parMgrPtr_->getPDSComm());
   bsuccess = bsuccess && bs1;
-#endif
 
   bs1 = netlistImportToolPtr_->registerDevMgr(devIntPtr_); bsuccess = bsuccess && bs1;
   bs1 = netlistImportToolPtr_->registerOutputMgr(outMgrPtr_); bsuccess = bsuccess && bs1;
@@ -454,20 +440,17 @@ bool N_CIR_Xyce::doRegistrations_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::setUpTopology_
+// Function      : Simulator::setUpTopology_
 // Purpose       : This function handles a lot of the initial setup.
 // Special Notes :
 // Scope         : private
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/08/00
 //-----------------------------------------------------------------------------
-bool N_CIR_Xyce::setUpTopology_()
+bool Simulator::setUpTopology_()
 {
-  string netListFile;
+  std::string netListFile;
 
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::startSafeBarrier();
-#endif
   if( procZeroFlag_ )
   {
     if (commandLine.getArgumentValue("netlist") != "")
@@ -476,58 +459,69 @@ bool N_CIR_Xyce::setUpTopology_()
       netListFile = "xyce.in";
 
     FILE * testFile;
-    if ( (testFile=fopen(netListFile.c_str(), "r")) == 0)
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, netListFile +
-                           " file not found.");
-    int ierr = fclose( testFile );
+    if ( (testFile = fopen(netListFile.c_str(), "r")) == 0)
+    {
+      Xyce::Report::UserError() << netListFile << " file not found";
+    }
+    else
+    {
+      fclose( testFile );
+    }
   }
 
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::safeBarrier(0);
-#endif
+  Xyce::Report::safeBarrier(comm_);
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         " ***** Reading and parsing netlist...\n");
+  Xyce::lout() << "***** Reading and parsing netlist..." << std::endl;
+
   netlistImportToolPtr_->constructCircuitFromNetlist(netListFile, externalNetlistParams_);
+
+  Xyce::Report::safeBarrier(comm_);
+
+  if ( commandLine.argExists("-syntax") )
+  {
+    Xyce::lout() << "***** Netlist syntax OK\n" << std::endl
+                 << "***** Device Type Counts ...\n" << std::endl;
+
+    Xyce::IO::printGlobalDeviceCounts(Xyce::lout(), comm_, devIntPtr_->getDeviceCountMap());
+    if (outMgrPtr_->getDetailedDeviceFlag())
+      Xyce::IO::printLocalDeviceCount(Xyce::lout(), comm_, devIntPtr_->getDeviceCountMap());
+
+    Xyce::lout() << std::endl;
+
+    reportTotalElapsedTime ();
+
+    Xyce_exit(0);
+  }
 
   delete netlistImportToolPtr_;
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         " ***** Setting up topology...\n");
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::startSafeBarrier();
-#endif
+  Xyce::lout() << "***** Setting up topology...\n" << std::endl;
 
   // topology query's device manager to see if any devices are bad (i.e. a resistor with zero resistance)
   // if so, a list of nodes to be supernoded is created
   topPtr_->verifyNodesAndDevices();
+
 #ifdef Xyce_PARALLEL_MPI
   // create a union of the supernode list on all processors
   topPtr_->mergeOffProcTaggedNodesAndDevices();
 #endif
-  // combine nodes into supernodes and remove now redundant devices (i.e. those only connected to 1 processor )
+
+// combine nodes into supernodes and remove now redundant devices (i.e. those only connected to 1 processor )
   topPtr_->removeTaggedNodesAndDevices();
 
   // if "-remeasure" was on the command line, then we don't need to
   // instantiate the devices.
-  if (commandLine.argExists(string("-remeasure")) )
+  if (commandLine.argExists("-remeasure"))
   {
     outMgrPtr_->remeasure();
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         " ***** Remeasure analysis complete\n");
+    Xyce::lout() << "***** Remeasure analysis complete\n" << std::endl;
     return false;
   }
   topPtr_->instantiateDevices();
 
   outMgrPtr_->delayedPrintLineDiagnostics();
 
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::safeBarrier(0);
-#endif
-
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::startSafeBarrier();
-#endif
+  Xyce::Report::safeBarrier(comm_);
 
 #ifdef Xyce_PARALLEL_MPI
   devIntPtr_->setGlobalFlags();
@@ -536,12 +530,11 @@ bool N_CIR_Xyce::setUpTopology_()
   // Setup of indices including global reordering.
   topPtr_->setupGlobalIndices();
 
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::safeBarrier(0);
-#endif
+  Xyce::Report::safeBarrier(comm_);
 
 #ifdef Xyce_DEBUG_DEVICE
-  devIntPtr_->printOutLists();
+  for (Xyce::Device::EntityTypeIdDeviceMap::const_iterator it = devIntPtr_->getDeviceMap().begin(); it != devIntPtr_->getDeviceMap().end(); ++it)
+    print(Xyce::lout(), *(*it).second);
 #endif
 
   return true;
@@ -549,7 +542,7 @@ bool N_CIR_Xyce::setUpTopology_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::setUpMatrixStructure_
+// Function      : Simulator::setUpMatrixStructure_
 // Purpose       : This function needs to set up the various linear algebra
 //                 entities which are owned by the LAS system class.  This
 //                 includes, most importantly, the Jacobian matrix and the
@@ -560,7 +553,7 @@ bool N_CIR_Xyce::setUpTopology_()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/08/00
 //-----------------------------------------------------------------------------
-bool N_CIR_Xyce::setUpMatrixStructure_()
+bool Simulator::setUpMatrixStructure_()
 {
   lasBuilderPtr_->generateParMaps();
   lasBuilderPtr_->generateGraphs();
@@ -575,14 +568,13 @@ bool N_CIR_Xyce::setUpMatrixStructure_()
 #endif
 
   int lasSize = lasSysPtr_->getGlobalSolutionSize();
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-		       " ***** Number of Unknowns = ",lasSize,"\n");
+  Xyce::lout() << "***** Number of Unknowns = " << lasSize << std::endl;
 
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::doInitializations_
+// Function      : Simulator::doInitializations_
 // Purpose       : This function calls "initializeAll" functions in all the
 //                 packages which have them.  Packages that have the LAS system
 //                 class registered with them will have one of these functions.
@@ -602,7 +594,7 @@ bool N_CIR_Xyce::setUpMatrixStructure_()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/13/00
 //-----------------------------------------------------------------------------
-bool N_CIR_Xyce::doInitializations_()
+bool Simulator::doInitializations_()
 {
   bool bsuccess = true;
   bool bs1 = true;
@@ -621,63 +613,73 @@ bool N_CIR_Xyce::doInitializations_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::runSolvers_
+// Function      : Simulator::runSolvers_
 // Purpose       : This function runs the solvers.
 // Special Notes :
 // Scope         : private
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/13/00
 //-----------------------------------------------------------------------------
-bool N_CIR_Xyce::runSolvers_()
+bool Simulator::runSolvers_()
 {
   return anaIntPtr_->run();
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::run
+// Function      : Simulator::run
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 02/19/01
 //-----------------------------------------------------------------------------
-bool N_CIR_Xyce::run(int iargs_tmp, char *cargs_tmp[])
+bool Simulator::run(int iargs_tmp, char *cargs_tmp[])
 {
   bool bsuccess = true;
-  bool bs1 = true;
 
-  bs1 = initialize(iargs_tmp, cargs_tmp);
-  bsuccess = bsuccess && bs1;
-
-  if (bsuccess)
+  try 
   {
-    bs1 = runSimulation();
+    bool bs1 = initialize(iargs_tmp, cargs_tmp);
+    bsuccess = bsuccess && bs1;
+  }
+  catch (std::exception &x) 
+  {
+    Xyce::lout() << "Exception " << x.what() << std::endl;
+    bsuccess = false;
+  }
+
+  if (!bsuccess)
+  {
+    reportTotalElapsedTime ();
+    Xyce::lout() << "Xyce Initialization Phase failed." << std::endl;
+    Xyce_exit(-1);
+  }
+
+  try {
+    bool bs1 = runSimulation();
     bsuccess = bsuccess && bs1;
 
     bs1 = finalize();
     bsuccess = bsuccess && bs1;
   }
-  else
-  {
-    reportTotalElapsedTime ();
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "Xyce Initialization Phase failed.");
-    Xyce_exit(0);
+  catch (std::exception &x) {
+    Xyce::lout() << "Exception " << x.what() << std::endl;
+    bsuccess = false;
   }
 
   return bsuccess;
-
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::runSimulation
+// Function      : Simulator::runSimulation
 // Purpose       : Main simulation driver.
 // Special Notes : Not private as this is also called from N_DAK_DakotaInterface
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/27/00
 //-----------------------------------------------------------------------------
-bool N_CIR_Xyce::runSimulation()
+bool Simulator::runSimulation()
 {
   return runSolvers_();
 }
@@ -686,7 +688,7 @@ bool N_CIR_Xyce::runSimulation()
 // API METHODS NEEDED FOR MIXED-SIGNAL and other external applications
 //
 //-----------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::initialize
+// Function      : Simulator::initialize
 // Purpose       : capture all "initialization-type" activities in one
 //                 method
 // Special Notes :
@@ -694,7 +696,7 @@ bool N_CIR_Xyce::runSimulation()
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 02/17/2004
 //-----------------------------------------------------------------------------
-bool N_CIR_Xyce::initialize( int iargs_tmp, char *cargs_tmp[] )
+bool Simulator::initialize( int iargs_tmp, char **cargs_tmp)
 {
   iargs = iargs_tmp;
   cargs = cargs_tmp;
@@ -707,18 +709,6 @@ bool N_CIR_Xyce::initialize( int iargs_tmp, char *cargs_tmp[] )
   // Start the solvers timer.
   ElapsedTimerPtr_ = new N_UTL_Timer( *(parMgrPtr_->getPDSComm()) );
 
-  // Banner
-  static const string bannerHdg("*****");
-  static const string bannerMsg("***** Welcome to the Xyce(TM) "
-                                    "Parallel Electronic Simulator\n");
-
-  const string versionMsg = "***** This is version " +
-   N_UTL_Version::getFullVersionString() + "\n";
-
-  static const string executeMsg("***** Executing ");
-  string netlistMsg = "netlist " ;
-  static const string crMsg = ("\n");
-
 #ifdef Xyce_PARALLEL_MPI
 #ifdef Xyce_DEBUG_ALL_PROCS_SAME_WD
     N_PDS_Comm * commPtr  = parMgrPtr_->getPDSComm();
@@ -727,71 +717,50 @@ bool N_CIR_Xyce::initialize( int iargs_tmp, char *cargs_tmp[] )
 #endif
 #endif
 
-#ifdef Xyce_DEBUG_CIRCUIT
-  string msg;
-#endif
-
   // register parallel mgr to allow parallel support
-  commandLine.registerParallelMgr( parMgrPtr_ );
+    commandLine.registerParallelMgr( parMgrPtr_ );
+
+    Xyce::initializeLogStream(parMgrPtr_->getPDSComm()->procID(), parMgrPtr_->getPDSComm()->numProc());
 
   // read in command line arguments
-  commandLine.parseCommandLine( iargs, cargs );
+    int status = commandLine.parseCommandLine( iargs, cargs );
+    if (status != 0)
+      Xyce_exit(status == -1 ? 0 : status);
 
+  // Set the output stream of the "-l" flag exists
+  if (commandLine.argExists("-l"))
+  {
+    Xyce::openLogFile(commandLine.getArgumentValue("-l"), commandLine.argExists("-per-processor"));
+  }
 
   if( procZeroFlag_ )
   {
-    // This utilizes the "-l <file>" command line option to output to a file
-    // instead of stdout.  Currently only works for serial (proc. 0) output.
-    // Parallel output will be directed to stdout - SAH, 27 Aug. 2002.
-
-    // Set the output stream of the "-l" flag exists
-    if (commandLine.argExists(string("-l")))
-    {
-      string outputFile;
-      outputFile = commandLine.getArgumentValue("-l");
-
-      // Allocate the output stream
-      N_ERH_ErrorMgr::output = new ofstream();
-
-      N_ERH_ErrorMgr::output->open(outputFile.c_str());
-
-      if (N_ERH_ErrorMgr::output->fail())
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, "Unable to open output file: ");
-
-      if (!isSerialFlag_)
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, crMsg +
-                               "-l <file> syntax not supported in parallel.  "
-                               "Parallel output will be directed to stdout "
-                               "but serial output directed to processor 0 "
-                               "will be sent to the requested file");
-    }
-
-    if (commandLine.getArgumentValue("netlist") != "")
-      netlistMsg += commandLine.getArgumentValue("netlist") + "...\n";
-    else
-      netlistMsg = netlistMsg + "MISSING!  Usage: " + string(cargs[0]) +
-                   " netlist \n";
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, crMsg + bannerHdg +
-                         crMsg + bannerMsg + bannerHdg + crMsg + versionMsg +
-                         crMsg + crMsg + executeMsg + netlistMsg + crMsg +
-                         crMsg);
+    Xyce::lout() << "\n"
+                 << "*****\n"
+                 << "***** Welcome to the Xyce(TM) Parallel Electronic Simulator\n"
+                 << "*****\n"
+                 << "***** This is version " << N_UTL_Version::getFullVersionString() << "\n\n\n"
+                 << "***** Executing netlist " << (commandLine.getArgumentValue("netlist") == "" ? "MISSING!" : commandLine.getArgumentValue("netlist")) << "\n\n";
 
     // Don't bother doing anything else if we weren't given a netlist!
-    if (commandLine.getArgumentValue("netlist") == "") return (STATUS_FAILURE);
+    if (commandLine.getArgumentValue("netlist") == "") 
+    {
+      Xyce::lout() << "  Usage: " << cargs[0] << " netlist\n" << std::endl;
+      return false;
+    }
 
     // check if a parameter file was specified for param substitution during parsing
-    if (commandLine.argExists(string("-prf")))
+    if (commandLine.argExists(std::string("-prf")))
     {
-      string parameterFile = commandLine.getArgumentValue("-prf");
+      std::string parameterFile = commandLine.getArgumentValue("-prf");
       readExternalParamsFromFile( parameterFile, iterationSuffix_, externalNetlistParams_ );
 #ifdef Xyce_DEBUG
       // debug print out externNetlistParams_
-      vector<pair<string,string> >::iterator currentPair = externalNetlistParams_.begin();
-      vector<pair<string,string> >::iterator endPair = externalNetlistParams_.end();
+      std::vector<std::pair<std::string,std::string> >::iterator currentPair = externalNetlistParams_.begin();
+      std::vector<std::pair<std::string,std::string> >::iterator endPair = externalNetlistParams_.end();
       while( currentPair != endPair )
       {
-        std::cout << "\"" << currentPair->first << "\" = \"" << currentPair->second << "\"" << endl;
+        Xyce::dout() << "\"" << currentPair->first << "\" = \"" << currentPair->second << "\"" << std::endl;
         currentPair++;
       }
 #endif
@@ -820,27 +789,23 @@ bool N_CIR_Xyce::initialize( int iargs_tmp, char *cargs_tmp[] )
   b2 = doAllocations_();
   bsuccess = bsuccess && b2;
 
-#ifdef Xyce_DEBUG_CIRCUIT
-  if (b2 == true)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
-                           "Allocation was successful.");
+  if (b2) {
+    if (Xyce::DEBUG_CIRCUIT)
+      Xyce::dout() << "Allocation was successful.";
+  }
   else
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg +
-                           "Allocation was NOT successful.");
-#endif
+    Xyce::Report::DevelFatal() << "Allocation was NOT successful.";
 
   // Register the external package pointers:
   b2 = doRegistrations_();
   bsuccess = bsuccess && b2;
 
-#ifdef Xyce_DEBUG_CIRCUIT
-  if (b2 == true)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
-                           "Registration was successful.");
+  if (b2) {
+    if (Xyce::DEBUG_CIRCUIT)
+      Xyce::dout() << "Registration was successful.";
+  }
   else
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg +
-                           "Registration was NOT successful.");
-#endif
+    Xyce::Report::DevelFatal() << "Registration was NOT successful.";
 
   b2 = setUpTopology_();
   if( !b2 )
@@ -849,36 +814,42 @@ bool N_CIR_Xyce::initialize( int iargs_tmp, char *cargs_tmp[] )
   }
   bsuccess = bsuccess && b2;
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         " ***** Device Count Summary ...\n");
-  outMgrPtr_->printDeviceCounts();
+  Xyce::lout() << "***** Device Count Summary ..." << std::endl;
 
-  if( commandLine.argExists( "-norun" ) )
+  Xyce::IO::printGlobalDeviceCounts(Xyce::lout(), comm_, devIntPtr_->getDeviceCountMap());
+  if (outMgrPtr_->getDetailedDeviceFlag())
+    Xyce::IO::printLocalDeviceCount(Xyce::lout(), comm_, devIntPtr_->getDeviceCountMap());
+
+  if( commandLine.argExists( "-norun" ) || 
+      commandLine.argExists( "-namesfile" )  )
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         " ***** Syntax and topology analysis complete\n");
+    Xyce::lout() << "\n***** Syntax and topology analysis complete" << std::endl;
+
+    if( commandLine.argExists( "-namesfile" ) )
+    {
+      setUpMatrixStructure_();
+      topPtr_->outputNameFile(true);
+    }
+
     return false;
   }
   else
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           " ***** Setting up matrix structure...\n");
+    Xyce::lout() << "\n***** Setting up matrix structure..." << std::endl;
     b2 = setUpMatrixStructure_();
     bsuccess = bsuccess && b2;
 
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                           " ***** Initializing...\n");
+    Xyce::lout() << "***** Initializing...\n" << std::endl;
     b2 = doInitializations_();
     bsuccess = bsuccess && b2;
 
-#ifdef Xyce_TEST_SOLN_VAR_MAP
+    // optional diagnostic output file:
     topPtr_->outputNameFile();
-#endif
 
     // if we loaded a parameter file from the command line, then the output manager
     // should scan the results as well as such files can specify response functions
     // than need to be reported by the output manager.
-    if (commandLine.argExists(string("-prf")))
+    if (commandLine.argExists(std::string("-prf")))
     {
       outMgrPtr_->setExternalNetlistParams( externalNetlistParams_ );
       if(iterationSuffix_.length() > 0)
@@ -886,9 +857,9 @@ bool N_CIR_Xyce::initialize( int iargs_tmp, char *cargs_tmp[] )
         outMgrPtr_->setOutputFilenameSuffix( iterationSuffix_ );
       }
     }
-    if (commandLine.argExists(string("-rsf")))
+    if (commandLine.argExists(std::string("-rsf")))
     {
-      string responseFile = commandLine.getArgumentValue("-rsf");
+      std::string responseFile = commandLine.getArgumentValue("-rsf");
       outMgrPtr_->setResponseFilename( responseFile );
     }
     // Start the solvers timer.
@@ -899,7 +870,7 @@ bool N_CIR_Xyce::initialize( int iargs_tmp, char *cargs_tmp[] )
 }
 
 //----------------------------------------------------------------------------
-// Function       : getDACDeviceNames
+// Function       : Simulator::getDACDeviceNames
 // Purpose        : Gets the (stripped) names of the DAC devices
 //                  in the circuit.
 // Special Notes  :
@@ -907,7 +878,7 @@ bool N_CIR_Xyce::initialize( int iargs_tmp, char *cargs_tmp[] )
 // Creator        : Lisa Maynes
 // Creation Date  : 06/13/2003
 //----------------------------------------------------------------------------
-bool N_CIR_Xyce::getDACDeviceNames(vector< string >& dacNames)
+bool Simulator::getDACDeviceNames(std::vector< std::string >& dacNames)
 {
   bool bsuccess = true;
   bsuccess = devIntPtr_ -> getDACDeviceNames( dacNames );
@@ -924,7 +895,7 @@ bool N_CIR_Xyce::getDACDeviceNames(vector< string >& dacNames)
 // Creator        : Tom Russo
 // Creation Date  : 05/07/2004
 //----------------------------------------------------------------------------
-bool N_CIR_Xyce::getADCMap(map<string, map<string,double> >&ADCMap)
+bool Simulator::getADCMap(std::map<std::string, std::map<std::string,double> >&ADCMap)
 {
   bool bsuccess = true;
   bsuccess = devIntPtr_ -> getADCMap(ADCMap);
@@ -944,8 +915,8 @@ bool N_CIR_Xyce::getADCMap(map<string, map<string,double> >&ADCMap)
 // Creator        : Lon Waters
 // Creation Date  : 06/09/2003
 //----------------------------------------------------------------------------
-bool N_CIR_Xyce::updateTimeVoltagePairs(
-   map< string, vector< pair<double,double> >* > const & timeVoltageUpdateMap)
+bool Simulator::updateTimeVoltagePairs(
+   std::map< std::string, std::vector< std::pair<double,double> >* > const & timeVoltageUpdateMap)
 {
   bool bsuccess = true;
 
@@ -965,8 +936,8 @@ bool N_CIR_Xyce::updateTimeVoltagePairs(
 // Creator        : Tom Russo
 // Creation Date  : 05/10/2004
 //----------------------------------------------------------------------------
-bool N_CIR_Xyce::getTimeVoltagePairs(
-   map< string, vector< pair<double,double> > > & timeVoltageUpdateMap)
+bool Simulator::getTimeVoltagePairs(
+   std::map< std::string, std::vector< std::pair<double,double> > > & timeVoltageUpdateMap)
 {
   bool bsuccess = true;
 
@@ -985,8 +956,8 @@ bool N_CIR_Xyce::getTimeVoltagePairs(
 // Creator        : Tom Russo
 // Creation Date  : 05/07/2004
 //----------------------------------------------------------------------------
-bool N_CIR_Xyce::setADCWidths(
-   map< string, int > const & ADCWidthMap)
+bool Simulator::setADCWidths(
+   std::map< std::string, int > const & ADCWidthMap)
 {
   bool bsuccess = true;
 
@@ -996,7 +967,7 @@ bool N_CIR_Xyce::setADCWidths(
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::simulateUntil
+// Function      : Simulator::simulateUntil
 // Purpose       : To continue the existing analog circuit simulation
 //                 until either the given <requestedUntilTime> is reached
 //                 or the simulation termination criterion is met.
@@ -1010,7 +981,7 @@ bool N_CIR_Xyce::setADCWidths(
 //               : Tom Russo, SNL, Component Information and Models
 // Creation Date : 06/03/2003
 //---------------------------------------------------------------------------
-bool N_CIR_Xyce::simulateUntil(double requestedUntilTime,
+bool Simulator::simulateUntil(double requestedUntilTime,
                                double& completedUntilTime)
 {
   bool bsuccess = false;
@@ -1024,8 +995,8 @@ bool N_CIR_Xyce::simulateUntil(double requestedUntilTime,
   anaIntPtr_->silenceProgress();
 
 #ifdef Xyce_DEBUG_CIRCUIT
-  std::cout << "N_CIR_Xyce::simulateUntil: ";
-  std::cout << "finalTime = " << finalTime
+  Xyce::dout() << "Xyce::simulateUntil: ";
+  Xyce::dout() << "finalTime = " << finalTime
             << ", currentTimeBeforeSim = " << currentTimeBeforeSim << std::endl;
 #endif
 
@@ -1035,7 +1006,7 @@ bool N_CIR_Xyce::simulateUntil(double requestedUntilTime,
     bsuccess = true;
     completedUntilTime = currentTimeBeforeSim;
 #ifdef Xyce_DEBUG_CIRCUIT
-    std::cout << "Case1: completedUntilTime = " << completedUntilTime;
+    Xyce::dout() << "Case1: completedUntilTime = " << completedUntilTime;
 #endif
   }
   else
@@ -1043,7 +1014,7 @@ bool N_CIR_Xyce::simulateUntil(double requestedUntilTime,
     // We are not already past the end of the netlist time
     anaIntPtr_->setPauseTime(Xycemin(requestedUntilTime,finalTime));
 #ifdef Xyce_DEBUG_CIRCUIT
-    std::cout << "N_CIR_Xyce::simulateUntil currentTimeBeforeSim = " << currentTimeBeforeSim << "  initialTime = " << initialTime << std::endl;
+    Xyce::dout() << "Xyce::simulateUntil currentTimeBeforeSim = " << currentTimeBeforeSim << "  initialTime = " << initialTime << std::endl;
 #endif
     if (currentTimeBeforeSim > initialTime)
     {
@@ -1051,26 +1022,26 @@ bool N_CIR_Xyce::simulateUntil(double requestedUntilTime,
     }
 
 #ifdef Xyce_DEBUG_CIRCUIT
-    std::cout << "N_CIR_Xyce::simulateUntil: Case2: requestedUntilTime = " << requestedUntilTime
+    Xyce::dout() << "Xyce::simulateUntil: Case2: requestedUntilTime = " << requestedUntilTime
               << ", pauseTime = " << anaIntPtr_->getPauseTime() << std::endl;
 #endif
 
     bsuccess = runSolvers_();
     completedUntilTime = anaIntPtr_->getTime();
 #ifdef Xyce_DEBUG_CIRCUIT
-    std::cout << "N_CIR_Xyce::simulateUntil: Case2: completedUntilTime = " << completedUntilTime << std::endl;
+    Xyce::dout() << "Xyce::simulateUntil: Case2: completedUntilTime = " << completedUntilTime << std::endl;
 #endif
   }
 
 #ifdef Xyce_DEBUG_CIRCUIT
-  std::cout << std::endl;
+  Xyce::dout() << std::endl;
 #endif
   //  return true;
   return bsuccess;
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::finalize
+// Function      : Simulator::finalize
 // Purpose       : To clean up after driving Xyce with the SIMBUS
 //                 simulation backplane. This includes the following:
 //                    Free any dynamically allocated memory...
@@ -1080,38 +1051,26 @@ bool N_CIR_Xyce::simulateUntil(double requestedUntilTime,
 //               : Lisa Maynes, CoMeT Solutions, Inc.
 // Creation Date : 06/03/2003
 //---------------------------------------------------------------------------
-bool N_CIR_Xyce::finalize()
+bool Simulator::finalize()
 {
   bool bsuccess = true;
 
-  static const string crMsg = ("\n");
-  static const string bannerHdg("*****");
-  static const string timeMsgPre = ("\n\tTotal Simulation Solvers Run "
-                                    "Time:\t");
-  static const string totTimeMsgPre = ("\n***** Total Elapsed Run Time: ");
-  static const string timeMsgPost = (" seconds");
-  string msg;
-  msg = ("\n***** Solution Summary *****");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg);
-
+  Xyce::lout() << "\n***** Solution Summary *****"  << std::endl;
 
   anaIntPtr_->outputSummary();
   outMgrPtr_->outputMacroResults();
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, timeMsgPre,
-                         XyceTimerPtr_->elapsedTime(), timeMsgPost);
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, totTimeMsgPre,
-                         ElapsedTimerPtr_->elapsedTime(), timeMsgPost);
-
-  // Closing banner
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, crMsg + bannerHdg +
-                         crMsg + "***** End of Xyce(TM) Simulation " +
-                         crMsg + bannerHdg);
+  {
+    Xyce::lout() << std::endl
+                 << "***** Total Simulation Solvers Run Time: " << XyceTimerPtr_->elapsedTime() << " seconds" << std::endl
+                 << "***** Total Elapsed Run Time:            " << ElapsedTimerPtr_->elapsedTime() << " seconds" << std::endl
+                 << "*****" << std::endl
+                 << "***** End of Xyce(TM) Simulation" << std::endl
+                 << "*****" << std::endl;
+  }
 
   // Close the output stream:
-  if (N_ERH_ErrorMgr::output != 0 && N_ERH_ErrorMgr::output->is_open())
-    N_ERH_ErrorMgr::output->close();
+  Xyce::closeLogFile();
 
   bsuccess = doDeAllocations_();
 
@@ -1119,23 +1078,20 @@ bool N_CIR_Xyce::finalize()
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::reportTotalElapsedTime ()
+// Function      : Simulator::reportTotalElapsedTime ()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 05/01/2009
 //---------------------------------------------------------------------------
-void N_CIR_Xyce::reportTotalElapsedTime ()
+void Simulator::reportTotalElapsedTime ()
 {
-  static const string totTimeMsgPre = ("\n***** Total Elapsed Run Time: ");
-  static const string timeMsgPost = (" seconds");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, totTimeMsgPre,
-                         ElapsedTimerPtr_->elapsedTime(), timeMsgPost);
+  Xyce::lout() <<  "\n***** Total Elapsed Run Time: " << ElapsedTimerPtr_->elapsedTime() << " seconds" << std::endl;
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::simulationComplete
+// Function      : Simulator::simulationComplete
 // Purpose       : Simply report whether we've reached the end of the
 //                 simulation
 // Special Notes :
@@ -1143,7 +1099,7 @@ void N_CIR_Xyce::reportTotalElapsedTime ()
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 05/06/2004
 //---------------------------------------------------------------------------
-bool N_CIR_Xyce::simulationComplete()
+bool Simulator::simulationComplete()
 {
   return anaIntPtr_->simulationComplete();
 }
@@ -1153,17 +1109,17 @@ bool N_CIR_Xyce::simulationComplete()
 // These are provisional!
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::provisionalStep
+// Function      : Simulator::provisionalStep
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/03/2009
 //---------------------------------------------------------------------------
-bool N_CIR_Xyce::provisionalStep
+bool Simulator::provisionalStep
   (double maxTimeStep,
    double &timeStep,
-   map< string, vector< pair<double,double> > > & timeVoltageUpdateMap)
+   std::map< std::string, std::vector< std::pair<double,double> > > & timeVoltageUpdateMap)
 {
   bool bsuccess=true;
 
@@ -1178,14 +1134,14 @@ bool N_CIR_Xyce::provisionalStep
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::getFinalTime
+// Function      : Simulator::getFinalTime
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/25/2009
 //---------------------------------------------------------------------------
-double N_CIR_Xyce::getFinalTime()
+double Simulator::getFinalTime()
 {
   double ft=0.0;
   if (anaIntPtr_!=0)
@@ -1196,14 +1152,14 @@ double N_CIR_Xyce::getFinalTime()
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::getTime
+// Function      : Simulator::getTime
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 04/10/2009
 //---------------------------------------------------------------------------
-double N_CIR_Xyce::getTime()
+double Simulator::getTime()
 {
   double t=0.0;
   if (anaIntPtr_!=0)
@@ -1214,27 +1170,27 @@ double N_CIR_Xyce::getTime()
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::acceptProvisionalStep
+// Function      : Simulator::acceptProvisionalStep
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 04/10/2009
 //---------------------------------------------------------------------------
-void N_CIR_Xyce::acceptProvisionalStep()
+void Simulator::acceptProvisionalStep()
 {
   anaIntPtr_->acceptProvisionalStep ();
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::rejectProvisionalStep
+// Function      : Simulator::rejectProvisionalStep
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/03/2009
 //---------------------------------------------------------------------------
-void N_CIR_Xyce::rejectProvisionalStep()
+void Simulator::rejectProvisionalStep()
 {
   anaIntPtr_->rejectProvisionalStep();
 }
@@ -1243,34 +1199,34 @@ void N_CIR_Xyce::rejectProvisionalStep()
 // API METHODS NEEDED FOR Two-level Functions:
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::simulateStep
+// Function      : Simulator::simulateStep
 // Purpose       :
 // Special Notes : Used for 2-level Newton solves.
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/01/2006
 //---------------------------------------------------------------------------
-bool N_CIR_Xyce::simulateStep
+bool Simulator::simulateStep
       ( const N_DEV_SolverState & solState,
-        const map<string,double> & inputMap,
-        vector<double> & outputVector,
-        vector< vector<double> > & jacobian,
+        const std::map<std::string,double> & inputMap,
+        std::vector<double> & outputVector,
+        std::vector< std::vector<double> > & jacobian,
         N_TIA_TwoLevelError & tlError)
 {
   bool bsuccess = false;
 
 #ifdef Xyce_DEBUG_CIRCUIT
-  cout << "\nN_CIR_Xyce::simulateStep: " << endl;
+  Xyce::dout() << "\nXyce::simulateStep: " << std::endl;
 #endif
 
   // Apply the input voltages to their appropriate sources:
-  map<string,double>::const_iterator iterM = inputMap.begin();
-  map<string,double>::const_iterator  endM = inputMap.end  ();
+  std::map<std::string,double>::const_iterator iterM = inputMap.begin();
+  std::map<std::string,double>::const_iterator  endM = inputMap.end  ();
   int i=0;
   for (; iterM != endM;++iterM, ++i)
   {
     bool found = true;
-    string name = iterM->first;
+    std::string name = iterM->first;
     double val  = iterM->second;
     devIntPtr_->setParam (name,val);
   }
@@ -1290,24 +1246,24 @@ bool N_CIR_Xyce::simulateStep
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::simulateStep
+// Function      : Simulator::simulateStep
 // Purpose       :
 // Special Notes : Used for 2-level Newton solves with Charon.
 // Scope         : public
 // Creator       : Roger Pawlowski, SNL
 // Creation Date : 07/16/2009
 //---------------------------------------------------------------------------
-bool N_CIR_Xyce::simulateStep
+bool Simulator::simulateStep
       (const N_DEV_ExternalSimulationData & ext_data,
-       const map<string,double> & inputMap,
-       vector<double> & outputVector,
-       vector< vector<double> > & jacobian,
+       const std::map<std::string,double> & inputMap,
+       std::vector<double> & outputVector,
+       std::vector< std::vector<double> > & jacobian,
        N_TIA_TwoLevelError & tlError)
 {
   bool bsuccess = false;
 
 #ifdef Xyce_DEBUG_CIRCUIT
-  cout << "\nN_CIR_Xyce::simulateStep: " << endl;
+  Xyce::dout() << "\nXyce::simulateStep: " << std::endl;
 #endif
 
   // Create N_DEX_SolverState object
@@ -1315,7 +1271,7 @@ bool N_CIR_Xyce::simulateStep
 
   if (ext_data.is_transient)
   {
-	  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO, "Xychron (mixed-model): Transient Xyce Step" );
+    Xyce::lout() << "Xychron (mixed-model): Transient Xyce Step" << std::endl;
 
     state.currTimeStep = ext_data.current_time_step_size;
     state.lastTimeStep = ext_data.previous_time_step_size;
@@ -1383,14 +1339,14 @@ bool N_CIR_Xyce::simulateStep
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::startupSolvers
+// Function      : Simulator::startupSolvers
 // Purpose       :
 // Special Notes : Used for 2-level Newton solves.
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/10/2006
 //---------------------------------------------------------------------------
-bool N_CIR_Xyce::startupSolvers ()
+bool Simulator::startupSolvers ()
 {
   bool bsuccess = true;
   bsuccess = anaIntPtr_->startupSolvers ();
@@ -1398,14 +1354,14 @@ bool N_CIR_Xyce::startupSolvers ()
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::finishSolvers
+// Function      : Simulator::finishSolvers
 // Purpose       :
 // Special Notes : Used for 2-level Newton solves.
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/10/2006
 //---------------------------------------------------------------------------
-bool N_CIR_Xyce::finishSolvers ()
+bool Simulator::finishSolvers ()
 {
   bool bsuccess = true;
   bsuccess = anaIntPtr_->finishSolvers ();
@@ -1413,58 +1369,58 @@ bool N_CIR_Xyce::finishSolvers ()
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::homotopyStepSuccess
+// Function      : Simulator::homotopyStepSuccess
 // Purpose       :
 // Special Notes : Used for 2-level Newton solves.
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/20/2006
 //---------------------------------------------------------------------------
-void N_CIR_Xyce::homotopyStepSuccess
-    (const vector<string> & paramNames,
-     const vector<double> & paramVals)
+void Simulator::homotopyStepSuccess
+    (const std::vector<std::string> & paramNames,
+     const std::vector<double> & paramVals)
 {
   anaIntPtr_->homotopyStepSuccess ( paramNames, paramVals);
   return;
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::homotopyStepFailure
+// Function      : Simulator::homotopyStepFailure
 // Purpose       :
 // Special Notes : Used for 2-level Newton solves.
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/30/2006
 //---------------------------------------------------------------------------
-void N_CIR_Xyce::homotopyStepFailure ()
+void Simulator::homotopyStepFailure ()
 {
   anaIntPtr_->homotopyStepFailure ();
   return;
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::stepSuccess
+// Function      : Simulator::stepSuccess
 // Purpose       :
 // Special Notes : Used for 2-level Newton solves.
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/12/2006
 //---------------------------------------------------------------------------
-void N_CIR_Xyce::stepSuccess (int analysis)
+void Simulator::stepSuccess (int analysis)
 {
   anaIntPtr_->stepSuccess (analysis);
   return;
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::stepFailure
+// Function      : Simulator::stepFailure
 // Purpose       :
 // Special Notes : Used for 2-level Newton solves.
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/12/2006
 //---------------------------------------------------------------------------
-void N_CIR_Xyce::stepFailure (int analysis)
+void Simulator::stepFailure (int analysis)
 {
   anaIntPtr_->stepFailure (analysis);
   return;
@@ -1472,14 +1428,14 @@ void N_CIR_Xyce::stepFailure (int analysis)
 
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::getInitialQnorm
+// Function      : Simulator::getInitialQnorm
 // Purpose       :
 // Special Notes : Used for 2-level Newton solves.
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/12/2006
 //---------------------------------------------------------------------------
-bool N_CIR_Xyce::getInitialQnorm (N_TIA_TwoLevelError & tle)
+bool Simulator::getInitialQnorm (N_TIA_TwoLevelError & tle)
 {
   bool bsuccess = true;
 
@@ -1492,14 +1448,14 @@ bool N_CIR_Xyce::getInitialQnorm (N_TIA_TwoLevelError & tle)
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::getBreakPoints
+// Function      : Simulator::getBreakPoints
 // Purpose       :
 // Special Notes : Used for 2-level Newton solves.
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/12/2006
 //---------------------------------------------------------------------------
-bool N_CIR_Xyce::getBreakPoints (vector<N_UTL_BreakPoint> &breakPointTimes)
+bool Simulator::getBreakPoints (std::vector<N_UTL_BreakPoint> &breakPointTimes)
 {
   bool bsuccess = true;
 
@@ -1512,14 +1468,14 @@ bool N_CIR_Xyce::getBreakPoints (vector<N_UTL_BreakPoint> &breakPointTimes)
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::updateStateArrays
+// Function      : Simulator::updateStateArrays
 // Purpose       :
 // Special Notes : Used for 2-level Newton solves, with LOCA.
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/18/2006
 //---------------------------------------------------------------------------
-bool N_CIR_Xyce::updateStateArrays ()
+bool Simulator::updateStateArrays ()
 {
   bool bsuccess = true;
 #if 0
@@ -1532,42 +1488,42 @@ bool N_CIR_Xyce::updateStateArrays ()
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::setInternalParam
+// Function      : Simulator::setInternalParam
 // Purpose       :
 // Special Notes : Used for 2-level Newton solves, with LOCA.
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/18/2006
 //---------------------------------------------------------------------------
-bool N_CIR_Xyce::setInternalParam (string & name, double val)
+bool Simulator::setInternalParam (std::string & name, double val)
 {
   cktLoaderPtr_->setParam (name, val);
   return true;
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::startTimeStep
+// Function      : Simulator::startTimeStep
 // Purpose       :
 // Special Notes : Used for 2-level Newton solves
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/20/2006
 //---------------------------------------------------------------------------
-bool N_CIR_Xyce::startTimeStep (const N_TIA_TimeIntInfo & tiInfo)
+bool Simulator::startTimeStep (const N_TIA_TimeIntInfo & tiInfo)
 {
   bool bsuccess = anaIntPtr_->startTimeStep(tiInfo);
   return bsuccess;
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::startTimeStep
+// Function      : Simulator::startTimeStep
 // Purpose       :
 // Special Notes : Used for 2-level Newton solves with Charon.
 // Scope         : public
 // Creator       : Roger Pawlowski, SNL
 // Creation Date : 08/28/2009
 //---------------------------------------------------------------------------
-bool N_CIR_Xyce::startTimeStep (const N_DEV_ExternalSimulationData & ext_data)
+bool Simulator::startTimeStep (const N_DEV_ExternalSimulationData & ext_data)
 {
   N_TIA_TimeIntInfo tiInfo;
 
@@ -1613,14 +1569,14 @@ bool N_CIR_Xyce::startTimeStep (const N_DEV_ExternalSimulationData & ext_data)
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::endTimeStep
+// Function      : Simulator::endTimeStep
 // Purpose       :
 // Special Notes : Used for 2-level Newton solves with Charon.
 // Scope         : public
 // Creator       : Russell Hooper, SNL
 // Creation Date : 10/16/2012
 //---------------------------------------------------------------------------
-bool N_CIR_Xyce::endTimeStep (N_DEV_ExternalSimulationData & ext_data)
+bool Simulator::endTimeStep (N_DEV_ExternalSimulationData & ext_data)
 {
   // We could opt to obtain selected time integration data here or
   // allow it to be obtained higher up, eg in charon::sc::CircuitDriver
@@ -1660,21 +1616,21 @@ bool N_CIR_Xyce::endTimeStep (N_DEV_ExternalSimulationData & ext_data)
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::endTimeStep
+// Function      : Simulator::endTimeStep
 // Purpose       :
 // Special Notes : Used for 2-level Newton solves with Charon.
 // Scope         : public
 // Creator       : Russell Hooper, SNL
 // Creation Date : 10/16/2012
 //---------------------------------------------------------------------------
-void N_CIR_Xyce::enable_lte_analysis()
+void Simulator::enable_lte_analysis()
 {
   N_TIA_TIAParams & tiaParams = anaIntPtr_->getTIAParams();
   tiaParams.errorAnalysisOption = 0; // use local truncation error estimates
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::readExternalParamsFromFile
+// Function      : Simulator::readExternalParamsFromFile
 // Purpose       :
 // Special Notes : Used to read parameters "tag" = "value" from an external
 //                 file.  Any "tag"s found while reading the netlist during
@@ -1683,8 +1639,8 @@ void N_CIR_Xyce::enable_lte_analysis()
 // Creator       : Richard Schiek, 1437 Electrical Systems Modeling
 // Creation Date : 07/24/2012
 //---------------------------------------------------------------------------
-void N_CIR_Xyce::readExternalParamsFromFile( string filename, string & iterationSuffix,
-  vector< pair< string, string > > & paramList )
+void Simulator::readExternalParamsFromFile( std::string filename, std::string & iterationSuffix,
+  std::vector< std::pair< std::string, std::string > > & paramList )
 {
   // attempt to get parameter file suffix so that if it is  part of a unique identifier
   // like an iteration or realization number it can be attached to the response output
@@ -1705,19 +1661,19 @@ void N_CIR_Xyce::readExternalParamsFromFile( string filename, string & iteration
   // at this stage just support the Dakota params.in format of "value" = "tag".
   // we could support other formats as well.
 
-  const string allowedChars("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_.$");
-  const string whiteSpace(" \t=\n\r");    // note we will treat "=" as whitespace
-  const string commentChars("*#;");  // if we find any of these then the rest of the line is a comment
+  const std::string allowedChars("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_.$");
+  const std::string whiteSpace(" \t=\n\r");    // note we will treat "=" as whitespace
+  const std::string commentChars("*#;");  // if we find any of these then the rest of the line is a comment
 
   // attempt to open the params file
-  ifstream paramFile(filename.c_str(), ifstream::in);
+  std::ifstream paramFile(filename.c_str(), std::ios::in);
   if( paramFile )
   {
     // loop over the file trying to gather names / values and response functions required.
     // general format:
     // white space tag/value white space or = tag/value
     //
-    string aLine;
+    std::string aLine;
     getline(paramFile, aLine);
     while ( paramFile.good() )
     {
@@ -1732,8 +1688,8 @@ void N_CIR_Xyce::readExternalParamsFromFile( string filename, string & iteration
       // shortest line we could have is x=1 or 3 chars.
       if( aLine.length() > 2 )
       {
-        string::size_type commentLoc = aLine.find_first_of( commentChars, 0 );
-        if( commentLoc != string::npos )
+        std::string::size_type commentLoc = aLine.find_first_of( commentChars, 0 );
+        if( commentLoc != std::string::npos )
         {
           // chop off comment to end of line.
           aLine.erase( commentLoc, aLine.length()-commentLoc );
@@ -1741,78 +1697,72 @@ void N_CIR_Xyce::readExternalParamsFromFile( string filename, string & iteration
         //check overall line length again.  This could have been just a comment line
         if( aLine.length() > 2 )
         {
-          string::size_type word1Start = aLine.find_first_of( allowedChars, 0 );
+          std::string::size_type word1Start = aLine.find_first_of( allowedChars, 0 );
           // check that we found a valid word1Start otherwise stop trying to parse this line.
-          if( word1Start != string::npos )
+          if( word1Start != std::string::npos )
           {
-            string::size_type word1End   = aLine.find_first_of( whiteSpace, word1Start );
+            std::string::size_type word1End   = aLine.find_first_of( whiteSpace, word1Start );
             // check that we found a valid word1End otherwise stop trying to parse this line.
-            if( word1End != string::npos )
+            if( word1End != std::string::npos )
             {
-              string::size_type word2Start = aLine.find_first_of( allowedChars, word1End );
+              std::string::size_type word2Start = aLine.find_first_of( allowedChars, word1End );
               // check that we found a valid word2Start otherwise stop trying to parse this line.
-              if( word2Start != string::npos )
+              if( word2Start != std::string::npos )
               {
-                string::size_type word2End   = aLine.find_first_of( whiteSpace, word2Start );
+                std::string::size_type word2End   = aLine.find_first_of( whiteSpace, word2Start );
                 // check that we found a valid word2End
-                if( word2End == string::npos )
+                if( word2End == std::string::npos )
                   word2End = aLine.length();
                 // if we get here then we have valid start,end indicies for word1 and word2
 
-                string word1=aLine.substr( word1Start, (word1End - word1Start) );
-                string word2=aLine.substr( word2Start, (word2End - word2Start) );
+                std::string word1=aLine.substr( word1Start, (word1End - word1Start) );
+                std::string word2=aLine.substr( word2Start, (word2End - word2Start) );
 
                 // sort out tag/value ordering.
                 // if word1=number assume format is value = tag
                 // otherwise assume format is tag = value
-                stringstream converter;
+                std::stringstream converter;
                 converter << word1;
                 double testvalue;
                 converter >> testvalue;
                 if( converter.fail() )
                 {
                   // couldn't convert tag1 to a double value so assume format is word1=tag word2=value
-                  paramList.push_back( pair<string,string>(word1,word2) );
+                  paramList.push_back( std::pair<std::string,std::string>(word1,word2) );
                 }
                 else
                 {
                   // tag1 was successfully converted to a value so assume format is word1=value word2=tag
-                  paramList.push_back( pair<string,string>(word2,word1) );
+                  paramList.push_back( std::pair<std::string,std::string>(word2,word1) );
                 }
 
-              }  // if ( word2Start != string::npos )
-            }    // if( word1End != string::npos )
-          }      // if( word1Start != string::npos )
+              }  // if ( word2Start != std::string::npos )
+            }    // if( word1End != std::string::npos )
+          }      // if( word1Start != std::string::npos )
         }        // if( aLine.length() > 2 ) -- check after removing comments
       }          // if( aLine.lenght() > 2 ) -- outer check
       // try to get another line
       getline(paramFile, aLine);
     }
-
   }
   else
   {
-    // emit warning that param file could not be found
-    string message = "Could not open parameter file: " + filename + ". Attempting to continue.";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_WARNING, message );
+    Xyce::Report::UserWarning() << "Could not open parameter file: " + filename + ". Attempting to continue.";
   }
 
   // for debug purposes.  output the params as read
-  std::cout << "Parameters read from \"" << filename << "\"" << std::endl;
-  vector< pair< string, string > >::iterator listitr = paramList.begin();
-  vector< pair< string, string > >::iterator enditr = paramList.end();
+  Xyce::dout() << "Parameters read from \"" << filename << "\"" << std::endl;
+  std::vector< std::pair< std::string, std::string > >::iterator listitr = paramList.begin();
+  std::vector< std::pair< std::string, std::string > >::iterator enditr = paramList.end();
   while( listitr != enditr )
   {
-    std::cout << "  " << listitr->first << " , " << listitr->second << std::endl;
+    Xyce::dout() << "  " << listitr->first << " , " << listitr->second << std::endl;
     listitr++;
   }
-
-
-
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::registerResponseVars
+// Function      : Simulator::registerResponseVars
 // Purpose       :
 // Special Notes : Used when Dakota or an external program calls Xyce to tell
 //                 Xyce what variables and expressions should be held as
@@ -1822,19 +1772,20 @@ void N_CIR_Xyce::readExternalParamsFromFile( string filename, string & iteration
 // Creator       : Richard Schiek, 1437 Electrical and MEMS modeling
 // Creation Date : 10/22/2008
 //---------------------------------------------------------------------------
-bool N_CIR_Xyce::registerResponseVars (string objString, RCP<vector< double > > varVectorPtr )
+bool Simulator::registerResponseVars (std::string objString, RCP<std::vector< double > > varVectorPtr )
 {
   if( outMgrPtr_ == 0)
   {
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0, "N_CIR_Xyce::registerResponseVars outMgrPtr_ is null");
+    Xyce::Report::DevelFatal0() << "Xyce::registerResponseVars outMgrPtr_ is null";
   }
   bool result = outMgrPtr_->registerResponseVars( objString, varVectorPtr );
+
   return result;
 
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::registerResponseVars
+// Function      : Simulator::registerResponseVars
 // Purpose       :
 // Special Notes : Used when Dakota or an external program calls Xyce to tell
 //                 Xyce what variables and expressions should be held as
@@ -1844,37 +1795,37 @@ bool N_CIR_Xyce::registerResponseVars (string objString, RCP<vector< double > > 
 // Creator       : Richard Schiek, 1437 Electrical and MEMS modeling
 // Creation Date : 10/22/2008
 //---------------------------------------------------------------------------
-void N_CIR_Xyce::finalizeResponseVars()
+void Simulator::finalizeResponseVars()
 {
   if( outMgrPtr_ == 0)
   {
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0, "N_CIR_Xyce::finalizeResponseVars outMgrPtr_ is null");
+    Xyce::Report::DevelFatal0() << "Xyce::finalizeResponseVars outMgrPtr_ is null";
   }
   outMgrPtr_->finalizeResponseVars();
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::initializeTransientModel
+// Function      : Simulator::initializeTransientModel
 // Purpose       :
 // Special Notes : Used for ModelEvaluator interface
 // Scope         : public
 // Creator       : Coffey, Schiek, Mei
 // Creation Date : 05/27/09
 //---------------------------------------------------------------------------
-void N_CIR_Xyce::initializeTransientModel()
+void Simulator::initializeTransientModel()
 {
   anaIntPtr_->initializeTransientModel();
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::evalTransientModel
+// Function      : Simulator::evalTransientModel
 // Purpose       :
 // Special Notes : Used for ModelEvaluator interface
 // Scope         : public
 // Creator       : Coffey, Schiek, Mei
 // Creation Date : 05/27/09
 //---------------------------------------------------------------------------
-bool N_CIR_Xyce::evalTransientModel
+bool Simulator::evalTransientModel
     (
      double t,
      N_LAS_Vector * SolVectorPtr,
@@ -1922,14 +1873,14 @@ bool N_CIR_Xyce::evalTransientModel
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::evalTransientModelState
+// Function      : Simulator::evalTransientModelState
 // Purpose       :
 // Special Notes : Used for ModelEvaluator interface
 // Scope         : public
 // Creator       : Coffey, Schiek, Mei
 // Creation Date : 05/29/09
 //---------------------------------------------------------------------------
-bool N_CIR_Xyce::evalTransientModelState
+bool Simulator::evalTransientModelState
     (
      double t,
      N_LAS_Vector * SolVectorPtr,
@@ -1948,14 +1899,14 @@ bool N_CIR_Xyce::evalTransientModelState
 }
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::getMapsAndGraphs
+// Function      : Simulator::getMapsAndGraphs
 // Purpose       :
 // Special Notes : Used for ModelEvaluator interface
 // Scope         : public
 // Creator       : Coffey, Schiek, Mei
 // Creation Date : 05/27/09
 //---------------------------------------------------------------------------
-void N_CIR_Xyce::getMapsAndGraphs
+void Simulator::getMapsAndGraphs
   (
    RCP<N_PDS_ParMap> & x_map,
    RCP<N_PDS_ParMap> & x_map_ognd,
@@ -1976,15 +1927,45 @@ void N_CIR_Xyce::getMapsAndGraphs
 
 
 //---------------------------------------------------------------------------
-// Function      : N_CIR_Xyce::getVariableNames
+// Function      : Simulator::getVariableNames
 // Purpose       :
 // Special Notes : Used for ModelEvaluator interface
 // Scope         : public
 // Creator       : Coffey
 // Creation Date : 07/28/09
 //---------------------------------------------------------------------------
-std::vector<std::string> N_CIR_Xyce::getVariableNames()
+std::vector<std::string> Simulator::getVariableNames()
 {
   return outMgrPtr_->getVariableNames();
 }
 
+void
+report_handler(
+  const char *  message,
+  unsigned      report_mask)
+{
+  // if ( !comm_->isSerial() && !(report_mask & MSG_SYMMETRIC))
+  //   os << "P" << comm_->procID() << " - ";
+
+  std::ostringstream oss;
+  Xyce::Util::word_wrap(oss, message, 78, " ", "");
+
+  // If symmetric then all processors are getting the same message, only write to p0 and not to ~p0 backlog.  If
+  // asymetric then one processor is getting the message, write to per processor stream which writes to per processor
+  // log file and to backlog.
+  if (report_mask & Xyce::Report::MSG_SYMMETRIC)
+    Xyce::lout() << oss.str();
+  else
+    Xyce::pout() << oss.str();
+
+  // If fatal error also send the message to the standard error file:
+  // Also save it for output on proc 0 if running in parallel
+  if (report_mask & Xyce::Report::MSG_TERMINATE)
+  {
+    std::cerr << oss.str() << std::endl;
+    Xyce::Report::abort();
+  }
+}
+
+} //namespace Circuit
+} // namespace Xyce

@@ -3,7 +3,7 @@ AM_CPPFLAGS = @Xyce_INCS@
 
 # needed for Dakota 4.x not 5.0
 if DAKOTA_OBJ_NEEDED 
-  DAKOTA_OBJS = $(DAKOTA_ARCH_DIR)/lib/Cparam.o 
+  DAKOTA_OBJS = 
 endif
 
 TEST_FFT_INTERFACE_SOURCES = \

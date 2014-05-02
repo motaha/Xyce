@@ -90,15 +90,14 @@ am__aclocal_m4_deps = $(top_srcdir)/config/libtool.m4 \
 	$(top_srcdir)/config/lt~obsolete.m4 \
 	$(top_srcdir)/config/xyce_check_bison.m4 \
 	$(top_srcdir)/config/xyce_check_braindamaged_random_shuffle.m4 \
-	$(top_srcdir)/config/xyce_check_flexible_insert.m4 \
 	$(top_srcdir)/config/xyce_check_iota.m4 \
-	$(top_srcdir)/config/xyce_check_stl_member_templates.m4 \
 	$(top_srcdir)/config/xyce_debug_option.m4 \
 	$(top_srcdir)/config/xyce_finite_number_check.m4 \
 	$(top_srcdir)/config/xyce_library_include.m4 \
 	$(top_srcdir)/config/xyce_library_option.m4 \
 	$(top_srcdir)/config/xyce_test_using_dec_cxx.m4 \
 	$(top_srcdir)/config/xyce_test_using_icclt11_cxx.m4 \
+	$(top_srcdir)/config/xyce_trilinos_library_option.m4 \
 	$(top_srcdir)/acinclude.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -108,8 +107,9 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 libADMS_la_LIBADD =
-am_libADMS_la_OBJECTS = N_DEV_ADMSvbic.lo N_DEV_ADMSHBT_X.lo \
-	N_DEV_ADMSPSP103VA.lo
+am_libADMS_la_OBJECTS = N_DEV_RegisterADMSDevices.lo \
+	N_DEV_ADMSHBT_X.lo N_DEV_ADMSPSP103VA.lo N_DEV_ADMSbsimcmg.lo \
+	N_DEV_ADMSvbic.lo
 libADMS_la_OBJECTS = $(am_libADMS_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -259,6 +259,7 @@ MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MAYBE_NONFREE = @MAYBE_NONFREE@
+MAYBE_PLUGIN = @MAYBE_PLUGIN@
 MAYBE_RAD = @MAYBE_RAD@
 MKDIR_P = @MKDIR_P@
 NM = @NM@
@@ -353,12 +354,16 @@ AM_CPPFLAGS = @Xyce_INCS@
 AM_CXXFLAGS = @ADMS_CXXFLAGS@
 noinst_LTLIBRARIES = libADMS.la
 libADMS_la_SOURCES = \
-  $(srcdir)/src/N_DEV_ADMSvbic.C \
-  $(srcdir)/include/N_DEV_ADMSvbic.h \
+  $(srcdir)/src/N_DEV_RegisterADMSDevices.C \
   $(srcdir)/src/N_DEV_ADMSHBT_X.C \
-  $(srcdir)/include/N_DEV_ADMSHBT_X.h \
   $(srcdir)/src/N_DEV_ADMSPSP103VA.C \
-  $(srcdir)/include/N_DEV_ADMSPSP103VA.h 
+  $(srcdir)/src/N_DEV_ADMSbsimcmg.C \
+  $(srcdir)/src/N_DEV_ADMSvbic.C \
+  $(srcdir)/include/N_DEV_RegisterADMSDevices.h \
+  $(srcdir)/include/N_DEV_ADMSHBT_X.h \
+  $(srcdir)/include/N_DEV_ADMSPSP103VA.h \
+  $(srcdir)/include/N_DEV_ADMSbsimcmg.h \
+  $(srcdir)/include/N_DEV_ADMSvbic.h
 
 all: all-am
 
@@ -417,7 +422,9 @@ distclean-compile:
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_ADMSHBT_X.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_ADMSPSP103VA.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_ADMSbsimcmg.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_ADMSvbic.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/N_DEV_RegisterADMSDevices.Plo@am__quote@
 
 .C.o:
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXXCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -440,12 +447,12 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LTCXXCOMPILE) -c -o $@ $<
 
-N_DEV_ADMSvbic.lo: $(srcdir)/src/N_DEV_ADMSvbic.C
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_ADMSvbic.lo -MD -MP -MF $(DEPDIR)/N_DEV_ADMSvbic.Tpo -c -o N_DEV_ADMSvbic.lo `test -f '$(srcdir)/src/N_DEV_ADMSvbic.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ADMSvbic.C
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_ADMSvbic.Tpo $(DEPDIR)/N_DEV_ADMSvbic.Plo
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_ADMSvbic.C' object='N_DEV_ADMSvbic.lo' libtool=yes @AMDEPBACKSLASH@
+N_DEV_RegisterADMSDevices.lo: $(srcdir)/src/N_DEV_RegisterADMSDevices.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_RegisterADMSDevices.lo -MD -MP -MF $(DEPDIR)/N_DEV_RegisterADMSDevices.Tpo -c -o N_DEV_RegisterADMSDevices.lo `test -f '$(srcdir)/src/N_DEV_RegisterADMSDevices.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_RegisterADMSDevices.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_RegisterADMSDevices.Tpo $(DEPDIR)/N_DEV_RegisterADMSDevices.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_RegisterADMSDevices.C' object='N_DEV_RegisterADMSDevices.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_ADMSvbic.lo `test -f '$(srcdir)/src/N_DEV_ADMSvbic.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ADMSvbic.C
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_RegisterADMSDevices.lo `test -f '$(srcdir)/src/N_DEV_RegisterADMSDevices.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_RegisterADMSDevices.C
 
 N_DEV_ADMSHBT_X.lo: $(srcdir)/src/N_DEV_ADMSHBT_X.C
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_ADMSHBT_X.lo -MD -MP -MF $(DEPDIR)/N_DEV_ADMSHBT_X.Tpo -c -o N_DEV_ADMSHBT_X.lo `test -f '$(srcdir)/src/N_DEV_ADMSHBT_X.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ADMSHBT_X.C
@@ -460,6 +467,20 @@ N_DEV_ADMSPSP103VA.lo: $(srcdir)/src/N_DEV_ADMSPSP103VA.C
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_ADMSPSP103VA.C' object='N_DEV_ADMSPSP103VA.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_ADMSPSP103VA.lo `test -f '$(srcdir)/src/N_DEV_ADMSPSP103VA.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ADMSPSP103VA.C
+
+N_DEV_ADMSbsimcmg.lo: $(srcdir)/src/N_DEV_ADMSbsimcmg.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_ADMSbsimcmg.lo -MD -MP -MF $(DEPDIR)/N_DEV_ADMSbsimcmg.Tpo -c -o N_DEV_ADMSbsimcmg.lo `test -f '$(srcdir)/src/N_DEV_ADMSbsimcmg.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ADMSbsimcmg.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_ADMSbsimcmg.Tpo $(DEPDIR)/N_DEV_ADMSbsimcmg.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_ADMSbsimcmg.C' object='N_DEV_ADMSbsimcmg.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_ADMSbsimcmg.lo `test -f '$(srcdir)/src/N_DEV_ADMSbsimcmg.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ADMSbsimcmg.C
+
+N_DEV_ADMSvbic.lo: $(srcdir)/src/N_DEV_ADMSvbic.C
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -MT N_DEV_ADMSvbic.lo -MD -MP -MF $(DEPDIR)/N_DEV_ADMSvbic.Tpo -c -o N_DEV_ADMSvbic.lo `test -f '$(srcdir)/src/N_DEV_ADMSvbic.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ADMSvbic.C
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/N_DEV_ADMSvbic.Tpo $(DEPDIR)/N_DEV_ADMSvbic.Plo
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='$(srcdir)/src/N_DEV_ADMSvbic.C' object='N_DEV_ADMSvbic.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS) -c -o N_DEV_ADMSvbic.lo `test -f '$(srcdir)/src/N_DEV_ADMSvbic.C' || echo '$(srcdir)/'`$(srcdir)/src/N_DEV_ADMSvbic.C
 
 mostlyclean-libtool:
 	-rm -f *.lo

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.1.2.2 $
+// Revision Number: $Revision: 1.6 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:44 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -108,14 +108,7 @@ class N_LAS_HBBuilder : public N_LAS_Builder
   Teuchos::RCP<N_LAS_BlockVector> createTimeDomainStateBlockVector() const;
   Teuchos::RCP<N_LAS_BlockVector> createTimeDomainStoreBlockVector() const;
   
-  // HB Vector creation:
-  Teuchos::RCP<N_LAS_Vector> createCompressedRealFormVector() const;
-  Teuchos::RCP<N_LAS_Vector> createExpandedRealFormVector() const;
-
-  Teuchos::RCP<N_LAS_BlockVector> createCompressedRealFormBlockVector() const;
   Teuchos::RCP<N_LAS_BlockVector> createExpandedRealFormBlockVector() const;
-
-  Teuchos::RCP<N_LAS_BlockVector> createCompressedRealFormTransposeBlockVector() const;
   Teuchos::RCP<N_LAS_BlockVector> createExpandedRealFormTransposeBlockVector() const;
   Teuchos::RCP<N_LAS_BlockVector> createExpandedRealFormTransposeStateBlockVector() const;
   Teuchos::RCP<N_LAS_BlockVector> createExpandedRealFormTransposeStoreBlockVector() const;
@@ -141,6 +134,16 @@ class N_LAS_HBBuilder : public N_LAS_Builder
   Teuchos::RCP<const Epetra_Map> getStateMap() const;
   Teuchos::RCP<const Epetra_Map> getStoreMap() const;
 
+  // Return the base map for each block in the expanded maps (a.k.a. time-domain maps)
+  Teuchos::RCP<const N_PDS_ParMap> getBaseSolutionMap() const
+  { return BaseMap_; }
+
+  Teuchos::RCP<const N_PDS_ParMap> getBaseStateMap() const
+  { return BaseStateMap_; }
+
+  Teuchos::RCP<const N_PDS_ParMap> getBaseStoreMap() const
+  { return BaseStoreMap_; }
+  
   // Return GID offset for blocks for construction of Loader
   int getHBOffset()
   { return offset_; }
@@ -151,12 +154,6 @@ class N_LAS_HBBuilder : public N_LAS_Builder
   int getHBStoreOffset()
   { return storeOffset_; }
 
-  Teuchos::RCP<const Epetra_Map> getHBCompressedRealFormMap() const
-  { return HBCompressedRealFormMap_; }
-  
-  Teuchos::RCP<const Epetra_Map> getHBExpandedRealFormMap() const
-  { return HBExpandedRealFormMap_; }
-  
 private:
 
   const int numHarmonics_;
@@ -168,25 +165,12 @@ private:
   int offset_, stateOffset_;
   int storeOffset_;
 
-  // HB small maps:
-  Teuchos::RCP<Epetra_Map> HBCompressedRealFormMap_; // numElem = number of harmonics + 1
- 
-  Teuchos::RCP<Epetra_Map> HBExpandedRealFormMap_; // numElem = 2*(number of harmonics)
-  Teuchos::RCP<Epetra_Map> HBExpandedRealFormStateMap_; 
-  Teuchos::RCP<Epetra_Map> HBExpandedRealFormStoreMap_; 
-  
   // HB maps for block vectors:
-  // numBlocks = (number of harmonics + 1), numElem = number of solution variables
-  Teuchos::RCP<Epetra_Map> HBCompressedRealFormBVMap_; 
-
   // numBlocks = 2*(number of harmonics), numElem = number of solution variables
-  Teuchos::RCP<Epetra_Map> HBExpandedRealFormBVMap_; 
-  Teuchos::RCP<Epetra_Map> HBExpandedRealFormStateBVMap_;
-  Teuchos::RCP<Epetra_Map> HBExpandedRealFormStoreBVMap_;
+  Teuchos::RCP<N_PDS_ParMap> HBExpandedRealFormBVMap_; 
+  Teuchos::RCP<N_PDS_ParMap> HBExpandedRealFormStateBVMap_;
+  Teuchos::RCP<N_PDS_ParMap> HBExpandedRealFormStoreBVMap_;
   
-  // numBlocks = number of solution variables, numElem = number of harmonics + 1
-  // We don't need a special map here, its the same as the non-tranpose
-
   // numBlocks = number of solution variables, numElem = 2*(number of harmonics) 
   // We don't need a special map here, its the same as the non-tranpose
 

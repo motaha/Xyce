@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.82.2.3 $
+// Revision Number: $Revision: 1.99 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -56,360 +56,8 @@
 #include <N_PDS_Comm.h>
 #include <N_ERH_ErrorMgr.h>
 
-// ---------  Other Includes  -----------
-
-// ---------  Helper Functions  -----------
-
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_ParamData::N_UTL_ParamData
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Richard Schiek, Electrical Modeling
-// Creation Date : 12/23/10
-//-----------------------------------------------------------------------------
-N_UTL_ParamData::N_UTL_ParamData(const string & t, const vector<string> & v)
-  : tag_(t), type_(STR_VEC), simVarContext(UNDEFINED), extIndex1(-1), extIndex2(-1)
-{
-  vals.stringVec_ = new vector<string>(v);
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_ParamData::N_UTL_ParamData
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Richard Schiek, Electrical Modeling
-// Creation Date : 12/23/10
-//-----------------------------------------------------------------------------
-N_UTL_ParamData::N_UTL_ParamData(const string & t, const vector<double> & v)
-  : tag_(t), type_(DBLE_VEC), simVarContext(UNDEFINED), extIndex1(-1), extIndex2(-1)
-{
-  vals.dbleVec_ = new vector<double>(v);
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_ParamData::N_UTL_ParamData
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Christy Warrender, Cognitive Modeling
-// Creation Date : 3/16/11
-//-----------------------------------------------------------------------------
-N_UTL_ParamData::N_UTL_ParamData(const string & t, const vector<int> & v)
-  : tag_(t), type_(INT_VEC), simVarContext(UNDEFINED), extIndex1(-1), extIndex2(-1)
-{
-  vals.intVec_ = new vector<int>(v);
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_ParamData::N_UTL_ParamData
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       :
-// Creation Date :
-//-----------------------------------------------------------------------------
-N_UTL_ParamData::N_UTL_ParamData(const string & t, const N_UTL_Expression & v)
-      : tag_(t), type_(EXPR), simVarContext(UNDEFINED), extIndex1(-1), extIndex2(-1)
-{
-  vals.exprVal_ = new N_UTL_Expression(v);
-}
-
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_ParamData::~N_UTL_ParamData
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Richard Schiek, Electrical Modeling
-// Creation Date : 12/23/10
-//-----------------------------------------------------------------------------
-void N_UTL_ParamData::freeAllocatedStorage()
-{
-  // delete any allocated space held by this object
-  if (type_ == STR)
-    delete vals.stringVal_;
-  if (type_ == STR_VEC )
-    delete vals.stringVec_;
-  if (type_ == DBLE_VEC )
-    delete vals.dbleVec_;
-  if (type_ == INT_VEC )
-    delete vals.intVec_;
-  if (type_ == EXPR)
-    delete vals.exprVal_;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_ParamData::~N_UTL_ParamData
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       :
-// Creation Date :
-//-----------------------------------------------------------------------------
-N_UTL_ParamData::~N_UTL_ParamData()
-{
-  freeAllocatedStorage();
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::N_UTL_Param
-// Purpose       : Constructor with no inititalization
-// Special Notes :
-// Scope         :
-// Creator       : Lon Waters, SNL
-// Creation Date : 5/16/01
-//-----------------------------------------------------------------------------
-N_UTL_Param::N_UTL_Param()
-  : data_( new N_UTL_ParamData )
-{
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::N_UTL_Param
-// Purpose       : Constructor initialized to string
-// Special Notes :
-// Scope         :
-// Creator       : Lon Waters, SNL
-// Creation Date : 5/16/01
-//-----------------------------------------------------------------------------
-N_UTL_Param::N_UTL_Param(const string & t, const string & v)
-  : data_( new N_UTL_ParamData( t, v ) )
-{
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::N_UTL_Param
-// Purpose       : Constructor initialized to double
-// Special Notes :
-// Scope         :
-// Creator       : Lon Waters, SNL
-// Creation Date : 5/16/01
-//-----------------------------------------------------------------------------
-N_UTL_Param::N_UTL_Param(const string & t, const double & v)
-  : data_( new N_UTL_ParamData( t, v ) )
-{
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::N_UTL_Param
-// Purpose       : Constructor initialized to int
-// Special Notes :
-// Scope         :
-// Creator       : Lon Waters, SNL
-// Creation Date : 5/16/01
-//-----------------------------------------------------------------------------
-N_UTL_Param::N_UTL_Param(const string & t, const int & v)
-  : data_( new N_UTL_ParamData( t, v ) )
-{
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::N_UTL_Param
-// Purpose       : Constructor initialized to long
-// Special Notes :
-// Scope         :
-// Creator       : Derek Barnes, SNL
-// Creation Date : 8/01/01
-//-----------------------------------------------------------------------------
-N_UTL_Param::N_UTL_Param(const string & t, const long & v)
-  : data_( new N_UTL_ParamData( t, v ) )
-{
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::N_UTL_Param
-// Purpose       : Constructor initialized to bool
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 03/14/06
-//-----------------------------------------------------------------------------
-N_UTL_Param::N_UTL_Param(const string & t, const bool & v)
-  : data_( new N_UTL_ParamData( t, v ) )
-{
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::N_UTL_Param
-// Purpose       : Constructor initialized to char *
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 03/14/06
-//-----------------------------------------------------------------------------
-N_UTL_Param::N_UTL_Param(const string & t, const char * v)
-  : data_( new N_UTL_ParamData( t, string(v) ) )
-{
-}
-
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::N_UTL_Param
-// Purpose       : Constructor initialized to vector<string>
-// Special Notes :
-// Scope         :
-// Creator       : Richard Schiek, Electrical Modeling, 1445
-// Creation Date : 12/23/10
-//-----------------------------------------------------------------------------
-N_UTL_Param::N_UTL_Param(const string & t, const vector<string> & v)
-  : data_( new N_UTL_ParamData( t, v ) )
-{
-}
-
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::N_UTL_Param
-// Purpose       : Constructor initialized to vector<double>
-// Special Notes :
-// Scope         :
-// Creator       : Richard Schiek, Electrical Modeling, 1445
-// Creation Date : 12/23/10
-//-----------------------------------------------------------------------------
-N_UTL_Param::N_UTL_Param(const string & t, const vector<double> & v)
-  : data_( new N_UTL_ParamData( t, v ) )
-{
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::N_UTL_Param
-// Purpose       : Constructor initialized to vector<int>
-// Special Notes :
-// Scope         :
-// Creator       : Christy Warrender, Cognitive Modeling, 1462
-// Creation Date : 3/17/11
-//-----------------------------------------------------------------------------
-N_UTL_Param::N_UTL_Param(const string & t, const vector<int> & v)
-  : data_( new N_UTL_ParamData( t, v ) )
-{
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::N_UTL_Param
-// Purpose       : Constructor initialized to expression
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 11/08/04
-//-----------------------------------------------------------------------------
-N_UTL_Param::N_UTL_Param(const string & t, const N_UTL_Expression & v)
-  : data_( new N_UTL_ParamData( t, v ) )
-{
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::N_UTL_Param
-// Purpose       : Copy Constructor
-// Special Notes :
-// Scope         :
-// Creator       : Lon Waters, SNL
-// Creation Date : 5/17/01
-//-----------------------------------------------------------------------------
-N_UTL_Param::N_UTL_Param(N_UTL_Param const& rhsParam)
-{
-  data_ = new N_UTL_ParamData;
-
-  data_->tag_ = rhsParam.data_->tag_;
-  data_->type_ = rhsParam.data_->type_;
-  data_->simVarContext = rhsParam.data_->simVarContext;
-  data_->extIndex1 = rhsParam.data_->extIndex1;
-  data_->extIndex2 = rhsParam.data_->extIndex2;
-  data_->expressionDataRCP = rhsParam.data_->expressionDataRCP;
-  data_->qualifiedParameterOrFunctionName = rhsParam.data_->qualifiedParameterOrFunctionName;
-  data_->fixedValue = rhsParam.data_->fixedValue;
-
-  if (data_->type_ == STR)
-    data_->vals.stringVal_ = new string(*(rhsParam.data_->vals.stringVal_));
-  else if (data_->type_ == DBLE)
-    data_->vals.dbleVal_ = rhsParam.data_->vals.dbleVal_;
-  else if (data_->type_ == INT)
-    data_->vals.intVal_ = rhsParam.data_->vals.intVal_;
-  else if (data_->type_ == LNG)
-    data_->vals.lngVal_ = rhsParam.data_->vals.lngVal_;
-  else if (data_->type_ == BOOL)
-    data_->vals.boolVal_ = rhsParam.data_->vals.boolVal_;
-  else if (data_->type_ == EXPR)
-    data_->vals.exprVal_ = new N_UTL_Expression(*(rhsParam.data_->vals.exprVal_));
-  else if (data_->type_ == STR_VEC)
-    data_->vals.stringVec_ = new vector<string>(*(rhsParam.data_->vals.stringVec_));
-  else if (data_->type_ == DBLE_VEC)
-    data_->vals.dbleVec_ = new vector<double>(*(rhsParam.data_->vals.dbleVec_));
-  else if (data_->type_ == INT_VEC)
-    data_->vals.intVec_ = new vector<int>(*(rhsParam.data_->vals.intVec_));
-
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::operator=
-// Purpose       : assignment operator
-// Special Notes :
-// Scope         :
-// Creator       : Lon Waters, SNL
-// Creation Date : 05/18/01
-//-----------------------------------------------------------------------------
-N_UTL_Param & N_UTL_Param::operator=(N_UTL_Param const& rhsParam)
-{
-  // if this currently contains a string or an expression, then
-  // we're going to create a new one.  So we need to delete
-  // the old one first.
-  data_->freeAllocatedStorage();
-  /*
-  if( data_->type_ == STR )
-  {
-    delete data_->vals.stringVal_;
-  }
-  else if( data_->type_ == EXPR )
-  {
-    delete data_->vals.exprVal_;
-  }
-  */
-
-  data_->tag_ = rhsParam.data_->tag_;
-  data_->type_ = rhsParam.data_->type_;
-  data_->simVarContext = rhsParam.data_->simVarContext;
-  data_->extIndex1 = rhsParam.data_->extIndex1;
-  data_->extIndex2 = rhsParam.data_->extIndex2;
-  data_->expressionDataRCP = rhsParam.data_->expressionDataRCP;
-  data_->qualifiedParameterOrFunctionName = rhsParam.data_->qualifiedParameterOrFunctionName;
-  data_->fixedValue = rhsParam.data_->fixedValue;
-
-  if (data_->type_ == STR)
-    data_->vals.stringVal_ = new string(*(rhsParam.data_->vals.stringVal_));
-  else if (data_->type_ == DBLE)
-    data_->vals.dbleVal_ = rhsParam.data_->vals.dbleVal_;
-  else if (data_->type_ == INT)
-    data_->vals.intVal_ = rhsParam.data_->vals.intVal_;
-  else if (data_->type_ == LNG)
-    data_->vals.lngVal_ = rhsParam.data_->vals.lngVal_;
-  else if (data_->type_ == BOOL)
-    data_->vals.boolVal_ = rhsParam.data_->vals.boolVal_;
-  else if (data_->type_ == EXPR)
-    data_->vals.exprVal_ = new N_UTL_Expression(*(rhsParam.data_->vals.exprVal_));
-  else if (data_->type_ == STR_VEC)
-    data_->vals.stringVec_ = new vector<string>(*(rhsParam.data_->vals.stringVec_));
-  else if (data_->type_ == DBLE_VEC)
-    data_->vals.dbleVec_ = new vector<double>(*(rhsParam.data_->vals.dbleVec_));
-  else if (data_->type_ == INT_VEC)
-    data_->vals.intVec_ = new vector<int>(*(rhsParam.data_->vals.intVec_));
-
-   return *this;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::~N_UTL_Param
-// Purpose       : Destructor
-// Special Notes :
-// Scope         :
-// Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 5/15/01
-//-----------------------------------------------------------------------------
-N_UTL_Param::~N_UTL_Param()
-{
-  if ( data_ != NULL) delete data_;
-  data_ = NULL;
-}
+namespace Xyce {
+namespace Util {
 
 //-----------------------------------------------------------------------------
 // Function      : upperString
@@ -419,11 +67,16 @@ N_UTL_Param::~N_UTL_Param()
 // Creator       : Rob Hoekstra, SNL
 // Creation Date : 5/10/01
 //-----------------------------------------------------------------------------
-const string N_UTL_Param::usVal() const
+std::string Param::usVal() const
 {
-  if (data_->type_ == STR)
-    return ExtendedString( *data_->vals.stringVal_ ).toUpper();
-  return string("");
+  std::string s;
+
+  if (data_->enumType() == STR) {
+    s = getValue<std::string>();
+    toUpper(s);
+  }
+
+  return s;
 }
 
 //-----------------------------------------------------------------------------
@@ -434,42 +87,20 @@ const string N_UTL_Param::usVal() const
 // Creator       : Rob Hoekstra, SNL
 // Creation Date : 5/10/01
 //-----------------------------------------------------------------------------
-const string N_UTL_Param::lsVal() const
+std::string Param::lsVal() const
 {
-  if (data_->type_ == STR)
-    return ExtendedString( *data_->vals.stringVal_ ).toLower();
-  return string("");
+  std::string s;
+
+  if (data_->enumType() == STR) {
+    s = getValue<std::string>();
+    toLower(s);
+  }
+
+  return s;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : get type
-// Purpose       :
-// Special Notes :
-// Scope         : Public
-// Creator       : Lon Waters, SNL
-// Creation Date : 5/16/01
-//-----------------------------------------------------------------------------
-const int & N_UTL_Param::getType() const
-{
-  return data_->type_;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::operator!=
-// Purpose       : "!=" operator
-// Special Notes :
-// Scope         : public
-// Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 5/15/01
-//-----------------------------------------------------------------------------
-bool N_UTL_Param::operator!=( N_UTL_Param const& rhsParam ) const
-{
-  return !(this->operator==(rhsParam));
-}
-
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::deepCompare
+// Function      : Param::deepCompare
 // Purpose       : Comapre two N_UTL_Parms deeper than the equity operator
 // Special Notes : The equity operator just checks that the TAGS are equal
 //                 this compares the value if that makes sense (i.e. INT to INT
@@ -479,1001 +110,337 @@ bool N_UTL_Param::operator!=( N_UTL_Param const& rhsParam ) const
 // Creation Date : 2/06/2012
 //-----------------------------------------------------------------------------
 // deepCompare -- compare TAG and Value if TAGS are the same
-bool N_UTL_Param::deepCompare(N_UTL_Param const & rhsParam) const
+bool Param::deepCompare(Param const & rhsParam) const
 {
-  bool match=false;
-
-
-#ifndef HAVE_STRCASECMP
-  bool tagMatch = ( uTag() == rhsParam.uTag() );
-#else
-  bool tagMatch = ( strcasecmp(( data_->tag_.c_str() ), ( rhsParam.data_->tag_.c_str() ) )==0 );
-#endif
-
-  if( tagMatch )
-  {
-    // tag name matches, so check type
-    if( getType() == rhsParam.getType() )
-    {
-      // type matches so it's sensible to check value
-      if( sVal() == rhsParam.sVal())
-      {
-        match=true;
-      }
-    }
-  }
-
-  return match;
+  return equal_nocase(tag_, rhsParam.tag_)
+    && getType() == rhsParam.getType()
+    && stringValue() == rhsParam.stringValue();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::set
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 02/17/06
-//-----------------------------------------------------------------------------
-N_UTL_Param & N_UTL_Param::set( const string & tag, const N_UTL_Param & p )
-{
-  data_->tag_ = tag;
-  setVal(p);
-  return *this;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::set
+// Function      : Param::sVal
 // Purpose       :
 // Special Notes :
 // Scope         :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/10/01
 //-----------------------------------------------------------------------------
-N_UTL_Param & N_UTL_Param::set( const string & tag, const string & val )
+std::string Param::stringValue() const
 {
-  data_->tag_ = tag;
-  setVal(val);
-  return *this;
+  std::ostringstream oss;
+  
+  if (data_->enumType() == STR)
+  {
+    oss << getValue<std::string>();
+  }
+  else if (data_->enumType() == INT)
+  {
+    oss << getValue<int>();
+  }
+  else if (data_->enumType() == LNG)
+  {
+    oss << getValue<long>();
+  }
+  else if (data_->enumType() == DBLE)
+  {
+    oss << getValue<double>();
+  }
+  else if (data_->enumType() == BOOL)
+  {
+    oss << (getValue<bool>() ? "TRUE" : "FALSE");
+  }
+  else if (data_->enumType() == STR_VEC)
+  {
+    oss << "STR_VEC";
+  }
+  else if (data_->enumType() == DBLE_VEC)
+  {
+    oss << "DBLE_VEC";
+  }
+  else if (data_->enumType() == INT_VEC)
+  {
+    oss << "INT_VEC";
+  }
+  else if (data_->enumType() == EXPR)
+  {
+    oss << getValue<Expression>().get_expression();
+  }
+
+  return oss.str();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::set
+// Function      : Param::getImmutableValue<double>
 // Purpose       :
 // Special Notes :
 // Scope         :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/10/01
 //-----------------------------------------------------------------------------
-N_UTL_Param & N_UTL_Param::set( const string & tag, const double & val )
-{
-  data_->tag_ = tag;
-  setVal(val);
-  return *this;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::set
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 5/10/01
-//-----------------------------------------------------------------------------
-N_UTL_Param & N_UTL_Param::set( const string & tag, const int & val )
-{
-  data_->tag_ = tag;
-  setVal(val);
-  return *this;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::set
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Derek Barnes, SNL, Parallel Computational Sciences
-// Creation Date : 08/01/01
-//-----------------------------------------------------------------------------
-N_UTL_Param & N_UTL_Param::set( const string & tag, const long & val )
-{
-  data_->tag_ = tag;
-  setVal(val);
-  return *this;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::set
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 03/14/06
-//-----------------------------------------------------------------------------
-N_UTL_Param & N_UTL_Param::set( const string & tag, const bool & val )
-{
-  data_->tag_ = tag;
-  setVal(val);
-  return *this;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::set
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 03/14/06
-//-----------------------------------------------------------------------------
-N_UTL_Param & N_UTL_Param::set( const string & tag, const char * val )
-{
-  data_->tag_ = tag;
-  setVal(string(val));
-  return *this;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::set
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Richard Schiek, Electrical Modeling
-// Creation Date : 12/23/10
-//-----------------------------------------------------------------------------
-N_UTL_Param & N_UTL_Param::set(const string & tag, const vector<string> & val)
-{
-  data_->tag_ = tag;
-  setVal(val);
-  return *this;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::set
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Richard Schiek, Electrical Modeling
-// Creation Date : 12/23/10
-//-----------------------------------------------------------------------------
-N_UTL_Param & N_UTL_Param::set(const string & tag, const vector<double> & val)
-{
-  data_->tag_ = tag;
-  setVal(val);
-  return *this;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::set
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Christy Warrender, Cognitive Modeling
-// Creation Date : 3/16/11
-//-----------------------------------------------------------------------------
-N_UTL_Param & N_UTL_Param::set(const string & tag, const vector<int> & val)
-{
-  data_->tag_ = tag;
-  setVal(val);
-  return *this;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::set
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 11/08/04
-//-----------------------------------------------------------------------------
-N_UTL_Param & N_UTL_Param::set( const string & tag, const N_UTL_Expression & val )
-{
-  data_->tag_ = tag;
-  setVal(val);
-  return *this;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::setTag
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 5/10/01
-//-----------------------------------------------------------------------------
-void N_UTL_Param::setTag( const string & tag )
-{
-  data_->tag_ = tag;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::setVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 02/17/06
-//-----------------------------------------------------------------------------
-void N_UTL_Param::setVal( const N_UTL_Param & p )
-{
-  int typ = p.getType();
-
-  if (typ == STR)
-    setVal(p.sVal());
-  else if (typ == DBLE)
-    setVal(p.dVal());
-  else if (typ == INT)
-    setVal(p.iVal());
-  else if (typ == LNG)
-    setVal(p.lVal());
-  else if (typ == BOOL)
-    setVal(p.bVal());
-  else if (typ == EXPR)
-    setVal(p.eVal());
-  else
-  {
-    string msg = "N_UTL_Param::setVal: unsupported type in setval(param)";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg );
-  }
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::setVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 5/10/01
-//-----------------------------------------------------------------------------
-void N_UTL_Param::setVal( const string & val )
-{
-  if (data_->type_ == EXPR)
-    delete data_->vals.exprVal_;
-  if (data_->type_ == STR)
-    *(data_->vals.stringVal_) = val;
-  else
-    data_->vals.stringVal_ = new string (val);
-  data_->type_ = STR;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::setVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 5/10/01
-//-----------------------------------------------------------------------------
-void N_UTL_Param::setVal( const double & val )
-{
-  if (data_->type_ == EXPR)
-    delete data_->vals.exprVal_;
-  if (data_->type_ == STR)
-    delete data_->vals.stringVal_;
-  data_->type_ = DBLE;
-  data_->vals.dbleVal_ = val;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::setVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 5/10/01
-//-----------------------------------------------------------------------------
-void N_UTL_Param::setVal( const int & val )
-{
-  if (data_->type_ == EXPR)
-    delete data_->vals.exprVal_;
-  if (data_->type_ == STR)
-    delete data_->vals.stringVal_;
-  data_->type_ = INT;
-  data_->vals.intVal_ = val;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::setVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Derek Barnes, SNL, Parallel Computational Sciences
-// Creation Date : 08/01/01
-//-----------------------------------------------------------------------------
-void N_UTL_Param::setVal( const long & val )
-{
-  if (data_->type_ == EXPR)
-    delete data_->vals.exprVal_;
-  if (data_->type_ == STR)
-    delete data_->vals.stringVal_;
-  data_->type_ = LNG;
-  data_->vals.lngVal_ = val;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::setVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 03/14/06
-//-----------------------------------------------------------------------------
-void N_UTL_Param::setVal( const bool & val )
-{
-  if (data_->type_ == EXPR)
-    delete data_->vals.exprVal_;
-  if (data_->type_ == STR)
-    delete data_->vals.stringVal_;
-  data_->type_ = BOOL;
-  data_->vals.boolVal_ = val;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::setVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 03/14/06
-//-----------------------------------------------------------------------------
-void N_UTL_Param::setVal( const char * val )
-{
-  string str(val);
-  setVal(string(val));
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::setVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Richard Schiek, Electrical Modeling
-// Creation Date : 12/23/10
-//-----------------------------------------------------------------------------
-void N_UTL_Param::setVal(const vector<string> & val)
-{
-  // delete any allocated space held by this object
-  data_->freeAllocatedStorage();
-  data_->vals.stringVec_ = new vector<string>(val);
-  data_->type_ = STR_VEC;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::setVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Richard Schiek, Electrical Modeling
-// Creation Date : 12/23/10
-//-----------------------------------------------------------------------------
-void N_UTL_Param::setVal(const vector<double> & val)
-{
-  // delete any allocated space held by this object
-  data_->freeAllocatedStorage();
-  data_->vals.dbleVec_ = new vector<double>(val);
-  data_->type_ = DBLE_VEC;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::setVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Christy Warrender, Cognitive Modeling
-// Creation Date : 3/16/11
-//-----------------------------------------------------------------------------
-void N_UTL_Param::setVal(const vector<int> & val)
-{
-  // delete any allocated space held by this object
-  data_->freeAllocatedStorage();
-  data_->vals.intVec_ = new vector<int>(val);
-  data_->type_ = INT_VEC;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::setVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 5/10/01
-//-----------------------------------------------------------------------------
-void N_UTL_Param::setVal( const N_UTL_Expression & val )
-{
-  // delete any allocated space held by this object
-  data_->freeAllocatedStorage();
-  data_->vals.exprVal_ = new N_UTL_Expression (val);
-  data_->type_ = EXPR;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::tag
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 5/10/01
-//-----------------------------------------------------------------------------
-const string & N_UTL_Param::tag() const
-{
-  return data_->tag_;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::sVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 5/10/01
-//-----------------------------------------------------------------------------
-const string & N_UTL_Param::sVal() const
-{
-  char buf[32];
-  string rVal;
-
-  if (data_->type_ == STR)
-  {
-    return *(data_->vals.stringVal_);
-  }
-  else if (data_->type_ == INT)
-  {
-    sprintf(buf, "%d", data_->vals.intVal_);
-    rVal = buf;
-  }
-  else if (data_->type_ == LNG)
-  {
-    sprintf(buf, "%ld", data_->vals.lngVal_);
-    rVal = buf;
-  }
-  else if (data_->type_ == DBLE)
-  {
-    sprintf(buf, "%g", data_->vals.dbleVal_);
-    rVal = buf;
-  }
-  else if (data_->type_ == BOOL)
-  {
-    if (data_->vals.boolVal_)
-      rVal = "TRUE";
-    else
-      rVal = "FALSE";
-  }
-  else if (data_->type_ == STR_VEC)
-  {
-    rVal = "STR_VEC";
-  }
-  else if (data_->type_ == DBLE_VEC)
-  {
-    rVal = "DBLE_VEC";
-  }
-  else if (data_->type_ == INT_VEC)
-  {
-    rVal = "INT_VEC";
-  }
-  else if (data_->type_ == EXPR)
-  {
-    rVal = data_->vals.exprVal_->get_expression();
-  }
-  else
-  {
-    rVal = "";
-  }
-
-//DNS: this used to return a static string, which did not work for multithreaded runs
-  data_->sReturnVal = rVal;
-  return data_->sReturnVal;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::dVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 5/10/01
-//-----------------------------------------------------------------------------
-const double & N_UTL_Param::dVal() const
+template<>
+double Param::getImmutableValue<double>() const
 {
   double val;
 
-  if (data_->type_ != DBLE)
+  if (data_->enumType() != DBLE)
   {
-    if (data_->type_ == STR)
+    if (data_->enumType() == STR)
     {
-      //ExtendedString tmp( *data_->vals.stringVal_ );
-      string & tmp = ( *data_->vals.stringVal_ );
-      //if (tmp.isValue())
-      if (N_UTL::isValue(tmp))
+      const std::string & tmp = getValue<std::string>();
+      if (isValue(tmp))
       {
-        //val = tmp.Value();
-        val = N_UTL::Value(tmp);
-        delete data_->vals.stringVal_;
+        val = Value(tmp);
       }
       else
       {
-        string msg("N_UTL_Param::dVal: attempt to assign value for: ");
-        msg += data_->tag_;
-        msg += " from string: ";
-        msg += tmp;
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg );
+        Report::DevelFatal() << "Cannot convert " << tmp << " to double for expression " <<  tag_;
       }
     }
-    else if (data_->type_ == INT)
+    else if (data_->enumType() == INT)
     {
-      val = data_->vals.intVal_;
+      val = getValue<int>();
     }
-    else if (data_->type_ == LNG)
+    else if (data_->enumType() == LNG)
     {
-      val = data_->vals.lngVal_;
+      val = getValue<long>();
     }
-    else if (data_->type_ == BOOL)
+    else if (data_->enumType() == BOOL)
     {
-      string msg("N_UTL_Param::dVal: attempt to assign value for: ");
-      msg += data_->tag_;
-      msg += " from bool";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg );
+      Report::DevelFatal() << "Cannot convert boolean to double for expression " <<  tag_;
     }
-    else if (data_->type_ == EXPR)
+    else if (data_->enumType() == EXPR)
     {
       // Only if this param expression is truely constant can it be converted to a double
       // else it is a fatal error, in the parser most likely
-      if (data_->vals.exprVal_->num_vars() == 0)
+      Expression &expression = const_cast<Expression &>(getValue<Expression>());
+      if (expression.num_vars() == 0)
       {
-        (void) data_->vals.exprVal_->evaluateFunction (val);
-        delete data_->vals.exprVal_;
+        expression.evaluateFunction(val);
       }
       else
       {
-        string msg("N_UTL_Param::dVal: attempt to evaluate expression: ");
-        msg += data_->vals.exprVal_->get_expression();
-        msg += ", which contains unknowns";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg );
+        Report::UserFatal() << "Attempt to evaluate expression " << expression.get_expression() << ", which contains unknowns";
       }
     }
     else
     {
       val = 0;
     }
-    data_->vals.dbleVal_ = val;
-    data_->type_ = DBLE;
+
+    const_cast<Param &>(*this).setVal(val);
   }
-  return data_->vals.dbleVal_;
+  
+  return getValue<double>();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::iVal
+// Function      : Param::iVal
 // Purpose       :
 // Special Notes :
 // Scope         :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/10/01
 //-----------------------------------------------------------------------------
-const int & N_UTL_Param::iVal() const
+template<>
+int Param::getImmutableValue<int>() const
 {
   int val;
   double dVal;
 
-  if (data_->type_ != INT)
+  if (data_->enumType() != INT)
   {
-    if (data_->type_ == STR)
+    if (data_->enumType() == STR)
     {
-      //ExtendedString tmp( *data_->vals.stringVal_ );
-      string & tmp = ( *data_->vals.stringVal_ );
-      //if (tmp.isInt())
-      if (N_UTL::isInt(tmp))
+      const std::string & tmp = getValue<std::string>();
+      if (isInt(tmp))
       {
-        //val = tmp.Ival();
-        val = N_UTL::Ival(tmp);
-        delete data_->vals.stringVal_;
+        val = Ival(tmp);
       }
-      //else if (tmp.isValue())
-      else if (N_UTL::isValue(tmp))
+      else if (isValue(tmp))
       {
-        //val = static_cast<int>(tmp.Value());
-        val = static_cast<int>(N_UTL::Value(tmp));
-        delete data_->vals.stringVal_;
+        val = static_cast<int>(Value(tmp));
       }
       else
       {
-        string msg("N_UTL_Param::iVal: attempt to assign value for: ");
-        msg += data_->tag_;
-        msg += " from string: ";
-        msg += tmp;
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg );
+        Report::DevelFatal() << "Cannot convert " << tmp << " to integer for expression " <<  tag_;
       }
     }
-    else if (data_->type_ == DBLE)
+    else if (data_->enumType() == DBLE)
     {
-      val = static_cast<int> (data_->vals.dbleVal_);
+      val = static_cast<int> (getValue<double>());
     }
-    else if (data_->type_ == LNG)
+    else if (data_->enumType() == LNG)
     {
-      val = static_cast<int> (data_->vals.lngVal_);
+      val = static_cast<int> (getValue<long>());
     }
-    else if (data_->type_ == BOOL)
+    else if (data_->enumType() == BOOL)
     {
-      string msg("N_UTL_Param::iVal: attempt to assign value for: ");
-      msg += data_->tag_;
-      msg += " from bool";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg );
+      Report::DevelFatal() << "Cannot convert boolean to integer for expression " <<  tag_;
     }
-    else if (data_->type_ == EXPR)
+    else if (data_->enumType() == EXPR)
     {
-      if (data_->vals.exprVal_->num_vars() == 0)
+      Expression &expression = const_cast<Expression &>(getValue<Expression>());
+
+      if (expression.num_vars() == 0)
       {
-        (void) data_->vals.exprVal_->evaluateFunction (dVal);
-        val = static_cast<int> (dVal);
-        delete data_->vals.exprVal_;
+        expression.evaluateFunction(dVal);
+        val = dVal;
       }
       else
       {
-        string msg("N_UTL_Param::iVal: attempt to evaluate expression: ");
-        msg += data_->vals.exprVal_->get_expression();
-        msg += ", which contains unknowns";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg );
+        Report::UserFatal() << "Attempt to evaluate expression " << expression.get_expression() << ", which contains unknowns";
       }
     }
     else
     {
       val = 0;
     }
-    data_->vals.intVal_ = val;
-    data_->type_ = INT;
+    const_cast<Param &>(*this).setVal(val);
   }
-  return data_->vals.intVal_;
+  return getValue<int>();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::lVal
+// Function      : Param::lVal
 // Purpose       :
 // Special Notes :
 // Scope         :
 // Creator       : Derek Barnes, SNL, Parallel Computational Sciences
 // Creation Date : 08/01/01
 //-----------------------------------------------------------------------------
-const long & N_UTL_Param::lVal() const
+template<>
+long Param::getImmutableValue<long>() const
 {
   long val;
   double dVal;
 
-  if (data_->type_ != LNG)
+  if (data_->enumType() != LNG)
   {
-    if (data_->type_ == STR)
+    if (data_->enumType() == STR)
     {
-      //ExtendedString tmp( *data_->vals.stringVal_ );
-      string & tmp = ( *data_->vals.stringVal_ );
-      //if (tmp.isInt())
-      if (N_UTL::isInt(tmp))
+      const std::string & tmp = getValue<std::string>();
+      if (isInt(tmp))
       {
-        //val = tmp.Ival();
-        val = N_UTL::Ival(tmp);
-        delete data_->vals.stringVal_;
+        val = Ival(tmp);
       }
-      //else if (tmp.isValue())
-      else if (N_UTL::isValue(tmp))
+      else if (isValue(tmp))
       {
-        //val = static_cast<int>(tmp.Value());
-        val = static_cast<int>(N_UTL::Value(tmp));
-        delete data_->vals.stringVal_;
+        val = static_cast<long>(Value(tmp));
       }
       else
       {
-        string msg("N_UTL_Param::iVal: attempt to assign value for: ");
-        msg += data_->tag_;
-        msg += " from string: ";
-        msg += tmp;
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg );
+        Report::DevelFatal() << "Cannot convert " << tmp << " to long integer for expression " <<  tag_;
       }
     }
-    else if (data_->type_ == DBLE)
+    else if (data_->enumType() == DBLE)
     {
-      val = static_cast<long> (data_->vals.dbleVal_);
+      val = static_cast<long> (getValue<double>());
     }
-    else if (data_->type_ == INT)
+    else if (data_->enumType() == INT)
     {
-      val = static_cast<long> (data_->vals.intVal_);
+      val = static_cast<long> (getValue<int>());
     }
-    else if (data_->type_ == BOOL)
+    else if (data_->enumType() == BOOL)
     {
-      string msg("N_UTL_Param::lVal: attempt to assign value for: ");
-      msg += data_->tag_;
-      msg += " from bool";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg );
+      Report::DevelFatal() << "Cannot convert boolean to long integer for expression " <<  tag_;
     }
-    else if (data_->type_ == EXPR)
+    else if (data_->enumType() == EXPR)
     {
-      if (data_->vals.exprVal_->num_vars() == 0)
+      Expression &expression = const_cast<Expression &>(getValue<Expression>());
+
+      if (expression.num_vars() == 0)
       {
-        (void) data_->vals.exprVal_->evaluateFunction (dVal);
-        val = static_cast<long> (dVal);
-        delete data_->vals.exprVal_;
+        expression.evaluateFunction (dVal);
+        val = dVal;
       }
       else
       {
-        string msg("N_UTL_Param::lVal: attempt to evaluate expression: ");
-        msg += data_->vals.exprVal_->get_expression();
-        msg += ", which contains unknowns";
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg );
+        Report::UserFatal() << "Attempt to evaluate expression " << expression.get_expression() << ", which contains unknowns";
       }
     }
     else
     {
       val = 0;
     }
-    data_->vals.lngVal_ = val;
-    data_->type_ = LNG;
+    const_cast<Param &>(*this).setVal(val);
   }
-  return data_->vals.lngVal_;
+  return getValue<long>();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::bVal
+// Function      : Param::bVal
 // Purpose       : Return booleen value of param
 // Special Notes :
 // Scope         :
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 11/17/04
 //-----------------------------------------------------------------------------
-bool N_UTL_Param::bVal() const
+template<>
+bool Param::getImmutableValue<bool>() const
 {
   bool rVal;
-  if (data_->type_ == DBLE)
-    rVal = (data_->vals.dbleVal_ != 0);
-  else if (data_->type_ == INT)
+  if (data_->enumType() == DBLE)
   {
-    rVal = (data_->vals.intVal_ != 0);
+    rVal = (getValue<double>() != 0.0);
   }
-  else if (data_->type_ == LNG)
+  else if (data_->enumType() == INT)
   {
-    rVal = (data_->vals.lngVal_ != 0);
+    rVal = (getValue<int>() != 0);
   }
-  else if (data_->type_ == BOOL)
+  else if (data_->enumType() == LNG)
   {
-    rVal = data_->vals.boolVal_;
+    rVal = (getValue<long>() != 0);
   }
-  else if (data_->type_ == STR)
+  else if (data_->enumType() == BOOL)
   {
-    //ExtendedString tmp( *data_->vals.stringVal_ );
-    string & tmp = ( *data_->vals.stringVal_ );
-    //if (tmp.isBool())
-    if (N_UTL::isBool(tmp))
+    rVal = getValue<bool>();
+  }
+  else if (data_->enumType() == STR)
+  {
+    const std::string & tmp = getValue<std::string>();
+    if (Util::isBool(tmp))
     {
-      //rVal = tmp.Bval();
-      rVal = N_UTL::Bval(tmp);
+      rVal = Bval(tmp);
     }
     else
     {
-      string msg("N_UTL_Param::bVal: attempt to assign value for: ");
-      msg += data_->tag_;
-      msg += " from string: ";
-      msg += tmp;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg );
+      Report::DevelFatal() << "Cannot convert " << tmp << " to boolean for expression " <<  tag_;
     }
   }
-  else if (data_->type_ == EXPR)
+  else if (data_->enumType() == EXPR)
   {
-    if (data_->vals.exprVal_->num_vars() == 0)
+    Expression &expression = const_cast<Expression &>(getValue<Expression>());
+
+    if (expression.num_vars() == 0)
     {
       double dVal;
-      (void) data_->vals.exprVal_->evaluateFunction (dVal);
+      expression.evaluateFunction (dVal);
       rVal = (dVal != 0);
     }
     else
     {
-      string msg("N_UTL_Param::lVal: attempt to evaluate expression: ");
-      msg += data_->vals.exprVal_->get_expression();
-      msg += ", which contains unknowns";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg );
+      Report::UserError() << "Attempt to evaluate expression " << expression.get_expression() << ", which contains unknowns";
     }
   }
   return rVal;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::sVecPtr
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Richard Schiek, Electrical Modeling
-// Creation Date : 12/23/10
-//-----------------------------------------------------------------------------
-vector<string> * N_UTL_Param::sVecPtr()
-{
-  if (data_->type_ != STR_VEC)
-  {
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, string ("N_UTL_Param::sVecPtr: attempt to return vector<string> pointer for non-vector<string> param"));
-  }
-  return data_->vals.stringVec_;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::sVecVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Richard Schiek, Electrical Modeling
-// Creation Date : 12/23/10
-//-----------------------------------------------------------------------------
-const vector<string> & N_UTL_Param::sVecVal() const
-{
-  if (data_->type_ != STR_VEC)
-  {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, string ("N_UTL_Param::sVecVal: attempt to return vector<string> for non vector<string> param"));
-  }
-  return *(data_->vals.stringVec_);
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::dVecPtr
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Richard Schiek, Electrical Modeling
-// Creation Date : 12/23/10
-//-----------------------------------------------------------------------------
-vector<double> * N_UTL_Param::dVecPtr()
-{
-  if (data_->type_ != DBLE_VEC)
-  {
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, string ("N_UTL_Param::dVecPtr: attempt to return vector<double> pointer for non-vector<double> param"));
-  }
-  return data_->vals.dbleVec_;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::dVecVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Richard Schiek, Electrical Modeling
-// Creation Date : 12/23/10
-//-----------------------------------------------------------------------------
-const vector<double> & N_UTL_Param::dVecVal() const
-{
-  if (data_->type_ != DBLE_VEC)
-  {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, string ("N_UTL_Param::dVecVal: attempt to return vector<double> for non vector<double> param"));
-  }
-  return *(data_->vals.dbleVec_);
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::iVecPtr
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Christy Warrender, Cognitive Modeling
-// Creation Date : 3/16/11
-//-----------------------------------------------------------------------------
-vector<int> * N_UTL_Param::iVecPtr()
-{
-  if (data_->type_ != INT_VEC)
-  {
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, string ("N_UTL_Param::iVecPtr: attempt to return vector<int> pointer for non-vector<int> param"));
-  }
-  return data_->vals.intVec_;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::iVecVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Christy Warrender, Cognitive Modeling
-// Creation Date : 3/16/11
-//-----------------------------------------------------------------------------
-const vector<int> & N_UTL_Param::iVecVal() const
-{
-  if (data_->type_ != INT_VEC)
-  {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, string ("N_UTL_Param::iVecVal: attempt to return vector<int> for non vector<int> param"));
-  }
-  return *(data_->vals.intVec_);
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::eVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 11/17/04
-//-----------------------------------------------------------------------------
-N_UTL_Expression * N_UTL_Param::ePtr()
-{
-  if (data_->type_ != EXPR)
-  {
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, string ("N_UTL_Param::ePtr: attempt to return expression pointer for non-expression param"));
-  }
-  return data_->vals.exprVal_;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::eVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 11/17/04
-//-----------------------------------------------------------------------------
-N_UTL_Expression * N_UTL_Param::ePtr() const
-{
-  if (data_->type_ != EXPR)
-  {
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, string ("N_UTL_Param::ePtr: attempt to return expression pointer for non-expression param"));
-  }
-  return data_->vals.exprVal_;
-}
-
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::eVal
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 11/17/04
-//-----------------------------------------------------------------------------
-const N_UTL_Expression & N_UTL_Param::eVal() const
-{
-  if (data_->type_ != EXPR)
-  {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, string ("N_UTL_Param::eVal: attempt to return expression for non-expression param"));
-  }
-  return *(data_->vals.exprVal_);
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::hasExpressionValue
-// Purpose       : Determine if the N_UTL_Param value is an expression.
+// Function      : Param::hasExpressionValue
+// Purpose       : Determine if the Param value is an expression.
 // Special Notes : This checks the value, not the tag.
 // Scope         :
 // Creator       : Lon Waters, SNL
 // Creation Date : 10/08/01
 //-----------------------------------------------------------------------------
-bool N_UTL_Param::hasExpressionValue() const
+bool Param::hasExpressionValue() const
 {
-  if ( data_->type_ == EXPR ) {
-    return true;
-  }
-  if ( data_->type_ != STR )
-  {
-    return false;
-  }
-  else if ( (*data_->vals.stringVal_)[0] != '{' ||
-            (*data_->vals.stringVal_)[data_->vals.stringVal_->size()-1] != '}' )
-  {
-    return false;
-  }
-  else
-  {
-    // The value is a string surrounded by braces: {...}
-    return true;
-  }
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::hasExpressionTag
-// Purpose       : Determine if the N_UTL_Param value is an expression.
-// Special Notes : This checks the tag.
-// Scope         :
-// Creator       : Eric Keiter, SNL, Computational Sciences
-// Creation Date : 08/15/04
-//-----------------------------------------------------------------------------
-bool N_UTL_Param::hasExpressionTag () const
-{
-  if ( data_->tag_[0] != '{' ||
-       data_->tag_[data_->tag_.size()-1] != '}' )
-  {
-    return false;
-  }
-  else
-  {
-    // The value is a string surrounded by braces: {...}
-    return true;
-  }
+  return data_->enumType() == EXPR
+    || (data_->enumType() == STR && hasExpressionTag(getValue<std::string>()));
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_UTL_Param::isQuoted
+// Function       : Param::isQuoted
 // Purpose        : Return true if the parameter value is enclosed in double
 //                  quotes.
 // Special Notes  :
@@ -1481,26 +448,22 @@ bool N_UTL_Param::hasExpressionTag () const
 // Creator        : Lon Waters
 // Creation Date  : 08/20/2002
 //----------------------------------------------------------------------------
-bool N_UTL_Param::isQuoted()
+bool Param::isQuoted()
 {
-  if ( data_->type_ != STR )
+  if ( data_->enumType() == STR )
   {
-    return false;
+    const std::string &s = getValue<std::string>();
+    if (s[0] == '"' && s[s.size() - 1] == '"' )
+    {
+      return true;
+    }
   }
-  else if ( (*data_->vals.stringVal_)[0] != '"' ||
-            (*data_->vals.stringVal_)[data_->vals.stringVal_->size()-1] != '"' )
-  {
-    return false;
-  }
-  else
-  {
-    // The value is a string surrounded by double quotes: "..."
-    return true;
-  }
+
+  return false;
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_UTL_Param::isNumeric
+// Function       : Param::isNumeric
 // Purpose        : Checks the value of the parameter to see if it is a
 //                  legal real or integer numeric value.
 // Special Notes  :
@@ -1508,26 +471,25 @@ bool N_UTL_Param::isQuoted()
 // Creator        : Lon Waters
 // Creation Date  : 12/06/2002
 //----------------------------------------------------------------------------
-bool N_UTL_Param::isNumeric() const
+bool Param::isNumeric() const
 {
   // Only do the checking if the parameter is string valued, return true
   // if it is already real or integer valued.
-  if ( data_->type_ == DBLE || data_->type_ == INT || data_->type_ == LNG )
+  if ( data_->enumType() == DBLE || data_->enumType() == INT || data_->enumType() == LNG )
     return true;
-  if ( data_->type_ == EXPR || data_->type_ == BOOL)
+  if ( data_->enumType() == EXPR || data_->enumType() == BOOL)
     return false;
-  else if ( data_->type_ == STR)
-    return N_UTL::isValue( (*data_->vals.stringVal_) );
-    //return ExtendedString(*data_->vals.stringVal_).isValue();
+  else if ( data_->enumType() == STR)
+    return isValue(getValue<std::string>());
   else
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL,string("N_UTL_Param::isNumeric: unknown type"));
+    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL,std::string("Param::isNumeric: unknown type"));
   }
   return true;
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_UTL_Param::isInteger
+// Function       : Param::isInteger
 // Purpose        : Checks the value of the parameter to see if it is a
 //                  legal integer numeric value.
 // Special Notes  :
@@ -1535,28 +497,27 @@ bool N_UTL_Param::isNumeric() const
 // Creator        : Dave Shirley
 // Creation Date  : 03/10/2006
 //----------------------------------------------------------------------------
-bool N_UTL_Param::isInteger() const
+bool Param::isInteger() const
 {
   // Only do the checking if the parameter is string valued, return true
   // if it is already real or integer valued.
-  if ( data_->type_ == INT || data_->type_ == LNG )
+  if ( data_->enumType() == INT || data_->enumType() == LNG )
     return true;
-  else if ( data_->type_ == EXPR || data_->type_ == BOOL)
+  else if ( data_->enumType() == EXPR || data_->enumType() == BOOL)
     return false;
-  else if ( data_->type_ == DBLE)
+  else if ( data_->enumType() == DBLE)
     return true;
-  else if ( data_->type_ == STR)
-    return N_UTL::isInt(*data_->vals.stringVal_);
-    //return ExtendedString(*data_->vals.stringVal_).isInt();
+  else if ( data_->enumType() == STR)
+    return isInt(getValue<std::string>());
   else
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, string("N_UTL_Param::isInteger: unknown type"));
+    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, std::string("Param::isInteger: unknown type"));
   }
   return true;
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_UTL_Param::isBool
+// Function       : Param::isBool
 // Purpose        : Checks the value of the parameter to see if it is a
 //                  legal bool value.
 // Special Notes  :
@@ -1564,26 +525,25 @@ bool N_UTL_Param::isInteger() const
 // Creator        : Dave Shirley
 // Creation Date  : 03/10/2006
 //----------------------------------------------------------------------------
-bool N_UTL_Param::isBool() const
+bool Param::isBool() const
 {
   // Only do the checking if the parameter is string valued, return true
   // if it is already real or integer valued.
-  if ( data_->type_ == DBLE || data_->type_ == INT || data_->type_ == LNG || data_->type_ == BOOL)
+  if ( data_->enumType() == DBLE || data_->enumType() == INT || data_->enumType() == LNG || data_->enumType() == BOOL)
     return true;
-  if ( data_->type_ == EXPR)
+  if ( data_->enumType() == EXPR)
     return false;
-  else if ( data_->type_ == STR)
-    return N_UTL::isBool(*data_->vals.stringVal_);
-    //return ExtendedString(*data_->vals.stringVal_).isBool();
+  else if ( data_->enumType() == STR)
+    return Util::isBool(getValue<std::string>());
   else
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL,string("N_UTL_Param::isBool: unknown type"));
+    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL,std::string("Param::isBool: unknown type"));
   }
   return true;
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_UTL_Param::setTimeDependent
+// Function       : Param::setTimeDependent
 // Purpose        : Set the flag indicating this is a time dependent parameter
 //                  to the given value.
 // Special Notes  :
@@ -1591,29 +551,26 @@ bool N_UTL_Param::isBool() const
 // Creator        : Lon Waters
 // Creation Date  : 08/19/2002
 //----------------------------------------------------------------------------
-void N_UTL_Param::setTimeDependent( bool const& timeDependent )
+void Param::setTimeDependent( bool timeDependent )
 {
-  string exp;
+  std::string exp;
 
-  if (data_->type_ == EXPR && timeDependent)
+  if (data_->enumType() == EXPR && timeDependent)
     return;
-  if (data_->type_ != EXPR && !timeDependent)
+  if (data_->enumType() != EXPR && !timeDependent)
     return;
-  if (data_->type_ != STR)
+  if (data_->enumType() != STR)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL,string("N_UTL_Param::setTimeDependent: attempt to convert non-string to expression"));
+    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL,std::string("Param::setTimeDependent: attempt to convert non-string to expression"));
   }
   if (!timeDependent)
     return;
-  exp = *(data_->vals.stringVal_);
-  delete data_->vals.stringVal_;
-  data_->type_ = EXPR;
-  data_->vals.exprVal_ = new N_UTL_Expression(exp);
-  return;
+  exp = getValue<std::string>();
+  setVal(Expression(exp));
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_UTL_Param::isTimeDependent
+// Function       : Param::isTimeDependent
 // Purpose        : Return the value of the flag indicating whether the
 //                  parameter is time dependent.
 // Special Notes  :
@@ -1621,220 +578,74 @@ void N_UTL_Param::setTimeDependent( bool const& timeDependent )
 // Creator        : Lon Waters
 // Creation Date  : 08/19/2002
 //----------------------------------------------------------------------------
-bool N_UTL_Param::isTimeDependent() const
+bool Param::isTimeDependent() const
 {
-  if (data_->type_ == EXPR)
-    return true;
-  return false;
-}
-
-
-//----------------------------------------------------------------------------
-// Function       : N_UTL_Param::setSimContextAndData
-// Purpose        : method for setting context and extra data.  Only need
-//                  three combinations as we figure out the context and
-//                  extra data at the same time and then set it.
-// Special Notes  :
-// Scope          :
-// Creator        : Rich Schiek, Electrical Systems Modeling, SNL
-// Creation Date  : 11/06/2012
-//----------------------------------------------------------------------------
-void N_UTL_Param::setSimContextAndData( SimulatorVariableContext aSimContext)
-{
-  data_->simVarContext = aSimContext;
-};
-
-//----------------------------------------------------------------------------
-// Function       : N_UTL_Param::setSimContextAndData
-// Purpose        : method for setting context and extra data.  Only need
-//                  three combinations as we figure out the context and
-//                  extra data at the same time and then set it.
-// Special Notes  :
-// Scope          :
-// Creator        : Rich Schiek, Electrical Systems Modeling, SNL
-// Creation Date  : 10/04/2012
-//----------------------------------------------------------------------------
-void N_UTL_Param::setSimContextAndData( SimulatorVariableContext aSimContext, int extraIndex1)
-{
-  data_->simVarContext = aSimContext;
-  data_->extIndex1=extraIndex1;
-};
-
-void N_UTL_Param::setSimContextAndData( SimulatorVariableContext aSimContext, int extraIndex1, int extraIndex2 )
-{
-  data_->simVarContext = aSimContext;
-  data_->extIndex1=extraIndex1;
-  data_->extIndex2=extraIndex2;
-};
-
-void N_UTL_Param::setSimContextAndData( SimulatorVariableContext aSimContext, RCP<N_UTL_ExpressionData> expDataRcp)
-{
-  data_->simVarContext = aSimContext;
-  data_->expressionDataRCP = expDataRcp;
-}
-
-void N_UTL_Param::setSimContextAndData( SimulatorVariableContext aSimContext, string aName)
-{
-  data_->simVarContext = aSimContext;
-  data_->qualifiedParameterOrFunctionName = aName;
-}
-
-void N_UTL_Param::setSimContextAndData( SimulatorVariableContext aSimContext, double aValue )
-{
-  data_->simVarContext = aSimContext;
-  data_->fixedValue = aValue;
+  return data_->enumType() == EXPR;
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::instance()
+// Function      : Param::instance()
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Rob Hoekstra, SNL
 // Creation Date : 6/28/01
 //-----------------------------------------------------------------------------
-Packable * N_UTL_Param::instance() const
+Packable * Param::instance() const
 {
-  return new N_UTL_Param();
+  return new Param();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::print
-// Purpose       :
-// Special Notes :
-// Scope         : Public
-// Creator       : Dave Shirley
-// Creation Date : 12/06/05
-//-----------------------------------------------------------------------------
-void N_UTL_Param::print()
-{
-  cout << "Parameter: " << uTag() << "  Type: ";
-  if (data_->type_ == STR)
-  {
-    cout << "String";
-    cout << "Value: '" <<  *(data_->vals.stringVal_) << "'";
-  }
-  else if (data_->type_ == INT)
-  {
-    cout << "Int";
-    cout << "Value: " <<  data_->vals.intVal_;
-  }
-  else if (data_->type_ == LNG)
-  {
-    cout << "Long";
-    cout << "Value: " << data_->vals.lngVal_;
-  }
-  else if (data_->type_ == BOOL)
-  {
-    cout << "Bool";
-    cout << "Value: " << data_->vals.boolVal_;
-  }
-  else if (data_->type_ == DBLE)
-  {
-    cout << "Double";
-    cout << "Value: " << data_->vals.dbleVal_;
-  }
-  else if (data_->type_ == EXPR)
-  {
-    cout << "Expression";
-    cout << "Value: " << data_->vals.exprVal_->get_expression();
-  }
-  else
-  {
-    cout << "Unsupported type";
-  }
-  cout << " context ";
-
-  switch (getSimContext())
-  {
-    case UNDEFINED:
-      cout << "UNDEFINED";
-      break;
-    case CONSTANT:
-      cout << "CONSTANT";
-      break;
-    case TEMPERATURE:
-      cout << "TEMPERATURE";
-      break;
-    case TIME_VAR:
-      cout << "TIME_VAR";
-      break;
-    case STEP_SWEEP_VAR:
-      cout << "STEP_SWEEP_VAR";
-      break;
-    case DC_SWEEP_VAR:
-      cout << "DC_SWEEP_VAR";
-      break;
-    case EXPRESSION:
-      cout << "EXPRESSION";
-      break;
-    case VOLTAGE_DIFFERENCE:
-      cout << "VOLTAGE_DIFFERENCE";
-      break;
-    case NODE_OR_DEVICE_NAME:
-      cout << "NODE_OR_DEVICE_NAME";
-      break;
-    case SOLUTION_VAR:
-      cout << "SOLUTION_VAR";
-      break;
-    case STATE_VAR:
-      cout << "STATE_VAR";
-      break;
-    case STORE_VAR:
-      cout << "STORE_VAR";
-      break;
-    case DEVICE_PARAMETER:
-      cout << "DEVICE_PARAMETER";
-      break;
-    case OBJECTIVE_FUNCTION:
-      cout << "OBJECTIVE_FUNCTION";
-      break;
-    case MEASURE_FUNCTION:
-      cout << "MEASURE_FUNCTION";
-      break;
-  }
-  cout << endl;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::packedByteCount
+// Function      : Param::packedByteCount
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Rob Hoekstra, SNL
 // Creation Date : 5/15/01
 //-----------------------------------------------------------------------------
-int N_UTL_Param::packedByteCount() const
+int Param::packedByteCount() const
 {
 
   int byteCount = 0;
 
   //tag info
-  byteCount += data_->tag_.length() + sizeof(int);
+  byteCount += tag_.length() + sizeof(int);
 
   //type
   byteCount += sizeof(int);
 
   //value info
-  switch( data_->type_ )
+  switch( data_->enumType() )
   {
-    case -1:   break;
-    case STR:  byteCount += data_->vals.stringVal_->length() + sizeof(int);
-               break;
-    case DBLE: byteCount += sizeof(double);
-               break;
+    case -1:
+      break;
+    case STR:
+      byteCount += getValue<std::string>().length() + sizeof(int);
+      break;
+    case DBLE:
+      byteCount += sizeof(double);
+      break;
     case BOOL:
-    case INT:  byteCount += sizeof(int);
-               break;
-    case LNG:  byteCount += sizeof(long);
-               break;
-    case EXPR: byteCount += data_->vals.exprVal_->get_expression().length() + sizeof(int);
-               break;
-    case STR_VEC: byteCount += sizeof(int);
-                  for (int i=0; i<(int)data_->vals.stringVec_->size(); i++)
-                  {  byteCount += (*data_->vals.stringVec_)[i].length() + sizeof(int); }
-                  break;
+    case INT:
+      byteCount += sizeof(int);
+      break;
+    case LNG:
+      byteCount += sizeof(long);
+      break;
+    case EXPR:
+      byteCount += getValue<Expression>().get_expression().length() + sizeof(int);
+      break;
+    case STR_VEC:
+      byteCount += sizeof(int);
+      for (size_t i = 0; i < getValue<std::vector<std::string> >().size(); i++) {
+        byteCount += getValue<std::vector<std::string> >()[i].length() + sizeof(int);
+      }
+      break;
+    case DBLE_VEC:
+      byteCount += ( sizeof(int) + getValue<std::vector<double> >().size() * sizeof(double) );
+      break;
   }
 
   return byteCount;
@@ -1842,194 +653,255 @@ int N_UTL_Param::packedByteCount() const
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::pack
+// Function      : Param::pack
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Rob Hoekstra, SNL
 // Creation Date : 5/15/01
 //-----------------------------------------------------------------------------
-void N_UTL_Param::pack( char * buf, int bsize, int & pos, N_PDS_Comm * comm ) const
+void Param::pack( char * buf, int bsize, int & pos, N_PDS_Comm * comm ) const
 {
 
   int length;
-  string tmp;
+  std::string tmp;
 
   //pack tag
-  length = data_->tag_.length();
+  length = tag_.length();
   comm->pack( &length, 1, buf, bsize, pos );
-  comm->pack( data_->tag_.c_str(), length, buf, bsize, pos );
+  comm->pack( tag_.c_str(), length, buf, bsize, pos );
 
   //pack type
-  comm->pack( &(data_->type_), 1, buf, bsize, pos );
+  int enum_type = data_->enumType();
+
+  comm->pack( &enum_type, 1, buf, bsize, pos );
 
   //pack value
-  switch( data_->type_ )
+  switch( data_->enumType() )
   {
-    case -1:   break;
-    case STR:  length = data_->vals.stringVal_->length();
-               comm->pack( &length, 1, buf, bsize, pos );
-               comm->pack( data_->vals.stringVal_->c_str(), length, buf, bsize, pos );
-               break;
+    case -1:
+      break;
 
-    case DBLE: comm->pack( &(data_->vals.dbleVal_), 1, buf, bsize, pos );
-               break;
+    case STR:
+      length = getValue<std::string>().length();
+      comm->pack( &length, 1, buf, bsize, pos );
+      comm->pack( getValue<std::string>().c_str(), length, buf, bsize, pos );
+      break;
 
-    case INT:  comm->pack( &(data_->vals.intVal_), 1, buf, bsize, pos );
-               break;
+    case DBLE:
+      comm->pack( &(getValue<double>()), 1, buf, bsize, pos );
+      break;
 
-    case BOOL: int i;
-               if (data_->vals.boolVal_)
-                 i = 1;
-               else
-                 i = 0;
-               comm->pack( &i, 1, buf, bsize, pos );
-               break;
+    case INT:
+      comm->pack( &(getValue<int>()), 1, buf, bsize, pos );
+      break;
 
-    case LNG:  comm->pack( &(data_->vals.lngVal_), 1, buf, bsize, pos );
-               break;
+    case BOOL:
+    {
+      int i;
+      if (getValue<bool>())
+        i = 1;
+      else
+        i = 0;
+      comm->pack( &i, 1, buf, bsize, pos );
+    }
+      break;
 
-    case EXPR: tmp = data_->vals.exprVal_->get_expression();
-               length = tmp.length();
-               comm->pack( &length, 1, buf, bsize, pos );
-               comm->pack( tmp.c_str(), length, buf, bsize, pos );
-               break;
+    case LNG:
+      comm->pack( &(getValue<long>()), 1, buf, bsize, pos );
+      break;
 
-    case STR_VEC: length = (int)data_->vals.stringVec_->size();
-                  comm->pack( &length, 1, buf, bsize, pos );
-                  for (int i=0; i<(int)data_->vals.stringVec_->size(); i++)
-                  {
-                    length = (*data_->vals.stringVec_)[i].length();
-                    comm->pack( &length, 1, buf, bsize, pos );
-                    comm->pack( (*data_->vals.stringVec_)[i].c_str(), length, buf, bsize, pos );
-                  }
-                  break;
+    case EXPR:
+      tmp = getValue<Expression>().get_expression();
+      length = tmp.length();
+      comm->pack( &length, 1, buf, bsize, pos );
+      comm->pack( tmp.c_str(), length, buf, bsize, pos );
+      break;
 
-    default:   string msg = "N_UTL_Param::pack: unknown type";
-               N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+    case STR_VEC:
+    {
+      const std::vector<std::string> &string_vector = getValue<std::vector<std::string> >();
+      length = (int) string_vector.size();
+      comm->pack( &length, 1, buf, bsize, pos );
+      for (int i=0; i < (int) string_vector.size(); i++)
+      {
+        length = string_vector[i].length();
+        comm->pack( &length, 1, buf, bsize, pos );
+        comm->pack( string_vector[i].c_str(), length, buf, bsize, pos );
+      }
+    }
+
+      break;
+
+    case DBLE_VEC:
+    {
+      const std::vector<double> &double_vector = getValue<std::vector<double> >();
+      length = (int) double_vector.size();
+      comm->pack( &length, 1, buf, bsize, pos );
+      comm->pack( &double_vector[0], length, buf, bsize, pos );
+    }
+
+      break;
+
+    default:   Report::DevelFatal() << "Param::pack: unknown type " << data_->enumType();
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::unpack
+// Function      : Param::unpack
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Rob Hoekstra, SNL
 // Creation Date : 5/15/01
 //-----------------------------------------------------------------------------
-void N_UTL_Param::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * comm )
+void Param::unpack( char * pB, int bsize, int & pos, N_PDS_Comm * comm )
 {
 
   int length;
+  int vector_size;
 
   //unpack tag
   comm->unpack( pB, bsize, pos, &length, 1 );
 
-  data_->tag_ = string( (pB+pos), length );
+  tag_ = std::string( (pB+pos), length );
   pos += length;
 
   //unpack type
-  comm->unpack( pB, bsize, pos, &(data_->type_), 1 );
+  int enum_type = -1;
+  comm->unpack( pB, bsize, pos, &enum_type, 1 );
 
-  switch( data_->type_ )
+  switch (enum_type)
   {
-    case -1:   break;
-    case STR:  comm->unpack( pB, bsize, pos, &length, 1 );
-               data_->vals.stringVal_ = new string( (pB+pos), length );
-               pos += length;
-               break;
+    case -1:
+      break;
 
-    case DBLE: comm->unpack( pB, bsize, pos, &(data_->vals.dbleVal_), 1 );
-               break;
+    case STR:
+      comm->unpack( pB, bsize, pos, &length, 1 );
+      setVal(std::string( (pB+pos), length ));
+      pos += length;
+      break;
 
-    case INT:  comm->unpack( pB, bsize, pos, &(data_->vals.intVal_), 1 );
-               break;
+    case DBLE: 
+    {
+      double d;
+      
+      comm->unpack( pB, bsize, pos, &d, 1 );
+      setVal(d);
+    }
+    break;
 
-    case BOOL: int i;
-               comm->unpack( pB, bsize, pos, &i, 1 );
-               if (i == 0)
-                 data_->vals.boolVal_ = false;
-               else
-                 data_->vals.boolVal_ = true;
-               break;
+    case INT: 
+    {
+      int i;
+      comm->unpack( pB, bsize, pos, &i, 1 );
+      setVal(i);
+    }
+    break;
 
-    case LNG:  comm->unpack( pB, bsize, pos, &(data_->vals.lngVal_), 1 );
-               break;
+    case BOOL:
+      int i;
+      comm->unpack( pB, bsize, pos, &i, 1 );
+      if (i == 0)
+        setVal(false);
+      else
+        setVal(true);
+      break;
 
-    case EXPR: comm->unpack( pB, bsize, pos, &length, 1 );
-               data_->vals.exprVal_ = new N_UTL_Expression (string( (pB+pos), length ));
-               pos += length;
-               break;
+    case LNG:
+    {
+      long l;
+      comm->unpack( pB, bsize, pos, &l, 1 );
+      setVal(l);
+    }
+    break;
 
-    case STR_VEC: comm->unpack( pB, bsize, pos, &length, 1 );
-                  data_->vals.stringVec_ = new vector<string>( length );
-                  for (int i=0; i<(int)data_->vals.stringVec_->size(); i++)
-                  {
-                    comm->unpack( pB, bsize, pos, &length, 1 );
-                    (*data_->vals.stringVec_)[i] = string( (pB+pos), length );
-                    pos += length;
-                  }
-                  break;
+    case EXPR:
+      comm->unpack( pB, bsize, pos, &length, 1 );
+      setVal(Expression(std::string( (pB+pos), length )));
+      pos += length;
+      break;
 
-    default:   string msg = "N_UTL_Param::unpack: unknown type";
-               N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
+    case STR_VEC:
+    {
+
+      comm->unpack( pB, bsize, pos, &vector_size, 1 );
+      setVal(std::vector<std::string>());
+      std::vector<std::string> &x = getValue<std::vector<std::string> >();
+      x.reserve(vector_size);
+
+      for (int i=0; i< vector_size; i++)
+      {
+        comm->unpack( pB, bsize, pos, &length, 1 );
+        x.push_back(std::string( (pB+pos), length ));
+        pos += length;
+      }
+    }
+
+    break;
+
+    case DBLE_VEC:
+    {
+      comm->unpack( pB, bsize, pos, &vector_size, 1 );
+      setVal(std::vector<double>());
+      std::vector<double> &x = getValue<std::vector<double> >();
+      x.resize(vector_size, 0.0);
+      comm->unpack( pB, bsize, pos, &(x[0]), vector_size );
+    }
+
+    break;
+
+    default:
+      std::string msg = "Param::unpack: unknown type";
+      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, msg );
   }
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_Param::operator<<
+// Function      : Param::operator<<
 // Purpose       : "<<" operator
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/15/01
 //-----------------------------------------------------------------------------
-ostream & operator << (ostream & os, const N_UTL_Param & p)
+std::ostream &operator<<(std::ostream & os, const Param & p)
 {
   os << p.tag() << "\t";
 
   switch (p.getType())
   {
     case STR:
-      os << " STR\t";
-      os << p.sVal();
+      os << " STR\t" << p.stringValue();
       break;
     case DBLE:
-      os << "DBLE\t";
-      os << p.dVal();
+      os << "DBLE\t"<< p.getValue<double>();
       break;
     case INT:
-      os << " INT\t";
-      os << p.iVal();
+      os << " INT\t" << p.getValue<int>();
       break;
     case LNG:
-      os << " LNG\t";
-      os << p.lVal();
+      os << " LNG\t" << p.getValue<long>();
       break;
     case BOOL:
-      os << "BOOL\t";
-      os << p.bVal();
+      os << "BOOL\t" << p.getValue<bool>();
       break;
     case EXPR:
-      os << "EXPR\t";
-      os << p.sVal();
+      os << "EXPR\t" << p.stringValue();
       break;
 
-    case STR_VEC:
+    case STR_VEC: 
+    {
       os << "STR_VEC\t";
+      int numElements = p.getValue<std::vector<std::string> >().size();
+      for(int i=0; i<numElements; i++)
       {
-        // extra scope from brackets keeps numElements local to this part of the case statement
-        // otherwise one would get compiler warnings that its initialization could be bypassed
-        // by later parts of the case statement
-        int numElements = p.sVecVal().size();
-        for(int i=0; i<numElements; i++)
-        {
-          os << p.sVecVal()[i] << " ";
-        }
+        os << p.getValue<std::vector<std::string> >()[i] << " ";
       }
-      break;
+    }
+    break;
+
     case INT_VEC:
       os << "INT_VEC\t";
       break;
@@ -2044,7 +916,10 @@ ostream & operator << (ostream & os, const N_UTL_Param & p)
       break;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+} // namespace Util
+} // namespace Xyce

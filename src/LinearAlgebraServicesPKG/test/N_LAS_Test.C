@@ -1,7 +1,7 @@
 //-------------------------------------------------------------------------
 // Copyright Notice
 //
-// Copyright (c) 2000, Sandia Corporation, Albuquerque, NM.
+// Copyright (c) 2000, 2013, Sandia Corporation, Albuquerque, NM.
 //-------------------------------------------------------------------------
 
 //-------------------------------------------------------------------------
@@ -19,11 +19,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.3 $
+// Revision Number: $Revision: 1.5 $
 //
-// Revision Date  : $Date: 2011/11/29 22:46:36 $
+// Revision Date  : $Date: 2013/09/27 20:50:45 $
 //
-// Current Owner  : $Author: hkthorn $
+// Current Owner  : $Author: dgbaur $
 //-------------------------------------------------------------------------
 
 // ---------- Standard Includes ----------
@@ -85,8 +85,6 @@ int N_LAS_LATest::vectorTests(N_PDS_ParMap *parMap, N_LAS_LAFactory *factory,
 {
 
   static const string msg("N_LAS_LATest::vectorTests - ");
-  static const string dashedLine("\n------------------------------"
-    "-----------------------------------------------\n");
 
   bool                iSuccess = true;
   double              result = 0.0, alpha = 1.0, beta = 2.0;
@@ -117,11 +115,9 @@ int N_LAS_LATest::vectorTests(N_PDS_ParMap *parMap, N_LAS_LAFactory *factory,
   }
   else
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedLine);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg +
-                           "All of the following vector function tests passed:"
-                           "\n\t* dotProduct\n\t* putScalar");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedLine);
+    Xyce::lout() << Xyce::section_divider << std::endl
+           << msg + "All of the following vector function tests passed:\n\t* dotProduct\n\t* putScalar" << std::endl
+           << Xyce::section_divider << std::endl;
   }
 
   // Randomize
@@ -148,12 +144,10 @@ int N_LAS_LATest::vectorTests(N_PDS_ParMap *parMap, N_LAS_LAFactory *factory,
   }
   else
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedLine);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg +
-                           "All of the following vector function tests passed:"
-                           "\n\t* newVector copy constructor\n\t* scale\n\t* "
-                           "addVec\n\t* lpNorm");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedLine);
+    Xyce::lout() << Xyce::section_divider << std::endl
+                 << msg << "All of the following vector function tests passed:" << std::endl
+                 << "\t* newVector copy constructor\n\t* scale\n\t* addVec\n\t* lpNorm" << std::endl
+                 << Xyce::section_divider << std::endl;
   }
 
   // Testing daxpy.
@@ -175,12 +169,11 @@ int N_LAS_LATest::vectorTests(N_PDS_ParMap *parMap, N_LAS_LAFactory *factory,
   }
   else
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedLine);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg +
-                           "All of the following vector function tests passed:"
-                           "\n\t* = operator\n\t* scale\n\t* daxpy\n\t* "
-                           "lpNorm");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedLine);
+    Xyce::lout() << Xyce::section_divider << std::endl
+                 << msg
+                 << "All of the following vector function tests passed:\n" << std::endl
+                 << "\t* = operator\n\t* scale\n\t* daxpy\n\t* lpNorm" << std::endl
+                 << Xyce::section_divider << std::endl;
   }
 
   // Testing indexing...
@@ -215,9 +208,6 @@ int N_LAS_LATest::matrixVectorTests(N_PDS_ParMap *parMap,
 {
 
   static const string msg("N_LAS_LATest::matrixVectorTests - ");
-  static const string dashedLine("\n------------------------------"
-    "-----------------------------------------------\n");
-
   bool                iSuccess = true;
   double              result   = 0.0;
   N_LAS_Matrix       *A        = NULL;
@@ -326,10 +316,9 @@ int N_LAS_LATest::matrixVectorTests(N_PDS_ParMap *parMap,
     iSuccess = false;
   else
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedLine);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg +
-                           "Power method converged\n\n");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedLine);
+    Xyce::lout() << Xyce::section_divider << std::endl
+                 << msg  <<"Power method converged\n\n" << std::endl
+                 << Xyce::section_divider << std::endl;
   }
 
   // Clean up
@@ -360,9 +349,6 @@ int N_LAS_LATest::solverTests(N_PDS_ParMap *parMap, N_LAS_LAFactory *factory,
 {
 
   static const string msg("N_LAS_LATest::solverTests - ");
-  static const string dashedLine("\n------------------------------"
-    "-----------------------------------------------\n");
-
   bool                iSuccess = true;
   double              result   = 0.0;
   N_LAS_Matrix       *A        = NULL;
@@ -460,10 +446,9 @@ int N_LAS_LATest::solverTests(N_PDS_ParMap *parMap, N_LAS_LAFactory *factory,
 
   if (iSuccess)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedLine);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg +
-                           "Solver converged\n\n");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedLine);
+    Xyce::lout() << Xyce::section_divider << std::endl
+           << msg + "Solver converged\n\n" << std::endl
+           << Xyce::section_divider << std::endl;
   }
 
   // Clean up
@@ -477,7 +462,6 @@ int N_LAS_LATest::solverTests(N_PDS_ParMap *parMap, N_LAS_LAFactory *factory,
   delete b;
 
   return iSuccess;
-
 }
 
 //-----------------------------------------------------------------------------
@@ -513,9 +497,9 @@ int N_LAS_LATest::RunTests(int iargs, char *cargs[], N_LAS_LATest *LATest)
 
   iSuccess = (parMgr != NULL);
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\n\n\tWelcome to the "
-                         "Xyce(TM) LinearAlgebraServices testing "
-                         "program.\n\n");
+  Xyce::lout() << "\n\n\tWelcome to the "
+                         "Xyce(TM << std::endl LinearAlgebraServices testing "
+                         "program.\n\n" << std::endl;
 
 #ifdef Xyce_PARALLEL_MPI
 
@@ -568,8 +552,8 @@ int N_LAS_LATest::RunTests(int iargs, char *cargs[], N_LAS_LATest *LATest)
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg + errorMsg);
   }
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "Test of "
-                         "LinearAlgebraServices completed successfully.");
+  Xyce::lout() << "Test of "
+                         "LinearAlgebraServices completed successfully." << std::endl;
 
   delete parMgr;
 

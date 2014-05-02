@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,48 +36,55 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.4.2.3 $
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Number: $Revision: 1.12 $
+// Revision Date  : $Date: 2014/02/24 23:49:20 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #ifndef Xyce_N_IO_MeasureFourier_h
 #define Xyce_N_IO_MeasureFourier_h
 
-// ----------   Xyce Includes   ----------
 #include <N_IO_MeasureBase.h>
 
-// ---------- Forward Declarations ----------
-
+namespace Xyce {
+namespace IO {
+namespace Measure {
 
 //-------------------------------------------------------------------------
-// Class         : N_IO_MeasureFourier
+// Class         : Fourier
 // Purpose       : Measure statistics of a simulation variable
 // Special Notes :
 // Creator       : Heidi Thornquist, SNL, Electrical Models & Simulation
 // Creation Date : 06/05/2013
 //-------------------------------------------------------------------------
-class N_IO_MeasureFourier : public N_IO_MeasureBase
+class Fourier : public Base
 {
-public:
-  N_IO_MeasureFourier( const N_UTL_OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr );
-  ~N_IO_MeasureFourier() {};
+  public:
+    Fourier( const Util::OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr );
+    ~Fourier() {};
 
-  void updateTran( const double circuitTime, RCP< N_LAS_Vector > solnVecRCP);
-  void updateDC( const vector<N_ANP_SweepParam> & dcParamsVec, RCP< N_LAS_Vector > solnVecRCP);
-  double getMeasureResult();
-  std::ostream& printMeasureResult(std::ostream& os);
+    void prepareOutputVariables();
+    void updateTran( const double circuitTime, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec);
+    void updateDC( const std::vector<N_ANP_SweepParam> & dcParamsVec, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec);
+    double getMeasureResult();
+    std::ostream& printMeasureResult(std::ostream& os);
 
-private:
-  void getLastPeriod_();
-  bool interpolateData_();
-  void calculateFT_();
-  string type_;
-  int numOutVars_, prdStart_; 
-  vector<double> outVarValues_, time_, newTime_, newValues_, mag_, phase_, nmag_, nphase_, freq_;
-  double period_, lastPrdStart_, thd_;
-  bool initialized_, calculated_;
+  private:
+    void getLastPeriod_();
+    bool interpolateData_();
+    void calculateFT_();
+    std::string type_;
+    int numOutVars_, prdStart_; 
+    std::vector<double> outVarValues_, time_, newTime_, newValues_, mag_, phase_, nmag_, nphase_, freq_;
+    double period_, lastPrdStart_, thd_;
+    bool initialized_, calculated_;
 
 };
+
+} // namespace Measure
+} // namespace IO
+} // namespace Xyce
+
+typedef Xyce::IO::Measure::Fourier N_IO_MeasureFourier;
 
 #endif

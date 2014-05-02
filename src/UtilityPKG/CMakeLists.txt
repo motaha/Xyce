@@ -27,9 +27,13 @@ set ( Utility_SOURCES
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_NoCase.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_OptionBlock.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_Param.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_Marshal.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_ReportHandler.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_Registry.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_Timer.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_Version.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_NameLevelKey.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_UTL_NetlistLocation.C
       CACHE INTERNAL "X_S" )
 
 

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.8.2.2 $
+// Revision Number: $Revision: 1.22.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -49,6 +49,7 @@
 // ---------- Standard Includes ----------
 
 // ----------   Xyce Includes   ----------
+#include <N_DEV_Configuration.h>
 #include <N_DEV_fwd.h>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DevicePDEInstance.h>
@@ -65,6 +66,20 @@ namespace Device {
 namespace RxnSet {
 
 class Model;
+class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance>
+{
+  static const char *name() {return "Rxn Effects Device";}
+  static const char *deviceTypeName() {return "YRXN level 1 (Rxn Device)";};
+  static const int numNodes() {return 2;}
+  static const bool modelRequired() {return true;}
+  static const bool isLinearDevice() {return false;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : Instance
@@ -84,41 +99,36 @@ class Instance : public DevicePDEInstance
 {
   friend class ParametricData<Instance>;
   friend class Model;
-
+  friend class Traits;
+    
   // functions
 public:
-  static ParametricData<Instance> &getParametricData();
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Instance(InstanceBlock & IB,
-                 Model & it_MB,
-                 MatrixLoadData & mlData1,
-                 SolverState &ss1,
-                 ExternData  &ed1,
-                 DeviceOptions & do1);
+  Instance(
+     const Configuration &       configuration,
+     const InstanceBlock &       IB,
+     Model &                     it_MB,
+     const FactoryBlock &        factory_block);
 
 
   Instance(const Instance &right);
 
   ~Instance();
 
-  void registerLIDs( const vector<int> & intLIDVecRef,
-                     const vector<int> & extLIDVecRef );
-  void registerStateLIDs( const vector<int> & stateLIDVecRef );
-  map<int,string> & getIntNameMap ();
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
+  void registerStateLIDs( const std::vector<int> & stateLIDVecRef );
+  std::map<int,std::string> & getIntNameMap ();
 
   const std::vector<std::string> & getDepSolnVars();
 
-  const vector< vector<int> > & jacobianStamp() const;
-  void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-  bool processParams (string param = "");
+  bool processParams ();
   bool updateTemperature (const double & temp = -999.0 );
 
-  bool getInstanceBreakPoints( vector<N_UTL_BreakPoint> &breakPointTimes);
+  bool getInstanceBreakPoints( std::vector<N_UTL_BreakPoint> &breakPointTimes);
 
   bool updateIntermediateVars ();
   bool updatePrimaryState ();
@@ -196,30 +206,30 @@ private:
   int li_Neg;
 
   // reaction region(s):
-  vector<Region*> regVec;
+  std::vector<Region*> regVec;
 
-  vector<int> regLastIndexVec;
-  vector<int> regFirstReactantIndexVec;
-  vector<int> regNumSpecieVec;
+  std::vector<int> regLastIndexVec;
+  std::vector<int> regFirstReactantIndexVec;
+  std::vector<int> regNumSpecieVec;
 
   // these are relative indices for use in the jacStamp setup:
-  vector< vector<int> > APosEqu_SpeciesOffset;
-  vector< vector<int> > ANegEqu_SpeciesOffset;
+  std::vector< std::vector<int> > APosEqu_SpeciesOffset;
+  std::vector< std::vector<int> > ANegEqu_SpeciesOffset;
 
-  vector< vector<double *> > APosEqu_SpeciesPtr;
-  vector< vector<double *> > ANegEqu_SpeciesPtr;
+  std::vector< std::vector<double *> > APosEqu_SpeciesPtr;
+  std::vector< std::vector<double *> > ANegEqu_SpeciesPtr;
 
-  vector< vector<double *> > APosEqu_ConstPtr;
-  vector< vector<double *> > ANegEqu_ConstPtr;
+  std::vector< std::vector<double *> > APosEqu_ConstPtr;
+  std::vector< std::vector<double *> > ANegEqu_ConstPtr;
 
   // mesh variables:
-  vector<double> xVec;
-  vector<double> dxVec;
+  std::vector<double> xVec;
+  std::vector<double> dxVec;
 
-  vector<int> xloStencilVec;
-  vector<int> xhiStencilVec;
+  std::vector<int> xloStencilVec;
+  std::vector<int> xhiStencilVec;
 
-  vector<TransportHelper> thVec;
+  std::vector<TransportHelper> thVec;
 
   double outputXscalar;
 
@@ -230,9 +240,9 @@ private:
   int ANegEquNegNodeOffset;
   int ANegEquPosNodeOffset;
 
-  vector< vector<int> > jacStamp;
-  vector<int> jacMap;
-  vector< vector<int> > jacMap2;
+  std::vector< std::vector<int> > jacStamp;
+  std::vector<int> jacMap;
+  std::vector< std::vector<int> > jacMap2;
 
   bool excludeNoSourceRegionsFlag;
   bool excludeNoSourceRegionsFlagGiven;
@@ -263,17 +273,13 @@ class Model : public DevicePDEModel
 
   friend class ParametricData<Model>;
   friend class Instance;
-
+  friend class Traits;
+    
 public:
-  static ParametricData<Model> &getParametricData();
-
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Model(const ModelBlock & MB,
-              SolverState & ss1,
-              DeviceOptions & do1);
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &          MB,
+     const FactoryBlock &        factory_block);
 
   ~Model();
 
@@ -283,15 +289,21 @@ private:
   Model &operator=(const Model &);
 
 public:
-  CompositeParam *constructComposite (string & cName, string & pName);
+  CompositeParam *constructComposite (const std::string & cName, const std::string & pName);
 
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
+    
   virtual std::ostream &printOutInstances(std::ostream &os) const;
 
-  bool processParams (string param = "");
-  bool processInstanceParams (string param = "");
+  bool processParams ();
+  bool processInstanceParams ();
 
 
 public:
+  void addInstance(Instance *instance) {
+    instanceContainer.push_back(instance);
+  }
+
   InstanceVector &getInstanceVector() {
     return instanceContainer;
   }
@@ -301,7 +313,7 @@ public:
   }
 
 private:
-  vector<Instance*> instanceContainer;
+  std::vector<Instance*> instanceContainer;
 
 private:
 
@@ -311,7 +323,7 @@ private:
   int  userNumRegions;
 
   // File name for reaction specification:
-  string rxnFileName;
+  std::string rxnFileName;
 
   //*************************************
   // Rxn reaction model stuff:
@@ -323,12 +335,14 @@ private:
   bool xlo_sourceGiven;
   bool xhi_sourceGiven;
 
-  vector<RegionData*> regionDataVec;
-  map <string,CompositeParam *> regionDataMap;
-  map <string,CompositeParam *> defectSourceMap;
+  std::vector<RegionData*> regionDataVec;
+  std::map<std::string,CompositeParam *> regionDataMap;
+  std::map<std::string,SpecieSource *> defectSourceMap;
 
   double masterSource;
 };
+
+void registerDevice();
 
 } // namespace RxnSet
 } // namespace Device

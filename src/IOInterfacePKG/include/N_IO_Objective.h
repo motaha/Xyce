@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.16.2.2 $
+// Revision Number: $Revision: 1.24.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Date  : $Date: 2014/02/26 20:42:38 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,19 +46,19 @@
 #ifndef Xyce_N_IO_Objective_h
 #define Xyce_N_IO_Objective_h
 
-// ---------- Standard Includes ----------
 #include <list>
 #include <string>
 #include <vector>
 #include <set>
 #include <time.h>
 
-// ----------   Xyce Includes   ----------
 #include <N_UTL_Xyce.h>
 #include <N_UTL_Misc.h>
 #include <N_UTL_OptionBlock.h>
 #include <N_IO_PkgOptionsMgr.h>
 #include <N_IO_fwd.h>
+#include <N_ANP_fwd.h>
+#include <N_UTL_fwd.h>
 
 #ifdef Xyce_Dakota
 // ---------- Trilinos Includes ----------
@@ -66,14 +66,13 @@
 #include <Epetra_SerialDenseVector.h>
 #endif
 
-// ---------- Forward Declarations ----------
-class N_TOP_Topology;
-class N_UTL_ExpressionData;
-class N_ANP_AnalysisInterface;
 class N_LAS_Vector;
 
+namespace Xyce {
+namespace IO {
+
 //-----------------------------------------------------------------------------
-// Class         : N_IO_Objective
+// Class         : Objective
 //
 // Purpose       : This class manages a single objective (for Dakota).
 //
@@ -82,75 +81,60 @@ class N_LAS_Vector;
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 02/13/06
 //-----------------------------------------------------------------------------
-class N_IO_Objective
+class Objective
 {
-  public:
-    N_IO_Objective();
-    ~N_IO_Objective();
-    void readData();
-    void printData();
+public:
+  Objective();
+  ~Objective();
+  void readData();
+  void printData();
 
-    void reset ();
-    double save (const N_LAS_Vector *, const N_LAS_Vector *, const N_LAS_Vector *);
-    double save (double, double, const N_LAS_Vector *, const N_LAS_Vector *, const N_LAS_Vector *);
-    double evaluate ();
+  void reset ();
+  double save (const N_LAS_Vector *, const N_LAS_Vector *, const N_LAS_Vector *);
+  double save (double, double, const N_LAS_Vector *, const N_LAS_Vector *, const N_LAS_Vector *);
+  double evaluate ();
 
-    bool parse(const string & in, N_IO_OutputMgr * outputMgrPtr );
-    bool initialize(const N_UTL_OptionBlock & , N_IO_OutputMgr * outputMgrPtr );
-/*
-    bool parse(const string & in, N_DEV_DeviceInterface * devPtr1, N_ANP_AnalysisInterface *,
-#ifdef Xyce_PARALLEL_MPI
-	  N_PDS_Comm * pdsCommPtr1,
-#endif
-	  N_TOP_Topology * topPtr1);
+  bool parse(const std::string & in, OutputMgr * outputMgrPtr );
+  bool initialize(const Util::OptionBlock & , OutputMgr * outputMgrPtr );
 
-    bool initialize(const N_UTL_OptionBlock & , N_DEV_DeviceInterface *, N_ANP_AnalysisInterface *,
-#ifdef Xyce_PARALLEL_MPI
-          N_PDS_Comm *,
-#endif
-          N_TOP_Topology *);
-*/
+  std::string var1;
+  std::string var2;
+  std::string file;
+  std::string function;                      // the function that will be applied to value={}
+  Util::ExpressionData *value;
+  Util::ExpressionData *weight;
 
-    string var1;
-    string var2;
-    string file;
-    string function;                      // the function that will be applied to value={}
-//    map<string, string> match;
-    N_UTL_ExpressionData *value;
-    N_UTL_ExpressionData *weight;
+private:
+  bool initializeInternal (std::string & fileStr, std::string & functionStr,
+                           std::string & valueStr, std::string & weightStr);
 
-  private:
-    bool initializeInternal (string & fileStr, string & functionStr,
-		    string & valueStr, string & weightStr);
+  OutputMgr * outputMgrPtr_;
 
-   // N_DEV_DeviceInterface * devPtr_;
-   // N_ANP_AnalysisInterface * anaIntPtr_;
-//#ifdef Xyce_PARALLEL_MPI
-//    N_PDS_Comm * pdsCommPtr_;
-//#endif
-//    N_TOP_Topology * topPtr_;
-    N_IO_OutputMgr * outputMgrPtr_;
-
-    double lastResult;                    // last value calculated during simulation
-    double minResult;                     // minimum value encountered during simulation
-    double maxResult;                     // maximum value encountered during simulation
-    double magResult;                     // magnitude of value encountered during simulation
-    double rmsResult;                     // root-mean-squared value calculated during simulation
-    double lastV1;
-    double lastWeight;
-    int lastInd2;
-    int lastIndInterpolate;
-    int n1;                               // number of elements in first independent var array
-    int n2;                               // number of elements in second independent var array
-    int lastN1, lastN2;                   // last time we saved data, this was where it was inserted.
-                                          // this can speed up the search for insertaiton points.
-    bool lastResultValid;
-    vector<double> var1Vals;              // first independent variable
-    vector<double> var2Vals;              // second independent variable (if needed)
-    vector<vector<double> > dataVal;      // externally supplied data[var2Index][var1Index]
-    vector<vector<double> > simVal;       // simulation calculated data[var2Index][var1Index]
-    vector<vector<bool> > simValValid;    // flags indicating if simulation was done at point [var1Index][var2Index]
-    vector<vector<double> > weightVal;    // weighting filter function
+  double lastResult;                    // last value calculated during simulation
+  double minResult;                     // minimum value encountered during simulation
+  double maxResult;                     // maximum value encountered during simulation
+  double magResult;                     // magnitude of value encountered during simulation
+  double rmsResult;                     // root-mean-squared value calculated during simulation
+  double lastV1;
+  double lastWeight;
+  int lastInd2;
+  int lastIndInterpolate;
+  int n1;                               // number of elements in first independent var array
+  int n2;                               // number of elements in second independent var array
+  int lastN1, lastN2;                   // last time we saved data, this was where it was inserted.
+  // this can speed up the search for insertaiton points.
+  bool lastResultValid;
+  std::vector<double> var1Vals;              // first independent variable
+  std::vector<double> var2Vals;              // second independent variable (if needed)
+  std::vector<std::vector<double> > dataVal;      // externally supplied data[var2Index][var1Index]
+  std::vector<std::vector<double> > simVal;       // simulation calculated data[var2Index][var1Index]
+  std::vector<std::vector<bool> > simValValid;    // flags indicating if simulation was done at point [var1Index][var2Index]
+  std::vector<std::vector<double> > weightVal;    // weighting filter function
 };
 
-#endif // Xyce_N_IO_Objective_h
+} // namespace IO
+} // namespace Xyce
+
+typedef Xyce::IO::Objective N_IO_Objective;
+
+#endif // Xyce_Objective_h

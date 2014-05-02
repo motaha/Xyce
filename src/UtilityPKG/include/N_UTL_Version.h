@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -35,9 +35,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.4.2.2 $
+// Revision Number: $Revision: 1.8 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -47,12 +47,8 @@
 #ifndef N_UTL_VERSION_H
 #define N_UTL_VERSION_H
 
-
-
 // ---------- Standard Includes -----------------------------------------------
 #include <string>
-
-using namespace std;
 
 //-----------------------------------------------------------------------------
 // Class         : N_UTL_Version
@@ -67,15 +63,15 @@ class N_UTL_Version
 public:
 
   // get full banner string for Xyce version
-  static string getFullVersionString();
+  static std::string getFullVersionString();
   // get the maj-min-rev number for Xyce version
-  static string getShortVersionString();
+  static std::string getShortVersionString();
 
-  static string getBuildVariant();
+  static std::string getBuildVariant();
 
-  static string getCapabilities();
+  static std::string getCapabilities();
 
-  static string getLicense();
+  static std::string getLicense();
   
 private:
   

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright(C) 2002-2013  Sandia Corporation
+//    Copyright(C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.102.2.2 $
+// Revision Number: $Revision: 1.117.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -47,49 +47,44 @@
 #ifndef Xyce_N_DEV_DeviceEntity_h
 #define Xyce_N_DEV_DeviceEntity_h
 
-// ---------- Standard Includes ----------
 #include <iosfwd>
-#include <list>
 #include <map>
 #include <string>
 #include <vector>
 
-// ------------- Xyce Includes ------------
-
 #include <N_DEV_fwd.h>
-#include <N_DEV_CompositeParam.h>
-#include <N_DEV_Units.h>
+#include <N_IO_fwd.h>
+#include <N_UTL_fwd.h>
+#include <N_UTL_NetlistLocation.h>
 #include <N_DEV_Pars.h>
-#include <N_ERH_ErrorMgr.h>
-#include <N_LAS_Vector.h>
-#include <N_UTL_BreakPoint.h>
-#include <N_UTL_Xyce.h>
-#include <N_UTL_NoCase.h>
 
-// ---------- Forward Declarations ----------
-class N_IO_CmdParse;
-class N_UTL_Expression;
+class N_LAS_Vector;
 
 namespace Xyce {
 namespace Device {
 
-struct netlistLocation_;
+typedef std::map<std::string, std::vector<Param>, LessNoCase> CompositeParamMap;
 
-void populateParams(const ParametricData<DeviceEntity>::ParameterMap &parameter_map, std::vector<Param> & param_list, DeviceParamMap &composite_param_list);
+void populateParams(const ParameterMap &parameter_map, std::vector<Param> &param_list, CompositeParamMap &composite_param_map);
+void setParameters(CompositeParam &composite_param, const std::string &pName, const Param &ndParam );
+void setParameters(DeviceEntity &entity, std::vector<Param>::const_iterator begin, std::vector<Param>::const_iterator end, const DeviceOptions &device_options);
+
+std::ostream &printParameter(std::ostream &os, const DeviceEntity &entity, const std::string &name, const Descriptor &param);
+std::ostream &printCompositeParameters(std::ostream &os, const CompositeParam &composite);
 
 struct Depend
 {
-    std::string                   name;
-    N_UTL_Expression *            expr;
-    union resUnion
-    {
-        double *                    result;
-        std::vector<double> *       resVec;
-    } resultU;
-    int                           vectorIndex;
-    std::vector<double>           vals;
-    std::vector<std::string>      global_params;
-    int                           n_vars, lo_var;
+  std::string                 name;
+  Util::Expression *          expr;
+  union resUnion
+  {
+    double *                result;
+    std::vector<double> *   resVec;
+  } resultU;
+  int                         vectorIndex;
+  std::vector<double>         vals;
+  std::vector<std::string>    global_params;
+  int                         n_vars, lo_var;
 };
 
 //-----------------------------------------------------------------------------
@@ -101,159 +96,144 @@ struct Depend
 //-----------------------------------------------------------------------------
 class DeviceEntity : public ParameterBase
 {
-  public:
-    typedef Descriptor Pars;
-    typedef ParametricData<void>::ParameterMap ParameterMap;
+public:
+  DeviceEntity(
+     const char * const        entity_type,
+     const std::string &       device_name,
+     ParametricData<void> &    parametric_data,
+     const SolverState &       solver_state,
+     const DeviceOptions &     device_options,
+     const std::string &       netlist_path,
+     int                       netlist_line);
 
-    DeviceEntity(
-      SolverState &       solver_state,
-      DeviceOptions &     device_options,
-      const std::string & device_name,
-      const std::string & net_list_file_path,
-      int                 net_list_file_line_number);
+private:
+  DeviceEntity(const DeviceEntity &);
+  DeviceEntity &operator=(const DeviceEntity &);
 
-  private:
-    DeviceEntity(const DeviceEntity &);
-    DeviceEntity &operator=(const DeviceEntity &);
+public:
+  virtual ~DeviceEntity();
 
-  public:
-    virtual ~DeviceEntity();
+  virtual bool processParams() = 0;
 
-    virtual bool processParams(std::string param = "") = 0;
-    virtual bool processInstanceParams(std::string param = "");
-    virtual CompositeParam *constructComposite(std::string & compositeName, std::string & paramName) {return NULL;}
+  virtual bool processInstanceParams() = 0;
 
-    bool setDefaultParam(double val);
-    double getDefaultParam();
+  virtual CompositeParam *constructComposite(const std::string &composite_name, const std::string &param_name) 
+  {
+    return NULL;
+  }
 
-    bool scaleParam(const std::string & paramName, double val, double val0);
-    bool scaleParam(const std::string & paramName, double val);
-    bool scaleDefaultParam(double val);
+  bool setDefaultParam(double val);
+  double getDefaultParam();
 
-    bool setParam(const std::string & paramName, double val);
-    bool getParam(const std::string & paramName, double & result);
-    bool getParamBreakpoints( std::vector<N_UTL_BreakPoint> & );
+  bool scaleParam(const std::string & paramName, double val, double val0);
+  bool scaleParam(const std::string & paramName, double val);
+  bool scaleDefaultParam(double val);
 
-    bool updateDependentParameters(N_LAS_Vector & vars);
-    bool updateDependentParameters(double temp_tmp);
-    bool updateGlobalParameters(map<std::string,double> &);
-    bool updateDependentParameters();
+  bool setParam(const std::string & paramName, double val);
+  bool getParam(const std::string & paramName, double & result);
+  bool getParamBreakpoints( std::vector<Util::BreakPoint> & );
 
-#if 0
-    bool perturbSensParam(Param & ndParam);
-#endif
+  bool updateDependentParameters(N_LAS_Vector & vars);
+  bool updateDependentParameters(double temp_tmp);
+  bool updateGlobalParameters(std::map<std::string, double> &);
+  bool updateDependentParameters();
 
-    std::ostream &printFormattedOutputParam(std::ostream &os, const std::string & paramName) const;
+  double setDependentParameter(Util::Param &, double *, ParameterType::ExprAccess);
+  double setDependentParameter(Util::Param &, std::vector<double> *, int , ParameterType::ExprAccess);
+  void setDependentParameter(Util::Param & par, Depend & dependentParam, ParameterType::ExprAccess depend);
 
-  protected:
-    double setDependentParameter(N_UTL_Param &, double *, ParameterType::ExprAccess);
-    double setDependentParameter(N_UTL_Param &, std::vector<double> *, int , ParameterType::ExprAccess);
-    void setDependentParameter(N_UTL_Param & par, Depend & dependentParam, ParameterType::ExprAccess depend);
+  void setDefaultParams() 
+  {
+    setDefaultParameters(*this, getParameterMap().begin(), getParameterMap().end(), devOptions_);
+  }
 
-    void setDefaultParams();
-    void setParams(std::vector<Param> & params);
+  void setParams(const std::vector<Param> & params) 
+  {
+    setParameters(*this, params.begin(), params.end(), devOptions_);
+  }
 
-  public:
-    bool given(const std::string & parameter_name);
+public:
+  bool given(const std::string & parameter_name) const;
 
-  public:
-    const std::string &getName() const {
-      return name_;
-    }
+  const char *getEntityType() const 
+  {
+    return entityType_;
+  }
 
-    void setName(const std::string &name) {
-      name_ = name;
-    }
+  const std::string &getName() const 
+  {
+    return name_;
+  }
 
-    const std::vector<Depend> &getDependentParams() {
-      return dependentParams;
-    }
+  void setDefaultParamName(const std::string &default_param_name) 
+  {
+    defaultParamName_ = default_param_name;
+  }
 
-    const DeviceOptions &getDeviceOptions() const {
-      return devOptions;
-    }
+  const std::vector<Depend> &getDependentParams() 
+  {
+    return dependentParams;
+  }
 
-    DeviceOptions &getDeviceOptions() {
-      return devOptions;
-    }
+  const DeviceOptions &getDeviceOptions() const 
+  {
+    return devOptions_;
+  }
 
-    const SolverState &getSolverState() const {
-      return solState;
-    }
+  const SolverState &getSolverState() const 
+  {
+    return solState_;
+  }
 
-    SolverState &getSolverState() {
-      return solState;
-    }
+  const NetlistLocation &netlistLocation() const 
+  {
+    return netlistLocation_;
+  }
 
-    netlistLocation_ netlistLocation() const;
+  const ParameterMap &getParameterMap() const 
+  {
+    return parametricData_.getMap();
+  }
 
-    // [DGB]  Hopefully htis crap goes away soon!
-    virtual const ParametricData<void> &getMyParametricData() const = 0;
+private:
+  void escape(std::string &) const;
+  void checkDepend(ParameterType::ExprAccess &);
 
-    const ParameterMap *getPMap() const {
-      return reinterpret_cast<const ParameterMap *>(&getMyParametricData().getMap());
-    }
+private:
+  const char * const          entityType_;
+  std::string                 name_;
+  std::string                 defaultParamName_;
+  ParametricData<void> &      parametricData_;
+  NetlistLocation             netlistLocation_;
 
-  private:
-    void escape(std::string &) const;
-    void checkDepend(ParameterType::ExprAccess &);
+  const SolverState &         solState_;
+  const DeviceOptions &       devOptions_;
 
-  private:
-    std::string                   name_;
-
-    std::string                   netlistFileName_;
-    int                           lineNumber_;
-
-  protected:
-    std::string                   defaultParamName;
-    double                        paramNew;
-    double                        paramOld;
-    SolverState &                 solState;
-    DeviceOptions &               devOptions;
-    N_IO_CmdParse &               commandLine;
-
-    std::vector<Depend>           dependentParams;
-    std::vector<int>              expVarGIDs;
-    std::vector<int>              expVarLIDs;
-    std::vector<std::string>      expVarNames;
-    std::vector<double>           expVarVals;
-    std::vector<double>           eVarVals;
+protected:
+  std::vector<Depend>         dependentParams;
+  std::vector<int>            expVarGIDs;
+  std::vector<int>            expVarLIDs;
+  std::vector<std::string>    expVarNames;
+  std::vector<double>         expVarVals;
+  std::vector<double>         eVarVals;
 };
 
 struct DeviceEntityCmp : public std::binary_function<DeviceEntity, DeviceEntity, bool>
+
 {
-    bool operator()(const DeviceEntity &entity_0, const DeviceEntity &entity_1) const {
-      return less_nocase(entity_0.getName(), entity_1.getName());
-    }
-    bool operator()(const DeviceEntity *entity_0, const DeviceEntity *entity_1) const {
-      return less_nocase(entity_0->getName(), entity_1->getName());
-    }
+  bool operator()(const DeviceEntity &entity_0, const DeviceEntity &entity_1) const 
+  {
+    return less_nocase(entity_0.getName(), entity_1.getName());
+  }
+  bool operator()(const DeviceEntity *entity_0, const DeviceEntity *entity_1) const 
+  {
+    return less_nocase(entity_0->getName(), entity_1->getName());
+  }
 };
-
-
-struct netlistLocation_
-{
-  netlistLocation_(const std::string &file_path, int line_number)
-    : filePath(file_path),
-      lineNumber(line_number)
-  {}
-
-  const std::string &filePath;
-  const int lineNumber;
-};
-
-inline std::ostream &operator<<(std::ostream &os, const netlistLocation_ &x) {
-  os << "file " << x.filePath << " at or near line " << x.lineNumber;
-  return os;
-}
 
 } // namespace Device
 } // namespace Xyce
 
-typedef Xyce::Device::DeviceEntity N_DEV_DeviceEntity;
 typedef Xyce::Device::Depend sDepend;
 
-std::ostream &dumpConfiguration(std::ostream &os, const Configuration &configuration);
-std::ostream &dumpParams(std::ostream &os, const N_DEV_DeviceEntity &entity);
-
-#endif
+#endif // Xyce_N_DEV_DeviceEntity_h

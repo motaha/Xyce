@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.27.6.2 $
+// Revision Number: $Revision: 1.32 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:46 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -93,19 +93,20 @@ class N_MPDE_Builder : public N_LAS_Builder
                   const int Size,
                   RCP<const N_MPDE_Discretization> Disc,
                   const bool warpMPDE)
-  : mpdeMgr_(mgr),
-    Size_(Size),
+  : Size_(Size),
     Disc_(Disc),
+    mpdeMgr_(mgr),
     warpMPDE_(warpMPDE),
-    omegaGID_(0),
     offset_(0),
     stateOffset_(0),
     storeOffset_(0),
-    phiGID_(0)
+    omegaGID_(0),
+    phiGID_(0),
+    augProcID_(-1)
   {}
 
   // Destructor
-  ~N_MPDE_Builder();
+  virtual ~N_MPDE_Builder() {}
 
   void setWarpedPhaseCondition(const Teuchos::RCP<N_MPDE_WarpedPhaseCondition>& warpMPDEPhasePtr)
   {
@@ -147,15 +148,19 @@ class N_MPDE_Builder : public N_LAS_Builder
 
   // Return GID offset for blocks to Manager for construction of Loader
   int getMPDEOffset()
-  { return offset_; };
+  { return offset_; }
 
   // Return omega GID to Manager for construction of Loader
   int getMPDEomegaGID()
-  { return omegaGID_; };
+  { return omegaGID_; }
 
   // Return phi GID to Manager for construction of Loader
   int getMPDEphiGID()
-  { return phiGID_; };
+  { return phiGID_; }
+
+  // Return processor id for augmented systems (i.e. warped MPDE)
+  int getMPDEaugProcID()
+  { return augProcID_; }
 
 private:
 
@@ -168,17 +173,15 @@ private:
   Teuchos::RCP<N_MPDE_WarpedPhaseCondition> warpMPDEPhasePtr_;
 
   bool warpMPDE_;
-  int offset_, stateOffset_;
-  int storeOffset_;
+  int offset_, stateOffset_, storeOffset_;
   int omegaGID_;
   int phiGID_;
+  int augProcID_;
 
   RCP<N_PDS_ParMap> BaseMap_, BaseStateMap_;
   RCP<N_PDS_ParMap> MPDEMap_, MPDEStateMap_;
-  RCP<Epetra_Map> epetraMPDEMap_, epetraMPDEStateMap_;
   RCP<N_PDS_ParMap> BaseStoreMap_;
   RCP<N_PDS_ParMap> MPDEStoreMap_;
-  RCP<Epetra_Map> epetraMPDEStoreMap_;
 
   RCP<Epetra_CrsGraph> BasedQdxGraph_;
   RCP<Epetra_CrsGraph> BasedFdxGraph_;

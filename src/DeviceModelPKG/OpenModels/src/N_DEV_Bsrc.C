@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.168.2.3 $
+// Revision Number: $Revision: 1.192.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -61,10 +61,12 @@
 
 // ----------   Xyce Includes   ----------
 #include <N_DEV_Bsrc.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
 
 #include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
@@ -75,44 +77,28 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<Bsrc::Instance>::ParametricData()
-{
-  // Set up configuration constants:
-  setNumNodes(2);
-  setNumOptionalNodes(0);
-  setNumFillNodes(0);
-  setModelRequired(0);
-
-  // Set up double precision variables:
-  addPar ("I", 0.0, false, ParameterType::SOLN_DEP,
-          &Bsrc::Instance::I,
-          NULL, U_AMP, CAT_NONE, "Current for current source");
-
-  addPar ("V", 0.0, false, ParameterType::SOLN_DEP,
-          &Bsrc::Instance::V,
-          NULL, U_VOLT, CAT_NONE, "Voltage for voltage source");
-}
-
-template<>
-ParametricData<Bsrc::Model>::ParametricData()
-{}
 
 namespace Bsrc {
 
 
+void Traits::loadInstanceParameters(ParametricData<Bsrc::Instance> &p)
+{
+  // Set up configuration constants:
+// Set up double precision variables:
+  p.addPar ("I", 0.0, &Bsrc::Instance::I)
+    .setExpressionAccess(ParameterType::SOLN_DEP)
+    .setUnit(U_AMP)
+    .setDescription("Current for current source");
 
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
+  p.addPar ("V", 0.0, &Bsrc::Instance::V)
+    .setExpressionAccess(ParameterType::SOLN_DEP)
+    .setUnit(U_VOLT)
+    .setDescription("Voltage for voltage source");
 }
 
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
+void Traits::loadModelParameters(ParametricData<Bsrc::Model> &p)
+{}
 
-  return parMap;
-}
 
 #define Xyce_NONPOINTER_MATRIX_LOAD 1
 
@@ -125,13 +111,12 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 06/05/01
 //-----------------------------------------------------------------------------
-Instance::Instance(InstanceBlock & IB,
-                   Model & BMiter,
-                   MatrixLoadData & mlData1,
-                   SolverState &ss1,
-                   ExternData  &ed1,
-                   DeviceOptions & do1)
-  : DeviceInstance(IB, mlData1, ss1, ed1, do1),
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock &         IB,
+  Model &                       BMiter,
+  const FactoryBlock &          factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(BMiter),
     IB(IB),
     li_Pos(-1),
@@ -159,10 +144,6 @@ Instance::Instance(InstanceBlock & IB,
   numExtVars   = 2;
   numStateVars = 0;
 
-  setName(IB.getName());
-  setModelName(getName());
-
-
   // Set params to constant default values:
   setDefaultParams ();
 
@@ -183,10 +164,7 @@ Instance::Instance(InstanceBlock & IB,
   }
   else
   {
-    string msg("Instance::Instance: Must supply one of V= or I=");
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Must supply one of V= or I=";
   }
 
   if (isVSRC)
@@ -198,9 +176,9 @@ Instance::Instance(InstanceBlock & IB,
     numIntVars = 0;
   }
 
-  vector<sDepend>::iterator d;
-  vector<sDepend>::iterator begin = dependentParams.begin();
-  vector<sDepend>::iterator end = dependentParams.end();
+  std::vector<sDepend>::iterator d;
+  std::vector<sDepend>::iterator begin = dependentParams.begin();
+  std::vector<sDepend>::iterator end = dependentParams.end();
 
   for  (d = begin ; d != end ; ++d)
   {
@@ -267,7 +245,7 @@ Instance::Instance(InstanceBlock & IB,
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 07/30/03
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
   return true;
 }
@@ -293,37 +271,17 @@ Instance::~Instance ()
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/21/02
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                             const vector<int> & extLIDVecRef )
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                             const std::vector<int> & extLIDVecRef )
 {
-  string msg;
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "-----------------------------------------------------------------------------";
-  cout << endl << dashedline << endl;
-  cout << "  BsrcInstance::registerLIDs" << endl;
-  cout << "  name = " << getName() << endl;
+  Xyce::dout() << std::endl << section_divider << std::endl;
+  Xyce::dout() << "  BsrcInstance::registerLIDs" << std::endl;
+  Xyce::dout() << "  name = " << getName() << std::endl;
 #endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if ( numInt != numIntVars )
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -337,8 +295,8 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
   li_Neg = extLIDVec[1];
 
 #ifdef Xyce_DEBUG_DEVICE
-  cout << "  li_Pos = " << li_Pos << endl;
-  cout << "  li_Neg = " << li_Neg << endl;
+  Xyce::dout() << "  li_Pos = " << li_Pos << std::endl;
+  Xyce::dout() << "  li_Neg = " << li_Neg << std::endl;
 #endif
 
   if( isVSRC )
@@ -346,12 +304,12 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
     li_Bra = intLIDVec[0];
 
 #ifdef Xyce_DEBUG_DEVICE
-    cout << "  li_Bra = " << li_Bra << endl;
+    Xyce::dout() << "  li_Bra = " << li_Bra << std::endl;
 #endif
   }
 
 #ifdef Xyce_DEBUG_DEVICE
-  cout << dashedline << endl;
+  Xyce::dout() << section_divider << std::endl;
 #endif
 }
 
@@ -363,7 +321,7 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 05/13/05
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (isVSRC)
@@ -371,7 +329,7 @@ map<int,string> & Instance::getIntNameMap ()
     if (intNameMap.empty ())
     {
       // set up internal name map
-      string tmpstr(getName()+"_branch");
+      std::string tmpstr(getName()+"_branch");
       spiceInternalName (tmpstr);
       intNameMap[ li_Bra ] = tmpstr;
     }
@@ -387,22 +345,12 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 01/17/2013
 //-----------------------------------------------------------------------------
-void Instance::registerStoreLIDs(const vector<int> & stoLIDVecRef )
+void Instance::registerStoreLIDs(const std::vector<int> & stoLIDVecRef )
 {
   if (!isVSRC)
   {
-    string msg;
+    AssertLIDs(stoLIDVecRef.size() == getNumStoreVars());
 
-    // Check if the size of the ID lists corresponds to the
-    // proper number of internal and external variables.
-    int numSto = stoLIDVecRef.size();
-
-    if (numSto != getNumStoreVars())
-    {
-      msg = "ResistorInstance::registerStoreLIDs:";
-      msg += "numSto != numStoreVars";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-    }
     li_store_branch = stoLIDVecRef[0];
   }
 }
@@ -415,7 +363,7 @@ void Instance::registerStoreLIDs(const vector<int> & stoLIDVecRef )
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 12/18/2012
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getStoreNameMap ()
+std::map<int,std::string> & Instance::getStoreNameMap ()
 {
   if (!isVSRC)
   {
@@ -424,9 +372,9 @@ map<int,string> & Instance::getStoreNameMap ()
     {
       // change subcircuitname:devicetype_deviceName to
       // devicetype:subcircuitName:deviceName
-      string modName(getName());
+      std::string modName(getName());
       spiceInternalName(modName);
-      string tmpstr;
+      std::string tmpstr;
       tmpstr = modName+":DEV_I";
       storeNameMap[ li_store_branch ] = tmpstr;
     }
@@ -443,21 +391,12 @@ map<int,string> & Instance::getStoreNameMap ()
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 06/21/02
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-  string msg;
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
+  AssertLIDs(li_ddt.size() == expNumDdt);
+  AssertLIDs(numStateVars == expNumDdt);
 
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-
-  if (staLIDVecRef.size() != numStateVars ||
-      li_ddt.size() != expNumDdt ||
-      numStateVars != expNumDdt)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
   for (int i=0 ; i<expNumDdt ; ++i)
   {
     li_ddt[i] = staLIDVecRef[i];
@@ -473,7 +412,7 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 06/06/01
 //-----------------------------------------------------------------------------
-const vector<string> & Instance::getDepSolnVars()
+const std::vector<std::string> & Instance::getDepSolnVars()
 {
   return DeviceInstance::getDepSolnVars();
 }
@@ -487,7 +426,7 @@ const vector<string> & Instance::getDepSolnVars()
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 9/2/02
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -501,7 +440,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creation Date : 9/2/02
 //-----------------------------------------------------------------------------
 void Instance::registerJacLIDs(
-  const vector< vector<int> > & jacLIDVec)
+  const std::vector< std::vector<int> > & jacLIDVec)
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
   if( isVSRC )
@@ -663,14 +602,10 @@ bool Instance::updateSecondaryState ()
     double maxMag = 1.0e+10;
     if (expVarDerivs[i] > maxMag || expVarDerivs[i] < -maxMag)
     {
-      cout << "\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
-      cout << "WARNING: Expression derivative exceeded magnitude of ";
-      cout << maxMag << "\n";
-      cout << "         Value being reduced\n";
-      cout << "Bsource is : " << getName() << "\n";
-      cout << " Expression derivative evaluates to " << expVarDerivs[i];
-      cout << "\n";
-      cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+      static Report::MessageCode id;
+
+      Report::UserWarning(id) << "Expression derivative |" << expVarDerivs[i] << "| exceeds " << maxMag << ", value reduced";
+
       expVarDerivs[i] = (expVarDerivs[i] > 0) ? maxMag : -maxMag;
     }
   }
@@ -783,7 +718,7 @@ bool Instance::loadDAEdFdx ()
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 02/17/02
 //-----------------------------------------------------------------------------
-void Instance::varTypes( vector<char> & varTypeVec )
+void Instance::varTypes( std::vector<char> & varTypeVec )
 {
   if( !isVSRC )
   {
@@ -802,10 +737,11 @@ void Instance::varTypes( vector<char> & varTypeVec )
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 06/05/01
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-              SolverState & ss1,
-              DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1)
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block)
 {
 }
 
@@ -819,9 +755,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -837,7 +773,7 @@ Model::~Model ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 06/03/02
 //-----------------------------------------------------------------------------
-bool Model::processParams(std::string param)
+bool Model::processParams()
 {
   return true;
 }
@@ -850,7 +786,7 @@ bool Model::processParams(std::string param)
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 03/23/06
 //-----------------------------------------------------------------------------
-bool Model::processInstanceParams(std::string param)
+bool Model::processInstanceParams()
 {
   return true;
 }
@@ -867,24 +803,45 @@ bool Model::processInstanceParams(std::string param)
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i;
-  os << endl;
-  os << "    name     getModelName()  Parameters" << endl;
+  os << std::endl;
+  os << "    name     model name  Parameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "      ";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 // Bsrc Master functions:
 
 //-----------------------------------------------------------------------------
@@ -897,7 +854,7 @@ std::ostream &Model::printOutInstances(std::ostream &os) const
 //-----------------------------------------------------------------------------
 bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & bi =  *(*it);
     if (bi.expNumVars == 0)
@@ -937,7 +894,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 //-----------------------------------------------------------------------------
 bool Master::updateSecondaryState ( double * staDerivVec, double * stoVec )
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & bi =  *(*it);
 
@@ -968,14 +925,9 @@ bool Master::updateSecondaryState ( double * staDerivVec, double * stoVec )
       double maxMag = 1.0e+10;
       if (bi.expVarDerivs[k] > maxMag || bi.expVarDerivs[k] < -maxMag)
       {
-        cout << "\n++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
-        cout << "WARNING: Expression derivative exceeded magnitude of ";
-        cout << maxMag << "\n";
-        cout << "         Value being reduced\n";
-        cout << "Bsource is : " << bi.getName() << "\n";
-        cout << " Expression derivative evaluates to " << bi.expVarDerivs[k];
-        cout << "\n";
-        cout << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+        static Report::MessageCode id;
+
+        Report::UserWarning(id) << "Expression derivative |" << bi.expVarDerivs[k] << "| exceeds " << maxMag << ", value reduced";
         bi.expVarDerivs[k] = (bi.expVarDerivs[k] > 0) ? maxMag : -maxMag;
       }
     }
@@ -994,7 +946,7 @@ bool Master::updateSecondaryState ( double * staDerivVec, double * stoVec )
 //-----------------------------------------------------------------------------
 bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  double * storeLeadF, double * storeLeadQ)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & bi = *(*it);
     double v_pos(0.0), v_neg(0.0), i_bra(0.0);
@@ -1034,7 +986,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
 //-----------------------------------------------------------------------------
 bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & bi = *(*it);
     double coef = 1.0;
@@ -1089,6 +1041,20 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
     }
   }
   return true;
+}
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("b", 1)
+    .registerDevice("f", 1)
+    .registerDevice("h", 1);
 }
 
 } // namespace Bsrc

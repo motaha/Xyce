@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.84.2.2 $
+// Revision Number: $Revision: 1.109.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:35 $
+// Revision Date  : $Date: 2014/03/06 23:33:42 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -53,14 +53,15 @@
 #include <math.h>
 #endif
 
-// ----------   Xyce Includes   ----------
 #include <N_DEV_fwd.h>
+#include <N_DEV_Message.h>
 #include <N_DEV_Const.h>
-#include <N_DEV_ExternDevice.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_DeviceMaster.h>
+#include <N_DEV_ExternData.h>
+#include <N_DEV_ExternDevice.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
 
 #include <N_DEV_XyceInterface.h>
 #include <N_DEV_CharonInterface.h>
@@ -80,12 +81,12 @@ template<>
 ParametricData<VoltageNode>::ParametricData()
 {
   // Set up map for double precision variables:
-  addPar("INITVAL", 0.0, false, &VoltageNode::initVal);
-  addPar("LIMITHIGH", 0.0, false, &VoltageNode::limValHigh);
-  addPar("LIMITLOW", 0.0, false, &VoltageNode::limValLow);
+  addPar("INITVAL", 0.0, &VoltageNode::initVal);
+  addPar("LIMITHIGH", 0.0, &VoltageNode::limValHigh);
+  addPar("LIMITLOW", 0.0, &VoltageNode::limValLow);
 
   // Set up exceptions (ie variables that are not doubles):
-  addPar("NAME", "VCONNECT0000", false, &VoltageNode::vsrcName);
+  addPar("NAME", "VCONNECT0000", &VoltageNode::vsrcName);
 }
 
 ParametricData<VoltageNode> &VoltageNode::getParametricData() {
@@ -103,35 +104,13 @@ ParametricData<VoltageNode> &VoltageNode::getParametricData() {
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/03/06
 //-----------------------------------------------------------------------------
-VoltageNode::VoltageNode ()
-  : CompositeParam (),
+VoltageNode::VoltageNode()
+  : CompositeParam(getParametricData()),
     vsrcName(""),
     initVal(0.0),
     limValHigh(0.15),
     limValLow(0.10)
 {
-
-  // Set up mapping from param names to class variables:
-
-  // if (parMap.empty())
-  // {
-  //   // Set up map for double precision variables:
-  //   addPar ("INITVAL", 0.0, false,
-  //           static_cast <double CompositeParam:: *> (&VoltageNode::initVal),
-  //           NULL);
-
-  //   addPar ("LIMITHIGH", 0.0, false,
-  //           static_cast <double CompositeParam:: *> (&VoltageNode::limValHigh),
-  //           NULL);
-
-  //   addPar ("LIMITLOW", 0.0, false,
-  //           static_cast <double CompositeParam:: *> (&VoltageNode::limValLow),
-  //           NULL);
-
-  //   // Set up exceptions (ie variables that are not doubles):
-  //   addPar ("NAME", "VCONNECT0000", false,
-  //           static_cast <string CompositeParam:: *> (&VoltageNode::vsrcName), NULL);
-  // }
 }
 
 //-----------------------------------------------------------------------------
@@ -143,49 +122,29 @@ VoltageNode::VoltageNode ()
 // Creation Date : 04/03/06
 //-----------------------------------------------------------------------------
 void VoltageNode::processParams ()
-{
-
-}
-
-template<>
-ParametricData<ExternDevice::Instance>::ParametricData()
-{
-  // Set up configuration constants:
-  setNumNodes(2);
-  setNumOptionalNodes(1000);
-  setNumFillNodes(0);
-  setModelRequired(0);
-
-  // Set up map for double precision variables:
-
-  // Set up map for non-double precision variables:
-  addPar("EXTERNCODE", string("xyce"), false, ParameterType::NO_DEP, &ExternDevice::Instance::externCode_);
-  addPar("NETLIST", string("input.cir"), false, ParameterType::NO_DEP, &ExternDevice::Instance::netlistFileName_);
-  addPar("VOLTLIM", false, false, ParameterType::NO_DEP, &ExternDevice::Instance:: voltageLimiterFlag);
-
-  addComposite("NODE", VoltageNode::getParametricData(), &ExternDevice::Instance::nodeMap);
-}
-
-template<>
-ParametricData<ExternDevice::Model>::ParametricData()
 {}
+
 
 
 namespace ExternDevice {
 
 
+void Traits::loadInstanceParameters(ParametricData<ExternDevice::Instance> &p)
+{
+  // Set up configuration constants:
+// Set up map for double precision variables:
 
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
+  // Set up map for non-double precision variables:
+  p.addPar("EXTERNCODE", std::string("xyce"), &ExternDevice::Instance::externCode_);
+  p.addPar("NETLIST", std::string("input.cir"), &ExternDevice::Instance::netlistFileName_);
+  p.addPar("VOLTLIM", false, &ExternDevice::Instance:: voltageLimiterFlag);
 
-  return parMap;
+  p.addComposite("NODE", VoltageNode::getParametricData(), &ExternDevice::Instance::voltageNodeVec);
 }
 
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
+void Traits::loadModelParameters(ParametricData<ExternDevice::Model> &p)
+{}
 
-  return parMap;
-}
 
 
 //-----------------------------------------------------------------------------
@@ -196,36 +155,32 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/09/05
 //-----------------------------------------------------------------------------
-bool Instance::processParams(string param)
+bool Instance::processParams()
 {
 
-  string msg;
+  std::string msg;
 
   if ( externCode_ == "xyce" )
   {
     if (extCodePtr_==0)
     {
-      extCodePtr_ = new XyceInterface ( devOptions, getDeviceOptions().commandLine, netlistFileName_ );
+      extCodePtr_ = new XyceInterface(getDeviceOptions(), commandLine_, netlistFileName_);
     }
   }
   else if ( externCode_ == "1d")
   {
-    msg = "Instance::processParams.  1D interface not suppported.\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
+    UserError(*this) << "1D interface not suppported";
   }
   else if ( externCode_ == "charon")
   {
     if (extCodePtr_==0)
     {
-      extCodePtr_ = new CharonInterface ( devOptions, netlistFileName_,
-						solState);
+      extCodePtr_ = new CharonInterface(getDeviceOptions(), netlistFileName_, getSolverState());
     }
   }
   else
   {
-    msg = "Instance::processParams. " + externCode_;
-    msg += " is not a recognized external device\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
+    UserError(*this) << externCode_ << " is not a recognized external device";
   }
 
   return true;
@@ -241,13 +196,11 @@ bool Instance::processParams(string param)
 //-----------------------------------------------------------------------------
 
 Instance::Instance(
-    InstanceBlock & instance_block,
-    Model &               model,
-    MatrixLoadData &      matrix_load_data,
-    SolverState &         solver_state,
-    ExternData  &         extern_data,
-    DeviceOptions &       device_options)
-  : DeviceInstance(instance_block, matrix_load_data, solver_state, extern_data, device_options),
+  const Configuration & configuration,
+  const InstanceBlock &       instance_block,
+  Model &                     model,
+  const FactoryBlock &        factory_block)
+  : DeviceInstance(instance_block, configuration.getInstanceParameters(), factory_block),
     model_(model),
     externCode_("xyce"),
     netlistFileName_("input.cir"),
@@ -260,19 +213,16 @@ Instance::Instance(
     newtonIterOld(0),
     voltageLimiterFlag(false),
     initJctGiven_ (false),
-    nodeGiven_(false)
+    nodeGiven_(false),
+    commandLine_(factory_block.commandLine_)
 {
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
 
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl << dashedline << endl;
-    cout << "In Instance::Instance() \n\n";
-    cout << "name             = " << getName() << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "name             = " << getName() << std::endl;
   }
 #endif
 
@@ -283,16 +233,16 @@ Instance::Instance(
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "numExtVars = " << numExtVars << endl;
+    Xyce::dout() << "numExtVars = " << numExtVars << std::endl;
 
-    vector<Param>::const_iterator iter_t;
-    vector<Param>::const_iterator begin_t = instance_block.params.begin();
-    vector<Param>::const_iterator end_t   = instance_block.params.end();
+    std::vector<Param>::const_iterator iter_t;
+    std::vector<Param>::const_iterator begin_t = instance_block.params.begin();
+    std::vector<Param>::const_iterator end_t   = instance_block.params.end();
 
     for (iter_t = begin_t; iter_t !=  end_t;  ++iter_t)
     {
-      cout << "Tag: " << iter_t->tag();
-      cout << "  Value = " << iter_t->sVal() << "  Given: " << iter_t->given() << endl;
+      Xyce::dout() << "Tag: " << iter_t->tag();
+      Xyce::dout() << "  Value = " << iter_t->stringValue() << "  Given: " << iter_t->given() << std::endl;
     }
   }
 #endif
@@ -318,11 +268,11 @@ Instance::Instance(
     {
       for( int j=0; j<size; j++)
       {
-        cout << "jacStamp[ " << i << ", " << j << "] = "
-             << jacStamp[i][j] << endl;
+        Xyce::dout() << "jacStamp[ " << i << ", " << j << "] = "
+             << jacStamp[i][j] << std::endl;
       }
     }
-    cout << endl;
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -335,7 +285,7 @@ Instance::Instance(
     // This name MUST be all caps!
     char tmp[16];
     sprintf(tmp,"VCONNECT%04d",i);
-    string vname(tmp);
+    std::string vname(tmp);
     voltageInputMap_[vname] = 0.0;
   }
 
@@ -389,8 +339,8 @@ Instance::~Instance()
   }
 
   // delete the pointers that are in the voltage node map.
-  vector<VoltageNode *>::iterator iterNode = voltageNodeVec.begin();
-  vector<VoltageNode *>::iterator endNode  = voltageNodeVec.end ();
+  std::vector<VoltageNode *>::iterator iterNode = voltageNodeVec.begin();
+  std::vector<VoltageNode *>::iterator endNode  = voltageNodeVec.end ();
   for (;iterNode!=endNode;++iterNode)
   {
     delete (*iterNode);
@@ -407,50 +357,23 @@ Instance::~Instance()
 // Creator       : Eric R. Keiter , SNL, Parallel Computational Sciences
 // Creation Date : 04/09/05
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                             const vector<int> & extLIDVecRef)
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                             const std::vector<int> & extLIDVecRef)
 {
-  string msg;
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
 
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl << dashedline << endl;
-    cout << "In Instance::register LIDs\n\n";
-    cout << "name             = " << getName() << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "In Instance::register LIDs\n\n";
+    Xyce::dout() << "name             = " << getName() << std::endl;
+    Xyce::dout() << "number of internal variables: " << numIntVars << std::endl;
+    Xyce::dout() << "number of external variables: " << numExtVars << std::endl;
   }
 #endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << "number of internal variables: " << numInt << endl;
-    cout << "number of external variables: " << numExt << endl;
-  }
-#endif
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
-
-  if ( numInt != numIntVars )
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -459,8 +382,8 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "\nEnd of Instance::register LIDs\n";
-    cout << dashedline << endl;
+    Xyce::dout() << "\nEnd of Instance::register LIDs\n";
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 }
@@ -473,49 +396,15 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Eric R. Keiter , SNL, Parallel Computational Sciences
 // Creation Date : 04/09/05
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-  string msg;
-
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << endl;
-    cout << dashedline << endl;
-    cout << "  In Instance::registerStateLIDs\n\n";
-    cout << "  name             = " << getName() << endl;
-  }
-
-#endif
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << "  Number of State LIDs: " << numSta << endl;
-  }
-#endif
-
-
-  if( numSta != numStateVars )
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
   int i=0;
   for ( ; i<numStateVars;++i)
   {
     voltageStateID_[i] = staLIDVecRef[i];
   }
-
 }
 
 //-----------------------------------------------------------------------------
@@ -526,7 +415,7 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 // Creator       : Eric R. Keiter , SNL, Parallel Computational Sciences
 // Creation Date : 04/09/05
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -539,7 +428,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Eric R. Keiter , SNL, Parallel Computational Sciences
 // Creation Date : 04/09/05
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   jacLIDs = jacLIDVec;
 }
@@ -585,7 +474,7 @@ bool Instance::loadDAEFVector ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "In ::loadDAEFVector " << getName() << endl;
+    Xyce::dout() << "In ::loadDAEFVector " << getName() << std::endl;
   }
 #endif
 
@@ -599,8 +488,8 @@ bool Instance::loadDAEFVector ()
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
       {
-        cout <<"Instance: iRow = " << iRow << "  current = ";
-        cout << currentOutputVector_[i] <<endl;
+        Xyce::dout() <<"Instance: iRow = " << iRow << "  current = ";
+        Xyce::dout() << currentOutputVector_[i] << std::endl;
       }
 #endif
       (*daeFVecPtr)[iRow] -= currentOutputVector_[i];
@@ -615,7 +504,7 @@ bool Instance::loadDAEFVector ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Done with Instance::loadDAEFVector "<< endl;
+    Xyce::dout() << "Done with Instance::loadDAEFVector "<< std::endl;
   }
 #endif
 
@@ -695,12 +584,11 @@ bool Instance::updatePrimaryState()
   bool bsuccess=true;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "  Instance::updatePrimaryState" << endl;
-    cout << "  name   = " << getName() << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "  Instance::updatePrimaryState" << std::endl;
+    Xyce::dout() << "  name   = " << getName() << std::endl;
   }
 #endif
 
@@ -733,7 +621,7 @@ bool Instance::updateSecondaryState()
 // Creation Date : 05/06/04
 //-----------------------------------------------------------------------------
 
-bool Instance::getBreakPoints ( vector<N_UTL_BreakPoint> & breakPointTimes)
+bool Instance::getBreakPoints ( std::vector<N_UTL_BreakPoint> & breakPointTimes)
 {
   // if necessary, initialize
   initialize ();
@@ -778,13 +666,13 @@ bool Instance::setupVoltageLimiting_ ()
   int iBC(0),i(0);
 
 #ifdef Xyce_DEBUG_DEVICE
-  cout << "In setupVoltageLimiting" << endl;
+  Xyce::dout() << "In setupVoltageLimiting" << std::endl;
 #endif
 
   origFlag=true;
 
-  map<string,double>::iterator iterM = voltageInputMap_.begin();
-  map<string,double>::iterator endM  = voltageInputMap_.end ();
+  std::map<std::string,double>::iterator iterM = voltageInputMap_.begin();
+  std::map<std::string,double>::iterator endM  = voltageInputMap_.end ();
 
   int voltSize = voltageOrig_.size();
   // save the orig, unlimited voltages:
@@ -792,20 +680,20 @@ bool Instance::setupVoltageLimiting_ ()
   {
     voltageOrig_[i] = iterM->second;
 #ifdef Xyce_DEBUG_DEVICE
-    cout << "voltageOrig_["<<i<<"] = " << voltageOrig_[i] << endl;
+    Xyce::dout() << "voltageOrig_["<<i<<"] = " << voltageOrig_[i] << std::endl;
 #endif
   }
 
 #ifdef Xyce_DEBUG_DEVICE
-  cout << getName() << "  Before Limiting:"<<endl;
+  Xyce::dout() << getName() << "  Before Limiting:"<< std::endl;
   iterM = voltageInputMap_.begin();
   for( ; iterM != endM; ++iterM)
   {
-    cout << "Blim: ";
-    cout << iterM->first;
-    cout << "\t";
-    cout << iterM->second;
-    cout << endl;
+    Xyce::dout() << "Blim: ";
+    Xyce::dout() << iterM->first;
+    Xyce::dout() << "\t";
+    Xyce::dout() << iterM->second;
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -815,13 +703,13 @@ bool Instance::setupVoltageLimiting_ ()
   {
     newtonIterOld=0;
 #ifdef Xyce_DEBUG_DEVICE
-    cout << "Inside the newtonIter==0... " << endl;
+    Xyce::dout() << "Inside the newtonIter==0... " << std::endl;
 #endif
 
     if (!(getSolverState().dcopFlag)||(getSolverState().locaEnabledFlag && getSolverState().dcopFlag))
     {
 #ifdef Xyce_DEBUG_DEVICE
-      cout << "Inside !dcopFlag || (locaEnabledFlago && dcopFlag) " << endl;
+      Xyce::dout() << "Inside !dcopFlag || (locaEnabledFlago && dcopFlag) " << std::endl;
 #endif
       for(i=0;i<voltSize;++i)
       {
@@ -833,7 +721,7 @@ bool Instance::setupVoltageLimiting_ ()
     else  // no history, just set old voltages to the current ones.
     {
 #ifdef Xyce_DEBUG_DEVICE
-      cout << "Inside no-history" << endl;
+      Xyce::dout() << "Inside no-history" << std::endl;
 #endif
       iterM = voltageInputMap_.begin();
       for(i=0;i<voltSize;++i,++iterM)
@@ -845,7 +733,7 @@ bool Instance::setupVoltageLimiting_ ()
   else if (getSolverState().newtonIter != 0 && getSolverState().newtonIter != newtonIterOld)
   {
 #ifdef Xyce_DEBUG_DEVICE
-    cout << "Inside lastCall. " << endl;
+    Xyce::dout() << "Inside lastCall. " << std::endl;
 #endif
     for(i=0;i<voltSize;++i)
     {
@@ -857,12 +745,12 @@ bool Instance::setupVoltageLimiting_ ()
   if (getSolverState().initJctFlag && getDeviceOptions().voltageLimiterFlag)
   {
 #ifdef Xyce_DEBUG_DEVICE
-    cout << "Inside the initJctFlag==true." << endl;
+    Xyce::dout() << "Inside the initJctFlag==true." << std::endl;
 #endif
     if (initJctGiven_)
     {
 #ifdef Xyce_DEBUG_DEVICE
-      cout << "Inside the local initJctGiven_==true." << endl;
+      Xyce::dout() << "Inside the local initJctGiven_==true." << std::endl;
 #endif
       origFlag=false;
       setInitJct = true;
@@ -872,8 +760,8 @@ bool Instance::setupVoltageLimiting_ ()
       {
         iterM->second = voltageNodeVec[i]->initVal;
 #ifdef Xyce_DEBUG_DEVICE
-        cout << "initVal : " << iterM->first << " = ";
-        cout << voltageNodeVec[i]->initVal << endl;
+        Xyce::dout() << "initVal : " << iterM->first << " = ";
+        Xyce::dout() << voltageNodeVec[i]->initVal << std::endl;
 #endif
       }
     }
@@ -926,20 +814,20 @@ bool Instance::setupVoltageLimiting_ ()
   }
 
 #ifdef Xyce_DEBUG_DEVICE
-  cout << getName() << "  After Limiting:"<<endl ;
+  Xyce::dout() << getName() << "  After Limiting:"<< std::endl;
   iterM = voltageInputMap_.begin();
   for( ; iterM != endM; ++iterM)
   {
-    cout << "Alim: ";
-    cout << iterM->first;
-    cout << "\t";
-    cout << iterM->second;
-    cout << endl;
+    Xyce::dout() << "Alim: ";
+    Xyce::dout() << iterM->first;
+    Xyce::dout() << "\t";
+    Xyce::dout() << iterM->second;
+    Xyce::dout() << std::endl;
   }
   if (origFlag)
-    cout << "origFlag is TRUE" << endl;
+    Xyce::dout() << "origFlag is TRUE" << std::endl;
   else
-    cout << "origFlag is FALSE" << endl;
+    Xyce::dout() << "origFlag is FALSE" << std::endl;
 #endif
 
   iterM = voltageInputMap_.begin();
@@ -1021,9 +909,7 @@ bool Instance::initialize ()
         int sizeVoltMap = voltageNodeVec.size();
         if (sizeVoltMap != numExtVars)
         {
-          string msg = "Instance::initialize: \n";
-          msg += "Number of specified nodes != numExtVars";
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
+          UserError(*this) << "Number of specified nodes != numExtVars";
         }
 
         // The name parameter was required, so force the voltageInputMap
@@ -1038,12 +924,12 @@ bool Instance::initialize ()
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
         {
-          map <string,double>::const_iterator iterVI = voltageInputMap_.begin();
-          map <string,double>::const_iterator endVI = voltageInputMap_.end ();
+          std::map<std::string,double>::const_iterator iterVI = voltageInputMap_.begin();
+          std::map<std::string,double>::const_iterator endVI = voltageInputMap_.end ();
           for (;iterVI!=endVI;++iterVI)
           {
-            cout << "voltageInputMap["<<iterVI->first<<"] = ";
-            cout << iterVI->second << endl;
+            Xyce::dout() << "voltageInputMap["<<iterVI->first<<"] = ";
+            Xyce::dout() << iterVI->second << std::endl;
           }
         }
 #endif
@@ -1061,9 +947,7 @@ bool Instance::initialize ()
 
         if (oneOrMoreInitSet && !allInitSet)
         {
-          string msg = "Instance::initialize: \n";
-          msg += "You have set an initial value on at least one node,\nbut not all of them.  You must either set all or none.\n";
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
+          UserError(*this) << "Initial value set on at least one node, but not all of them.  You must either set all or none.";
         }
 
         initJctGiven_ = allInitSet;
@@ -1081,7 +965,7 @@ bool Instance::initialize ()
             voltageNodeVec[i] = new VoltageNode();
             char tmp[16];
             sprintf(tmp,"VCONNECT%04d",i);
-            voltageNodeVec[i]->vsrcName = string(tmp);
+            voltageNodeVec[i]->vsrcName = std::string(tmp);
           }
         }
       }
@@ -1090,14 +974,10 @@ bool Instance::initialize ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "Initializing internal Xyce" << endl;
+      Xyce::dout() << "Initializing internal Xyce" << std::endl;
     }
 #endif
-    extCodePtr_->initialize(
-#ifdef Xyce_PARALLEL_MPI
-      comm_
-#endif
-                            );
+    extCodePtr_->initialize(comm_);
 
     startTimeStep ();
     initializeFlag_ = true;
@@ -1114,7 +994,7 @@ bool Instance::initialize ()
 // Creator       : Eric Keiter, SNL
 // Creation Date : 04/03/06
 //-----------------------------------------------------------------------------
-CompositeParam *Instance::constructComposite(string & cName, string & pName)
+CompositeParam *Instance::constructComposite(const std::string & cName, const std::string & pName)
 {
   CompositeParam * cpPtr = NULL;
 
@@ -1127,10 +1007,7 @@ CompositeParam *Instance::constructComposite(string & cName, string & pName)
   }
   else
   {
-    string msg =
-      "Instance::ConstructComposite: unrecognized composite name: ";
-    msg += cName;
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
+    UserError(*this) << "Unrecognized composite name " << cName;
   }
 
   return cpPtr;
@@ -1154,13 +1031,13 @@ bool Instance::updateIntermediateVars()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Instance::updateIntermediateVars:" << endl;
+    Xyce::dout() << "Instance::updateIntermediateVars:" << std::endl;
 
     int vnSize = voltageNodeVec.size();
 
     for (i=0;i<vnSize;++i)
     {
-      cout << voltageNodeVec[i];
+      Xyce::dout() << voltageNodeVec[i];
     }
   }
 #endif
@@ -1195,8 +1072,8 @@ bool Instance::updateIntermediateVars()
 
   if( comm_->procID() != owningProc_ ) locallyConnected_ = false;
 
-  map<string,double>::iterator iterM = voltageInputMap_.begin();
-  map<string,double>::iterator endM  = voltageInputMap_.end ();
+  std::map<std::string,double>::iterator iterM = voltageInputMap_.begin();
+  std::map<std::string,double>::iterator endM  = voltageInputMap_.end ();
 
   for( ; iterM != endM; ++iterM )
   {
@@ -1220,7 +1097,7 @@ bool Instance::updateIntermediateVars()
   //
 
   innerSolveStatus_ = extCodePtr_->simulateStep (
-    solState,
+    getSolverState(),
     voltageInputMap_,
     currentOutputVector_,
     conductanceJacobian_,
@@ -1262,8 +1139,8 @@ bool Instance::updateTemperature( const double & temp )
 // Creation Date : 03/12/06
 //-----------------------------------------------------------------------------
 void Instance::homotopyStepSuccess
-(const vector<string> & paramNames,
- const vector<double> & paramVals)
+(const std::vector<std::string> & paramNames,
+ const std::vector<double> & paramVals)
 {
   extCodePtr_->homotopyStepSuccess ( paramNames, paramVals);
   return;
@@ -1387,7 +1264,7 @@ bool Instance::startTimeStep ()
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/15/06
 //-----------------------------------------------------------------------------
-bool Instance::setInternalParam(string & name1, double val)
+bool Instance::setInternalParam(std::string & name1, double val)
 {
   bool bsuccess = true;
   initialize ();
@@ -1408,7 +1285,7 @@ bool Instance::setInternalParam(string & name1, double val)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/09/05
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
 
 
@@ -1423,12 +1300,12 @@ bool Model::processParams (string param)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/09/05
 //-----------------------------------------------------------------------------
-Model::Model(const ModelBlock & MB,
-             SolverState & ss1,
-             DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1)
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block)
 {
-
   processParams ();
 }
 
@@ -1442,9 +1319,9 @@ Model::Model(const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model()
 {
-  vector<Instance*>::iterator iterI;
-  vector<Instance*>::iterator firstI = instanceContainer.begin ();
-  vector<Instance*>::iterator lastI  = instanceContainer.end ();
+  std::vector<Instance*>::iterator iterI;
+  std::vector<Instance*>::iterator firstI = instanceContainer.begin ();
+  std::vector<Instance*>::iterator lastI  = instanceContainer.end ();
 
   // loop over instances:
   for (iterI = firstI; iterI != lastI; ++iterI)
@@ -1466,21 +1343,56 @@ Model::~Model()
 
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i;
-  os << endl;
-  os << "    name     getModelName()  Parameters" << endl;
+  os << std::endl;
+  os << "    name     model name  Parameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "      ";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
+
+  return os;
+}
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new DeviceMaster<Traits>(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("ext", 1)
+    .registerModelType("ext", 1);
 }
 
 } // namespace ExternDevice

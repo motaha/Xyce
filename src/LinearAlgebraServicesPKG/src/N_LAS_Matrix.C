@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.98.2.2 $
+// Revision Number: $Revision: 1.110 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -54,6 +54,7 @@
 // ----------   Xyce Includes   ----------
 
 #include <N_UTL_Misc.h>
+#include <N_UTL_fwd.h>
 
 #include <N_LAS_Matrix.h>
 #include <N_LAS_MultiVector.h>
@@ -89,16 +90,29 @@
 //-----------------------------------------------------------------------------
 N_LAS_Matrix::~N_LAS_Matrix()
 {
-  if ( isOwned_ ) {
+  if ( isOwned_ ) 
+  {
     if( oDCRSMatrix_ != aDCRSMatrix_ )
-      if( viewTransform_ ) delete viewTransform_; //destroys aDCRSMatrix_ as well
-      else                 delete aDCRSMatrix_;
+    {
+      if( viewTransform_ )
+      {
+        delete viewTransform_; //destroys aDCRSMatrix_ as well
+      }
+      else
+      {
+        delete aDCRSMatrix_;
+      }
+    }
 
-    if( oDCRSMatrix_ ) delete oDCRSMatrix_;
+    if( oDCRSMatrix_ ) 
+      delete oDCRSMatrix_;
   }
 
-  if( exporter_ ) delete exporter_;
-  if( offsetIndex_ ) delete offsetIndex_;
+  if( exporter_ ) 
+    delete exporter_;
+
+  if( offsetIndex_ ) 
+    delete offsetIndex_;
 }
 
 
@@ -110,7 +124,7 @@ N_LAS_Matrix::~N_LAS_Matrix()
 // Creator       : Scott A. Hutchinson, SNL, Parallel Computational Sciences
 // Creation Date : 06/04/00
 //-----------------------------------------------------------------------------
-N_LAS_Matrix::N_LAS_Matrix( N_PDS_ParMap & map, vector<int> & diagArray )
+N_LAS_Matrix::N_LAS_Matrix( N_PDS_ParMap & map, std::vector<int> & diagArray )
 : aDCRSMatrix_(0),
   oDCRSMatrix_(0),
   viewTransform_(0),
@@ -159,19 +173,22 @@ N_LAS_Matrix::N_LAS_Matrix( Epetra_CrsGraph * overlapGraph,
 {
   oDCRSMatrix_ = new Epetra_CrsMatrix( Copy, *overlapGraph );
 
-#ifndef Xyce_PARALLEL_MPI
-  viewTransform_ = new EpetraExt::CrsMatrix_View( *overlapGraph, *baseGraph );
-  aDCRSMatrix_ = &((*viewTransform_)( *oDCRSMatrix_ ));
-#else
-  aDCRSMatrix_ = new Epetra_CrsMatrix( Copy, *baseGraph );
-  exporter_ = new Epetra_Export( overlapGraph->RowMap(), baseGraph->RowMap() );
-  offsetIndex_ = new Epetra_OffsetIndex( *overlapGraph, *baseGraph, *exporter_ );
-#endif	
+  if ( (oDCRSMatrix_->Comm()).NumProc() > 1 )
+  { 
+    aDCRSMatrix_ = new Epetra_CrsMatrix( Copy, *baseGraph );
+    exporter_ = new Epetra_Export( overlapGraph->RowMap(), baseGraph->RowMap() );
+    offsetIndex_ = new Epetra_OffsetIndex( *overlapGraph, *baseGraph, *exporter_ );
+  }
+  else
+  {
+    viewTransform_ = new EpetraExt::CrsMatrix_View( *overlapGraph, *baseGraph );
+    aDCRSMatrix_ = &((*viewTransform_)( *oDCRSMatrix_ ));
+  }
 }
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_Matrix::fillComplete
-// Purpose       : 
+// Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
@@ -273,12 +290,11 @@ void N_LAS_Matrix::filterRowSum( const double & threshold )
 //-----------------------------------------------------------------------------
 void N_LAS_Matrix::put( double s )
 {
-  int PetraError =     aDCRSMatrix_->PutScalar(s);
-  PetraError = oDCRSMatrix_->PutScalar(s);
-
-#ifdef Xyce_DEBUG_LINEAR
-  processError( "N_LAS_Matrix::put - ", PetraError );
-#endif
+  if ( exporter_ )
+  {
+    aDCRSMatrix_->PutScalar(s);
+  }
+  oDCRSMatrix_->PutScalar(s);
 }
 
 //-----------------------------------------------------------------------------
@@ -291,9 +307,10 @@ void N_LAS_Matrix::put( double s )
 //-----------------------------------------------------------------------------
 void N_LAS_Matrix::scale(double scaleFactor)
 {
-#ifdef Xyce_PARALLEL_MPI
-  aDCRSMatrix_->Scale(scaleFactor);
-#endif
+  if ( exporter_ )
+  {
+    aDCRSMatrix_->Scale(scaleFactor);
+  }
   oDCRSMatrix_->Scale(scaleFactor);
 }
 
@@ -322,6 +339,7 @@ int N_LAS_Matrix::getRowLength(int row) const
 //-----------------------------------------------------------------------------
 void N_LAS_Matrix::getRow(int row, int &length, double *coeffs, int *colIndices) const
 {
+  std::cout << "N_LAS_Matrix::getRow( " << row << " ) " << std::endl;
   int PetraError = aDCRSMatrix_->ExtractGlobalRowView(row, length, coeffs, colIndices);
 
 #ifdef Xyce_DEBUG_LINEAR
@@ -332,8 +350,8 @@ void N_LAS_Matrix::getRow(int row, int &length, double *coeffs, int *colIndices)
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_Matrix::getRowCopy
-// Purpose       : 
-// Special Notes : 
+// Purpose       :
+// Special Notes :
 // Scope         : Public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 03/05/06
@@ -351,10 +369,10 @@ void N_LAS_Matrix::getRowCopy
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_Matrix::getLocalRowCopy
-// Purpose       : 
-// Special Notes : 
-//               : 
-//               : 
+// Purpose       :
+// Special Notes :
+//               :
+//               :
 // Scope         : Public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 03/05/06
@@ -420,12 +438,12 @@ int N_LAS_Matrix::getLocalRowLength(int row) const
 // Function      : N_LAS_Matrix::putLocalRow
 // Function      : N_LAS_Matrix::shirleyPutRow
 // Purpose       : Put a row into the sparse matrix.
-// Special Notes : Replace already allocated values.  
+// Special Notes : Replace already allocated values.
 //                 erkeite: note; unlike putRow, this function uses the
 //                 a-matrix.
 //
-//                 erkeite:  This function was mis-named as putLocalRow.  
-//                 The row index being used here needs to be a gid (global), 
+//                 erkeite:  This function was mis-named as putLocalRow.
+//                 The row index being used here needs to be a gid (global),
 //                 not an lid (local).  I have re-named it shirleyPutRow
 //                 for now.  (in part because I need a real putLocalRow).
 //
@@ -613,12 +631,12 @@ bool N_LAS_Matrix::sumIntoLocalRow(int row, int length, const double * coeffs,
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_Matrix::returnRawEntryPointer
 //
-// Purpose       : This function returns a raw double* pointer to a single 
+// Purpose       : This function returns a raw double* pointer to a single
 //                 matrix element, specified by the local row,col indices.
 //
 // Special Notes : This function is much more convenient for developers of the
 //                 device package than dealing with local compressed rows and
-//                 the offsets required to use the bracket operators. 
+//                 the offsets required to use the bracket operators.
 //
 // Scope         : Public
 // Creator       : Eric R. Keiter, SNL
@@ -633,7 +651,7 @@ double * N_LAS_Matrix::returnRawEntryPointer (int lidRow, int lidCol)
   double * values;
 
   oDCRSMatrix_->ExtractMyRowView( lidRow, num_entries, values, indices );
-   
+
   for( int j = 0; j < num_entries; ++j )
   {
      if (indices[j] == lidCol)
@@ -648,8 +666,8 @@ double * N_LAS_Matrix::returnRawEntryPointer (int lidRow, int lidCol)
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_Matrix::extractLocalRowView
-// Purpose       : 
-// Special Notes : 
+// Purpose       :
+// Special Notes :
 // Scope         : Public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 05/18/2010
@@ -661,8 +679,8 @@ int N_LAS_Matrix::extractLocalRowView(int lidRow, int& numEntries, double*& valu
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_Matrix::extractLocalRowView
-// Purpose       : 
-// Special Notes : 
+// Purpose       :
+// Special Notes :
 // Scope         : Public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 05/18/2010
@@ -684,8 +702,8 @@ bool N_LAS_Matrix::sumIntoRowWithTest(int row, int length, const double *coeffs,
                                                            const int *colIndices)
 {
   int new_length = 0;
-  vector<double> new_vals(length);
-  vector<int> new_indices(length);
+  std::vector<double> new_vals(length);
+  std::vector<int> new_indices(length);
 
   int i, j;
   bool found;
@@ -712,13 +730,6 @@ bool N_LAS_Matrix::sumIntoRowWithTest(int row, int length, const double *coeffs,
 
   }
 
-/*
-  cout << "N_LAS_Matrix:sumIntoRowWithTest\n";
-  for( int i = 0; i < length; ++i )
-    cout << i << " " << colIndices[i] << " " << coeffs[i] << endl;
-  cout << "-----------------------\n";
-*/
-
   sumIntoRow( row, new_length, &(new_vals[0]), &(new_indices[0]) );
 
   return true;
@@ -736,15 +747,15 @@ bool N_LAS_Matrix::sumIntoRowWithTest(int row, int length, const double *coeffs,
 //-----------------------------------------------------------------------------
 bool N_LAS_Matrix::sumIntoLocalRow( int row,
                                     int length,
-                                    const vector<double> & vals,
-                                    const vector<int> & indices )
+                                    const std::vector<double> & vals,
+                                    const std::vector<int> & indices )
 {
   int new_length = 0;
   bool found;
   int i, j;
 
-  vector<double> new_vals(length);
-  vector<int> new_indices(length);
+  std::vector<double> new_vals(length);
+  std::vector<int> new_indices(length);
 
   for( i = 0; i < length; ++i )
   {
@@ -768,13 +779,13 @@ bool N_LAS_Matrix::sumIntoLocalRow( int row,
   }
 
 /*
-  cout << "N_LAS_Matrix:sumIntoLocalRow\n";
+  Xyce::dout() << "N_LAS_Matrix:sumIntoLocalRow\n";
   for( int i = 0; i < length; ++i )
-    cout << i << " " << indices[i] << " " << vals[i] << endl;
-  cout << "-----------------------\n";
+    Xyce::dout() << i << " " << indices[i] << " " << vals[i] << std::endl;
+  Xyce::dout() << "-----------------------\n";
   for( int i = 0; i < new_length; ++i )
-    cout << i << " " << new_indices[i] << " " << new_vals[i] << endl;
-  cout << "-----------------------\n";
+    Xyce::dout() << i << " " << new_indices[i] << " " << new_vals[i] << std::endl;
+  Xyce::dout() << "-----------------------\n";
 */
 
   int PetraError = aDCRSMatrix_->SumIntoMyValues( row, new_length, &new_vals[0], &new_indices[0] );
@@ -821,23 +832,23 @@ void N_LAS_Matrix::add( const N_LAS_Matrix & A )
 // Creator       : Eric Keiter
 // Creation Date : 2/13/07
 //-----------------------------------------------------------------------------
-void N_LAS_Matrix::linearCombo( const double a, const N_LAS_Matrix & A, 
+void N_LAS_Matrix::linearCombo( const double a, const N_LAS_Matrix & A,
                                 const double b, const N_LAS_Matrix & B)
 {
   int NumRows = (*aDCRSMatrix_).NumMyRows();
-  
+
   int *aIndices, *bIndices;
   int aNumIndices, bNumIndices;
   double *aValues, *bValues;
-  
+
   for( int i = 0; i < NumRows; ++i ) {
     // Get a view of the i-th row for A and B.
     A.aDCRSMatrix_->ExtractMyRowView( i, aNumIndices, aValues, aIndices );
     B.aDCRSMatrix_->ExtractMyRowView( i, bNumIndices, bValues, bIndices );
- 
+
     // Add in the entries from each matrix.
     for ( int j = 0; j < aNumIndices; ++j )
-      (*aDCRSMatrix_)[i][j] = a*aValues[j] + b*bValues[j];      
+      (*aDCRSMatrix_)[i][j] = a*aValues[j] + b*bValues[j];
   }
 }
 
@@ -862,7 +873,7 @@ double * N_LAS_Matrix::operator[]( int row )
 // Creator       : Robert J. Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 9/5/02
 //-----------------------------------------------------------------------------
-double * const & N_LAS_Matrix::operator[]( int row ) const
+double * const N_LAS_Matrix::operator[]( int row ) const
 {
   return (*oDCRSMatrix_)[row];
 }
@@ -903,14 +914,14 @@ void N_LAS_Matrix::writeToFile(char *filename, bool useLIDs, bool mmFormat )
     int masterRank = 0;
 
     int MaxNumEntries = aDCRSMatrix_->MaxNumEntries();
-    vector<int> Indices( MaxNumEntries );
-    vector<double> Values( MaxNumEntries );
+    std::vector<int> Indices( MaxNumEntries );
+    std::vector<double> Values( MaxNumEntries );
     int NumEntries;
     int NumMyRows = aDCRSMatrix_->NumMyRows();
 
     if( !aDCRSMatrix_->Filled() )
     {
-      cerr << "N_LAS_Matrix: can't writeToFile unless Filled!" << endl;
+      std::cerr << "N_LAS_Matrix: can't writeToFile unless Filled!" << std::endl;
       return;
     }
 
@@ -980,10 +991,10 @@ void N_LAS_Matrix::writeToFile(char *filename, bool useLIDs, bool mmFormat )
 // Creator       : Scott A. Hutchinson, SNL, Parallel Computational Sciences
 // Creation Date : 06/04/00
 //-----------------------------------------------------------------------------
-void N_LAS_Matrix::processError(string methodMsg, int error) const
+void N_LAS_Matrix::processError(std::string methodMsg, int error) const
 {
 
-  const string PetraError("Function returned with an error.\n");
+  const std::string PetraError("Function returned with an error.\n");
 
   // Process the error
   if( error < 0 ) N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, methodMsg + PetraError);
@@ -1000,15 +1011,18 @@ void N_LAS_Matrix::processError(string methodMsg, int error) const
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 07/14/00
 //-----------------------------------------------------------------------------
-void N_LAS_Matrix::printPetraObject() const
+void N_LAS_Matrix::printPetraObject(std::ostream &os) const
 {
-  cout << *oDCRSMatrix_;
-  cout << *aDCRSMatrix_;
+  if (oDCRSMatrix_ != aDCRSMatrix_)
+  {
+    os << *oDCRSMatrix_;
+  }
+  os << *aDCRSMatrix_;
 }
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_Matrix::setUseTranspose
-// Purpose       : 
+// Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
@@ -1021,7 +1035,7 @@ int N_LAS_Matrix::setUseTranspose (bool useTranspose)
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_Matrix::useTranspose
-// Purpose       : 
+// Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences

@@ -1157,15 +1157,11 @@ int DeviceTestor::runTests(int iargs, char *cargs[])
 
   if (isuccess == STATUS_SUCCESS)
   {
-     N_ERH_ErrorMgr::report (
-          N_ERH_ErrorMgr::DEV_DEBUG_0,
-          string("Allocation was successful"));
+    Xyce::dout() << "Allocation was successful" << std::endl;
   }
   else
   {
-     N_ERH_ErrorMgr::report (
-          N_ERH_ErrorMgr::DEV_FATAL_0,
-          string("Allocation was NOT successful."));
+    Xyce::Report::DevelFatal0() << "Allocation was NOT successful." << std::endl;
   }
 
 
@@ -1176,15 +1172,11 @@ int DeviceTestor::runTests(int iargs, char *cargs[])
 
   if (isuccess == STATUS_SUCCESS)
   {
-     N_ERH_ErrorMgr::report (
-          N_ERH_ErrorMgr::DEV_DEBUG_0,
-          string("Registration was successful."));
+    Xyce::dout() << "Registration was successful." << std::endl;
   }
   else
   {
-     N_ERH_ErrorMgr::report (
-          N_ERH_ErrorMgr::DEV_FATAL_0,
-          string("Registration was NOT successful."));
+    Xyce::Report::DevelFatal0() << "Registration was NOT successful." << std::endl;
   }
 
   isuccess = doInitializations ();
@@ -1199,15 +1191,11 @@ int DeviceTestor::runTests(int iargs, char *cargs[])
 
   if (isuccess == STATUS_SUCCESS)
   {
-     N_ERH_ErrorMgr::report (
-          N_ERH_ErrorMgr::DEV_DEBUG_0,
-          string("Device creation was successful."));
+    Xyce::dout() << "Device creation was successful." << std::endl;
   }
   else
   {
-     N_ERH_ErrorMgr::report (
-          N_ERH_ErrorMgr::DEV_FATAL_0,
-          string("Device creation was NOT successful."));
+    Xyce::Report::DevelFatal0() << "Device creation was NOT successful." << std::endl;
   }
 
   //////////////////////////////////////////////////////////////
@@ -1217,30 +1205,22 @@ int DeviceTestor::runTests(int iargs, char *cargs[])
 
   if (isuccess == STATUS_SUCCESS)
   {
-     N_ERH_ErrorMgr::report (
-          N_ERH_ErrorMgr::DEV_DEBUG_0,
-          string("getting default element info successful."));
+    Xyce::dout() << "getting default element info successful." << std::endl;
   }
   else
   {
-     N_ERH_ErrorMgr::report (
-          N_ERH_ErrorMgr::DEV_FATAL_0,
-          string("getting default element info NOT successful."));
+    Xyce::Report::DevelFatal0() << "getting default element info NOT successful." << std::endl;
   }
 
   isuccess = getDefaultModelInfo();
 
   if (isuccess == STATUS_SUCCESS)
   {
-     N_ERH_ErrorMgr::report (
-          N_ERH_ErrorMgr::DEV_DEBUG_0,
-          string("getting default model info successful."));
+    Xyce::dout() << "getting default model info successful." << std::endl;
   }
   else
   {
-     N_ERH_ErrorMgr::report (
-          N_ERH_ErrorMgr::DEV_FATAL_0,
-          string("getting default model info NOT successful."));
+    Xyce::Report::DevelFatal0() << "getting default model info NOT successful." << std::endl;
   }
 
   //////////////////////////////////////////////////////////////
@@ -1249,15 +1229,11 @@ int DeviceTestor::runTests(int iargs, char *cargs[])
 
   if (isuccess == STATUS_SUCCESS)
   {
-     N_ERH_ErrorMgr::report (
-          N_ERH_ErrorMgr::DEV_FATAL_0,
-          string("Device creator does not enforce singletons."));
+    Xyce::Report::DevelFatal0() << "Device creator does not enforce singletons." << std::endl;
   }
   else
   {
-     N_ERH_ErrorMgr::report (
-          N_ERH_ErrorMgr::DEV_DEBUG_0,
-          string("Device creator does enforce singletons."));
+    Xyce::dout() << "Device creator does enforce singletons." << std::endl;
   }
 
   //////////////////////////////////////////////////////////////
@@ -1280,15 +1256,11 @@ int DeviceTestor::runTests(int iargs, char *cargs[])
   isuccess = addModels();
   if (isuccess == STATUS_SUCCESS)
   {
-     N_ERH_ErrorMgr::report (
-          N_ERH_ErrorMgr::DEV_DEBUG_0,
-          string("addModels was successful."));
+    Xyce::dout() << "addModels was successful." << std::endl;
   }
   else
   {
-     N_ERH_ErrorMgr::report (
-          N_ERH_ErrorMgr::DEV_FATAL_0,
-          string("addModels was NOT successful."));
+    Xyce::Report::DevelFatal0() << "addModels was NOT successful." << std::endl;
   }
 
 
@@ -1298,15 +1270,11 @@ int DeviceTestor::runTests(int iargs, char *cargs[])
 
   if (isuccess == STATUS_SUCCESS)
   {
-     N_ERH_ErrorMgr::report (
-          N_ERH_ErrorMgr::DEV_DEBUG_0,
-          string("addInstances was successful."));
+    Xyce::dout() << "addInstances was successful." << std::endl;
   }
   else
   {
-     N_ERH_ErrorMgr::report (
-          N_ERH_ErrorMgr::DEV_FATAL_0,
-          string("addInstances was NOT successful."));
+    Xyce::Report::DevelFatal0() << "addInstances was NOT successful." << std::endl;
   }
 
   //////////////////////////////////////////////////////////////
@@ -1336,15 +1304,11 @@ int DeviceTestor::runTests(int iargs, char *cargs[])
 
   if (isuccess == STATUS_SUCCESS)
   {
-     N_ERH_ErrorMgr::report (
-          N_ERH_ErrorMgr::DEV_DEBUG_0,
-          string("De-Allocation was successful."));
+    Xyce::dout() << "De-Allocation was successful." << std::endl;
   }
   else
   {
-     N_ERH_ErrorMgr::report (
-          N_ERH_ErrorMgr::DEV_FATAL_0,
-          string("De-Allocation was NOT successful."));
+    Xyce::Report::DevelFatal0() << "De-Allocation was NOT successful." << std::endl;
   }
 
   //////////////////////////////////////////////////////////////

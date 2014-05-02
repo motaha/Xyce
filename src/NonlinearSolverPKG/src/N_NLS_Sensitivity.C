@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,7 +36,7 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.64.2.4 $
+// Revision Number: $Revision: 1.82 $
 //
 // Revision Date  : $Date $
 //
@@ -104,12 +104,19 @@ N_NLS_Sensitivity::N_NLS_Sensitivity (N_NLS_NonLinearSolver & nls,
       solutionSize_(0),
       solveDirectFlag_(true),
       solveAdjointFlag_(true),
+      outputScaledFlag_(false),
+      outputUnscaledFlag_(true),
       maxParamStringSize_(0),
+      stdOutputFlag_(true),
+      fileOutputFlag_(false),
+      dakotaFileOutputFlag_(false),
+      numSolves_(0),
       difference(SENS_FWD),
       objFuncGiven_(false),
       objFuncGIDsetup_(false),
       expNumVars_(0),
       expVal_(0.0),
+      objFuncString_(""),
       curValue_(0.0),
       objFuncEval_(0.0),
       dOdp_(0.0),
@@ -223,6 +230,131 @@ N_NLS_Sensitivity::~N_NLS_Sensitivity()
   dXdpPtrVector_.clear();
 }
 
+
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_Sensitivity::stdOutput
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Eric Keiter, SNL
+// Creation Date : 2/18/2014
+//-----------------------------------------------------------------------------
+void N_NLS_Sensitivity::stdOutput (
+       std::string idString,
+       std::vector<double> & paramVals,
+       std::vector<double> & sensitivities,
+       std::vector<double> & scaled_sensitivities)
+{
+  // Send the sensitivity information to the screen:
+#ifdef Xyce_PARALLEL_MPI
+  N_PDS_Comm *pdsCommPtr = pdsMgrPtr_->getPDSComm();
+  int myPID = pdsCommPtr->procID();
+  if (myPID==0)
+#endif
+  {
+    Xyce::dout() << "\n"<<idString << " Sensitivities of objective function:" 
+        << objFuncString_ << std::endl;
+
+    Xyce::dout() << std::setw(maxParamStringSize_)<<"Name";
+    Xyce::dout() << "\t"<<std::setw(13)<<"Value";
+    Xyce::dout() << "\t"<<std::setw(13)<<"Sensitivity";
+    Xyce::dout() << "\t"<<std::setw(13)<<"Normalized"<<std::endl;
+
+    for (int iparam=0; iparam< numSensParams_; ++iparam)
+    {
+      Xyce::dout() << std::setw(maxParamStringSize_)<<paramNameVec_[iparam];
+
+      Xyce::dout() << "\t" << std::setw(13)<< std::scientific<< std::setprecision(4)
+        << paramVals[iparam];
+
+      Xyce::dout() << "\t" << std::setw(13)<< std::scientific<< std::setprecision(4)
+        << sensitivities[iparam];
+
+      Xyce::dout() << "\t" << std::setw(13)<< std::scientific<< std::setprecision(4)
+        << scaled_sensitivities[iparam] << std::endl;
+    }
+  }
+#ifdef Xyce_PARALLEL_MPI
+  pdsCommPtr->barrier();
+#endif
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_Sensitivity::fileOutput
+// Purpose       : Dump sensitivity information out to a file.
+// Special Notes :
+// Scope         : public
+// Creator       : Eric Keiter, SNL
+// Creation Date : 2/18/2014
+//-----------------------------------------------------------------------------
+void N_NLS_Sensitivity::fileOutput (
+       std::string idString,
+       std::vector<double> & paramVals,
+       std::vector<double> & sensitivities,
+       std::vector<double> & scaled_sensitivities)
+{
+
+#ifdef Xyce_PARALLEL_MPI
+  N_PDS_Comm *pdsCommPtr = pdsMgrPtr_->getPDSComm();
+  int myPID = pdsCommPtr->procID();
+  if (myPID==0)
+#endif
+  {
+    std::ostringstream numSolvesOStr;
+    numSolvesOStr << numSolves_;
+    std::string dodpFileName = netlistFileName_ + numSolvesOStr.str() + "_dodp" + idString +".txt";
+    FILE *fp = fopen(dodpFileName.c_str(),"w");
+    for (int iparam=0;iparam< numSensParams_; ++iparam)
+    {
+      fprintf(fp,"\t%16.8e\n", sensitivities[iparam]);
+    }
+    fclose(fp);
+  }
+#ifdef Xyce_PARALLEL_MPI
+  pdsCommPtr->barrier();
+#endif
+}
+
+//-----------------------------------------------------------------------------
+// Function      : N_NLS_Sensitivity::dakOutput
+// Purpose       : Dump sensitivity information out to a dakota-style file.
+// Special Notes :
+// Scope         : public
+// Creator       : Eric Keiter, SNL
+// Creation Date : 2/19/2014
+//-----------------------------------------------------------------------------
+void N_NLS_Sensitivity::dakOutput (
+       std::string idString,
+       std::vector<double> & paramVals,
+       std::vector<double> & sensitivities,
+       std::vector<double> & scaled_sensitivities)
+{
+#ifdef Xyce_PARALLEL_MPI
+  N_PDS_Comm *pdsCommPtr = pdsMgrPtr_->getPDSComm();
+  int myPID = pdsCommPtr->procID();
+  if (myPID==0)
+#endif
+  {
+    // write a file format that can be used by dakota :
+    // Note that currently, this will simply overwrite the same 
+    // file every time this function is called.
+    std::string dakotaFileName = netlistFileName_ + "_dodp" + idString + "_all.txt";
+    FILE *fp2 = fopen(dakotaFileName.c_str(),"w");
+    fprintf(fp2,"%16.8e", objFuncEval_ );
+    fprintf(fp2,"%s","\n[\n");
+    for (int iparam=0;iparam< numSensParams_; ++iparam)
+    {
+      fprintf(fp2,"\t%16.8e\n", sensitivities[iparam]);
+    }
+    fprintf(fp2,"%s","]\n");
+    fclose(fp2);
+  }
+#ifdef Xyce_PARALLEL_MPI
+  pdsCommPtr->barrier();
+#endif
+}
+
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_Sensitivity::solve
 // Purpose       :
@@ -231,9 +363,20 @@ N_NLS_Sensitivity::~N_NLS_Sensitivity()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 11/21/02
 //-----------------------------------------------------------------------------
-int N_NLS_Sensitivity::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
+int N_NLS_Sensitivity::solve ( 
+     std::vector<double> & objectiveVec,
+     std::vector<double> & dOdpVec, 
+     std::vector<double> & dOdpAdjVec,
+     std::vector<double> & scaled_dOdpVec, 
+     std::vector<double> & scaled_dOdpAdjVec)
 {
   if (!solveDirectFlag_ && !solveAdjointFlag_) return 1;
+
+  dOdpVec_.clear();
+  dOdpAdjVec_.clear();
+
+  scaled_dOdpVec_.clear();
+  scaled_dOdpAdjVec_.clear();
 
   // It may now be neccessary to re-load the jacobian and rhs vectors.
   // It is necccessary, for example, if the two-level Newton solver is the
@@ -246,8 +389,39 @@ int N_NLS_Sensitivity::solve (N_NLS_NonLinearSolver * nlsTmpPtr)
 
   calcObjFuncDerivs ();
 
-  if (solveDirectFlag_) solveDirect ();
-  if (solveAdjointFlag_) solveAdjoint ();
+  objectiveVec.clear();
+  objectiveVec.push_back(objFuncEval_);
+
+  if (solveDirectFlag_) 
+  {
+    solveDirect ();
+
+    if (outputUnscaledFlag_)
+    {
+      dOdpVec = dOdpVec_;
+    }
+
+    if (outputScaledFlag_)
+    {
+      scaled_dOdpVec = scaled_dOdpVec_;
+    }
+  }
+
+  if (solveAdjointFlag_) 
+  {
+    solveAdjoint ();
+    if (outputUnscaledFlag_)
+    {
+      dOdpAdjVec = dOdpAdjVec_;
+    }
+
+    if (outputScaledFlag_)
+    {
+      scaled_dOdpAdjVec = scaled_dOdpAdjVec_;
+    }
+  }
+
+  numSolves_++;
 
   return 1;
 }
@@ -318,8 +492,8 @@ int N_NLS_Sensitivity::solveDirect ()
 #ifdef Xyce_DEBUG_NONLINEAR
   if (debugLevel_ > 0)
   {
-    std::cout << std::endl;
-    std::cout << "In N_NLS_Sensitivity::solveDirect" << std::endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "In N_NLS_Sensitivity::solveDirect" << std::endl;
   }
 #endif
 
@@ -353,11 +527,12 @@ int N_NLS_Sensitivity::solveDirect ()
     // do debug output.
     if (debugLevel_ > 0)
     {
-      std::cout << "iparam="<<iparam << "\t" << paramNameVec_[iparam] <<std::endl;
+      Xyce::dout() << "iparam="<<iparam << "\t" << paramNameVec_[iparam] <<std::endl;
       for (int k = 0; k < solutionSize_; ++k)
       {
-        std::cout << "k = " << std::setw(4) << k
-          <<" dXdp = "<< std::setw(11)<< std::scientific<< std::setprecision(4)<< (*(dXdpPtrVector_[iparam]))[k]
+        Xyce::dout() << "k = " << std::setw(4) << k
+          <<" dXdp = "<< std::setw(11)<< std::scientific
+          << std::setprecision(4)<< (*(dXdpPtrVector_[iparam]))[k]
           <<std::endl;
       }
 
@@ -382,52 +557,26 @@ int N_NLS_Sensitivity::solveDirect ()
     tmp += dOdp_;
 
     dOdpVec_.push_back(tmp);
+ 
+    // get scaled value.  dO/dp*(p/100)
+    double normalize = paramOrigVals_[iparam]/100.0;
+    tmp *= normalize;
+    scaled_dOdpVec_.push_back(tmp);
   }
 
-
-  // Send the sensitivity information to the screen:
-#ifdef Xyce_PARALLEL_MPI
-  N_PDS_Comm *pdsCommPtr = pdsMgrPtr_->getPDSComm();
-  int myPID = pdsCommPtr->procID();
-  if (myPID==0)
-#endif
+  if (stdOutputFlag_)
   {
-    std::cout << "\nDirect Sensitivities:"<<std::endl;
-    for (iparam=0; iparam< numSensParams_; ++iparam)
-    {
-      std::cout << std::setw(maxParamStringSize_)<<paramNameVec_[iparam];
-      std::cout << "\tdOdp = " << std::setw(11)<< std::scientific<< std::setprecision(4)
-        << dOdpVec_[iparam] << std::endl;
-    }
+    stdOutput(std::string("Direct"), paramOrigVals_, dOdpVec_, scaled_dOdpVec_);
   }
-#ifdef Xyce_PARALLEL_MPI
-  pdsCommPtr->barrier();
-#endif
 
-  // Dump this information out to a file.
-#ifdef Xyce_PARALLEL_MPI
-  if (myPID==0)
-#endif
+  if (fileOutputFlag_)
   {
-    std::string dodpFileName = netlistFileName_ + "_dodpDirect.txt";
-    FILE *fp = fopen(dodpFileName.c_str(),"w");
-    for (iparam=0;iparam< numSensParams_; ++iparam)
-    {
-      fprintf(fp,"\t%16.8e\n", dOdpVec_[iparam]);
-    }
-    fclose(fp);
+    fileOutput(std::string("Direct"), paramOrigVals_, dOdpVec_, scaled_dOdpVec_);
+  }
 
-    // dump out everything
-    dodpFileName = netlistFileName_ + "_dodpDirect_all.txt";
-    fp = fopen(dodpFileName.c_str(),"w");
-    fprintf(fp,"%16.8e", objFuncEval_ );
-    fprintf(fp,"%s","\n[\n");
-    for (iparam=0;iparam< numSensParams_; ++iparam)
-    {
-      fprintf(fp,"\t%16.8e\n", dOdpVec_[iparam]);
-    }
-    fprintf(fp,"%s","]\n");
-    fclose(fp);
+  if (dakotaFileOutputFlag_)
+  {
+    dakOutput(std::string("Direct"), paramOrigVals_, dOdpVec_, scaled_dOdpVec_);
   }
 
   return 1;
@@ -478,7 +627,7 @@ bool N_NLS_Sensitivity::calcObjFuncDerivs ()
       {
         std::list<int> svGIDList1, dummyList;
         char type1;
-        bool found = top_.getNodeSVarGIDs(NodeID(expVarNames_[i],_VNODE), svGIDList1, dummyList, type1);
+        bool found = top_.getNodeSVarGIDs(NodeID(expVarNames_[i], Xyce::_VNODE), svGIDList1, dummyList, type1);
 
         bool foundLocal = found;
 #ifdef Xyce_PARALLEL_MPI
@@ -491,7 +640,7 @@ bool N_NLS_Sensitivity::calcObjFuncDerivs ()
         pdsCommPtr->sumAll(&found_local, &found_glob, 1);
         found = (found_glob != 0.0)?true:false;
 #ifdef Xyce_DEBUG_NONLINEAR
-        std::cout << "global found = " << found_glob <<std::endl;
+        Xyce::dout() << "global found = " << found_glob <<std::endl;
 #endif
         }
 #endif
@@ -499,7 +648,7 @@ bool N_NLS_Sensitivity::calcObjFuncDerivs ()
         bool found2 = false;
         if (!found)// if looking for this as a voltage node failed, try a "device" (i.e. current) node.
         {
-          found2 = top_.getNodeSVarGIDs(NodeID(expVarNames_[i],_DNODE), svGIDList1, dummyList, type1);
+          found2 = top_.getNodeSVarGIDs(NodeID(expVarNames_[i], Xyce::_DNODE), svGIDList1, dummyList, type1);
         }
 
         bool foundLocal2 = found2;
@@ -513,14 +662,14 @@ bool N_NLS_Sensitivity::calcObjFuncDerivs ()
           pdsCommPtr->sumAll(&found_local, &found_glob, 1);
           found2 = (found_glob != 0.0)?true:false;
 #ifdef Xyce_DEBUG_NONLINEAR
-          std::cout << "global found2 = " << found_glob <<std::endl;
+          Xyce::dout() << "global found2 = " << found_glob <<std::endl;
 #endif
         }
 #endif
 
         if (!found && !found2)
         {
-          static std::string tmp = " ***** ERROR: objective function variable not found!\n";
+          static std::string tmp = "objective function variable not found!\n";
           N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL, tmp);
         }
 
@@ -531,7 +680,7 @@ bool N_NLS_Sensitivity::calcObjFuncDerivs ()
         }
 
 #ifdef Xyce_DEBUG_NONLINEAR
-        std::cout << "tmpGID = " << tmpGID <<std::endl;
+        Xyce::dout() << "tmpGID = " << tmpGID <<std::endl;
 #endif
         expVarGIDs_[i] = tmpGID;
       }
@@ -564,7 +713,7 @@ bool N_NLS_Sensitivity::calcObjFuncDerivs ()
       double tmpDODX = expVarDerivs_[i];
 
 #ifdef Xyce_DEBUG_NONLINEAR
-      std::cout << "i="<<i<<"  gid = " << tmpGID << "  dodx = "<< tmpDODX << std::endl;
+      Xyce::dout() << "i="<<i<<"  gid = " << tmpGID << "  dodx = "<< tmpDODX << std::endl;
 #endif
 
       if (tmpGID != -1)
@@ -658,6 +807,11 @@ int N_NLS_Sensitivity::solveAdjoint ()
   {
     double tmp = -1.0 * lambdaVectorPtr_->dotProduct(*(dfdpPtrVector_[iparam]));
     dOdpAdjVec_.push_back(tmp);
+
+    // get scaled value.  dO/dp*(p/100)
+    double normalize = paramOrigVals_[iparam]/100.0;
+    tmp *= normalize;
+    scaled_dOdpAdjVec_.push_back(tmp);
   }
 
 
@@ -670,64 +824,18 @@ int N_NLS_Sensitivity::solveAdjoint ()
   NewtonVectorPtr_->update(1.0, *(savedNewtonVectorPtr_),0.0);
 
   // set the sensitivity information to the screen:
-#ifdef Xyce_PARALLEL_MPI
-  N_PDS_Comm *pdsCommPtr = pdsMgrPtr_->getPDSComm();
-  int myPID = pdsCommPtr->procID();
-  if (myPID==0)
-#endif
-  { 
-    std::cout << "\nAdjoint Sensitivities:"<<std::endl;
-    for (int iparam=0; iparam< numSensParams_; ++iparam)
-    {
-      std::cout << std::setw(maxParamStringSize_)<<paramNameVec_[iparam];
-      std::cout << "\tdOdp = " << std::setw(11)<< std::scientific<< std::setprecision(4)
-        << dOdpAdjVec_[iparam] << std::endl;
-    }
-  }
-#ifdef Xyce_PARALLEL_MPI
-  pdsCommPtr->barrier();
-#endif
-
-#ifdef Xyce_DEBUG_NONLINEAR
-  if (debugLevel_ > 0)
+  if (stdOutputFlag_)
   {
-    for (int iparam=0; iparam< numSensParams_; ++iparam)
-    {
-      for (int k1 = 0; k1 < solutionSize_; ++k1)
-      {
-        std::cout << "k = " << std::setw(4) << k1
-          <<" dfdp = "<< std::setw(11)<< std::scientific<< std::setprecision(4)<< (*(dfdpPtrVector_[iparam]))[k1]
-          <<std::endl;
-      }
-    }
+    stdOutput(std::string("Adjoint"), paramOrigVals_, dOdpAdjVec_, scaled_dOdpAdjVec_);
   }
-#endif
-
-  // Dump this information out to a file.
-#ifdef Xyce_PARALLEL_MPI
-  if (myPID==0)
-#endif
+  if (fileOutputFlag_)
   {
-    int iparam;
-    std::string dodpFileName = netlistFileName_ + "_dodpAdjoint.txt";
-    FILE *fp = fopen(dodpFileName.c_str(),"w");
-    for (iparam=0;iparam< numSensParams_; ++iparam)
-    {
-      fprintf(fp,"\t%16.8e\n", dOdpAdjVec_[iparam]);
-    }
-    fclose(fp);
+    fileOutput(std::string("Adjoint"), paramOrigVals_, dOdpVec_, scaled_dOdpVec_);
+  }
 
-    // dump out everything
-    dodpFileName = netlistFileName_ + "_dodpAdjoint_all.txt";
-    fp = fopen(dodpFileName.c_str(),"w");
-    fprintf(fp,"%16.8e", objFuncEval_ );
-    fprintf(fp,"%s","\n[\n");
-    for (iparam=0;iparam< numSensParams_; ++iparam)
-    {
-      fprintf(fp,"\t%16.8e\n", dOdpAdjVec_[iparam]);
-    }
-    fprintf(fp,"%s","]\n");
-    fclose(fp);
+  if (dakotaFileOutputFlag_)
+  {
+    dakOutput(std::string("Adjoint"), paramOrigVals_, dOdpVec_, scaled_dOdpVec_);
   }
 
   return 1;
@@ -757,6 +865,8 @@ bool N_NLS_Sensitivity::calcSensitivities ()
   pdsCommPtr->barrier();
 #endif
 
+  paramOrigVals_.clear();
+  
   // save a copy of the f vector.
   origFVectorPtr_->update(1.0, *(rhsVectorPtr_), 0.0);
 
@@ -773,8 +883,8 @@ bool N_NLS_Sensitivity::calcSensitivities ()
 #ifdef Xyce_DEBUG_NONLINEAR
     if (debugLevel_ > 0)
     {
-      std::cout << std::endl << "  Calculating df/dp for: ";
-      std::cout << *iterParam << std::endl;
+      Xyce::dout() << std::endl << "  Calculating df/dp for: ";
+      Xyce::dout() << *iterParam << std::endl;
     }
 #endif
 
@@ -785,7 +895,7 @@ bool N_NLS_Sensitivity::calcSensitivities ()
     // now perturb the value of this parameter.
     std::string paramName(*iterParam);
     double paramOrig = 0.0;
-    bool found = loaderPtr_->getParam (paramName, paramOrig);
+    bool found = loaderPtr_->getParamAndReduce(paramName, paramOrig);
     if (!found)
     {
       std::string msg("Sensitivity::calcSensitivities: cannot find parameter ");
@@ -795,6 +905,7 @@ bool N_NLS_Sensitivity::calcSensitivities ()
 
     double dp = sqrtEta_ * (1.0 + fabs(paramOrig));
     double paramPerturbed = paramOrig;
+    paramOrigVals_.push_back(paramOrig);
 
     if (difference==SENS_FWD)
     {
@@ -806,19 +917,19 @@ bool N_NLS_Sensitivity::calcSensitivities ()
     }
     else if (difference==SENS_CNT)
     {
-      static std::string tmp = " ***** ERROR: difference=central not supported.\n";
+      static std::string tmp = "difference=central not supported.\n";
       N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0, tmp);
     }
     else
     {
-      static std::string tmp = " ***** ERROR: difference not recognized!\n";
+      static std::string tmp = "difference not recognized!\n";
       N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0, tmp);
     }
 
 #ifdef Xyce_DEBUG_NONLINEAR
     if (debugLevel_ > 0)
     {
-      std::cout << std::setw(maxParamStringSize_)<< *iterParam
+      Xyce::dout() << std::setw(maxParamStringSize_)<< *iterParam
         << " dp = " << std::setw(11)<< std::scientific<< std::setprecision(4) << dp 
         << " original value = " << std::setw(16)<< std::scientific<< std::setprecision(9) << paramOrig 
         << " modified value = " << std::setw(16)<< std::scientific<< std::setprecision(9) << paramPerturbed 
@@ -847,13 +958,13 @@ bool N_NLS_Sensitivity::calcSensitivities ()
 #ifdef Xyce_DEBUG_NONLINEAR
     if (debugLevel_ > 0)
     {
-      std::cout << *iterParam << ": ";
-      std::cout.width(15); std::cout.precision(7); std::cout.setf(ios::scientific);
-      std::cout << "deviceSens_dp = " << dp << std::endl;
+      Xyce::dout() << *iterParam << ": ";
+      Xyce::dout().width(15); Xyce::dout().precision(7); Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << "deviceSens_dp = " << dp << std::endl;
 
       for (int k1 = 0; k1 < solutionSize_; ++k1)
       {
-        std::cout << "k = " << std::setw(4) << k1
+        Xyce::dout() << "k = " << std::setw(4) << k1
           <<" fpert = "<< std::setw(11)<< std::scientific<< std::setprecision(4)<< (*(pertFVectorPtr_))[k1]
           <<" forig = "<< std::setw(11)<< std::scientific<< std::setprecision(4)<< (*(origFVectorPtr_))[k1]
           <<" dfdp = "<< std::setw(11)<< std::scientific<< std::setprecision(4)<< (*(dfdpPtrVector_[iparam]))[k1]
@@ -899,20 +1010,21 @@ bool N_NLS_Sensitivity::calcSensitivities ()
 bool N_NLS_Sensitivity::setOptions(const N_UTL_OptionBlock& OB)
 {
   bool bsuccess = true;
-  list<N_UTL_Param>::const_iterator iter = OB.getParams().begin();
-  list<N_UTL_Param>::const_iterator end   = OB.getParams().end();
+  std::list<N_UTL_Param>::const_iterator iter = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator end   = OB.getParams().end();
 
   numSensParams_ = 0;
   for ( ; iter != end; ++ iter)
   {
     if (iter->uTag() == "OBJFUNC")
     {
-      expPtr_ = new N_UTL_Expression(iter->sVal());
+      objFuncString_ = iter->stringValue();
+      expPtr_ = new N_UTL_Expression(iter->stringValue());
       objFuncGiven_ = true;
     }
     else if ( std::string( iter->uTag() ,0,5) == "PARAM") // this is a vector
     {
-      ExtendedString tag = iter->sVal();
+      ExtendedString tag = iter->stringValue();
       tag.toUpper();
       // set up the initial skeleton of the maps:
       ++numSensParams_;
@@ -925,10 +1037,7 @@ bool N_NLS_Sensitivity::setOptions(const N_UTL_OptionBlock& OB)
     }
     else
     {
-      std::string tmp =
-        " ***** WARNING: " + iter->uTag() +
-        " is not a recognized sensitivity solver option.\n";
-      N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_INFO_0, tmp);
+      Xyce::Report::UserWarning() << iter->uTag() << " is not a recognized sensitivity solver option.\n" << std::endl;
     }
   }
 
@@ -976,7 +1085,7 @@ bool N_NLS_Sensitivity::setOptions(const N_UTL_OptionBlock& OB)
 
     for (iter=begin;iter!=end;++iter)
     {
-      std::cout << *iter<<std::endl;
+      Xyce::dout() << *iter<<std::endl;
     }
   }
 #endif
@@ -1004,36 +1113,49 @@ bool N_NLS_Sensitivity::setOptions(const N_UTL_OptionBlock& OB)
 bool N_NLS_Sensitivity::setSensitivityOptions(const N_UTL_OptionBlock& OB)
 {
   bool bsuccess = true;
-  list<N_UTL_Param>::const_iterator iter = OB.getParams().begin();
-  list<N_UTL_Param>::const_iterator end   = OB.getParams().end();
+  std::list<N_UTL_Param>::const_iterator iter = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator end   = OB.getParams().end();
 
   for ( ; iter != end; ++ iter)
   {
     if (iter->uTag() == "ADJOINT")
     {
-      if (iter->dVal()==1.0)
-      {
-        solveAdjointFlag_ = true;
-      }
-      else
-      {
-        solveAdjointFlag_ = false;
-      }
+      solveAdjointFlag_ = 
+        static_cast<bool>(iter->getImmutableValue<bool>());
     }
     else if (iter->uTag() == "DIRECT")
     {
-      if (iter->dVal()==1.0)
-      {
-        solveDirectFlag_ = true;
-      }
-      else
-      {
-        solveDirectFlag_ = false;
-      }
+      solveDirectFlag_ = 
+        static_cast<bool>(iter->getImmutableValue<bool>());
+    }
+    else if (iter->uTag() == "OUTPUTSCALED")
+    {
+      outputScaledFlag_ = 
+        static_cast<bool>(iter->getImmutableValue<bool>());
+    }
+    else if (iter->uTag() == "OUTPUTUNSCALED")
+    {
+      outputUnscaledFlag_ = 
+        static_cast<bool>(iter->getImmutableValue<bool>());
+    }
+    else if (iter->uTag() == "STDOUTPUT")
+    {
+      stdOutputFlag_ = 
+        static_cast<bool>(iter->getImmutableValue<bool>());
+    }
+    else if (iter->uTag() == "DAKOTAFILE")
+    {
+      dakotaFileOutputFlag_ = 
+        static_cast<bool>(iter->getImmutableValue<bool>());
+    }
+    else if (iter->uTag() == "DIAGNOSTICFILE")
+    {
+      fileOutputFlag_ = 
+        static_cast<bool>(iter->getImmutableValue<bool>());
     }
     else if (iter->uTag() == "DIFFERENCE")
     {
-      ExtendedString sval=iter->sVal();
+      ExtendedString sval=iter->stringValue();
       sval.toUpper();
       if(sval=="FORWARD")
       {
@@ -1046,32 +1168,29 @@ bool N_NLS_Sensitivity::setSensitivityOptions(const N_UTL_OptionBlock& OB)
       else if(sval=="CENTRAL")
       {
         difference=SENS_CNT;
-        static std::string tmp = " ***** ERROR: difference=central not supported.\n";
+        static std::string tmp = "difference=central not supported.\n";
         N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0, tmp);
       }
       else
       {
-        static std::string tmp = " ***** ERROR: difference not recognized!\n";
+        static std::string tmp = "difference not recognized!\n";
         N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0, tmp);
       }
     }
     else if (iter->uTag() == "SQRTETA")
     {
-      sqrtEta_ = iter->dVal();
+      sqrtEta_ = iter->getImmutableValue<double>();
       sqrtEtaGiven_ = true;
     }
 #ifdef Xyce_DEBUG_NONLINEAR
     else if (iter->uTag() == "DEBUGLEVEL")
     {
-      debugLevel_ = iter->iVal();
+      debugLevel_ = iter->getImmutableValue<int>();
     }
 #endif
     else
     {
-      std::string tmp =
-        " ***** WARNING: " + iter->uTag() +
-        " is not a recognized sensitivity solver option.\n";
-      N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_INFO_0, tmp);
+      Xyce::Report::UserWarning() << iter->uTag() << " is not a recognized sensitivity solver option.\n" << std::endl;
     }
   }
 

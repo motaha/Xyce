@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.35.2.2 $
+// Revision Number: $Revision: 1.44 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -62,6 +62,7 @@
 #include <N_ERH_ErrorMgr.h>
 #include <N_LAS_LAFactory.h>
 #include <Epetra_CrsGraph.h>
+#undef HAVE_LIBPARMETIS
 #include <EpetraExt_View_CrsGraph.h>
 
 //-----------------------------------------------------------------------------
@@ -72,20 +73,14 @@
 // Creator       : Scott A. Hutchinson, SNL, Parallel Computational Sciences
 // Creation Date : 03/09/00
 //-----------------------------------------------------------------------------
-N_PDS_Manager::N_PDS_Manager(bool & isSerial, bool & procFlag, int iargs, char * cargs[]
-#ifdef Xyce_PARALLEL_MPI
-                             , MPI_Comm * comm
-#endif
-                            )
+N_PDS_Manager::N_PDS_Manager(bool & isSerial, bool & procFlag, int iargs, char **cargs, Xyce::Parallel::Machine comm)
   : Comm_(0),
     Topo_(0)
 {
-  Comm_ = N_PDS_CommFactory::create(iargs, cargs
-#ifdef Xyce_PARALLEL_MPI
-                                    , comm
-#endif
-                                   );
-  N_ERH_ErrorMgr::registerComm(Comm_);
+  Comm_ = N_PDS_CommFactory::create(iargs, cargs, comm);
+
+  N_ERH_ErrorMgr::registerComm(Comm_->comm());
+  
   isSerial = Comm_->isSerial();
   procFlag = (Comm_->procID() == 0);
 }
@@ -101,15 +96,15 @@ N_PDS_Manager::N_PDS_Manager(bool & isSerial, bool & procFlag, int iargs, char *
 //-----------------------------------------------------------------------------
 N_PDS_Manager::~N_PDS_Manager()
 {
-  map<string,N_PDS_ParMap *>::iterator it_spmM = pm_Map_.begin();
-  map<string,N_PDS_ParMap *>::iterator end_spmM = pm_Map_.end();
+  std::map<std::string,N_PDS_ParMap *>::iterator it_spmM = pm_Map_.begin();
+  std::map<std::string,N_PDS_ParMap *>::iterator end_spmM = pm_Map_.end();
   for( ; it_spmM != end_spmM; ++it_spmM )
   {
     deleteParallelMap( it_spmM->first );
   }
 
-  map<string,Epetra_CrsGraph*>::iterator it_mgM = mg_Map_.begin();
-  map<string,Epetra_CrsGraph*>::iterator end_mgM = mg_Map_.end();
+  std::map<std::string,Epetra_CrsGraph*>::iterator it_mgM = mg_Map_.begin();
+  std::map<std::string,Epetra_CrsGraph*>::iterator end_mgM = mg_Map_.end();
   for( ; it_mgM != end_mgM; ++it_mgM )
   {
     deleteMatrixGraph( it_mgM->first );
@@ -146,7 +141,7 @@ bool N_PDS_Manager::registerTopology( N_TOP_Topology * topo )
 //-----------------------------------------------------------------------------
 N_PDS_ParMap * N_PDS_Manager::createParallelMap( int & num_global,
 			                         const int & num_local,
-                                                 const vector<int> & gid_map,
+                                                 const std::vector<int> & gid_map,
                                                  const int index_base )
 {
   return N_PDS_ParMapFactory::create( num_global, num_local, gid_map, index_base, Comm_ );
@@ -160,7 +155,7 @@ N_PDS_ParMap * N_PDS_Manager::createParallelMap( int & num_global,
 // Creator       : Robert J Hoekstra, SNL, Parallel Compuational Sciences
 // Creation Date : 01/31/01
 //-----------------------------------------------------------------------------
-bool N_PDS_Manager::addParallelMap( const string & name, N_PDS_ParMap * map )
+bool N_PDS_Manager::addParallelMap( const std::string & name, N_PDS_ParMap * map )
 {
   if( !pm_Map_.count( name ) )
   {
@@ -183,7 +178,7 @@ bool N_PDS_Manager::addParallelMap( const string & name, N_PDS_ParMap * map )
 // Creator       : Robert J Hoekstra, SNL, Parallel Compuational Sciences
 // Creation Date : 01/31/01
 //-----------------------------------------------------------------------------
-N_PDS_ParMap * N_PDS_Manager::getParallelMap( const string & name )
+N_PDS_ParMap * N_PDS_Manager::getParallelMap( const std::string & name )
 {
   if( pm_Map_.count( name ) )
     return pm_Map_[ name ];
@@ -203,7 +198,7 @@ N_PDS_ParMap * N_PDS_Manager::getParallelMap( const string & name )
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 01/31/01
 //-----------------------------------------------------------------------------
-bool N_PDS_Manager::deleteParallelMap( const string & name )
+bool N_PDS_Manager::deleteParallelMap( const std::string & name )
 {
   if( pm_Map_.count( name ) )
   {
@@ -217,15 +212,14 @@ bool N_PDS_Manager::deleteParallelMap( const string & name )
     }
     else
     {
-      N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL,
-        "Parallel Map is NULL!\n" );
+      Xyce::Report::DevelFatal().in("N_PDS_Manager::deleteParallelMap") << "Parallel Map is NULL!";
       return false;
     }
   }
   else
   {
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_WARNING,
-      "Deleting Non-existent Parallel Map!\n" );
+    Xyce::Report::UserWarning() << "Deleting Non-existent Parallel Map!";
+    
     return false;
   }
 }
@@ -238,7 +232,7 @@ bool N_PDS_Manager::deleteParallelMap( const string & name )
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 01/31/01
 //-----------------------------------------------------------------------------
-bool N_PDS_Manager::addGlobalAccessor( const string & name )
+bool N_PDS_Manager::addGlobalAccessor( const std::string & name )
 {
   if( pm_Map_.count( name ) )
   {
@@ -270,7 +264,7 @@ bool N_PDS_Manager::addGlobalAccessor( const string & name )
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 01/31/01
 //-----------------------------------------------------------------------------
-N_PDS_GlobalAccessor * N_PDS_Manager::getGlobalAccessor( const string & name )
+N_PDS_GlobalAccessor * N_PDS_Manager::getGlobalAccessor( const std::string & name )
 {
   if( ga_Map_.count(name) )
     return ga_Map_[ name ];
@@ -290,7 +284,7 @@ N_PDS_GlobalAccessor * N_PDS_Manager::getGlobalAccessor( const string & name )
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 01/31/01
 //-----------------------------------------------------------------------------
-bool N_PDS_Manager::deleteGlobalAccessor( const string & name )
+bool N_PDS_Manager::deleteGlobalAccessor( const std::string & name )
 {
   if( ga_Map_.count( name ) )
   {
@@ -321,7 +315,7 @@ bool N_PDS_Manager::deleteGlobalAccessor( const string & name )
 // Creation Date : 02/1/01
 //-----------------------------------------------------------------------------
 N_PDS_GlobalAccessor * N_PDS_Manager::createGlobalAccessor
-				( const string & name )
+				( const std::string & name )
 {
   if( name == "" )
     return new N_PDS_GlobalAccessor( Comm_ );
@@ -366,7 +360,7 @@ N_PDS_ParDir * N_PDS_Manager::createParDir() const
 // Creator       : Robert J Hoekstra, SNL, Parallel Compuational Sciences
 // Creation Date : 08/23/02
 //-----------------------------------------------------------------------------
-bool N_PDS_Manager::addMatrixGraph( const string & name,
+bool N_PDS_Manager::addMatrixGraph( const std::string & name,
                                     Epetra_CrsGraph * graph,
                                     EpetraExt::CrsGraph_View * trans )
 {
@@ -394,7 +388,7 @@ bool N_PDS_Manager::addMatrixGraph( const string & name,
 // Creator       : Robert J Hoekstra, SNL, Parallel Compuational Sciences
 // Creation Date : 08/23/02
 //-----------------------------------------------------------------------------
-Epetra_CrsGraph * N_PDS_Manager::getMatrixGraph( const string & name )
+Epetra_CrsGraph * N_PDS_Manager::getMatrixGraph( const std::string & name )
 {
   if( mg_Map_.count( name ) )
     return mg_Map_[ name ];
@@ -413,7 +407,7 @@ Epetra_CrsGraph * N_PDS_Manager::getMatrixGraph( const string & name )
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 03/31/03
 //-----------------------------------------------------------------------------
-bool N_PDS_Manager::deleteMatrixGraph( const string & name )
+bool N_PDS_Manager::deleteMatrixGraph( const std::string & name )
 {
   if( mg_Map_.count( name ) )
   {

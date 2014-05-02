@@ -1,7 +1,7 @@
 //-------------------------------------------------------------------------
 // Copyright Notice
 //
-// Copyright (c) 2000, Sandia Corporation, Albuquerque, NM.
+// Copyright (c) 2000, 2013, Sandia Corporation, Albuquerque, NM.
 //-------------------------------------------------------------------------
 
 //-------------------------------------------------------------------------
@@ -21,11 +21,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.13 $
+// Revision Number: $Revision: 1.15 $
 //
-// Revision Date  : $Date: 2011/03/15 19:52:22 $
+// Revision Date  : $Date: 2013/09/18 22:32:30 $
 //
-// Current Owner  : $Author: erkeite $
+// Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 
@@ -40,10 +40,10 @@
 
 using namespace std;
 
-void readSpiceNamesFile (ifstream * inStream1, map <int, string> & chileMap1, map <string, int> & chileMap2)
+void readSpiceNamesFile (std::ifstream * inStream1, std::map<int, std::string> & chileMap1, std::map<std::string, int> & chileMap2)
 {
   int index;
-  string name;
+  std::string name;
   bool endOfFile = (*inStream1).eof();
 
   while ( !endOfFile )
@@ -53,12 +53,12 @@ void readSpiceNamesFile (ifstream * inStream1, map <int, string> & chileMap1, ma
     if (endOfFile) continue;
 
     // fix name to remove "#" characters, and replace with "_"
-    string::iterator iter;
-    string::iterator iter2;
-    string::iterator first = name.begin ();
-    string::iterator last  = name.end   ();
-    string::iterator test1("#");
-    string::iterator test2("_");
+    std::string::iterator iter;
+    std::string::iterator iter2;
+    std::string::iterator first = name.begin ();
+    std::string::iterator last  = name.end   ();
+    std::string::iterator test1("#");
+    std::string::iterator test2("_");
 
     // are there any ":x" characters?  If so convert to ":"
     first = name.begin ();
@@ -86,10 +86,10 @@ void readSpiceNamesFile (ifstream * inStream1, map <int, string> & chileMap1, ma
   }
 }
 
-void readXyceNamesFile (ifstream * inStream2, map <int, string> & XyceMap1, map <string, int> & XyceMap2)
+void readXyceNamesFile (std::ifstream * inStream2, std::map<int, std::string> & XyceMap1, std::map<std::string, int> & XyceMap2)
 {
   int index;
-  string name;
+  std::string name;
   bool endOfFile = (*inStream2).eof();
 
   (*inStream2) >> name; // this is the HEADER
@@ -113,13 +113,13 @@ void readXyceNamesFile (ifstream * inStream2, map <int, string> & XyceMap1, map 
 
 #ifndef BOTH_FILES_ARE_XYCE 
     // Modify the name to chilespice format
-    string::iterator iter;
-    string::iterator iter2;
-    string::iterator first = name.begin ();
-    string::iterator last  = name.end   ();
-    string::iterator test1("x");
-    string::iterator test2(":");
-    string::iterator test3(":x");
+    std::string::iterator iter;
+    std::string::iterator iter2;
+    std::string::iterator first = name.begin ();
+    std::string::iterator last  = name.end   ();
+    std::string::iterator test1("x");
+    std::string::iterator test2(":");
+    std::string::iterator test3(":x");
 
     // first look for subcircuit names, and remove
     // the "x" prefix.
@@ -161,19 +161,19 @@ void readXyceNamesFile (ifstream * inStream2, map <int, string> & XyceMap1, map 
 
 int main (int iargs , char *cargs[] )
 {
-  map <string, int> chileMap2;
-  map <int, string> chileMap1;
+  std::map<std::string, int> chileMap2;
+  std::map<int, std::string> chileMap1;
 
-  map <string, int> XyceMap2;
-  map <int, string> XyceMap1;
+  std::map<std::string, int> XyceMap2;
+  std::map<int, std::string> XyceMap1;
 
-  map <int, int> mergedMap;
+  std::map<int, int> mergedMap;
 
-  ifstream * inStream1;
-  ifstream * inStream2;
+  std::ifstream * inStream1;
+  std::ifstream * inStream2;
 
-  ofstream * outStream;
-  ofstream * outStream2;
+  std::ofstream * outStream;
+  std::ofstream * outStream2;
 
   if (iargs != 3)
   {
@@ -187,12 +187,12 @@ int main (int iargs , char *cargs[] )
 
 
 #ifdef BOTH_FILES_ARE_XYCE 
-  cout << "Reading in the first Xyce name file: " << string(cargs[1]) <<endl;
+  cout << "Reading in the first Xyce name file: " << std::string(cargs[1]) <<endl;
 #else
-  cout << "Reading in the chilespice name file: " << string(cargs[1]) <<endl;
+  cout << "Reading in the chilespice name file: " << std::string(cargs[1]) <<endl;
 #endif
 
-  inStream1 = new ifstream( cargs[1] );
+  inStream1 = new std::ifstream( cargs[1] );
 #ifdef BOTH_FILES_ARE_XYCE 
   readXyceNamesFile (inStream1, chileMap1, chileMap2);
 #else
@@ -201,19 +201,19 @@ int main (int iargs , char *cargs[] )
   delete inStream1;
 
 #ifdef BOTH_FILES_ARE_XYCE 
-  cout << "Reading in the second Xyce name file: " << string(cargs[2]) <<endl;
+  cout << "Reading in the second Xyce name file: " << std::string(cargs[2]) <<endl;
 #else
-  cout << "Reading in the Xyce name file: " << string(cargs[2]) <<endl;
+  cout << "Reading in the Xyce name file: " << std::string(cargs[2]) <<endl;
 #endif
 
-  inStream2 = new ifstream( cargs[2] );
+  inStream2 = new std::ifstream( cargs[2] );
   readXyceNamesFile (inStream2, XyceMap1, XyceMap2);
 #if 0
 
   cout << "XyceMap2: " << endl;
 
-  map<string, int>::iterator iterX2 = XyceMap2.begin();
-  map<string, int>::iterator endX2  = XyceMap2.end ();
+  std::map<std::string, int>::iterator iterX2 = XyceMap2.begin();
+  std::map<std::string, int>::iterator endX2  = XyceMap2.end ();
   for( ;iterX2!=endX2;++iterX2)
   {
     cout << iterX2->first << "\t" << iterX2->second << endl;
@@ -232,11 +232,11 @@ int main (int iargs , char *cargs[] )
   cout << "  xyce size 1 = " << xyceSize1 << endl;
   cout << "  xyce size 2 = " << xyceSize2 << endl;
 
-  outStream = new ofstream( "mergedMap.txt" );
-  outStream2 = new ofstream( "namePerm.txt" );
+  outStream = new std::ofstream( "mergedMap.txt" );
+  outStream2 = new std::ofstream( "namePerm.txt" );
 
-  map<int, string>::iterator iter = chileMap1.begin();
-  map<int, string>::iterator end  = chileMap1.end ();
+  std::map<int, std::string>::iterator iter = chileMap1.begin();
+  std::map<int, std::string>::iterator end  = chileMap1.end ();
 
 
   for ( ; iter != end; iter++)
@@ -257,8 +257,8 @@ int main (int iargs , char *cargs[] )
     }
   }
 
-  map <int,int>::iterator iterMM = mergedMap.begin();
-  map <int,int>::iterator endMM  = mergedMap.end ();
+  std::map<int,int>::iterator iterMM = mergedMap.begin();
+  std::map<int,int>::iterator endMM  = mergedMap.end ();
 
   for ( ; iterMM != endMM; iterMM++)
   {

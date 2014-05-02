@@ -7,7 +7,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -43,9 +43,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.31.4.2 $
+// Revision Number: $Revision: 1.38 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:32 $
+// Revision Date  : $Date: 2014/02/24 23:49:13 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -73,29 +73,21 @@ using Teuchos::rcp;
 
 #include <iostream>
 
-//#define Xyce_Dakota_Debug 1
-
-#ifdef Xyce_PARALLEL_MPI
-N_DAK_DakotaInterface::N_DAK_DakotaInterface( const Dakota::ProblemDescDB& problem_db, const MPI_Comm & analysis_comm):
-  Dakota::DirectApplicInterface( problem_db ),
-  MPICommObject( analysis_comm ),
-#else
 N_DAK_DakotaInterface::N_DAK_DakotaInterface( const Dakota::ProblemDescDB& problem_db):
   Dakota::DirectApplicInterface( problem_db ),
-#endif
-	theProblemDescDB( problem_db )
+  theProblemDescDB( problem_db )
 {
 #ifdef Xyce_Dakota_Debug
-  std::cout << "N_DAK_DakotaInterface::N_DAK_DakotaInterface() " << std::endl;
+  Xyce::dout() << "N_DAK_DakotaInterface::N_DAK_DakotaInterface() " << std::endl;
 #endif
-  simulationDataValues = rcp( new vector<double>(1) );  // assume just one response function
+  simulationDataValues = rcp( new std::vector<double>(1) );  // assume just one response function
   //interfaceSynchronization="synchronous";
 }
 
 N_DAK_DakotaInterface::~N_DAK_DakotaInterface()
 {
 #ifdef Xyce_Dakota_Debug
-  std::cout << "N_DAK_DakotaInterface::~N_DAK_DakotaInterface() " << std::endl;
+  Xyce::dout() << "N_DAK_DakotaInterface::~N_DAK_DakotaInterface() " << std::endl;
 #endif
   deleteCargs( xyceIargs, xyceCargs );
 
@@ -111,10 +103,10 @@ void N_DAK_DakotaInterface::setArguments( int iargsIn, char * cargsIn [] )
   copyCargs( xyceIargs, cargsIn, xyceCargs );
   
 #ifdef Xyce_Dakota_Debug
-	std::cout << "N_DAK_DakotaInterface::setArguments" << std::endl;
+	Xyce::dout() << "N_DAK_DakotaInterface::setArguments" << std::endl;
 	for(int i=0; i<xyceIargs; i++)
 	{
-	  std::cout << "arg[" << i << "] = \"" << xyceCargs[i] << "\"" << std::endl;
+	  Xyce::dout() << "arg[" << i << "] = \"" << xyceCargs[i] << "\"" << std::endl;
 	}
 #endif
   
@@ -126,28 +118,20 @@ void N_DAK_DakotaInterface::setArguments( int iargsIn, char * cargsIn [] )
 // routines called directly by Dakota
 //
 
-int N_DAK_DakotaInterface::derived_map_if( const Dakota::String& if_name)
-{
-#ifdef Xyce_Dakota_Debug
-	std::cout << "N_DAK_DakotaInterface::derived_map_if() if_name = \"" << if_name << "\"" << std::endl;
-#endif
-	return 0;
-}
-
 int N_DAK_DakotaInterface::derived_map_ac( const Dakota::String& ac_name)
 {
 
 #ifdef Xyce_Dakota_Debug
-	std::cout << "N_DAK_DakotaInterface::derived_map_ac() ac_name = \"" << ac_name << "\"" << std::endl;
-	std::cout << "numACV = " << numACV << " numADIV = " << numADIV << " numADRV = " << numADRV << std::endl;
-	std::cout << "xCLabels.size() = " << xCLabels.size() 
+	Xyce::dout() << "N_DAK_DakotaInterface::derived_map_ac() ac_name = \"" << ac_name << "\"" << std::endl;
+	Xyce::dout() << "numACV = " << numACV << " numADIV = " << numADIV << " numADRV = " << numADRV << std::endl;
+	Xyce::dout() << "xCLabels.size() = " << xCLabels.size() 
 	  << "  xDILabels.size() = " << xDILabels.size()
 	  << "  xDRLabels.size() = " << xDRLabels.size() << std::endl;
 #endif
 	//
 	// loop over all the continuous and discrete variables labels and values 
 	// 
-  ostringstream varValue;
+  std::ostringstream varValue;
   // make sure the list of variable substitutions is clear
   variableSubVec.clear();
   
@@ -157,49 +141,49 @@ int N_DAK_DakotaInterface::derived_map_ac( const Dakota::String& ac_name)
 	for(int i=0; i < numACV; i++)
 	{
 	  // clear the string stream
-	  varValue.str( string() );
+	  varValue.str( std::string() );
 	  varValue.clear();
 	  varValue << xC[i];
-	  string varValueAsString( varValue.str() );
-	  variableSubVec.push_back( make_pair<string,string>( xCLabels[i], varValueAsString ) );
+	  std::string varValueAsString( varValue.str() );
+	  variableSubVec.push_back( std::make_pair<std::string,std::string>( xCLabels[i], varValueAsString ) );
 	}
 	
   // now get discrete integer variables 
   varValue.precision(0);
 	for(int i=0; i < numADIV; i++)
 	{
-	  varValue.str( string() );
+	  varValue.str( std::string() );
 	  varValue.clear();
 	  varValue << xDI[i];
-	  string varValueAsString( varValue.str() );
-	  variableSubVec.push_back( make_pair<string,string>( xDILabels[i], varValueAsString ) );
+	  std::string varValueAsString( varValue.str() );
+	  variableSubVec.push_back( std::make_pair<std::string,std::string>( xDILabels[i], varValueAsString ) );
 	}
   
   // now get discrete real variables 
   varValue.precision(0);
 	for(int i=0; i < numADRV; i++)
 	{
-	  varValue.str( string() );
+	  varValue.str( std::string() );
 	  varValue.clear();
 	  varValue << xDR[i];
-	  string varValueAsString( varValue.str() );
-	  variableSubVec.push_back( make_pair<string,string>( xDRLabels[i], varValueAsString ) );
+	  std::string varValueAsString( varValue.str() );
+	  variableSubVec.push_back( std::make_pair<std::string,std::string>( xDRLabels[i], varValueAsString ) );
 	}
 
 #ifdef Xyce_Dakota_Debug
-  std::cout << "N_DAK_DakotaInterface::derived_map_ac() variableSubVec" << std::endl;
-  vector< pair<string,string> >::iterator currPair = variableSubVec.begin();
-  vector< pair<string,string> >::iterator endPair = variableSubVec.end();
+  Xyce::dout() << "N_DAK_DakotaInterface::derived_map_ac() variableSubVec" << std::endl;
+  std::vector< std::pair<std::string,std::string> >::iterator currPair = variableSubVec.begin();
+  std::vector< std::pair<std::string,std::string> >::iterator endPair = variableSubVec.end();
   while( currPair != endPair )
   {
-    std::cout << "\"" << currPair->first << "\", \"" << currPair->second << "\"" << std::endl;
+    Xyce::dout() << "\"" << currPair->first << "\", \"" << currPair->second << "\"" << std::endl;
     currPair++;
   }
   
-  std::cout << "arguments are: " << std::endl;
+  Xyce::dout() << "arguments are: " << std::endl;
   for(int i=0; i<xyceIargs; i++ )
   {
-    std::cout << "arg[" << i << "]= \""<< xyceCargs[i] << "\"" << std::endl;
+    Xyce::dout() << "arg[" << i << "]= \""<< xyceCargs[i] << "\"" << std::endl;
   }
 #endif
 
@@ -219,7 +203,7 @@ int N_DAK_DakotaInterface::derived_map_ac( const Dakota::String& ac_name)
 	//
 	 
 #ifdef Xyce_Dakota_Debug
-  std::cout << "N_DAK_DakotaInterface::derived_map_ac() Requested response functions: " 
+  Xyce::dout() << "N_DAK_DakotaInterface::derived_map_ac() Requested response functions: " 
     << numFns << std::endl; 
 #endif
 
@@ -229,16 +213,16 @@ int N_DAK_DakotaInterface::derived_map_ac( const Dakota::String& ac_name)
   // final setup on the circuit
   //
 #ifdef Xyce_Dakota_Debug
-  std::cout << "N_DAK_DakotaInterface::derived_map_ac() Running Dakota iteration " 
+  Xyce::dout() << "N_DAK_DakotaInterface::derived_map_ac() Running Dakota iteration " 
 	  << evaluation_id() << std::endl;
 #endif
 
   // instruct the xyce object on how to tag the output files
 	int evaluationID = this->evaluation_id();
-  ostringstream runSuffix;
+  std::ostringstream runSuffix;
   runSuffix << ".run";
   runSuffix << evaluationID;
-  string runSuffixAsString( runSuffix.str() );
+  std::string runSuffixAsString( runSuffix.str() );
 	xyceCirPtr_->setOutputFileSuffix( runSuffixAsString );
 
 	//
@@ -251,7 +235,7 @@ int N_DAK_DakotaInterface::derived_map_ac( const Dakota::String& ac_name)
 	// before we call finalize which will clean up the Xyce 
 	// simulation we need to get any response functions
 #ifdef Xyce_Dakota_Debug
-	std::cout << "N_DAK_DakotaInterface::derived_map_ac() Xyce iteration done." << std::endl;
+	Xyce::dout() << "N_DAK_DakotaInterface::derived_map_ac() Xyce iteration done." << std::endl;
 #endif
  
 	if( numResponseVars > 1 )
@@ -294,14 +278,6 @@ int N_DAK_DakotaInterface::derived_map_ac( const Dakota::String& ac_name)
 	return 0;
 }
 
-int N_DAK_DakotaInterface::derived_map_of( const Dakota::String& of_name)
-{
-#ifdef Xyce_Dakota_Debug
-	std::cout << "N_DAK_DakotaInterface::derived_map_of() of_name = \"" << of_name << "\"" << std::endl;
-#endif
-	return 0;
-}
-
 void N_DAK_DakotaInterface::setUpResponse()
 {
   //
@@ -316,10 +292,10 @@ void N_DAK_DakotaInterface::setUpResponse()
   numResponseVars = numFns;
 
 #ifdef Xyce_Dakota_Debug
-  std::cout << "N_DAK_DakotaInterface::setUpResponse() numResponseVars = " << numResponseVars << std::endl;
+  Xyce::dout() << "N_DAK_DakotaInterface::setUpResponse() numResponseVars = " << numResponseVars << std::endl;
   for( int i=0; i<numResponseVars; i++ )
   {
-    std::cout << "Response variable " << i << ": \"" << fnLabels[i] << "\"" << std::endl;
+    Xyce::dout() << "Response variable " << i << ": \"" << fnLabels[i] << "\"" << std::endl;
   }
 #endif
 
@@ -354,7 +330,7 @@ void N_DAK_DakotaInterface::copyCargs( const int originalIargs, char ** const or
       continue;
     }
     
-    string tmpString(originalCargs[i]);
+    std::string tmpString(originalCargs[i]);
     int size = tmpString.size()+2;
     copyCargs[i] = new char[size];
     if( copyCargs[i] == NULL )
@@ -387,6 +363,4 @@ void N_DAK_DakotaInterface::deleteCargs( const int len, char ** & cargs )
     cargs=NULL;
   }
 }
-
-//#undef Xyce_Dakota_Debug
 

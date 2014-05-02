@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.58.2.2 $
+// Revision Number: $Revision: 1.68.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -49,14 +49,10 @@
 
 #include <string>
 
-// ----------   Xyce Includes   ----------
 #include <N_DEV_fwd.h>
 #include <N_IO_fwd.h>
 #include <N_UTL_fwd.h>
 #include <N_UTL_Param.h>
-
-// ----------   Forward Declarations   ----------
-class N_IO_CmdParse;
 
 namespace Xyce {
 namespace Device {
@@ -70,132 +66,128 @@ namespace Device {
 //-----------------------------------------------------------------------------
 class DeviceOptions
 {
-  public:
-    DeviceOptions(N_IO_CmdParse & cp);
-    ~DeviceOptions();
+  friend std::ostream & operator<<(std::ostream & os, const DeviceOptions & devOp);
 
-    bool setupDefaultOptions ();
-    bool applyCmdLineOptions ();
-    bool registerOptions (const N_UTL_OptionBlock & OB);
+public:
+  DeviceOptions();
+  ~DeviceOptions();
 
-    void setBlockAnalysisFlag(bool flagVal);
+  bool registerOptions(const Util::OptionBlock & OB);
 
-    // Assignment operator:
-    DeviceOptions & operator=(DeviceOptions const & rhs);
+  void setBlockAnalysisFlag(bool flagVal);
 
-#ifdef Xyce_DEBUG_DEVICE
-    friend ostream & operator<<(ostream & os, const DeviceOptions & devOp);
-#endif
+  bool setupDefaultOptions (const IO::CmdParse &command_line);
+  bool applyCmdLineOptions (const IO::CmdParse &command_line);
 
-  protected:
+  // // Assignment operator:
+private:
+  DeviceOptions & operator=(DeviceOptions const & rhs);
 
-  private:
+public:
+  // some general MOS parameters:
+  double defad;  // MOS drain diffusion area.
+  double defas;  // MOS source diffusion area.
+  double defl;   // MOS channel length.
+  double defw;   // MOS channel width.
 
-  public:
+  double abstol; // absolute current error tolerance.
+  double reltol; // relative current error tolerance.
+  double chgtol; // absolute charge error tolerance.
 
-    // some general MOS parameters:
-    double defad;  // MOS drain diffusion area.
-    double defas;  // MOS source diffusion area.
-    double defl;   // MOS channel length.
-    double defw;   // MOS channel width.
+  double gmin;      // minimum allowed conductance.
+  double gmin_orig; // this is needed for gmin-homotopy.
+  double gmin_init; // this is needed for gmin-homotopy.
+  double gmin_scalar; // this is needed for gmin-homotopy.
 
-    double abstol; // absolute current error tolerance.
-    double reltol; // relative current error tolerance.
-    double chgtol; // absolute charge error tolerance.
+  double gmax;   // maximum allowed conductance.
 
-    double gmin;      // minimum allowed conductance.
-    double gmin_orig; // this is needed for gmin-homotopy.
-    double gmin_init; // this is needed for gmin-homotopy.
-    double gmin_scalar; // this is needed for gmin-homotopy.
+  double testJac_relTol; // reltol for num. jacobian diagnostic
+  double testJac_absTol; // abstol for num. jacobian diagnostic.
+  double testJac_SqrtEta;// dx = numJacSqrtEta * (1.0 + fabs(soln[i]));
+  double deviceSens_dp;  // similar to eta, but for numerical device sensitivities
 
-    double gmax;   // maximum allowed conductance.
+  double tnom;   // nominal temperature for device params.
+  Util::Param temp;   // operating temperature of ckt.
 
-    double testJac_relTol; // reltol for num. jacobian diagnostic
-    double testJac_absTol; // abstol for num. jacobian diagnostic.
-    double testJac_SqrtEta;// dx = numJacSqrtEta * (1.0 + fabs(soln[i]));
-    double deviceSens_dp;  // similar to eta, but for numerical device sensitivities
+  double scale_src; // scaling for source loads
 
-    double tnom;   // nominal temperature for device params.
-    N_UTL_Param temp;   // operating temperature of ckt.
+  bool numericalJacobianFlag;
+  bool testJacobianFlag;
+  int testJacStartStep;
+  int testJacStopStep;
+  bool testJacWarn;
+  bool testJacDeviceNameGiven;
+  std::string testJacDeviceName;
+  bool voltageLimiterFlag;
+  int lambertWFlag;
 
-    double scale_src; // scaling for source loads
+  bool newMeyerFlag;
 
-    bool numericalJacobianFlag;
-    bool testJacobianFlag;
-    int testJacStartStep;
-    int testJacStopStep;
-    bool testJacWarn;
-    bool testJacDeviceNameGiven;
-    string testJacDeviceName;
-    bool voltageLimiterFlag;
-    int lambertWFlag;
+  double icMultiplier;
 
-    bool newMeyerFlag;
+  double defaultMaxTimeStep;
 
-    double icMultiplier;
+  // mosfet homotopy:
+  double vdsScaleMin;
+  double vgstConst;
+  int numGainScaleBlocks;
+  bool staggerGainScale;
+  bool randomizeVgstConst;
+  double length0;
+  double width0;
+  double tox0;
+  double minRes;
+  double minCap;
+  double exp_order;
 
-    double defaultMaxTimeStep;
+  // tolerance on resistance below which it will be treated as zero
+  double zeroResistanceTol;
+  bool checkForZeroResistance;
+  bool detailedDeviceCounts;
 
-    // mosfet homotopy:
-    double vdsScaleMin;
-    double vgstConst;
-    int numGainScaleBlocks;
-    bool staggerGainScale;
-    bool randomizeVgstConst;
-    double length0;
-    double width0;
-    double tox0;
-    double minRes;
-    double minCap;
-    double exp_order;
+  int    sensDebugLevel;
+  int    debugLevel;
+  int    debugMinTimestep;
+  int    debugMaxTimestep;
+  double debugMinTime;
+  double debugMaxTime;
 
-    // tolerance on resistance below which it will be treated as zero
-    double zeroResistanceTol;
-    bool checkForZeroResistance;
-    bool detailedDeviceCounts;
+  int    verboseLevel;
 
-#ifdef Xyce_DEBUG_DEVICE
-    int    sensDebugLevel;
-    int    debugLevel;
-    int    debugMinTimestep;
-    int    debugMaxTimestep;
-    double debugMinTime;
-    double debugMaxTime;
-#endif
-    int    verboseLevel;
+  bool blockAnalysisFlag;       // This indicates an MPDE/HB run.  This is true during both IC and MPDE/HB phase.
+  // It is toggled by the presence of the .mpde analysis statement in the netlist.
 
-    bool blockAnalysisFlag;       // This indicates an MPDE/HB run.  This is true during both IC and MPDE/HB phase.
-    // It is toggled by the presence of the .mpde analysis statement in the netlist.
+  bool newExcessPhase;
+  bool defaultNewExcessPhase;   // default is true for MPDE, false for non-MPDE.
 
-    bool newExcessPhase;
-    bool defaultNewExcessPhase;   // default is true for MPDE, false for non-MPDE.
+  double excessPhaseScalar1;
+  double excessPhaseScalar2;
 
-    double excessPhaseScalar1;
-    double excessPhaseScalar2;
+  unsigned int randomSeed;      // seed for random number generator used by some devices.
+  // note: each device gets its own random number generator so
+  // it must initialize thing correctly. (See N_DEV_Synapse3 for an
+  // example)
 
-    unsigned int randomSeed;      // seed for random number generator used by some devices.
-    // note: each device gets its own random number generator so
-    // it must initialize thing correctly. (See N_DEV_Synapse3 for an
-    // example)
+  bool tryToCompact;            // Try to compact past history for LTRA device(s).
 
-    bool tryToCompact;            // Try to compact past history for LTRA device(s).
+  bool calculateAllLeadCurrents;   // class level flag to have the device manager
+  // configure all devices to load lead current.
+  // data in store and storeQvec.
 
-    bool calculateAllLeadCurrents;   // class level flag to have the device manager
-                                     // configure all devices to load lead current.
-                                     // data in store and storeQvec.
-
-    N_IO_CmdParse & commandLine;
+  //    IO::CmdParse & commandLine;
 };
 
 inline void DeviceOptions::setBlockAnalysisFlag(bool flagVal)
 {
+
+  //  voltageLimiterFlag = false;
   blockAnalysisFlag = flagVal;
 
   // tscoffe/tmei 07/30/08:  Note, if we call this with "false", then the
   // newExcessPhase and defaultNewExcessPhase flags will not go back to their
   // "user-set" values, they will be set to false.
   newExcessPhase = flagVal;
-  defaultNewExcessPhase = flagVal;
+  defaultNewExcessPhase = flagVal; 
 }
 
 } // namespace Device

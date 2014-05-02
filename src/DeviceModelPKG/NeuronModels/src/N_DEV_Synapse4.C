@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.29.2.1 $
+// Revision Number: $Revision: 1.49.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:34 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //----------------------------------------------------------------------------
@@ -53,11 +53,16 @@
 // ----------   Xyce Includes   ----------
 //
 #include <N_DEV_Const.h>
-#include <N_DEV_Synapse4.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_DeviceMaster.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Synapse4.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
+
+#include <N_DEV_Synapse.h>
 
 #include <N_LAS_Matrix.h>
 #include <N_LAS_Vector.h>
@@ -65,70 +70,52 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<Synapse4::Instance>::ParametricData()
-{
-  // Set up configuration constants:
-  setNumNodes(2);
-  setNumOptionalNodes(0);
-  setNumFillNodes(0);
-  setModelRequired(0);
-  addModelType("SYNAPSE");
-
-  // Set up map for double precision variables:
-  addPar ("GMAX", 0.01, false, ParameterType::NO_DEP,
-          &Synapse4::Instance::gMax,
-          &Synapse4::Instance::gMaxGiven,
-          U_OHMM1, CAT_NONE, "Maximal Synaptic Conductance");
-  
-}
-
-template<>
-ParametricData<Synapse4::Model>::ParametricData()
-{
-  // Set up map for double precision variables:
-  addPar ("VTHRESH", 0.01, false, ParameterType::NO_DEP,
-          &Synapse4::Model::vThresh, NULL,
-          U_VOLT, CAT_NONE, "Presynaptic voltage spike threhsold");
-
-  addPar ("DELAY", 0.001, false, ParameterType::NO_DEP,
-          &Synapse4::Model::delay, NULL,
-          U_SECOND, CAT_NONE, "Time delay between presynaptic signal and postsynaptic response");
-
-  addPar ("GMAX", 0.01, false, ParameterType::NO_DEP,
-          &Synapse4::Model::gMax, NULL,
-          U_OHMM1, CAT_NONE, "Maximal Synaptic Conductance");
-
-  addPar ("EREV", 0.0, false, ParameterType::NO_DEP,
-          &Synapse4::Model::eRev, NULL,
-          U_VOLT, CAT_NONE, "Postsynaptic Reversal Potential");
-
-  addPar ("TAU1", 0.0001, false, ParameterType::NO_DEP,
-          &Synapse4::Model::tau1, NULL,
-          U_SECM1, CAT_NONE, "Rise time constant");
-
-  addPar ("TAU2", 0.01, false, ParameterType::NO_DEP,
-          &Synapse4::Model::tau2, NULL,
-          U_SECM1, CAT_NONE, "Decay time constant");
-}
 
 namespace Synapse4 {
 
-vector< vector<int> > Instance::jacStamp;
 
+void Traits::loadInstanceParameters(ParametricData<Synapse4::Instance> &p)
+{
+  // Set up configuration constants:
+// Set up map for double precision variables:
+  p.addPar ("GMAX", 0.01, false, ParameterType::NO_DEP,
+          &Synapse4::Instance::gMax,
+          &Synapse4::Instance::gMaxGiven,
+          U_OHMM1, CAT_NONE, "Maximal Synaptic Conductance");
 
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
 }
 
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
+void Traits::loadModelParameters(ParametricData<Synapse4::Model> &p)
+{
+  // Set up map for double precision variables:
+  p.addPar ("VTHRESH", 0.01, &Synapse4::Model::vThresh)
+    .setUnit(U_VOLT)
+    .setDescription("Presynaptic voltage spike threhsold");
 
-  return parMap;
+  p.addPar ("DELAY", 0.001, &Synapse4::Model::delay)
+    .setUnit(U_SECOND)
+    .setDescription("Time delay between presynaptic signal and postsynaptic response");
+
+  p.addPar ("GMAX", 0.01, &Synapse4::Model::gMax)
+    .setUnit(U_OHMM1)
+    .setDescription("Maximal Synaptic Conductance");
+
+  p.addPar ("EREV", 0.0, &Synapse4::Model::eRev)
+    .setUnit(U_VOLT)
+    .setDescription("Postsynaptic Reversal Potential");
+
+  p.addPar ("TAU1", 0.0001, &Synapse4::Model::tau1)
+    .setUnit(U_SECM1)
+    .setDescription("Rise time constant");
+
+  p.addPar ("TAU2", 0.01, &Synapse4::Model::tau2)
+    .setUnit(U_SECM1)
+    .setDescription("Decay time constant");
 }
+
+
+
+std::vector< std::vector<int> > Instance::jacStamp;
 
 // Class Instance
 //-----------------------------------------------------------------------------
@@ -139,10 +126,10 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Christina Warrender, SNL,
 // Creation Date : 10/12/11
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
   // initialization
-  respondTime = numeric_limits<double>::max( );
+  respondTime = std::numeric_limits<double>::max( );
   ready = true;
   //active = false;
 
@@ -158,13 +145,11 @@ bool Instance::processParams (string param)
 // Creation Date : 10/12/11
 //-----------------------------------------------------------------------------
 Instance::Instance(
-  InstanceBlock & IB,
+  const Configuration & configuration,
+  const InstanceBlock & IB,
   Model & Riter,
-  MatrixLoadData & mlData1,
-  SolverState &ss1,
-  ExternData  &ed1,
-  DeviceOptions & do1)
-  : DeviceInstance(IB, mlData1, ss1, ed1, do1),
+  const FactoryBlock &  factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(Riter),
     li_Prev(-1),
     li_Post(-1),
@@ -184,9 +169,6 @@ Instance::Instance(
   numExtVars   = 2;   // presynaptic V and postsynaptic V
   setNumStoreVars(3);   // A0, B0, t0
   numLeadCurrentStoreVars = 1;
-
-  setName(IB.getName());
-  setModelName(model_.getName());
 
   if( jacStamp.empty() )
   {
@@ -240,41 +222,20 @@ Instance::~Instance ()
 // Creator       : Christina Warrender, SNL,
 // Creation Date : 10/12/11
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                             const vector<int> & extLIDVecRef )
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                             const std::vector<int> & extLIDVecRef )
 {
-  string msg;
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "-------------------------------------------------------------------------"
-    "----";
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl << dashedline << endl;
-    cout << "  SynapseInstance::registerLIDs" << endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "  SynapseInstance::registerLIDs" << std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -286,8 +247,8 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << "  li_Prev = " << li_Prev << endl;
-    cout << "  li_Post = " << li_Post << endl;
+    Xyce::dout() << "  li_Prev = " << li_Prev << std::endl;
+    Xyce::dout() << "  li_Post = " << li_Post << std::endl;
   }
 #endif
 
@@ -299,7 +260,7 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 }
@@ -312,13 +273,13 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Christina Warrender, SNL, Cognitive Modeling
 // Creation Date : 10/17/11
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   /*
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
-  string tmpstr;
+  std::string tmpstr;
 
   tmpstr = name + "_A";
   spiceInternalName (tmpstr);
@@ -339,20 +300,10 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Christina Warrender, SNL,
 // Creation Date : 10/12/11
 //-----------------------------------------------------------------------------
-void Instance::registerStoreLIDs(const vector<int> & stoLIDVecRef )
+void Instance::registerStoreLIDs(const std::vector<int> & stoLIDVecRef )
 {
-  string msg;
+  AssertLIDs(stoLIDVecRef.size() == getNumStoreVars());
 
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSto = stoLIDVecRef.size();
-
-  if (numSto != getNumStoreVars())
-  {
-    msg = "Instance::registerStoreLIDs:";
-    msg += "numSto != numStoreVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
   // copy over the global ID lists.
   stoLIDVec = stoLIDVecRef;
 
@@ -374,13 +325,13 @@ void Instance::registerStoreLIDs(const vector<int> & stoLIDVecRef )
 // Creator       : Rich Schiek, SNL, Electrical Systems Modeling
 // Creation Date : 08/01/2012
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getStoreNameMap()
+std::map<int,std::string> & Instance::getStoreNameMap()
 {
   // set up the internal name map, if it hasn't been already.
   if (stateNameMap.empty ())
   {
-    string baseString(getName() + "_");
-    string tempString;
+    std::string baseString(getName() + "_");
+    std::string tempString;
 
     tempString = baseString + "A0";
     storeNameMap[ li_A0_store ] = tempString;
@@ -405,7 +356,7 @@ map<int,string> & Instance::getStoreNameMap()
 // Creator       : Christina Warrender, SNL,
 // Creation Date : 10/12/11
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -418,7 +369,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Christina Warrender, SNL,
 // Creation Date : 10/12/11
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
 #ifdef Xyce_FullSynapseJac
@@ -523,19 +474,16 @@ bool Instance::updateIntermediateVars()
     didVpost = cond;
 
 #ifdef Xyce_DEBUG_DEVICE
-    const string dashedline =
-      "-------------------------------------------------------------------------"
-      "----";
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << endl << dashedline << endl;
-      cout << "  SynapseInstance::updateIntermediateVars" << endl;
-      cout << "Anow:  " << Anow << endl;
-      cout << "Bnow:  " << Bnow << endl;
-      cout << "vPost:  " << vPost << endl;
-      cout << "eRev:  " << eRev << endl;
-      cout << "ipost:  " << ipost << endl;
-      cout << "didVpost:  " << didVpost << endl;
+      Xyce::dout() << std::endl << section_divider << std::endl;
+      Xyce::dout() << "  SynapseInstance::updateIntermediateVars" << std::endl;
+      Xyce::dout() << "Anow:  " << Anow << std::endl;
+      Xyce::dout() << "Bnow:  " << Bnow << std::endl;
+      Xyce::dout() << "vPost:  " << vPost << std::endl;
+      Xyce::dout() << "eRev:  " << eRev << std::endl;
+      Xyce::dout() << "ipost:  " << ipost << std::endl;
+      Xyce::dout() << "didVpost:  " << didVpost << std::endl;
     }
 #endif
 
@@ -694,10 +642,10 @@ bool Instance::outputPlotFiles ()
   double * stoVector = extData.nextStoVectorRawPtr;
   if (time >= respondTime)
   {
-    //std::cout << "Instance::outputPlotFiles() adjusting A0, B0 and t0 = " << getSolverState().currTime << std::endl;
+    //Xyce::dout() << "Instance::outputPlotFiles() adjusting A0, B0 and t0 = " << getSolverState().currTime << std::endl;
     // succesfully processed a step, so adjust the next
     // respondTime to distant future
-    respondTime = numeric_limits<double>::max( );
+    respondTime = std::numeric_limits<double>::max( );
     //active = true;
 
     // now we also update the A0, B0 and t0 in the state vector
@@ -711,7 +659,7 @@ bool Instance::outputPlotFiles ()
     stoVector[li_A0_store] = Anow + deltaAB;
     stoVector[li_B0_store] = Bnow + deltaAB;
     stoVector[li_t0_store] = getSolverState().currTime;
-    //std::cout << "A:  " << (*staVector)[li_A0_state] << " B: " << (*staVector)[li_B0_state] << endl;
+    //Xyce::dout() << "A:  " << (*staVector)[li_A0_state] << " B: " << (*staVector)[li_B0_state] << std::endl;
   }
 
 /* disabling this because determining the point at which the synaptic current becomes negligible
@@ -757,7 +705,7 @@ bool Instance::updateTemperature ( const double & temp_tmp)
 // Creator       : Christina Warrender, SNL,
 // Creation Date : 10/12/11
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   // initialize variables needed to calculate synaptic dynamics
   if (tau1/tau2 > .9999) {
@@ -779,12 +727,12 @@ bool Model::processParams (string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 10/12/11
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -802,10 +750,11 @@ bool Model::processInstanceParams(string param)
 // Creator       : Christina Warrender, SNL,
 // Creation Date : 10/12/11
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-              SolverState & ss1,
-              DeviceOptions & do1)
-  : DeviceModel(MB, ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
     vThresh(0.0),
     delay(0.0),
     gMax(0.0),
@@ -839,9 +788,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -859,24 +808,46 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i,isize;
   isize = instanceContainer.size();
-  os << endl;
-  os << "Number of Synapse4 Instances: " << isize << endl;
-  os << "    name     getModelName()  Parameters" << endl;
+  os << std::endl;
+  os << "Number of Synapse4 Instances: " << isize << std::endl;
+  os << "    name     model name  Parameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
+  return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 //-----------------------------------------------------------------------------
 // Function      : Master::updateState
@@ -900,7 +871,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 #pragma omp parallel for reduction (&&:bsuccess)
 #endif
 
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     bool tmpBool = (*it)->updateIntermediateVars();	// skipping call to updatePrimaryState
     bsuccess = bsuccess && tmpBool;
@@ -948,7 +919,7 @@ bool Master::loadDAEVectors(double * solVec, double * fVec, double * qVec, doubl
   // becomes negligible is somewhat problematic, and there don't appear to be significant savings
   // from avoiding loads when synapse is inactive
 
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     bool tmpBool = (*it)->loadDAEFVector();
     bsuccess = bsuccess && tmpBool;
@@ -981,13 +952,26 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
   // becomes negligible is somewhat problematic, and there don't appear to be significant savings
   // from avoiding loads when synapse is inactive
 
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     bool tmpBool = (*it)->loadDAEdFdx();
     bsuccess = bsuccess && tmpBool;
   }
 
   return bsuccess;
+}
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("synapse", 4)
+    .registerModelType("synapse", 4);
 }
 
 } // namespace Synapse4

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.16.2.2 $
+// Revision Number: $Revision: 1.21 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -64,12 +64,6 @@
 #include <N_ERH_ErrorMgr.h>
 
 // ----------  Other Includes   ----------
-
-#ifdef Xyce_PARALLEL_MPI
-#include <Epetra_MpiComm.h>
-#else
-#include <Epetra_SerialComm.h>
-#endif
 
 //-----------------------------------------------------------------------------
 // Function      : N_PDS_ParComm::N_PDS_ParComm
@@ -111,12 +105,12 @@ N_PDS_ParComm::N_PDS_ParComm( int iargs,
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 03/16/06
 //-----------------------------------------------------------------------------
-N_PDS_ParComm::N_PDS_ParComm( MPI_Comm * comm )
+N_PDS_ParComm::N_PDS_ParComm( MPI_Comm comm )
   :
   petraCommOwned_(true),
   mpiCommOwned_(true)
 {
-  mpiComm_ = new N_PDS_MPIComm( *comm );
+  mpiComm_ = new N_PDS_MPIComm( comm );
   petraComm_ = new Epetra_MpiComm( mpiComm_->comm() );
 
   isSerial_ = ( numProc() == 1 );
@@ -144,6 +138,14 @@ N_PDS_ParComm::N_PDS_ParComm(const N_PDS_ParComm &right)
 {
 }
 
+Xyce::Parallel::Machine N_PDS_ParComm::comm() const {
+#ifdef Xyce_PARALLEL_MPI
+      return mpiComm_->comm();
+#else
+      return 0;
+#endif
+    }
+    
 //-----------------------------------------------------------------------------
 // Function      : N_PDS_ParComm::operator=
 // Purpose       : Assignment operator.

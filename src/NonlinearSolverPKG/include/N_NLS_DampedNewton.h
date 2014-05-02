@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.70.2.2 $
+// Revision Number: $Revision: 1.76 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:47 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -47,16 +47,14 @@
 #ifndef Xyce_N_NLS_DampedNewton_h
 #define Xyce_N_NLS_DampedNewton_h
 
-// ----------   Xyce Includes   ----------
+#include <N_IO_fwd.h>
 #include <N_NLS_NonLinearSolver.h>
 #include <N_NLS_NLParams.h>
 #include <N_NLS_ParamMgr.h>
 #include <N_NLS_ReturnCodes.h>
 
-// ---------- Forward Declarations ----------
 class N_NLS_ConstraintBT;
 class N_NLS_TwoLevelNewton;
-class N_IO_CmdParse;
 
 //-----------------------------------------------------------------------------
 // Class         : N_NLS_DampedNewton
@@ -114,13 +112,9 @@ private:
 
   void updateWeights_();
 
-#ifdef Xyce_VERBOSE_NONLINEAR
-
-  void printHeader_();
-  void printFooter_();
-  void printStepInfo_(int step);
-
-#endif
+  void printHeader_(std::ostream &os);
+  void printFooter_(std::ostream &os);
+  void printStepInfo_(std::ostream &os, int step);
 
   bool rhs_();
   bool newton_();

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.18.2.2 $
+// Revision Number: $Revision: 1.24.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -65,20 +65,10 @@ class SourceInstance : public DeviceInstance
 {
 public:
   SourceInstance(
-    InstanceBlock & IB,
-    N_DEV_MatrixLoadData & mlData1,
-    SolverState &ss1,
-    ExternData  &ed1,
-    DeviceOptions & do1);
-
-  SourceInstance(
-    const std::string & instance_name,
-    const std::string & model_name,
-    N_DEV_MatrixLoadData & mlData1,
-    SolverState &ss1,
-    ExternData  &ed1,
-    DeviceOptions & do1);
-
+     const InstanceBlock &       IB,
+     ParametricData<void> &      parametric_data,
+     const FactoryBlock &        factory_block);
+    
   ~SourceInstance();
 
 private:
@@ -94,7 +84,7 @@ public:
 
   double period();
 
-  virtual bool getInstanceBreakPoints (vector<N_UTL_BreakPoint> &breakPointTimes);
+  virtual bool getInstanceBreakPoints (std::vector<N_UTL_BreakPoint> &breakPointTimes);
   virtual bool updateSource ();
 
   virtual bool loadBVectorsforAC(double * bVecReal, double * bVecImag ) {

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.14.6.2 $
+// Revision Number: $Revision: 1.23 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:44 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -79,48 +79,53 @@ class N_LAS_BlockMatrix : public N_LAS_Matrix
  public:
 
   //Constructors
-  N_LAS_BlockMatrix( int Size,
-                     const vector< vector<int> > & BlockColumns,
-                     const Epetra_CrsGraph & Graph,
-                     const Epetra_CrsGraph & BaseGraph,
-                     int AugmentCount = 0 );
+  N_LAS_BlockMatrix( int size,
+                     int offset,
+                     const std::vector< std::vector<int> > & blockColumns,
+                     const Epetra_CrsGraph & globalGraph,
+                     const Epetra_CrsGraph & subBlockGraph,
+                     int augmentCount = 0 );
 
   //Destructor
-  ~N_LAS_BlockMatrix();
+  ~N_LAS_BlockMatrix() {}
 
   //Block Access
   N_LAS_Matrix & block( int row, int col );
 
   int blockSize()
-  { return BlockSize_; }
+  { return blockSize_; }
   
   int numBlockRows()
-  { return NumBlockRows_; }
+  { return numBlockRows_; }
+
+  // Put function for the block sparse-matrix.
+  void put(double s);
+
+  // Replace the entries of an augmented row using the row GID.
+  void replaceAugmentedRow(int rowGID, int length, double * coeffs, int * colIndices); 
 
   void replaceAugmentedColumn(int augmentedColumn, const N_LAS_BlockVector & vec);
-  
-  void printPetraObject() const;
+
+  // Assemble global matrix with blocks
+  // NOTE:  The global matrix is not always a view of the local matrix, so this function ensures
+  // that the values are sync'ed up.  Call this before using the global matrix for computations.
+  void assembleGlobalMatrix();
+ 
+  void fillComplete();
+ 
+  void printPetraObject(std::ostream &os) const;
 
  private:
 
-  const int BlockSize_;
-  const int NumBlockRows_;
-  const int AugmentCount_;
-  vector<int> AugmentGIDs_;
-  
-  const vector< vector<int> > Cols_;
-  vector< vector<N_LAS_Matrix*> > Blocks_;
+  bool blocksViewGlobalMat_;
+  const int blockSize_;
+  const int offset_;
+  const int numBlockRows_;
+  const int augmentCount_;
 
+  std::vector<int> augmentGIDs_, baseNumCols_, baseIndices_;
+  const std::vector< std::vector<int> > cols_;
+  std::vector< std::vector<Teuchos::RCP<N_LAS_Matrix> > > blocks_;
 };
-
-// Nonmember constructor
-RCP<N_LAS_BlockMatrix> N_LAS_blockMatrix( 
-    const vector< vector<int> > & BlockColumns,
-    Epetra_Map & BlockMap,
-    const Epetra_CrsGraph & BaseGraph,
-    int AugmentCount = 0 
-    );
-
-
 
 #endif // Xyce_N_LAS_BlockMatrix_h

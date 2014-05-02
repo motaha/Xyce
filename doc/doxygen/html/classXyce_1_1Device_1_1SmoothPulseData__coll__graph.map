@@ -1,0 +1,7 @@
+<map id="Xyce::Device::SmoothPulseData" name="Xyce::Device::SmoothPulseData">
+<area shape="rect" id="node2" href="$classXyce_1_1Device_1_1SourceData.html" title="Xyce::Device::SourceData" alt="" coords="97,187,279,213"/>
+<area shape="rect" id="node3" href="$classXyce_1_1Device_1_1DeviceOptions.html" title="Xyce::Device::DeviceOptions" alt="" coords="5,96,204,123"/>
+<area shape="rect" id="node4" href="$classXyce_1_1Device_1_1SolverState.html" title="Xyce::Device::SolverState" alt="" coords="229,96,411,123"/>
+<area shape="rect" id="node5" href="$classN__NLS__NonLinInfo.html" title="N_NLS_NonLinInfo" alt="" coords="164,5,308,32"/>
+<area shape="rect" id="node6" href="$classN__TIA__TimeIntInfo.html" title="N_TIA_TimeIntInfo" alt="" coords="332,5,472,32"/>
+</map>

@@ -1,0 +1,5 @@
+<map id="Xyce::Device::MOSFET2::Model" name="Xyce::Device::MOSFET2::Model">
+<area shape="rect" id="node2" href="$classXyce_1_1Device_1_1DeviceModel.html" title="Xyce::Device::DeviceModel" alt="" coords="13,155,203,181"/>
+<area shape="rect" id="node3" href="$classXyce_1_1Device_1_1DeviceEntity.html" title="Xyce::Device::DeviceEntity" alt="" coords="15,80,201,107"/>
+<area shape="rect" id="node4" href="$classXyce_1_1Device_1_1ParameterBase.html" title="Base class for all parameters." alt="" coords="5,5,211,32"/>
+</map>

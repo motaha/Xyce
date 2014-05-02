@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,19 +31,17 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.25.2.11 $
-// Revision Date  : $Date: 2013/12/19 01:07:15 $
-// Current Owner  : $Author: tmei $
+// Revision Number: $Revision: 1.60 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
+// Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 #include <Xyce_config.h>
 
-// ---------- Standard Includes ----------
-
-// ----------   Xyce Includes   ----------
 #include <N_ANP_AnalysisManager.h>
 #include <N_ANP_HB.h>
 #include <N_ANP_Transient.h>
 #include <N_ANP_DCSweep.h>
+#include <N_ANP_Report.h>
 #include <N_MPDE_Manager.h>
 #include <N_MPDE_Discretization.h>
 
@@ -55,6 +53,7 @@
 #include <N_LAS_HBPrecondFactory.h>
 #include <N_LAS_PrecondFactory.h>
 #include <N_LAS_System.h>
+#include <N_LAS_BlockSystemHelpers.h>
 
 #include <N_NLS_Manager.h>
 
@@ -68,16 +67,19 @@ using Teuchos::rcp;
 using Teuchos::RCP;
 using Teuchos::rcp_dynamic_cast;
 
+namespace Xyce {
+namespace Analysis {
+
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::N_ANP_HB( N_ANP_AnalysisManager * )
+// Function      : HB::HB( AnalysisManager * )
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, SNL
 // Creation Date : 09/18/2008
 //-----------------------------------------------------------------------------
-N_ANP_HB::N_ANP_HB( N_ANP_AnalysisManager * anaManagerPtr ) :
-  N_ANP_AnalysisBase(anaManagerPtr),
+HB::HB( AnalysisManager * anaManagerPtr ) :
+  AnalysisBase(anaManagerPtr),
   debugLevel(0),
   isPaused(false),
   startDCOPtime(0.0),
@@ -92,6 +94,7 @@ N_ANP_HB::N_ANP_HB( N_ANP_AnalysisManager * anaManagerPtr ) :
   startUpPeriodsFinished_(false),
   saveIcData_(false),
   tiaParams_( anaManagerPtr->tiaParams ),
+  voltLimFlag_(1), 
   taHB_(1),
   fastTimeDisc_(0),
   fastTimeDiscOrder_(1),
@@ -117,14 +120,14 @@ N_ANP_HB::N_ANP_HB( N_ANP_AnalysisManager * anaManagerPtr ) :
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::getStepNumber()
+// Function      : HB::getStepNumber()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist
 // Creation Date : 5/20/13
 //-----------------------------------------------------------------------------
-int N_ANP_HB::getStepNumber ()
+int HB::getStepNumber ()
 {
   if ( !Teuchos::is_null( analysisObject_ ) )
   {
@@ -134,14 +137,14 @@ int N_ANP_HB::getStepNumber ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::setStepNumber()
+// Function      : HB::setStepNumber()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist
 // Creation Date : 5/20/13
 //-----------------------------------------------------------------------------
-void N_ANP_HB::setStepNumber (int step)
+void HB::setStepNumber (int step)
 {
   if ( !Teuchos::is_null( analysisObject_ ) )
   {
@@ -150,14 +153,14 @@ void N_ANP_HB::setStepNumber (int step)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::setBeginningIntegrationFlag()
+// Function      : HB::setBeginningIntegrationFlag()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist
 // Creation Date : 5/20/13
 //-----------------------------------------------------------------------------
-void N_ANP_HB::setBeginningIntegrationFlag(bool bif)
+void HB::setBeginningIntegrationFlag(bool bif)
 {
   if ( !Teuchos::is_null( analysisObject_ ) )
   {
@@ -166,14 +169,14 @@ void N_ANP_HB::setBeginningIntegrationFlag(bool bif)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::getBeginningIntegrationFlag()
+// Function      : HB::getBeginningIntegrationFlag()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist
 // Creation Date : 5/20/13
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::getBeginningIntegrationFlag()
+bool HB::getBeginningIntegrationFlag()
 {
   if ( !Teuchos::is_null( analysisObject_ ) )
   {
@@ -183,14 +186,14 @@ bool N_ANP_HB::getBeginningIntegrationFlag()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::setIntegrationMethod
+// Function      : HB::setIntegrationMethod
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist
 // Creation Date : 5/20/13
 //-----------------------------------------------------------------------------
-void N_ANP_HB::setIntegrationMethod(int im)
+void HB::setIntegrationMethod(int im)
 {
   if ( !Teuchos::is_null( analysisObject_ ) )
   {
@@ -199,14 +202,14 @@ void N_ANP_HB::setIntegrationMethod(int im)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::getIntegrationMethod
+// Function      : HB::getIntegrationMethod
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist
 // Creation Date : 5/20/13
 //-----------------------------------------------------------------------------
-unsigned int N_ANP_HB::getIntegrationMethod ()
+unsigned int HB::getIntegrationMethod ()
 {
   if ( !Teuchos::is_null( analysisObject_ ) )
   {
@@ -216,14 +219,14 @@ unsigned int N_ANP_HB::getIntegrationMethod ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::run()
+// Function      : HB::run()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, SNL
 // Creation Date : 09/18/2008
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::run()
+bool HB::run()
 {
 
   // initializeAll_();
@@ -249,11 +252,6 @@ bool N_ANP_HB::run()
   //
   // }
 
-#ifdef Xyce_PARALLEL_MPI
-  std::string msg = "The HB analysis cannot yet be run in parallel.  Try a serial build of Xyce to run HB.\n";
-  N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0,msg);
-#endif
-
   bool bsuccess = true;
 
   bsuccess = bsuccess & init();
@@ -270,26 +268,22 @@ bool N_ANP_HB::run()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::init()
+// Function      : HB::init()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, SNL
 // Creation Date : 09/18/2008
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::init()
+bool HB::init()
 {
   bool returnValue=true;
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, " ***** Running HB initial conditions....\n");
-  const string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
+  Xyce::lout() << " ***** Running HB initial conditions....\n" << std::endl;
 #ifdef Xyce_DEBUG_HB
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                          "  N_ANP_HB::init()");
+  Xyce::dout() << std::endl
+         << section_divider << std::endl
+         << "  HB::init()" << std::endl;
 #endif // Xyce_DEBUG_HB
 
   //Store copy of transient TIAParams for HB run
@@ -297,9 +291,10 @@ bool N_ANP_HB::init()
   //
   // If it was requested, advance the solution a fixed number of startup periods
   //
-  period_ =   1.0/tiaParams_.freq;
+  period_ =   1.0/tiaParams_.freqs[0];
 
-  if (taHB_ == 1) 
+
+  if (taHB_ == 1)
   {
   bool retTol1 = runTol_(); returnValue = returnValue && retTol1;
 
@@ -310,7 +305,7 @@ bool N_ANP_HB::init()
     bool startupPeriodsSuccess = runStartupPeriods_();
     if (!startupPeriodsSuccess)
     {
-      std::string msg = "N_ANP_HB::init().  Failed to calculate the startup periods.\n";
+      std::string msg = "HB::init().  Failed to calculate the startup periods.\n";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
     }
     returnValue = returnValue && startupPeriodsSuccess;
@@ -318,19 +313,21 @@ bool N_ANP_HB::init()
     bool icSuccess = runTransientIC_();
     if (!icSuccess)
     {
-      std::string msg = "N_ANP_HB::init().  Initial HB Transient failed \n";
+      std::string msg = "HB::init().  Initial HB Transient failed \n";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
     }
     returnValue = returnValue && icSuccess;
   }
 
   interpolateIC_();
+
+
   }
   else
   {
 
     double TimeStep = period_/static_cast<double>(size_);
-//    timeSteps_.push_back( TimeStep );
+    timeSteps_.push_back( TimeStep );
     fastTimes_.resize(size_+1);
 
     goodTimePoints_.resize(size_+1);
@@ -348,9 +345,9 @@ bool N_ANP_HB::init()
   for( i = 0; i < size_; ++i )
   {
     if (i < (size_-1)/2)
-      freqPoints_[i] = -static_cast<double>((size_-1)/2 - i) * tiaParams_.freq;
+      freqPoints_[i] = -static_cast<double>((size_-1)/2 - i) * tiaParams_.freqs[0];
     else
-      freqPoints_[i] = static_cast<double>(i - (size_-1)/2) * tiaParams_.freq;
+      freqPoints_[i] = static_cast<double>(i - (size_-1)/2) * tiaParams_.freqs[0];
   }
 
 
@@ -361,15 +358,13 @@ bool N_ANP_HB::init()
   hbBuilderPtr_ = rcp(new N_LAS_HBBuilder( size_, mpdeDiscPtr_ ));
 
 #ifdef Xyce_DEBUG_HB
-  std::cout << "N_ANP_HB::init():  Generate Maps\n";
+  Xyce::dout() << "HB::init():  Generate Maps\n";
 #endif // Xyce_DEBUG_HB
   hbBuilderPtr_->generateMaps( rcp(pdsMgrPtr_->getParallelMap( "SOLUTION" ), false),
                                rcp(pdsMgrPtr_->getParallelMap( "SOLUTION_OVERLAP_GND" ), false) );
   hbBuilderPtr_->generateStateMaps( rcp(pdsMgrPtr_->getParallelMap( "STATE" ),false) );
   hbBuilderPtr_->generateStoreMaps( rcp(pdsMgrPtr_->getParallelMap( "STORE" ),false) );
-
-  hbLoaderPtr_ = rcp(new N_LOA_HBLoader( mpdeState_, mpdeDiscPtr_ ) );
-  hbLoaderPtr_->registerHBBuilder(hbBuilderPtr_);
+  hbBuilderPtr_->generateGraphs( *(pdsMgrPtr_->getMatrixGraph( "JACOBIAN" )) );
 
   HBICVectorPtr_ = hbBuilderPtr_->createTimeDomainBlockVector();
   HBICStateVectorPtr_ = hbBuilderPtr_->createTimeDomainStateBlockVector();
@@ -377,9 +372,10 @@ bool N_ANP_HB::init()
   HBICQVectorPtr_ = hbBuilderPtr_->createTimeDomainBlockVector();
 
   HBICVectorFreqPtr_ = hbBuilderPtr_->createExpandedRealFormTransposeBlockVector();
-  HBICStateVectorFreqPtr_ = hbBuilderPtr_->createExpandedRealFormTransposeStateBlockVector();
-  HBICQVectorFreqPtr_ = hbBuilderPtr_->createExpandedRealFormTransposeBlockVector();
-  HBICStoreVectorFreqPtr_ = hbBuilderPtr_->createExpandedRealFormTransposeStoreBlockVector();
+
+//  HBICStateVectorFreqPtr_ = hbBuilderPtr_->createExpandedRealFormTransposeStateBlockVector();
+//  HBICQVectorFreqPtr_ = hbBuilderPtr_->createExpandedRealFormTransposeBlockVector();
+//  HBICStoreVectorFreqPtr_ = hbBuilderPtr_->createExpandedRealFormTransposeStoreBlockVector();
 
   tiaParams_.finalTime =  period_;
   anaManagerRCPtr_->registerTIAParams (tiaParams_);
@@ -391,7 +387,12 @@ bool N_ANP_HB::init()
   //anaManagerRCPtr_->anaIntPtr->getnlHBOptions(saved_nlHBOB_);
   nlsMgrRCPtr_->getHBOptions(saved_nlHBOB_);
 
-  if (taHB_ == 1)
+  // Create HB Loader.
+  hbLoaderPtr_ = rcp(new N_LOA_HBLoader( mpdeState_, mpdeDiscPtr_ ) );
+  hbLoaderPtr_->registerHBBuilder(hbBuilderPtr_);
+  hbLoaderPtr_->registerAppBuilder(appBuilderPtr_);
+
+  if (taHB_==1)
   {
   // Pick up IC data from the initial transient.
   for (int i=0 ; i<size_ ; ++i)
@@ -399,7 +400,7 @@ bool N_ANP_HB::init()
 #ifdef Xyce_DEBUG_HB
     if( debugLevel > 0 )
     {
-      std::cout << "N_ANP_HB::init():  Loading initial condition data from time: fastTimes_["
+      Xyce::dout() << "HB::init():  Loading initial condition data from time: fastTimes_["
                 << i << "] = " << fastTimes_[i] << std::endl;
     }
 #endif // Xyce_DEBUG_HB
@@ -411,72 +412,45 @@ bool N_ANP_HB::init()
   }
 
   hbLoaderPtr_->permutedFFT(*HBICVectorPtr_, &*HBICVectorFreqPtr_);
-  }
 
+  }
 #ifdef Xyce_DEBUG_HB
   if ( debugLevel > 1 )
   {
-    std::cout << "HB Initial Condition Solution!\n";
-    HBICVectorPtr_->printPetraObject();
-    std::cout << "HB Initial Condition State Vector!\n";
-    HBICStateVectorPtr_->printPetraObject();
-    std::cout << "HB Initial Condition Store Vector!\n";
-    HBICStoreVectorPtr_->printPetraObject();
+    Xyce::dout() << "HB Initial Condition Solution!\n";
+    HBICVectorPtr_->printPetraObject(std::cout);
+    Xyce::dout() << "HB Initial Condition State Vector!\n";
+    HBICStateVectorPtr_->printPetraObject(std::cout);
+    Xyce::dout() << "HB Initial Condition Store Vector!\n";
+    HBICStoreVectorPtr_->printPetraObject(std::cout);
   }
 #endif // Xyce_DEBUG_HB
 
   //Destroy Solvers, etc. from IC phase and prepare for HB
   //-----------------------------------------
+
+//  if ( voltLimFlag_ == 0 )
+//    devInterfacePtr_->setVoltageLimiterFlag (false);
+  devInterfacePtr_->setVoltageLimiterFlag (voltLimFlag_);
+
   devInterfacePtr_->setMPDEFlag( true );
   anaManagerRCPtr_->resetAll();
 
   //-----------------------------------------
 
-  //Finish setup of HB Builder
-  //-----------------------------------------
-  hbBuilderPtr_->generateGraphs
-    ( *(pdsMgrPtr_->getMatrixGraph( "JACOBIAN" )) );
-  //-----------------------------------------
-
-  //Setup HB Loader
+  //Finish setup of HB Loader
   //-----------------------------------------
   hbLoaderPtr_->registerAppLoader( loaderRCPtr_ );
   hbLoaderPtr_->registerDeviceInterface( devInterfacePtr_ );
   goodTimePoints_.resize(size_+1);
   goodTimePoints_[size_] = period_;
 
+  for( int i = 0; i < size_; ++i )
+  {
+    goodTimePoints_[i] = goodTimePoints_[i] - tiaParams_.initialTime;
+  }
+
   hbLoaderPtr_->setFastTimes(goodTimePoints_);
-  //hbLoaderPtr_->setPeriodFlags( nonPeriodicFlags );
-
-  //Include these for the loader to use with devices
-  hbLoaderPtr_->registerAppVec ( rcp(appBuilderPtr_->createVector()) );
-  hbLoaderPtr_->registerAppNextStaVec ( rcp(appBuilderPtr_->createStateVector()) );
-  hbLoaderPtr_->registerAppCurrStaVec ( rcp(appBuilderPtr_->createStateVector()) );
-  hbLoaderPtr_->registerAppLastStaVec ( rcp(appBuilderPtr_->createStateVector()) );
-
-  hbLoaderPtr_->registerAppNextStoVec ( rcp(appBuilderPtr_->createStoreVector()) );
-  hbLoaderPtr_->registerAppCurrStoVec ( rcp(appBuilderPtr_->createStoreVector()) );
-  hbLoaderPtr_->registerAppLastStoVec ( rcp(appBuilderPtr_->createStoreVector()) );
-  hbLoaderPtr_->registerAppStoLeadCurrQCompVec ( rcp(appBuilderPtr_->createStoreVector()) );
-
-  hbLoaderPtr_->registerAppdQdx( rcp(appBuilderPtr_->createMatrix()) );
-  hbLoaderPtr_->registerAppdFdx( rcp(appBuilderPtr_->createMatrix()) );
-
-  // Check this!
-  hbLoaderPtr_->registerMPDEdQdx
-    ( rcp_dynamic_cast<N_LAS_BlockMatrix>(rcp(hbBuilderPtr_->createMatrix())) );
-
-  hbLoaderPtr_->registerMPDEdFdx
-    ( rcp_dynamic_cast<N_LAS_BlockMatrix>(rcp(hbBuilderPtr_->createMatrix())) );
-
-  hbLoaderPtr_->registerXt(hbBuilderPtr_->createTimeDomainBlockVector());
-  hbLoaderPtr_->registerVt(hbBuilderPtr_->createTimeDomainBlockVector());
-
-  hbLoaderPtr_->registerHBdQdx
-    ( rcp_dynamic_cast<N_LAS_BlockMatrix>(rcp(hbBuilderPtr_->createMatrix())) );
-
-  hbLoaderPtr_->registerHBdFdx
-    ( rcp_dynamic_cast<N_LAS_BlockMatrix>(rcp(hbBuilderPtr_->createMatrix())) );
 
   //-----------------------------------------
   //Construct Solvers, etc. for HB Phase
@@ -516,13 +490,11 @@ bool N_ANP_HB::init()
   RCP<N_LAS_HBPrecondFactory> tmpPrecFactory
     = rcp_dynamic_cast<N_LAS_HBPrecondFactory>( precFactory_ );
 
-  tmpPrecFactory->registerAppLoader( loaderRCPtr_ );
   tmpPrecFactory->registerAppBuilder( appBuilderPtr_ );
   tmpPrecFactory->registerHBLoader( hbLoaderPtr_ );
   tmpPrecFactory->registerHBBuilder( hbBuilderPtr_ );
-  tmpPrecFactory->registerMPDEState( rcp(&mpdeState_, false) );
-  tmpPrecFactory->registerDeviceInterface( devInterfacePtr_ );
   tmpPrecFactory->setFastTimes( goodTimePoints_ );
+  tmpPrecFactory->setTimeSteps( timeSteps_ );
 
   nlsMgrRCPtr_->registerPrecondFactory( precFactory_ );
   //-----------------------------------------
@@ -538,120 +510,116 @@ bool N_ANP_HB::init()
   nlsMgrRCPtr_->setAnalysisMode(anpAnalysisModeToNLS(ANP_MODE_HB));
 
 #ifdef Xyce_DEBUG_HB
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+  Xyce::dout() << section_divider << std::endl;
 #endif // Xyce_DEBUG_HB
 
   return returnValue;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::loopProcess()
+// Function      : HB::loopProcess()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, SNL
 // Creation Date : 09/18/2008
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::loopProcess()
+bool HB::loopProcess()
 {
   bool returnValue = true;
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, " ***** Beginning full HB simulation....\n");
+  Xyce::lout() << " ***** Beginning full HB simulation....\n" << std::endl;
 
 #ifdef Xyce_DEBUG_HB
-  const string dashedline =
-    "---------------------------------------------------------------"
-    "-------------";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                          "  N_ANP_HB::loopProcess");
+  Xyce::dout() << std::endl
+         << section_divider << std::endl
+         << "  HB::loopProcess" << std::endl;
 #endif // Xyce_DEBUG_HB
 
-  N_TIA_DataStore * dsPtr = anaManagerRCPtr_->getTIADataStore();
+  RCP<N_TIA_DataStore> dsPtr = anaManagerRCPtr_->getTIADataStore();
   *(dsPtr->nextSolutionPtr) = *(HBICVectorFreqPtr_.get());
   *(dsPtr->nextStatePtr) = *(HBICStateVectorPtr_.get());
   *(dsPtr->nextStorePtr) = *(HBICStoreVectorPtr_.get());
 
   // try to run the problem
-  analysisObject_ = Teuchos::rcp(new N_ANP_DCSweep( anaManagerRCPtr_.get() ));
+  analysisObject_ = Teuchos::rcp(new DCSweep( anaManagerRCPtr_.get() ));
   returnValue = analysisObject_->run();
 
   // Add in simulation times
   accumulateStatistics_();
 
   // print out analysis info
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, " ***** Harmonic Balance Computation Summary *****");
+  Xyce::lout() << " ***** Harmonic Balance Computation Summary *****" << std::endl;
   analysisObject_->printLoopInfo( 0, 0 );
 
 #ifdef Xyce_DEBUG_HB
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
+  dout() << section_divider << std::endl;
 #endif // Xyce_DEBUG_HB
 
   return returnValue;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::processSuccessfulDCOP()
+// Function      : HB::processSuccessfulDCOP()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, SNL
 // Creation Date : 09/18/2008
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::processSuccessfulDCOP()
+bool HB::processSuccessfulDCOP()
 {
   return false;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::processSuccessfulStep()
+// Function      : HB::processSuccessfulStep()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, SNL
 // Creation Date : 09/18/2008
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::processSuccessfulStep()
+bool HB::processSuccessfulStep()
 {
   return false;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::processFailedStep
+// Function      : HB::processFailedStep
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, SNL
 // Creation Date : 09/18/2008
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::processFailedStep()
+bool HB::processFailedStep()
 {
   return false;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::processFailedDCOP
+// Function      : HB::processFailedDCOP
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, SNL
 // Creation Date : 09/18/2008
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::processFailedDCOP()
+bool HB::processFailedDCOP()
 {
   return false;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::finish
+// Function      : HB::finish
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, SNL
 // Creation Date : 09/18/2008
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::finish()
+bool HB::finish()
 {
   // Move statistics into common variable
   totalNumberSuccessfulStepsTaken_ = hbTotalNumberSuccessfulStepsTaken_;
@@ -670,8 +638,13 @@ bool N_ANP_HB::finish()
   return true;
 }
 
+bool HB::handlePredictor()
+{
+  return true;
+}
+
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::resetForStepAnalysis()
+// Function      : HB::resetForStepAnalysis()
 // Purpose       : When doing a .STEP sweep, some data must be reset to its
 //                 initial state.
 // Special Notes :
@@ -679,7 +652,7 @@ bool N_ANP_HB::finish()
 // Creator       : Todd Coffey, SNL
 // Creation Date : 09/18/2008
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::resetForStepAnalysis()
+bool HB::resetForStepAnalysis()
 {
   totalNumberSuccessStepsThisParameter_ = 0;
 
@@ -692,7 +665,7 @@ bool N_ANP_HB::resetForStepAnalysis()
 
     secRCPtr_->resetAll();
 
-    anaManagerRCPtr_->nextOutputTime_ = 0.0;
+    anaManagerRCPtr_->setNextOutputTime(0.0);
     anaManagerRCPtr_->registerLinearSystem( &*lasSystemRCPtr_ );
     anaManagerRCPtr_->registerLoader( loaderRCPtr_.get() );
     anaManagerRCPtr_->resumeSimulation();
@@ -729,59 +702,30 @@ bool N_ANP_HB::resetForStepAnalysis()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::finalVerboseOutput
+// Function      : HB::finalVerboseOutput
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, SNL
 // Creation Date : 09/18/2008
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::finalVerboseOutput()
+bool HB::finalVerboseOutput()
 {
   return false;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::printStepHeader()
-// Purpose       : Prints out time step information.
-// Special Notes :
-// Scope         : public
-// Creator       : Todd Coffey, SNL
-// Creation Date : 09/18/2008
-//-----------------------------------------------------------------------------
-void N_ANP_HB::printStepHeader()
-{
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::printProgress()
-// Purpose       : Outputs run completion percentage and estimated
-//                 time-to-completion.
-//
-// Special Notes : This will need some fixing to work with .STEP.
-//
-// Scope         : public
-// Creator       : Todd Coffey, SNL
-// Creation Date : 09/18/2008
-//-----------------------------------------------------------------------------
-void N_ANP_HB::printProgress()
-{
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::setHBOptions
+// Function      : HB::setHBOptions
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist
 // Creation Date : 05/13/13
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::setHBOptions(const N_UTL_OptionBlock & OB)
+bool HB::setHBOptions(const N_UTL_OptionBlock & OB)
 {
-  string msg;
-
-  list<N_UTL_Param>::const_iterator iterPL = OB.getParams().begin();
-  list<N_UTL_Param>::const_iterator  endPL = OB.getParams().end();
+  std::list<N_UTL_Param>::const_iterator iterPL = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator  endPL = OB.getParams().end();
 
   for( ; iterPL != endPL; ++iterPL )
   {
@@ -790,12 +734,14 @@ bool N_ANP_HB::setHBOptions(const N_UTL_OptionBlock & OB)
 
     if ( tag == "NUMFREQ" )
     {
-      size_    = iterPL->iVal();
+      size_    = iterPL->getImmutableValue<int>();
     }
     else if ( tag == "STARTUPPERIODS" )
     {
-      startUpPeriods_ = iterPL->iVal();
-      startUpPeriodsGiven_ = true;
+      startUpPeriods_ = iterPL->getImmutableValue<int>();
+
+      if (startUpPeriods_ > 0)
+        startUpPeriodsGiven_ = true;
     }
     else if( tag == "SAVEICDATA" )
     {
@@ -803,21 +749,23 @@ bool N_ANP_HB::setHBOptions(const N_UTL_OptionBlock & OB)
     }
     else if( tag == "TEST" )
     {
-      test_     = static_cast<bool> (iterPL->iVal());
+      test_     = static_cast<bool> (iterPL->getImmutableValue<int>());
     }
     else if (tag == "DEBUGLEVEL" )
     {
-      debugLevel = iterPL->iVal ();
+      debugLevel = iterPL->getImmutableValue<int>();
     }
     else if ( tag == "TAHB" )
     {
-      taHB_ = iterPL->iVal ();
+      taHB_ = iterPL->getImmutableValue<int>();
     }
+    else if ( tag == "VOLTLIM" )
+    {
+      voltLimFlag_ = static_cast<bool> (iterPL->getImmutableValue<int>());
+    }  
     else
     {
-      msg = "N_ANP_HB::setHBOptions";
-      msg += " Unrecognized HBINT option: "+tag+"\n";
-      N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_WARNING, msg);
+      UserWarning(*this) << "Unrecognized HBINT option " << tag;
     }
   }
 
@@ -826,14 +774,14 @@ bool N_ANP_HB::setHBOptions(const N_UTL_OptionBlock & OB)
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::setLinSol
+// Function      : HB::setLinSol
 // Purpose       : this is needed for .STEP to work with HB
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter
 // Creation Date : 7/12/2013
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::setLinSol(const N_UTL_OptionBlock & OB)
+bool HB::setLinSol(const N_UTL_OptionBlock & OB)
 {
   // Save the non-HB linear solver option block
   saved_lsOB_ = OB;
@@ -842,14 +790,14 @@ bool N_ANP_HB::setLinSol(const N_UTL_OptionBlock & OB)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::setHBLinSol
+// Function      : HB::setHBLinSol
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist
 // Creation Date : 5/13/13
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::setHBLinSol(const N_UTL_OptionBlock & OB)
+bool HB::setHBLinSol(const N_UTL_OptionBlock & OB)
 {
   // Save the HB linear solver option block
   saved_lsHBOB_ = OB;
@@ -861,7 +809,7 @@ bool N_ANP_HB::setHBLinSol(const N_UTL_OptionBlock & OB)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::isAnalysis
+// Function      : HB::isAnalysis
 // Purpose       :
 // Special Notes :
 // Scope         : public
@@ -870,7 +818,7 @@ bool N_ANP_HB::setHBLinSol(const N_UTL_OptionBlock & OB)
 // Notes         : Alternatively, we could try to cast the analysis object
 //               : However, this method is called a lot.
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::isAnalysis( int analysis_type )
+bool HB::isAnalysis( int analysis_type )
 {
   bool returnValue = false;
 
@@ -886,90 +834,165 @@ bool N_ANP_HB::isAnalysis( int analysis_type )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::prepareHBOutput
+// Function      : HB::prepareHBOutput
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, 9233, Computational Sciences
 // Creation Date : 08/20/07
 //-----------------------------------------------------------------------------
-void N_ANP_HB::prepareHBOutput(
+void HB::prepareHBOutput(
     N_LAS_Vector & solnVecPtr,
     std::vector<double> & timePoints,
     std::vector<double> & freqPoints,
     RCP<N_LAS_BlockVector> & timeDomainSolnVec,
     RCP<N_LAS_BlockVector> & freqDomainSolnVecReal,
-    RCP<N_LAS_BlockVector> & freqDomainSolnVecImaginary
+    RCP<N_LAS_BlockVector> & freqDomainSolnVecImag,
+    RCP<N_LAS_BlockVector> & timeDomainStoreVec,
+    RCP<N_LAS_BlockVector> & freqDomainStoreVecReal,
+    RCP<N_LAS_BlockVector> & freqDomainStoreVecImag
     ) const
 {
   N_LAS_BlockVector & blockSolVecPtr = dynamic_cast<N_LAS_BlockVector &>(solnVecPtr);
 
-  timePoints = fastTimes_;
-  freqPoints = freqPoints_;
-  timeDomainSolnVec = hbBuilderPtr_->createTimeDomainBlockVector();
-  freqDomainSolnVecReal = hbBuilderPtr_->createExpandedRealFormBlockVector();
-  freqDomainSolnVecImaginary = hbBuilderPtr_->createExpandedRealFormBlockVector();
+  Teuchos::RCP<N_LAS_BlockVector> bStoreVecFreqPtr_ = hbLoaderPtr_->getStoreVecFreqPtr();
+
+  timeDomainStoreVec = hbBuilderPtr_->createTimeDomainStoreBlockVector();
+
+  if (bStoreVecFreqPtr_->blockCount() > 0 )
+  {
+    hbLoaderPtr_->permutedIFT(*bStoreVecFreqPtr_, &*timeDomainStoreVec);
+//  bStoreVecFreqPtr_->printPetraObject(std::cout);
+  } 
 
   //TD solution
+  timeDomainSolnVec = hbBuilderPtr_->createTimeDomainBlockVector(); 
   int blockCount = timeDomainSolnVec->blockCount();
-  int N = timeDomainSolnVec->block(0).globalLength();
+  int N = timeDomainSolnVec->block(0).globalLength(); 
 
-  hbLoaderPtr_->permutedIFT(blockSolVecPtr, &*timeDomainSolnVec);
+  timePoints.resize(size_);
 
-  N_UTL_FFTInterface<std::vector<double> > HBTransform(blockCount);
+  for( int i = 0; i < size_; ++i )
+  {
+    timePoints[i] = fastTimes_[i] - tiaParams_.initialTime;
+  }
 
-  // Register vectors with the transform before calculating the FFT.
-  std::vector<double> inputSignal(blockCount, 0.0);
-  std::vector<double> outputSignal((blockCount+1), 0.0);
-  std::vector<double> temp(0);  // This is a dummy variable since we are only computing FFTs.
-  HBTransform.registerVectors( inputSignal, &outputSignal, temp, &temp );
+  freqPoints = freqPoints_;
+
+  // Create individual block vectors to store the real and imaginary parts separately.
+  Teuchos::RCP<N_PDS_ParMap> baseMap = Teuchos::rcp_const_cast<N_PDS_ParMap>( hbBuilderPtr_->getBaseSolutionMap() );
+  Teuchos::RCP<N_PDS_ParMap> globalMap = createBlockParMap( blockCount, *baseMap );
+  freqDomainSolnVecReal = Teuchos::rcp( new N_LAS_BlockVector( blockCount, globalMap, baseMap ) );
+  freqDomainSolnVecImag = Teuchos::rcp( new N_LAS_BlockVector( blockCount, globalMap, baseMap ) );
+
+  hbLoaderPtr_->permutedIFT(blockSolVecPtr, &*timeDomainSolnVec); 
+
+//  Xyce::dout() << "HB X Vector TD" << std::endl;
+//  timeDomainSolnVec->printPetraObject(std::cout);
+
+//  Xyce::dout() << "HB Store Vector TD" << std::endl;
+//  timeDomainStoreVec->printPetraObject(std::cout);
+
+  // Now copy over the frequency domain solution, real and imaginary parts separately, into the output vectors.
+  for (int j=0; j<N; j++)
+  {
+    // See if this time-domain solution variable is owned by the local processor.
+    // If so, this processor owns the entire j-th block of the blockSolVecPtr vector,
+    // and the j-th entry of every block in the freqDomainSolnVec[Real/Imag] vector.
+    int lid = baseMap->globalToLocalIndex( j );
+    N_LAS_Vector& solBlock = blockSolVecPtr.block( j );
+
+    N_LAS_Vector& realVecRef =  freqDomainSolnVecReal->block((blockCount-1)/2);
+    N_LAS_Vector& imagVecRef =  freqDomainSolnVecImag->block((blockCount-1)/2);
+
+    if (lid >= 0)
+    { 
+      realVecRef[lid] = solBlock[0];  
+      imagVecRef[lid] = solBlock[1];
+    }
+
+    for (int i=1; i <= (blockCount-1)/2; ++i)
+    {
+      N_LAS_Vector& realVecRef_neg =  freqDomainSolnVecReal->block((blockCount-1)/2 - i);
+      N_LAS_Vector& imagVecRef_neg =  freqDomainSolnVecImag->block((blockCount-1)/2 - i);
+      N_LAS_Vector& realVecRef_pos =  freqDomainSolnVecReal->block((blockCount-1)/2 + i);
+      N_LAS_Vector& imagVecRef_pos =  freqDomainSolnVecImag->block((blockCount-1)/2 + i);
+
+      if (lid >= 0)
+      {
+        realVecRef_neg[lid] = solBlock[ 2*(blockCount-i) ];
+        imagVecRef_neg[lid] = solBlock[ 2*(blockCount-i) + 1 ];
+        realVecRef_pos[lid] = solBlock[ 2*i ];
+        imagVecRef_pos[lid] = solBlock[ 2*i+1 ];
+      }
+    }
+  } 
+
+  // proceed to store variables
+  Teuchos::RCP<N_PDS_ParMap> baseStoreMap = Teuchos::rcp_const_cast<N_PDS_ParMap>( hbBuilderPtr_->getBaseStoreMap() );
+  Teuchos::RCP<N_PDS_ParMap> globalStoreMap = createBlockParMap( blockCount, *baseStoreMap );
+  freqDomainStoreVecReal = Teuchos::rcp( new N_LAS_BlockVector( blockCount, globalStoreMap, baseStoreMap ) );
+  freqDomainStoreVecImag = Teuchos::rcp( new N_LAS_BlockVector( blockCount, globalStoreMap, baseStoreMap ) );
+
+//  hbLoaderPtr_->permutedIFT(blockSolVecPtr, &*timeDomainSolnVec);
+
+  N = timeDomainStoreVec->block(0).globalLength(); 
 
   for (int j=0; j<N; j++)
   {
-    for (int i=0; i<blockCount; ++i)
-    {
-      N_LAS_Vector& timeVecRef = timeDomainSolnVec->block(i);
+    // See if this time-domain solution variable is owned by the local processor.
+    // If so, this processor owns the entire j-th block of the blockSolVecPtr vector,
+    // and the j-th entry of every block in the freqDomainSolnVec[Real/Imag] vector.
+    int lid = baseStoreMap->globalToLocalIndex( j );
+    N_LAS_Vector& storeBlock =  bStoreVecFreqPtr_->block( j );
 
-      inputSignal[i] = timeVecRef[j];
+    N_LAS_Vector& realVecRef =  freqDomainStoreVecReal->block((blockCount-1)/2);
+    N_LAS_Vector& imagVecRef =  freqDomainStoreVecImag->block((blockCount-1)/2);
+
+    if (lid >= 0)
+    { 
+      realVecRef[lid] = storeBlock[0];  
+      imagVecRef[lid] = storeBlock[1];
     }
 
-    // Calculate FFT for inputSignal.
-    HBTransform.calculateFFT();
-
-    N_LAS_Vector& realVecRef =  freqDomainSolnVecReal->block((blockCount-1)/2);
-    realVecRef[j] = outputSignal[0]/blockCount;
-
-    N_LAS_Vector& imagVecRef =  freqDomainSolnVecImaginary->block((blockCount-1)/2);
-    imagVecRef[j] = outputSignal[1]/blockCount;
-
-    for (int i=(blockCount-1)/2; i>0; --i)
+    for (int i=1; i <= (blockCount-1)/2; ++i)
     {
-      N_LAS_Vector&  realVecRef_first =  freqDomainSolnVecReal->block((blockCount-1)/2 - i);
-      realVecRef_first[j] = outputSignal[2*i]/blockCount;
+      N_LAS_Vector& realVecRef_neg =  freqDomainStoreVecReal->block((blockCount-1)/2 - i);
+      N_LAS_Vector& imagVecRef_neg =  freqDomainStoreVecImag->block((blockCount-1)/2 - i);
+      N_LAS_Vector& realVecRef_pos =  freqDomainStoreVecReal->block((blockCount-1)/2 + i);
+      N_LAS_Vector& imagVecRef_pos =  freqDomainStoreVecImag->block((blockCount-1)/2 + i);
 
-      N_LAS_Vector& realVecRef_second =  freqDomainSolnVecReal->block((blockCount-1)/2 + i);
-      realVecRef_second[j] = outputSignal[2*i]/blockCount;
-
-      N_LAS_Vector& imagVecRef_first =  freqDomainSolnVecImaginary->block((blockCount-1)/2 - i);
-      imagVecRef_first[j] = -outputSignal[2*i+1]/blockCount;
-
-      N_LAS_Vector& imagVecRef_second =  freqDomainSolnVecImaginary->block((blockCount-1)/2 + i);
-      imagVecRef_second[j] = outputSignal[2*i+1]/blockCount;
-
+      if (lid >= 0)
+      {
+        realVecRef_neg[lid] = storeBlock[ 2*(blockCount-i) ];
+        imagVecRef_neg[lid] = storeBlock[ 2*(blockCount-i) + 1 ];
+        realVecRef_pos[lid] = storeBlock[ 2*i ];
+        imagVecRef_pos[lid] = storeBlock[ 2*i+1 ];
+      }
     }
-  }
+  } 
+
+//  Xyce::dout() << "HB X Vector FD" << std::endl;
+//  freqDomainSolnVecReal->printPetraObject(std::cout);
+//  freqDomainSolnVecImag->printPetraObject(std::cout);
+
+//  Xyce::dout() << "HB Store Vector FD" << std::endl;
+
+//  freqDomainStoreVecReal->printPetraObject(std::cout);
+//  freqDomainStoreVecImag->printPetraObject(std::cout); 
+
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::accumulateStatistics()
+// Function      : HB::accumulateStatistics()
 // Purpose       : Add in the statistics from the current analysis object
 // Special Notes :
 // Scope         : private
 // Creator       : Heidi Thornquist, 1355, Electrical Models & Simulation
 // Creation Date : 05/29/13
 //-----------------------------------------------------------------------------
-void N_ANP_HB::accumulateStatistics_()
+void HB::accumulateStatistics_()
 {
   hbTotalNumberSuccessfulStepsTaken_ += analysisObject_->totalNumberSuccessfulStepsTaken_;
   hbTotalNumberFailedStepsAttempted_ += analysisObject_->totalNumberFailedStepsAttempted_;
@@ -987,7 +1010,7 @@ void N_ANP_HB::accumulateStatistics_()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::runTol_
+// Function      : HB::runTol_
 // Purpose       : Conducts transient run to determine right tolerance
 //                 parameters for IC calculation
 // Special Notes :
@@ -995,11 +1018,11 @@ void N_ANP_HB::accumulateStatistics_()
 // Creator       : T. Mei, 1437, Electrical and Micro Modeling
 // Creation Date : 02/23/09
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::runTol_()
+bool HB::runTol_()
 {
   bool returnValue = true;
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, " ***** Computing tolerance parameters for HB IC calculation....\n");
+  Xyce::lout() << " ***** Computing tolerance parameters for HB IC calculation....\n" << std::endl;
 
   N_TIA_TIAParams & tiaParams = anaManagerRCPtr_->tiaParams;
   N_TIA_TIAParams tiaParamsSave = tiaParams;
@@ -1022,28 +1045,32 @@ bool N_ANP_HB::runTol_()
 
   // Create a transient analysis object for this section.
   isTransient_ = true;
-  analysisObject_ = Teuchos::rcp( new N_ANP_Transient( anaManagerRCPtr_.get() ) );
+  analysisObject_ = Teuchos::rcp( new Transient( anaManagerRCPtr_.get() ) );
   analysisObject_->setAnalysisParams( N_UTL_OptionBlock() );
   //analysisObject_->registerLoader( loaderRCPtr_.get() );
-  Teuchos::rcp_dynamic_cast<N_ANP_Transient>(analysisObject_)->resetForHB();
+  Teuchos::rcp_dynamic_cast<Transient>(analysisObject_)->resetForHB();
   returnValue = analysisObject_->run();
 
   if (!returnValue)
   {
-    std::string msg = "N_ANP_HB::runTol_().  Transient calculation failed.\n";
+    std::string msg = "Calculation of tolerance parameters failed for relErrorTol = "
+                      + Teuchos::Utils::toString(tiaParams.relErrorTol) + ".\n";
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL_0, msg );
   }
 
-//  int numPoints = anaManagerRCPtr_->wimPtr->getNumberOfSteps();
 
   int numPoints = anaManagerRCPtr_->getStepNumber();
 
   while((numPoints < (1.2*size_)) && (tiaParams.relErrorTol>= 1e-6))
   {
+      std::string msg = "Tolerance parameters refined, re-running with relErrorTol = "
+                        + Teuchos::Utils::toString(tiaParams.relErrorTol/10) + ".\n";
+      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING_0, msg );
+
       if (!startUpPeriodsGiven_)
       {
         // Clear the fast time data storage before performing the next transient
-        N_TIA_DataStore * dsPtr = anaManagerRCPtr_->getTIADataStore();
+        RCP<N_TIA_DataStore> dsPtr = anaManagerRCPtr_->getTIADataStore();
         dsPtr->resetFastTimeData();
       }
 
@@ -1051,21 +1078,23 @@ bool N_ANP_HB::runTol_()
       anaManagerRCPtr_->registerTIAParams (tiaParams);
 
       // Create a transient analysis object for this section.
-      analysisObject_ = Teuchos::rcp( new N_ANP_Transient( anaManagerRCPtr_.get() ) );
+      analysisObject_ = Teuchos::rcp( new Transient( anaManagerRCPtr_.get() ) );
       analysisObject_->setAnalysisParams( N_UTL_OptionBlock() );
       //analysisObject_->registerLoader( loaderRCPtr_.get() );
-      Teuchos::rcp_dynamic_cast<N_ANP_Transient>(analysisObject_)->resetForHB();
+      Teuchos::rcp_dynamic_cast<Transient>(analysisObject_)->resetForHB();
       bool retV = analysisObject_->run();
 
       if (!retV)
       {
-        std::string msg = "N_ANP_HB::runTol_().  Transient calculation failed.\n";
+        std::string msg = "Calculation of tolerance parameters failed for relErrorTol = "
+                          + Teuchos::Utils::toString(tiaParams.relErrorTol) + ".\n";
         N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL_0, msg );
       }
       returnValue = retV && returnValue;
-//      numPoints = anaManagerRCPtr_->wimPtr->getNumberOfSteps();
-      numPoints = anaManagerRCPtr_->getStepNumber();
 
+
+    numPoints = anaManagerRCPtr_->getStepNumber();
+      
   }
 
   // Add in simulation times
@@ -1082,7 +1111,7 @@ bool N_ANP_HB::runTol_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::runStartupPeriods_()
+// Function      : HB::runStartupPeriods_()
 // Purpose       : Runs normal transient problem through the requested
 //                 number of startup periods
 // Special Notes :
@@ -1090,12 +1119,11 @@ bool N_ANP_HB::runTol_()
 // Creator       : Richard Schiek, 1437, Electrical and Micro Modeling
 // Creation Date : 09/17/07
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::runStartupPeriods_()
+bool HB::runStartupPeriods_()
 {
   bool returnValue = true;
 
-  std::string msg = "  ***** Computing " + Teuchos::Utils::toString( startUpPeriods_ ) + " start up periods for HB IC calculation....";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg);
+  Xyce::lout() << "  ***** Computing " << startUpPeriods_ << " start up periods for HB IC calculation...." << std::endl;
 
   // need to advance time by startUpPeriods_ * period_
   N_TIA_TIAParams & tiaParams = anaManagerRCPtr_->tiaParams;
@@ -1107,7 +1135,7 @@ bool N_ANP_HB::runStartupPeriods_()
   tiaParams.pauseTime = tiaParams.finalTime;
 
 #ifdef Xyce_DEBUG_HB
-  std::cout << "N_ANP_HB::runStartupPeriods_():  Advancing time through "
+  Xyce::dout() << "HB::runStartupPeriods_():  Advancing time through "
             << startUpPeriods_ << " startup periods"
             << " initialTime = " << tiaParams.initialTime
             << " finalTime = " << tiaParams.finalTime << std::endl;
@@ -1125,9 +1153,9 @@ bool N_ANP_HB::runStartupPeriods_()
 
     // Create a transient analysis object for this section.
     isTransient_ = true;
-    analysisObject_ = Teuchos::rcp( new N_ANP_Transient( anaManagerRCPtr_.get() ) );
+    analysisObject_ = Teuchos::rcp( new Transient( anaManagerRCPtr_.get() ) );
     analysisObject_->setAnalysisParams( N_UTL_OptionBlock() );
-    Teuchos::rcp_dynamic_cast<N_ANP_Transient>(analysisObject_)->resetForHB();
+    Teuchos::rcp_dynamic_cast<Transient>(analysisObject_)->resetForHB();
     returnValue = analysisObject_->run();
     isTransient_ = false;
 
@@ -1142,7 +1170,7 @@ bool N_ANP_HB::runStartupPeriods_()
 
   // put the dsPtr->currentSolutionPtr into dcOpSol and State Vec so that it
   // is used as our initial condition for the pending fast time scale runs
-  N_TIA_DataStore * dsPtr = anaManagerRCPtr_->getTIADataStore();
+  RCP<N_TIA_DataStore> dsPtr = anaManagerRCPtr_->getTIADataStore();
   dcOpSolVecPtr_ = rcp( new N_LAS_Vector( *(dsPtr->currSolutionPtr) ));
   dcOpStateVecPtr_ = rcp( new N_LAS_Vector( *(dsPtr->currStatePtr) ));
   dcOpQVecPtr_ = rcp( new N_LAS_Vector( *(dsPtr->daeQVectorPtr) ));
@@ -1158,18 +1186,18 @@ bool N_ANP_HB::runStartupPeriods_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::runTransientIC_
+// Function      : HB::runTransientIC_
 // Purpose       : Conducts a regular transient run for HB initial conditions
 // Special Notes :
 // Scope         : private
 // Creator       : Ting Mei, SNL
 // Creation Date : 10/03/2008
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::runTransientIC_()
+bool HB::runTransientIC_()
 {
   bool returnValue = true;
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, " ***** Running transient to compute HB initial condition....\n");
+  Xyce::lout() << " ***** Running transient to compute HB initial condition....\n" << std::endl;
 
   // this prevents extra DC op data from being printed.
   devInterfacePtr_->setMPDEFlag( true );
@@ -1193,7 +1221,7 @@ bool N_ANP_HB::runTransientIC_()
   tiaParams.maxOrder = 1;
 
 #ifdef Xyce_DEBUG_HB
-  std::cout << "N_ANP_HB::runTransientIC_():  Advancing time from"
+  Xyce::dout() << "HB::runTransientIC_():  Advancing time from"
        << " initialTime = " << tiaParams.initialTime
        << " finalTime = " << tiaParams.finalTime << std::endl;
 #endif // Xyce_DEBUG_HB
@@ -1203,7 +1231,7 @@ bool N_ANP_HB::runTransientIC_()
   {
     tiaParams.NOOP = true;
 
-    N_TIA_DataStore * dsPtr = anaManagerRCPtr_->getTIADataStore();
+    RCP<N_TIA_DataStore> dsPtr = anaManagerRCPtr_->getTIADataStore();
     *(dsPtr->nextSolutionPtr) = *(dcOpSolVecPtr_.get());
     *(dsPtr->nextStatePtr) = *(dcOpStateVecPtr_.get());
     *(dsPtr->daeQVectorPtr) = *(dcOpQVecPtr_.get());
@@ -1215,9 +1243,9 @@ bool N_ANP_HB::runTransientIC_()
 
   // Create a transient analysis object for this section.
   isTransient_ = true;
-  analysisObject_ = Teuchos::rcp( new N_ANP_Transient( anaManagerRCPtr_.get() ) );
+  analysisObject_ = Teuchos::rcp( new Transient( anaManagerRCPtr_.get() ) );
   analysisObject_->setAnalysisParams( N_UTL_OptionBlock() );
-  Teuchos::rcp_dynamic_cast<N_ANP_Transient>(analysisObject_)->resetForHB();
+  Teuchos::rcp_dynamic_cast<Transient>(analysisObject_)->resetForHB();
   returnValue = analysisObject_->run();
   isTransient_ = false;
 
@@ -1241,7 +1269,7 @@ bool N_ANP_HB::runTransientIC_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_HB::interpolateIC_()
+// Function      : HB::interpolateIC_()
 // Purpose       : Tries to filter the fast time points from a transient run
 //                 so that points are not too close together
 // Special Notes :
@@ -1249,21 +1277,22 @@ bool N_ANP_HB::runTransientIC_()
 // Creator       : Richard Schiek, 1437, Electrical and Micro Modeling
 // Creation Date : 09/17/07
 //-----------------------------------------------------------------------------
-bool N_ANP_HB::interpolateIC_()
+bool HB::interpolateIC_()
 {
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, " ***** Interpolating transient solution for IC calculation....\n");
+  Xyce::lout() << " ***** Interpolating transient solution for IC calculation....\n" << std::endl;
 
-  N_TIA_DataStore * dsPtr = anaManagerRCPtr_->getTIADataStore();
+  RCP<N_TIA_DataStore> dsPtr = anaManagerRCPtr_->getTIADataStore();
   int numPoints = dsPtr->timeSteps.size();
 
 #ifdef Xyce_DEBUG_HB
-  std::cout << "N_ANP_HB::interpolateIC_(): Initial transient run produced " << numPoints << " points." << std::endl;
+  Xyce::dout() << "HB::interpolateIC_(): Initial transient run produced " << numPoints << " points." << std::endl;
 #endif
 
   std::vector<int> goodIndicies;
   goodTimePoints_.resize(size_);
 
   double TimeStep = period_/static_cast<double>(size_);
+  timeSteps_.push_back( TimeStep );
   for( int i = 0; i < size_; ++i )
   {
     goodTimePoints_[i] = tiaParams_.initialTime + static_cast<double>(i) * TimeStep;
@@ -1290,12 +1319,12 @@ bool N_ANP_HB::interpolateIC_()
 #ifdef Xyce_DEBUG_HB
     if( debugLevel > 0 )
     {
-      std::cout << "\t\t timeStep[ " << i << " ] = " << dsPtr->timeSteps[i];
+      Xyce::dout() << "\t\t timeStep[ " << i << " ] = " << dsPtr->timeSteps[i];
       if( dsPtr->timeStepsBreakpointFlag[i] == true )
       {
-        std::cout << "  Breakpoint";
+        Xyce::dout() << "  Breakpoint";
       }
-      std::cout << std::endl;
+      Xyce::dout() << std::endl;
     }
 #endif
     while( ( GoodTimePointIndex < size_ )  && (dsPtr->timeSteps[i] <= goodTimePoints_[GoodTimePointIndex]) && (goodTimePoints_[GoodTimePointIndex] < dsPtr->timeSteps[i+1]))
@@ -1358,4 +1387,6 @@ bool N_ANP_HB::interpolateIC_()
   return true;
 }
 
+} // namespace Analysis
+} // namespace Xyce
 

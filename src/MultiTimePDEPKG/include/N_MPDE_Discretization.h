@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.3.6.2 $
+// Revision Number: $Revision: 1.7 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:46 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -78,7 +78,7 @@ class N_MPDE_Discretization
   int Width() const { return width_; }
   int Order() const { return order_; }
 
-  const vector<double> & Coeffs() const { return coeffs_; }
+  const std::vector<double> & Coeffs() const { return coeffs_; }
 
  private:
 
@@ -88,9 +88,9 @@ class N_MPDE_Discretization
   int start_;
   int width_;
 
-  vector<double> coeffs_;
+  std::vector<double> coeffs_;
 
-  void GenerateCoeffs_( Type type, int Order, vector<double> & coeffs );
+  void GenerateCoeffs_( Type type, int Order, std::vector<double> & coeffs );
 };
 
 #endif //Xyce_MPDE_DISCRETIZATION_H

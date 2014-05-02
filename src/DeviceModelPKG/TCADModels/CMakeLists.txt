@@ -3,6 +3,7 @@
 
 # class source list
 set ( TCADModels_SOURCES  
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_RegisterTCADDevices.C 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_2DPDE_DAE.C 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_2DPDE_Output.C 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_2DPDEInstance.C 
@@ -21,16 +22,12 @@ set ( TCADModels_SOURCES
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_DEV_PDE_Electrode.C
       CACHE INTERNAL "X_S" )
 
-
 # add header files to project
 set ( XYCE_INCLUDE_DIRECTORIES ${XYCE_INCLUDE_DIRECTORIES} 
       ${CMAKE_CURRENT_SOURCE_DIR}/include
       CACHE INTERNAL "X_I" )
 
-
-
-
 # -- build requested libraries -----------------------------------------------
 set ( XYCE_PACKAGE_LIBRARIES ${XYCE_PACKAGE_LIBRARIES} 
-      TCADModels 
+      TCADModels
       CACHE INTERNAL "X_L" )

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.6.2.2 $
+// Revision Number: $Revision: 1.11 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:44 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -63,8 +63,6 @@
 class N_LAS_Problem;
 class N_LAS_MultiVector;
 
-class N_UTL_Param;
-
 class Epetra_Operator;
 
 //-----------------------------------------------------------------------------
@@ -87,7 +85,7 @@ public:
   // Set the preconditioner options
   virtual bool setOptions(const N_UTL_OptionBlock & OB) = 0;
   virtual bool setDefaultOptions() = 0;
-  virtual bool setDefaultOption( const string & option ) = 0;
+  virtual bool setDefaultOption( const std::string & option ) = 0;
 
   // Set individual preconditioner options
   virtual bool setParam( const N_UTL_Param & param ) = 0;

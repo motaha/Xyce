@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.7.2.1 $
+// Revision Number: $Revision: 1.25.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:33 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -51,11 +51,16 @@
 #include <N_UTL_Misc.h>
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_Neuron9.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_DeviceMaster.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_Neuron9.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
+
+#include <N_DEV_Neuron.h>
 
 #include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
@@ -63,82 +68,64 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<Neuron9::Instance>::ParametricData()
+
+namespace Neuron9 {
+
+
+void Traits::loadInstanceParameters(ParametricData<Neuron9::Instance> &p)
 {
-  setNumNodes(2);
-  setNumOptionalNodes(0);
-  setNumFillNodes(0);
-  setModelRequired(1);
-  setPrimaryParameter("");
-  addModelType("NEURON");
 }
 
-template<>
-ParametricData<Neuron9::Model>::ParametricData()
+void Traits::loadModelParameters(ParametricData<Neuron9::Model> &p)
 {
   // Set up map for double precision variables:
-  addPar ("CMEM", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("CMEM", 0.0, false, ParameterType::NO_DEP,
           &Neuron9::Model::cMem,
           &Neuron9::Model::cMemGiven,
           U_FARAD, CAT_NONE, "Membrane capacitance");
 
-  addPar ("ELEAK", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("ELEAK", 0.0, false, ParameterType::NO_DEP,
           &Neuron9::Model::eLeak,
           &Neuron9::Model::eLeakGiven,
           U_VOLT, CAT_NONE, "Leak current reversal potential");
 
-  addPar ("GMEM", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("GMEM", 0.0, false, ParameterType::NO_DEP,
           &Neuron9::Model::gMem,
           &Neuron9::Model::gMemGiven,
           U_OHMM1, CAT_NONE, "Membrane conductance");
 
-  addPar ("EK", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("EK", 0.0, false, ParameterType::NO_DEP,
           &Neuron9::Model::eK,
           &Neuron9::Model::eKGiven,
           U_VOLT, CAT_NONE, "Potassium reversal potential");
 
-  addPar ("GK", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("GK", 0.0, false, ParameterType::NO_DEP,
           &Neuron9::Model::gK,
           &Neuron9::Model::gKGiven,
           U_OHMM1, CAT_NONE, "Potassium base conductance");
 
-  addPar ("ENA", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("ENA", 0.0, false, ParameterType::NO_DEP,
           &Neuron9::Model::eNa,
           &Neuron9::Model::eNaGiven,
           U_VOLT, CAT_NONE, "Sodium reversal potential");
 
-  addPar ("GNA", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("GNA", 0.0, false, ParameterType::NO_DEP,
           &Neuron9::Model::gNa,
           &Neuron9::Model::gNaGiven,
           U_OHMM1, CAT_NONE, "Sodium base conductance");
 
-  addPar ("VREST", 0.0, false, ParameterType::NO_DEP,
+  p.addPar ("VREST", 0.0, false, ParameterType::NO_DEP,
           &Neuron9::Model::vRest,
           &Neuron9::Model::vRestGiven,
           U_VOLT, CAT_NONE, "Resting potential");
 }
 
-namespace Neuron9 {
+
 
 //
 // static class member inits
 //
-vector< vector<int> > Instance::jacStamp;
-
-
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
-}
-
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
+std::vector< std::vector<int> > Instance::jacStamp;
 
 const double Instance::VT = -63.0;	// mV
 
@@ -151,7 +138,7 @@ const double Instance::VT = -63.0;	// mV
 // Creator       : Christy Warrender, SNL, Cognitive Modeling
 // Creation Date : 06/22/12
 //-----------------------------------------------------------------------------
-bool Instance::processParams(string param)
+bool Instance::processParams()
 {
   // If there are any time dependent parameters, set their values at for
   // the current time.
@@ -184,14 +171,13 @@ bool Instance::updateTemperature ( const double & temp)
 // Creator       : Christy Warrender, SNL, Cognitive Modeling
 // Creation Date : 06/22/12
 //-----------------------------------------------------------------------------
-Instance::Instance(InstanceBlock & IB,
-                   Model & Miter,
-                   MatrixLoadData & mlData1,
-                   SolverState &ss1,
-                   ExternData  &ed1,
-                   DeviceOptions & do1)
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock &         IB,
+  Model &                       Miter,
+  const FactoryBlock &          factory_block)
 
-  : DeviceInstance (IB, mlData1, ss1, ed1, do1),
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(Miter),
     kcl1Fvalue(0.0),
     kcl1Qvalue(0.0),
@@ -237,10 +223,6 @@ Instance::Instance(InstanceBlock & IB,
   devConMap.resize(2);
   devConMap[0] = 1;
   devConMap[1] = 1;
-
-  setName(IB.getName());
-  setModelName(model_.getName());
-
 
   // set up jacStamp
   if( jacStamp.empty() )
@@ -317,41 +299,20 @@ Instance::~Instance()
 // Creator       : Christy Warrender, SNL, Cognitive Modeling
 // Creation Date : 06/22/12
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs(const vector<int> & intLIDVecRef,
-                            const vector<int> & extLIDVecRef)
+void Instance::registerLIDs(const std::vector<int> & intLIDVecRef,
+                            const std::vector<int> & extLIDVecRef)
 {
-  string msg;
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "-------------------------------------------------------------------------"
-    "----";
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << endl << dashedline << endl;
-    cout << "  Instance::registerLIDs" << endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "  Instance::registerLIDs" << std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -366,18 +327,18 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << "  li_Pos = " << li_Pos << endl
-         << "  li_Neg = " << li_Neg << endl
-         << "  li_nPro = " << li_nPro << endl
-         << "  li_mPro = " << li_mPro << endl
-         << "  li_hPro = " << li_hPro << endl;
+    Xyce::dout() << "  li_Pos = " << li_Pos << std::endl
+         << "  li_Neg = " << li_Neg << std::endl
+         << "  li_nPro = " << li_nPro << std::endl
+         << "  li_mPro = " << li_mPro << std::endl
+         << "  li_hPro = " << li_hPro << std::endl;
   }
 #endif
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 }
@@ -390,12 +351,12 @@ void Instance::registerLIDs(const vector<int> & intLIDVecRef,
 // Creator       : Christy Warrender, SNL, Cognitive Modeling
 // Creation Date : 06/22/12
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
-    string tmpstr;
+    std::string tmpstr;
 
     tmpstr = getName() + "_N";
     spiceInternalName (tmpstr);
@@ -418,20 +379,9 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Christy Warrender, SNL, Cognitive Modeling
 // Creation Date : 06/22/12
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
   // copy over the global ID lists.
   staLIDVec = staLIDVecRef;
@@ -459,7 +409,7 @@ bool Instance::loadDeviceMask ()
   bool returnVal=false;
   N_LAS_Vector * maskVectorPtr = extData.deviceMaskVectorPtr;
 
-//   std::cout << "Masking n, m and h" << std::endl;
+//   Xyce::dout() << "Masking n, m and h" << std::endl;
 //   (*maskVectorPtr)[li_nPro] = 0.0;
 //   (*maskVectorPtr)[li_mPro] = 0.0;
 //   (*maskVectorPtr)[li_hPro] = 0.0;
@@ -476,7 +426,7 @@ bool Instance::loadDeviceMask ()
 // Creator       : Christy Warrender, SNL, Cognitive Modeling
 // Creation Date : 06/22/12
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -489,7 +439,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Christy Warrender, SNL, Cognitive Modeling
 // Creation Date : 06/22/12
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
 
@@ -529,7 +479,7 @@ void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
 //-----------------------------------------------------------------------------
 bool Instance::updateIntermediateVars()
 {
-  //std::cout << "Instance::updateIntermediateVars()" << std::endl;
+  //Xyce::dout() << "Instance::updateIntermediateVars()" << std::endl;
 
   bool bsuccess = true;
 
@@ -688,7 +638,7 @@ bool Instance::updateIntermediateVars()
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
     double vRest = model_.vRest;
-    std::cout << "Instance::updateIntermediateVars()" << std::endl
+    Xyce::dout() << "Instance::updateIntermediateVars()" << std::endl
               << "vRest(input) = " << vRest << std::endl
               << "v1 = " << v1Now << std::endl
               << "v2 = " << v2Now << std::endl
@@ -936,7 +886,7 @@ bool Instance::setIC ()
 // Creator       : Christy Warrender, SNL, Cognitive Modeling
 // Creation Date : 06/22/12
 //-----------------------------------------------------------------------------
-void Instance::varTypes( vector<char> & varTypeVec )
+void Instance::varTypes( std::vector<char> & varTypeVec )
 {
   //varTypeVec.resize(1);
   //varTypeVec[0] = 'I';
@@ -951,7 +901,7 @@ void Instance::varTypes( vector<char> & varTypeVec )
 // Creator       : Christy Warrender, SNL, Cognitive Modeling
 // Creation Date : 06/22/12
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   return true;
 }
@@ -964,12 +914,12 @@ bool Model::processParams (string param)
 // Creator       : Christy Warrender, SNL, Cognitive Modeling
 // Creation Date : 06/22/12
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -987,10 +937,11 @@ bool Model::processInstanceParams(string param)
 // Creator       : Christy Warrender, SNL, Cognitive Modeling
 // Creation Date : 06/22/12
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-              SolverState & ss1,
-              DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1)
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block)
 {
 
   // Set params to constant default values:
@@ -1021,9 +972,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1043,25 +994,47 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i, isize;
   isize = instanceContainer.size();
 
-  os << endl;
-  os << "Number of Neuron instances: " << isize << endl;
-  os << "    name=\t\tmodelName\tParameters" << endl;
+  os << std::endl;
+  os << "Number of Neuron instances: " << isize << std::endl;
+  os << "    name=\t\tmodelName\tParameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
+  return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 
 //-----------------------------------------------------------------------------
@@ -1074,12 +1047,25 @@ std::ostream &Model::printOutInstances(std::ostream &os) const
 //-----------------------------------------------------------------------------
 bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     // just call the instance level update state
     (*it)->updatePrimaryState();
   }
   return true;
+}
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("neuron", 9)
+    .registerModelType("neuron", 9);
 }
 
 } // namespace Neuron9

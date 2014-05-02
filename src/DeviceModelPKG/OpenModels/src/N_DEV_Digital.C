@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,11 +36,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.69.2.2 $
+// Revision Number: $Revision: 1.97.2.5 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/14 18:03:21 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: peshola $
 //-------------------------------------------------------------------------
 #include <Xyce_config.h>
 
@@ -58,11 +58,15 @@
 
 // ----------   Xyce Includes   ----------
 #include <N_DEV_Const.h>
+#include <N_DEV_DeviceOptions.h>
+#include <N_DEV_DeviceMaster.h>
 #include <N_DEV_Digital.h>
 #include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
-#include <N_DEV_DeviceOptions.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
+#include <N_UTL_BreakPoint.h>
 
 #include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
@@ -70,122 +74,99 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<Digital::Instance>::ParametricData()
-{
-  setNumNodes(2);
-  setNumOptionalNodes(20);
-  setNumFillNodes(0);
-  setModelRequired(1);
-  setPrimaryParameter("");
-  addModelType("DIG");
-
-  // Set up double precision variables:
-
-  // Set up non-double precision variables:
-  addPar ("IC1", false, false, ParameterType::NO_DEP,
-          &Digital::Instance::ic1, NULL,
-          U_LOGIC, CAT_NONE, "Vector of initial values for output(s)");
-  addPar ("IC2", false, false, ParameterType::NO_DEP,
-          &Digital::Instance::ic2, NULL,
-          U_NONE, CAT_NONE, "");
-  addPar ("IC3", false, false, ParameterType::NO_DEP,
-          &Digital::Instance::ic3, NULL,
-          U_NONE, CAT_NONE, "");
-  makeVector ("IC", 3);
-}
-
-template<>
-ParametricData<Digital::Model>::ParametricData()
-{
-  // Set up double precision variables:
-  addPar ("VLO", 0., false, ParameterType::NO_DEP,
-          &Digital::Model::vlo,
-          NULL, U_VOLT, CAT_NONE, "Internal low state supply voltage");
-
-  addPar ("VHI", 0., false, ParameterType::NO_DEP,
-          &Digital::Model::vhi,
-          NULL, U_VOLT, CAT_NONE, "Internal high state supply voltage");
-
-  addPar ("VREF", 0., false, ParameterType::NO_DEP,
-          &Digital::Model::vref,
-          NULL, U_VOLT, CAT_NONE, "Internal reference voltage for inputs");
-
-  addPar ("CLO", 1.e-6, false, ParameterType::NO_DEP,
-          &Digital::Model::clo,
-          NULL, U_FARAD, CAT_NONE, "Capacitance between output node and low reference");
-
-  addPar ("CHI", 1.e-6, false, ParameterType::NO_DEP,
-          &Digital::Model::chi,
-          NULL, U_FARAD, CAT_NONE, "Capacitance between output node and high reference");
-
-  addPar ("CLOAD", 1.e-6, false, ParameterType::NO_DEP,
-          &Digital::Model::cload,
-          NULL, U_FARAD, CAT_NONE, "Capacitance between input node and input reference");
-
-  addPar ("RLOAD", 1000., false, ParameterType::NO_DEP,
-          &Digital::Model::rload,
-          NULL, U_OHM, CAT_NONE, "Resistance between input node and input reference");
-
-  addPar ("S0RLO", 100., false, ParameterType::NO_DEP,
-          &Digital::Model::s0rlo,
-          NULL, U_OHM, CAT_NONE, "Low state resistance between output node and low reference");
-
-  addPar ("S0RHI", 100., false, ParameterType::NO_DEP,
-          &Digital::Model::s0rhi,
-          NULL, U_OHM, CAT_NONE, "Low state resitance between output node and high reference");
-
-  addPar ("S0TSW", 1.e-8, false, ParameterType::NO_DEP,
-          &Digital::Model::s0tsw,
-          NULL, U_SECOND, CAT_NONE, "Switching time transition to low state");
-
-  addPar ("S0VLO", -1.5, false, ParameterType::NO_DEP,
-          &Digital::Model::s0vlo,
-          NULL, U_VOLT, CAT_NONE, "Minimum voltage to switch to low state");
-
-  addPar ("S0VHI", 1.7, false, ParameterType::NO_DEP,
-          &Digital::Model::s0vhi,
-          NULL, U_VOLT, CAT_NONE, "Maximum voltage to switch to low state");
-
-  addPar ("S1RLO", 100., false, ParameterType::NO_DEP,
-          &Digital::Model::s1rlo,
-          NULL, U_OHM, CAT_NONE, "High state resistance between output node and low reference");
-
-  addPar ("S1RHI", 100., false, ParameterType::NO_DEP,
-          &Digital::Model::s1rhi,
-          NULL, U_OHM, CAT_NONE, "High state resistance between output node and high reference");
-
-  addPar ("S1TSW", 1.e-8, false, ParameterType::NO_DEP,
-          &Digital::Model::s1tsw,
-          NULL, U_SECOND, CAT_NONE, "Switching time transition to high state");
-
-  addPar ("S1VLO", 0.9, false, ParameterType::NO_DEP,
-          &Digital::Model::s1vlo,
-          NULL, U_VOLT, CAT_NONE, "Minimum voltage to switch to high state");
-
-  addPar ("S1VHI", 7.0, false, ParameterType::NO_DEP,
-          &Digital::Model::s1vhi,
-          NULL, U_VOLT, CAT_NONE, "Maximum voltage to switch to high state");
-
-  addPar ("DELAY", 1.e-8, false, ParameterType::NO_DEP,
-          &Digital::Model::delay,
-          NULL, U_SECOND, CAT_NONE, "Delay time of device");
-}
 
 namespace Digital {
 
+// enables debug output for just the digital devices
+//static const int DEBUG_DEVICE = 1;
 
+void Traits::loadInstanceParameters(ParametricData<Digital::Instance> &p)
+{
+// Set up double precision variables:
 
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
+  // Set up non-double precision variables:
+  p.addPar ("IC1", false, &Digital::Instance::ic1)
+    .setUnit(U_LOGIC)
+    .setDescription("Vector of initial values for output(s)");
+  p.addPar ("IC2", false, &Digital::Instance::ic2);
 
-  return parMap;
+  p.makeVector ("IC", 2);
 }
 
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
+void Traits::loadModelParameters(ParametricData<Digital::Model> &p)
+{
+  // Set up double precision variables:
+  p.addPar ("VLO", 0., &Digital::Model::vlo)
+    .setUnit(U_VOLT)
+    .setDescription("Internal low state supply voltage");
 
-  return parMap;
+  p.addPar ("VHI", 0., &Digital::Model::vhi)
+    .setUnit(U_VOLT)
+    .setDescription("Internal high state supply voltage");
+
+  p.addPar ("VREF", 0., &Digital::Model::vref)
+    .setUnit(U_VOLT)
+    .setDescription("Internal reference voltage for inputs");
+
+  p.addPar ("CLO", 1.e-6, &Digital::Model::clo)
+    .setUnit(U_FARAD)
+    .setDescription("Capacitance between output node and low reference");
+
+  p.addPar ("CHI", 1.e-6, &Digital::Model::chi)
+    .setUnit(U_FARAD)
+    .setDescription("Capacitance between output node and high reference");
+
+  p.addPar ("CLOAD", 1.e-6, &Digital::Model::cload)
+    .setUnit(U_FARAD)
+    .setDescription("Capacitance between input node and input reference");
+
+  p.addPar ("RLOAD", 1000., &Digital::Model::rload)
+    .setUnit(U_OHM)
+    .setDescription("Resistance between input node and input reference");
+
+  p.addPar ("S0RLO", 100., &Digital::Model::s0rlo)
+    .setUnit(U_OHM)
+    .setDescription("Low state resistance between output node and low reference");
+
+  p.addPar ("S0RHI", 100., &Digital::Model::s0rhi)
+    .setUnit(U_OHM)
+    .setDescription("Low state resitance between output node and high reference");
+
+  p.addPar ("S0TSW", 1.e-8, &Digital::Model::s0tsw)
+    .setUnit(U_SECOND)
+    .setDescription("Switching time transition to low state");
+
+  p.addPar ("S0VLO", -1.5, &Digital::Model::s0vlo)
+    .setUnit(U_VOLT)
+    .setDescription("Minimum voltage to switch to low state");
+
+  p.addPar ("S0VHI", 1.7, &Digital::Model::s0vhi)
+    .setUnit(U_VOLT)
+    .setDescription("Maximum voltage to switch to low state");
+
+  p.addPar ("S1RLO", 100., &Digital::Model::s1rlo)
+    .setUnit(U_OHM)
+    .setDescription("High state resistance between output node and low reference");
+
+  p.addPar ("S1RHI", 100., &Digital::Model::s1rhi)
+    .setUnit(U_OHM)
+    .setDescription("High state resistance between output node and high reference");
+
+  p.addPar ("S1TSW", 1.e-8, &Digital::Model::s1tsw)
+    .setUnit(U_SECOND)
+    .setDescription("Switching time transition to high state");
+
+  p.addPar ("S1VLO", 0.9, &Digital::Model::s1vlo)
+    .setUnit(U_VOLT)
+    .setDescription("Minimum voltage to switch to high state");
+
+  p.addPar ("S1VHI", 7.0, &Digital::Model::s1vhi)
+    .setUnit(U_VOLT)
+    .setDescription("Maximum voltage to switch to high state");
+
+  p.addPar ("DELAY", 1.e-8, &Digital::Model::delay)
+    .setUnit(U_SECOND)
+    .setDescription("Delay time of device");
 }
 
 // Class Instance
@@ -197,7 +178,7 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 01/05/06
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
 
   // If there are any time dependent parameters, set their values for
@@ -215,13 +196,11 @@ bool Instance::processParams (string param)
 // Creation Date : 01/05/06
 //-----------------------------------------------------------------------------
 Instance::Instance(
-  InstanceBlock & IB,
+  const Configuration & configuration,
+  const InstanceBlock & IB,
   Model & Diter,
-  MatrixLoadData & mlData1,
-  SolverState &ss1,
-  ExternData  &ed1,
-  DeviceOptions & do1)
-  : DeviceInstance(IB, mlData1, ss1, ed1, do1),
+  const FactoryBlock &  factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(Diter),
     li_Lo(-1),
     li_Hi(-1),
@@ -231,65 +210,106 @@ Instance::Instance(
     row_Ref(-1),
     breakTime(0.)
 {
-  // can't check for MPDE at this point because MPD_Manager may not exist yet.
-  // for example with Xyce -param case.  So for now we can't catch this
-  // error here.
-
-  // #ifdef Xyce_MPDE
-  //  string msg("::addInstance digital devices not compatible with MPDE");
-  //  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, std::ostringstream() << "Error in " << netlistLocation() << "\n" << msg);
-  // #endif // Xyce_MPDE
-
-  setName(IB.getName());
-  int i, p1, p2;
-  p1 = getName().find_first_of('%');
-  p2 = getName().find_last_of('%');
-  if (p1 != string::npos && p2 != string::npos && p2 > p1)
+  int i, tokenCount = 0, dev_numInputs = 0;
+  tokenCount = count(getName().begin(),getName().end(),'%'); 
+  if (tokenCount == 2 || tokenCount == 3)
   {
+    int p1, p2, p3;
+    p1 = getName().find_first_of('%');
+    p2 = p1 + 1 + getName().substr(p1+1).find_first_of('%');
+    // parse U devices with a variable number of inputs
+    if (tokenCount == 3)
+    {   
+      p3 = getName().find_last_of('%');
+      if (p3 != getName().size()-1){
+        dev_numInputs = std::atoi(getName().substr(p3+1).c_str());
+      }
+    }
+ 
     numExtVars = 0;
-    if (!model_.given("VLO"))
-    {
+    // Code required to support both Y-style and U-style digital devices.
+    // Y digital devices are now deprecated.
+    std::string dev_letter = getName().substr(p1-1,1);
+    if (dev_letter == "U"){
+      // For U devices, DPWR and DGND are always specified on the instance line.
+      // Warning message if VHI, VLO or VREF are in the model card.
       li_Lo = 0;
-      ++numExtVars;
-    }
-    if (!model_.given("VHI"))
-    {
       li_Hi = 0;
-      ++numExtVars;
-    }
-    if (!model_.given("VREF"))
-    {
       li_Ref = 0;
-      ++numExtVars;
+      numExtVars += 2;
+      if (model_.given("VLO"))
+      { 
+        UserWarning(*this)<< "VLO model parameter ignored for U digital device";
+      }
+      if (model_.given("VHI"))
+      { 
+        UserWarning(*this)<< "VHI model parameter ignored for U digital device";
+      }
+      if (model_.given("VREF"))
+      { 
+        UserWarning(*this)<< "VREF model parameter ignored for U digital device";
+      }
     }
-    string dev_type(getName().substr(p1+1,p2-p1-1));
-    if (dev_type == "NOT")
+    else if (dev_letter == "Y")
     {
+      // legacy code required to support VLO, VHI and VREF variables
+      // being on the instance line rather than in model card in Y devices
+      UserWarning(*this)<< "Y digital device (" << getName() << ") is deprecated. Consider using U device instead."; 
+      if (!model_.given("VLO"))
+      {
+        li_Lo = 0;
+        ++numExtVars;
+      }
+      if (!model_.given("VHI"))
+      {
+        li_Hi = 0;
+        ++numExtVars;
+      }
+      if (!model_.given("VREF"))
+      {
+        li_Ref = 0;
+        ++numExtVars;
+      }
+    }  
+    else
+    {
+      UserError0(*this) << "Digital device letter must be Y or U: " << getName();
+    }
+
+    // Configure number of inputs/outputs for each device
+    // Y devices are limited to 2 inputs.
+    std::string dev_type(getName().substr(p1+1,p2-p1-1));
+    if (dev_type == "NOT" || dev_type == "INV")
+    {
+      if (dev_type == "NOT")
+      {
+        UserWarning(*this)<< "NOT gate type (" << getName() << ") is deprecated. Consider using INV instead."; 
+      }
       numInput = 1;
       numOutput = 1;
-      gate = NOT;
+      gate = INV;
     }
     else if (dev_type == "AND")
     {
-      numInput = 2;
+      (dev_letter == "Y") ? (numInput = 2) : (numInput = dev_numInputs);
       numOutput = 1;
       gate = AND;
     }
     else if (dev_type == "NAND")
     {
-      numInput = 2;
+      (dev_letter == "Y") ? (numInput = 2) : (numInput = dev_numInputs);
       numOutput = 1;
       gate = NAND;
     }
     else if (dev_type == "OR")
     {
-      numInput = 2;
+      (dev_letter == "Y") ? (numInput = 2) : (numInput = dev_numInputs);
       numOutput = 1;
       gate = OR;
     }
     else if (dev_type == "NOR")
     {
-      numInput = 2;
+      (dev_letter == "Y") ? (numInput = 2) : (numInput = dev_numInputs);
       numOutput = 1;
       gate = NOR;
     }
@@ -311,31 +331,33 @@ Instance::Instance(
       numOutput = 1;
       gate = NXOR;
     }
-    //Genie 110812
     else if (dev_type == "DFF")
     {
       numInput = 4;  //PREB, CLRB, clock, data
       numOutput = 2; //Q, Q_bar
       gate = DFF;
     }
+    // DLTCH device still under development
+    /*else if (dev_type == "DLTCH")
+    {
+      numInput = 4;  // PREB, CLRB, Enable, Data
+      numOutput = 2; // Q, Q_bar
+      gate = DLTCH;
+    }*/
+    else if (dev_type == "BUF")
+    {
+      numInput = 1;
+      numOutput = 1;
+      gate = BUF;
+    }
     else
     {
-      string msg("Unknown digital device type: ");
-      msg += dev_type;
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+      UserError0(*this) << "Unknown digital device type " << dev_type;
     }
-  }
-  else if (getName().substr(0,7) == "Digital")
-  {
-    numExtVars = 0;
-    numInput = 0;
-    numOutput = 0;
   }
   else
   {
-    string msg("Internal error in digital device name: ");
+    std::string msg("Internal error in digital device name: ");
     msg += getName();
     std::ostringstream oss;
     oss << "Error in " << netlistLocation() << "\n" << msg;
@@ -346,23 +368,36 @@ Instance::Instance(
   int oBase = numExtVars + numInput;
   numExtVars += numInput + numOutput;
 
-////cout << "iBase = " << iBase << ", oBase = " << oBase << ", numExtVars = " << numExtVars << endl;
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0)
+  {
+    Xyce::dout() << "Digital Device " << getName() << " has iBase = " <<
+        iBase << ", oBase = " << oBase << ", numExtVars = " <<
+        numExtVars << std::endl;
+  }
 
-
+  // catch cases of AND, NAND, OR or NOR gate with only one input specified
+  // or the number of nodes on the instance line does not match the 
+  // (N) value specified as part of the gate type (e.g, AND(4))
+  if ((gate == AND) || (gate == NAND) || (gate == OR) || (gate == NOR))
+  {
+    if (numInput == 1)
+    {
+      UserError0(*this) << "this device must have more than one input.";
+    }
+    if ( (dev_numInputs != 0) && (IB.numExtVars - iBase - numOutput != dev_numInputs) )
+    {
+      std::cout << IB.numExtVars << " " << dev_numInputs << " " << numExtVars << std::endl; 
+      UserError0(*this) << "too few I/O nodes on instance line.";
+    }
+  }
+  // catch case where gates with a fixed number of inputs have
+  // wrong number of inputs
   if (numExtVars != IB.numExtVars)
   {
-    ostringstream msg;
-    msg << "Incorrect number of nodes in digital device: ";
-    msg << getName();
-    msg << ".  Found: ";
-    msg << IB.numExtVars;
-    msg << ", Should be: ";
-    msg << numExtVars;
-    msg << ".";
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg.str();
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Incorrect number of nodes in digital device "
+         << ".  Found " << IB.numExtVars << ", should be " << numExtVars;
   }
+
   numIntVars   = 0;
   numStateVars = 4*numInput + 6*numOutput;
 
@@ -406,10 +441,6 @@ Instance::Instance(
   outL.resize(numOutput);
   oTime.resize(numOutput);
 
-  //Genie 110812.
-  //changeState.resize(numInput);
-
-
   // These are to store the indicies into the jacobian for the four element
   // stamps for the capacitor/resistors connected to the input/outputs. The
   // format is to have 6 int vectors for each stamp with format:
@@ -424,28 +455,17 @@ Instance::Instance(
   for (i=0 ; i<numExtVars ; ++i)
     devConMap[i] = 1;
 
-  setModelName(model_.getName());
-
   jacStamp.resize(numExtVars);
   int row = 0;
-  if (li_Lo == 0)
+  // Code required to support both Y-style and U-style digital devices.
+  // Y digital devices are now deprecated.
+  std::string dev_letter = getDeviceLetter();
+  if (dev_letter == "U")
   {
-    row_Lo = row;
-    jacStamp[row].push_back(row);
-    for (i=0 ; i<numOutput ; ++i)
-    {
-      li_jac_Lo[i].push_back(row);
-      li_jac_Lo[i].push_back(0);
-      li_jac_Lo[i].push_back(jacStamp[row].size());
-      li_jac_Lo[i].push_back(oBase+i);
-      li_jac_Lo[i].push_back(jacStamp[oBase+i].size());
-      jacStamp[row].push_back(oBase+i);
-      jacStamp[oBase+i].push_back(row);
-    }
-    ++row;
-  }
-  if (li_Hi == 0)
-  {
+    // digital power and digital ground node are always on
+    // the instance line for a U device.  The low reference
+    // voltage for inputs is assumed to be the same as the
+    // digital ground node.
     row_Hi = row;
     jacStamp[row].push_back(row);
     for (i=0 ; i<numOutput ; ++i)
@@ -459,23 +479,91 @@ Instance::Instance(
       jacStamp[oBase+i].push_back(row);
     }
     ++row;
-  }
-  if (li_Ref == 0)
-  {
-    row_Ref = row;
+
+    row_Lo = row;
     jacStamp[row].push_back(row);
+    for (i=0 ; i<numOutput ; ++i)
+    {
+      li_jac_Lo[i].push_back(row);
+      li_jac_Lo[i].push_back(0);
+      li_jac_Lo[i].push_back(jacStamp[row].size());
+      li_jac_Lo[i].push_back(oBase+i);
+      li_jac_Lo[i].push_back(jacStamp[oBase+i].size());
+      jacStamp[row].push_back(oBase+i);
+      jacStamp[oBase+i].push_back(row);
+    }
+  
+    row_Ref = row;
     for (i=0 ; i<numInput ; ++i)
     {
       li_jac_Ref[i].push_back(row);
       li_jac_Ref[i].push_back(0);
-      li_jac_Ref[i].push_back(jacStamp[row].size());
+      li_jac_Ref[i].push_back(1);
       li_jac_Ref[i].push_back(iBase+i);
       li_jac_Ref[i].push_back(jacStamp[iBase+i].size());
       jacStamp[row].push_back(iBase+i);
       jacStamp[iBase+i].push_back(row);
     }
-    ++row;
   }
+  else if (dev_letter == "Y") 
+  {
+    // output low and output high reference voltages and input 
+    // low reference voltage are optionally on the instance line 
+    // for Y devices.
+    if (li_Lo == 0)
+    {
+      row_Lo = row;
+      jacStamp[row].push_back(row);
+      for (i=0 ; i<numOutput ; ++i)
+      {
+        li_jac_Lo[i].push_back(row);
+        li_jac_Lo[i].push_back(0);
+        li_jac_Lo[i].push_back(jacStamp[row].size());
+        li_jac_Lo[i].push_back(oBase+i);
+        li_jac_Lo[i].push_back(jacStamp[oBase+i].size());
+        jacStamp[row].push_back(oBase+i);
+        jacStamp[oBase+i].push_back(row);
+      }
+      ++row;
+    }
+    if (li_Hi == 0)
+    {
+      row_Hi = row;
+      jacStamp[row].push_back(row);
+      for (i=0 ; i<numOutput ; ++i)
+      {
+        li_jac_Hi[i].push_back(row);
+        li_jac_Hi[i].push_back(0);
+        li_jac_Hi[i].push_back(jacStamp[row].size());
+        li_jac_Hi[i].push_back(oBase+i);
+        li_jac_Hi[i].push_back(jacStamp[oBase+i].size());
+        jacStamp[row].push_back(oBase+i);
+        jacStamp[oBase+i].push_back(row);
+      }
+      ++row;
+    }
+    if (li_Ref == 0)
+    {
+      row_Ref = row;
+      jacStamp[row].push_back(row);
+      for (i=0 ; i<numInput ; ++i)
+      {
+        li_jac_Ref[i].push_back(row);
+        li_jac_Ref[i].push_back(0);
+        li_jac_Ref[i].push_back(jacStamp[row].size());
+        li_jac_Ref[i].push_back(iBase+i);
+        li_jac_Ref[i].push_back(jacStamp[iBase+i].size());
+        jacStamp[row].push_back(iBase+i);
+        jacStamp[iBase+i].push_back(row);
+      }
+      ++row;
+    }
+  }
+  else
+  {
+    UserError0(*this) << "Digital device letter must be Y or U: " << getName();
+  }
+
   for (i=0 ; i<numInput ; ++i)
   {
     if (li_Ref == 0)
@@ -508,7 +596,6 @@ Instance::Instance(
     }
     jacStamp[oBase+i].push_back(oBase+i);
   }
-
 
   // Set params to constant default values:
   setDefaultParams ();
@@ -547,11 +634,11 @@ Instance::~Instance()
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 01/05/06
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                             const vector<int> & extLIDVecRef)
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                             const std::vector<int> & extLIDVecRef)
 
 {
-  string msg;
+  std::string msg;
 
   // Check if the size of the ID lists corresponds to the proper number of
   // internal and external variables.
@@ -581,17 +668,39 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
   // rows.
 
   int i=0, j;
-  if (li_Lo == 0)
-    li_Lo = extLIDVec[i++];
-  if (li_Hi == 0)
+  // Code required to support both Y-style and U-style digital devices.
+  // Y digital devices are now deprecated
+  std::string dev_letter = getDeviceLetter();
+  if (dev_letter == "U")
+  {
+    // ordering on U-device instance line is dig_power_node (DPWR) then 
+    // dig_ground_node (DGND).  Assume that input low-reference
+    // voltage (VREF in Y devices) is equal to DGND.
     li_Hi = extLIDVec[i++];
-  if (li_Ref == 0)
-    li_Ref = extLIDVec[i++];
+    li_Lo = extLIDVec[i++];
+    li_Ref = li_Lo;
+  }
+  else if (dev_letter == "Y")
+  {
+    // for Y devices, ordering of output high/low reference nodes (VHI/VLO)
+    // on instance line is reversed.  Input low-reference voltage (VREF), 
+    // VHI and VLO can either be on the instance line or in the model card.
+    if (li_Lo == 0)
+      li_Lo = extLIDVec[i++];
+    if (li_Hi == 0)
+      li_Hi = extLIDVec[i++];
+    if (li_Ref == 0)
+      li_Ref = extLIDVec[i++];
+  }
+  else
+  {
+    UserError0(*this) << "Digital device letter must be Y or U: " << getName();
+  } 
+
   for (j=0 ; j<numInput ; ++j)
     li_Inp[j] = extLIDVec[i++];
   for (j=0 ; j<numOutput ; ++j)
     li_Out[j] = extLIDVec[i++];
-
 }
 
 //-----------------------------------------------------------------------------
@@ -602,9 +711,9 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 01/05/06
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef)
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef)
 {
-  string msg;
+  std::string msg;
 
   // Check if the size of the ID lists corresponds to the proper number of
   // internal and external variables.
@@ -649,7 +758,7 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef)
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 01/05/06
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   return intNameMap;
 }
@@ -663,7 +772,7 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 01/05/06
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -676,7 +785,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 01/05/06
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
   int i;
@@ -684,67 +793,111 @@ void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
   int oBase = iBase + numInput;
   int lo_present, hi_present;
 
-  if (row_Lo < 0)
-    lo_present = 0;
-  else
-    lo_present = 1;
-  if (row_Hi < 0)
-    hi_present = 0;
-  else
-    hi_present = 1;
+  (row_Lo < 0) ? (lo_present = 0) : (lo_present = 1);
+  (row_Hi < 0) ? (hi_present = 0) : (hi_present = 1);
 
-  if (row_Ref == -1)
+  // Code required to support both Y-style and U-style digital devices.
+  // Y digital devices are now deprecated.
+  std::string dev_letter = getDeviceLetter();
+  
+  if (dev_letter == "U")
   {
-    for (i=0 ; i<numInput ; ++i)
+    if ( (row_Lo == -1) || (row_Hi == -1) || (row_Ref == -1) )
     {
-      li_jac_Ref[i].push_back(jacLIDVec[li_jac_Ref[i][0]][0]);
+       UserError0(*this) << "Internal error in Instance::registerJacLIDs() for " << getName();
     }
-  }
-  else
-  {
-    for (i=0 ; i<numInput ; ++i)
+    else
     {
-      li_jac_Ref[i][1] = jacLIDVec[li_jac_Ref[i][0]][li_jac_Ref[i][1]];
-      li_jac_Ref[i][2] = jacLIDVec[li_jac_Ref[i][0]][li_jac_Ref[i][2]];
-      li_jac_Ref[i][4] = jacLIDVec[li_jac_Ref[i][3]][li_jac_Ref[i][4]];
-      li_jac_Ref[i][5] = jacLIDVec[li_jac_Ref[i][3]][li_jac_Ref[i][5]];
-    }
-  }
+      for (i=0 ; i<numInput ; ++i)
+      {
+        li_jac_Ref[i][1] = jacLIDVec[li_jac_Ref[i][0]][li_jac_Ref[i][1]];
+        li_jac_Ref[i][2] = jacLIDVec[li_jac_Ref[i][0]][li_jac_Ref[i][2]];
+        li_jac_Ref[i][4] = jacLIDVec[li_jac_Ref[i][3]][li_jac_Ref[i][4]];
+        li_jac_Ref[i][5] = jacLIDVec[li_jac_Ref[i][3]][li_jac_Ref[i][5]];
+      }
 
-  if (row_Lo == -1)
-  {
-    for (i=0 ; i<numOutput ; ++i)
-    {
-      li_jac_Lo[i].push_back(jacLIDVec[li_jac_Lo[i][0]][hi_present]);
+      for (i=0 ; i<numOutput ; ++i)
+      {
+        li_jac_Lo[i][1] = jacLIDVec[li_jac_Lo[i][0]][li_jac_Lo[i][1]];
+        li_jac_Lo[i][2] = jacLIDVec[li_jac_Lo[i][0]][li_jac_Lo[i][2]];
+        li_jac_Lo[i][4] = jacLIDVec[li_jac_Lo[i][3]][li_jac_Lo[i][4]];
+        li_jac_Lo[i][5] = jacLIDVec[li_jac_Lo[i][3]][li_jac_Lo[i][5]];
+      }
+  
+      for (i=0 ; i<numOutput ; ++i)
+      {
+        li_jac_Hi[i][1] = jacLIDVec[li_jac_Hi[i][0]][li_jac_Hi[i][1]];
+        li_jac_Hi[i][2] = jacLIDVec[li_jac_Hi[i][0]][li_jac_Hi[i][2]];
+        li_jac_Hi[i][4] = jacLIDVec[li_jac_Hi[i][3]][li_jac_Hi[i][4]];
+        li_jac_Hi[i][5] = jacLIDVec[li_jac_Hi[i][3]][li_jac_Hi[i][5]];
+      }
     }
   }
-  else
+  else if (dev_letter == "Y") 
   {
-    for (i=0 ; i<numOutput ; ++i)
+    // row_Ref == -1 means that VREF is in the model card
+    if (row_Ref == -1)
     {
-      li_jac_Lo[i][1] = jacLIDVec[li_jac_Lo[i][0]][li_jac_Lo[i][1]];
-      li_jac_Lo[i][2] = jacLIDVec[li_jac_Lo[i][0]][li_jac_Lo[i][2]];
-      li_jac_Lo[i][4] = jacLIDVec[li_jac_Lo[i][3]][li_jac_Lo[i][4]];
-      li_jac_Lo[i][5] = jacLIDVec[li_jac_Lo[i][3]][li_jac_Lo[i][5]];
+      for (i=0 ; i<numInput ; ++i)
+      {
+        li_jac_Ref[i].push_back(jacLIDVec[li_jac_Ref[i][0]][0]);
+      }
     }
-  }
+    else
+    {
+      // this for loop is identical for both U and Y devices
+      for (i=0 ; i<numInput ; ++i)
+      {
+        li_jac_Ref[i][1] = jacLIDVec[li_jac_Ref[i][0]][li_jac_Ref[i][1]];
+        li_jac_Ref[i][2] = jacLIDVec[li_jac_Ref[i][0]][li_jac_Ref[i][2]];
+        li_jac_Ref[i][4] = jacLIDVec[li_jac_Ref[i][3]][li_jac_Ref[i][4]];
+        li_jac_Ref[i][5] = jacLIDVec[li_jac_Ref[i][3]][li_jac_Ref[i][5]];
+      }
+    }
+    
+    // row_Lo == -1 means that VLO is in the model card
+    if (row_Lo == -1)
+    {
+      for (i=0 ; i<numOutput ; ++i)
+      {
+        li_jac_Lo[i].push_back(jacLIDVec[li_jac_Lo[i][0]][hi_present]);
+      }
+    }
+    else
+    {
+      // this for loop is identical for both U and Y devices
+      for (i=0 ; i<numOutput ; ++i)
+      {
+        li_jac_Lo[i][1] = jacLIDVec[li_jac_Lo[i][0]][li_jac_Lo[i][1]];
+        li_jac_Lo[i][2] = jacLIDVec[li_jac_Lo[i][0]][li_jac_Lo[i][2]];
+        li_jac_Lo[i][4] = jacLIDVec[li_jac_Lo[i][3]][li_jac_Lo[i][4]];
+        li_jac_Lo[i][5] = jacLIDVec[li_jac_Lo[i][3]][li_jac_Lo[i][5]];
+      }
+    }
 
-  if (row_Hi == -1)
-  {
-    for (i=0 ; i<numOutput ; ++i)
+    // row_Hi == -1 means that VHI is in the model card
+    if (row_Hi == -1)
     {
-      li_jac_Hi[i].push_back(jacLIDVec[li_jac_Hi[i][0]][lo_present]);
+      for (i=0 ; i<numOutput ; ++i)
+      {
+        li_jac_Hi[i].push_back(jacLIDVec[li_jac_Hi[i][0]][lo_present]);
+      }
     }
-  }
+    else
+    {
+      // this for loop is identical for both U and Y devices
+      for (i=0 ; i<numOutput ; ++i)
+      {
+        li_jac_Hi[i][1] = jacLIDVec[li_jac_Hi[i][0]][li_jac_Hi[i][1]];
+        li_jac_Hi[i][2] = jacLIDVec[li_jac_Hi[i][0]][li_jac_Hi[i][2]];
+        li_jac_Hi[i][4] = jacLIDVec[li_jac_Hi[i][3]][li_jac_Hi[i][4]];
+        li_jac_Hi[i][5] = jacLIDVec[li_jac_Hi[i][3]][li_jac_Hi[i][5]];
+      }
+    }
+  }  
   else
   {
-    for (i=0 ; i<numOutput ; ++i)
-    {
-      li_jac_Hi[i][1] = jacLIDVec[li_jac_Hi[i][0]][li_jac_Hi[i][1]];
-      li_jac_Hi[i][2] = jacLIDVec[li_jac_Hi[i][0]][li_jac_Hi[i][2]];
-      li_jac_Hi[i][4] = jacLIDVec[li_jac_Hi[i][3]][li_jac_Hi[i][4]];
-      li_jac_Hi[i][5] = jacLIDVec[li_jac_Hi[i][3]][li_jac_Hi[i][5]];
-    }
+    UserError0(*this) << "Digital device letter must be Y or U: " << getName();
   }
 }
 
@@ -765,7 +918,7 @@ bool Instance::updatePrimaryState ()
   double transitionTime;
   bool changeState = false; //Genie 110812
   bool clocking = false; //Genie 111212
-  //vector<bool> changeState;  //Genie 110812
+  //std::vector<bool> changeState;  //Genie 110812
   bool toPrint = false; //Genie 022713
 
   int i;
@@ -775,48 +928,28 @@ bool Instance::updatePrimaryState ()
   N_LAS_Vector & oldStaVector = *(extData.currStaVectorPtr);
   N_LAS_Vector & oldSolVector = *(extData.currSolVectorPtr);
 
-  //Genie 113012
-  ////cout <<"Digital::updatePrimaryState() is called." <<endl;
-
   // The convention in this device is to consider the 'positive' side of the
-  // capacitors as the Vsrc or node that supplies the voltage, or for the output,
-  // vref.  The 'positive' voltages are thus the same for all input/outputs
-  if (li_Lo >= 0)
-    v_poslo = solVector[li_Lo];
-  else
-    v_poslo = model_.vlo;
-  if (li_Hi >= 0)               //Genie 112712. If VHI is not speficied, li_Hi >=0 and
-    v_poshi = solVector[li_Hi];	// v_poshi is derived from CLOAD/RLOAD by solVector.
-  else				// If VHI is specified, li_Hi == -1 and v_poshi is specified
-    v_poshi = model_.vhi;	// by the netlist model card.
-  if (li_Ref >= 0)
-    v_posref = solVector[li_Ref];
-  else
-    v_posref = model_.vref;
+  // capacitors as the Vsrc or node that supplies the voltage, or for the
+  // output, vref. The 'positive' voltages are thus the same for all
+  // input/outputs
+  (li_Lo >= 0) ? (v_poslo = solVector[li_Lo]) : (v_poslo = model_.vlo);
+
+  // If VHI is not specified, li_Hi >=0 and v_poshi is derived from
+  // CLOAD/RLOAD by solVector.  If VHI is specified, li_Hi == -1 and
+  // v_poshi is specified by the netlist model card.
+  (li_Hi >= 0) ? (v_poshi = solVector[li_Hi]) : (v_poshi = model_.vhi);
+  (li_Ref >= 0) ? (v_posref = solVector[li_Ref]) : (v_posref = model_.vref);
 
   lastT = 0;
-
-  //Genie 110812
-  //changeState.resize(numInput);
-  //for (i=0 ; i<numInput ; ++i)
-  //     changeState[i] = false;
-
-  //Genie 022713
-  if (getSolverState().currTime > 3)
-     toPrint = true;
 
   for (i=0 ; i<numInput ; ++i)
   {
     //initialize
     currentState = static_cast <int> (oldStaVector[li_currentStateInp[i]]);
     transitionTime = oldStaVector[li_transitionTimeInp[i]];
-    //changeState[i] = false; //Genie 110812
     changeState = false; //Genie 022013 Clear the memory of changeState.
-			//Attempt to debug DFF state not changing issue due to wrong oTime
-
 
     // obtain voltage drop accross the capacitor:
-
     v_neg = solVector[li_Inp[i]];
 
     time = getSolverState().currTime;
@@ -831,47 +964,12 @@ bool Instance::updatePrimaryState ()
     if (getSolverState().dcopFlag)
     {
       transitionTime = 0;
-      if (-vcapref[i] < model_.s0vhi)
-        currentState = 0;
-      else
-        currentState = 1;
+      (-vcapref[i] < model_.s0vhi) ? (currentState = 0) : (currentState = 1);
 
       oldStaVector[li_currentStateInp[i]] = currentState;
       oldStaVector[li_transitionTimeInp[i]] = transitionTime;
     }
-
-    //Genie 120312 Debug
-    /*if (gate == NOT)
-  {
-   cout << "UpdatePrimaryState(NOT): dcopFlag = " << getSolverState().dcopFlag << ", s0vhi = " << (*M_iter)->s0vhi << "currentState = " << currentState << ", s1vlo = " << (*M_iter)->s1vlo << endl;
-   cout << ", v_posref = " << v_posref << "vcapref[0] = " << vcapref[i] << ", v_neg = " << v_neg << endl;
-  }*/
-    //Genie 121812 clock Debug
-    /*if (gate == DFF && i == 2)
-  {
-   cout << "UpdatePrimaryState(DFF): dcopFlag = " << getSolverState().dcopFlag << ", s0vhi = " << (*M_iter)->s0vhi << "currentState(in2) = " << currentState << ", s1vlo = " << (*M_iter)->s1vlo << endl;
-   cout << ", vcapref[2] = " << vcapref[2] << endl;
-   cout << ", oldStaVector[li_currentStateInp[2]] = " << static_cast <int> (oldStaVector[li_currentStateInp[2]]) << endl;
-  }*/
-   //Genie 021913 Debug
-   /*
-   if (gate == DFF && i == 3 && toPrint) //data debug
-  {
-   cout << "At simulation time " << getSolverState().currTime << endl;
-   cout << "UpdatePrimaryState(DFF): dcopFlag = " << getSolverState().dcopFlag << ", s0vhi = " << (*M_iter)->s0vhi << "currentState(in3) = " << currentState << ", s1vlo = " << (*M_iter)->s1vlo << endl;
-   cout << ", vcapref[3] = " << vcapref[3] << endl;
-   cout << ", oldStaVector[li_currentStateInp[3]] = " << static_cast <int> (oldStaVector[li_currentStateInp[3]]) << endl;
-  }*/
-   //Genie 022813 Vrf debug
-   if (gate == DFF && i == 1 && toPrint) //data debug
-  {
-   cout << "At simulation time " << getSolverState().currTime << endl;
-   cout << "UpdatePrimaryState(DFF): dcopFlag = " << getSolverState().dcopFlag << ", s0vhi = " << model_.s0vhi << "currentState(in1) = " << currentState << ", s1vlo = " << model_.s1vlo << endl;
-   cout << ", vcapref[1] = " << vcapref[1] << endl;
-   cout << ", oldStaVector[li_currentStateInp[1]] = " << static_cast <int> (oldStaVector[li_currentStateInp[1]]) << endl;
-  }
-
-
+ 
     iTime[i] = transitionTime;
 
     staVector[li_transitionTimeInp[i]] = transitionTime;
@@ -879,36 +977,36 @@ bool Instance::updatePrimaryState ()
     if (currentState == 0)
     {
       inpL[i] = false;
-      if (-vcapref[i] > model_.s0vhi)
+      if ((-vcapref[i] > model_.s0vhi) && (-vcapref[i] > model_.s1vlo))
       {
-        if (-vcapref[i] > model_.s1vlo)
-        {
           currentState = 1;
           changeState = true;
-	  ////cout << "Gate Type " << gate << " changes state to 1" << endl;
-	  if (gate == DFF && i == 2)  //Genie 111212: i==2 -> clk
-          {   clocking = true;  // clock of  DFF changes state
-            ////cout << "clock of DFF changes state to 1" << endl;
+          if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0)
+	  {
+	    Xyce::dout() << "Device " << getName() << " changed state from 0 to 1 at time " << getSolverState().currTime << std::endl;
 	  }
-        }
+
+          if (gate == DFF && i == 2)  // i==2 -> clk
+          {   
+            clocking = true;  // clock of  DFF changes state
+	  }
       }
     }
     else
     {
       inpL[i] = true;
-      if (-vcapref[i] < model_.s1vlo)
+      if ((-vcapref[i] < model_.s1vlo) && (-vcapref[i] < model_.s0vhi))
       {
-        if (-vcapref[i] < model_.s0vhi)
-        {
           currentState = 0;
           changeState = true;
-	  ////cout << "Gate type "<< gate << " changes state to 0" << endl;
+          if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0)
+	  {
+	    Xyce::dout() << "Device " << getName() << " changed state from 1 to 0 at time " << getSolverState().currTime << std::endl;
+	  }
 	  if (gate == DFF && i == 2)  //Genie 111212
 	  {
             clocking = true;  // clock of  DFF changes state
-            ////cout << "clock of DFF changes state to 0" << endl;
 	  }
-        }
       }
     }
 
@@ -917,10 +1015,7 @@ bool Instance::updatePrimaryState ()
       double vOld, del;
 
       inpL[i] = (currentState == 1);
-      if (li_Ref >= 0)
-        vOld = oldSolVector[li_Ref];
-      else
-        vOld = model_.vref;
+      (li_Ref >= 0) ? (vOld = oldSolVector[li_Ref]) : (vOld = model_.vref);
       vOld = oldSolVector[li_Inp[i]] - vOld;
       if (fabs(vcapref[i]+vOld) < 1.e-12)
         del = 0;
@@ -946,38 +1041,36 @@ bool Instance::updatePrimaryState ()
       lastT = iTime[i];
   } // end for loop numInput i
 
-  if (gate == NOT)
+  if (gate == INV)
   {
     outL[0] = !inpL[0];
-    //Genie 113012
-    ////cout << "NOT: inpL[0] = " << inpL[0] << ", outL[0] = " << outL[0] << endl;
     oTime[0] = lastT+model_.delay;
   }
   else if (gate == AND)
   {
-    outL[0] = inpL[0] & inpL[1];
+    outL[0] = !(count(inpL.begin(),inpL.end(),false) > 0);
     oTime[0] = lastT+model_.delay;
   }
   else if (gate == NAND)
   {
-    outL[0] = !(inpL[0] & inpL[1]);
+    outL[0] = (count(inpL.begin(),inpL.end(),false) > 0);
     oTime[0] = lastT+model_.delay;
   }
   else if (gate == OR)
   {
-    outL[0] = inpL[0] | inpL[1];
+    outL[0] = (count(inpL.begin(),inpL.end(),true) > 0);
     oTime[0] = lastT+model_.delay;
   }
   else if (gate == NOR)
   {
-    outL[0] = !(inpL[0] | inpL[1]);
+    outL[0] = !(count(inpL.begin(),inpL.end(),true) > 0);
     oTime[0] = lastT+model_.delay;
   }
   else if (gate == ADD)
   {
     outL[0] = inpL[0] ^ inpL[1] ^ inpL[2];
-    //outL[0] = (inpL[0] & inpL[1]) | (inpL[1] & inpL[2]) | (inpL[0] & inpL[2]);
-    outL[1] = (inpL[0] & inpL[1]) | (inpL[1] & inpL[2]) | (inpL[0] & inpL[2]); //Genie, 101612. carry-out sum
+    // carry-out sum
+    outL[1] = (inpL[0] & inpL[1]) | (inpL[1] & inpL[2]) | (inpL[0] & inpL[2]);
 
     oTime[0] = lastT+model_.delay;
     oTime[1] = lastT+model_.delay;
@@ -992,7 +1085,54 @@ bool Instance::updatePrimaryState ()
     outL[0] = !(inpL[0] ^ inpL[1]);
     oTime[0] = lastT+model_.delay;
   }
-  //Genie
+  else if (gate == BUF)
+  {
+    outL[0] = inpL[0];
+    oTime[0] = lastT+model_.delay;
+  }
+  // DLTCH device still under development.  This else-if
+  // clause not reachable in Xyce 6.1
+  else if (gate == DLTCH)
+  { // DLTCH: in0: PREB, in1: CLRB, in2: enable, in3: data
+    // DLTCH: out0: Q, out1: Q_bar
+    if ((inpL[0] == 1) && (inpL[1] == 0))
+    {
+      outL[0] = 0;
+      outL[1] = 1;
+      oTime[0] = lastT+model_.delay;
+      oTime[1] = lastT+model_.delay;
+    }
+    else if ((inpL[0] == 0) && (inpL[1] == 1))
+    {
+      outL[0] = 1;
+      outL[1] = 0;
+      oTime[0] = lastT+model_.delay;
+      oTime[1] = lastT+model_.delay;
+    }
+     else if ((inpL[0] == 0) && (inpL[1] == 0))
+    { // this state is unstable, and needs further testing
+      outL[0] = 1;
+      outL[1] = 1;
+      oTime[0] = lastT+model_.delay;
+      oTime[1] = lastT+model_.delay;
+    }
+    else if (inpL[2] == 1)
+    { // enable line, PREB and CLRB are TRUE
+      outL[0] = inpL[3];
+      outL[1] = !inpL[3];
+      oTime[0] = lastT+model_.delay;
+      oTime[1] = lastT+model_.delay;
+    }
+    else
+    {
+      // no op.  Keep outputs latched in current state
+      // this statement deals with the startup condition,
+      // when no IC's were specified.  However, it may cause
+      // trouble when transitioning from the PREB/CLRB = 0
+      // state
+      outL[1] = !outL[0];
+    }
+  }
   else if (gate == DFF)
   { // DFF: in0: PREB, in1: CLRB, in2: clock, in3: data
     // DFF: out0: Q, out1: Q_bar
@@ -1001,65 +1141,36 @@ bool Instance::updatePrimaryState ()
     // CD4013B: out0: Q, out1: Q_bar
     if (clocking && inpL[2] ==1) //clock rising edge 0->1
     {
-        if (toPrint){
-          cout << "At simulation time: " << getName() << ", " << getSolverState().currTime << endl;
-	   cout << "clock rising edge, D = " << inpL[3] << ", set = " << !inpL[0] << ", reset = " << !inpL[1] << endl;
-	}
         if (inpL[0] == 1 && inpL[1] == 1) //PREB = CLRB = 1
- 	//if (inpL[0] == 0 && inpL[1] == 0) //S = R = 0
-        //if (inpL[0] == 1 ) //Genie 022813. Brute force debug for...PREB = CLRB = 1
         {
             outL[0] = inpL[3];  //Q = D
             outL[1] = !(inpL[3]); //Q_bar = !D
-	    if (toPrint) {
-	        cout << "Set=Reset=0, " << "D = " << inpL[3] << ", Q = " << outL[0] << ", Q_bar = " << outL[1] << endl;
-	    }
 	}
     }
     else if (clocking && inpL[2] ==0) //clock falling edge 1->0
     {
-        if (toPrint)
-	     cout << "clock falling edge, D= " << inpL[3] << ", set = " << !inpL[0] << ", reset = " << !inpL[1] << endl;
  	if (inpL[0] == 1 && inpL[1] == 1) //PREB = CLRB = 1
-	//if (inpL[0] == 0 && inpL[1] == 0) //S = R = 0
         {
             outL[0] = oldStaVector[li_currentStateOut[0]]; //no change
             outL[1] = oldStaVector[li_currentStateOut[1]]; //no change
-             if (toPrint) {
-	        cout << "Set=Reset=0, " << "D = " << inpL[3] << ", no change Q = " << outL[0] << ", Q_bar = " << outL[1] << endl;
-	    }
-
 	}
     }
     else // no clock change
     {
       if (inpL[0] == 1 && inpL[1] == 0) //PREB=1, CLRB = 0
-	//if (inpL[0] == 0 && inpL[1] == 1) //S=0, R = 1
         {
             outL[0] = 0;
             outL[1] = 1;
-	     if (toPrint) {
-	        cout << "Set=0, Reset=1, " << "D = " << inpL[3] << ", Q = " << outL[0] << ", Q_bar = " << outL[1] << endl;
-	    }
 	}
 	else if (inpL[0] == 0 && inpL[1] == 1) //PREB = 0, CLRB = 1
-	//else if (inpL[0] == 1 && inpL[1] == 0) //S = 1, R = 0
         {
             outL[0] = 1;
             outL[1] = 0;
-	     if (toPrint) {
-	        cout << "Set=1, Reset=0, " << "D = " << inpL[3] << ", Q = " << outL[0] << ", Q_bar = " << outL[1] << endl;
-	    }
-
 	}
 	else if (inpL[0] == 0 && inpL[1] == 0) //PREB = CLRB = 0
-	//else if (inpL[0] == 1 && inpL[1] == 1) //S = R = 1
         {
             outL[0] = 1;
             outL[1] = 1;
-	     if (toPrint) {
-	        cout << "Set=Reset=1, " << "D = " << inpL[3] << ", Q = " << outL[0] << ", Q_bar = " << outL[1] << endl;
-	    }
 	}
     }
     oTime[0] = lastT+model_.delay;
@@ -1083,43 +1194,26 @@ bool Instance::updatePrimaryState ()
         if (given("IC2"))
           outL[i] = ic2;
       }
-      else if (i == 2)
-      {
-        if (given("IC3"))
-          outL[i] = ic3;
-      }
       else
       {
-        string msg("Insufficient initial conditions supported in digital device");
+        std::string msg("Insufficient initial conditions supported in digital device");
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
       }
 
       oldStaVector[li_currentStateOut[i]] = outL[i]?1:0;
       oldStaVector[li_transitionTimeOut[i]] = time;
-
-      //Genie 022013 debug
-      /*if (gate == DFF){
-          cout << "DFF Output: At simulation time " << getSolverState().currTime << endl;
-          cout << "oldStaVector[li_currentStateOut[" << i << "] = " << oldStaVector[li_currentStateOut[i]] << endl;
-      }*/
     }
 
     //current logic state of output nodes
     currentState = static_cast <int> (oldStaVector[li_currentStateOut[i]]);
     transitionTime = oldStaVector[li_transitionTimeOut[i]];
 
-    /*if (gate == NOT) //Genie
-      cout << "Digital(NOT):: currentState (out) = " << currentState << ", outL[i] = " << outL[i] << endl; */
-    //Genie
-    if (gate == DFF && toPrint)
-      cout << "Digital(DFF):: " << getName() << ", currentState (out) = " << currentState << ", i = " << i << ", outL[0] = " << outL[0] << ", outL[1] = " << outL[1] << ", oTime[i] = " << oTime[i] << endl;
-
     if (currentState == 1)
       curr = true;
     else
       curr = false;
 
-    if (curr != outL[i]) //Genie 110812. This is executed when scopFlag is false
+    if (curr != outL[i]) // This is executed when scopFlag is false
     {
       if (oTime[i] <= time)
       {
@@ -1139,7 +1233,6 @@ bool Instance::updatePrimaryState ()
     staVector[li_transitionTimeOut[i]] = transitionTime;
 
     // obtain voltage drop accross the capacitors:
-
     v_neg = solVector[li_Out[i]];
 
     elapsed = time - transitionTime;
@@ -1150,7 +1243,7 @@ bool Instance::updatePrimaryState ()
       elapsed /= model_.s1tsw;
     else
     {
-      string msg("Instance::updateSecondaryState: unrecognized state");
+      std::string msg("Instance::updateSecondaryState: unrecognized state");
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
     }
 
@@ -1163,8 +1256,9 @@ bool Instance::updatePrimaryState ()
         frac = 0;
       else
       {
-        // This is a simple linear transition.  Since there is a breakpoint at the start of
-        // the transition it is OK to have a discontinuity there.
+        // This is a simple linear transition.  Since there is a
+        // breakpoint at the start of the transition it is OK to
+        // have a discontinuity there.
         frac = 1-elapsed;
       }
     }
@@ -1180,50 +1274,15 @@ bool Instance::updatePrimaryState ()
       ghi[i] = 1/(frac*model_.s0rhi + (1-frac)*model_.s1rhi);
     }
 
-    //Genie 113012
-    /*if (gate == NOT)
-  {
-    cout << "Gate NOT new currentState (out)= " << currentState << ", frac = " << frac << endl;
-    cout << "s0rlo = " << model_.s0rlo << ", s1rlo = " << model_.s1rlo << endl;
-  }*/
-    //Genie 021913
-   if (gate == DFF && toPrint)
-  {
-    cout << "At simulation time = " << getSolverState().currTime << endl;
-    cout << "Gate DFF new currentState (out[" << i << "]= " << currentState << endl;
-  }
-
     rilo[i] = glo[i]*(v_poslo-v_neg);
     rihi[i] = ghi[i]*(v_poshi-v_neg);
 
-   /*if (gate == NOT)
-  {
-   cout << "rilo[" << i << "] = " << rilo[i] << ", glo[i] = " << glo[i];
-   cout << "v_poslo = " << v_poslo << "v_poshi = " << v_poshi << ", v_neg = " << v_neg << endl;
-  }*/
-   /*if (gate == DFF)
-  {
-   cout << "v_poslo = " << v_poslo << "v_poshi = " << v_poshi << ", v_neg = " << v_neg << endl;
-  }*/
     vcaplo[i] = v_poslo-v_neg;
     vcaphi[i] = v_poshi-v_neg;
 
     // Obtain the "current"  value for the charge stored in the capacitors.
-    ////qlo[i] = model_.clo*vcaphi[i]; //Genie 022113 Found bug?
-    qlo[i] = model_.clo*vcaplo[i];  //Genie 022113. Fix
+    qlo[i] = model_.clo*vcaplo[i]; 
     qhi[i] = model_.chi*vcaphi[i];
-
-   /*if (gate == NOT)
-   {
-    cout << "vcaplo = " << vcaplo[i] << ", vcaphi = " << vcaphi[i] << endl;
-    cout << "qhi[i] = " << qhi[i] << ", chi = " << model_.chi << endl;
-    cout << "qlo[i] = " << qlo[i] << ", clo = " << model_.clo << endl;
-    cout << "model_.chi*vcaphi[i] = " << model_.chi*vcaphi[i] << endl;
-   }*/
-   if (gate == DFF && toPrint)
-   {
-    cout << "vcaplo[" << i << "] = "<< vcaplo[i] << ", vcaphi[" << i << "] = " << vcaphi[i] << endl;
-   }
 
     staVector[li_QloState[i]] = qlo[i];
     staVector[li_QhiState[i]] = qhi[i];
@@ -1284,7 +1343,7 @@ bool Instance::updateSecondaryState ()
 // Creation Date : 02/07/06
 //-----------------------------------------------------------------------------
 bool Instance::getInstanceBreakPoints
-( vector<N_UTL_BreakPoint> & breakPointTimes )
+( std::vector<N_UTL_BreakPoint> & breakPointTimes )
 {
   if (breakTime > getSolverState().currTime)
   {
@@ -1313,25 +1372,21 @@ bool Instance::loadDAEQVector ()
   bool bsuccess = true;
   int i;
 
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2("---------------------");
-  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "  Instance::loadDAEQVector" << endl;
-    cout << "  name = " << getName() <<endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "  Instance::loadDAEQVector" << std::endl;
+    Xyce::dout() << "  name = " << getName() <<std::endl;
   }
-#endif
 
   for (i=0 ; i<numOutput ; ++i)
   {
-#ifdef Xyce_DEBUG_DEVICE
-    if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+    if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
     {
-      cout << "  qlo[" << i << "] = " << qlo[i] << endl;
-      cout << "  qhi[" << i << "] = " << qhi[i] << endl;
+      Xyce::dout() << "  qlo[" << i << "] = " << qlo[i] << std::endl;
+      Xyce::dout() << "  qhi[" << i << "] = " << qhi[i] << std::endl;
     }
-#endif
+
     if (li_Lo >= 0)
     {
 
@@ -1351,12 +1406,11 @@ bool Instance::loadDAEQVector ()
 
   for (i=0 ; i<numInput ; ++i)
   {
-#ifdef Xyce_DEBUG_DEVICE
-    if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+    if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
     {
-      cout << "  qref[" << i << "] = " << qref[i] << endl;
+      Xyce::dout() << "  qref[" << i << "] = " << qref[i] << std::endl;
     }
-#endif
+
     if (li_Ref >= 0)
     {
 
@@ -1391,25 +1445,21 @@ bool Instance::loadDAEFVector ()
   double v_tmp = 0.0;
   int i;
 
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2("---------------------");
-  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "  Instance::loadDAEFVector" << endl;
-    cout << "  name = " << getName() <<endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "  Instance::loadDAEFVector" << std::endl;
+    Xyce::dout() << "  name = " << getName() <<std::endl;
   }
-#endif
 
   for (i=0 ; i<numOutput ; ++i)
   {
-#ifdef Xyce_DEBUG_DEVICE
-    if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+    if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
     {
-      cout << "  rilo[" << i << "] = " << rilo[i] << endl;
-      cout << "  rihi[" << i << "] = " << rihi[i] << endl;
+      Xyce::dout() << "  rilo[" << i << "] = " << rilo[i] << std::endl;
+      Xyce::dout() << "  rihi[" << i << "] = " << rihi[i] << std::endl;
     }
-#endif
+
     if (li_Lo >= 0)
     {
 
@@ -1429,12 +1479,11 @@ bool Instance::loadDAEFVector ()
 
   for (i=0 ; i<numInput ; ++i)
   {
-#ifdef Xyce_DEBUG_DEVICE
-    if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+    if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
     {
-      cout << "  riref[" << i << "] = " << riref[i] << endl;
+      Xyce::dout() << "  riref[" << i << "] = " << riref[i] << std::endl;
     }
-#endif
+
     if (li_Ref >= 0)
     {
 
@@ -1445,12 +1494,10 @@ bool Instance::loadDAEFVector ()
     (*extData.daeFVectorPtr)[li_Inp[i]] -= riref[i];
   }
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
+    Xyce::dout() << subsection_divider << std::endl;
   }
-#endif
 
   return bsuccess;
 }
@@ -1477,26 +1524,21 @@ bool Instance::loadDAEdQdx ()
 
   N_LAS_Matrix * dQdxMatPtr = extData.dQdxMatrixPtr;
 
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2("---------------------");
-  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 <<endl;
-    cout << "  Instance::loadDAEdQdx" << endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << subsection_divider <<std::endl;
+    Xyce::dout() << "  Instance::loadDAEdQdx" << std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
-#endif
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
   {
-    cout << "\nLoading DIGITAL dQdx matrix\n";
-    cout << "Capacitance lo: " << model_.clo << endl;
-    cout << "Capacitance hi: " << model_.chi << endl;
-    cout << "Capacitance load: " << model_.cload << endl;
-    cout << "DONE DIGITAL dQdx matrix LOAD\n";
+    Xyce::dout() << "\nLoading DIGITAL dQdx matrix\n";
+    Xyce::dout() << "Capacitance lo: " << model_.clo << std::endl;
+    Xyce::dout() << "Capacitance hi: " << model_.chi << std::endl;
+    Xyce::dout() << "Capacitance load: " << model_.cload << std::endl;
+    Xyce::dout() << "DONE DIGITAL dQdx matrix LOAD\n";
   }
-#endif
 
   for (i=0 ; i<numInput ; ++i)
   {
@@ -1576,14 +1618,11 @@ bool Instance::loadDAEdFdx ()
   N_LAS_Matrix * dFdxMatPtr = extData.dFdxMatrixPtr;
   int i;
 
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2("---------------------");
-  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 <<endl;
-    cout << "  Instance::loadDAEdFdx" << endl;
+    Xyce::dout() << subsection_divider <<std::endl;
+    Xyce::dout() << "  Instance::loadDAEdFdx" << std::endl;
   }
-#endif
 
   for (i=0 ; i<numInput ; ++i)
   {
@@ -1607,13 +1646,12 @@ bool Instance::loadDAEdFdx ()
 
   for (i=0 ; i<numOutput ; ++i)
   {
-#ifdef Xyce_DEBUG_DEVICE
-    if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+    if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 2 && getSolverState().debugTimeFlag)
     {
-      cout << "  glo[" << i << "] = " << glo[i] << endl;
-      cout << "  ghi[" << i << "] = " << ghi[i] << endl;
+      Xyce::dout() << "  glo[" << i << "] = " << glo[i] << std::endl;
+      Xyce::dout() << "  ghi[" << i << "] = " << ghi[i] << std::endl;
     }
-#endif
+
     if (row_Lo >= 0)
     {
 
@@ -1660,7 +1698,7 @@ bool Instance::loadDAEdFdx ()
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 01/05/06
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
 
   // If there are any time dependent parameters, set their values for
@@ -1677,12 +1715,12 @@ bool Model::processParams (string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 03/23/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1701,10 +1739,11 @@ bool Model::processInstanceParams(string param)
 // Creation Date : 01/05/06
 //-----------------------------------------------------------------------------
 
-Model::Model(const ModelBlock & MB,
-             SolverState & ss1,
-             DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1)
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block)
 
 {
 
@@ -1722,10 +1761,7 @@ Model::Model(const ModelBlock & MB,
   // calculate dependent (ie computed) params and check for errors:
   if (rload == 0)
   {
-    string msg("Zero load resistance in inputs");
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Zero load resistance in inputs";
   }
   gload = 1/rload;
 
@@ -1743,9 +1779,9 @@ Model::Model(const ModelBlock & MB,
 
 Model::~Model()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1765,27 +1801,93 @@ Model::~Model()
 
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i,isize;
 
   isize = instanceContainer.size();
-  os << endl;
-  os << "Number of digital instances: " << isize << endl;
-  os << "    name\t\tmodelName\tParameters" << endl;
+  os << std::endl;
+  os << "Number of digital instances: " << isize << std::endl;
+  os << "    name\t\tmodelName\tParameters" << std::endl;
 
   for (i = 0, iter = first; iter != last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new DeviceMaster<Traits>(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Instance::getDeviceLetter ()
+//
+// Purpose       : Returns first letter of device name string (basically U or Y).
+//                 Returns blank ("") if the function fails.
+//
+// Special Notes : 
+//
+// Scope         : public
+// Creator       : Pete Sholander
+// Creation Date : 03/11/14
+//-----------------------------------------------------------------------------
+std::string Instance::getDeviceLetter ()
+{
+  int p1 = getName().find_first_of('%');
+  std::string dev_letter = (p1 != std::string::npos) ? getName().substr(p1-1,1) : "";
+  return dev_letter;
+}
+
+void registerDevice()
+{
+  // NOT device is deprecated now
+  // removed .registerDevice("dltch", 1) since that device is still 
+  // under development
+  Config<Traits>::addConfiguration()
+    .registerDevice("inv", 1)
+    .registerDevice("not",1)
+    .registerDevice("and", 1)
+    .registerDevice("nand", 1)
+    .registerDevice("or", 1)
+    .registerDevice("nor", 1)
+    .registerDevice("add", 1)
+    .registerDevice("xor", 1)
+    .registerDevice("nxor", 1)
+    .registerDevice("dff", 1)
+    .registerDevice("buf", 1)
+    .registerModelType("dig", 1);
 }
 
 } // namespace Digital

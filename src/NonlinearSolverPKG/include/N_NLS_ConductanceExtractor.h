@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.11.6.2 $
+// Revision Number: $Revision: 1.18 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:47 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -47,19 +47,17 @@
 #define Xyce_N_NLS_ConductanceExtractor_h
 
 // ---------- Standard Includes ----------
-#include<vector>
+#include <vector>
+
 #include <Teuchos_RefCountPtr.hpp>
 using Teuchos::RefCountPtr;
 using Teuchos::rcp;
 
-// ----------   Xyce Includes   ----------
+#include <N_IO_fwd.h>
+
 #include <N_NLS_NonLinearSolver.h>
 
-// ---------- Forward Declarations ----------
-class N_TOP_Topology;
-class N_IO_CmdParse;
 class N_PDS_ParMap;
-class N_IO_PkgOptionsMgr;
 
 //-----------------------------------------------------------------------------
 // Class         : N_NLS_ConductanceExtractor
@@ -78,32 +76,32 @@ public:
   ~N_NLS_ConductanceExtractor ();
   
   bool extract ( 
-      const map<string,double> & inputMap,
-      vector<double> & outputVector,
-      vector< vector<double> > & jacobian );
+      const std::map<std::string,double> & inputMap,
+      std::vector<double> & outputVector,
+      std::vector< std::vector<double> > & jacobian );
   
   bool extract ( 
-      const string & isoName,
-      vector< vector<double> > & jacobian );
+      const std::string & isoName,
+      std::vector< std::vector<double> > & jacobian );
   
   
   bool setOptions(const N_UTL_OptionBlock& OB);
   
   // Method to register the package options manager
-  bool registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr );
+  bool registerPkgOptionsMgr( N_IO_PkgOptionsMgr *pkgOptPtr );
 
 protected:
 private:
-  bool setupIDs_( const map<string,double> & inputMap);
+  bool setupIDs_( const std::map<std::string,double> & inputMap);
   bool setup_dIdX_Vectors_();
   
-  bool setupISO2_IDs_(const string & isoName);
+  bool setupISO2_IDs_(const std::string & isoName);
   
   void printJacobian_ (
-     const map<string,double> & inputMap,
-     vector< vector<double> > & jacobian);
+     const std::map<std::string,double> & inputMap,
+     std::vector< std::vector<double> > & jacobian);
   
-  void printPetraObjects_ (const string & varName);
+  void printPetraObjects_ (const std::string & varName);
   
   struct N_NLS_ConductanceExtractor_OptionsReg : public N_IO_PkgOptionsReg
   {
@@ -124,21 +122,21 @@ private:
   int debugLevel_;
 
   // temporary stuff, for use with iso devices:
-  map<string, double> varMap_;
+  std::map<std::string, double> varMap_;
 
   // GID variables
   bool gidsSetUpFlag_;
-  vector<int> currentGIDs_;
-  vector<int> currentLIDs_;
-  vector<int> vsrcPosGIDs_;
-  vector<int> vsrcPosLIDs_;
+  std::vector<int> currentGIDs_;
+  std::vector<int> currentLIDs_;
+  std::vector<int> vsrcPosGIDs_;
+  std::vector<int> vsrcPosLIDs_;
 
   // package references:
   N_NLS_NonLinearSolver & nls_;
   N_TOP_Topology & top_;
   N_IO_CmdParse & commandLine_;
   // package options manager
-  RCP<N_IO_PkgOptionsMgr> pkgOptMgrPtr_;
+  N_IO_PkgOptionsMgr * pkgOptMgrPtr_;
   
   // linear system data:
   N_LAS_System  * lasSysPtr_;
@@ -152,7 +150,7 @@ private:
 
   N_LAS_Vector  * matrixDiagonalPtr_;
 
-  vector <N_LAS_Vector*> dIdxPtrVector_;
+  std::vector<N_LAS_Vector*> dIdxPtrVector_;
 
   N_LAS_Matrix  * jacobianMatrixPtr_;
   N_LAS_Vector  ** nextSolVectorPtrPtr_;

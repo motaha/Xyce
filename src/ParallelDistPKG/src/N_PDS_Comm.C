@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -39,44 +39,38 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.13.6.2 $
+// Revision Number: $Revision: 1.18 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
 #ifdef Xyce_PARALLEL_MPI
 #include <mpi.h>
 #endif
 
-// ----------   Xyce Includes   ----------
-
 #include <N_PDS_Comm.h>
 #include <N_ERH_ErrorMgr.h>
 
-// ----------  Other Includes   ----------
-
 #include <Epetra_Comm.h>
 
+namespace Xyce {
+namespace Parallel {
+
 //-----------------------------------------------------------------------------
-// Function      : N_PDS_Comm::N_PDS_Comm
+// Function      : Communicator::Communicator
 // Purpose       : Default constructor
 // Special Notes :
 // Scope         : Public
 // Creator       : Scott A. Hutchinson, SNL, Parallel Computational Sciences
 // Creation Date : 03/13/00
 //-----------------------------------------------------------------------------
-N_PDS_Comm::N_PDS_Comm()
-  :
-  commOwned_(true)
+Communicator::Communicator()
+  : commOwned_(true)
 {
-
   // Initialize
   isSerial_ = true;
 
@@ -102,14 +96,14 @@ N_PDS_Comm::N_PDS_Comm()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_PDS_Comm::~N_PDS_Comm
+// Function      : Communicator::~Communicator
 // Purpose       : Destructor
 // Special Notes : Virtual
 // Scope         : Public
 // Creator       : Scott A. Hutchinson, SNL, Parallel Computational Sciences
 // Creation Date : 03/13/00
 //-----------------------------------------------------------------------------
-N_PDS_Comm::~N_PDS_Comm()
+Communicator::~Communicator()
 {
   if( commOwned_ )
     if( libComm_ != NULL && libComm_ != 0 ) delete libComm_;
@@ -122,107 +116,109 @@ N_PDS_Comm::~N_PDS_Comm()
 #ifdef Xyce_PARALLEL_MPI
 
 //-----------------------------------------------------------------------------
-// Function      : N_PDS_Comm::scanSum
+// Function      : Communicator::scanSum
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 02/26/01
 //-----------------------------------------------------------------------------
-bool N_PDS_Comm::scanSum( double * vals, double * sums, int count ) const
+bool Communicator::scanSum( double * vals, double * sums, int count ) const
 {
   return ( libComm_->ScanSum( vals, sums, count ) == 0 );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_PDS_Comm::sumAll
+// Function      : Communicator::sumAll
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 02/26/01
 //-----------------------------------------------------------------------------
-bool N_PDS_Comm::sumAll( double * vals, double * sums, int count ) const
+bool Communicator::sumAll( double * vals, double * sums, int count ) const
 {
   return ( libComm_->SumAll( vals, sums, count ) == 0 );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_PDS_Comm::maxAll
+// Function      : Communicator::maxAll
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 02/26/01
 //-----------------------------------------------------------------------------
-bool N_PDS_Comm::maxAll( double * vals, double * maxs, int count ) const
+bool Communicator::maxAll( double * vals, double * maxs, int count ) const
 {
   return ( libComm_->MaxAll( vals, maxs, count ) == 0 );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_PDS_Comm::minAll
+// Function      : Communicator::minAll
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 02/26/01
 //-----------------------------------------------------------------------------
-bool N_PDS_Comm::minAll( double * vals, double * mins, int count ) const
+bool Communicator::minAll( double * vals, double * mins, int count ) const
 {
   return ( libComm_->MinAll( vals, maxs, count ) == 0 );
 }
 #endif
 
 //-----------------------------------------------------------------------------
-// Function      : N_PDS_Comm::scanSum
+// Function      : Communicator::scanSum
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/18/05
 //-----------------------------------------------------------------------------
-bool N_PDS_Comm::scanSum( int * vals, int * sums, int count ) const
+bool Communicator::scanSum( int * vals, int * sums, int count ) const
 {
   return ( libComm_->ScanSum( vals, sums, count ) == 0 );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_PDS_Comm::sumAll
+// Function      : Communicator::sumAll
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/18/05
 //-----------------------------------------------------------------------------
-bool N_PDS_Comm::sumAll( int * vals, int * sums, int count ) const
+bool Communicator::sumAll( int * vals, int * sums, int count ) const
 {
   return ( libComm_->SumAll( vals, sums, count ) == 0 );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_PDS_Comm::maxAll
+// Function      : Communicator::maxAll
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/18/05
 //-----------------------------------------------------------------------------
-bool N_PDS_Comm::maxAll( int * vals, int * maxs, int count ) const
+bool Communicator::maxAll( int * vals, int * maxs, int count ) const
 {
   return ( libComm_->MaxAll( vals, maxs, count ) == 0 );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_PDS_Comm::minAll
+// Function      : Communicator::minAll
 // Purpose       :
 // Special Notes :
 // Scope         : Public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/18/05
 //-----------------------------------------------------------------------------
-bool N_PDS_Comm::minAll( int * vals, int * mins, int count ) const
+bool Communicator::minAll( int * vals, int * mins, int count ) const
 {
   return ( libComm_->MinAll( vals, maxs, count ) == 0 );
 }
-#endif
+
+} // namespace Parallel
+} // namespace Xyce

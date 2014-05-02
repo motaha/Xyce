@@ -25,11 +25,6 @@
   package_include.h files from Trilinos
 */
 
-/* define if the STL cannot support member templates */
-#ifndef BAD_STL
-#cmakedefine BAD_STL
-#endif 
-
 /* Define to 1 if you have the <algorithm> header file. */
 #ifndef HAVE_ALGORITHM
 #cmakedefine HAVE_ALGORITHM
@@ -176,7 +171,8 @@
 #endif
 
 /* Define to 1 if you have the <limits.h> header file. */
-#ifndef HAVE_LIMITS_H #cmakedefine HAVE_LIMITS_H
+#ifndef HAVE_LIMITS_H 
+#cmakedefine HAVE_LIMITS_H
 #endif
 
 /* Define to 1 if you have the <math.h> header file. */
@@ -204,11 +200,6 @@
 #cmakedefine HAVE__ISNAN_AND__FINITE_SUPPORT
 #endif
 
-
-/* define if the compiler has numeric_limits<T> */
-#ifndef HAVE_NUMERIC_LIMITS
-#cmakedefine HAVE_NUMERIC_LIMITS
-#endif
 
 /* Define to 1 if you have the <ostream> header file. */
 #ifndef HAVE_OSTREAM

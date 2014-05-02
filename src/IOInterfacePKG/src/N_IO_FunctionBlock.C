@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.28.6.2 $
+// Revision Number: $Revision: 1.37 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:43 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -51,16 +51,7 @@
 #include <N_UTL_Misc.h>
 
 #include <iostream>
-
-#ifdef HAVE_ALGORITHM
 #include <algorithm>
-#else
-#ifdef HAVE_ALGO_H
-#include <algo.h>
-#else
-#error Must have either <algorithm> or <algo.h>!
-#endif
-#endif
 
 // ----------   Xyce Includes   ----------
 #include <N_IO_CircuitBlock.h>
@@ -70,17 +61,20 @@
 #include <N_UTL_Expression.h>
 #include <N_PDS_Comm.h>
 
+namespace Xyce {
+namespace IO {
+
 //-----------------------------------------------------------------------------
-// Function      : N_IO_FunctionBlock::N_IO_FunctionBlock
+// Function      : FunctionBlock::FunctionBlock
 // Purpose       : constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 12/26/2001
 //-----------------------------------------------------------------------------
-N_IO_FunctionBlock::N_IO_FunctionBlock(
-    string const& fileName,
-    vector<N_IO_SpiceSeparatedFieldTool::StringToken> const& parsedInputLine)
+FunctionBlock::FunctionBlock(
+    std::string const& fileName,
+    std::vector<N_IO_SpiceSeparatedFieldTool::StringToken> const& parsedInputLine)
 : netlistFileName_(fileName),
   parsedLine(parsedInputLine)
 {
@@ -89,22 +83,20 @@ N_IO_FunctionBlock::N_IO_FunctionBlock(
   len = parsedLine[parsedLine.size()-1].string_.size();
   if (parsedLine[parsedLine.size()-1].string_.substr(0,1) != "{" ||
       parsedLine[parsedLine.size()-1].string_.substr(len-1,1) != "}") {
-    string msg("In .func line for function: ");
-    msg += parsedLine[1].string_ + ", expression must be enclosed by curly braces\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-        netlistFileName_, parsedLine[0].lineNumber_);
+    Report::UserFatal0().at(netlistFileName_, parsedLine[0].lineNumber_)
+      << "In .func line for function: " << parsedLine[1].string_ << ", expression must be enclosed by curly braces";
   }
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_FunctionBlock::N_IO_FunctionBlock
+// Function       : FunctionBlock::FunctionBlock
 // Purpose        : copy constructor
 // Special Notes  : 
 // Scope          : public
 // Creator        : Lon Waters
 // Creation Date  : 02/26/2003
 //----------------------------------------------------------------------------
-N_IO_FunctionBlock::N_IO_FunctionBlock( N_IO_FunctionBlock const& rhsFB )
+FunctionBlock::FunctionBlock( FunctionBlock const& rhsFB )
   : netlistFileName_(rhsFB.netlistFileName_),
     parsedLine(rhsFB.parsedLine),
     functionName(rhsFB.functionName),
@@ -115,25 +107,25 @@ N_IO_FunctionBlock::N_IO_FunctionBlock( N_IO_FunctionBlock const& rhsFB )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_FunctionBlock::print
+// Function      : FunctionBlock::print
 // Purpose       : Output the details of a function block to standard out.
 // Special Notes :
 // Scope         : public
 // Creator       : Lon Waters, SNL
 // Creation Date : 12/26/2001
 //-----------------------------------------------------------------------------
-void N_IO_FunctionBlock::print()
+void FunctionBlock::print()
 {
-  cout << endl;
-  cout << "Function Information" << endl;
-  cout << "--------------------" << endl;
-  cout << "  name: " << functionName << endl;
-  cout << "  name and args: " << functionNameAndArgs << endl;
-  cout << "  body: " << functionBody << endl;
+  Xyce::dout() << std::endl
+               << "Function Information" << std::endl
+               << "--------------------" << std::endl
+               << "  name: " << functionName << std::endl
+               << "  name and args: " << functionNameAndArgs << std::endl
+               << "  body: " << functionBody << std::endl;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_FunctionBlock::extractData
+// Function      : FunctionBlock::extractData
 // Purpose       : Extract function data from parsed line formed from a
 //                 netlist .func statement.
 // Special Notes :
@@ -141,7 +133,7 @@ void N_IO_FunctionBlock::print()
 // Creator       : Lon Waters, SNL
 // Creation Date : 12/26/2001
 //-----------------------------------------------------------------------------
-bool N_IO_FunctionBlock::extractData()
+bool FunctionBlock::extractData()
 {
   ExtendedString ES1("");
 
@@ -158,10 +150,8 @@ bool N_IO_FunctionBlock::extractData()
   if ( (parsedLine[arg_start].string_ != "(") || 
        (parsedLine[arg_end].string_ != ")") )
   {
-    string msg(".FUNC argument list must be enclosed by parentheses");
-    msg += " in function " + functionName + "\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-        netlistFileName_, parsedLine[arg_start].lineNumber_);
+    Report::UserFatal0().at(netlistFileName_, parsedLine[arg_start].lineNumber_)
+      << ".FUNC argument list must be enclosed by parentheses in function " << functionName;
   }
 
   // Collect up the function name and arguments (with enclosing parentheses),
@@ -193,28 +183,28 @@ bool N_IO_FunctionBlock::extractData()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_FunctionBlock::instance
+// Function      : FunctionBlock::instance
 // Purpose       : implement packable
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-Packable * N_IO_FunctionBlock::instance() const
+Packable * FunctionBlock::instance() const
 {
-  return new N_IO_FunctionBlock();
+  return new FunctionBlock();
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_FunctionBlock::packedByteCount
+// Function      : FunctionBlock::packedByteCount
 // Purpose       : Counts bytes needed to pack block.
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-int N_IO_FunctionBlock::packedByteCount() const
+int FunctionBlock::packedByteCount() const
 {
   int byteCount = 0;
   int size, j;
@@ -256,14 +246,14 @@ int N_IO_FunctionBlock::packedByteCount() const
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_FunctionBlock::pack
+// Function      : FunctionBlock::pack
 // Purpose       : Packs function block into char buffer using MPI_PACK.
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_IO_FunctionBlock::pack( char * buf, int bsize, int & pos,
+void FunctionBlock::pack( char * buf, int bsize, int & pos,
  N_PDS_Comm * comm ) const
 {
   int size, length, j;
@@ -311,22 +301,21 @@ void N_IO_FunctionBlock::pack( char * buf, int bsize, int & pos,
 #ifdef Xyce_COUNT_PACKED_BYTES
   if (pos != predictedPos)
   {
-    string msg("Predicted pos does not match actual pos in N_IO_FunctionBlock::pack");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING, msg );
+    DevelFatal(*this, "FunctionBlock::pack") << "Predicted pos does not match actual pos";
   }
 #endif
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_FunctionBlock::unpack
+// Function      : FunctionBlock::unpack
 // Purpose       : Unpacks function block from char buffer using MPI_UNPACK.
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_IO_FunctionBlock::unpack( char * pB, int bsize, int & pos,
+void FunctionBlock::unpack( char * pB, int bsize, int & pos,
  N_PDS_Comm * comm)
 {
   int length, size, j;
@@ -342,12 +331,12 @@ void N_IO_FunctionBlock::unpack( char * pB, int bsize, int & pos,
 
   // unpack function name
   comm->unpack( pB, bsize, pos, &length, 1 );
-  functionName = string( ( pB + pos ), length );
+  functionName = std::string( ( pB + pos ), length );
   pos += length;
 
   // unpack function name and args
   comm->unpack( pB, bsize, pos, &length, 1 );
-  functionNameAndArgs = string( ( pB + pos ), length );
+  functionNameAndArgs = std::string( ( pB + pos ), length );
   pos += length;
 
   // unpack function args
@@ -355,18 +344,20 @@ void N_IO_FunctionBlock::unpack( char * pB, int bsize, int & pos,
   for( j = 0; j < size; ++j )
   {
     comm->unpack( pB, bsize, pos, &length, 1 );
-    functionArgs.push_back( string( ( pB + pos ), length ) );
+    functionArgs.push_back( std::string( ( pB + pos ), length ) );
     pos += length;
   }
 
   // unpack function body
   comm->unpack( pB, bsize, pos, &length, 1 );
-  functionBody = string( ( pB + pos ), length );
+  functionBody = std::string( ( pB + pos ), length );
   pos += length;
 
   // unpack netlistFileName
   comm->unpack( pB, bsize, pos, &length, 1 );
-  netlistFileName_ = string( ( pB + pos ), length );
+  netlistFileName_ = std::string( ( pB + pos ), length );
   pos += length;
 }
 
+} // namespace IO
+} // namespace Xyce

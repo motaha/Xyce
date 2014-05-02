@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -47,11 +47,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.42.2.2 $
+// Revision Number: $Revision: 1.54.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/25 22:30:31 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: dgbaur $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
@@ -65,6 +65,7 @@
 // ----------   Xyce Includes   ----------
 #include <N_DEV_2DPDE.h>
 #include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
 
 #include <N_DEV_DeviceOptions.h>
 #include <N_DEV_MatrixLoadData.h>
@@ -101,7 +102,7 @@ bool Instance::doSensMeshResize ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "In Instance::doSensMeshResize." << endl;
+    Xyce::dout() << "In Instance::doSensMeshResize." << std::endl;
   }
 #endif
 
@@ -135,13 +136,13 @@ bool Instance::doSensMeshResize ()
 
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "  x0           = " << scalingVars.x0 << endl;
-    cout << "  deviceWidth  = " << deviceWidth  << endl;
-    cout << "  old_width    = " << old_width    << endl;
-    cout << "  widthRatio   = " << widthRatio   << endl;
-    cout << "  deviceLength = " << deviceLength << endl;
-    cout << "  old_length   = " << old_length   << endl;
-    cout << "  lengthRatio  = " << lengthRatio  << endl;
+    Xyce::dout() << "  x0           = " << scalingVars.x0 << std::endl;
+    Xyce::dout() << "  deviceWidth  = " << deviceWidth  << std::endl;
+    Xyce::dout() << "  old_width    = " << old_width    << std::endl;
+    Xyce::dout() << "  widthRatio   = " << widthRatio   << std::endl;
+    Xyce::dout() << "  deviceLength = " << deviceLength << std::endl;
+    Xyce::dout() << "  old_length   = " << old_length   << std::endl;
+    Xyce::dout() << "  lengthRatio  = " << lengthRatio  << std::endl;
   }
 #endif
 
@@ -157,9 +158,9 @@ bool Instance::doSensMeshResize ()
   {
     for (int i=0;i<numMeshPoints;++i)
     {
-      cout << " x["<<i<<"] = " << xVec[i];
-      cout << " y["<<i<<"] = " << yVec[i];
-      cout << endl;
+      Xyce::dout() << " x["<<i<<"] = " << xVec[i];
+      Xyce::dout() << " y["<<i<<"] = " << yVec[i];
+      Xyce::dout() << std::endl;
     }
   }
 #endif
@@ -171,7 +172,7 @@ bool Instance::doSensMeshResize ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "Done with Instance::doSensMeshResize." << endl;
+    Xyce::dout() << "Done with Instance::doSensMeshResize." << std::endl;
   }
 #endif
 
@@ -235,9 +236,9 @@ bool Instance::setupMesh ()
   // First straighten out the electrode map, if it exists.
   // The electrode map is one of the arguments that need to be passed into
   // the "internal" mesh setup, so it has to be corrected first.
-  vector<DeviceInterfaceNode>::iterator first = dIVec.begin ();
-  vector<DeviceInterfaceNode>::iterator last  = dIVec.end   ();
-  vector<DeviceInterfaceNode>::iterator iterV;
+  std::vector<DeviceInterfaceNode>::iterator first = dIVec.begin ();
+  std::vector<DeviceInterfaceNode>::iterator last  = dIVec.end   ();
+  std::vector<DeviceInterfaceNode>::iterator iterV;
 
   if (!(electrodeMap.empty ()))
   {
@@ -252,7 +253,7 @@ bool Instance::setupMesh ()
       }
       else
       {
-        string msg = "Instance::doMeshBasedInitializations."
+        std::string msg = "Instance::doMeshBasedInitializations."
         "can't find " + iterV->nName + " in the electrode Map\n";
         N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
       }
@@ -261,14 +262,14 @@ bool Instance::setupMesh ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-       cout << "list of user-specified electrodes:" << endl;
-       map<string, PDE_2DElectrode*>::iterator mapIter;
-       map<string, PDE_2DElectrode*>::iterator mapStart = electrodeMap.begin();
-       map<string, PDE_2DElectrode*>::iterator mapEnd = electrodeMap.end();
+       Xyce::dout() << "list of user-specified electrodes:" << std::endl;
+       std::map<std::string, PDE_2DElectrode*>::iterator mapIter;
+       std::map<std::string, PDE_2DElectrode*>::iterator mapStart = electrodeMap.begin();
+       std::map<std::string, PDE_2DElectrode*>::iterator mapEnd = electrodeMap.end();
 
        // for ( mapIter = mapStart; mapIter != mapEnd; ++mapIter )
        // {
-       //  cout << *(mapIter->second);
+       //  Xyce::dout() << *(mapIter->second);
        // }
     }
 #endif
@@ -276,13 +277,11 @@ bool Instance::setupMesh ()
 
   ///////////////////////////////////////////////////////////////////
   // Allocate the mesh container.
-  meshContainerPtr = new PDE_2DMesh(devOptions, sgplotLevel);
+  meshContainerPtr = new PDE_2DMesh(getDeviceOptions(), sgplotLevel);
 
   if (!given("MESHFILE"))
   {
-    string msg = "Instance::doMeshBasedInitializations."
-    "no mesh file specified.  Setting meshfile=internal.msh\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_INFO_0,msg);
+    lout() << "No mesh file specified.  Setting meshfile=internal.msh\n" << std::endl;
   }
 
   ///////////////////////////////////////////////////////////////////
@@ -292,8 +291,8 @@ bool Instance::setupMesh ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << endl;
-      cout << "Reading mesh file..." << endl;
+      Xyce::dout() << std::endl;
+      Xyce::dout() << "Reading mesh file..." << std::endl;
     }
 #endif
     usingInternalMesh = false;
@@ -305,13 +304,13 @@ bool Instance::setupMesh ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << endl;
-      cout << "Generating internal mesh..." << endl;
+      Xyce::dout() << std::endl;
+      Xyce::dout() << "Generating internal mesh..." << std::endl;
     }
 #endif
     usingInternalMesh = true;
 
-    string outputMeshFileName = outputName + ".msh";
+    std::string outputMeshFileName = outputName + ".msh";
     meshContainerPtr->initializeInternalMesh
       (numMeshPointsX,
        numMeshPointsY,
@@ -332,11 +331,11 @@ bool Instance::setupMesh ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "\n";
-    cout << "Done setting up the mesh." << endl;
-    cout << "  numMeshPoints      = " << numMeshPoints << "\n";
-    cout << "  numMeshEdges       = " << numMeshEdges << "\n";
-    cout << "  numMeshCells       = " << numMeshCells << "\n";
+    Xyce::dout() << "\n";
+    Xyce::dout() << "Done setting up the mesh." << std::endl;
+    Xyce::dout() << "  numMeshPoints      = " << numMeshPoints << "\n";
+    Xyce::dout() << "  numMeshEdges       = " << numMeshEdges << "\n";
+    Xyce::dout() << "  numMeshCells       = " << numMeshCells << "\n";
 
     //cout << "  Vbi                = " << Vbi << "\n";
     //cout << "  Na                 = " << Na << "\n";
@@ -344,8 +343,8 @@ bool Instance::setupMesh ()
     //cout << "  gradedJunctionFlag = " << gradedJunctionFlag << "\n";
     //cout << "  displCurrentFlag   = " << displCurrentFlag << "\n";
     //cout << "  junction width(WJ) = " << WJ << "\n";
-    //cout << "  deviceWidth        = " << deviceWidth << endl;
-    //cout << "  deviceLength       = " << deviceLength << endl;
+    //cout << "  deviceWidth        = " << deviceWidth << std::endl;
+    //cout << "  deviceLength       = " << deviceLength << std::endl;
   }
 #endif
 
@@ -368,9 +367,9 @@ bool Instance::setupDINodes ()
 {
   bool bsuccess = true;
 
-  vector<DeviceInterfaceNode>::iterator first = dIVec.begin ();
-  vector<DeviceInterfaceNode>::iterator last  = dIVec.end   ();
-  vector<DeviceInterfaceNode>::iterator iterV;
+  std::vector<DeviceInterfaceNode>::iterator first = dIVec.begin ();
+  std::vector<DeviceInterfaceNode>::iterator last  = dIVec.end   ();
+  std::vector<DeviceInterfaceNode>::iterator iterV;
 
   // loop through the boundary condition name vector and
   // check if it matches the boundary conditions given in the mesh file.
@@ -391,7 +390,7 @@ bool Instance::setupDINodes ()
       if ( !(edgeLabelExist) )
       {
         meshContainerPtr->printLabels ();
-        string msg = "Instance::setupDINodes: "
+        std::string msg = "Instance::setupDINodes: "
        "The boundary condition label "+tmpName+
        " doesn't exist in the mesh file.\n";
         N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
@@ -406,7 +405,7 @@ bool Instance::setupDINodes ()
       {
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 0)
-          cout << "Erasing DI: " << iterV->eName << endl;
+          Xyce::dout() << "Erasing DI: " << iterV->eName << std::endl;
 #endif
         dIVec.erase (iterV);
       }
@@ -433,20 +432,20 @@ bool Instance::setupDINodes ()
       }
       else
       {
-        string msg = "Instance::doMeshBasedInitializations."
+        std::string msg = "Instance::doMeshBasedInitializations."
         "can't find " + iterV->nName + " in the electrode Map\n";
         N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
       }
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0)
       {
-        cout << endl;
-        cout << "name = " << iterV->eName << endl;
-        cout << " material = " << iterV->material << endl;
-        cout << " mat. given = " << iterV->materialGiven << endl;
-        cout << " oxide boundary flag = " << iterV->oxideBndryFlag << endl;
-        cout << " oxide thickness = " << iterV->oxthick << endl;
-        cout << " oxide charge = " << iterV->oxcharge << endl;
+        Xyce::dout() << std::endl;
+        Xyce::dout() << "name = " << iterV->eName << std::endl;
+        Xyce::dout() << " material = " << iterV->material << std::endl;
+        Xyce::dout() << " mat. given = " << iterV->materialGiven << std::endl;
+        Xyce::dout() << " oxide boundary flag = " << iterV->oxideBndryFlag << std::endl;
+        Xyce::dout() << " oxide thickness = " << iterV->oxthick << std::endl;
+        Xyce::dout() << " oxide charge = " << iterV->oxcharge << std::endl;
       }
 #endif
     }
@@ -463,7 +462,7 @@ bool Instance::setupDINodes ()
 
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
-      cout << "Testing the neumann stuff.  Name = " << tmpName << endl;
+      Xyce::dout() << "Testing the neumann stuff.  Name = " << tmpName << std::endl;
 #endif
 
     if ( tmpBCmap.find(tmpName) != tmpBCmap.end () )
@@ -485,10 +484,10 @@ bool Instance::setupDINodes ()
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0)
       {
-        cout << "Setting the neumann flags of " << tmpName << ":\n";
-        cout << "  Vflag = " << iterV->neumannBCFlagV << endl;
-        cout << "  Nflag = " << iterV->neumannBCFlagN << endl;
-        cout << "  Pflag = " << iterV->neumannBCFlagP << endl;
+        Xyce::dout() << "Setting the neumann flags of " << tmpName << ":\n";
+        Xyce::dout() << "  Vflag = " << iterV->neumannBCFlagV << std::endl;
+        Xyce::dout() << "  Nflag = " << iterV->neumannBCFlagN << std::endl;
+        Xyce::dout() << "  Pflag = " << iterV->neumannBCFlagP << std::endl;
       }
 #endif
     }
@@ -499,20 +498,20 @@ bool Instance::setupDINodes ()
   {
     first = dIVec.begin ();
     last  = dIVec.end   ();
-    cout << "Final DI list: " << endl;
+    Xyce::dout() << "Final DI list: " << std::endl;
     for (iterV=first;iterV!=last; ++iterV)
     {
-      cout << "DI name:" << iterV->eName;
-      cout << "  The neumann flags are:" << endl;
-      cout << "  Vflag =";
-      if (iterV->neumannBCFlagV) cout <<" true." << endl;
-      else                       cout <<" false." << endl;
-      cout << "  Nflag =";
-      if (iterV->neumannBCFlagN) cout <<" true." << endl;
-      else                       cout <<" false." << endl;
-      cout << "  Pflag =";
-      if (iterV->neumannBCFlagP) cout <<" true." << endl;
-      else                       cout <<" false." << endl;
+      Xyce::dout() << "DI name:" << iterV->eName;
+      Xyce::dout() << "  The neumann flags are:" << std::endl;
+      Xyce::dout() << "  Vflag =";
+      if (iterV->neumannBCFlagV) Xyce::dout() <<" true." << std::endl;
+      else                       Xyce::dout() <<" false." << std::endl;
+      Xyce::dout() << "  Nflag =";
+      if (iterV->neumannBCFlagN) Xyce::dout() <<" true." << std::endl;
+      else                       Xyce::dout() <<" false." << std::endl;
+      Xyce::dout() << "  Pflag =";
+      if (iterV->neumannBCFlagP) Xyce::dout() <<" true." << std::endl;
+      else                       Xyce::dout() <<" false." << std::endl;
     }
   }
 #endif
@@ -551,9 +550,9 @@ bool Instance::doAllocations ()
   {
     for (int i=0;i<numMeshPoints;++i)
     {
-      cout << " x["<<i<<"] = " << xVec[i];
-      cout << " y["<<i<<"] = " << yVec[i];
-      cout << endl;
+      Xyce::dout() << " x["<<i<<"] = " << xVec[i];
+      Xyce::dout() << " y["<<i<<"] = " << yVec[i];
+      Xyce::dout() << std::endl;
     }
   }
 #endif
@@ -632,9 +631,9 @@ bool Instance::doAllocations ()
   labelNameVector.reserve(numMeshPoints);
 
   // allocate the boundary condition arrays:
-  vector<DeviceInterfaceNode>::iterator first = dIVec.begin ();
-  vector<DeviceInterfaceNode>::iterator last  = dIVec.end   ();
-  vector<DeviceInterfaceNode>::iterator iterV;
+  std::vector<DeviceInterfaceNode>::iterator first = dIVec.begin ();
+  std::vector<DeviceInterfaceNode>::iterator last  = dIVec.end   ();
+  std::vector<DeviceInterfaceNode>::iterator iterV;
 
   for (iterV=first;iterV!=last; ++iterV)
   {
@@ -738,9 +737,9 @@ bool Instance::setupLabelIndex ()
   // the current region label.
 
   int i;
-  vector<int>::iterator firstL;
-  vector<int>::iterator lastL;
-  vector<int>::iterator iterL;
+  std::vector<int>::iterator firstL;
+  std::vector<int>::iterator lastL;
+  std::vector<int>::iterator iterL;
 
   for (i=0;i<numMeshLabels;++i)
   {
@@ -787,33 +786,30 @@ bool Instance::setupLabelIndex ()
   }
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
 
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << dashedline << endl;
-    cout << "In the Intance::setupLabelIndex ";
-    cout << "  name = "<< getName() <<endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "In the Intance::setupLabelIndex ";
+    Xyce::dout() << "  name = "<< getName() << std::endl;
 
 #if 0
-    vector<string>::iterator firstM = labelNameVector.begin();
-    vector<string>::iterator lastM  = labelNameVector.end ();
-    vector<string>::iterator iterM;
+    std::vector<std::string>::iterator firstM = labelNameVector.begin();
+    std::vector<std::string>::iterator lastM  = labelNameVector.end ();
+    std::vector<std::string>::iterator iterM;
 
     for (i=0, iterM=firstM;iterM!=lastM;++i,++iterM)
     {
-      cout << "  i = "<<i<<" name = " << *iterM << endl;
+      Xyce::dout() << "  i = "<<i<<" name = " << *iterM << std::endl;
     }
 #endif
-    map<string,int>::iterator firstDIM = labelDIMap.begin ();
-    map<string,int>::iterator lastDIM  = labelDIMap.end ();
-    map<string,int>::iterator iterDIM;
+    std::map<std::string,int>::iterator firstDIM = labelDIMap.begin ();
+    std::map<std::string,int>::iterator lastDIM  = labelDIMap.end ();
+    std::map<std::string,int>::iterator iterDIM;
     for(iterDIM=firstDIM;iterDIM!=lastDIM;++iterDIM)
     {
-      cout << " DI index = "<< iterDIM->second;
-      cout << "  name = " << iterDIM->first << endl;
+      Xyce::dout() << " DI index = "<< iterDIM->second;
+      Xyce::dout() << "  name = " << iterDIM->first << std::endl;
     }
   }
 
@@ -822,14 +818,14 @@ bool Instance::setupLabelIndex ()
     for (i=0;i<numMeshPoints;++i)
     {
       mLabel * labelPtr = meshContainerPtr->getLabel(labelIndex[i]);
-      cout << "  labelIndex["<<i<<"] = " << labelIndex[i];
-      cout << "  name = " << labelPtr->name <<endl;
+      Xyce::dout() << "  labelIndex["<<i<<"] = " << labelIndex[i];
+      Xyce::dout() << "  name = " << labelPtr->name << std::endl;
     }
   }
 
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 
 #endif
@@ -865,14 +861,14 @@ bool Instance::setupLabelIndex ()
 //-----------------------------------------------------------------------------
 bool Instance::setupBoundaryStencil ()
 {
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end  ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end  ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "In Instance::setupBoundaryStencil." << endl;
+    Xyce::dout() << "In Instance::setupBoundaryStencil." << std::endl;
   }
 #endif
 
@@ -887,9 +883,9 @@ bool Instance::setupBoundaryStencil ()
 
      mLabel * labelPtr = meshContainerPtr->getLabel(iterDI->eName);
 
-     vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
-     vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
-     vector<int>::iterator iterI;
+     std::vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
+     std::vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
+     std::vector<int>::iterator iterI;
 
      for(iterI=firstI;iterI!=lastI;++iterI)
      {
@@ -932,7 +928,7 @@ bool Instance::checkForElectrodeOverlap ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "In Instance::checkForElectrodeOverlap." << endl;
+    Xyce::dout() << "In Instance::checkForElectrodeOverlap." << std::endl;
   }
 #endif
 
@@ -946,9 +942,9 @@ bool Instance::checkForElectrodeOverlap ()
 
      mLabel * labelPtr = meshContainerPtr->getLabel(dIVec[iDI].eName);
 
-     vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
-     vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
-     vector<int>::iterator iterI;
+     std::vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
+     std::vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
+     std::vector<int>::iterator iterI;
 
      for(iterI=firstI;iterI!=lastI;++iterI)
      {
@@ -956,7 +952,7 @@ bool Instance::checkForElectrodeOverlap ()
 
        if (boundaryTest[nodeIndex] != 0)
        {
-         string msg = "Electrodes " + dIVec[iDI].eName + " and " +
+         std::string msg = "Electrodes " + dIVec[iDI].eName + " and " +
        	 dIVec[boundaryTest[nodeIndex]-1].eName + " overlap";
          N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
        }
@@ -1002,9 +998,9 @@ bool Instance::setupNumVars ()
   // (If all BC are dirichlet, then *3, for each equation).
   numInterfaceMeshPoints = 0;
 
-  vector<DeviceInterfaceNode>::iterator first = dIVec.begin ();
-  vector<DeviceInterfaceNode>::iterator last  = dIVec.end   ();
-  vector<DeviceInterfaceNode>::iterator iterV;
+  std::vector<DeviceInterfaceNode>::iterator first = dIVec.begin ();
+  std::vector<DeviceInterfaceNode>::iterator last  = dIVec.end   ();
+  std::vector<DeviceInterfaceNode>::iterator iterV;
   for (iterV=first;iterV!=last; ++iterV)
   {
     mLabel * labelPtr = meshContainerPtr->getLabel(iterV->eName);
@@ -1012,10 +1008,10 @@ bool Instance::setupNumVars ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << iterV->eName;
-      cout << ":  numInterfaceMeshPoints = ";
-      cout << labelPtr->mNodeVector.size ();
-      cout << endl;
+      Xyce::dout() << iterV->eName;
+      Xyce::dout() << ":  numInterfaceMeshPoints = ";
+      Xyce::dout() << labelPtr->mNodeVector.size ();
+      Xyce::dout() << std::endl;
     }
 #endif
   }
@@ -1042,15 +1038,15 @@ bool Instance::setupNumVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "\n";
-    cout << " numInterfaceMeshPoints   = " << numInterfaceMeshPoints<<endl;
-    cout << " numMeshPoints            = " << numMeshPoints<<endl;
-    cout << " numElectrodes            = " << numElectrodes<<endl;
-    cout << " numIntVars               = " << numIntVars<<endl;
-    cout << " 3*numMeshPoints          = " << 3*numMeshPoints<<endl;
-    cout << " 3*numInterfaceMeshPoints = "<<3*numInterfaceMeshPoints<<endl;
-    cout << " totalDirchlet            = " << totalDirchlet<<endl;
-    cout << endl;
+    Xyce::dout() << "\n";
+    Xyce::dout() << " numInterfaceMeshPoints   = " << numInterfaceMeshPoints<< std::endl;
+    Xyce::dout() << " numMeshPoints            = " << numMeshPoints<< std::endl;
+    Xyce::dout() << " numElectrodes            = " << numElectrodes<< std::endl;
+    Xyce::dout() << " numIntVars               = " << numIntVars<< std::endl;
+    Xyce::dout() << " 3*numMeshPoints          = " << 3*numMeshPoints<< std::endl;
+    Xyce::dout() << " 3*numInterfaceMeshPoints = "<<3*numInterfaceMeshPoints<< std::endl;
+    Xyce::dout() << " totalDirchlet            = " << totalDirchlet<< std::endl;
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -1075,9 +1071,9 @@ bool Instance::setupNumVars ()
 //-----------------------------------------------------------------------------
 bool Instance::allocatePDTerms ()
 {
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end  ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end  ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
   // now do dIdX.
   for(iterDI=firstDI;iterDI!=lastDI;++iterDI)
   {
@@ -1086,13 +1082,13 @@ bool Instance::allocatePDTerms ()
     // obtain the node indices for the current label, loop over them.
     // for each edge node, add an extra column entry to the colarray.
 
-    vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
-    vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
-    vector<int>::iterator iterI;
+    std::vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
+    std::vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
+    std::vector<int>::iterator iterI;
 
-    vector<EDGEINFO>::iterator firstEI;
-    vector<EDGEINFO>::iterator lastEI;
-    vector<EDGEINFO>::iterator iterEI;
+    std::vector<EDGEINFO>::iterator firstEI;
+    std::vector<EDGEINFO>::iterator lastEI;
+    std::vector<EDGEINFO>::iterator iterEI;
 
     int cnt2  = 0;
     int nodeIndex;
@@ -1311,19 +1307,19 @@ bool Instance::allocatePDTerms ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << endl;
-      cout << "number of neighbor nodes for " << iterDI->eName;
-      cout << " is " << size1 << endl;
+      Xyce::dout() << std::endl;
+      Xyce::dout() << "number of neighbor nodes for " << iterDI->eName;
+      Xyce::dout() << " is " << size1 << std::endl;
       int  i;
       for (i=0;i<size1;++i)
       {
-        cout << "neighborNodes["<<i<<"] = " << iterDI->neighborNodes[i] << endl;
+        Xyce::dout() << "neighborNodes["<<i<<"] = " << iterDI->neighborNodes[i] << std::endl;
       }
-      cout << endl;
-      cout << "dIdX size for " << iterDI->eName << "  is " << size3 << endl;
+      Xyce::dout() << std::endl;
+      Xyce::dout() << "dIdX size for " << iterDI->eName << "  is " << size3 << std::endl;
       for (i=0;i<size3;++i)
       {
-        cout << "dIdX["<<i<<"] = " << iterDI->dIdXcols[i] << endl;
+        Xyce::dout() << "dIdX["<<i<<"] = " << iterDI->dIdXcols[i] << std::endl;
       }
     }
 #endif
@@ -1359,13 +1355,12 @@ bool Instance::allocatePDTerms ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << iterDI->eName << ": size of dFdVckt = " << dFdVindex << endl;
+      Xyce::dout() << iterDI->eName << ": size of dFdVckt = " << dFdVindex << std::endl;
     }
 #endif
 
 #else
-    string msg = "NEW_BC must be turned on to use TWO_LEVEL_NEWTON";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_WARNING_0,msg);
+    UserWarning0(*this) << "NEW_BC must be turned on to use TWO_LEVEL_NEWTON";
 #endif // Xyce_NEW_BC
 
   }  // end of DI loop
@@ -1399,22 +1394,20 @@ bool Instance::setupBCEdgeAreas ()
 {
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline="--------------------------------------------------"
-    "---------------------------";
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
-    cout << "setupBCEdgeAreas.  name = " << getName() << endl;
-    cout.setf(ios::scientific);
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "setupBCEdgeAreas.  name = " << getName() << std::endl;
+    Xyce::dout().setf(std::ios::scientific);
   }
 #endif
 
   // now set up the local areas for needed to interface device boundary
   // conditions to the circuit
 
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end  ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end  ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
   for (iterDI = firstDI; iterDI!=lastDI; ++iterDI)
   {
@@ -1424,9 +1417,9 @@ bool Instance::setupBCEdgeAreas ()
 
      mLabel * labelPtr = meshContainerPtr->getLabel(iterDI->eName);
 
-     vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
-     vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
-     vector<int>::iterator iterI;
+     std::vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
+     std::vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
+     std::vector<int>::iterator iterI;
 
      iterDI->area       = 0.0;  // total area for the edge.
 
@@ -1435,9 +1428,9 @@ bool Instance::setupBCEdgeAreas ()
        // loop over neighbor nodes/edges to get area sum for this node.
        mNode * nodePtr = meshContainerPtr->getNode(*iterI);
 
-       vector<EDGEINFO>::iterator firstEI = nodePtr->edgeInfoVector.begin();
-       vector<EDGEINFO>::iterator lastEI  = nodePtr->edgeInfoVector.end  ();
-       vector<EDGEINFO>::iterator iterEI;
+       std::vector<EDGEINFO>::iterator firstEI = nodePtr->edgeInfoVector.begin();
+       std::vector<EDGEINFO>::iterator lastEI  = nodePtr->edgeInfoVector.end  ();
+       std::vector<EDGEINFO>::iterator iterEI;
 
        double areaLocal = 0.0; // total "area" for the this node
        double areaTmp   = 0.0; // partial area for the this node(from one edge)
@@ -1445,9 +1438,9 @@ bool Instance::setupBCEdgeAreas ()
 #ifdef Xyce_DEBUG_DEVICE
        if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
        {
-         cout << " --------------- " << endl;
-         cout << "name = " << iterDI->eName;
-         cout << "  node      = " << *iterI <<endl;
+         Xyce::dout() << " --------------- " << std::endl;
+         Xyce::dout() << "name = " << iterDI->eName;
+         Xyce::dout() << "  node      = " << *iterI << std::endl;
        }
 #endif
 
@@ -1494,13 +1487,13 @@ bool Instance::setupBCEdgeAreas ()
 #ifdef Xyce_DEBUG_DEVICE
          if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
          {
-           cout << "  neighbor node   = " << neighbor <<endl;
-           cout << "  areaTmp         = " << areaTmp <<endl;
-           cout << "  areaLocal       = " << areaLocal << endl;
-           cout << "  elen            = " << iterEI->elen << endl;
-           cout << "  label name      = " << labelPtr->name << endl;
-           cout << "  DI eName        = " << iterDI->eName << endl;
-           cout << "---" << endl;
+           Xyce::dout() << "  neighbor node   = " << neighbor << std::endl;
+           Xyce::dout() << "  areaTmp         = " << areaTmp << std::endl;
+           Xyce::dout() << "  areaLocal       = " << areaLocal << std::endl;
+           Xyce::dout() << "  elen            = " << iterEI->elen << std::endl;
+           Xyce::dout() << "  label name      = " << labelPtr->name << std::endl;
+           Xyce::dout() << "  DI eName        = " << iterDI->eName << std::endl;
+           Xyce::dout() << "---" << std::endl;
          }
 #endif
        }
@@ -1508,7 +1501,7 @@ bool Instance::setupBCEdgeAreas ()
 #ifdef Xyce_DEBUG_DEVICE
        if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
        {
-         cout << " --------------- " << endl;
+         Xyce::dout() << " --------------- " << std::endl;
        }
 #endif
        iterDI->area += areaLocal;
@@ -1520,8 +1513,8 @@ bool Instance::setupBCEdgeAreas ()
 #ifdef Xyce_DEBUG_DEVICE
      if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout.setf(ios::scientific);
-      cout << "  Total area for edge: " << iterDI->area << endl;
+      Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << "  Total area for edge: " << iterDI->area << std::endl;
     }
 #endif
   }  // iterDI loop.
@@ -1529,7 +1522,7 @@ bool Instance::setupBCEdgeAreas ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline << "\n";
+    Xyce::dout() << section_divider << "\n";
   }
 #endif
   return true;
@@ -1553,9 +1546,9 @@ bool Instance::setupMinDXVector ()
     // loop over neighbor nodes/edges to get area sum for this node.
     mNode * nodePtr = meshContainerPtr->getNode(i);
 
-    vector<EDGEINFO>::iterator firstEI = nodePtr->edgeInfoVector.begin();
-    vector<EDGEINFO>::iterator lastEI  = nodePtr->edgeInfoVector.end  ();
-    vector<EDGEINFO>::iterator iterEI;
+    std::vector<EDGEINFO>::iterator firstEI = nodePtr->edgeInfoVector.begin();
+    std::vector<EDGEINFO>::iterator lastEI  = nodePtr->edgeInfoVector.end  ();
+    std::vector<EDGEINFO>::iterator iterEI;
 
     double tmpDX = +1.0e99;
     for (iterEI=firstEI;iterEI!=lastEI;++iterEI)
@@ -1565,7 +1558,7 @@ bool Instance::setupMinDXVector ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 2)
     {
-      cout << "i = " << i << "   minDX = " << tmpDX; cout << endl;
+      Xyce::dout() << "i = " << i << "   minDX = " << tmpDX; Xyce::dout() << std::endl;
     }
 #endif
     minDXVec[i] = tmpDX;
@@ -1601,9 +1594,9 @@ bool Instance::setupJacStamp ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "In Instance::setupJacStamp" << endl;
-    cout << "numIntVars = " << numIntVars << endl;
-    cout << "numMeshPoints = " << numMeshPoints << endl;
+    Xyce::dout() << "In Instance::setupJacStamp" << std::endl;
+    Xyce::dout() << "numIntVars = " << numIntVars << std::endl;
+    Xyce::dout() << "numMeshPoints = " << numMeshPoints << std::endl;
   }
 #endif
 
@@ -1627,7 +1620,7 @@ bool Instance::setupJacStamp ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "size of jacStamp = " << jacStamp.size() << endl;
+    Xyce::dout() << "size of jacStamp = " << jacStamp.size() << std::endl;
   }
 #endif
 
@@ -1659,9 +1652,9 @@ bool Instance::setupJacStamp ()
   /////////////////////////////////////////////////////////////////////////
   // Do the external variables first:
   // Loop over the boundary condition "device interface" labels.
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end  ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end  ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
   int DIsize = dIVec.size ();
   firstDI = dIVec.begin();
   lastDI  = dIVec.end  ();
@@ -1699,13 +1692,13 @@ bool Instance::setupJacStamp ()
      // for each edge node, add an extra column entry to the colarray,
      // which corresponds to the global ID of the connected ckt node.
 
-     vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
-     vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
-     vector<int>::iterator iterI;
+     std::vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
+     std::vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
+     std::vector<int>::iterator iterI;
 
-     vector<EDGEINFO>::iterator firstEI;
-     vector<EDGEINFO>::iterator lastEI;
-     vector<EDGEINFO>::iterator iterEI;
+     std::vector<EDGEINFO>::iterator firstEI;
+     std::vector<EDGEINFO>::iterator lastEI;
+     std::vector<EDGEINFO>::iterator iterEI;
 
      int imesh;
 
@@ -1780,14 +1773,14 @@ bool Instance::setupJacStamp ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << "  mesh point i = " << i << endl;
+      Xyce::dout() << "  mesh point i = " << i << std::endl;
     }
 #endif
 
     mNode * nodePtr = meshContainerPtr->getNode(i);
-    vector<EDGEINFO>::iterator firstEI = nodePtr->edgeInfoVector.begin ();
-    vector<EDGEINFO>::iterator lastEI  = nodePtr->edgeInfoVector.end   ();
-    vector<EDGEINFO>::iterator iterEI;
+    std::vector<EDGEINFO>::iterator firstEI = nodePtr->edgeInfoVector.begin ();
+    std::vector<EDGEINFO>::iterator lastEI  = nodePtr->edgeInfoVector.end   ();
+    std::vector<EDGEINFO>::iterator iterEI;
 
     // get the temporary LID row indices:
     int Vrow = MESHtoLID_V[i];
@@ -1797,9 +1790,9 @@ bool Instance::setupJacStamp ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << "  Vrow = " << Vrow << endl;
-      cout << "  Nrow = " << Nrow << endl;
-      cout << "  Prow = " << Prow << endl;
+      Xyce::dout() << "  Vrow = " << Vrow << std::endl;
+      Xyce::dout() << "  Nrow = " << Nrow << std::endl;
+      Xyce::dout() << "  Prow = " << Prow << std::endl;
     }
 #endif
 
@@ -1951,9 +1944,9 @@ bool Instance::setupJacStamp ()
      // for each edge node, add an extra column entry to the colarray,
      // which corresponds to the global ID of the connected ckt node.
 
-     vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
-     vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
-     vector<int>::iterator iterI;
+     std::vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
+     std::vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
+     std::vector<int>::iterator iterI;
 
      // For the "new" boundary conditions, this step isn't neccessary,
      // as the boundary nodes no longer have any dependent variables.
@@ -1974,15 +1967,15 @@ bool Instance::setupJacStamp ()
     int irow, icol;
     for(irow=0;irow<jacStamp.size();++irow)
     {
-      cout << "irow = " << irow;
+      Xyce::dout() << "irow = " << irow;
       if (irow < dIVec.size())
-        cout << "  " << dIVec[irow].eName << "  KCL";
-      cout << endl;
+        Xyce::dout() << "  " << dIVec[irow].eName << "  KCL";
+      Xyce::dout() << std::endl;
       for (icol=0;icol<jacStamp[irow].size();++icol)
       {
         int jsTmp = jacStamp[irow][icol];
-        cout << "   jacStamp["<<irow<<"]["<<icol<<"] = "<<jsTmp;
-        cout << endl;
+        Xyce::dout() << "   jacStamp["<<irow<<"]["<<icol<<"] = "<<jsTmp;
+        Xyce::dout() << std::endl;
       }
     }
   }
@@ -2000,48 +1993,23 @@ bool Instance::setupJacStamp ()
 // Creation Date : 11/14/01
 //-----------------------------------------------------------------------------
 void Instance::registerGIDs(
-  const list<index_pair> & intGIDListRef,
-  const list<index_pair> & extGIDListRef)
+  const std::list<index_pair> & intGIDListRef,
+  const std::list<index_pair> & extGIDListRef)
 {
-  string msg;
-  string tmpstr;
-
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << dashedline << endl;
-    cout << "In the Intance::registerGIDs function.  ";
-    cout << "  name = "<< getName() <<endl;
-  }
-#endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intGIDListRef.size();
-  int numExt = extGIDListRef.size();
+  AssertLIDs(intGIDListRef.size() == numIntVars);
+//  AssertLIDs(extGIDListRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "numInt = " << numInt <<"\n";
-    cout << "numExt = " << numExt <<"\n";
-    cout << "numMeshPoints = " << numMeshPoints << "\n";
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "In the Instance::registerGIDs function.  ";
+    Xyce::dout() << "  name = "<< getName() << std::endl;
+    Xyce::dout() << "numInt = " << numIntVars <<"\n";
+    Xyce::dout() << "numExt = " << numExtVars <<"\n";
+    Xyce::dout() << "numMeshPoints = " << numMeshPoints << "\n";
   }
 #endif
-
-  // number of internal variables equals the number of
-  // mesh points *3.
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerGIDs:";
-    msg += "numInt != 3*numMeshPoints.  ";
-    msg += "Check the metadata in the parser\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
-  }
 
   // copy over the global ID lists:
   intGIDList.assign(intGIDListRef.begin(), intGIDListRef.end());
@@ -2051,18 +2019,18 @@ void Instance::registerGIDs(
 
   // First do the external variables:
   // These will all be voltage nodes connected to the devices.
-  list<index_pair>::iterator it1 = extGIDList.begin();
+  std::list<index_pair>::iterator it1 = extGIDList.begin();
 
-  list<index_pair>::iterator first = extGIDList.begin();
-  list<index_pair>::iterator last  = extGIDList.end  ();
-  list<index_pair>::iterator iter;
+  std::list<index_pair>::iterator first = extGIDList.begin();
+  std::list<index_pair>::iterator last  = extGIDList.end  ();
+  std::list<index_pair>::iterator iter;
   int index;
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "Setting up the indices for the external circuit nodes:" << endl;
-    cout << "External node list:" << endl;
+    Xyce::dout() << "Setting up the indices for the external circuit nodes:" << std::endl;
+    Xyce::dout() << "External node list:" << std::endl;
   }
 #endif
 
@@ -2077,20 +2045,20 @@ void Instance::registerGIDs(
 #ifdef Xyce_DEBUG_DEVICE
      if (getDeviceOptions().debugLevel > 0)
     {
-      cout << "node = " << iter->row << " col = ";
-      cout << iter->col << "  numExtNodes = " << numExtNodes << endl;
+      Xyce::dout() << "node = " << iter->row << " col = ";
+      Xyce::dout() << iter->col << "  numExtNodes = " << numExtNodes << std::endl;
     }
 #endif
   }
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
-    cout << " number of owned external nodes = " << numExtNodes << endl;
+    Xyce::dout() << " number of owned external nodes = " << numExtNodes << std::endl;
 #endif
 
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end  ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end  ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
   int numRealDIs = 0;
   for(iterDI=firstDI;iterDI!=lastDI;++iterDI)
   {
@@ -2100,16 +2068,15 @@ void Instance::registerGIDs(
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << " number of user specified boundary conditions = ";
-    cout << numRealDIs << endl;
+    Xyce::dout() << " number of user specified boundary conditions = ";
+    Xyce::dout() << numRealDIs << std::endl;
   }
 #endif
 
   if (numRealDIs < numExtNodes)
   {
-    msg = "Instance::registerGIDs:";
-    msg += "number of boundary conditions < number of external nodes";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
+    DevelFatal(*this).in("Instance::registerGIDs")
+      << "Number of boundary conditions < number of external nodes";
   }
 
   int isizeDI = dIVec.size();
@@ -2122,16 +2089,16 @@ void Instance::registerGIDs(
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << "   name = "<<dIVec[index].eName<<" gid = ";
-      cout << dIVec[index].gid;
-      cout << endl;
+      Xyce::dout() << "   name = "<<dIVec[index].eName<<" gid = ";
+      Xyce::dout() << dIVec[index].gid;
+      Xyce::dout() << std::endl;
     }
 #endif
 
     // Obtain the node index for the first node of the current label.
     // Note: This particular attribute may be obsolete...
     mLabel * labelPtr = meshContainerPtr->getLabel(dIVec[index].eName);
-    vector<int>::iterator iterTmp = labelPtr->mNodeVector.begin();
+    std::vector<int>::iterator iterTmp = labelPtr->mNodeVector.begin();
 
     dIVec[index].firstMeshNodeIndex = *iterTmp;
   }
@@ -2140,13 +2107,13 @@ void Instance::registerGIDs(
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "doing internal vars, row arrays:"<<endl;
+    Xyce::dout() << "doing internal vars, row arrays:"<< std::endl;
   }
 #endif
 
   // Do the internal variables.  There should be a lot of these.
-  list<index_pair>::iterator intEnd = intGIDList.end();
-  list<index_pair>::iterator it2    = intGIDList.begin();
+  std::list<index_pair>::iterator intEnd = intGIDList.end();
+  std::list<index_pair>::iterator it2    = intGIDList.begin();
   int i=0;
 
   // The interior points will be blocked (V,N,P) together.
@@ -2187,15 +2154,15 @@ void Instance::registerGIDs(
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel >1)
     {
-      cout << "doing row arrays for mesh point " << i << endl;
+      Xyce::dout() << "doing row arrays for mesh point " << i << std::endl;
       if (!(boundaryStenV[i]))
-	cout << "  Vrow = " << Vrow << endl;
+	Xyce::dout() << "  Vrow = " << Vrow << std::endl;
 
       if (!(boundaryStenN[i]))
-	cout << "  Nrow = " << Nrow << endl;
+	Xyce::dout() << "  Nrow = " << Nrow << std::endl;
 
       if (!(boundaryStenP[i]))
-	cout << "  Prow = " << Prow << endl;
+	Xyce::dout() << "  Prow = " << Prow << std::endl;
     }
 #endif
 
@@ -2219,10 +2186,10 @@ void Instance::registerGIDs(
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel >1)
     {
-      cout << "doing row arrays for mesh point " << i << endl;
-      cout << "  Vrow = " << Vrow << endl;
-      cout << "  Nrow = " << Nrow << endl;
-      cout << "  Prow = " << Prow << endl;
+      Xyce::dout() << "doing row arrays for mesh point " << i << std::endl;
+      Xyce::dout() << "  Vrow = " << Vrow << std::endl;
+      Xyce::dout() << "  Nrow = " << Nrow << std::endl;
+      Xyce::dout() << "  Prow = " << Prow << std::endl;
     }
 #endif
 #endif // Xyce_NEW_BC
@@ -2240,12 +2207,12 @@ void Instance::registerGIDs(
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "maxColsPerRow = " << maxColsPerRow <<endl;
+    Xyce::dout() << "maxColsPerRow = " << maxColsPerRow << std::endl;
   }
 #endif
 
 #ifdef Xyce_DEBUG_DEVICE
-  cout << dashedline << endl;
+  Xyce::dout() << section_divider << std::endl;
 #endif
 }
 
@@ -2254,7 +2221,7 @@ void Instance::registerGIDs(
 // Purpose       : Sets up the "internal names map".
 //
 // Special Notes : This is to help with debugging.  It assigns a unique
-//                 string name to each internal variable of this device.
+//                 std::string name to each internal variable of this device.
 //
 //                 This function was once part of registerGID's, but I
 //                 decided to break that function up to make it more
@@ -2280,21 +2247,23 @@ void Instance::setupIntNameMap ()
     Vrow = Vrowarray[i]; Nrow = Nrowarray[i]; Prow = Prowarray[i];
 
     if (Vrow != -1)
-    { sprintf(tmpchar,"%s_V_%d_%s",
+    {
+      sprintf(tmpchar,"%s_V_%d_%s",
               getName().c_str(), i, labelNameVector[i].c_str());
-      intNameMap[Vrow] = string(tmpchar);
+      intNameMap[Vrow] = std::string(tmpchar);
     }
 
     if (Nrow != -1)
-    { sprintf(tmpchar,"%s_N_%d_%s",
+    {
+      sprintf(tmpchar,"%s_N_%d_%s",
               getName().c_str(), i, labelNameVector[i].c_str());
-      intNameMap[Nrow] = string(tmpchar);
+      intNameMap[Nrow] = std::string(tmpchar);
     }
 
     if (Prow != -1)
     { sprintf(tmpchar,"%s_P_%d_%s",
               getName().c_str(), i, labelNameVector[i].c_str());
-      intNameMap[Prow] = string(tmpchar);
+      intNameMap[Prow] = std::string(tmpchar);
     }
   }
 
@@ -2308,7 +2277,7 @@ void Instance::setupIntNameMap ()
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 05/13/05
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
@@ -2339,15 +2308,15 @@ void Instance::setupRowColPairs ()
 {
 
   int i, j;
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end  ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end  ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "Instance::setupRowColPairs ()" << endl;
-    cout << "  doing internal vars, col arrays:"<<endl;
+    Xyce::dout() << "Instance::setupRowColPairs ()" << std::endl;
+    Xyce::dout() << "  doing internal vars, col arrays:"<< std::endl;
   }
 #endif
 
@@ -2363,14 +2332,14 @@ void Instance::setupRowColPairs ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 1)
     {
-      cout << "doing col arrays for mesh point " << i<<endl;
+      Xyce::dout() << "doing col arrays for mesh point " << i<< std::endl;
     }
 #endif
 
     mNode * nodePtr = meshContainerPtr->getNode(i);
-    vector<EDGEINFO>::iterator firstEI = nodePtr->edgeInfoVector.begin ();
-    vector<EDGEINFO>::iterator lastEI  = nodePtr->edgeInfoVector.end   ();
-    vector<EDGEINFO>::iterator iterEI;
+    std::vector<EDGEINFO>::iterator firstEI = nodePtr->edgeInfoVector.begin ();
+    std::vector<EDGEINFO>::iterator lastEI  = nodePtr->edgeInfoVector.end   ();
+    std::vector<EDGEINFO>::iterator iterEI;
 
     // voltage col arrays:
     Vcolarray[i].push_back(Vrowarray[i]);
@@ -2403,9 +2372,9 @@ void Instance::setupRowColPairs ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 2)
     {
-      cout << "size of vcolarray["<<i<<"] = " << Vcolarray[i].size() <<endl;
+      Xyce::dout() << "size of vcolarray["<<i<<"] = " << Vcolarray[i].size() << std::endl;
       for(int eric=0;eric<Vcolarray[i].size();++eric)
-        cout << "  col["<<eric<<"] = " << Vcolarray[i][eric] <<endl;
+        Xyce::dout() << "  col["<<eric<<"] = " << Vcolarray[i][eric] << std::endl;
     }
 #endif
 
@@ -2475,7 +2444,7 @@ void Instance::setupRowColPairs ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "doing some boundary condition vars:"<<endl;
+    Xyce::dout() << "doing some boundary condition vars:"<< std::endl;
   }
 #endif
 
@@ -2501,7 +2470,7 @@ void Instance::setupRowColPairs ()
 #ifdef Xyce_DEBUG_DEVICE
      if (getDeviceOptions().debugLevel > 1)
     {
-      cout << "Device Interface: " << dIVec[index].eName << endl;
+      Xyce::dout() << "Device Interface: " << dIVec[index].eName << std::endl;
     }
 #endif
 
@@ -2511,9 +2480,9 @@ void Instance::setupRowColPairs ()
      // for each edge node, add an extra column entry to the colarray,
      // which corresponds to the global ID of the connected ckt node.
 
-     vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
-     vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
-     vector<int>::iterator iterI;
+     std::vector<int>::iterator firstI = labelPtr->mNodeVector.begin();
+     std::vector<int>::iterator lastI  = labelPtr->mNodeVector.end  ();
+     std::vector<int>::iterator iterI;
 
      // For the "new" boundary conditions, this step isn't neccessary,
      // as the boundary nodes no longer have any dependent variables.
@@ -2543,14 +2512,14 @@ void Instance::setupRowColPairs ()
      // to the  nearest neighbors of edge nodes.
      //dIVec[index].col.push_back(dIVec[index].gid);
 
-     vector<EDGEINFO>::iterator firstEI;
-     vector<EDGEINFO>::iterator lastEI;
-     vector<EDGEINFO>::iterator iterEI;
+     std::vector<EDGEINFO>::iterator firstEI;
+     std::vector<EDGEINFO>::iterator lastEI;
+     std::vector<EDGEINFO>::iterator iterEI;
 
 #ifdef Xyce_DEBUG_DEVICE
      if (getDeviceOptions().debugLevel > 2)
      {
-       cout << "V edge and edge neighbor gids:" <<endl;
+       Xyce::dout() << "V edge and edge neighbor gids:" << std::endl;
      }
 #endif
 
@@ -2564,7 +2533,7 @@ void Instance::setupRowColPairs ()
        if (getDeviceOptions().debugLevel > 2)
        {
          int ind1 = dIVec[index].Vcol.size()-1;
-         cout << "  1Vcol["<<ind1<<"] = " << itmp << endl;
+         Xyce::dout() << "  1Vcol["<<ind1<<"] = " << itmp << std::endl;
        }
 #endif
 
@@ -2582,7 +2551,7 @@ void Instance::setupRowColPairs ()
          if (getDeviceOptions().debugLevel > 2)
          {
            int ind1 = dIVec[index].Vcol.size()-1;
-           cout << "  2Vcol["<<ind1<<"] = " << itmp << endl;
+           Xyce::dout() << "  2Vcol["<<ind1<<"] = " << itmp << std::endl;
          }
 #endif
        }
@@ -2591,7 +2560,7 @@ void Instance::setupRowColPairs ()
 #ifdef Xyce_DEBUG_DEVICE
      if (getDeviceOptions().debugLevel > 2)
      {
-       cout << "N edge and edge neighbor gids:" <<endl;
+       Xyce::dout() << "N edge and edge neighbor gids:" << std::endl;
      }
 #endif
 
@@ -2605,7 +2574,7 @@ void Instance::setupRowColPairs ()
        if (getDeviceOptions().debugLevel > 2)
        {
          int ind1 = dIVec[index].Ncol.size()-1;
-         cout << " 1Ncol["<<ind1<<"] = " << itmp << endl;
+         Xyce::dout() << " 1Ncol["<<ind1<<"] = " << itmp << std::endl;
        }
 #endif
 
@@ -2623,7 +2592,7 @@ void Instance::setupRowColPairs ()
          if (getDeviceOptions().debugLevel > 2)
          {
            int ind1 = dIVec[index].Ncol.size()-1;
-           cout << " 2Ncol["<<ind1<<"] = " << itmp << endl;
+           Xyce::dout() << " 2Ncol["<<ind1<<"] = " << itmp << std::endl;
          }
 #endif
        }
@@ -2632,7 +2601,7 @@ void Instance::setupRowColPairs ()
 #ifdef Xyce_DEBUG_DEVICE
      if (getDeviceOptions().debugLevel > 2)
      {
-       cout << "P edge and edge neighbor gids:" <<endl;
+       Xyce::dout() << "P edge and edge neighbor gids:" << std::endl;
      }
 #endif
      // now do the P nodes.
@@ -2645,7 +2614,7 @@ void Instance::setupRowColPairs ()
        if (getDeviceOptions().debugLevel > 2)
          {
            int ind1 = dIVec[index].Pcol.size()-1;
-           cout << " 1Pcol["<<ind1<<"] = " << itmp << endl;
+           Xyce::dout() << " 1Pcol["<<ind1<<"] = " << itmp << std::endl;
          }
 #endif
 
@@ -2663,7 +2632,7 @@ void Instance::setupRowColPairs ()
          if (getDeviceOptions().debugLevel > 2)
          {
            int ind1 = dIVec[index].Pcol.size()-1;
-           cout << " 2Pcol["<<ind1<<"] = " << itmp << endl;
+           Xyce::dout() << " 2Pcol["<<ind1<<"] = " << itmp << std::endl;
          }
 #endif
        }
@@ -2685,7 +2654,7 @@ void Instance::setupRowColPairs ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "Setting up the index pairs."<<endl;
+    Xyce::dout() << "Setting up the index pairs."<< std::endl;
   }
 #endif
 
@@ -2702,7 +2671,7 @@ void Instance::setupRowColPairs ()
   {
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 2)
-      cout << "device interface name: " << iterDI->eName << endl;
+      Xyce::dout() << "device interface name: " << iterDI->eName << std::endl;
 #endif
     // check that this label exists, and is an edge label
     // (everything in the dIVec container should pass these tests
@@ -2715,7 +2684,7 @@ void Instance::setupRowColPairs ()
 
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 2)
-      cout << "index = " << index<< "  gid = " << dIVec[index].gid <<endl;
+      Xyce::dout() << "index = " << index<< "  gid = " << dIVec[index].gid << std::endl;
 #endif
 
     // Do the (gid, gid) node.
@@ -2748,7 +2717,7 @@ void Instance::setupRowColPairs ()
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 2)
         {
-          cout << "Vcol["<<j<<"] = " << dIVec[index].Vcol[j] <<endl;
+          Xyce::dout() << "Vcol["<<j<<"] = " << dIVec[index].Vcol[j] << std::endl;
         }
 #endif
       }
@@ -2765,7 +2734,7 @@ void Instance::setupRowColPairs ()
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 2)
         {
-          cout << "Ncol["<<j<<"] = " << dIVec[index].Ncol[j] <<endl;
+          Xyce::dout() << "Ncol["<<j<<"] = " << dIVec[index].Ncol[j] << std::endl;
         }
 #endif
       }
@@ -2782,7 +2751,7 @@ void Instance::setupRowColPairs ()
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 2)
         {
-          cout << "Pcol["<<j<<"] = " << dIVec[index].Pcol[j] <<endl;
+          Xyce::dout() << "Pcol["<<j<<"] = " << dIVec[index].Pcol[j] << std::endl;
         }
 #endif
       }
@@ -2795,8 +2764,8 @@ void Instance::setupRowColPairs ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 2)
     {
-      cout << "Mesh Index: i = " << i << "  label = ";
-      cout << labelNameVector[i] <<endl;
+      Xyce::dout() << "Mesh Index: i = " << i << "  label = ";
+      Xyce::dout() << labelNameVector[i] << std::endl;
     }
 #endif
     nn = Vcolarray[i].size();
@@ -2811,8 +2780,8 @@ void Instance::setupRowColPairs ()
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 2)
         {
-          cout << "  V row,col = " << Vrowarray[i] << ", ";
-          cout << Vcolarray[i][j] << "\n";
+          Xyce::dout() << "  V row,col = " << Vrowarray[i] << ", ";
+          Xyce::dout() << Vcolarray[i][j] << "\n";
         }
 #endif
       }
@@ -2829,8 +2798,8 @@ void Instance::setupRowColPairs ()
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 2)
         {
-          cout << "  N row,col = " << Nrowarray[i] << ", ";
-          cout << Ncolarray[i][j] << "\n";
+          Xyce::dout() << "  N row,col = " << Nrowarray[i] << ", ";
+          Xyce::dout() << Ncolarray[i][j] << "\n";
         }
 #endif
       }
@@ -2847,8 +2816,8 @@ void Instance::setupRowColPairs ()
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 2)
         {
-          cout << "  P row,col = " << Prowarray[i] << ", ";
-          cout << Pcolarray[i][j] << "\n";
+          Xyce::dout() << "  P row,col = " << Prowarray[i] << ", ";
+          Xyce::dout() << Pcolarray[i][j] << "\n";
         }
 #endif
       }
@@ -2858,7 +2827,7 @@ void Instance::setupRowColPairs ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 2)
   {
-    cout << endl;
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -2867,19 +2836,19 @@ void Instance::setupRowColPairs ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 2)
   {
-    list<index_pair>::iterator ip_iter;
+    std::list<index_pair>::iterator ip_iter;
     for (i=0,
          ip_iter  = indexPairList.begin();
          ip_iter != indexPairList.end();
          ++ip_iter,++i)
     {
-       cout << "i="<<i<<":  (";
-       cout.width(6);
-       cout << ip_iter->row;
-       cout << ", ";
-       cout.width(6);
-       cout <<  ip_iter->col;
-       cout << ")\n";
+       Xyce::dout() << "i="<<i<<":  (";
+       Xyce::dout().width(6);
+       Xyce::dout() << ip_iter->row;
+       Xyce::dout() << ", ";
+       Xyce::dout().width(6);
+       Xyce::dout() <<  ip_iter->col;
+       Xyce::dout() << ")\n";
     }
   }
 #endif
@@ -2896,52 +2865,30 @@ void Instance::setupRowColPairs ()
 // Creation Date : 11/14/01
 //-----------------------------------------------------------------------------
 void Instance::registerStateGIDs(
-  const list<index_pair> & staGIDListRef)
+  const std::list<index_pair> & staGIDListRef)
 {
-
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << "\n";
-    cout << dashedline << "\n";
-    cout << "  In Instance::registerStateGIDs\n\n";
-    cout << "  name             = " << getName() << "\n";
-  }
-#endif
-
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables.
-  int numSta = staGIDListRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateGIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
+  AssertLIDs(staGIDListRef.size() == numStateVars);
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "  Number of State GIDs: " << numSta << "\n";
+    Xyce::dout() << "\n";
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "  In Instance::registerStateGIDs\n\n";
+    Xyce::dout() << "  name             = " << getName() << "\n";
+    Xyce::dout() << "  Number of State GIDs: " << numStateVars << "\n";
   }
 #endif
 
   // Copy over the global ID lists:
   staGIDList.assign(staGIDListRef.begin(), staGIDListRef.end());
 
-  list<index_pair>::iterator it1 = staGIDList.begin();
-  list<index_pair>::iterator last1 = staGIDList.end ();
+  std::list<index_pair>::iterator it1 = staGIDList.begin();
+  std::list<index_pair>::iterator last1 = staGIDList.end ();
 
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI  = firstDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI  = firstDI;
 
   int i=0;
   for (; (iterDI!=lastDI && it1!=last1);++iterDI,++it1,++i)
@@ -2960,20 +2907,20 @@ void Instance::registerStateGIDs(
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 1)
   {
-    cout << "  State indices:" << "\n";
-    cout << "\n";
+    Xyce::dout() << "  State indices:" << "\n";
+    Xyce::dout() << "\n";
     for (iterDI=firstDI; iterDI!=lastDI;++iterDI)
     {
-      cout << "  ";
-      cout.width(12);
-      cout.setf(ios::right);
-      cout << iterDI->eName;
-      cout.setf(ios::left);
-      cout << "  stateC = " << iterDI->stateC;
-      cout << "  stateC_owned = " << iterDI->stateC_owned << "\n";
+      Xyce::dout() << "  ";
+      Xyce::dout().width(12);
+      Xyce::dout().setf(std::ios::right);
+      Xyce::dout() << iterDI->eName;
+      Xyce::dout().setf(std::ios::left);
+      Xyce::dout() << "  stateC = " << iterDI->stateC;
+      Xyce::dout() << "  stateC_owned = " << iterDI->stateC_owned << "\n";
     }
 
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -2987,49 +2934,23 @@ void Instance::registerStateGIDs(
 // Creator       : Eric R. Keiter,  SNL, Parallel Computational Sciences
 // Creation Date : 09/18/02
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                                        const vector<int> & extLIDVecRef)
-
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                                        const std::vector<int> & extLIDVecRef)
 {
-  string msg;
-  string tmpstr;
-
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << dashedline << endl;
-    cout << "In the Intance::registerLIDs function.  ";
-    cout << "  name = "<< getName() <<endl;
-  }
-#endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  // AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "numInt = " << numInt <<"\n";
-    cout << "numExt = " << numExt <<"\n";
-    cout << "numMeshPoints = " << numMeshPoints << "\n";
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "In the Intance::registerLIDs function.  ";
+    Xyce::dout() << "  name = "<< getName() << std::endl;
+    Xyce::dout() << "numInt = " << numIntVars << std::endl;
+    Xyce::dout() << "numExt = " << numExtVars << std::endl;
+    Xyce::dout() << "numMeshPoints = " << numMeshPoints << std::endl;
   }
 #endif
-
-  // number of internal variables equals the number of
-  // mesh points *3.
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != 3*numMeshPoints.  ";
-    msg += "Check the metadata in the parser\n";
-    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
-  }
 
   // copy over the global ID lists:
   intLIDVec = intLIDVecRef;
@@ -3042,8 +2963,8 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "Setting up the indices for the external circuit nodes:" << endl;
-    cout << "External node list:" << endl;
+    Xyce::dout() << "Setting up the indices for the external circuit nodes:" << std::endl;
+    Xyce::dout() << "External node list:" << std::endl;
   }
 #endif
 
@@ -3057,9 +2978,9 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
      if (getDeviceOptions().debugLevel > 1)
      {
-       cout << "   name = "<<dIVec[index].eName<<" lid = ";
-       cout << dIVec[index].lid;
-       cout << endl;
+       Xyce::dout() << "   name = "<<dIVec[index].eName<<" lid = ";
+       Xyce::dout() << dIVec[index].lid;
+       Xyce::dout() << std::endl;
      }
 #endif
   }
@@ -3068,7 +2989,7 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "Doing internal vars, row arrays:"<<endl;
+    Xyce::dout() << "Doing internal vars, row arrays:"<< std::endl;
   }
 #endif
 
@@ -3103,15 +3024,15 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 1)
     {
-      cout << "doing lid row arrays for mesh point " << i << endl;
+      Xyce::dout() << "doing lid row arrays for mesh point " << i << std::endl;
       if (!(boundaryStenV[i]))
-	cout << "  li_Vrow = " << li_Vrowarray[i] << endl;
+	Xyce::dout() << "  li_Vrow = " << li_Vrowarray[i] << std::endl;
 
       if (!(boundaryStenN[i]))
-	cout << "  li_Nrow = " << li_Nrowarray[i] << endl;
+	Xyce::dout() << "  li_Nrow = " << li_Nrowarray[i] << std::endl;
 
       if (!(boundaryStenP[i]))
-	cout << "  li_Prow = " << li_Prowarray[i] << endl;
+	Xyce::dout() << "  li_Prow = " << li_Prowarray[i] << std::endl;
     }
 #endif
 
@@ -3128,10 +3049,10 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 1)
     {
-      cout << "doing lid row arrays for mesh point " << i << endl;
-      cout << "  li_Vrow = " << li_Vrowarray[i] << endl;
-      cout << "  li_Nrow = " << li_Nrowarray[i] << endl;
-      cout << "  li_Prow = " << li_Prowarray[i] << endl;
+      Xyce::dout() << "doing lid row arrays for mesh point " << i << std::endl;
+      Xyce::dout() << "  li_Vrow = " << li_Vrowarray[i] << std::endl;
+      Xyce::dout() << "  li_Nrow = " << li_Nrowarray[i] << std::endl;
+      Xyce::dout() << "  li_Prow = " << li_Prowarray[i] << std::endl;
     }
 #endif
 #endif // Xyce_NEW_BC
@@ -3139,7 +3060,7 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
   }
 
 #ifdef Xyce_DEBUG_DEVICE
-  cout << dashedline << endl;
+  Xyce::dout() << section_divider << std::endl;
 #endif
 
 
@@ -3153,49 +3074,27 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 09/18/02
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef)
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef)
 {
-
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << "\n";
-    cout << dashedline << "\n";
-    cout << "  In Instance::registerStateLIDs\n\n";
-    cout << "  name             = " << getName() << "\n";
-  }
-#endif
-
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "  Number of State LIDs: " << numSta << "\n";
+    Xyce::dout() << "\n";
+    Xyce::dout() << section_divider << "\n";
+    Xyce::dout() << "  In Instance::registerStateLIDs\n\n";
+    Xyce::dout() << "  name             = " << getName() << "\n";
+    Xyce::dout() << "  Number of State LIDs: " << numStateVars << "\n";
   }
 #endif
 
   // Copy over the local ID lists:
   staLIDVec = staLIDVecRef;
 
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
-  vector<DeviceInterfaceNode>::iterator iterDI  = firstDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI  = firstDI;
 
   int i=0,j=0;
   for (; iterDI!=lastDI;++iterDI,++i)
@@ -3212,27 +3111,27 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 1)
   {
-    cout << "  State indices:" << "\n";
-    cout << "\n";
+    Xyce::dout() << "  State indices:" << "\n";
+    Xyce::dout() << "\n";
     for (iterDI=firstDI; iterDI!=lastDI;++iterDI)
     {
-      cout << "  ";
-      cout.width(12);
-      cout.setf(ios::right);
-      cout << iterDI->eName;
-      cout.setf(ios::left);
-      cout << "  li_stateC = " << iterDI->li_stateC;
-      cout << endl;
+      Xyce::dout() << "  ";
+      Xyce::dout().width(12);
+      Xyce::dout().setf(std::ios::right);
+      Xyce::dout() << iterDI->eName;
+      Xyce::dout().setf(std::ios::left);
+      Xyce::dout() << "  li_stateC = " << iterDI->li_stateC;
+      Xyce::dout() << std::endl;
     }
 
-    cout << "  Displacement state indices:\n";
+    Xyce::dout() << "  Displacement state indices:\n";
     for (j=0;j<numMeshPoints;++j,++i)
     {
-       cout << "  edge: " << j << "  li_stateDispl = " << li_stateDispl[j];
-       cout << endl;
+       Xyce::dout() << "  edge: " << j << "  li_stateDispl = " << li_stateDispl[j];
+       Xyce::dout() << std::endl;
     }
 
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -3246,7 +3145,7 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef)
 // Creator       : Eric R. Keiter, Dept. 9233
 // Creation Date : 02/23/03
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -3268,7 +3167,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creation Date : 02/23/03
 //-----------------------------------------------------------------------------
 void Instance::registerJacLIDs
-    ( const vector< vector<int> > & jacLIDVec )
+    ( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs ( jacLIDVec );
 
@@ -3277,16 +3176,16 @@ void Instance::registerJacLIDs
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "In Instance::registerJacLIDs" << endl;
+    Xyce::dout() << "In Instance::registerJacLIDs" << std::endl;
   }
 #endif
 
   /////////////////////////////////////////////////////////////////////////
   // Do the external variables first:
   // Loop over the boundary condition "device interface" labels.
-  vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
-  vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end  ();
-  vector<DeviceInterfaceNode>::iterator iterDI;
+  std::vector<DeviceInterfaceNode>::iterator firstDI = dIVec.begin();
+  std::vector<DeviceInterfaceNode>::iterator lastDI  = dIVec.end  ();
+  std::vector<DeviceInterfaceNode>::iterator iterDI;
   int DIsize = dIVec.size ();
   firstDI = dIVec.begin();
   lastDI  = dIVec.end  ();
@@ -3301,11 +3200,11 @@ void Instance::registerJacLIDs
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << "index = " << index;
-      cout << "  jacRowSize = " << jacRowSize;
-      cout << "  name = " << dIVec[index].eName << endl;
-      cout << " lidOffset = ";
-      cout << dIVec[index].lidOffset << endl;
+      Xyce::dout() << "index = " << index;
+      Xyce::dout() << "  jacRowSize = " << jacRowSize;
+      Xyce::dout() << "  name = " << dIVec[index].eName << std::endl;
+      Xyce::dout() << " lidOffset = ";
+      Xyce::dout() << dIVec[index].lidOffset << std::endl;
     }
 #endif
 
@@ -3319,8 +3218,8 @@ void Instance::registerJacLIDs
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0)
       {
-        cout << "  crossOffsets["<<itmp<<"] = ";
-        cout << dIVec[index].crossOffsets[itmp] << endl;
+        Xyce::dout() << "  crossOffsets["<<itmp<<"] = ";
+        Xyce::dout() << dIVec[index].crossOffsets[itmp] << std::endl;
       }
 #endif
     }
@@ -3333,8 +3232,8 @@ void Instance::registerJacLIDs
 #ifdef Xyce_DEBUG_DEVICE
       if (getDeviceOptions().debugLevel > 0)
       {
-        cout << " dIdXoffset["<<tmpIndex<<"] = ";
-        cout << dIVec[index].dIdXoffset[tmpIndex] << endl;
+        Xyce::dout() << " dIdXoffset["<<tmpIndex<<"] = ";
+        Xyce::dout() << dIVec[index].dIdXoffset[tmpIndex] << std::endl;
       }
 #endif
     }
@@ -3354,13 +3253,13 @@ void Instance::registerJacLIDs
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << " mesh point i = " << i << endl;
+      Xyce::dout() << " mesh point i = " << i << std::endl;
     }
 #endif
 
     mNode * nodePtr = meshContainerPtr->getNode(i);
-    vector<EDGEINFO>::iterator firstEI = nodePtr->edgeInfoVector.begin ();
-    vector<EDGEINFO>::iterator lastEI  = nodePtr->edgeInfoVector.end   ();
+    std::vector<EDGEINFO>::iterator firstEI = nodePtr->edgeInfoVector.begin ();
+    std::vector<EDGEINFO>::iterator lastEI  = nodePtr->edgeInfoVector.end   ();
 
     // get the temporary LID row indices:
     int Vrow = MESHtoLID_V[i];
@@ -3370,9 +3269,9 @@ void Instance::registerJacLIDs
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0)
     {
-      cout << "   Vrow = " << Vrow << endl;
-      cout << "   Nrow = " << Nrow << endl;
-      cout << "   Prow = " << Prow << endl;
+      Xyce::dout() << "   Vrow = " << Vrow << std::endl;
+      Xyce::dout() << "   Nrow = " << Nrow << std::endl;
+      Xyce::dout() << "   Prow = " << Prow << std::endl;
     }
 #endif
 
@@ -3388,8 +3287,8 @@ void Instance::registerJacLIDs
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 1)
         {
-          cout << "   li_Voffset["<<i<<"]["<<ioff<<"] = ";
-          cout << li_VoffsetArray[i][ioff] << endl;
+          Xyce::dout() << "   li_Voffset["<<i<<"]["<<ioff<<"] = ";
+          Xyce::dout() << li_VoffsetArray[i][ioff] << std::endl;
         }
 #endif
       }
@@ -3406,8 +3305,8 @@ void Instance::registerJacLIDs
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 1)
         {
-          cout << "   li_Noffset["<<i<<"]["<<ioff<<"] = ";
-          cout << li_NoffsetArray[i][ioff] << endl;
+          Xyce::dout() << "   li_Noffset["<<i<<"]["<<ioff<<"] = ";
+          Xyce::dout() << li_NoffsetArray[i][ioff] << std::endl;
         }
 #endif
       }
@@ -3424,8 +3323,8 @@ void Instance::registerJacLIDs
 #ifdef Xyce_DEBUG_DEVICE
         if (getDeviceOptions().debugLevel > 1)
         {
-          cout << "   li_Poffset["<<i<<"]["<<ioff<<"] = ";
-          cout << li_PoffsetArray[i][ioff] << endl;
+          Xyce::dout() << "   li_Poffset["<<i<<"]["<<ioff<<"] = ";
+          Xyce::dout() << li_PoffsetArray[i][ioff] << std::endl;
         }
 #endif
       }

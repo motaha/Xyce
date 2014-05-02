@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,17 +31,12 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.38.6.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:47 $
+// Revision Number: $Revision: 1.49 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
-
-
-// ---------- Standard Includes ----------
-
-// ----------   Xyce Includes   ----------
 
 #include <N_MPDE_Builder.h>
 #include <N_MPDE_Discretization.h>
@@ -53,33 +48,11 @@
 
 #include <N_LAS_BlockVector.h>
 #include <N_LAS_BlockMatrix.h>
+#include <N_LAS_BlockSystemHelpers.h>
 #include <N_PDS_ParMap.h>
+#include <N_PDS_Comm.h>
 
 #include <N_ERH_ErrorMgr.h>
-
-
-#ifdef HAVE_ALGORITHM
-#include <algorithm>
-#else
-#ifdef HAVE_ALGO_H
-#include <algo.h>
-#else
-#error Must have either <algorithm> or <algo.h>!
-#endif
-#endif
-
-//-----------------------------------------------------------------------------
-// Function      : N_MPDE_Builder::~N_MPDE_Builder
-// Purpose       : destructor
-// Special Notes :
-// Scope         : public
-// Creator       : Robert Hoekstra, 9233, Computational Sciences
-// Creation Date : 03/12/04
-//-----------------------------------------------------------------------------
-N_MPDE_Builder::~N_MPDE_Builder()
-{
-}
-
 
 //-----------------------------------------------------------------------------
 // Function      : N_MPDE_Builder::createVector
@@ -145,35 +118,6 @@ N_LAS_Vector * N_MPDE_Builder::createStoreVector( double initialValue ) const
 N_LAS_Matrix * N_MPDE_Builder::createDAEdQdxMatrix( double initialValue ) const
 {
   return createDAEdFdxMatrix( initialValue );
-  
-  /*  NOTE:  The dQdx matrix is created with the same graph as the dFdx so
-             that the construction of the Jacobian is faster
-  
-  vector< vector<int> > Cols(Size_);
-  for( int i = 0; i < Size_; ++i )
-  {
-    Cols[i].resize(1);
-    Cols[i][0] = i;
-  }
-  if (warpMPDE_)
-  {
-    // tscoffe/tmei 08/11/05:  Appending an extra row & column for omega and phi
-    return dynamic_cast<N_LAS_Matrix*>(
-          new N_LAS_BlockMatrix( Size_,
-                                 Cols,
-                                 *MPDEdQdxGraph_,
-                                 *BasedQdxGraph_,
-                                 2) );
-  }
-  else
-  {
-    return dynamic_cast<N_LAS_Matrix*>(
-          new N_LAS_BlockMatrix( Size_,
-                                 Cols,
-                                 *MPDEdQdxGraph_,
-                                 *BasedQdxGraph_ ) );
-  }
-  */
 }
 
 //-----------------------------------------------------------------------------
@@ -186,7 +130,7 @@ N_LAS_Matrix * N_MPDE_Builder::createDAEdQdxMatrix( double initialValue ) const
 //-----------------------------------------------------------------------------
 N_LAS_Matrix * N_MPDE_Builder::createDAEdFdxMatrix( double initialValue ) const
 {
-  vector< vector<int> > Cols(Size_);
+  std::vector< std::vector<int> > Cols(Size_);
   int Start = Disc_->Start();
   int Width = Disc_->Width();
 
@@ -208,6 +152,7 @@ N_LAS_Matrix * N_MPDE_Builder::createDAEdFdxMatrix( double initialValue ) const
     // tscoffe/tmei 08/11/05:  Appending an extra row & column for omega and phi
     return dynamic_cast<N_LAS_Matrix*>(
           new N_LAS_BlockMatrix( Size_,
+                                 offset_, 
                                  Cols,
                                  *MPDEdFdxGraph_,
                                  *BasedFdxGraph_,
@@ -217,6 +162,7 @@ N_LAS_Matrix * N_MPDE_Builder::createDAEdFdxMatrix( double initialValue ) const
   {
     return dynamic_cast<N_LAS_Matrix*>(
           new N_LAS_BlockMatrix( Size_,
+                                 offset_,
                                  Cols,
                                  *MPDEdFdxGraph_,
                                  *BasedFdxGraph_ ) );
@@ -249,66 +195,29 @@ bool N_MPDE_Builder::generateMaps( const RCP<N_PDS_ParMap>& BaseMap )
   //Save copy of base map
   BaseMap_ = BaseMap;
   
-  const Epetra_Comm & Comm  = BaseMap_->petraMap()->Comm();
-
   //determine block offset
-  int MaxGID = BaseMap->petraMap()->MaxAllGID();
-  int BaseIndex = BaseMap->petraMap()->IndexBase();
-  offset_ = 1;
-  while( offset_ <= MaxGID ) offset_ *= 10;
+  offset_ = generateOffset( *BaseMap );
 
-  //Setup Block Maps and MPDE Map
-  int BlockSize = BaseMap->petraMap()->NumGlobalElements();
-  vector<int> BlockGIDs(BlockSize);
-  vector<int> MPDEGIDs;
+  std::vector<int> augGIDs(2);
   if (warpMPDE_)
   {
-    // tscoffe/tmei 08/02/05:  Added two to size of vector for omega and phi
-    MPDEGIDs.resize(Size_*BlockSize+2);
+    // tscoffe/tmei 08/02/05:  Added two to size of map for omega and phi
+    MPDEMap_ = createBlockParMap( Size_, *BaseMap, 2, &augGIDs );
+    omegaGID_ = augGIDs[0];
+    phiGID_ = augGIDs[1];
+    
+    // Figure out which processor owns the augmented rows.
+    int omegaLID = MPDEMap_->globalToLocalIndex( omegaGID_ );
+    int augProc = -1;
+    if (omegaLID >= 0)
+      augProc = BaseMap->pdsComm()->procID();
+    BaseMap->pdsComm()->maxAll( &augProc, &augProcID_, 1 );
   }
   else
   {
-    MPDEGIDs.resize(Size_*BlockSize);
-  }
-  vector<int> BaseGIDs(BlockSize);
-
-  BaseMap->petraMap()->MyGlobalElements( &BaseGIDs[0] );
-
-  for( int i = 0; i < Size_; ++i )
-    for( int j = 0; j < BlockSize; ++j )
-    {
-      BlockGIDs[j] = BaseGIDs[j] + offset_*i;
-      MPDEGIDs[i*BlockSize+j] = BaseGIDs[j] + offset_*i;
-    }
-  if (warpMPDE_)
-  {
-    // tscoffe/tmei 08/02/05
-    omegaGID_ = offset_*Size_; // next unique GID
-    phiGID_ = omegaGID_+1;
-    MPDEGIDs[Size_*BlockSize] = omegaGID_;
-    MPDEGIDs[Size_*BlockSize+1] = phiGID_;
-
-    // tscoffe/tmei 08/02/05:  Added two to BlockSize*Size_
-    //                         This extra size in the Map is not handled in the
-    //                         createVector & createMatrix
-    epetraMPDEMap_ = rcp(new Epetra_Map( BlockSize*Size_+2,
-                                         BlockSize*Size_+2,
-                                         &MPDEGIDs[0],
-                                         BaseIndex,
-                                         Comm ));
-  }
-  else
-  {
-    epetraMPDEMap_ = rcp(new Epetra_Map( BlockSize*Size_,
-                                         BlockSize*Size_,
-                                         &MPDEGIDs[0],
-                                         BaseIndex,
-                                         Comm ));
+    MPDEMap_ = createBlockParMap( Size_, *BaseMap );
   }
 
-  // Create N_PDS_ParMap for the state variables
-  MPDEMap_ = rcp(new N_PDS_ParMap( &*epetraMPDEMap_, BaseMap_->pdsComm() ));
-  
   return true;
 }
 
@@ -325,40 +234,11 @@ bool N_MPDE_Builder::generateStateMaps( const RCP<N_PDS_ParMap>& BaseStateMap )
   //Save copy of base map
   BaseStateMap_ = BaseStateMap;
 
-  const Epetra_Comm & Comm  = BaseStateMap_->petraMap()->Comm();
-
   //determine block offset
-  int MaxGID = BaseStateMap->petraMap()->MaxAllGID();
-  int BaseIndex = BaseStateMap->petraMap()->IndexBase();
-  
-  stateOffset_=1;
-  while ( stateOffset_ <= MaxGID ) stateOffset_ *= 10;
+  stateOffset_= generateOffset( *BaseStateMap );
 
-  //Setup Block Maps and MPDE Map
-  int BlockSize = BaseStateMap->petraMap()->NumGlobalElements();
-  vector<int> BlockGIDs(BlockSize);
-  vector<int> MPDEGIDs;
-  MPDEGIDs.resize(Size_*BlockSize);
-  vector<int> BaseGIDs(BlockSize);
-
-  BaseStateMap->petraMap()->MyGlobalElements( &BaseGIDs[0] );
-
-  for( int i = 0; i < Size_; ++i )
-    for( int j = 0; j < BlockSize; ++j )
-    {
-      BlockGIDs[j] = BaseGIDs[j] + stateOffset_*i;
-      MPDEGIDs[i*BlockSize+j] = BaseGIDs[j] + stateOffset_*i;
-    }
-
-  // Create Epetra map for the state variables
-  epetraMPDEStateMap_ = rcp(new Epetra_Map( BlockSize*Size_,
-                                            BlockSize*Size_,
-                                            &MPDEGIDs[0],
-                                            BaseIndex,
-                                            Comm ));
-
-  // Create N_PDS_ParMap for the state variables
-  MPDEStateMap_ = rcp(new N_PDS_ParMap( &*epetraMPDEStateMap_, BaseStateMap_->pdsComm() ));
+  //Setup Block Maps for state
+  MPDEStateMap_ = createBlockParMap( Size_, *BaseStateMap );
 
   return true;
 }
@@ -376,40 +256,11 @@ bool N_MPDE_Builder::generateStoreMaps( const RCP<N_PDS_ParMap>& BaseStoreMap )
   //Save copy of base map
   BaseStoreMap_ = BaseStoreMap;
 
-  const Epetra_Comm & Comm  = BaseStoreMap_->petraMap()->Comm();
-
   //determine block offset
-  int MaxGID = BaseStoreMap->petraMap()->MaxAllGID();
-  int BaseIndex = BaseStoreMap->petraMap()->IndexBase();
-  
-  storeOffset_=1;
-  while ( storeOffset_ <= MaxGID ) storeOffset_ *= 10;
+  storeOffset_= generateOffset( *BaseStoreMap );
 
-  //Setup Block Maps and MPDE Map
-  int BlockSize = BaseStoreMap->petraMap()->NumGlobalElements();
-  vector<int> BlockGIDs(BlockSize);
-  vector<int> MPDEGIDs;
-  MPDEGIDs.resize(Size_*BlockSize);
-  vector<int> BaseGIDs(BlockSize);
-
-  BaseStoreMap->petraMap()->MyGlobalElements( &BaseGIDs[0] );
-
-  for( int i = 0; i < Size_; ++i )
-    for( int j = 0; j < BlockSize; ++j )
-    {
-      BlockGIDs[j] = BaseGIDs[j] + storeOffset_*i;
-      MPDEGIDs[i*BlockSize+j] = BaseGIDs[j] + storeOffset_*i;
-    }
-
-  // Create Epetra map for the store variables
-  epetraMPDEStoreMap_ = rcp(new Epetra_Map( BlockSize*Size_,
-                                            BlockSize*Size_,
-                                            &MPDEGIDs[0],
-                                            BaseIndex,
-                                            Comm ));
-
-  // Create N_PDS_ParMap for the store variables
-  MPDEStoreMap_ = rcp(new N_PDS_ParMap( &*epetraMPDEStoreMap_, BaseStoreMap_->pdsComm() ));
+  //Setup Block Maps for store
+  MPDEStoreMap_ = createBlockParMap( Size_, *BaseStoreMap );
 
   return true;
 }
@@ -426,27 +277,24 @@ bool N_MPDE_Builder::generateGraphs( const Epetra_CrsGraph & BasedQdxGraph,
                                      const Epetra_CrsGraph & BasedFdxGraph,
                                      const Epetra_CrsGraph & BaseFullGraph )
 {
-  if( Teuchos::is_null(BaseMap_) ) abort(); //Need to setup Maps first
+  if( Teuchos::is_null(BaseMap_) )
+    Xyce::Report::DevelFatal0().in("N_MPDE_Builder::generateGraphs")
+      << "Need to setup Maps first";
 
   //Copies of base graphs
   BasedQdxGraph_ = rcp(new Epetra_CrsGraph( BasedQdxGraph ));
   BasedFdxGraph_ = rcp(new Epetra_CrsGraph( BasedFdxGraph ));
   BaseFullGraph_ = rcp(new Epetra_CrsGraph( BaseFullGraph ));
 
-  int BlockSize = BaseMap_->petraMap()->NumGlobalElements();
-
-  //Construct MPDE dQdX Graph
-  //MPDEdQdxGraph_ = new Epetra_CrsGraph( Copy,
-  //                                      dynamic_cast<Epetra_BlockMap&>(*MPDEMap_),
-  //                                      0 );
+  int BlockSize = BaseMap_->numLocalEntities();
 
   //Construct MPDE dFdX Graph
   MPDEdFdxGraph_ = rcp(new Epetra_CrsGraph( Copy,
                                             *(MPDEMap_->petraBlockMap()),
                                             0 ));
   
-  int MaxIndices = BasedQdxGraph_->MaxNumIndices();
-  vector<int> Indices(MaxIndices);
+  int MaxIndices = BasedFdxGraph_->MaxNumIndices();
+  std::vector<int> Indices(MaxIndices);
   int NumIndices;
   int BaseRow;
   int MPDERow;
@@ -454,53 +302,31 @@ bool N_MPDE_Builder::generateGraphs( const Epetra_CrsGraph & BasedQdxGraph,
   {
     for( int j = 0; j < BlockSize; ++j )
     {
-      BaseRow = BaseMap_->petraMap()->GID(j);
-      BasedQdxGraph.ExtractGlobalRowCopy( BaseRow, MaxIndices, NumIndices, &Indices[0] );
+      BaseRow = BaseMap_->localToGlobalIndex(j);
+      BasedFdxGraph.ExtractGlobalRowCopy( BaseRow, MaxIndices, NumIndices, &Indices[0] );
       for( int k = 0; k < NumIndices; ++k ) Indices[k] += offset_*i;
       //Diagonal Block
       MPDERow = BaseRow + offset_*i;
-      //MPDEdQdxGraph_->InsertGlobalIndices( MPDERow, NumIndices, &Indices[0] );
-      // Insert in F also, as its the default graph for the full Jacobian matrix
       MPDEdFdxGraph_->InsertGlobalIndices( MPDERow, NumIndices, &Indices[0] );
     }
   }
+
 #ifdef Xyce_DEBUG_MPDE
-  cout << "Q and F graphs before adding (phi,phi) entry:" << endl;
-  cout << "MPDEdQdxGraph = [same as MPDEdFdxGraph]" << endl;
   if (mpdeMgr_->debugLevel > 0)
   {
-    // MPDEdQdxGraph_->Print(cout);
-    cout << "MPDEdFdxGraph = " << endl;
-    MPDEdFdxGraph_->Print(cout);
-  }
-#endif // Xyce_DEBUG_MPDE
-  if (warpMPDE_)
-  {
-    // Add phi equation terms:  \dot{phi(t_1)} = omega(t_1)
-    MPDERow = phiGID_;
-    NumIndices = 1;
-    Indices[0] = phiGID_;
-    //MPDEdQdxGraph_->InsertGlobalIndices( MPDERow, NumIndices, &Indices[0] );
-    // Insert in F also, as its the default graph for the full Jacobian matrix
-    MPDEdFdxGraph_->InsertGlobalIndices( MPDERow, NumIndices, &Indices[0] );
-  }
-#ifdef Xyce_DEBUG_MPDE
-  cout << "Q and F graphs after adding (phi,phi) entry:" << endl;
-  cout << "MPDEdQdxGraph = [same as MPDEdFdxGraph]" << endl;
-  if (mpdeMgr_->debugLevel > 0)
-  {
-    // MPDEdQdxGraph_->Print(cout);
-    cout << "MPDEdFdxGraph = " << endl;
-    MPDEdFdxGraph_->Print(cout);
+    Xyce::dout() << "Q and F graphs before adding warped terms:" << std::endl;
+    Xyce::dout() << "MPDEdFdxGraph = [same as MPDEQddxGraph]" << std::endl;
+    Xyce::dout() << "MPDEdFdxGraph = " << std::endl;
+    MPDEdFdxGraph_->Print(std::cout);
   }
 #endif // Xyce_DEBUG_MPDE
 
   MaxIndices = BasedFdxGraph_->MaxNumIndices();
   Indices.resize(MaxIndices);
-  vector<int> NewIndices(MaxIndices);
+  std::vector<int> NewIndices(MaxIndices);
   int DiscStart = Disc_->Start();
   int DiscWidth = Disc_->Width();
-  vector<int> Cols(DiscWidth);
+  std::vector<int> Cols(DiscWidth);
   for( int i = 0; i < Size_; ++i )
   {
     for( int j = 0; j < DiscWidth; ++j )
@@ -512,7 +338,7 @@ bool N_MPDE_Builder::generateGraphs( const Epetra_CrsGraph & BasedQdxGraph,
 
     for( int j = 0; j < BlockSize; ++j )
     {
-      BaseRow = BaseMap_->petraMap()->GID(j);
+      BaseRow = BaseMap_->localToGlobalIndex(j);
       BasedFdxGraph.ExtractGlobalRowCopy( BaseRow, MaxIndices, NumIndices, &Indices[0] );
 
       MPDERow = BaseRow + offset_*i;
@@ -533,27 +359,43 @@ bool N_MPDE_Builder::generateGraphs( const Epetra_CrsGraph & BasedQdxGraph,
     {
       for( int j = 0; j < BlockSize; ++j )
       {
-        BaseRow = BaseMap_->petraMap()->GID(j);
+        BaseRow = BaseMap_->localToGlobalIndex(j);
         MPDERow = BaseRow + offset_*i;
-        //BasedQdxGraph.ExtractGlobalRowCopy( BaseRow, MaxIndices, NumIndices, &Indices[0] );
-        //if ( NumIndices > 0 )
-        //{
         NumIndices = 1;
         NewIndices[0] = omegaGID_; 
         MPDEdFdxGraph_->InsertGlobalIndices( MPDERow, NumIndices, &NewIndices[0] );
-        //}
       }
     }
-    Teuchos::RCP<vector<int> > phaseGraph = warpMPDEPhasePtr_->getPhaseGraph();
-    MPDERow = omegaGID_;
-    NumIndices = phaseGraph->size();
-    MPDEdFdxGraph_->InsertGlobalIndices( MPDERow, NumIndices, &((*phaseGraph)[0]) );
-    // Enter graph details for phi:  \dot{phi(t_1)} = omega(t_1)
-    MPDERow = phiGID_;
-    NumIndices = 1;
-    NewIndices.clear();
-    NewIndices.push_back(omegaGID_);
-    MPDEdFdxGraph_->InsertGlobalIndices( MPDERow, NumIndices, &NewIndices[0] );
+    if ( BaseMap_->pdsComm()->procID() == augProcID_ )
+    {
+      NumIndices = 1;
+      Indices[0] = phiGID_;
+      MPDEdFdxGraph_->InsertGlobalIndices( phiGID_, NumIndices, &Indices[0] );
+
+      Teuchos::RCP<std::vector<int> > phaseGraph = warpMPDEPhasePtr_->getPhaseGraph();
+      NumIndices = phaseGraph->size();
+      MPDEdFdxGraph_->InsertGlobalIndices( omegaGID_, NumIndices, &((*phaseGraph)[0]) );
+
+      // An (omegaGID, omegaGID) entry must be inserted if not done by the phase graph.
+      // This is because when the augmented column is loaded, an entry is expected for each
+      // row of column omegaGID.
+      bool isOmegaCol = false;
+      for (int i=0; i<NumIndices; ++i)
+      {
+        if ((*phaseGraph)[i] == omegaGID_)
+          isOmegaCol = true;
+      }
+
+      // Enter graph details for phi:  \dot{phi(t_1)} = omega(t_1)
+      NumIndices = 1;
+      NewIndices.clear();
+      NewIndices.push_back(omegaGID_);
+      MPDEdFdxGraph_->InsertGlobalIndices( phiGID_, NumIndices, &NewIndices[0] );
+
+      // Add (omegaGID, omegaGID) entry if one doesn't already exist.
+      if (!isOmegaCol) 
+        MPDEdFdxGraph_->InsertGlobalIndices( omegaGID_, NumIndices, &NewIndices[0] );
+    }
   }
   MPDEdFdxGraph_->FillComplete();
 
@@ -568,10 +410,10 @@ bool N_MPDE_Builder::generateGraphs( const Epetra_CrsGraph & BasedQdxGraph,
 #ifdef Xyce_DEBUG_MPDE
   if (mpdeMgr_->debugLevel > 0)
   {  
-    cout << "Final MPDEdQdxGraph = " << endl;
-    MPDEdQdxGraph_->Print(cout);
-    cout << "Final MPDEdFdxGraph = " << endl;
-    MPDEdFdxGraph_->Print(cout);
+    Xyce::dout() << "Final MPDEdQdxGraph = " << std::endl;
+    MPDEdQdxGraph_->Print(std::cout);
+    Xyce::dout() << "Final MPDEdFdxGraph = " << std::endl;
+    MPDEdFdxGraph_->Print(std::cout);
   }
 #endif // Xyce_DEBUG_MPDE
 
@@ -589,7 +431,7 @@ bool N_MPDE_Builder::generateGraphs( const Epetra_CrsGraph & BasedQdxGraph,
 //-----------------------------------------------------------------------------
 Teuchos::RCP<const Epetra_Map> N_MPDE_Builder::getSolutionMap() const
 {
-  return(epetraMPDEMap_);
+  return(rcp( MPDEMap_->petraMap(), false ));
 }
 
 //-----------------------------------------------------------------------------
@@ -603,7 +445,7 @@ Teuchos::RCP<const Epetra_Map> N_MPDE_Builder::getSolutionMap() const
 //-----------------------------------------------------------------------------
 Teuchos::RCP<const Epetra_Map> N_MPDE_Builder::getStateMap() const
 {
-  return(epetraMPDEStateMap_);
+  return(rcp( MPDEStateMap_->petraMap(), false ));
 }
 
 //-----------------------------------------------------------------------------
@@ -617,6 +459,6 @@ Teuchos::RCP<const Epetra_Map> N_MPDE_Builder::getStateMap() const
 //-----------------------------------------------------------------------------
 Teuchos::RCP<const Epetra_Map> N_MPDE_Builder::getStoreMap() const
 {
-  return(epetraMPDEStoreMap_);
+  return(rcp( MPDEStoreMap_->petraMap(), false ));
 }
 

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -39,9 +39,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.40.2.2 $
+// Revision Number: $Revision: 1.46 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:47 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -49,26 +49,20 @@
 #ifndef Xyce_N_NLS_NOX_ParameterSet_h
 #define Xyce_N_NLS_NOX_ParameterSet_h
 
-// ---------- Standard Includes ----------
-
 #include <vector>
 
-// ----------   Xyce Includes   ----------
 #include <N_UTL_Misc.h>
+#include <N_PDS_fwd.h>
 #include <N_UTL_NoCase.h>
-
-// ----------   NOX Includes   ----------
 
 #include "NOX.H"
 #include "Teuchos_RefCountPtr.hpp"
-
-// ---------- Forward Declarations ----------
 
 class N_LAS_Vector;
 class N_LAS_System;
 class N_NLS_ReturnCodes;
 class N_LOA_Loader;
-class N_PDS_Comm;
+
 namespace N_NLS_NOX {
   class AugmentLinSys;
 }
@@ -112,12 +106,12 @@ public:
 			 bool nonTrivialDeviceMaskFlag, N_LAS_Vector * maskVectorPtr);
 #else
   bool createStatusTests(N_LAS_Vector** currSolnVectorPtrPtr,
-			 N_LOA_Loader& l, vector<char> & varTypeVec);
+			 N_LOA_Loader& l, std::vector<char> & varTypeVec);
 #endif
   Teuchos::RefCountPtr<NOX::StatusTest::Generic> getStatusTests();
-  bool getVectorParam (const string &, int, double &);
-  bool getVectorParam (const string &, int, string &);
-  int getVectorParamSize(const string& vectorName);
+  bool getVectorParam (const std::string &, int, double &);
+  bool getVectorParam (const std::string &, int, std::string &);
+  int getVectorParamSize(const std::string& vectorName);
   int getStatusTestReturnCode() const;
   void setStatusTestReturnCodes (const N_NLS_ReturnCodes & retCodesTmp);
 
@@ -127,7 +121,6 @@ public:
   Teuchos::RefCountPtr<Teuchos::ParameterList> getDebugParams();
   int getNoxSolverType() const;
 
-#ifdef Xyce_DEBUG_NONLINEAR
   inline int  getDebugLevel() const
   {
     return debugLevel_;
@@ -157,7 +150,6 @@ public:
   {
     return screenOutputFlag_;
   };
-#endif
 
   double getMaxNormF() const;
   int getMaxNormFindex () const;
@@ -201,7 +193,7 @@ public:
 
 private:
 
-  void unsupportedOption_(const string& tag);
+  void unsupportedOption_(const std::string& tag);
   bool parseOptionBlock_(const N_UTL_OptionBlock& OB);
 
 private:
@@ -212,13 +204,13 @@ private:
   Teuchos::ParameterList& debugParams_;
   Teuchos::ParameterList statusTestParams_;
 
-  map<string, vector<N_UTL_Param> > vectorParams;
+  std::map<std::string, std::vector<N_UTL_Param> > vectorParams;
 
   // Combo of all tests
   Teuchos::RefCountPtr<NOX::StatusTest::Combo> comboPtr_;
 
   // Vector containing all the tests we create
-  vector< Teuchos::RefCountPtr<NOX::StatusTest::Generic> > tests_;
+  std::vector< Teuchos::RefCountPtr<NOX::StatusTest::Generic> > tests_;
 
   bool isParamsSet_;
   bool isStatusTestsSet_;
@@ -252,7 +244,6 @@ private:
   bool savedLocaOptions_;
   N_UTL_OptionBlock savedLocaOB_;
 
-#ifdef Xyce_DEBUG_NONLINEAR
   // debug info:
   int  debugLevel_;
   int debugMinTimeStep_;
@@ -260,8 +251,8 @@ private:
   double debugMinTime_;
   double debugMaxTime_;
   bool screenOutputFlag_;
-#endif
 };
+
 } // namespace N_NLS_NOX
 
 #endif

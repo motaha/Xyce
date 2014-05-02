@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.24.2.2 $
+// Revision Number: $Revision: 1.33 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:43 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -82,21 +82,18 @@ using Teuchos::rcp;
 #include <N_UTL_ExpressionData.h>
 #include <N_UTL_FFTInterface.hpp>
 
-//------ Misc Includes --------
-
-
-//------ Extern Declarations --------
-
+namespace Xyce {
+namespace IO {
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_Objective::N_IO_Objective
+// Function      : Objective::Objective
 // Purpose       : constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Dave Shirley
 // Creation Date : 02/13/06
 //-----------------------------------------------------------------------------
-N_IO_Objective::N_IO_Objective()
+Objective::Objective()
   :value(NULL),
    weight(NULL),
    lastResult(0),
@@ -117,14 +114,14 @@ N_IO_Objective::N_IO_Objective()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_Objective::~N_IO_Objective
+// Function      : Objective::~Objective
 // Purpose       : destructor
 // Special Notes :
 // Scope         : public
 // Creator       : Dave Shirley
 // Creation Date : 02/13/06
 //-----------------------------------------------------------------------------
-N_IO_Objective::~N_IO_Objective()
+Objective::~Objective()
 {
   if (value != NULL)
     delete value;
@@ -133,7 +130,7 @@ N_IO_Objective::~N_IO_Objective()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_Objective:parse
+// Function      : Objective:parse
 // Purpose       : Parse input string, and set objective
 // Special Notes :
 // Scope         : public
@@ -141,86 +138,72 @@ N_IO_Objective::~N_IO_Objective()
 // Creation Date : 04/06/06
 //-----------------------------------------------------------------------------
 
-/*
-bool N_IO_Objective::parse (const string & in, N_DEV_DeviceInterface * devPtr1,
-    N_ANP_AnalysisInterface * anaIntPtr,
-#ifdef Xyce_PARALLEL_MPI
-              N_PDS_Comm * pdsCommPtr1,
-#endif
-              N_TOP_Topology * topPtr1)
-*/
-bool N_IO_Objective::parse (const string & in, N_IO_OutputMgr * outputMgrPtr )
+bool Objective::parse (const std::string & in, OutputMgr * outputMgrPtr )
 {
-  string line (in);
-  string fileStr, functionStr, valueStr, weightStr;
+  std::string line (in);
+  std::string fileStr, functionStr, valueStr, weightStr;
   std::string::size_type n, begin, end;
 
-//  devPtr_ = devPtr1;
-//  anaIntPtr_ = anaIntPtr_;
-//#ifdef Xyce_PARALLEL_MPI
-//  pdsCommPtr_ = pdsCommPtr1;
-//#endif
-//  topPtr_ = topPtr1;
   outputMgrPtr_ = outputMgrPtr;
 
-  if (line.find_first_of('=') == string::npos)
+  if (line.find_first_of('=') == std::string::npos)
     valueStr = line;
   else
   {
-    while ((n = line.find_first_of(' ')) != string::npos)
+    while ((n = line.find_first_of(' ')) != std::string::npos)
       line.erase(n,1);
-    while ((n = line.find_first_of('\t')) != string::npos)
+    while ((n = line.find_first_of('\t')) != std::string::npos)
       line.erase(n,1);
     ExtendedString uLine(line);
     uLine.toUpper();
 
     // get the filename
-    n = uLine.find(string("FILE="));
-    if (n != string::npos)
+    n = uLine.find(std::string("FILE="));
+    if (n != std::string::npos)
     {
       begin = n + 6;
       if (line.size() < begin+1 || line[begin-1] != '"')
         return false;
       end = begin + uLine.substr(begin).find_first_of('"');
-      if (end == string::npos)
+      if (end == std::string::npos)
         return false;
       fileStr = line.substr(begin,end-begin);
     }
 
     // get the function we will apply
-    n = uLine.find(string("FUNCTION="));
-    if (n != string::npos) {
+    n = uLine.find(std::string("FUNCTION="));
+    if (n != std::string::npos) {
       begin = n + 10;
       if (line.size() < begin+1 || line[begin-1] != '"')
         return false;
       end = begin + uLine.substr(begin).find_first_of('"');
-      if (end == string::npos)
+      if (end == std::string::npos)
         return false;
       functionStr = line.substr(begin,end-begin);
     }
 
     // get the value expression
-    n = uLine.find(string("VALUE="));
-    if (n != string::npos)
+    n = uLine.find(std::string("VALUE="));
+    if (n != std::string::npos)
     {
       begin = n + 7;
       if (line.size() < begin+1 || line[begin-1] != '{')
         return false;
       end = begin + uLine.substr(begin).find_first_of('}');
-      if (end == string::npos)
+      if (end == std::string::npos)
         return false;
       valueStr = line.substr(begin,end-begin);
     }
 
     // get the weighting expression
-    n = uLine.find(string("WEIGHT="));
-    if (n != string::npos)
+    n = uLine.find(std::string("WEIGHT="));
+    if (n != std::string::npos)
     {
       begin = n + 8;
       if (line.size() < begin+1 || line[begin-1] != '{')
         return false;
       end = begin + uLine.substr(begin).find_first_of('}');
-      if (end == string::npos)
+      if (end == std::string::npos)
         return false;
       weightStr = line.substr(begin,end-begin);
     }
@@ -229,29 +212,21 @@ bool N_IO_Objective::parse (const string & in, N_IO_OutputMgr * outputMgrPtr )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_Objective:initialize
+// Function      : Objective:initialize
 // Purpose       : Parse input string, and set objective
 // Special Notes :
 // Scope         : public
 // Creator       : Dave Shirley
 // Creation Date : 04/07/06
 //-----------------------------------------------------------------------------
-/*
-bool N_IO_Objective::initialize (const N_UTL_OptionBlock & OB,
-              N_DEV_DeviceInterface * devPtr1, N_ANP_AnalysisInterface * anaIntPtr,
-#ifdef Xyce_PARALLEL_MPI
-              N_PDS_Comm * pdsCommPtr1,
-#endif
-              N_TOP_Topology * topPtr1)
-*/
-bool N_IO_Objective::initialize (const N_UTL_OptionBlock & OB, N_IO_OutputMgr * outputMgrPtr )
+bool Objective::initialize (const Util::OptionBlock & OB, OutputMgr * outputMgrPtr )
 {
-  string fileStr, functionStr, valueStr, weightStr;
-  list<N_UTL_Param>::const_iterator it_tp;
-  list<N_UTL_Param>::const_iterator it_param;
-  list<N_UTL_Param>::const_iterator it_type;
-  list<N_UTL_Param>::const_iterator first = OB.getParams().begin();
-  list<N_UTL_Param>::const_iterator last = OB.getParams().end();
+  std::string fileStr, functionStr, valueStr, weightStr;
+  std::list<N_UTL_Param>::const_iterator it_tp;
+  std::list<N_UTL_Param>::const_iterator it_param;
+  std::list<N_UTL_Param>::const_iterator it_type;
+  std::list<N_UTL_Param>::const_iterator first = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator last = OB.getParams().end();
 
 //  devPtr_ = devPtr1;
 //  anaIntPtr_ = anaIntPtr;
@@ -268,35 +243,33 @@ bool N_IO_Objective::initialize (const N_UTL_OptionBlock & OB, N_IO_OutputMgr * 
     }
     else if (it_tp->uTag() == "FUNCTION" )
     {
-      functionStr = it_tp->sVal ();
+      functionStr = it_tp->stringValue();
     }
     else if (it_tp->uTag() == "VALUE")
     {
-      valueStr = it_tp->sVal ();
+      valueStr = it_tp->stringValue();
     }
     else if (it_tp->uTag() == "WEIGHT")
     {
-      weightStr = it_tp->sVal ();
+      weightStr = it_tp->stringValue();
     }
     else if (it_tp->uTag() == "FILE")
     {
-      fileStr = it_tp->sVal();
+      fileStr = it_tp->stringValue();
     }
 //  else if (it_tp->uTag() == "MATCH")
 //  {
-//    string m, m1, m2;
+//    std::string m, m1, m2;
 //    m = it_tp->sVal();
-//    string::size_type col = m.find_first_of(':');
+//    std::string::size_type col = m.find_first_of(':');
 //    m1 = m.substr(0,col);
 //    m2 = m.substr(col+1);
 //    match[m1] = m2;
 //  }
   }
-  return initializeInternal (fileStr, functionStr, valueStr, weightStr);
-}
-
+  return initializeInternal (fileStr, functionStr, valueStr, weightStr); } 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_Objective:initializeInternal
+// Function      : Objective:initializeInternal
 // Purpose       : Internal intialization from .objective or objective name
 //                 from Dakota
 // Special Notes :
@@ -304,8 +277,8 @@ bool N_IO_Objective::initialize (const N_UTL_OptionBlock & OB, N_IO_OutputMgr * 
 // Creator       : Dave Shirley
 // Creation Date : 04/07/06
 //-----------------------------------------------------------------------------
-bool N_IO_Objective::initializeInternal (string & fileStr, string & functionStr,
-               string & valueStr, string & weightStr)
+bool Objective::initializeInternal (std::string & fileStr, std::string & functionStr,
+               std::string & valueStr, std::string & weightStr)
 {
   if (fileStr.size() > 0)
   {
@@ -341,39 +314,39 @@ bool N_IO_Objective::initializeInternal (string & fileStr, string & functionStr,
     else
     {
       // issue a fatal error
-      string msg("N_IO_Objective: Unknows function type requested \"" + functionStr + "\"");
+      std::string msg("Objective: Unknows function type requested \"" + functionStr + "\"");
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL,msg);
     }
   }
   if (valueStr.size() > 0)
   {
   /*
-    value = new N_UTL_ExpressionData (valueStr, devPtr_, anaIntPtr_,
+    value = new Util::ExpressionData (valueStr, devPtr_, anaIntPtr_,
 #ifdef Xyce_PARALLEL_MPI
              pdsCommPtr_,
 #endif
              topPtr_);
 
-      value = new N_UTL_ExpressionData (valueStr, devPtr_, anaIntPtr_,
+      value = new Util::ExpressionData (valueStr, devPtr_, anaIntPtr_,
 #ifdef Xyce_PARALLEL_MPI
              pdsCommPtr_,
 #endif
              topPtr_);
   */
-    value = new N_UTL_ExpressionData (valueStr, outputMgrPtr_ );
+    value = new Util::ExpressionData (valueStr, *outputMgrPtr_ );
     if (value == static_cast<N_UTL_ExpressionData *>(NULL))
       return false;
   }
   if (weightStr.size() > 0)
   {
     /*
-    weight = new N_UTL_ExpressionData (weightStr, devPtr_, anaIntPtr_,
+    weight = new Util::ExpressionData (weightStr, devPtr_, anaIntPtr_,
 #ifdef Xyce_PARALLEL_MPI
              pdsCommPtr_,
 #endif
              topPtr_);
     */
-    weight = new N_UTL_ExpressionData (weightStr, outputMgrPtr_ );
+    weight = new Util::ExpressionData (weightStr, *outputMgrPtr_ );
     if (weight == static_cast<N_UTL_ExpressionData *>(NULL))
       return false;
   }
@@ -381,7 +354,7 @@ bool N_IO_Objective::initializeInternal (string & fileStr, string & functionStr,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_Objective::readData
+// Function      : Objective::readData
 // Purpose       : Reads in data from external file.  Needs improvement in
 //                 getting a small amount of feedback to user that the operation
 //                 was or was not successful. -- RLS
@@ -390,7 +363,7 @@ bool N_IO_Objective::initializeInternal (string & fileStr, string & functionStr,
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-void N_IO_Objective::readData()
+void Objective::readData()
 {
   int i;
   double v;
@@ -403,7 +376,7 @@ void N_IO_Objective::readData()
 
   if( !inputFileStream )
   {
-    string msg("Could not open file of experimental data: " + file);
+    std::string msg("Could not open file of experimental data: " + file);
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL,msg);
   }
   std::string inputLine;
@@ -457,85 +430,85 @@ void N_IO_Objective::readData()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_Objective::printData
+// Function      : Objective::printData
 // Purpose       : Debug function to print out read and stored data
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, Sandia National Lab
 // Creation Date : 01/19/07
 //-----------------------------------------------------------------------------
-void N_IO_Objective::printData()
+void Objective::printData()
 {
   int len = var1Vals.size();
   for(int i=0; i<len; i++ )
   {
-    std::cout << "var1Vals[ " << i << " ] = " << var1Vals[i] << std::endl;
+    Xyce::dout() << "var1Vals[ " << i << " ] = " << var1Vals[i] << std::endl;
   }
 
   len = var2Vals.size();
   for(int i=0; i<len; i++ )
   {
-    std::cout << "var2Vals[ " << i << " ] = " << var2Vals[i] << std::endl;
+    Xyce::dout() << "var2Vals[ " << i << " ] = " << var2Vals[i] << std::endl;
   }
 
   len = dataVal.size();
   for(int i=0; i<len; i++)
   {
     int len2 = dataVal[i].size();
-    std::cout << "dataVal[ " << i << " ] = { ";
+    Xyce::dout() << "dataVal[ " << i << " ] = { ";
     for(int j=0; j<len2; j++)
     {
-      std::cout << "   " << dataVal[i][j];
+      Xyce::dout() << "   " << dataVal[i][j];
     }
-    std::cout << " }" << std::endl;
+    Xyce::dout() << " }" << std::endl;
   }
 
   len = simVal.size();
   for(int i=0; i<len; i++)
   {
     int len2 = simVal[i].size();
-    std::cout << "simVal[ " << i << " ] = { ";
+    Xyce::dout() << "simVal[ " << i << " ] = { ";
     for(int j=0; j<len2; j++)
     {
-      std::cout << "   " << simVal[i][j];
+      Xyce::dout() << "   " << simVal[i][j];
     }
-    std::cout << " }" << std::endl;
+    Xyce::dout() << " }" << std::endl;
   }
 
   len = simValValid.size();
   for(int i=0; i<len; i++)
   {
     int len2 = simValValid[i].size();
-    std::cout << "simValValid[ " << i << " ] = { ";
+    Xyce::dout() << "simValValid[ " << i << " ] = { ";
     for(int j=0; j<len2; j++)
     {
-      std::cout << "   " << simValValid[i][j];
+      Xyce::dout() << "   " << simValValid[i][j];
     }
-    std::cout << " }" << std::endl;
+    Xyce::dout() << " }" << std::endl;
   }
 
   len = weightVal.size();
   for(int i=0; i<len; i++)
   {
     int len2 = weightVal[i].size();
-    std::cout << "weightVal[ " << i << " ] = { ";
+    Xyce::dout() << "weightVal[ " << i << " ] = { ";
     for(int j=0; j<len2; j++)
     {
-      std::cout << "   " << weightVal[i][j];
+      Xyce::dout() << "   " << weightVal[i][j];
     }
-    std::cout << " }" << std::endl;
+    Xyce::dout() << " }" << std::endl;
   }
 
 }
 //-----------------------------------------------------------------------------
-// Function      : N_IO_Objective::reset
+// Function      : Objective::reset
 // Purpose       : Reset objective to initial state
 // Special Notes :
 // Scope         : public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 04/04/06
 //-----------------------------------------------------------------------------
-void N_IO_Objective::reset()
+void Objective::reset()
 {
   int i, j;
   lastResultValid = false;
@@ -556,14 +529,14 @@ void N_IO_Objective::reset()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_Objective::save
+// Function      : Objective::save
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-double N_IO_Objective::save(const N_LAS_Vector * solnVecPtr, const N_LAS_Vector * stateVecPtr, const N_LAS_Vector * storeVecPtr)
+double Objective::save(const N_LAS_Vector * solnVecPtr, const N_LAS_Vector * stateVecPtr, const N_LAS_Vector * storeVecPtr)
 {
   if (value)
     lastResult = value->evaluate(solnVecPtr, stateVecPtr, storeVecPtr);
@@ -601,14 +574,14 @@ double N_IO_Objective::save(const N_LAS_Vector * solnVecPtr, const N_LAS_Vector 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_Objective::save
+// Function      : Objective::save
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-double N_IO_Objective::save(double v1, double v2, const N_LAS_Vector * solnVecPtr, const N_LAS_Vector * stateVecPtr, const N_LAS_Vector * storeVecPtr)
+double Objective::save(double v1, double v2, const N_LAS_Vector * solnVecPtr, const N_LAS_Vector * stateVecPtr, const N_LAS_Vector * storeVecPtr)
 {
   int i, j, ind1, ind2, indInterpolate;
   double val, wgt, sum;
@@ -622,7 +595,7 @@ double N_IO_Objective::save(double v1, double v2, const N_LAS_Vector * solnVecPt
   else
     wgt = 1;
 
-   //std::cout << "N_IO_Objective::save() ------------------------" << std::endl
+   //Xyce::dout() << "Objective::save() ------------------------" << std::endl
    //    << "\t" << var1 << "\tv1 = " << v1 << std::endl
    //    << "\t" << var2 << "\tv2 = " << v2 << std::endl
    //    << "\tval = " << val << std::endl
@@ -721,7 +694,7 @@ double N_IO_Objective::save(double v1, double v2, const N_LAS_Vector * solnVecPt
   }
   else
   {
-    std::cout << "N_IO_Objective::save() unable to save data:" << std::endl;
+    Xyce::dout() << "Objective::save() unable to save data:" << std::endl;
     // Being here indicates that we have data we are unable to save
   }
 
@@ -729,20 +702,20 @@ double N_IO_Objective::save(double v1, double v2, const N_LAS_Vector * solnVecPt
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_Objective::evaluate
+// Function      : Objective::evaluate
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
-double N_IO_Objective::evaluate()
+double Objective::evaluate()
 {
   double result = 0.0;
 
-  //std::cout << "N_IO_Objective::evaluate---------------------------------------" << std::endl;
+  //Xyce::dout() << "Objective::evaluate---------------------------------------" << std::endl;
   //printData();
-  // std::cout << "In N_IO_Objective::evaluate function \"" << function << "\"" << std::endl;
+  // Xyce::dout() << "In Objective::evaluate function \"" << function << "\"" << std::endl;
   if( function == "VALUE" )
   {
     // this is the default behavior.  Just
@@ -770,7 +743,7 @@ double N_IO_Objective::evaluate()
     }
 
     // should issue a warning if numValid is much less than n1 or n1*n2
-    // std::cout << "Used " << numValid << " points from a set of " << n1*n2 << " L2Norm = "<< result << std::endl;
+    // Xyce::dout() << "Used " << numValid << " points from a set of " << n1*n2 << " L2Norm = "<< result << std::endl;
     // printData();
     if( function == "L1NORM" )
     {
@@ -827,9 +800,9 @@ double N_IO_Objective::evaluate()
   {
     // in this case we will calculate the power spectra of the two signals
     // and then take the appropriate norm of the differnce
-    vector<double> simValPowerSpecResult;
+    std::vector<double> simValPowerSpecResult;
 
-    vector<double> dataValPowerSpecResult;
+    std::vector<double> dataValPowerSpecResult;
 
     // set up the fft engine to calculate the fft in place to conserve memory
     int sigLen = var1Vals.size();
@@ -838,8 +811,8 @@ double N_IO_Objective::evaluate()
     // copy simulation and external data to working vectors
     // for the calculation.  Note: we do filtering and weighting here as needed
     int numSig = simVal.size();
-    vector<double> simValFFTResult;
-    vector<double> dataValFFTResult;
+    std::vector<double> simValFFTResult;
+    std::vector<double> dataValFFTResult;
     simValFFTResult.resize(2 * sigLen);
     dataValFFTResult.resize(2 * sigLen );
 
@@ -921,3 +894,6 @@ double N_IO_Objective::evaluate()
 
   return result;
 }
+
+} // namespace IO
+} // namespace Xyce

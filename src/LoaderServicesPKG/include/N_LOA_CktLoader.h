@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.83.2.2 $
+// Revision Number: $Revision: 1.88 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:46 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -143,12 +143,20 @@ public:
   bool setInitialGuess (N_LAS_Vector * solVectorPtr);
 
   // Function for setting a single parameter value.
-  bool setParam (string & name, double val);
+    virtual bool setParam(std::string & name, double val) {
+      return deviceIntPtr->setParam(name,val);
+    }
 
-  // Function for getting a single parameter value.
-  double getParam (const string & name);
-  bool getParam (const string & name, double & val);
-  bool getVsrcLIDs (string & srcName, int & li_Pos, int & li_Neg, int & li_Bra);
+    // Function for getting a single parameter value.
+    virtual double getParamAndReduce(const std::string & name) {
+      return deviceIntPtr->getParamAndReduce(name);
+    }
+
+    virtual bool getParamAndReduce(const std::string & name, double & val) {
+      return deviceIntPtr->getParamAndReduce(name,val);
+    }
+
+  bool getVsrcLIDs (std::string & srcName, int & li_Pos, int & li_Neg, int & li_Bra);
 
   // Method which is called to update the sources.
   bool updateSources();
@@ -166,13 +174,13 @@ public:
   int  enablePDEContinuation ();
   bool disablePDEContinuation ();
 
-  void getNumInterfaceNodes (vector<int> & numINodes);
+  void getNumInterfaceNodes (std::vector<int> & numINodes);
   bool loadCouplingRHS(int iSubProblem, int iCouple, N_LAS_Vector * dfdvPtr);
   bool calcCouplingTerms (int iSubProblem, int iCouple, const N_LAS_Vector * dxdvPtr);
   virtual bool raiseDebugLevel (int increment);
 
   // Gets the time integration required breakpoint times (in a vector).
-  bool getBreakPoints(vector < N_UTL_BreakPoint > & breakPointTimes);
+  bool getBreakPoints(std::vector< N_UTL_BreakPoint > & breakPointTimes);
 
   // Accessor which returns the maximum time step size (in seconds).
   double getMaxTimeStepSize();
@@ -191,8 +199,8 @@ public:
 
   // Functions needed by the NEW (power node) 2-level algorithm:
   void homotopyStepSuccess
-    (const vector<string> & paramNames,
-     const vector<double> & paramVals);
+    (const std::vector<std::string> & paramNames,
+     const std::vector<double> & paramVals);
 
   void homotopyStepFailure ();
 
@@ -201,9 +209,9 @@ public:
 
   void acceptStep();
 
-  virtual bool getInitialQnorm (vector<N_TIA_TwoLevelError> & tleVec );
+  virtual bool getInitialQnorm (std::vector<N_TIA_TwoLevelError> & tleVec );
 
-  virtual bool getInnerLoopErrorSums (vector<N_TIA_TwoLevelError> & tleVec);
+  virtual bool getInnerLoopErrorSums (std::vector<N_TIA_TwoLevelError> & tleVec);
 
   bool updateStateArrays ();
   bool startTimeStep ();
@@ -435,45 +443,6 @@ inline bool N_LOA_CktLoader::setInitialGuess(N_LAS_Vector * solVectorPtr)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_LOA_CktLoader::setParam
-// Purpose       :
-// Special Notes : Used for continuation calculations.
-// Scope         : public
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 5/02/03
-//-----------------------------------------------------------------------------
-inline bool N_LOA_CktLoader::setParam(string & name, double val)
-{
-  return  N_LOA_CktLoader::deviceIntPtr->setParam(name,val);
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_LOA_CktLoader::getParam
-// Purpose       :
-// Special Notes : Used for continuation calculations.
-// Scope         : public
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 5/02/03
-//-----------------------------------------------------------------------------
-inline double N_LOA_CktLoader::getParam (const string & name)
-{
-  return N_LOA_CktLoader::deviceIntPtr->getParam(name);
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_LOA_CktLoader::getParam
-// Purpose       :
-// Special Notes :
-// Scope         : public
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 3/04/06
-//-----------------------------------------------------------------------------
-inline bool N_LOA_CktLoader::getParam (const string & name, double & val)
-{
-  return N_LOA_CktLoader::deviceIntPtr->getParam(name,val);
-}
-
-//-----------------------------------------------------------------------------
 // Function      : N_LOA_CktLoader::getVsrcLIDs
 // Purpose       :
 // Special Notes :
@@ -482,7 +451,7 @@ inline bool N_LOA_CktLoader::getParam (const string & name, double & val)
 // Creation Date : 3/05/06
 //-----------------------------------------------------------------------------
 inline bool N_LOA_CktLoader::getVsrcLIDs
-  (string & srcName, int & li_Pos, int & li_Neg, int & li_Bra)
+  (std::string & srcName, int & li_Pos, int & li_Neg, int & li_Bra)
 {
   return N_LOA_CktLoader::deviceIntPtr->getVsrcLIDs
       (srcName, li_Pos, li_Neg, li_Bra);
@@ -577,7 +546,7 @@ inline bool N_LOA_CktLoader::getLimiterFlag ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/11/01
 //-----------------------------------------------------------------------------
-inline bool N_LOA_CktLoader::getBreakPoints ( vector<N_UTL_BreakPoint> & breakPointTimes )
+inline bool N_LOA_CktLoader::getBreakPoints ( std::vector<N_UTL_BreakPoint> & breakPointTimes )
 {
   return N_LOA_CktLoader::deviceIntPtr->getBreakPoints(breakPointTimes);
 }
@@ -645,7 +614,7 @@ inline bool N_LOA_CktLoader::disablePDEContinuation ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 12/03/02
 //-----------------------------------------------------------------------------
-inline void N_LOA_CktLoader::getNumInterfaceNodes (vector<int> & numINodes)
+inline void N_LOA_CktLoader::getNumInterfaceNodes (std::vector<int> & numINodes)
 {
   deviceIntPtr->getNumInterfaceNodes (numINodes);
 }
@@ -739,8 +708,8 @@ inline bool N_LOA_CktLoader::innerDevsConverged()
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
 inline void N_LOA_CktLoader::homotopyStepSuccess
-    (const vector<string> & paramNames,
-     const vector<double> & paramVals)
+    (const std::vector<std::string> & paramNames,
+     const std::vector<double> & paramVals)
 {
   return deviceIntPtr->homotopyStepSuccess (paramNames, paramVals) ;
 }
@@ -806,7 +775,7 @@ inline void N_LOA_CktLoader::acceptStep ()
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 03/18/07
 //-----------------------------------------------------------------------------
-inline bool N_LOA_CktLoader::getInitialQnorm (vector<N_TIA_TwoLevelError> & tleVec )
+inline bool N_LOA_CktLoader::getInitialQnorm (std::vector<N_TIA_TwoLevelError> & tleVec )
 {
   return deviceIntPtr->getInitialQnorm(tleVec);
 }
@@ -819,7 +788,7 @@ inline bool N_LOA_CktLoader::getInitialQnorm (vector<N_TIA_TwoLevelError> & tleV
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 03/15/06
 //-----------------------------------------------------------------------------
-inline bool N_LOA_CktLoader::getInnerLoopErrorSums (vector <N_TIA_TwoLevelError> & tleVec)
+inline bool N_LOA_CktLoader::getInnerLoopErrorSums (std::vector<N_TIA_TwoLevelError> & tleVec)
 {
   return deviceIntPtr->getInnerLoopErrorSums (tleVec);
 }

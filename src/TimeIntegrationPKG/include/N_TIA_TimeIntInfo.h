@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,9 +31,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.11.6.2 $
+// Revision Number: $Revision: 1.16 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -42,9 +42,7 @@
 #define Xyce_N_TIA_TIME_INT_INFO_H
 
 // ---------- Standard Declarations ----------
-#ifdef Xyce_VERBOSE_TIME
-#include <iostream>
-#endif
+#include <iosfwd>
 
 // ---------- Forward Declarations ----------
 
@@ -123,7 +121,6 @@ public:
   bool sweepSourceResetFlag;
 };
 
-#ifdef Xyce_VERBOSE_TIME
 //-----------------------------------------------------------------------------
 // Function      : operator<<
 // Purpose       : "<<" operator for two-level info class.
@@ -132,42 +129,7 @@ public:
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 1/29/07
 //-----------------------------------------------------------------------------
-inline ostream & operator<<(ostream & os, const N_TIA_TimeIntInfo & tiInfo)
-{
-  os << "\n-----------------------------------------\n";
-  os << "\tTimeIntInfo:\n";
-  os << "\tcurrentOrder = " << tiInfo.currentOrder << "\n";
-  os << "\tnumberOfSteps = " << tiInfo.numberOfSteps << "\n";
-  os << "\tusedOrder = " << tiInfo.usedOrder << "\n";
-  os << "\tnscsco = " << tiInfo.nscsco << "\n";
-  
-  os << "\tpdt = " << tiInfo.pdt << "\n";
-  os << "\tnextTimeStep = " << tiInfo.nextTimeStep << "\n";
-  os << "\tcurrTimeStep = " << tiInfo.currTimeStep << "\n";
-  os << "\tnextTime = " << tiInfo.nextTime << "\n";
-  os << "\tcurrentTime = " << tiInfo.currentTime << "\n";
-  os << "\tfinalTime = " << tiInfo.finalTime << "\n";
-  os << "\tstartingTimeStep = " << tiInfo.startingTimeStep << "\n";
-  os << "\tbpTol = " << tiInfo.bpTol << "\n";
-  os << "\tdcopFlag = " << tiInfo.dcopFlag << "\n";
-  os << "\tacopFlag = " << tiInfo.acopFlag << "\n";
-  os << "\tinputOPFlag = " << tiInfo.inputOPFlag << "\n";
-  os << "\ttranopFlag = " << tiInfo.tranopFlag << "\n";
-  os << "\ttransientFlag = " << tiInfo.transientFlag << "\n";
-  os << "\tdcsweepFlag = " << tiInfo.dcsweepFlag << "\n";
-  os << "\tsweepSourceResetFlag = " << tiInfo.sweepSourceResetFlag << "\n";
-  os << "\ttimeStepNumber = " << tiInfo.timeStepNumber << "\n";
-  os << "\tinitTranFlag = " << tiInfo.initTranFlag << "\n";
-  os << "\tbeginIntegrationFlag = " << tiInfo.beginIntegrationFlag << "\n";
-  os << "\tdoubleDCOPStep = " << tiInfo.doubleDCOPStep << "\n";
-  os << "\tdoubleDCOPEnabled = " << tiInfo.doubleDCOPEnabled << "\n";
-  os << "\tstepLoopIter = " << tiInfo.stepLoopIter << "\n";
-  os << "-----------------------------------------\n";
-  os << endl;
-
-  return os;
-}
-#endif
+std::ostream & operator<<(std::ostream & os, const N_TIA_TimeIntInfo & tiInfo);
 
 #endif // Xyce_N_TIA_TIME_INT_INFO_H
 

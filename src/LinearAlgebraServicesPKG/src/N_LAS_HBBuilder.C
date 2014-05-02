@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,17 +31,12 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.2.2.3 $
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Number: $Revision: 1.14 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
-
-
-// ---------- Standard Includes ----------
-
-// ----------   Xyce Includes   ----------
 
 #include <N_LAS_HBBuilder.h>
 #include <N_MPDE_Discretization.h>
@@ -54,24 +49,13 @@
 #include <N_PDS_ParMap.h>
 
 #include <N_ERH_ErrorMgr.h>
-
-// ---------- Other Includes   ----------
+#include <N_UTL_fwd.h>
 
 #include <Epetra_Comm.h>
 #include <Epetra_Map.h>
 #include <Epetra_CrsGraph.h>
 #include <Teuchos_OrdinalTraits.hpp>
 #include <Teuchos_Utils.hpp>
-
-#ifdef HAVE_ALGORITHM
-#include <algorithm>
-#else
-#ifdef HAVE_ALGO_H
-#include <algo.h>
-#else
-#error Must have either <algorithm> or <algo.h>!
-#endif
-#endif
 
 using Teuchos::rcp;
 using Teuchos::RCP;
@@ -127,7 +111,6 @@ N_LAS_Vector * N_LAS_HBBuilder::createVector( double initialValue ) const
 {
   RCP<N_LAS_Vector> vector =
     createExpandedRealFormTransposeBlockVector(); 
-//    createCompressedRealFormTransposeBlockVector();
   vector.release(); // Release ownership of the object.
   return(&*vector);
 }
@@ -143,7 +126,7 @@ N_LAS_Vector * N_LAS_HBBuilder::createVector( double initialValue ) const
 RCP<N_LAS_BlockVector> N_LAS_HBBuilder::createTimeDomainBlockVector( ) const
 {
   RCP<N_LAS_BlockVector> vector = rcp(
-        new N_LAS_BlockVector( numHarmonics_, oHBMap_, BaseMap_ ) 
+        new N_LAS_BlockVector( numHarmonics_, HBMap_, BaseMap_ ) 
         );
   return(vector);
 }
@@ -159,7 +142,7 @@ RCP<N_LAS_BlockVector> N_LAS_HBBuilder::createTimeDomainBlockVector( ) const
 RCP<N_LAS_BlockVector> N_LAS_HBBuilder::createTimeDomainStateBlockVector( ) const
 {
   RCP<N_LAS_BlockVector> vector = rcp(
-        new N_LAS_BlockVector( numHarmonics_, *(HBStateMap_->petraMap()), *(BaseStateMap_->petraMap()) ) 
+        new N_LAS_BlockVector( numHarmonics_, HBStateMap_, BaseStateMap_ ) 
         );
   return(vector);
 }
@@ -175,69 +158,9 @@ RCP<N_LAS_BlockVector> N_LAS_HBBuilder::createTimeDomainStateBlockVector( ) cons
 RCP<N_LAS_BlockVector> N_LAS_HBBuilder::createTimeDomainStoreBlockVector( ) const
 {
   RCP<N_LAS_BlockVector> vector = rcp(
-        new N_LAS_BlockVector( numHarmonics_, *(HBStoreMap_->petraMap()), *(BaseStoreMap_->petraMap()) ) 
+        new N_LAS_BlockVector( numHarmonics_, HBStoreMap_, BaseStoreMap_ ) 
         );
   return(vector);
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_LAS_HBBuilder::createCompressedRealFormVector
-// Purpose       : 
-// Special Notes :
-// Scope         : public
-// Creator       : Todd Coffey 1414, Rich Schiek 1437
-// Creation Date : 9/9/08
-//-----------------------------------------------------------------------------
-RCP<N_LAS_Vector> N_LAS_HBBuilder::createCompressedRealFormVector() const
-{
-  // We're using N_LAS_BlockVector because the N_LAS_Vector interface is ugly (and difficult).
-  RCP<N_LAS_BlockVector> vec = rcp(new N_LAS_BlockVector(
-        1, // one block 
-        *HBCompressedRealFormMap_,
-        *HBCompressedRealFormMap_
-        )
-      );
-  return(vec);
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_LAS_HBBuilder::createExpandedRealFormVector
-// Purpose       : 
-// Special Notes :
-// Scope         : public
-// Creator       : Todd Coffey 1414, Rich Schiek 1437
-// Creation Date : 9/9/08
-//-----------------------------------------------------------------------------
-RCP<N_LAS_Vector> N_LAS_HBBuilder::createExpandedRealFormVector() const
-{
-  // We're using N_LAS_BlockVector because the N_LAS_Vector interface is ugly (and difficult).
-  RCP<N_LAS_BlockVector> vec = rcp(new N_LAS_BlockVector(
-        1, // one block 
-        *HBExpandedRealFormMap_,
-        *HBExpandedRealFormMap_
-        )
-      );
-  return(vec);
-}
-
-
-//-----------------------------------------------------------------------------
-// Function      : N_LAS_HBBuilder::createCompressedRealFormBlockVector
-// Purpose       : 
-// Special Notes :
-// Scope         : public
-// Creator       : Todd Coffey 1414, Rich Schiek 1437
-// Creation Date : 9/9/08
-//-----------------------------------------------------------------------------
-RCP<N_LAS_BlockVector> N_LAS_HBBuilder::createCompressedRealFormBlockVector() const
-{
-  RCP<N_LAS_BlockVector> vec = rcp(new N_LAS_BlockVector(
-        numHarmonics_+1,
-        *HBCompressedRealFormBVMap_,
-        *(BaseMap_->petraMap())
-        )
-      );
-  return(vec);
 }
 
 //-----------------------------------------------------------------------------
@@ -250,30 +173,9 @@ RCP<N_LAS_BlockVector> N_LAS_HBBuilder::createCompressedRealFormBlockVector() co
 //-----------------------------------------------------------------------------
 RCP<N_LAS_BlockVector> N_LAS_HBBuilder::createExpandedRealFormBlockVector() const
 {
-  RCP<N_LAS_BlockVector> vec = rcp(new N_LAS_BlockVector(
-        2*numHarmonics_,
-        *HBExpandedRealFormBVMap_,
-        *(BaseMap_->petraMap())
-        )
-      );
-  return(vec);
-}
-//-----------------------------------------------------------------------------
-// Function      : N_LAS_HBBuilder::createCompressedRealFormTransposeBlockVector
-// Purpose       : 
-// Special Notes :
-// Scope         : public
-// Creator       : Todd Coffey 1414, Rich Schiek 1437
-// Creation Date : 9/9/08
-//-----------------------------------------------------------------------------
-RCP<N_LAS_BlockVector> N_LAS_HBBuilder::createCompressedRealFormTransposeBlockVector() const
-{
-  RCP<N_LAS_BlockVector> vec = rcp(new N_LAS_BlockVector(
-        numSolVariables_,
-        *HBCompressedRealFormBVMap_,
-        *HBCompressedRealFormMap_
-        )
-      );
+  RCP<N_LAS_BlockVector> vec = rcp(
+        new N_LAS_BlockVector( 2*numHarmonics_, HBExpandedRealFormBVMap_, BaseMap_ )
+        );
   return(vec);
 }
 
@@ -287,12 +189,9 @@ RCP<N_LAS_BlockVector> N_LAS_HBBuilder::createCompressedRealFormTransposeBlockVe
 //-----------------------------------------------------------------------------
 RCP<N_LAS_BlockVector> N_LAS_HBBuilder::createExpandedRealFormTransposeBlockVector() const
 {
-  RCP<N_LAS_BlockVector> vec = rcp(new N_LAS_BlockVector(
-        numSolVariables_,
-        *HBExpandedRealFormBVMap_,
-        *HBExpandedRealFormMap_
-        )
-      );
+  RCP<N_LAS_BlockVector> vec = rcp(
+        new N_LAS_BlockVector( 2*numHarmonics_, HBExpandedRealFormBVMap_ )
+        );
   return(vec);
 }
 
@@ -306,12 +205,9 @@ RCP<N_LAS_BlockVector> N_LAS_HBBuilder::createExpandedRealFormTransposeBlockVect
 //-----------------------------------------------------------------------------
 RCP<N_LAS_BlockVector> N_LAS_HBBuilder::createExpandedRealFormTransposeStateBlockVector() const
 {
-  RCP<N_LAS_BlockVector> vec = rcp(new N_LAS_BlockVector(
-        numStateVariables_,
-        *HBExpandedRealFormStateBVMap_,
-        *HBExpandedRealFormStateMap_
-        )
-      );
+  RCP<N_LAS_BlockVector> vec = rcp(
+        new N_LAS_BlockVector( 2*numHarmonics_, HBExpandedRealFormStateBVMap_ )
+        );
   return(vec);
 }
 
@@ -325,12 +221,9 @@ RCP<N_LAS_BlockVector> N_LAS_HBBuilder::createExpandedRealFormTransposeStateBloc
 //-----------------------------------------------------------------------------
 RCP<N_LAS_BlockVector> N_LAS_HBBuilder::createExpandedRealFormTransposeStoreBlockVector() const
 {
-  RCP<N_LAS_BlockVector> vec = rcp(new N_LAS_BlockVector(
-        numStoreVariables_,
-        *HBExpandedRealFormStoreBVMap_,
-        *HBExpandedRealFormStoreMap_
-        )
-      );
+  RCP<N_LAS_BlockVector> vec = rcp(
+        new N_LAS_BlockVector( 2*numHarmonics_, HBExpandedRealFormStoreBVMap_ )
+        );
   return(vec);
 }
 
@@ -390,6 +283,7 @@ N_LAS_Matrix * N_LAS_HBBuilder::createDAEdFdxMatrix( double initialValue ) const
 {
   return dynamic_cast<N_LAS_Matrix*>(
         new N_LAS_BlockMatrix( numHarmonics_,
+                               offset_,
                                blockPattern_,
                                *HBFullGraph_,
                                *BaseFullGraph_ ) );
@@ -417,24 +311,22 @@ N_LAS_Matrix * N_LAS_HBBuilder::createDAEFullMatrix( double initialValue ) const
 // Creation Date : 03/12/04
 //-----------------------------------------------------------------------------
 bool N_LAS_HBBuilder::generateMaps( const RCP<N_PDS_ParMap>& BaseMap, 
-                                 const RCP<N_PDS_ParMap>& oBaseMap )
+                                    const RCP<N_PDS_ParMap>& oBaseMap )
 {
   //Save copy of base map
   BaseMap_ = BaseMap;
-  //std::cout << "BaseMap" << std::endl;
-  //BaseMap->petraMap()->Print(std::cout);
+  //Xyce::dout() << "BaseMap" << std::endl;
+  //BaseMap->petraMap()->Print(Xyce::dout());
   oBaseMap_ = oBaseMap;
-  //std::cout << "oBaseMap" << std::endl;
-  //oBaseMap->petraMap()->Print(std::cout);
+  //Xyce::dout() << "oBaseMap" << std::endl;
+  //oBaseMap->petraMap()->Print(Xyce::dout());
 
   //Determine block offset
-  int MaxGID = BaseMap->maxGlobalEntity();
-  
-  offset_=1;
-  while ( offset_ <= MaxGID ) offset_ *= 10;
+  offset_ = generateOffset( *BaseMap );
 
   //Check to see if a graph can be generated using 32-bit integers for the 
   //specified number of harmonics.
+  int MaxGID = BaseMap->maxGlobalEntity();
   long int hbMaxGID = MaxGID + offset_*(numHarmonics_-1);
   if ( hbMaxGID > Teuchos::OrdinalTraits<int>::max() )
   {
@@ -445,54 +337,22 @@ bool N_LAS_HBBuilder::generateMaps( const RCP<N_PDS_ParMap>& BaseMap,
   }                          
 
   // Use the block linear system helper to create the block parallel maps
-  // NOTE:  At this time augmented parallel maps are not supported.
   std::vector<RCP<N_PDS_ParMap> > blockMaps = createBlockParMaps(numHarmonics_, *BaseMap, *oBaseMap);
 
   HBMap_ = blockMaps[0];
   oHBMap_ = blockMaps[1];
   
-  //std::cout << "HBMap_" << std::endl;
-  //std::cout << *HBMap_ << std::endl; 
-  //std::cout << "oHBMap_" << std::endl;
-  //std::cout << *oHBMap_ << std::endl;
+  //Xyce::dout() << "HBMap_" << std::endl;
+  //Xyce::dout() << *HBMap_ << std::endl; 
+  //Xyce::dout() << "oHBMap_" << std::endl;
+  //Xyce::dout() << *oHBMap_ << std::endl;
   //Save copy of base map
-
-  const Epetra_Comm & Comm  = BaseMap_->petraMap()->Comm();
-  int BaseIndex = BaseMap->indexBase();
-  //BaseMap_->petraMap()->SetTracebackMode(2); 
 
   // Helpful names for various sizes (subtract 1 for ground node):
   numSolVariables_ = oBaseMap_->numLocalEntities()-1;
 
-  // Compressed Real Form small map:
-  HBCompressedRealFormMap_ = rcp(new Epetra_Map(
-        numHarmonics_+1,
-        BaseIndex,
-        Comm
-        )
-      );
-  // Expanded Real Form small map:
-  HBExpandedRealFormMap_ = rcp(new Epetra_Map(
-        2*numHarmonics_,
-        BaseIndex,
-        Comm
-        )
-      );
-
-  // Compressed Real Form for Block Vector map:
-  HBCompressedRealFormBVMap_ = rcp(new Epetra_Map(
-        numSolVariables_*(numHarmonics_+1),
-        BaseIndex,
-        Comm
-        )
-      );
   // Expanded Real Form for Block Vector map:
-  HBExpandedRealFormBVMap_ = rcp(new Epetra_Map(
-        numSolVariables_*2*numHarmonics_,
-        BaseIndex,
-        Comm
-        )
-      );
+  HBExpandedRealFormBVMap_ = createBlockFreqERFParMap( numHarmonics_, *BaseMap );
 
   return true;
 }
@@ -510,38 +370,18 @@ bool N_LAS_HBBuilder::generateStateMaps( const RCP<N_PDS_ParMap>& BaseStateMap )
   //Save copy of base map
   BaseStateMap_ = BaseStateMap;
 
-  const Epetra_Comm & Comm  = BaseStateMap_->petraMap()->Comm();
-
   //determine block offset
-  int MaxGID = BaseStateMap->maxGlobalEntity();
-  
-  stateOffset_=1;
-  while ( stateOffset_ <= MaxGID ) stateOffset_ *= 10;
+  stateOffset_ = generateOffset( *BaseStateMap );
 
   // Use the block linear system helper to create the block parallel maps
   // NOTE:  At this time augmented parallel maps are not supported.
   HBStateMap_ = createBlockParMap(numHarmonics_, *BaseStateMap);
 
-  //determine base index
-  int BaseStateIndex = BaseStateMap->indexBase();
-
   // Helpful names for various sizes:
   numStateVariables_ = BaseStateMap_->numGlobalEntities();
 
-  HBExpandedRealFormStateMap_ = rcp(new Epetra_Map(
-        2*numHarmonics_,
-        BaseStateIndex,
-        Comm
-        )
-      );
-
   // Expanded Real Form for Block Vector map:
-  HBExpandedRealFormStateBVMap_ = rcp(new Epetra_Map(
-        numStateVariables_*2*numHarmonics_,
-        BaseStateIndex,
-        Comm
-        )
-      );
+  HBExpandedRealFormStateBVMap_ = createBlockFreqERFParMap( numHarmonics_, *BaseStateMap );
 
   return true;
 }
@@ -559,38 +399,18 @@ bool N_LAS_HBBuilder::generateStoreMaps( const RCP<N_PDS_ParMap>& BaseStoreMap )
   //Save copy of base map
   BaseStoreMap_ = BaseStoreMap;
 
-  const Epetra_Comm & Comm  = BaseStoreMap_->petraMap()->Comm();
-
   //determine block offset
-  int MaxGID = BaseStoreMap->maxGlobalEntity();
-  
-  storeOffset_=1;
-  while ( storeOffset_ <= MaxGID ) storeOffset_ *= 10;
+  storeOffset_ = generateOffset( *BaseStoreMap );
 
   // Use the block linear system helper to create the block parallel maps
   // NOTE:  At this time augmented parallel maps are not supported.
   HBStoreMap_ = createBlockParMap(numHarmonics_, *BaseStoreMap);
 
-  //determine base index
-  int BaseStoreIndex = BaseStoreMap->indexBase();
-
   // Helpful names for various sizes:
   numStoreVariables_ = BaseStoreMap_->numGlobalEntities();
 
-  HBExpandedRealFormStoreMap_ = rcp(new Epetra_Map(
-        2*numHarmonics_,
-        BaseStoreIndex,
-        Comm
-        )
-      );
-
   // Expanded Real Form for Block Vector map:
-  HBExpandedRealFormStoreBVMap_ = rcp(new Epetra_Map(
-        numStoreVariables_*2*numHarmonics_,
-        BaseStoreIndex,
-        Comm
-        )
-      );
+  HBExpandedRealFormStoreBVMap_ = createBlockFreqERFParMap( numHarmonics_, *BaseStoreMap );
 
   return true;
 }
@@ -605,7 +425,9 @@ bool N_LAS_HBBuilder::generateStoreMaps( const RCP<N_PDS_ParMap>& BaseStoreMap )
 //-----------------------------------------------------------------------------
 bool N_LAS_HBBuilder::generateGraphs( const Epetra_CrsGraph & BaseFullGraph )
 {
-  if( Teuchos::is_null(BaseMap_) ) abort(); //Need to setup Maps first
+  if( Teuchos::is_null(BaseMap_) )
+    Xyce::Report::DevelFatal0().in("N_LAS_HBBuilder::generateGraphs")
+      << "Need to setup Maps first";
 
   //Copies of base graphs
   BaseFullGraph_ = rcp(new Epetra_CrsGraph( BaseFullGraph ));
@@ -630,7 +452,7 @@ bool N_LAS_HBBuilder::generateGraphs( const Epetra_CrsGraph & BaseFullGraph )
                                           0 ));
   
   int MaxIndices = BaseFullGraph_->MaxNumIndices();
-  vector<int> Indices(MaxIndices);
+  std::vector<int> Indices(MaxIndices);
   int NumIndices=0, BaseRow=0, HBRow=0;
 
   for( int i = 0; i < numHarmonics_; ++i )
@@ -648,8 +470,8 @@ bool N_LAS_HBBuilder::generateGraphs( const Epetra_CrsGraph & BaseFullGraph )
   }
   
 #ifdef Xyce_DEBUG_HB
-  std::cout << "N_LAS_HBBuilder::generateGraphs():  HB full graph after inserting diagonal blocks:" << std::endl;
-  HBFullGraph_->Print(cout);
+  Xyce::dout() << "N_LAS_HBBuilder::generateGraphs():  HB full graph after inserting diagonal blocks:" << std::endl;
+  HBFullGraph_->Print(std::cout);
 #endif // Xyce_DEBUG_HB
  
   MaxIndices = BaseFullGraph_->MaxNumIndices();
@@ -685,8 +507,8 @@ bool N_LAS_HBBuilder::generateGraphs( const Epetra_CrsGraph & BaseFullGraph )
   HBFullGraph_->FillComplete();
 
 #ifdef Xyce_DEBUG_HB
-  std::cout << "N_LAS_HBBuilder::generateGraphs():  Final HB Graph = " << std::endl;
-  HBFullGraph_->Print(cout);
+  Xyce::dout() << "N_LAS_HBBuilder::generateGraphs():  Final HB Graph = " << std::endl;
+  HBFullGraph_->Print(std::cout);
 #endif // Xyce_DEBUG_HB
 
   return true;
@@ -703,8 +525,7 @@ bool N_LAS_HBBuilder::generateGraphs( const Epetra_CrsGraph & BaseFullGraph )
 //-----------------------------------------------------------------------------
 RCP<const Epetra_Map> N_LAS_HBBuilder::getSolutionMap() const
 {
-//  return(HBCompressedRealFormBVMap_); HBExpandedRealFormBVMap_
-    return(HBExpandedRealFormBVMap_);
+    return(rcp(HBExpandedRealFormBVMap_->petraMap(),false));
 }
 
 //-----------------------------------------------------------------------------

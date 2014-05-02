@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.44.2.2 $
+// Revision Number: $Revision: 1.49.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -60,17 +60,17 @@
 // enum statements:
 // device indices:
 enum Src_index{
-    _SIN_DATA,      // 0
-    _EXP_DATA,      // 1
-    _PULSE_DATA,    // 2
-    _PWL_DATA,      // 3
-    _SFFM_DATA,     // 4
-    _DC_DATA,    // 5
-    _SMOOTH_PULSE_DATA, // 6
-    _AC_DATA,     //tmei: 05/02
-    //_DISTOF1_DATA,
-    //_DISTOF2_DATA,
-    _NUM_SRC_DATA       // total number of data types
+  _SIN_DATA,      // 0
+  _EXP_DATA,      // 1
+  _PULSE_DATA,    // 2
+  _PWL_DATA,      // 3
+  _SFFM_DATA,     // 4
+  _DC_DATA,    // 5
+  _SMOOTH_PULSE_DATA, // 6
+  _AC_DATA,     //tmei: 05/02
+  //_DISTOF1_DATA,
+  //_DISTOF2_DATA,
+  _NUM_SRC_DATA       // total number of data types
 };
 
 
@@ -89,8 +89,8 @@ class SourceData
 {
 
 public:
-  SourceData(SolverState & ss1,
-             DeviceOptions & do1);
+  SourceData(const SolverState & ss1,
+             const DeviceOptions & do1);
   SourceData(const SourceData &right);
 
   virtual ~SourceData();
@@ -98,7 +98,7 @@ public:
   virtual bool initializeSource ();
 
   virtual bool updateSource   ();
-  virtual bool getBreakPoints (vector<N_UTL_BreakPoint> & breakPointTimes)
+  virtual bool getBreakPoints (std::vector<N_UTL_BreakPoint> & breakPointTimes)
   { return true; }
 
   virtual double getMaxTimeStepSize ();
@@ -112,7 +112,7 @@ public:
   bool getResetFlag ()
   { return resetFlag_; }
 
-  string getSourceTypeName ();
+  std::string getSourceTypeName ();
 
   virtual void getParams (double *) {}
   virtual void setParams (double *) {}
@@ -137,9 +137,9 @@ private:
 public:
 protected:
 
-  string sourceName_;
-  string typeName_;
-  string defaultParamName_;
+  std::string sourceName_;
+  std::string typeName_;
+  std::string defaultParamName_;
 
   double time;
   double SourceValue;
@@ -148,8 +148,8 @@ protected:
 
   bool resetFlag_;
 
-  SolverState & solState_;
-  DeviceOptions & devOptions_;
+  const SolverState & solState_;
+  const DeviceOptions & devOptions_;
 
   bool fastTimeScaleFlag_;
 
@@ -177,9 +177,9 @@ class SinData : public SourceData
 
 public:
   SinData(const SinData &right);
-  SinData(const vector<Param> & paramRef,
-          SolverState   & ss1,
-          DeviceOptions & do1);
+  SinData(const std::vector<Param> & paramRef,
+          const SolverState   & ss1,
+          const DeviceOptions & do1);
 
   ~SinData();
 
@@ -236,9 +236,9 @@ class ExpData : public SourceData
 {
 public:
   ExpData(const ExpData & right);
-  ExpData(const vector<Param> & paramRef,
-          SolverState & ss1,
-          DeviceOptions & do1);
+  ExpData(const std::vector<Param> & paramRef,
+          const SolverState & ss1,
+          const DeviceOptions & do1);
 
   ~ExpData();
 
@@ -292,9 +292,9 @@ class ACData : public SourceData
 
 public:
   ACData(const ACData &right);
-  ACData(const vector<Param> & paramRef,
-         SolverState   & ss1,
-         DeviceOptions & do1);
+  ACData(const std::vector<Param> & paramRef,
+         const SolverState   & ss1,
+         const DeviceOptions & do1);
 
   ~ACData();
 
@@ -308,13 +308,7 @@ public:
 
   void setRealFlag(bool flag) { realFlag_ = flag; }
 
-protected:
 private:
-
-public:
-protected:
-private:
-
   double ACMAG;    // Amplitude (V or A)
   double ACPHASE; // Phase (degrees)
 
@@ -340,9 +334,9 @@ class PulseData : public SourceData
 {
 public:
   PulseData(const PulseData  & right);
-  PulseData(const vector<Param> & paramRef,
-            SolverState   & ss1,
-            DeviceOptions & do1);
+  PulseData(const std::vector<Param> & paramRef,
+            const SolverState   & ss1,
+            const DeviceOptions & do1);
 
   ~PulseData();
 
@@ -350,7 +344,7 @@ public:
   bool updateSource();
   void getParams (double *);
   void setParams (double *);
-  bool getBreakPoints(vector<N_UTL_BreakPoint> & breakPointTimes);
+  bool getBreakPoints(std::vector<N_UTL_BreakPoint> & breakPointTimes);
 
 #ifdef Xyce_DEBUG_DEVICE
   void printOutParams();
@@ -359,9 +353,6 @@ public:
   double getMaxTimeStepSize ();
 
   double period() { return PER; }
-
-protected:
-private:
 
 public:
   double V1;  // Initial value  (for a voltage source, units are Volts,
@@ -400,31 +391,26 @@ class PWLinData : public SourceData
 {
 public:
   PWLinData(const PWLinData &right);
-  PWLinData(const vector<Param> & paramRef,
-            SolverState   & ss1,
-            DeviceOptions & do1);
+  PWLinData(const std::vector<Param> & paramRef,
+            const SolverState   & ss1,
+            const DeviceOptions & do1);
 
   ~PWLinData();
 
   bool updateSource();
-  bool getBreakPoints( vector<N_UTL_BreakPoint> & breakPointTimes);
+  bool getBreakPoints( std::vector<N_UTL_BreakPoint> & breakPointTimes);
 
 #ifdef Xyce_DEBUG_DEVICE
   void printOutParams ();
 #endif
 
-protected:
-private:
-
-public:
-protected:
 private:
   // Data Members for Class Attributes
   int NUM; //number of time,voltage pairs
   bool REPEAT; //repeat cycle?
   double REPEATTIME; //start time in cycle for repeat
   double TD; //time delay
-  vector< pair<double,double> > TVVEC;  // Array (time,voltage)
+  std::vector< std::pair<double,double> > TVVEC;  // Array (time,voltage)
 
   int loc_; //current location in time vector
   double starttime_; //absolute start time of current cycle
@@ -448,9 +434,9 @@ class SFFMData : public SourceData
 {
 public:
   SFFMData(const SFFMData   & right);
-  SFFMData(const vector<Param> & paramRef,
-           SolverState   & ss1,
-           DeviceOptions & do1);
+  SFFMData(const std::vector<Param> & paramRef,
+           const SolverState   & ss1,
+           const DeviceOptions & do1);
 
   ~SFFMData();
 
@@ -463,11 +449,6 @@ public:
   void printOutParams ();
 #endif
 
-protected:
-private:
-
-public:
-protected:
 private:
   double V0;  // Offset. (V or A)
   double VA;  // Amplitude (V or A)
@@ -499,9 +480,9 @@ class ConstData : public SourceData
 {
 public:
   ConstData(const ConstData   & right);
-  ConstData(const vector<Param> & paramRef,
-            SolverState   & ss1,
-            DeviceOptions & do1);
+  ConstData(const std::vector<Param> & paramRef,
+            const SolverState   & ss1,
+            const DeviceOptions & do1);
 
   ~ConstData();
 
@@ -512,11 +493,7 @@ public:
 #ifdef Xyce_DEBUG_DEVICE
   void printOutParams();
 #endif
-protected:
-private:
 
-public:
-protected:
 private:
   double V0;
 
@@ -539,9 +516,9 @@ class SmoothPulseData : public SourceData
 {
 public:
   SmoothPulseData(const SmoothPulseData  & right);
-  SmoothPulseData(const vector<Param> & paramRef,
-                  SolverState   & ss1,
-                  DeviceOptions & do1);
+  SmoothPulseData(const std::vector<Param> & paramRef,
+                  const SolverState   & ss1,
+                  const DeviceOptions & do1);
 
   ~SmoothPulseData();
 
@@ -549,7 +526,7 @@ public:
   bool updateSource();
   void getParams (double *);
   void setParams (double *);
-  bool getBreakPoints(vector<N_UTL_BreakPoint> & breakPointTimes);
+  bool getBreakPoints(std::vector<N_UTL_BreakPoint> & breakPointTimes);
 
 #ifdef Xyce_DEBUG_DEVICE
   void printOutParams();
@@ -558,9 +535,6 @@ public:
   double getMaxTimeStepSize ();
 
   double period() { return PER; }
-
-protected:
-private:
 
 public:
   double V1;  // Initial value  (for a voltage source, units are Volts,

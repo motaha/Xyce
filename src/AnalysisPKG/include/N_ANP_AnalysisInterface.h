@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.36.2.3 $
+// Revision Number: $Revision: 1.47 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:30 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -59,12 +59,15 @@ using Teuchos::rcp;
 
 #include <N_DEV_fwd.h>
 #include <N_UTL_fwd.h>
+#include <N_ANP_fwd.h>
+
 #include <N_UTL_Xyce.h>
 #include <N_UTL_Misc.h>
 #include <N_UTL_Timer.h>
 #include <N_NLS_Manager.h>
 
 #include <N_IO_fwd.h>
+#include <N_PDS_fwd.h>
 #include <N_IO_PkgOptionsMgr.h>
 
 // ---------- Forward Declarations ----------
@@ -78,22 +81,16 @@ class N_NLS_Manager;
 
 class N_LAS_System;
 
-class N_IO_CmdParse;
-
 class N_LOA_Loader;
 
-class N_IO_RestartMgr;
-class N_IO_PkgOptionsMgr;
-
-class N_PDS_Comm;
 class N_PDS_Manager;
-class N_ANP_AnalysisManager;
 class N_TIA_MPDEInterface;
-class N_UTL_BreakPoint;
 
 class N_LOA_NonlinearEquationLoader;
-class N_TOP_Topology;
 class N_LAS_Builder;
+
+namespace Xyce {
+namespace Analysis {
 
 // ---------- Enum Definitions ----------
 enum Vector_Tag
@@ -103,7 +100,7 @@ enum Vector_Tag
   NUM_VECTOR_TYPES // 2
 };
 
-enum ANP_Analysis_Mode
+enum Analysis_Mode
 {
   ANP_MODE_INVALID,
   ANP_MODE_DC_OP,
@@ -119,32 +116,29 @@ enum ANP_Analysis_Mode
 //-----------------------------------------------------------------------------
 // Class         :
 // Purpose       : This function converts between N_NLS_Manager.h AnalysisMode
-//               : and N_ANP_AnalysisInterface.h ANP_Analysis_Mode
+//               : and AnalysisInterface.h ANP_Analysis_Mode
 // Special Notes :
 // Creator       : Todd Coffey, 1414
 // Creation Date : 07/23/08
 //-----------------------------------------------------------------------------
-AnalysisMode anpAnalysisModeToNLS(ANP_Analysis_Mode mode);
-
-
-
+AnalysisMode anpAnalysisModeToNLS(Analysis_Mode mode);
 
 //-----------------------------------------------------------------------------
-// Class         : N_ANP_AnalysisInterface
+// Class         : AnalysisInterface
 // Purpose       :
 // Special Notes :
 // Creator       : Eric R. Keiter, 9233, Computational Sciences
 // Creation Date : 11/09/00
 //-----------------------------------------------------------------------------
-class N_ANP_AnalysisInterface
+class AnalysisInterface
 {
 public:
 
   // Default donstructor
-  N_ANP_AnalysisInterface(N_IO_CmdParse & cp);
+  AnalysisInterface(N_IO_CmdParse & cp);
 
   // Destructor
-  ~N_ANP_AnalysisInterface();
+  ~AnalysisInterface();
 
 
   // Execution functions:
@@ -187,7 +181,7 @@ public:
   bool registerApplicationBuilder( N_LAS_Builder * appBuilderPtr );
 
   // Method to register the package options manager
-  bool registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr );
+  bool registerPkgOptionsMgr( N_IO_PkgOptionsMgr * pkgOptPtr );
 
   // Method to set the transient solution parameters.
   bool setTranAnalysisParams(const N_UTL_OptionBlock & tiaParamBlock);
@@ -295,8 +289,8 @@ public:
 
   // updates the State vectors. This function is called from the LOCA interface.
   bool completeHomotopyStep
-    ( const vector<string> & paramNames,
-      const vector<double> & paramVals,
+    ( const std::vector<std::string> & paramNames,
+      const std::vector<double> & paramVals,
       N_LAS_Vector * solnVecPtr );
 
   // Called from the LOCA interface:
@@ -309,8 +303,8 @@ public:
   // loop.
   bool equateTmpVectors();
 
-  bool updateDerivsBlock(const list < index_pair > & solGIDList,
-                         const list < index_pair > & staGIDlist);
+  bool updateDerivsBlock(const std::list< index_pair > & solGIDList,
+                         const std::list< index_pair > & staGIDlist);
 
   // Gets the size of the restart data (bytes?).
   int restartDataSize( bool pack = true );
@@ -322,22 +316,22 @@ public:
   bool restoreRestartData(char * buf, int bsize, int & pos, N_PDS_Comm * comm, bool pack = true );
 
   // Gets the solution variable data.
-  bool getSolnVarData(const int & gid, vector < double > & varData);
+  bool getSolnVarData(const int & gid, std::vector< double > & varData);
 
   // Gets the state variable data.
-  bool getStateVarData(const int & gid, vector < double > & varData);
+  bool getStateVarData(const int & gid, std::vector< double > & varData);
 
   // Gets the store variable data.
-  bool getStoreVarData(const int & gid, vector < double > & varData);
+  bool getStoreVarData(const int & gid, std::vector< double > & varData);
 
   // Sets the solution variable data.
-  bool setSolnVarData(const int & gid, const vector < double > & varData);
+  bool setSolnVarData(const int & gid, const std::vector< double > & varData);
 
   // Sets the state variable data.
-  bool setStateVarData(const int & gid, const vector < double > & varData);
+  bool setStateVarData(const int & gid, const std::vector< double > & varData);
 
   // Sets the store variable data.
-  bool setStoreVarData(const int & gid, const vector < double > & varData);
+  bool setStoreVarData(const int & gid, const std::vector< double > & varData);
 
   // set begining integration to true
   void setBeginningIntegrationFlag(bool bif);
@@ -355,239 +349,239 @@ public:
   N_TIA_TIAParams& getTIAParams();
 
   // .TRAN
-  struct N_ANP_AnalysisInterface_TransAnalysisReg : public N_IO_PkgOptionsReg
+  struct AnalysisInterface_TransAnalysisReg : public N_IO_PkgOptionsReg
   {
-    N_ANP_AnalysisInterface_TransAnalysisReg( N_ANP_AnalysisInterface * mgr )
+    AnalysisInterface_TransAnalysisReg( AnalysisInterface * mgr )
     : Mgr(mgr)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return Mgr->setTranAnalysisParams( options ); }
 
-    N_ANP_AnalysisInterface * Mgr;
+    AnalysisInterface * Mgr;
   };
 
   // .options TIMEINT
-  struct N_ANP_AnalysisInterface_TranOptionsReg : public N_IO_PkgOptionsReg
+  struct AnalysisInterface_TranOptionsReg : public N_IO_PkgOptionsReg
   {
-    N_ANP_AnalysisInterface_TranOptionsReg( N_ANP_AnalysisInterface * mgr )
+    AnalysisInterface_TranOptionsReg( AnalysisInterface * mgr )
     : Mgr(mgr)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return Mgr->setTranOptions( options ); }
 
-    N_ANP_AnalysisInterface * Mgr;
+    AnalysisInterface * Mgr;
   };
 
   // .DC
-  struct N_ANP_AnalysisInterface_DCAnalysisReg : public N_IO_PkgOptionsReg
+  struct AnalysisInterface_DCAnalysisReg : public N_IO_PkgOptionsReg
   {
-    N_ANP_AnalysisInterface_DCAnalysisReg( N_ANP_AnalysisInterface * mgr )
+    AnalysisInterface_DCAnalysisReg( AnalysisInterface * mgr )
     : Mgr(mgr)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return Mgr->setDCAnalysisParams( options ); }
 
-    N_ANP_AnalysisInterface * Mgr;
+    AnalysisInterface * Mgr;
   };
 
   // .options OP_IO
-  struct N_ANP_AnalysisInterface_DCOPOptionsReg : public N_IO_PkgOptionsReg
+  struct AnalysisInterface_DCOPOptionsReg : public N_IO_PkgOptionsReg
   {
-    N_ANP_AnalysisInterface_DCOPOptionsReg( N_ANP_AnalysisInterface * mgr )
+    AnalysisInterface_DCOPOptionsReg( AnalysisInterface * mgr )
     : Mgr(mgr)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return Mgr->setDCOPRestartParams( options ); }
 
-    N_ANP_AnalysisInterface * Mgr;
+    AnalysisInterface * Mgr;
   };
 
 
   // .OP
-  struct N_ANP_AnalysisInterface_OPAnalysisReg : public N_IO_PkgOptionsReg
+  struct AnalysisInterface_OPAnalysisReg : public N_IO_PkgOptionsReg
   {
-    N_ANP_AnalysisInterface_OPAnalysisReg( N_ANP_AnalysisInterface * mgr )
+    AnalysisInterface_OPAnalysisReg( AnalysisInterface * mgr )
     : Mgr(mgr)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return Mgr->setOPAnalysisParams( options ); }
 
-    N_ANP_AnalysisInterface * Mgr;
+    AnalysisInterface * Mgr;
   };
 
   // .STEP
-  struct N_ANP_AnalysisInterface_STEPAnalysisReg : public N_IO_PkgOptionsReg
+  struct AnalysisInterface_STEPAnalysisReg : public N_IO_PkgOptionsReg
   {
-    N_ANP_AnalysisInterface_STEPAnalysisReg( N_ANP_AnalysisInterface * mgr )
+    AnalysisInterface_STEPAnalysisReg( AnalysisInterface * mgr )
     : Mgr(mgr)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return Mgr->setSTEPAnalysisParams( options ); }
 
-    N_ANP_AnalysisInterface * Mgr;
+    AnalysisInterface * Mgr;
   };
 
   // .options SAVE
-  struct N_ANP_AnalysisInterface_SaveOptionsReg : public N_IO_PkgOptionsReg
+  struct AnalysisInterface_SaveOptionsReg : public N_IO_PkgOptionsReg
   {
-    N_ANP_AnalysisInterface_SaveOptionsReg( N_ANP_AnalysisInterface * mgr )
+    AnalysisInterface_SaveOptionsReg( AnalysisInterface * mgr )
     : Mgr(mgr)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return Mgr->setSaveOptions( options ); }
 
-    N_ANP_AnalysisInterface * Mgr;
+    AnalysisInterface * Mgr;
   };
 
   // .MPDE
-  struct N_ANP_AnalysisInterface_MPDE_AnalysisReg : public N_IO_PkgOptionsReg
+  struct AnalysisInterface_MPDE_AnalysisReg : public N_IO_PkgOptionsReg
   {
-    N_ANP_AnalysisInterface_MPDE_AnalysisReg( N_ANP_AnalysisInterface * anpInt )
+    AnalysisInterface_MPDE_AnalysisReg( AnalysisInterface * anpInt )
     : anpInt_(anpInt)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return anpInt_->setMPDEAnalysisParams( options ); }
 
-    N_ANP_AnalysisInterface * anpInt_;
+    AnalysisInterface * anpInt_;
   };
 
   // .HB
-  struct N_ANP_AnalysisInterface_HB_AnalysisReg : public N_IO_PkgOptionsReg
+  struct AnalysisInterface_HB_AnalysisReg : public N_IO_PkgOptionsReg
   {
-    N_ANP_AnalysisInterface_HB_AnalysisReg( N_ANP_AnalysisInterface * anpInt )
+    AnalysisInterface_HB_AnalysisReg( AnalysisInterface * anpInt )
     : anpInt_(anpInt)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return anpInt_->setHBAnalysisParams( options ); }
 
-    N_ANP_AnalysisInterface * anpInt_;
+    AnalysisInterface * anpInt_;
   };
 
   // .options HBINT
-  struct N_ANP_AnalysisInterface_HB_OptionsReg : public N_IO_PkgOptionsReg
+  struct AnalysisInterface_HB_OptionsReg : public N_IO_PkgOptionsReg
   {
-    N_ANP_AnalysisInterface_HB_OptionsReg( N_ANP_AnalysisInterface * anpInt )
+    AnalysisInterface_HB_OptionsReg( AnalysisInterface * anpInt )
     : anpInt_(anpInt)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return anpInt_->setHBOptions( options ); }
 
-    N_ANP_AnalysisInterface * anpInt_;
+    AnalysisInterface * anpInt_;
   };
 
   // .options LINSOL
-  struct N_ANP_AnalysisInterface_LinSolReg : public N_IO_PkgOptionsReg
+  struct AnalysisInterface_LinSolReg : public N_IO_PkgOptionsReg
   {
-    N_ANP_AnalysisInterface_LinSolReg( N_ANP_AnalysisInterface * anpInt )
+    AnalysisInterface_LinSolReg( AnalysisInterface * anpInt )
     : anpInt_(anpInt)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return anpInt_->setLinSol( options ); }
 
-    N_ANP_AnalysisInterface * anpInt_;
+    AnalysisInterface * anpInt_;
   };
 
   // .options LINSOL-HB
-  struct N_ANP_AnalysisInterface_HB_LinSolReg : public N_IO_PkgOptionsReg
+  struct AnalysisInterface_HB_LinSolReg : public N_IO_PkgOptionsReg
   {
-    N_ANP_AnalysisInterface_HB_LinSolReg( N_ANP_AnalysisInterface * anpInt )
+    AnalysisInterface_HB_LinSolReg( AnalysisInterface * anpInt )
     : anpInt_(anpInt)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return anpInt_->setHBLinSol( options ); }
 
-    N_ANP_AnalysisInterface * anpInt_;
+    AnalysisInterface * anpInt_;
   };
 
   // .options MPDEINT
-  struct N_ANP_AnalysisInterface_MPDE_OptionsReg : public N_IO_PkgOptionsReg
+  struct AnalysisInterface_MPDE_OptionsReg : public N_IO_PkgOptionsReg
   {
-    N_ANP_AnalysisInterface_MPDE_OptionsReg( N_ANP_AnalysisInterface * anpInt )
+    AnalysisInterface_MPDE_OptionsReg( AnalysisInterface * anpInt )
     : anpInt_(anpInt)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return anpInt_->setMPDEOptions( options ); }
 
-    N_ANP_AnalysisInterface * anpInt_;
+    AnalysisInterface * anpInt_;
   };
 
   // .options TIMEINT-MPDE
-  struct N_ANP_AnalysisInterface_MPDE_TranMPDEOptionsReg : public N_IO_PkgOptionsReg
+  struct AnalysisInterface_MPDE_TranMPDEOptionsReg : public N_IO_PkgOptionsReg
   {
-    N_ANP_AnalysisInterface_MPDE_TranMPDEOptionsReg( N_ANP_AnalysisInterface * anpInt )
+    AnalysisInterface_MPDE_TranMPDEOptionsReg( AnalysisInterface * anpInt )
     : anpInt_(anpInt)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return anpInt_->setTRANMPDEOptions( options ); }
 
-    N_ANP_AnalysisInterface * anpInt_;
+    AnalysisInterface * anpInt_;
   };
 
   // .AC
-  struct N_ANP_AnalysisInterface_AC_AnalysisReg : public N_IO_PkgOptionsReg
+  struct AnalysisInterface_AC_AnalysisReg : public N_IO_PkgOptionsReg
   {
-    N_ANP_AnalysisInterface_AC_AnalysisReg( N_ANP_AnalysisInterface * anpInt )
+    AnalysisInterface_AC_AnalysisReg( AnalysisInterface * anpInt )
     : anpInt_(anpInt)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return anpInt_->setACAnalysisParams( options ); }
 
-    N_ANP_AnalysisInterface * anpInt_;
+    AnalysisInterface * anpInt_;
   };
 
   // .MOR
-  struct N_ANP_AnalysisInterface_MOR_AnalysisReg : public N_IO_PkgOptionsReg
+  struct AnalysisInterface_MOR_AnalysisReg : public N_IO_PkgOptionsReg
   {
-    N_ANP_AnalysisInterface_MOR_AnalysisReg( N_ANP_AnalysisInterface * anpInt )
+    AnalysisInterface_MOR_AnalysisReg( AnalysisInterface * anpInt )
     : anpInt_(anpInt)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return anpInt_->setMORAnalysisParams( options ); }
 
-    N_ANP_AnalysisInterface * anpInt_;
+    AnalysisInterface * anpInt_;
   };
 
   // .options MOR_OPTS
-  struct N_ANP_AnalysisInterface_MOR_OptionsReg : public N_IO_PkgOptionsReg
+  struct AnalysisInterface_MOR_OptionsReg : public N_IO_PkgOptionsReg
   {
-    N_ANP_AnalysisInterface_MOR_OptionsReg( N_ANP_AnalysisInterface * anpInt )
+    AnalysisInterface_MOR_OptionsReg( AnalysisInterface * anpInt )
     : anpInt_(anpInt)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return anpInt_->setMOROptions( options ); }
 
-    N_ANP_AnalysisInterface * anpInt_;
+    AnalysisInterface * anpInt_;
   };
 
   
   // .options SENS 
-  struct N_ANP_AnalysisInterface_SensOptionsReg : public N_IO_PkgOptionsReg
+  struct AnalysisInterface_SensOptionsReg : public N_IO_PkgOptionsReg
   {
-    N_ANP_AnalysisInterface_SensOptionsReg( N_ANP_AnalysisInterface * anpInt )
+    AnalysisInterface_SensOptionsReg( AnalysisInterface * anpInt )
     : anpInt_(anpInt)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return anpInt_->setSensOptions( options ); }
 
-    N_ANP_AnalysisInterface * anpInt_;
+    AnalysisInterface * anpInt_;
   };
 
   // Function calls relating to residual and jacobian assembly
@@ -616,15 +610,15 @@ public:
   void rejectProvisionalStep ();
 
   void homotopyStepSuccess
-    ( const vector<string> & paramNames,
-      const vector<double> & paramVals);
+    ( const std::vector<std::string> & paramNames,
+      const std::vector<double> & paramVals);
 
   void homotopyStepFailure ();
 
   void stepSuccess (int analysis);
   void stepFailure (int analysis);
   bool getInitialQnorm (N_TIA_TwoLevelError & tle);
-  bool getBreakPoints (vector<N_UTL_BreakPoint> &breakPointTimes);
+  bool getBreakPoints (std::vector<N_UTL_BreakPoint> &breakPointTimes);
 
 #ifdef Xyce_Dakota
   // routines to get/set Dakota run flags and actually run a Dakota iteration
@@ -642,7 +636,7 @@ public:
   void silenceProgress();
   void enableProgress();
 
-  N_ANP_AnalysisManager * getAnalysisMgr () const { return &*anaManagerPtr_; }
+  AnalysisManager * getAnalysisMgr () const { return &*anaManagerPtr_; }
 
   void initializeTransientModel();
   bool evalTransientModel(
@@ -675,15 +669,20 @@ public:
 private :
 
   // Pointer to the TIA AnalysisManager.
-  RefCountPtr<N_ANP_AnalysisManager> anaManagerPtr_;
+  RefCountPtr<AnalysisManager> anaManagerPtr_;
 
   // commandline object
   N_IO_CmdParse & commandLine_;
 
   // package options manager
-  RCP<N_IO_PkgOptionsMgr> pkgOptMgrPtr_;
+  N_IO_PkgOptionsMgr *pkgOptMgrPtr_;
 
 };
+
+} // namespace Analysis
+} // namespace Xyce
+
+typedef Xyce::Analysis::AnalysisInterface N_ANP_AnalysisInterface;
 
 #endif //_TIME_MANAGER_H
 

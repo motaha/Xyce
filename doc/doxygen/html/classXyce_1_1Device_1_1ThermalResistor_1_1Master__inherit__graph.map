@@ -1,0 +1,5 @@
+<map id="Xyce::Device::ThermalResistor::Master" name="Xyce::Device::ThermalResistor::Master">
+<area shape="rect" id="node2" href="$classXyce_1_1Device_1_1DeviceMaster.html" title="Xyce::Device::DeviceMaster\l\&lt; Traits \&gt;" alt="" coords="13,174,208,215"/>
+<area shape="rect" id="node3" href="$classXyce_1_1Device_1_1Device.html" title="The Device class is an interface for device implementations." alt="" coords="59,5,209,32"/>
+<area shape="rect" id="node4" href="$classXyce_1_1Device_1_1DeviceMaster.html" title="DeviceMaster instantiates a device as described by the device traits T." alt="" coords="127,83,355,109"/>
+</map>

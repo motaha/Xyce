@@ -1,0 +1,11 @@
+A simple test circuit
+*Vin 1 0 SIN( 0V 12V 1 0 0)
+Vin 1 0 10V
+Rr1 1 2 200
+Rr2 2 0 200
+.TRAN 0 2
+.PRINT TRAN V(1) V(2)
+*.DC Vin 10V 11V 1V
+*.PRINT DC V(1) V(2)
+.END
+

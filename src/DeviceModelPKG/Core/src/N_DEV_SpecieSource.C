@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.3.2.2 $
+// Revision Number: $Revision: 1.9 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/02/24 23:49:15 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -59,7 +59,7 @@ namespace Device {
 template<>
 ParametricData<SpecieSource>::ParametricData()
 {
-  addPar("NAME", "none", false, &SpecieSource::name);
+  addPar("NAME", "none", &SpecieSource::name);
 }
 
 ParametricData<SpecieSource> &SpecieSource::getParametricData() {
@@ -77,20 +77,9 @@ ParametricData<SpecieSource> &SpecieSource::getParametricData() {
 // Creation Date :
 // ----------------------------------------------------------------------------
 SpecieSource::SpecieSource ()
-    : CompositeParam (),
-      name("V0")
-{
-
-  // // Set up mapping from param names to class variables:
-  // if (parMap.empty())
-  // {
-  //   // Set up map for double precision variables:
-
-  //   // Set up map for non-double precision variables:
-  //   addPar ("NAME", "none", false,
-  //           static_cast <string CompositeParam:: *> (&SpecieSource::name), NULL);
-  // }
-}
+  : CompositeParam (getParametricData()),
+    name("V0")
+{}
 
 // ----------------------------------------------------------------------------
 // Function      : SpecieSource::processParam
@@ -101,7 +90,7 @@ SpecieSource::SpecieSource ()
 // Creation Date :
 // ----------------------------------------------------------------------------
 bool SpecieSource::processParam
-  (Param & ndParam, string & param, DevicePDEInstance & di)
+(Param & ndParam, std::string & param, DevicePDEInstance & di)
 {
   bool bsuccess = true;
 

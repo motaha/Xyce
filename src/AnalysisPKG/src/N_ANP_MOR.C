@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,8 +31,8 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.21.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:31 $
+// Revision Number: $Revision: 1.37.2.1 $
+// Revision Date  : $Date: 2014/03/04 23:50:53 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
@@ -62,6 +62,7 @@
 #include <N_LAS_BlockSystemHelpers.h>
 
 #include <N_ANP_MOR.h>
+#include <N_ANP_Report.h>
 #include <N_LAS_MOROperators.h>
 
 #include <N_PDS_ParMap.h>
@@ -97,16 +98,19 @@
 #include <Teuchos_LAPACK.hpp>
 #include <Teuchos_BLAS.hpp>
 
+namespace Xyce {
+namespace Analysis {
+
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::N_ANP_MOR( N_ANP_AnalysisManager * )
+// Function      : MOR::MOR( AnalysisManager * )
 // Purpose       : constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Ting Mei
 // Creation Date : 5/11
 //-----------------------------------------------------------------------------
-N_ANP_MOR::N_ANP_MOR( N_ANP_AnalysisManager * anaManagerPtr ) :
-  N_ANP_AnalysisBase(anaManagerPtr),
+MOR::MOR( AnalysisManager * anaManagerPtr ) :
+  AnalysisBase(anaManagerPtr),
   dcopFlag_(true),
   morEvalSize_(0),
   numPorts_(0),
@@ -118,58 +122,50 @@ N_ANP_MOR::N_ANP_MOR( N_ANP_AnalysisManager * anaManagerPtr ) :
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::~N_ANP_MOR()
+// Function      : MOR::~MOR()
 // Purpose       : destructor
 // Special Notes :
 // Scope         : public
 // Creator       : Ting Mei
 // Creation Date : 5/11
 //-----------------------------------------------------------------------------
-N_ANP_MOR::~N_ANP_MOR()
+MOR::~MOR()
 {
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::setAnalysisParams
+// Function      : MOR::setAnalysisParams
 // Purpose       :
 // Special Notes : These are from the .MOR statement.
 // Scope         : public
 // Creator       : Ting Mei, SNL
 // Creation Date : 6/11
 //-----------------------------------------------------------------------------
-bool N_ANP_MOR::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
+bool MOR::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
 {
-  list<N_UTL_Param>::const_iterator it_tp;
-  list<N_UTL_Param>::const_iterator first = paramsBlock.getParams().begin();
-  list<N_UTL_Param>::const_iterator last = paramsBlock.getParams().end();
+  std::list<N_UTL_Param>::const_iterator it_tp;
+  std::list<N_UTL_Param>::const_iterator first = paramsBlock.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator last = paramsBlock.getParams().end();
   for (it_tp = first; it_tp != last; ++it_tp)
   {
     if (it_tp->uTag()      == "SIZE")
     {
-      tiaParams.ROMsize = it_tp->iVal();
+      tiaParams.ROMsize = it_tp->getImmutableValue<int>();
     }
     else if (it_tp->uTag() == "PORTLIST")
     {
-      portList_         = it_tp->sVecVal();
+      portList_         = it_tp->getValue<std::vector<std::string> >();
     }
   }
 
 //  tiaParams.debugLevel = 1;
 #ifdef Xyce_DEBUG_ANALYSIS
-  string dashedline = "-------------------------------------------------"
-                       "----------------------------\n";
-
   if (tiaParams.debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       " MOR simulation parameters");
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            " size = ",
-            tiaParams.ROMsize);
+    dout() << std::endl
+           << section_divider << std::endl
+           <<" MOR simulation parameters" << std::endl
+           << " size = " << tiaParams.ROMsize << std::endl;
   }
 #endif
 
@@ -177,14 +173,14 @@ bool N_ANP_MOR::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::run()
+// Function      : MOR::run()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Ting Mei, SNL
 // Creation Date : 5/11
 //-----------------------------------------------------------------------------
-bool N_ANP_MOR::run()
+bool MOR::run()
 {
   bool bsuccess = true;
 
@@ -218,14 +214,14 @@ bool N_ANP_MOR::run()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::init()
+// Function      : MOR::init()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Ting Mei, SNL
 // Creation Date : 5/11
 //-----------------------------------------------------------------------------
-bool N_ANP_MOR::init()
+bool MOR::init()
 {
   bool bsuccess = true;
 
@@ -255,30 +251,30 @@ bool N_ANP_MOR::init()
   // devices that have them (usually PDE devices).  This is different than
   // the "intializeProblem" call, which sets IC's.  (initial conditions are
   // different than initial guesses.
-  loaderRCPtr_->setInitialGuess (dsRCPtr_->nextSolutionPtr);
+  loaderRCPtr_->setInitialGuess (anaManagerRCPtr_->getTIADataStore()->nextSolutionPtr);
 
   // If available, set initial solution
   inputOPFlag_ =
-    outputMgrAdapterRCPtr_->setupInitialConditions( *(dsRCPtr_->nextSolutionPtr),
-                        *(dsRCPtr_->flagSolutionPtr));
+    outputMgrAdapterRCPtr_->setupInitialConditions( *(anaManagerRCPtr_->getTIADataStore()->nextSolutionPtr),
+                        *(anaManagerRCPtr_->getTIADataStore()->flagSolutionPtr));
 
   // Set a constant history for operating point calculation
-  dsRCPtr_->setConstantHistory();
-  dsRCPtr_->computeDividedDifferences();
+  anaManagerRCPtr_->getTIADataStore()->setConstantHistory();
+  anaManagerRCPtr_->getTIADataStore()->computeDividedDifferences();
   wimRCPtr_->obtainCorrectorDeriv();
 
   // solving for DC op
   handlePredictor();
   loaderRCPtr_->updateSources();
   secRCPtr_->newtonConvergenceStatus = nlsMgrRCPtr_->solve();
-  dsRCPtr_->stepLinearCombo ();
+  anaManagerRCPtr_->getTIADataStore()->stepLinearCombo ();
   gatherStepStatistics_ ();
   secRCPtr_->evaluateStepError ();
 
   if ( secRCPtr_->newtonConvergenceStatus <= 0)
   {
-    string msg=
-        "ERROR: Solving for DC operating point failed! Cannot continue MOR analysis.";
+    std::string msg=
+        "Solving for DC operating point failed! Cannot continue MOR analysis.";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   }
 
@@ -297,8 +293,8 @@ bool N_ANP_MOR::init()
   // Check that the listed ports on the .mor line are the same number as the B matrix entries.
   if ( numPorts_ != (int)portList_.size() )
   {
-    string msg=
-        "ERROR: Number of specified ports in .MOR line is inconsistent with number of voltage sources.";
+    std::string msg=
+        "Number of specified ports in .MOR line is inconsistent with number of voltage sources.";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   }
 
@@ -336,8 +332,8 @@ bool N_ANP_MOR::init()
       }
     }
     if (found == false)
-    {  string msg=
-         "ERROR: Did not find voltage source corresponding to port.";
+    {  std::string msg=
+         "Did not find voltage source corresponding to port.";
          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
     }
   }
@@ -354,63 +350,63 @@ bool N_ANP_MOR::init()
   }
 
   // Create C and G matrices from DCOP solution
-  dsRCPtr_->daeQVectorPtr->putScalar(0.0);
-  dsRCPtr_->daeFVectorPtr->putScalar(0.0);
+  anaManagerRCPtr_->getTIADataStore()->daeQVectorPtr->putScalar(0.0);
+  anaManagerRCPtr_->getTIADataStore()->daeFVectorPtr->putScalar(0.0);
 
-  dsRCPtr_->dFdxdVpVectorPtr->putScalar(0.0);
-  dsRCPtr_->dQdxdVpVectorPtr->putScalar(0.0);
-  dsRCPtr_->dQdxMatrixPtr->put(0.0);
-  dsRCPtr_->dFdxMatrixPtr->put(0.0);
+  anaManagerRCPtr_->getTIADataStore()->dFdxdVpVectorPtr->putScalar(0.0);
+  anaManagerRCPtr_->getTIADataStore()->dQdxdVpVectorPtr->putScalar(0.0);
+  anaManagerRCPtr_->getTIADataStore()->dQdxMatrixPtr->put(0.0);
+  anaManagerRCPtr_->getTIADataStore()->dFdxMatrixPtr->put(0.0);
 
   loaderRCPtr_->updateState
-                ((dsRCPtr_->nextSolutionPtr),
-               (dsRCPtr_->currSolutionPtr),
-               (dsRCPtr_->lastSolutionPtr),
-               (dsRCPtr_->nextStatePtr),
-               (dsRCPtr_->currStatePtr),
-               (dsRCPtr_->lastStatePtr),
-               (dsRCPtr_->nextStorePtr),
-               (dsRCPtr_->currStorePtr),
-               (dsRCPtr_->lastStorePtr)
+                ((anaManagerRCPtr_->getTIADataStore()->nextSolutionPtr),
+               (anaManagerRCPtr_->getTIADataStore()->currSolutionPtr),
+               (anaManagerRCPtr_->getTIADataStore()->lastSolutionPtr),
+               (anaManagerRCPtr_->getTIADataStore()->nextStatePtr),
+               (anaManagerRCPtr_->getTIADataStore()->currStatePtr),
+               (anaManagerRCPtr_->getTIADataStore()->lastStatePtr),
+               (anaManagerRCPtr_->getTIADataStore()->nextStorePtr),
+               (anaManagerRCPtr_->getTIADataStore()->currStorePtr),
+               (anaManagerRCPtr_->getTIADataStore()->lastStorePtr)
                );
 
   loaderRCPtr_->loadDAEVectors
-              ((dsRCPtr_->nextSolutionPtr),
-               (dsRCPtr_->currSolutionPtr),
-               (dsRCPtr_->lastSolutionPtr),
-               (dsRCPtr_->nextStatePtr),
-               (dsRCPtr_->currStatePtr),
-               (dsRCPtr_->lastStatePtr),
-               (dsRCPtr_->nextStateDerivPtr),
-               (dsRCPtr_->nextStorePtr),
-               (dsRCPtr_->currStorePtr),
-               (dsRCPtr_->lastStorePtr),
-               (dsRCPtr_->nextStoreLeadCurrQCompPtr),
-               (dsRCPtr_->daeQVectorPtr),
-               (dsRCPtr_->daeFVectorPtr),
-               (dsRCPtr_->dFdxdVpVectorPtr),
-               (dsRCPtr_->dQdxdVpVectorPtr) );
+              ((anaManagerRCPtr_->getTIADataStore()->nextSolutionPtr),
+               (anaManagerRCPtr_->getTIADataStore()->currSolutionPtr),
+               (anaManagerRCPtr_->getTIADataStore()->lastSolutionPtr),
+               (anaManagerRCPtr_->getTIADataStore()->nextStatePtr),
+               (anaManagerRCPtr_->getTIADataStore()->currStatePtr),
+               (anaManagerRCPtr_->getTIADataStore()->lastStatePtr),
+               (anaManagerRCPtr_->getTIADataStore()->nextStateDerivPtr),
+               (anaManagerRCPtr_->getTIADataStore()->nextStorePtr),
+               (anaManagerRCPtr_->getTIADataStore()->currStorePtr),
+               (anaManagerRCPtr_->getTIADataStore()->lastStorePtr),
+               (anaManagerRCPtr_->getTIADataStore()->nextStoreLeadCurrQCompPtr),
+               (anaManagerRCPtr_->getTIADataStore()->daeQVectorPtr),
+               (anaManagerRCPtr_->getTIADataStore()->daeFVectorPtr),
+               (anaManagerRCPtr_->getTIADataStore()->dFdxdVpVectorPtr),
+               (anaManagerRCPtr_->getTIADataStore()->dQdxdVpVectorPtr) );
 
-  loaderRCPtr_->loadDAEMatrices(dsRCPtr_->nextSolutionPtr,
-      dsRCPtr_->nextStatePtr, dsRCPtr_->nextStateDerivPtr,
-      dsRCPtr_->nextStorePtr,
-      dsRCPtr_->dQdxMatrixPtr,  dsRCPtr_->dFdxMatrixPtr);
+  loaderRCPtr_->loadDAEMatrices(anaManagerRCPtr_->getTIADataStore()->nextSolutionPtr,
+      anaManagerRCPtr_->getTIADataStore()->nextStatePtr, anaManagerRCPtr_->getTIADataStore()->nextStateDerivPtr,
+      anaManagerRCPtr_->getTIADataStore()->nextStorePtr,
+      anaManagerRCPtr_->getTIADataStore()->dQdxMatrixPtr,  anaManagerRCPtr_->getTIADataStore()->dFdxMatrixPtr);
 
-  CPtr_ = rcp(dsRCPtr_->dQdxMatrixPtr, false);
-  GPtr_ = rcp(dsRCPtr_->dFdxMatrixPtr, false);
+  CPtr_ = rcp(anaManagerRCPtr_->getTIADataStore()->dQdxMatrixPtr, false);
+  GPtr_ = rcp(anaManagerRCPtr_->getTIADataStore()->dFdxMatrixPtr, false);
 
-/*
-  cout << "Branch nodes: " << endl;
-  for (unsigned int i=0; i < bMatEntriesVec_.size(); ++i)
-  {
-    cout << "Node " << i << " : " << bMatEntriesVec_[i] << endl;
-  }
 
-  cout << "Printing GPtr: " << endl;
-  GPtr_->printPetraObject();
-  cout << "Printing CPtr: " << endl;
-  CPtr_->printPetraObject();
-*/
+  ///  Xyce::dout() << "Branch nodes: " << std::endl;
+  ///  for (unsigned int i=0; i < bMatEntriesVec_.size(); ++i)
+  ///  {
+  ///    Xyce::dout() << "Node " << i << " : " << bMatEntriesVec_[i] << std::endl;
+  ///  }
+
+  ///  Xyce::dout() << "Printing GPtr: " << std::endl;
+  ///  GPtr_->printPetraObject();
+  ///  Xyce::dout() << "Printing CPtr: " << std::endl;
+  ///  CPtr_->printPetraObject();
+
 
   // Storage for row extraction
   int length=1, numEntries=0;
@@ -423,8 +419,8 @@ bool N_ANP_MOR::init()
      numEntries = GPtr_->getLocalRowLength( bMatEntriesVec_[i] );
      if ( numEntries != 1 )
      {
-       string msg=
-         "ERROR: Supposed voltage source row has too many entries! Cannot continue MOR analysis.";
+       std::string msg=
+         "Supposed voltage source row has too many entries! Cannot continue MOR analysis.";
          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
      }
 
@@ -439,23 +435,22 @@ bool N_ANP_MOR::init()
      }
   }
 
-  /*
-  cout << "Printing GPtr (after scaling): " << endl;
-  GPtr_->printPetraObject();
-  */
+
+  ///  Xyce::dout() << "Printing GPtr (after scaling): " << std::endl;
+  ///  GPtr_->printPetraObject();
 
   return bsuccess;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::reduceSystem()
+// Function      : MOR::reduceSystem()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist, SNL
 // Creation Date : 6/4/2012
 //-----------------------------------------------------------------------------
-bool N_ANP_MOR::reduceSystem()
+bool MOR::reduceSystem()
 {
   // At this time, the reduceSystem() method will compute the reduced-order system using
   // multi-port PRIMA.  This method should allow the user multiple algorithms, defined by
@@ -469,7 +464,7 @@ bool N_ANP_MOR::reduceSystem()
 
   RCP<N_PDS_ParMap> BaseMap_;
   BaseMap_ = rcp(pdsMgrPtr_->getParallelMap( "SOLUTION" ), false);
-  //BaseMap_->petraMap()->Print(std::cout);
+  //BaseMap_->petraMap()->Print(Xyce::dout());
 
   // Create matrix for (G + s0 * C)
   if (s0_ != 0.0)
@@ -492,13 +487,11 @@ bool N_ANP_MOR::reduceSystem()
     BPtr_->setElementByGlobalIndex( BaseMap_->localToGlobalIndex(bMatEntriesVec_[j]), -1.0, j );
   }
 
-  /*
-  std::cout << "Printing out BPtr" << std::endl;
-  BPtr_->epetraObj().Print(std::cout);
+  ///  Xyce::dout() << "Printing out BPtr" << std::endl;
+  ///  BPtr_->epetraObj().Print(Xyce::dout());
 
-  std::cout << "Printing out sCpG" << std::endl;
-  (sCpG_MatrixPtr_->epetraObj()).Print(std::cout);
-  */
+  ///  Xyce::dout() << "Printing out sCpG" << std::endl;
+  ///  (sCpG_MatrixPtr_->epetraObj()).Print(Xyce::dout());
 
   // Create linear problem for (G + s0 * C)
   origProblem_ = rcp(new Epetra_LinearProblem(&sCpG_MatrixPtr_->epetraObj(), &RPtr_->epetraObj(), &BPtr_->epetraObj() ) );
@@ -512,7 +505,7 @@ bool N_ANP_MOR::reduceSystem()
   int linearStatus = origSolver_->SymbolicFactorization();
   if (linearStatus != 0)
   {
-    std::cout << "Amesos symbolic factorization exited with error: " << linearStatus << std::endl;
+    Xyce::dout() << "Amesos symbolic factorization exited with error: " << linearStatus << std::endl;
     bsuccess = false;
   }
 
@@ -520,7 +513,7 @@ bool N_ANP_MOR::reduceSystem()
   linearStatus = origSolver_->NumericFactorization();
   if (linearStatus != 0)
   {
-    std::cout << "Amesos numeric factorization exited with error: " << linearStatus << std::endl;
+    Xyce::dout() << "Amesos numeric factorization exited with error: " << linearStatus << std::endl;
     bsuccess = false;
   }
 
@@ -528,14 +521,12 @@ bool N_ANP_MOR::reduceSystem()
   linearStatus = origSolver_->Solve();
   if (linearStatus != 0)
   {
-    std::cout << "Amesos solve exited with error: " << linearStatus << std::endl;
+    Xyce::dout() << "Amesos solve exited with error: " << linearStatus << std::endl;
     bsuccess = false;
   }
 
-  /*
-  std::cout << "Printing out R" << std::endl;
-  (RPtr_->epetraObj()).Print(std::cout);
-  */
+  ///  Xyce::dout() << "Printing out R" << std::endl;
+  ///  (RPtr_->epetraObj()).Print(Xyce::dout());
 
   // Create an Epetra_Operator object to apply the operator inv(G + s0*C)*C
   RCP<Epetra_Operator> COpPtr_ = rcp( &CPtr_->epetraObj(), false );
@@ -547,9 +538,7 @@ bool N_ANP_MOR::reduceSystem()
   if (tiaParams.ROMsize > RPtr_->globalLength())
   {
     kblock = (int)(RPtr_->globalLength() / numPorts_);
-    string msg=
-        "Requested reduced-order model dimension is larger than original system dimension, resizing to original system dimension.";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
+    UserWarning(*this) << "Requested reduced-order model dimension is larger than original system dimension, resizing to original system dimension";
   }
   else
   {
@@ -639,10 +628,10 @@ bool N_ANP_MOR::reduceSystem()
 
   RCP<MV> W = rcp( new Epetra_MultiVector( V->Map(), k ) );
   W = V;
-//  std::cout << "Printing out V" << std::endl;
-//  V->Print(std::cout);
-//  std::cout << "Printing out W" << std::endl;
-//  W->Print(std::cout);
+//  Xyce::dout() << "Printing out V" << std::endl;
+//  V->Print(Xyce::dout());
+//  Xyce::dout() << "Printing out W" << std::endl;
+//  W->Print(Xyce::dout());
 
   // ---------------------------------------------------------------------
   // Sparsify the reduced system, if requested.
@@ -657,17 +646,17 @@ bool N_ANP_MOR::reduceSystem()
     GPtr_->matvec( false, xyceV, temp2 );
     // V' * G * V
     MVT::MvTransMv( 1.0, xyceV.epetraObj(), temp2.epetraObj(), redG_ );
-    //redG_.print( std::cout );
+    //redG_.print( Xyce::dout() );
 
     // C * V
     CPtr_->matvec( false, xyceV, temp2 );
     // V' * C * V
     MVT::MvTransMv( 1.0, xyceV.epetraObj(), temp2.epetraObj(), redC_ );
-    //redC_.print( std::cout );
+    //redC_.print( Xyce::dout() );
 
     // V' * B
     MVT::MvTransMv( 1.0, xyceV.epetraObj(), BPtr_->epetraObj(), redB_ );
-    //redB_.print( std::cout );
+    //redB_.print( Xyce::dout() );
 
     bsuccess = bsuccess & sparsifyRedSystem_();
   }
@@ -706,7 +695,7 @@ if ( scaleType == 2 || scaleType == 3  || scaleType ==4)
 
     MVT::MvTransMv( 1.0, *V, Xmag, Xhatscale );
 
-//    Xhatscale.print(std::cout);
+//    Xhatscale.print(Xyce::dout());
     for (int i=0; i<k; ++i)
     {
 
@@ -741,7 +730,7 @@ if ( scaleType == 2 || scaleType == 3  || scaleType ==4)
     }
   }
 
-//  Xhatscale.print(std::cout);
+//  Xhatscale.print(Xyce::dout());
 
   // Scale the computed basis vectors before projecting the original system
   Teuchos::SerialDenseMatrix<int,ST> D(k,k);
@@ -756,18 +745,18 @@ if ( scaleType == 2 || scaleType == 3  || scaleType ==4)
       else
         D(i,i) = 1.0;
     }
-    std::cout << " the scaling matrix "  <<  std::endl;
+    Xyce::dout() << " the scaling matrix "  <<  std::endl;
 
-//    D.print(std::cout);
+//    D.print(Xyce::dout());
 
     MVT::MvTimesMatAddMv( 1.0, *V, D, 0.0, *Vtemp );
     V = Vtemp;
   }
 
-//  std::cout << "Printing out V" << std::endl;
-//  V->Print(std::cout);
-//  std::cout << "Printing out W" << std::endl;
-//  W->Print(std::cout);
+//  Xyce::dout() << "Printing out V" << std::endl;
+//  V->Print(Xyce::dout());
+//  Xyce::dout() << "Printing out W" << std::endl;
+//  W->Print(Xyce::dout());
 
   // ---------------------------------------------------------------------
   // Now use the basis vectors for K_k(inv(G + s0*C)*C, R) to compute
@@ -787,31 +776,31 @@ if ( scaleType == 2 || scaleType == 3  || scaleType ==4)
     GPtr_->matvec( false, xyceV, temp2 );
   // V' * G * V
     MVT::MvTransMv( 1.0, xyceW.epetraObj(), temp2.epetraObj(), redG_ );
-    //redG_.print( std::cout );
+    //redG_.print( Xyce::dout() );
 
   // C * V
     CPtr_->matvec( false, xyceV, temp2 );
   // V' * C * V
     MVT::MvTransMv( 1.0, xyceW.epetraObj(), temp2.epetraObj(), redC_ );
-  //redC_.print( std::cout );
+  //redC_.print( Xyce::dout() );
 
   // V' * B
     MVT::MvTransMv( 1.0, xyceW.epetraObj(), BPtr_->epetraObj(), redB_ );
-  //redB_.print( std::cout );
+  //redB_.print( Xyce::dout() );
 
     MVT::MvTransMv( 1.0, xyceV.epetraObj(), BPtr_->epetraObj(), redL_ );
 
 
-//  std::cout << "Printing out redB" << std::endl;
-//  redB_.print(std::cout);
-//  std::cout << "Printing out redL" << std::endl;
-//  redL_.print(std::cout);
+//  Xyce::dout() << "Printing out redB" << std::endl;
+//  redB_.print(Xyce::dout());
+//  Xyce::dout() << "Printing out redL" << std::endl;
+//  redL_.print(Xyce::dout());
   }
   else
   {
 //    RCP<MV> Vtemp = rcp( new Epetra_MultiVector( V->Map(), k ) );
 
-//    redL_.print(std::cout);
+//    redL_.print(Xyce::dout());
 
     if ( scaleType <= 1 )
     {
@@ -821,45 +810,45 @@ if ( scaleType == 2 || scaleType == 3  || scaleType ==4)
       redL_.scale(1.0/tiaParams.morScaleFactor);
 //      redL_.multiply( Teuchos::NO_TRANS, Teuchos::NO_TRANS, 1.0, D, redL_, 0.0 );
 
-//      redL_.print(std::cout);
+//      redL_.print(Xyce::dout());
 
     }
     else
     {
-      string msg=
-      "N_ANP_MOR::reduceSystem: MOR options sparsificationType=1 can only be used with scaletype=1. Other scale types have not been supported for sparsification!";
+      std::string msg=
+      "MOR::reduceSystem: MOR options sparsificationType=1 can only be used with scaletype=1. Other scale types have not been supported for sparsification!";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
     }
 
   }
-/*  // ---------------------------------------------------------------------
-  // Sparsify the reduced system, if requested.
-  // ---------------------------------------------------------------------
-  if (tiaParams.morSparsificationType)
-  {
+//  // ---------------------------------------------------------------------
+//   // Sparsify the reduced system, if requested.
+//   // ---------------------------------------------------------------------
+//   if (tiaParams.morSparsificationType)
+//   {
 
-    N_LAS_MultiVector xyceV( &*V, false );
-    N_LAS_MultiVector temp2( *BaseMap_, k );
+//     N_LAS_MultiVector xyceV( &*V, false );
+//     N_LAS_MultiVector temp2( *BaseMap_, k );
 
-    // G * V
-    GPtr_->matvec( false, xyceV, temp2 );
-    // V' * G * V
-    MVT::MvTransMv( 1.0, xyceV.epetraObj(), temp2.epetraObj(), redG_ );
-    //redG_.print( std::cout );
+//     // G * V
+//     GPtr_->matvec( false, xyceV, temp2 );
+//     // V' * G * V
+//     MVT::MvTransMv( 1.0, xyceV.epetraObj(), temp2.epetraObj(), redG_ );
+//     //redG_.print( Xyce::dout() );
 
-    // C * V
-    CPtr_->matvec( false, xyceV, temp2 );
-    // V' * C * V
-    MVT::MvTransMv( 1.0, xyceV.epetraObj(), temp2.epetraObj(), redC_ );
-    //redC_.print( std::cout );
+//     // C * V
+//     CPtr_->matvec( false, xyceV, temp2 );
+//     // V' * C * V
+//     MVT::MvTransMv( 1.0, xyceV.epetraObj(), temp2.epetraObj(), redC_ );
+//     //redC_.print( Xyce::dout() );
 
-    // V' * B
-    MVT::MvTransMv( 1.0, xyceV.epetraObj(), BPtr_->epetraObj(), redB_ );
-    //redB_.print( std::cout );
+//     // V' * B
+//     MVT::MvTransMv( 1.0, xyceV.epetraObj(), BPtr_->epetraObj(), redB_ );
+//     //redB_.print( Xyce::dout() );
 
-    bsuccess = bsuccess & sparsifyRedSystem_();
-  }
-*/
+//     bsuccess = bsuccess & sparsifyRedSystem_();
+//   }
+//
   // ---------------------------------------------------------------------
   // Output the projected system, redG_, redC_, and redB_.
   // ---------------------------------------------------------------------
@@ -875,8 +864,8 @@ if ( scaleType == 2 || scaleType == 3  || scaleType ==4)
 
 #else
 
-  string msg=
-   "ERROR: Belos is necessary to compute a reduced-order model!  Please recompile Xyce with Belos enabled!";
+  std::string msg=
+   "Belos is necessary to compute a reduced-order model!  Please recompile Xyce with Belos enabled!";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
 
 #endif // Xyce_BELOS
@@ -885,14 +874,14 @@ if ( scaleType == 2 || scaleType == 3  || scaleType ==4)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::evalOrigTransferFunction()
+// Function      : MOR::evalOrigTransferFunction()
 // Purpose       : Evaluate original transfer function.
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist and Ting Mei, SNL
 // Creation Date : 5/29/2012
 //-----------------------------------------------------------------------------
-bool N_ANP_MOR::evalOrigTransferFunction()
+bool MOR::evalOrigTransferFunction()
 {
   bool bsuccess = true;
 
@@ -928,14 +917,14 @@ bool N_ANP_MOR::evalOrigTransferFunction()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::evalRedTransferFunction()
+// Function      : MOR::evalRedTransferFunction()
 // Purpose       : Evaluate reduced transfer function.
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist and Ting Mei, SNL
 // Creation Date : 5/29/2012
 //-----------------------------------------------------------------------------
-bool N_ANP_MOR::evalRedTransferFunction()
+bool MOR::evalRedTransferFunction()
 {
   bool bsuccess = true;
 
@@ -970,14 +959,14 @@ bool N_ANP_MOR::evalRedTransferFunction()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::createOrigLinearSystem_()
+// Function      : MOR::createOrigLinearSystem_()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Ting Mei, Heidi Thornquist, SNL
 // Creation Date : 6/20/2011
 //-----------------------------------------------------------------------------
-bool N_ANP_MOR::createOrigLinearSystem_()
+bool MOR::createOrigLinearSystem_()
 {
   bool bsuccess = true;
 
@@ -996,7 +985,7 @@ bool N_ANP_MOR::createOrigLinearSystem_()
   std::vector<RCP<N_PDS_ParMap> > blockMaps = createBlockParMaps(numBlocks, *BaseMap_, *oBaseMap_);
 
   // Create a block vector
-  REFBPtr_ = rcp ( new N_LAS_BlockVector ( numBlocks, *(blockMaps[0]->petraMap()), *(BaseMap_->petraMap())) );
+  REFBPtr_ = rcp ( new N_LAS_BlockVector ( numBlocks, blockMaps[0], BaseMap_ ) );
 
   std::vector<std::vector<int> > blockPattern(2);
   blockPattern[0].resize(2);
@@ -1010,7 +999,7 @@ bool N_ANP_MOR::createOrigLinearSystem_()
 
   RCP<Epetra_CrsGraph> blockGraph = createBlockGraph( offset, blockPattern, *blockMaps[0], *BaseFullGraph_);
 
-  sCpG_REFMatrixPtr_ = rcp ( new N_LAS_BlockMatrix( numBlocks, blockPattern, *blockGraph, *BaseFullGraph_) );
+  sCpG_REFMatrixPtr_ = rcp ( new N_LAS_BlockMatrix( numBlocks, offset, blockPattern, *blockGraph, *BaseFullGraph_) );
 
   // Load diagonal blocks of real equivalent form: (G - s0*C)
   sCpG_REFMatrixPtr_->put( 0.0 ); // Zero out whole matrix
@@ -1030,7 +1019,7 @@ bool N_ANP_MOR::createOrigLinearSystem_()
   // Create solver factory
   Amesos amesosFactory;
 
-  REFXPtr_ = rcp ( new N_LAS_BlockVector (numBlocks, *(blockMaps[0]->petraMap()), *(BaseMap_->petraMap())) );
+  REFXPtr_ = rcp ( new N_LAS_BlockVector ( numBlocks, blockMaps[0], BaseMap_ ) );
   REFXPtr_->putScalar( 0.0 );
 
   blockProblem_ = rcp(new Epetra_LinearProblem(&sCpG_REFMatrixPtr_->epetraObj(), &REFXPtr_->epetraObj(), &REFBPtr_->epetraObj() ) );
@@ -1041,7 +1030,7 @@ bool N_ANP_MOR::createOrigLinearSystem_()
 
   if (linearStatus != 0)
   {
-    std::cout << "Amesos symbolic factorization exited with error: " << linearStatus;
+    Xyce::dout() << "Amesos symbolic factorization exited with error: " << linearStatus;
     bsuccess = false;
   }
 
@@ -1050,14 +1039,14 @@ bool N_ANP_MOR::createOrigLinearSystem_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::createRedLinearSystem_()
+// Function      : MOR::createRedLinearSystem_()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Ting Mei, Heidi Thornquist, SNL
 // Creation Date : 6/20/2011
 //-----------------------------------------------------------------------------
-bool N_ANP_MOR::createRedLinearSystem_()
+bool MOR::createRedLinearSystem_()
 {
   // Get the reduced system size.
   int k = redG_.numRows();
@@ -1084,7 +1073,7 @@ bool N_ANP_MOR::createRedLinearSystem_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::updateOrigLinearSystemFreq_()
+// Function      : MOR::updateOrigLinearSystemFreq_()
 // Purpose       :
 // Special Notes :
 // Scope         : public
@@ -1092,7 +1081,7 @@ bool N_ANP_MOR::createRedLinearSystem_()
 // Creation Date : 6/20/2011
 //-----------------------------------------------------------------------------
 
-bool N_ANP_MOR::updateOrigLinearSystemFreq_()
+bool MOR::updateOrigLinearSystemFreq_()
 {
   double omega =  2.0 * M_PI * currentFreq_;
 
@@ -1108,7 +1097,7 @@ bool N_ANP_MOR::updateOrigLinearSystemFreq_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::updateRedLinearSystemFreq_()
+// Function      : MOR::updateRedLinearSystemFreq_()
 // Purpose       :
 // Special Notes :
 // Scope         : public
@@ -1116,7 +1105,7 @@ bool N_ANP_MOR::updateOrigLinearSystemFreq_()
 // Creation Date : 6/20/2011
 //-----------------------------------------------------------------------------
 
-bool N_ANP_MOR::updateRedLinearSystemFreq_()
+bool MOR::updateRedLinearSystemFreq_()
 {
   int k = redG_.numRows();
 
@@ -1138,7 +1127,7 @@ bool N_ANP_MOR::updateRedLinearSystemFreq_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::solveLinearSystem_()
+// Function      : MOR::solveLinearSystem_()
 // Purpose       :
 // Special Notes :
 // Scope         : public
@@ -1146,7 +1135,7 @@ bool N_ANP_MOR::updateRedLinearSystemFreq_()
 // Creation Date : 6/2011
 //-----------------------------------------------------------------------------
 
-bool N_ANP_MOR::solveOrigLinearSystem_()
+bool MOR::solveOrigLinearSystem_()
 {
 
   bool bsuccess = true;
@@ -1156,7 +1145,7 @@ bool N_ANP_MOR::solveOrigLinearSystem_()
 
   if (linearStatus != 0)
   {
-    std::cout << "Amesos numeric factorization exited with error: " << linearStatus;
+    Xyce::dout() << "Amesos numeric factorization exited with error: " << linearStatus;
     bsuccess = false;
   }
 
@@ -1169,7 +1158,7 @@ bool N_ANP_MOR::solveOrigLinearSystem_()
     linearStatus = blockSolver_->Solve();
     if (linearStatus != 0)
     {
-      std::cout << "Amesos solve exited with error: " << linearStatus;
+      Xyce::dout() << "Amesos solve exited with error: " << linearStatus;
       bsuccess = false;
     }
 
@@ -1187,7 +1176,7 @@ bool N_ANP_MOR::solveOrigLinearSystem_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::solveRedLinearSystem_()
+// Function      : MOR::solveRedLinearSystem_()
 // Purpose       :
 // Special Notes :
 // Scope         : public
@@ -1195,7 +1184,7 @@ bool N_ANP_MOR::solveOrigLinearSystem_()
 // Creation Date : 6/2011
 //-----------------------------------------------------------------------------
 
-bool N_ANP_MOR::solveRedLinearSystem_()
+bool MOR::solveRedLinearSystem_()
 {
   bool bsuccess = true;
 
@@ -1214,7 +1203,7 @@ bool N_ANP_MOR::solveRedLinearSystem_()
                 sCpG_redMatrix_.stride(), &ipiv[0], &info );
   if (info != 0)
   {
-    std::cout << "LAPACK::GETRF: LU factorization failed with error: " << info << std::endl;
+    Xyce::dout() << "LAPACK::GETRF: LU factorization failed with error: " << info << std::endl;
     bsuccess = false;
   }
 
@@ -1224,7 +1213,7 @@ bool N_ANP_MOR::solveRedLinearSystem_()
                 sCpG_redMatrix_.stride(), &ipiv[0], ref_redB_.values(), ref_redB_.stride(), &info );
   if (info != 0)
   {
-    std::cout << "LAPACK::GETRS: LU solve failed with error: " << info << std::endl;
+    Xyce::dout() << "LAPACK::GETRS: LU solve failed with error: " << info << std::endl;
     bsuccess = false;
   }
 
@@ -1250,14 +1239,14 @@ bool N_ANP_MOR::solveRedLinearSystem_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::sparsifyRedSystem_()
+// Function      : MOR::sparsifyRedSystem_()
 // Purpose       : Use techniques to sparsify the projected system.
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist and Ting Mei, SNL
 // Creation Date : 8/20/2012
 //-----------------------------------------------------------------------------
-bool N_ANP_MOR::sparsifyRedSystem_()
+bool MOR::sparsifyRedSystem_()
 {
   bool bsuccess = true;
 
@@ -1277,7 +1266,7 @@ bool N_ANP_MOR::sparsifyRedSystem_()
                 tmp_Ghat.stride(), &ipiv[0], &info );
   if (info != 0)
   {
-    std::cout << "LAPACK::GETRF: LU factorization of Ghat failed with error: " << info << std::endl;
+    Xyce::dout() << "LAPACK::GETRF: LU factorization of Ghat failed with error: " << info << std::endl;
     bsuccess = false;
   }
 
@@ -1287,10 +1276,10 @@ bool N_ANP_MOR::sparsifyRedSystem_()
   std::vector<double> condWork( 4*k );
   std::vector<int> condIWork( k );
   lapack.GECON( norm, tmp_Ghat.numRows(), tmp_Ghat.values(), tmp_Ghat.stride(), tmp_Ghat.normOne(), &condGhat, &condWork[0], &condIWork[0], &info );
-  // std::cout << "Condition estimate for Ghat is : " << 1.0/ condGhat << std::endl;
+  // Xyce::dout() << "Condition estimate for Ghat is : " << 1.0/ condGhat << std::endl;
   if (info != 0)
   {
-    std::cout << "LAPACK::GECON: Computing condition estimate of Ghat failed with error: " << info << std::endl;
+    Xyce::dout() << "LAPACK::GECON: Computing condition estimate of Ghat failed with error: " << info << std::endl;
     bsuccess = false;
   }
 
@@ -1300,22 +1289,22 @@ bool N_ANP_MOR::sparsifyRedSystem_()
                 tmp_Ghat.stride(), &ipiv[0], A.values(), A.stride(), &info );
   if (info != 0)
   {
-    std::cout << "LAPACK::GETRS: LU solve failed with error: " << info << std::endl;
+    Xyce::dout() << "LAPACK::GETRS: LU solve failed with error: " << info << std::endl;
     bsuccess = false;
   }
-  //std::cout << "A = inv(Ghat)*Chat" << std::endl;
-  //A.print(std::cout);
+  //Xyce::dout() << "A = inv(Ghat)*Chat" << std::endl;
+  //A.print(Xyce::dout());
 
   // Compute R = inv(Ghat)* Bhat
   lapack.GETRS( trans, tmp_Ghat.numRows(), R.numCols(), tmp_Ghat.values(),
                 tmp_Ghat.stride(), &ipiv[0], R.values(), R.stride(), &info );
   if (info != 0)
   {
-    std::cout << "LAPACK::GETRS: LU solve failed with error: " << info << std::endl;
+    Xyce::dout() << "LAPACK::GETRS: LU solve failed with error: " << info << std::endl;
     bsuccess = false;
   }
-  //std::cout << "R = inv(Ghat)*Bhat" << std::endl;
-  //R.print(std::cout);
+  //Xyce::dout() << "R = inv(Ghat)*Bhat" << std::endl;
+  //R.print(Xyce::dout());
 
   // Reduce A to Schur form and compute the eigenvalues.
   // Allocate the work space. This space will be used below for calls to:
@@ -1341,7 +1330,7 @@ bool N_ANP_MOR::sparsifyRedSystem_()
                &work[0], lwork, &info );
   if (info != 0)
   {
-    std::cout << "LAPACK::GGEV: Computing eigenvectors and values of A = inv(Ghat)*Chat failed with error: " << info << std::endl;
+    Xyce::dout() << "LAPACK::GGEV: Computing eigenvectors and values of A = inv(Ghat)*Chat failed with error: " << info << std::endl;
     bsuccess = false;
   }
 
@@ -1386,17 +1375,15 @@ bool N_ANP_MOR::sparsifyRedSystem_()
     }
   }
 
-  /*
-  std::cout << "Eigenvalues of A: " << std::endl;
-  for (int i=0; i<k; ++i)
-    std::cout << revals[i] << "\t" << ievals[i] << "\t" << beta[i] << std::endl;
+  // Xyce::dout() << "Eigenvalues of A: " << std::endl;
+  // for (int i=0; i<k; ++i)
+  //   Xyce::dout() << revals[i] << "\t" << ievals[i] << "\t" << beta[i] << std::endl;
 
-  std::cout << "Eigenvectors of A: " << std::endl;
-  Q.print(std::cout);
-  */
+  // Xyce::dout() << "Eigenvectors of A: " << std::endl;
+  // Q.print(Xyce::dout());
 
   // Construct complex eigenvectors
-  Teuchos::SerialDenseMatrix<int, complex<double> > V(k, k);
+  Teuchos::SerialDenseMatrix<int, std::complex<double> > V(k, k);
   for (int i=0; i<k; i++)
   {
     if (rowIndex[i] == 1)
@@ -1419,42 +1406,42 @@ bool N_ANP_MOR::sparsifyRedSystem_()
   }
 
   // Factor V
-  Teuchos::LAPACK<int, complex<double> > lapack_complex;
+  Teuchos::LAPACK<int, std::complex<double> > lapack_complex;
   lapack_complex.GETRF( V.numRows(), V.numCols(), V.values(), V.stride(), &ipiv[0], &info );
   if (info != 0)
   {
-    std::cout << "LAPACK::GETRF: LU factorization of eigenvectors failed with error: " << info << std::endl;
+    Xyce::dout() << "LAPACK::GETRF: LU factorization of eigenvectors failed with error: " << info << std::endl;
     bsuccess = false;
   }
 
   // Compute condition estimate of V.
   double condV = 0.0;
-  std::vector<complex<double> > condCWork( 2*k );
+  std::vector<std::complex<double> > condCWork( 2*k );
   lapack_complex.GECON( norm, V.numRows(), V.values(), V.stride(), V.normOne(), &condV, &condCWork[0], &condWork[0], &info );
-  //std::cout << "Condition estimate for V is : " << 1.0/condV << std::endl;
+  //Xyce::dout() << "Condition estimate for V is : " << 1.0/condV << std::endl;
   if (info != 0)
   {
-    std::cout << "LAPACK::GECON: Computing condition estimate of V failed with error: " << info << std::endl;
+    Xyce::dout() << "LAPACK::GECON: Computing condition estimate of V failed with error: " << info << std::endl;
     bsuccess = false;
   }
 
   // Compute inv(V)
-  std::vector<complex<double> > cwork( lwork );
+  std::vector<std::complex<double> > cwork( lwork );
   lapack_complex.GETRI( V.numRows(), V.values(), V.stride(), &ipiv[0], &cwork[0], lwork, &info );
   if (info != 0)
   {
-    std::cout << "LAPACK::GETRI: Computing inverse of V failed with error: " << info << std::endl;
+    Xyce::dout() << "LAPACK::GETRI: Computing inverse of V failed with error: " << info << std::endl;
     bsuccess = false;
   }
 
   // Convert R to a complex vector to use the multiply routine for inv(V).
-  Teuchos::SerialDenseMatrix<int, complex<double> > tmpR( k, numPorts_ );
+  Teuchos::SerialDenseMatrix<int, std::complex<double> > tmpR( k, numPorts_ );
   for (int j=0; j<numPorts_; j++)
     for (int i=0; i<k; i++)
       tmpR(i,j) = std::complex<double>( R(i,j), 0.0 );
 
   // Compute inv(V) * R
-  Teuchos::SerialDenseMatrix<int, complex<double> > tmp_redB(k ,numPorts_);
+  Teuchos::SerialDenseMatrix<int, std::complex<double> > tmp_redB(k ,numPorts_);
   tmp_redB.multiply(Teuchos::NO_TRANS, Teuchos::NO_TRANS, 1.0, V, tmpR, 0.0);
 
   // Generate compressed real storage of V*R and inv(V)
@@ -1489,7 +1476,7 @@ bool N_ANP_MOR::sparsifyRedSystem_()
   lapack.GETRF( invV.numRows(), invV.numCols(), invV.values(), invV.stride(), &ipiv[0], &info );
   if (info != 0)
   {
-    std::cout << "LAPACK::GETRF: LU factorization of inv(V) failed with error: " << info << std::endl;
+    Xyce::dout() << "LAPACK::GETRF: LU factorization of inv(V) failed with error: " << info << std::endl;
     bsuccess = false;
   }
 
@@ -1499,16 +1486,14 @@ bool N_ANP_MOR::sparsifyRedSystem_()
                 invV.stride(), &ipiv[0], redL_.values(), redL_.stride(), &info );
   if (info != 0)
   {
-    std::cout << "LAPACK::GETRS: LU solve for Lhat failed with error: " << info << std::endl;
+    Xyce::dout() << "LAPACK::GETRS: LU solve for Lhat failed with error: " << info << std::endl;
     bsuccess = false;
   }
 
-  /*
-  std::cout << "Bhat : " << std::endl;
-  redB_.print(std::cout);
-  std::cout << "Lhat : " << std::endl;
-  redL_.print(std::cout);
-  */
+  // Xyce::dout() << "Bhat : " << std::endl;
+  // redB_.print(Xyce::dout());
+  // Xyce::dout() << "Lhat : " << std::endl;
+  // redL_.print(Xyce::dout());
 
   // Create redCPtr_ and redGPtr_
   // Generate Epetra_Map that puts all the values of the reduced system on one processor.
@@ -1566,14 +1551,14 @@ bool N_ANP_MOR::sparsifyRedSystem_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::processSuccessfulStep()
+// Function      : MOR::processSuccessfulStep()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Ting Mei, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_ANP_MOR::processSuccessfulStep(bool origSys)
+bool MOR::processSuccessfulStep(bool origSys)
 {
   bool bsuccess = true;
 
@@ -1599,14 +1584,14 @@ bool N_ANP_MOR::processSuccessfulStep(bool origSys)
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::processFailedStep
+// Function      : MOR::processFailedStep
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Ting Mei, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_ANP_MOR::processFailedStep()
+bool MOR::processFailedStep()
 {
   bool bsuccess = true;
 
@@ -1619,19 +1604,19 @@ bool N_ANP_MOR::processFailedStep()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::finish
+// Function      : MOR::finish
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Ting Mei, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_ANP_MOR::finish()
+bool MOR::finish()
 {
   bool bsuccess = true;
 
 #ifdef Xyce_DEBUG_ANALYSIS
-  cout << "Calling N_ANP_MOR::finish() outputs!" << endl;
+  Xyce::dout() << "Calling MOR::finish() outputs!" << std::endl;
 #endif
 
   if (!(morEvalFailures_.empty()))
@@ -1644,16 +1629,16 @@ bool N_ANP_MOR::finish()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::handlePredictor
+// Function      : MOR::handlePredictor
 // Purpose       :
 // Special Notes :
 // Scope         : private
 // Creator       : Eric Keiter, SNL
 // Creation Date : 06/24/2013
 //-----------------------------------------------------------------------------
-bool N_ANP_MOR::handlePredictor()
+bool MOR::handlePredictor()
 {
-  dsRCPtr_->setErrorWtVector();
+  anaManagerRCPtr_->getTIADataStore()->setErrorWtVector();
   wimRCPtr_->obtainPredictor();
   wimRCPtr_->obtainPredictorDeriv();
 
@@ -1665,14 +1650,14 @@ bool N_ANP_MOR::handlePredictor()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::updateCurrentFreq_(int stepNumber )
+// Function      : MOR::updateCurrentFreq_(int stepNumber )
 // Purpose       :
 // Special Notes : Used for MOR analysis classes.
 // Scope         : public
 // Creator       : Ting Mei, SNL.
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_ANP_MOR::updateCurrentFreq_(int stepNumber)
+bool MOR::updateCurrentFreq_(int stepNumber)
 {
   double fStart = tiaParams.morCompFStart;
 
@@ -1686,8 +1671,8 @@ bool N_ANP_MOR::updateCurrentFreq_(int stepNumber)
   }
   else
   {
-    string msg=
-      "N_ANP_MOR::updateCurrentFreq_: unsupported STEP type";
+    std::string msg=
+      "MOR::updateCurrentFreq_: unsupported STEP type";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   }
 
@@ -1695,14 +1680,14 @@ bool N_ANP_MOR::updateCurrentFreq_(int stepNumber)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_MOR::setupSweepParam_
+// Function      : MOR::setupSweepParam_
 // Purpose       : Processes sweep parameters.
 // Special Notes : Used for MOR analysis classes.
 // Scope         : public
 // Creator       : Ting Mei, SNL.
 // Creation Date :
 //-----------------------------------------------------------------------------
-int N_ANP_MOR::setupSweepParam_()
+int MOR::setupSweepParam_()
 {
   int fCount = 0;
   double fStart = tiaParams.morCompFStart;
@@ -1711,9 +1696,9 @@ int N_ANP_MOR::setupSweepParam_()
 #ifdef Xyce_DEBUG_ANALYSIS
   if (anaManagerRCPtr_->tiaParams.debugLevel > 0)
   {
-    cout << endl << endl;
-    cout << "-----------------" << endl;
-    cout << "N_ANP_MOR::setupSweepParam_" << endl;
+    Xyce::dout() << std::endl << std::endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "MOR::setupSweepParam_" << std::endl;
   }
 #endif
 
@@ -1728,7 +1713,7 @@ int N_ANP_MOR::setupSweepParam_()
 #ifdef Xyce_DEBUG_ANALYSIS
     if (anaManagerRCPtr_->tiaParams.debugLevel > 0)
     {
-      cout << "fStep   = " << fStep_  << endl;
+      Xyce::dout() << "fStep   = " << fStep_  << std::endl;
     }
 #endif
   }
@@ -1739,7 +1724,7 @@ int N_ANP_MOR::setupSweepParam_()
 #ifdef Xyce_DEBUG_ANALYSIS
     if (anaManagerRCPtr_->tiaParams.debugLevel > 0)
     {
-      cout << "stepMult_ = " << stepMult_  << endl;
+      Xyce::dout() << "stepMult_ = " << stepMult_  << std::endl;
     }
 #endif
   }
@@ -1755,14 +1740,14 @@ int N_ANP_MOR::setupSweepParam_()
 #ifdef Xyce_DEBUG_ANALYSIS
     if (anaManagerRCPtr_->tiaParams.debugLevel > 0)
     {
-      cout << "stepMult_ = " << stepMult_  << endl;
+      Xyce::dout() << "stepMult_ = " << stepMult_  << std::endl;
     }
 #endif
   }
   else
   {
-    string msg=
-      "N_ANP_MOR::setupSweepParam: unsupported type";
+    std::string msg=
+      "MOR::setupSweepParam: unsupported type";
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   }
 
@@ -1770,3 +1755,6 @@ int N_ANP_MOR::setupSweepParam_()
   // for the step loop.
   return fCount;
 }
+
+} // namespace Analysis
+} // namespace Xyce

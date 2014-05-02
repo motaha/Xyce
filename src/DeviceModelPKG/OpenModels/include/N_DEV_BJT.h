@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.141.2.2 $
+// Revision Number: $Revision: 1.157.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -51,7 +51,8 @@
 // ---------- Standard Includes ----------
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_DeviceTemplate.h>
+#include <N_DEV_Configuration.h>
+#include <N_DEV_DeviceMaster.h>
 #include <N_DEV_DeviceInstance.h>
 #include <N_DEV_DeviceModel.h>
 #include <N_DEV_DeviceBlock.h>
@@ -65,6 +66,22 @@ namespace Device {
 namespace BJT {
 
 class Model;
+class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance>
+{
+  static const char *name() {return "Bipolar Junction Transistor";}
+  static const char *deviceTypeName() {return "Q level 1";}
+  static const int numNodes() {return 3;}
+  static const int numOptionalNodes() {return 4;}
+  static const int numFillNodes() {return 1;}
+  static const bool modelRequired() {return true;}
+  static const bool isLinearDevice() {return false;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : Instance
@@ -83,441 +100,436 @@ class Model;
 
 class Instance : public DeviceInstance
 {
-    friend class ParametricData<Instance>;
-    friend class Model;
-    friend class Master;
+  friend class ParametricData<Instance>;
+  friend class Model;
+  friend class Traits;friend class Master;
 
-    // functions
-  public:
-    static ParametricData<Instance> &getParametricData();
+  // functions
+public:
 
-    virtual const ParametricData<void> &getMyParametricData() const {
-      return getParametricData();
-    }
+  Instance(
+     const Configuration &       configuration,
+     const InstanceBlock &     IB,
+     Model &                   it_MB,
+     const FactoryBlock &      factory_block);
 
-    Instance(InstanceBlock & IB,
-             Model & it_MB,
-             MatrixLoadData & mlData1,
-             SolverState &ss1,
-             ExternData  &ed1,
-             DeviceOptions & do1);
+  ~Instance();
 
-    ~Instance();
+private:
+  Instance(const Instance &);
+  Instance &operator=(const Instance &);
 
-  private:
-    Instance(const Instance &);
-    Instance &operator=(const Instance &);
+public:
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
+  void registerStateLIDs( const std::vector<int> & stateLIDVecRef );
+  void registerStoreLIDs( const std::vector<int> & stoLIDVecRef);
 
-  public:
-    void registerLIDs( const vector<int> & intLIDVecRef,
-                       const vector<int> & extLIDVecRef );
-    void registerStateLIDs( const vector<int> & stateLIDVecRef );
-    void registerStoreLIDs( const vector<int> & stoLIDVecRef);
+  std::map<int,std::string> & getIntNameMap ();
+  std::map<int,std::string> & getStoreNameMap();
 
-    map<int,string> & getIntNameMap ();
-    map<int,string> & getStoreNameMap();
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-    const vector< vector<int> > & jacobianStamp() const;
-    void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  bool processParams ();
+  bool updateTemperature (const double & temp = -999.0 );
+  bool lambertWCurrent (double &Id, double &Gd, double Vd, double Vte, double Isat);
 
-    bool processParams (string param = "");
-    bool updateTemperature (const double & temp = -999.0 );
-    bool lambertWCurrent (double &Id, double &Gd, double Vd, double Vte, double Isat);
+  bool updateIntermediateVars ();
+  bool updatePrimaryState ();
+  bool updateSecondaryState ();
 
-    bool updateIntermediateVars ();
-    bool updatePrimaryState ();
-    bool updateSecondaryState ();
-
-    bool loadDeviceMask ();
+  bool loadDeviceMask ();
 
 #ifdef Xyce_DEBUG_EXCESS_PHASE
-    bool plotfileFlag () {return true;}
+  bool plotfileFlag () {return true;}
 #else
-    bool plotfileFlag () {return false;}
+  bool plotfileFlag () {return false;}
 #endif
 
-    void oldDAEExcessPhaseCalculation1 ();
-    void oldDAEExcessPhaseCalculation2
-    (double & iEX, double & gEX, double & iC_local);
+  void oldDAEExcessPhaseCalculation1 ();
+  void oldDAEExcessPhaseCalculation2
+  (double & iEX, double & gEX, double & iC_local);
 
-    // load functions, residual:
-    bool loadDAEQVector ();
-    bool loadDAEFVector ();
+  // load functions, residual:
+  bool loadDAEQVector ();
+  bool loadDAEFVector ();
 
-    void auxDAECalculations ();
+  void auxDAECalculations ();
 
-    // load functions, Jacobian:
-    bool loadDAEdQdx ();
-    bool loadDAEdFdx ();
+  // load functions, Jacobian:
+  bool loadDAEdQdx ();
+  bool loadDAEdFdx ();
 
-    // Debugging Excess Phase function:
-    bool outputPlotFiles ();
+  // Debugging Excess Phase function:
+  bool outputPlotFiles ();
 
-    void setupPointers();
+  void setupPointers();
 
-  protected:
-  private:
+protected:
+private:
 
-    //attributes
-  public:
-    //iterator reference to the BJT model which owns this instance.
-    // Getters and setters
-    Model &getModel() {
-      return model_;
-    }
+  //attributes
+public:
+  //iterator reference to the BJT model which owns this instance.
+  // Getters and setters
+  Model &getModel() 
+  {
+    return model_;
+  }
 
-  private:
+private:
 
-    Model &       model_;         //< Owning model
+  Model &       model_;         //< Owning model
 
-    //external instance params
-    double AREA;  // The normalized emitter area (AREA)
-    double icVBE; // the inital base-emitter voltage (ICVBE)
-    double icVCE; // the inital collector-emitter voltage (ICVCE)
-    double TEMP;  // instance temperature (TEMP)
-    bool   OFF;   // initial mode of operation (OFF)
-    bool lambertWFlag;
-    bool IC_GIVEN;
-    bool externalNodeMode;
-    bool offFlag;
+  //external instance params
+  double AREA;  // The normalized emitter area (AREA)
+  double icVBE; // the inital base-emitter voltage (ICVBE)
+  double icVCE; // the inital collector-emitter voltage (ICVCE)
+  double TEMP;  // instance temperature (TEMP)
+  bool   OFF;   // initial mode of operation (OFF)
+  bool lambertWFlag;
+  bool IC_GIVEN;
+  bool externalNodeMode;
+  bool offFlag;
 
-    //generated instance params
-    double vt;           //thermal junc. volt.
-    double tSatCur;      //saturation current (temp. adj.)
-    double tBetaF;       //forward beta       (temp. adj.)
-    double tBetaR;       //reverse beta       (temp. adj.)
-    double tBELeakCur;   //BE leakage current (temp. adj.)
-    double tBCLeakCur;   //BC leakage current (temp. adj.)
-    double tBECap;       //BE capacitance     (temp. adj.)
-    double tBCCap;       //BC capacitance     (temp. adj.)
-    double tBEPot;       //BE potential       (temp. adj.)
-    double tBCPot;       //BC potential       (temp. adj.)
-    double tDepCap;      //join pt in diode curve (temp. adj.)
-    double tF1;          //polynomial coeff.  (temp. adj.)
-    double tF4;          //polynomial coeff.  (temp. adj.)
-    double tF5;          //polynomial coeff.  (temp. adj.)
-    double tVCrit;       //critical voltage   (temp. adj.)
+  //generated instance params
+  double vt;           //thermal junc. volt.
+  double tSatCur;      //saturation current (temp. adj.)
+  double tBetaF;       //forward beta       (temp. adj.)
+  double tBetaR;       //reverse beta       (temp. adj.)
+  double tBELeakCur;   //BE leakage current (temp. adj.)
+  double tBCLeakCur;   //BC leakage current (temp. adj.)
+  double tBECap;       //BE capacitance     (temp. adj.)
+  double tBCCap;       //BC capacitance     (temp. adj.)
+  double tBEPot;       //BE potential       (temp. adj.)
+  double tBCPot;       //BC potential       (temp. adj.)
+  double tDepCap;      //join pt in diode curve (temp. adj.)
+  double tF1;          //polynomial coeff.  (temp. adj.)
+  double tF4;          //polynomial coeff.  (temp. adj.)
+  double tF5;          //polynomial coeff.  (temp. adj.)
+  double tVCrit;       //critical voltage   (temp. adj.)
 
-    // additional temperature-adjusted parameters
-    double tleakBEEmissionCoeff;
-    double tleakBCEmissionCoeff;
-    double tRollOffExp;
-    double tInvRollOffF;
-    double tInvRollOffR;
-    double tInvEarlyVoltF;
-    double tInvEarlyVoltR;
-    double tBaseResist;
-    double tCollectorResist;
-    double tEmitterResist;
+  // additional temperature-adjusted parameters
+  double tleakBEEmissionCoeff;
+  double tleakBCEmissionCoeff;
+  double tRollOffExp;
+  double tInvRollOffF;
+  double tInvRollOffR;
+  double tInvEarlyVoltF;
+  double tInvEarlyVoltR;
+  double tBaseResist;
+  double tCollectorResist;
+  double tEmitterResist;
 
-    //generated intermediate variables
-    double vEEp;      // e-e' voltage
-    double vBBp;      // b-b' voltage
-    double vCCp;      // c-c' voltage
+  //generated intermediate variables
+  double vEEp;      // e-e' voltage
+  double vBBp;      // b-b' voltage
+  double vCCp;      // c-c' voltage
 
-    double vBE;       // b'-e' voltage
-    double vBC;       // b'-c' voltage
-    double vBX;       // b-c'  voltage
-    double vCS;       // c'-s  voltage
+  double vBE;       // b'-e' voltage
+  double vBC;       // b'-c' voltage
+  double vBX;       // b-c'  voltage
+  double vCS;       // c'-s  voltage
 
-    double vBE_old;   // b'-e' voltage, from previous newton step.
-    double vBC_old;   // b'-c' voltage, from previous newton step.
+  double vBE_old;   // b'-e' voltage, from previous newton step.
+  double vBC_old;   // b'-c' voltage, from previous newton step.
 
-    double vBE_orig;  // b'-e' voltage, before pinning.
-    double vBC_orig;  // b'-c' voltage, before pinning.
+  double vBE_orig;  // b'-e' voltage, before pinning.
+  double vBC_orig;  // b'-c' voltage, before pinning.
 
-    double qB;        // Base charge factor
-    double invqB;     // inverse of qB
-    double dqBdvEp;   // d(qB)/d(vE')
-    double dqBdvBp;   // d(qB)/d(vB')
-    double dqBdvCp;   // d(qB)/d(vC')
+  double qB;        // Base charge factor
+  double invqB;     // inverse of qB
+  double dqBdvEp;   // d(qB)/d(vE')
+  double dqBdvBp;   // d(qB)/d(vB')
+  double dqBdvCp;   // d(qB)/d(vC')
 
-    double iBE;       // b-e current (not including capacitors)
-    double iBC;       // b-c current (not including capacitors)
-    double iBEleak;
-    double iBCleak;
-    double iCE;       // c-e current
+  double iBE;       // b-e current (not including capacitors)
+  double iBC;       // b-c current (not including capacitors)
+  double iBEleak;
+  double iBCleak;
+  double iCE;       // c-e current
 
-    double iB;        // total current to base
-    double iC;        // total current to collector
-    double iE;        // total current to emitter
+  double iB;        // total current to base
+  double iC;        // total current to collector
+  double iE;        // total current to emitter
 
-    // high current versions of iBE, gBE.
-    double iBEhighCurr;
-    double gBEhighCurr;
+  // high current versions of iBE, gBE.
+  double iBEhighCurr;
+  double gBEhighCurr;
 
-    double gBE;
-    double gBC;
-    double gBEleak;
-    double gBCleak;
+  double gBE;
+  double gBC;
+  double gBEleak;
+  double gBCleak;
 
-    double gEpr;      // conductance for e-e' resistance
-    double gCpr;      // conductance for c-c' resistance
+  double gEpr;      // conductance for e-e' resistance
+  double gCpr;      // conductance for c-c' resistance
 
-    double gX;        // conductance for b-b' resistance
+  double gX;        // conductance for b-b' resistance
 
-    double geqCB;     // high current forward transit effect (conductance)
-    double capeqCB;   // high current forward transit effect (capacitance)
+  double geqCB;     // high current forward transit effect (conductance)
+  double capeqCB;   // high current forward transit effect (capacitance)
 
-    // Partial derivatives that originally were local to load function
-    double diBrdvB;
-    double diBrdvEp;
-    double diBrdvCp;
-    double diBrdvBp;
-    double diCEdvEp;
-    double diCEdvCp;
-    double diCEdvBp;
-    double diBEdvEp;
-    double diBEdvCp;
-    double diBEdvBp;
+  // Partial derivatives that originally were local to load function
+  double diBrdvB;
+  double diBrdvEp;
+  double diBrdvCp;
+  double diBrdvBp;
+  double diCEdvEp;
+  double diCEdvCp;
+  double diCEdvBp;
+  double diBEdvEp;
+  double diBEdvCp;
+  double diBEdvBp;
 
-    double gCapBEdiff;
-    double gCapBEdep;
-    double gCapBCdiff;
-    double gCapBCdep;
-    double gCapBX;
-    double gCapCS;
-    double gBEtot;
-    double gBCtot;
-    //double gCpr;
-    //double gEpr;
+  double gCapBEdiff;
+  double gCapBEdep;
+  double gCapBCdiff;
+  double gCapBCdep;
+  double gCapBX;
+  double gCapCS;
+  double gBEtot;
+  double gBCtot;
+  //double gCpr;
+  //double gEpr;
 
 
-    //state variables
-    double qBEdiff;   // charge in the b-e diffusion capacitor
-    double iBEdiff;   // current through the b-e diffusion capacitor
-    double capBEdiff; // capacitance for b-e diffusion capacitor
-    double qBEdep;    // charge in the b-e depletion capacitor
-    double iBEdep;    // current through the b-e diffusion capacitor
-    double capBEdep; // capacitance for b-e depletion capacitor
-    double qCS;       // charge in the c-s capacitor
-    double iCS;       // current through the c-s capacitor
-    double capCS;     // capacitance for c-s capacitor
-    double qBCdiff;   // charge in the b-c diffusion capacitor
-    double iBCdiff;   // current through the b-c diffusion capacitor
-    double capBCdiff; // capacitance for b-c diffusion capacitor
-    double qBCdep;    // charge in the b-c depletion capacitor
-    double iBCdep;    // current through the b-c depletion capacitor
-    double capBCdep;  // capacitance for b-c depletion capacitor
-    double qBX;       // charge in the b-cP capacitor
-    double iBX;       // current through the b-cP capacitor
-    double capBX;     // capacitance for b-cP capacitor
+  //state variables
+  double qBEdiff;   // charge in the b-e diffusion capacitor
+  double iBEdiff;   // current through the b-e diffusion capacitor
+  double capBEdiff; // capacitance for b-e diffusion capacitor
+  double qBEdep;    // charge in the b-e depletion capacitor
+  double iBEdep;    // current through the b-e diffusion capacitor
+  double capBEdep; // capacitance for b-e depletion capacitor
+  double qCS;       // charge in the c-s capacitor
+  double iCS;       // current through the c-s capacitor
+  double capCS;     // capacitance for c-s capacitor
+  double qBCdiff;   // charge in the b-c diffusion capacitor
+  double iBCdiff;   // current through the b-c diffusion capacitor
+  double capBCdiff; // capacitance for b-c diffusion capacitor
+  double qBCdep;    // charge in the b-c depletion capacitor
+  double iBCdep;    // current through the b-c depletion capacitor
+  double capBCdep;  // capacitance for b-c depletion capacitor
+  double qBX;       // charge in the b-cP capacitor
+  double iBX;       // current through the b-cP capacitor
+  double capBX;     // capacitance for b-cP capacitor
 
-    //local indexing of solution and state variables
-    int li_Coll;
-    int li_CollP;
-    int li_Base;
-    int li_BaseP;
-    int li_Emit;
-    int li_EmitP;
-    int li_Subst;
+  //local indexing of solution and state variables
+  int li_Coll;
+  int li_CollP;
+  int li_Base;
+  int li_BaseP;
+  int li_Emit;
+  int li_EmitP;
+  int li_Subst;
 
-    //new variables for full new DAE integration of excess phase term
-    int li_Ifx;
-    int li_dIfx;
+  //new variables for full new DAE integration of excess phase term
+  int li_Ifx;
+  int li_dIfx;
 
-    int li_qstateBEdiff;
-    int li_qstateBEdep;
-    int li_qstateCS;
-    int li_qstateBCdiff;
-    int li_qstateBCdep;
-    int li_qstateBX;
+  int li_qstateBEdiff;
+  int li_qstateBEdep;
+  int li_qstateCS;
+  int li_qstateBCdiff;
+  int li_qstateBCdep;
+  int li_qstateBX;
 
-    // for the "old" excess phase calculation.
-    int li_istateCEXBC;
+  // for the "old" excess phase calculation.
+  int li_istateCEXBC;
 
-    // stored data for limiting and lead currents.
-    int li_storevBE;
-    int li_storevBC;
-    int li_store_capeqCB;
-    int li_store_dev_ib;
-    int li_store_dev_ie;
-    int li_store_dev_ic;
-    int li_store_dev_is;
+  // stored data for limiting and lead currents.
+  int li_storevBE;
+  int li_storevBC;
+  int li_store_capeqCB;
+  int li_store_dev_ib;
+  int li_store_dev_ie;
+  int li_store_dev_ic;
+  int li_store_dev_is;
 
-    //conductance values
-    double gcpr;
-    double gepr;
-    double gx;
-    double gm;
-    double go;
-    double gmu;
-    double gpi;
-    double gccs;
-    double geqbx;
-    double geqbc;
+  //conductance values
+  double gcpr;
+  double gepr;
+  double gx;
+  double gm;
+  double go;
+  double gmu;
+  double gpi;
+  double gccs;
+  double geqbx;
+  double geqbc;
 
-    // excess phase variables
-    double nextCexbc;
-    double currCexbc;
-    double lastCexbc;
-    double phaseScalar;
-    double dt0,dt1;
+  // excess phase variables
+  double nextCexbc;
+  double currCexbc;
+  double lastCexbc;
+  double phaseScalar;
+  double dt0,dt1;
 
-    // Offset variables corresponding to the above declared indices.
-    int AEmitEquEmitPNodeOffset;
-    int AEmitPEquEmitNodeOffset;
-    int ABaseEquBasePNodeOffset;
-    int ABasePEquBaseNodeOffset;
-    int ACollEquCollPNodeOffset;
-    int ACollPEquCollNodeOffset;
-    int AEmitEquEmitNodeOffset;
-    int AEmitPEquEmitPNodeOffset;
-    int ABaseEquBaseNodeOffset;
-    int ABasePEquBasePNodeOffset;
-    int ACollEquCollNodeOffset;
-    int ACollPEquCollPNodeOffset;
-    int AEmitPEquBasePNodeOffset;
-    int ABasePEquEmitPNodeOffset;
-    int AEmitPEquCollPNodeOffset;
-    int ACollPEquEmitPNodeOffset;
-    int ABasePEquCollPNodeOffset;
-    int ACollPEquBasePNodeOffset;
-    int ABaseEquCollPNodeOffset;
-    int ACollPEquBaseNodeOffset;
-    int ASubstEquSubstNodeOffset;
-    int ASubstEquCollPNodeOffset;
-    int ACollPEquSubstNodeOffset;
-    int ABaseEquEmitPNodeOffset;
+  // Offset variables corresponding to the above declared indices.
+  int AEmitEquEmitPNodeOffset;
+  int AEmitPEquEmitNodeOffset;
+  int ABaseEquBasePNodeOffset;
+  int ABasePEquBaseNodeOffset;
+  int ACollEquCollPNodeOffset;
+  int ACollPEquCollNodeOffset;
+  int AEmitEquEmitNodeOffset;
+  int AEmitPEquEmitPNodeOffset;
+  int ABaseEquBaseNodeOffset;
+  int ABasePEquBasePNodeOffset;
+  int ACollEquCollNodeOffset;
+  int ACollPEquCollPNodeOffset;
+  int AEmitPEquBasePNodeOffset;
+  int ABasePEquEmitPNodeOffset;
+  int AEmitPEquCollPNodeOffset;
+  int ACollPEquEmitPNodeOffset;
+  int ABasePEquCollPNodeOffset;
+  int ACollPEquBasePNodeOffset;
+  int ABaseEquCollPNodeOffset;
+  int ACollPEquBaseNodeOffset;
+  int ASubstEquSubstNodeOffset;
+  int ASubstEquCollPNodeOffset;
+  int ACollPEquSubstNodeOffset;
+  int ABaseEquEmitPNodeOffset;
 
-    //new offsets for full new DAE integration of excess phase term
-    int ACollPEquIfxNodeOffset;
-    int AEmitPEquIfxNodeOffset;
+  //new offsets for full new DAE integration of excess phase term
+  int ACollPEquIfxNodeOffset;
+  int AEmitPEquIfxNodeOffset;
 
-    // ERK.  These 3 are only needed for dcop.
-    int AIfxEquCollPNodeOffset;
-    int AIfxEquBasePNodeOffset;
-    int AIfxEquEmitPNodeOffset;
+  // ERK.  These 3 are only needed for dcop.
+  int AIfxEquCollPNodeOffset;
+  int AIfxEquBasePNodeOffset;
+  int AIfxEquEmitPNodeOffset;
 
-    int AIfxEquIfxNodeOffset;
-    int AIfxEqudIfxNodeOffset;
+  int AIfxEquIfxNodeOffset;
+  int AIfxEqudIfxNodeOffset;
 
-    int AdIfxEquCollPNodeOffset;
-    int AdIfxEquBasePNodeOffset;
-    int AdIfxEquEmitPNodeOffset;
-    int AdIfxEquIfxNodeOffset;
-    int AdIfxEqudIfxNodeOffset;
+  int AdIfxEquCollPNodeOffset;
+  int AdIfxEquBasePNodeOffset;
+  int AdIfxEquEmitPNodeOffset;
+  int AdIfxEquIfxNodeOffset;
+  int AdIfxEqudIfxNodeOffset;
 
 #ifndef Xyce_NONPOINTER_MATRIX_LOAD
-    // f-matrix pointers:
-    double * f_EmitEquEmitPNodePtr;
-    double * f_EmitPEquEmitNodePtr;
-    double * f_BaseEquBasePNodePtr;
-    double * f_BasePEquBaseNodePtr;
-    double * f_CollEquCollPNodePtr;
-    double * f_CollPEquCollNodePtr;
-    double * f_EmitEquEmitNodePtr;
-    double * f_EmitPEquEmitPNodePtr;
-    double * f_BaseEquBaseNodePtr;
-    double * f_BasePEquBasePNodePtr;
-    double * f_CollEquCollNodePtr;
-    double * f_CollPEquCollPNodePtr;
-    double * f_EmitPEquBasePNodePtr;
-    double * f_BasePEquEmitPNodePtr;
-    double * f_EmitPEquCollPNodePtr;
-    double * f_CollPEquEmitPNodePtr;
-    double * f_BasePEquCollPNodePtr;
-    double * f_CollPEquBasePNodePtr;
-    double * f_BaseEquCollPNodePtr;
-    double * f_CollPEquBaseNodePtr;
-    double * f_SubstEquSubstNodePtr;
-    double * f_SubstEquCollPNodePtr;
-    double * f_CollPEquSubstNodePtr;
-    double * f_BaseEquEmitPNodePtr;
+  // f-matrix pointers:
+  double * f_EmitEquEmitPNodePtr;
+  double * f_EmitPEquEmitNodePtr;
+  double * f_BaseEquBasePNodePtr;
+  double * f_BasePEquBaseNodePtr;
+  double * f_CollEquCollPNodePtr;
+  double * f_CollPEquCollNodePtr;
+  double * f_EmitEquEmitNodePtr;
+  double * f_EmitPEquEmitPNodePtr;
+  double * f_BaseEquBaseNodePtr;
+  double * f_BasePEquBasePNodePtr;
+  double * f_CollEquCollNodePtr;
+  double * f_CollPEquCollPNodePtr;
+  double * f_EmitPEquBasePNodePtr;
+  double * f_BasePEquEmitPNodePtr;
+  double * f_EmitPEquCollPNodePtr;
+  double * f_CollPEquEmitPNodePtr;
+  double * f_BasePEquCollPNodePtr;
+  double * f_CollPEquBasePNodePtr;
+  double * f_BaseEquCollPNodePtr;
+  double * f_CollPEquBaseNodePtr;
+  double * f_SubstEquSubstNodePtr;
+  double * f_SubstEquCollPNodePtr;
+  double * f_CollPEquSubstNodePtr;
+  double * f_BaseEquEmitPNodePtr;
 
-    //new offsets for full new DAE integration of excess phase term
-    double * f_CollPEquIfxNodePtr;
-    double * f_EmitPEquIfxNodePtr;
+  //new offsets for full new DAE integration of excess phase term
+  double * f_CollPEquIfxNodePtr;
+  double * f_EmitPEquIfxNodePtr;
 
-    // ERK.  These 3 are only needed for dcop.
-    double * f_IfxEquCollPNodePtr;
-    double * f_IfxEquBasePNodePtr;
-    double * f_IfxEquEmitPNodePtr;
+  // ERK.  These 3 are only needed for dcop.
+  double * f_IfxEquCollPNodePtr;
+  double * f_IfxEquBasePNodePtr;
+  double * f_IfxEquEmitPNodePtr;
 
-    double * f_IfxEquIfxNodePtr;
-    double * f_IfxEqudIfxNodePtr;
+  double * f_IfxEquIfxNodePtr;
+  double * f_IfxEqudIfxNodePtr;
 
-    double * f_dIfxEquCollPNodePtr;
-    double * f_dIfxEquBasePNodePtr;
-    double * f_dIfxEquEmitPNodePtr;
-    double * f_dIfxEquIfxNodePtr;
-    double * f_dIfxEqudIfxNodePtr;
+  double * f_dIfxEquCollPNodePtr;
+  double * f_dIfxEquBasePNodePtr;
+  double * f_dIfxEquEmitPNodePtr;
+  double * f_dIfxEquIfxNodePtr;
+  double * f_dIfxEqudIfxNodePtr;
 
 
-    // q-matrix pointers:
-    double * q_EmitEquEmitPNodePtr;
-    double * q_EmitPEquEmitNodePtr;
-    double * q_BaseEquBasePNodePtr;
-    double * q_BasePEquBaseNodePtr;
-    double * q_CollEquCollPNodePtr;
-    double * q_CollPEquCollNodePtr;
-    double * q_EmitEquEmitNodePtr;
-    double * q_EmitPEquEmitPNodePtr;
-    double * q_BaseEquBaseNodePtr;
-    double * q_BasePEquBasePNodePtr;
-    double * q_CollEquCollNodePtr;
-    double * q_CollPEquCollPNodePtr;
-    double * q_EmitPEquBasePNodePtr;
-    double * q_BasePEquEmitPNodePtr;
-    double * q_EmitPEquCollPNodePtr;
-    double * q_CollPEquEmitPNodePtr;
-    double * q_BasePEquCollPNodePtr;
-    double * q_CollPEquBasePNodePtr;
-    double * q_BaseEquCollPNodePtr;
-    double * q_CollPEquBaseNodePtr;
-    double * q_SubstEquSubstNodePtr;
-    double * q_SubstEquCollPNodePtr;
-    double * q_CollPEquSubstNodePtr;
-    double * q_BaseEquEmitPNodePtr;
+  // q-matrix pointers:
+  double * q_EmitEquEmitPNodePtr;
+  double * q_EmitPEquEmitNodePtr;
+  double * q_BaseEquBasePNodePtr;
+  double * q_BasePEquBaseNodePtr;
+  double * q_CollEquCollPNodePtr;
+  double * q_CollPEquCollNodePtr;
+  double * q_EmitEquEmitNodePtr;
+  double * q_EmitPEquEmitPNodePtr;
+  double * q_BaseEquBaseNodePtr;
+  double * q_BasePEquBasePNodePtr;
+  double * q_CollEquCollNodePtr;
+  double * q_CollPEquCollPNodePtr;
+  double * q_EmitPEquBasePNodePtr;
+  double * q_BasePEquEmitPNodePtr;
+  double * q_EmitPEquCollPNodePtr;
+  double * q_CollPEquEmitPNodePtr;
+  double * q_BasePEquCollPNodePtr;
+  double * q_CollPEquBasePNodePtr;
+  double * q_BaseEquCollPNodePtr;
+  double * q_CollPEquBaseNodePtr;
+  double * q_SubstEquSubstNodePtr;
+  double * q_SubstEquCollPNodePtr;
+  double * q_CollPEquSubstNodePtr;
+  double * q_BaseEquEmitPNodePtr;
 
-    //new offsets for full new DAE integration of excess phase term
-    double * q_CollPEquIfxNodePtr;
-    double * q_EmitPEquIfxNodePtr;
+  //new offsets for full new DAE integration of excess phase term
+  double * q_CollPEquIfxNodePtr;
+  double * q_EmitPEquIfxNodePtr;
 
-    // ERK.  These 3 are only needed for dcop.
-    double * q_IfxEquCollPNodePtr;
-    double * q_IfxEquBasePNodePtr;
-    double * q_IfxEquEmitPNodePtr;
+  // ERK.  These 3 are only needed for dcop.
+  double * q_IfxEquCollPNodePtr;
+  double * q_IfxEquBasePNodePtr;
+  double * q_IfxEquEmitPNodePtr;
 
-    double * q_IfxEquIfxNodePtr;
-    double * q_IfxEqudIfxNodePtr;
+  double * q_IfxEquIfxNodePtr;
+  double * q_IfxEqudIfxNodePtr;
 
-    double * q_dIfxEquCollPNodePtr;
-    double * q_dIfxEquBasePNodePtr;
-    double * q_dIfxEquEmitPNodePtr;
-    double * q_dIfxEquIfxNodePtr;
-    double * q_dIfxEqudIfxNodePtr;
+  double * q_dIfxEquCollPNodePtr;
+  double * q_dIfxEquBasePNodePtr;
+  double * q_dIfxEquEmitPNodePtr;
+  double * q_dIfxEquIfxNodePtr;
+  double * q_dIfxEqudIfxNodePtr;
 #endif
 
 
-    static vector< vector<int> > jacStamp_RB_RC_RE_;
-    static vector< vector<int> > jacStamp_RB_RC_;
-    static vector< vector<int> > jacStamp_RB_RE_;
-    static vector< vector<int> > jacStamp_RC_RE_;
-    static vector< vector<int> > jacStamp_RB_;
-    static vector< vector<int> > jacStamp_RC_;
-    static vector< vector<int> > jacStamp_RE_;
-    static vector< vector<int> > jacStamp_;
+  static std::vector< std::vector<int> > jacStamp_RB_RC_RE_;
+  static std::vector< std::vector<int> > jacStamp_RB_RC_;
+  static std::vector< std::vector<int> > jacStamp_RB_RE_;
+  static std::vector< std::vector<int> > jacStamp_RC_RE_;
+  static std::vector< std::vector<int> > jacStamp_RB_;
+  static std::vector< std::vector<int> > jacStamp_RC_;
+  static std::vector< std::vector<int> > jacStamp_RE_;
+  static std::vector< std::vector<int> > jacStamp_;
 
-    static vector<int> jacMap_RB_RC_RE_;
-    static vector<int> jacMap_RB_RC_;
-    static vector<int> jacMap_RB_RE_;
-    static vector<int> jacMap_RC_RE_;
-    static vector<int> jacMap_RB_;
-    static vector<int> jacMap_RC_;
-    static vector<int> jacMap_RE_;
-    static vector<int> jacMap_;
+  static std::vector<int> jacMap_RB_RC_RE_;
+  static std::vector<int> jacMap_RB_RC_;
+  static std::vector<int> jacMap_RB_RE_;
+  static std::vector<int> jacMap_RC_RE_;
+  static std::vector<int> jacMap_RB_;
+  static std::vector<int> jacMap_RC_;
+  static std::vector<int> jacMap_RE_;
+  static std::vector<int> jacMap_;
 
-    static vector< vector<int> > jacMap2_RB_RC_RE_;
-    static vector< vector<int> > jacMap2_RB_RC_;
-    static vector< vector<int> > jacMap2_RB_RE_;
-    static vector< vector<int> > jacMap2_RC_RE_;
-    static vector< vector<int> > jacMap2_RB_;
-    static vector< vector<int> > jacMap2_RC_;
-    static vector< vector<int> > jacMap2_RE_;
-    static vector< vector<int> > jacMap2_;
+  static std::vector< std::vector<int> > jacMap2_RB_RC_RE_;
+  static std::vector< std::vector<int> > jacMap2_RB_RC_;
+  static std::vector< std::vector<int> > jacMap2_RB_RE_;
+  static std::vector< std::vector<int> > jacMap2_RC_RE_;
+  static std::vector< std::vector<int> > jacMap2_RB_;
+  static std::vector< std::vector<int> > jacMap2_RC_;
+  static std::vector< std::vector<int> > jacMap2_RE_;
+  static std::vector< std::vector<int> > jacMap2_;
 
-    int callsOutputPlot;
+  int callsOutputPlot;
 };
 
 //-----------------------------------------------------------------------------
@@ -529,196 +541,200 @@ class Instance : public DeviceInstance
 //-----------------------------------------------------------------------------
 class Model : public DeviceModel
 {
-    typedef std::vector<Instance *> InstanceVector;
+  typedef std::vector<Instance *> InstanceVector;
 
-    friend class ParametricData<Model>;
-    friend class Instance;
-    friend class Master;
+  friend class ParametricData<Model>;
+  friend class Instance;
+  friend class Traits;friend class Master;
 
-  public:
-    static ParametricData<Model> &getParametricData();
+public:
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &        MB,
+     const FactoryBlock &      factory_block);
 
-    virtual const ParametricData<void> &getMyParametricData() const {
-      return getParametricData();
-    }
+  ~Model();
 
-    Model(const ModelBlock & MB,
-          SolverState & ss1,
-          DeviceOptions & do1);
+private:
+  Model();
+  Model(const Model &);
+  Model &operator=(const Model &);
 
-    ~Model();
+public:
+  void updateIntermediateParams();
 
-  private:
-    Model();
-    Model(const Model &);
-    Model &operator=(const Model &);
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
 
-  public:
-    void updateIntermediateParams();
+  virtual std::ostream &printOutInstances(std::ostream &os) const;
 
-    virtual std::ostream &printOutInstances(std::ostream &os) const;
-
-    bool processParams (string param = "");
-    bool processInstanceParams (string param = "");
+  bool processParams ();
+  bool processInstanceParams ();
 
 
-  public:
-    InstanceVector &getInstanceVector() {
-      return instanceContainer;
-    }
+public:
+  void addInstance(Instance *instance) 
+  {
+    instanceContainer.push_back(instance);
+  }
 
-    const InstanceVector &getInstanceVector() const {
-      return instanceContainer;
-    }
+  InstanceVector &getInstanceVector() 
+  {
+    return instanceContainer;
+  }
 
-  private:
-    vector<Instance*> instanceContainer;
+  const InstanceVector &getInstanceVector() const 
+  {
+    return instanceContainer;
+  }
 
-  private:
+private:
+  std::vector<Instance*> instanceContainer;
 
-    //external model params
-    int TYPE;                  //+1 = NPN, -1 = PNP
-    double TNOM;               //nominal temperature
-    double satCur;             //Saturation Current (IS)
+private:
 
-    double betaF;              //forward beta (BF)
-    bool   BFgiven;            // given flag for forward beta (spice/Pspice)
-    bool   BFMgiven;           // given flag for forward beta (hspice)
-    double emissionCoeffF;     //forward current emmission coeff (NF)
-    double earlyVoltF;         //forward early voltage (VAF)
-    bool   VAgiven;            // given flag for fwd early voltage (Hspice/Pspice)
-    bool   VAFgiven;           // given flag for fwd early voltage (Spice)
-    bool   VBFgiven;           // given flag for fwd early voltage (Hspice)
+  //external model params
+  int TYPE;                  //+1 = NPN, -1 = PNP
+  double TNOM;               //nominal temperature
+  double satCur;             //Saturation Current (IS)
 
-    double rollOffF;           //forward high current roll-off (IKF)
-    bool IKFgiven;             // given flag for high current roll-off (spice)
-    bool IKgiven;              // given flag for high current roll-off (pspice/hspice)
-    bool JBFgiven;             // given flag for high current roll-off (hspice)
+  double betaF;              //forward beta (BF)
+  bool   BFgiven;            // given flag for forward beta (spice/Pspice)
+  bool   BFMgiven;           // given flag for forward beta (hspice)
+  double emissionCoeffF;     //forward current emmission coeff (NF)
+  double earlyVoltF;         //forward early voltage (VAF)
+  bool   VAgiven;            // given flag for fwd early voltage (Hspice/Pspice)
+  bool   VAFgiven;           // given flag for fwd early voltage (Spice)
+  bool   VBFgiven;           // given flag for fwd early voltage (Hspice)
 
-    double leakBECurrent;      //BE leakage saturation current (ISE)
-    double leakBEEmissionCoeff;//BE leakage emission coeff. (NE)
-    bool NEgiven;              // given flag for leakage emission coef.(NE) (spice/pspice)
-    bool NLEgiven;             // given flag for leakage emission coef.(NLE) (hspice)
+  double rollOffF;           //forward high current roll-off (IKF)
+  bool IKFgiven;             // given flag for high current roll-off (spice)
+  bool IKgiven;              // given flag for high current roll-off (pspice/hspice)
+  bool JBFgiven;             // given flag for high current roll-off (hspice)
 
-    double betaR;              // reverse beta (BR)
-    bool BRgiven;              // given flag for reverse beta, BR (spice/pspice)
-    bool BRMgiven;             // given flag for reverse beta, BR (hspice)
+  double leakBECurrent;      //BE leakage saturation current (ISE)
+  double leakBEEmissionCoeff;//BE leakage emission coeff. (NE)
+  bool NEgiven;              // given flag for leakage emission coef.(NE) (spice/pspice)
+  bool NLEgiven;             // given flag for leakage emission coef.(NLE) (hspice)
 
-    double emissionCoeffR;     // reverse current emmission coeff (NR)
-    double earlyVoltR;         // reverse early voltage (VAR/VB/VRB/BV)
-    bool VARgiven;             // given flag for reverse early voltage(VAR)  (spice)
-    bool VBgiven;              // given flag for reverse early voltage(VB)  (pspice/hspice)
-    bool VRBgiven;             // given flag for reverse early voltage(VRB)  (hspice)
-    bool BVgiven;              // given flag for reverse early voltage(BV)  (hspice)
+  double betaR;              // reverse beta (BR)
+  bool BRgiven;              // given flag for reverse beta, BR (spice/pspice)
+  bool BRMgiven;             // given flag for reverse beta, BR (hspice)
+
+  double emissionCoeffR;     // reverse current emmission coeff (NR)
+  double earlyVoltR;         // reverse early voltage (VAR/VB/VRB/BV)
+  bool VARgiven;             // given flag for reverse early voltage(VAR)  (spice)
+  bool VBgiven;              // given flag for reverse early voltage(VB)  (pspice/hspice)
+  bool VRBgiven;             // given flag for reverse early voltage(VRB)  (hspice)
+  bool BVgiven;              // given flag for reverse early voltage(BV)  (hspice)
 
 
-    double rollOffR;           //reverse high current roll-off (IKR)
-    bool IKRgiven;             // given flag  for reverse high current roll-off (IKR) (spice)
-    bool JBRgiven;             // given flag  for reverse high current roll-off (JBR) (Hspice)
-    double leakBCCurrent;      //BC leakage saturation current (ISC)
-    double leakBCEmissionCoeff;//BC leakage emission coeff. (NC)
+  double rollOffR;           //reverse high current roll-off (IKR)
+  bool IKRgiven;             // given flag  for reverse high current roll-off (IKR) (spice)
+  bool JBRgiven;             // given flag  for reverse high current roll-off (JBR) (Hspice)
+  double leakBCCurrent;      //BC leakage saturation current (ISC)
+  double leakBCEmissionCoeff;//BC leakage emission coeff. (NC)
 
-    double baseResist;         //zero bias base resistance (RB)
-    double baseCurrHalfResist; //current for 1/2 base resistance (IRB)
-    bool IRBgiven;             // given flag for 1/2 base resist. (IRB, spice)
-    bool JRBgiven;             // given flag for 1/2 base resist. (JRB, spice)
-    bool IOBgiven;             // given flag for 1/2 base resist. (IOB, spice)
+  double baseResist;         //zero bias base resistance (RB)
+  double baseCurrHalfResist; //current for 1/2 base resistance (IRB)
+  bool IRBgiven;             // given flag for 1/2 base resist. (IRB, spice)
+  bool JRBgiven;             // given flag for 1/2 base resist. (JRB, spice)
+  bool IOBgiven;             // given flag for 1/2 base resist. (IOB, spice)
 
-    double minBaseResist;      //min base resistance for high current (RBM)
-    double emitterResist;      //emitter resistance (RE)
-    double collectorResist;    //collector resistance (RC)
+  double minBaseResist;      //min base resistance for high current (RBM)
+  double emitterResist;      //emitter resistance (RE)
+  double collectorResist;    //collector resistance (RC)
 
-    double depCapBE;           //BE zero bias depletion capacitance (CJE)
-    double potBE;              //BE built-in potential (VJE)
-    bool VJEgiven;             // given flag for BE built-in potential (VJE,spice)
-    bool PEgiven;              // given flag for BE built-in potential (PE,pspice, hspice)
+  double depCapBE;           //BE zero bias depletion capacitance (CJE)
+  double potBE;              //BE built-in potential (VJE)
+  bool VJEgiven;             // given flag for BE built-in potential (VJE,spice)
+  bool PEgiven;              // given flag for BE built-in potential (PE,pspice, hspice)
 
-    double juncExpBE;          //BE junction exponential factor (MJE)
-    bool MJEgiven;             // given flag for BE exponential factor (MJE,spice)
-    bool MEgiven;              // given flag for BE exponential factor (ME,pspice, hspice)
+  double juncExpBE;          //BE junction exponential factor (MJE)
+  bool MJEgiven;             // given flag for BE exponential factor (MJE,spice)
+  bool MEgiven;              // given flag for BE exponential factor (ME,pspice, hspice)
 
-    double transTimeF;         //ideal forward transit time (TF)
-    double transTimeBiasCoeffF;//bias dependent coefficient for TF (XTF)
-    double transTimeFVBC;      //VBC dependence for TF (VTF)
-    double transTimeHighCurrF; //high current parameter for TF (ITF)
-    bool ITFgiven;             // given flag for ITF (spice)
-    bool JTFgiven;             // given flag for ITF (hspice)
-    double excessPhase;        //excess phase at freq=1.0/(TF*2PI) Hz (PTF)
+  double transTimeF;         //ideal forward transit time (TF)
+  double transTimeBiasCoeffF;//bias dependent coefficient for TF (XTF)
+  double transTimeFVBC;      //VBC dependence for TF (VTF)
+  double transTimeHighCurrF; //high current parameter for TF (ITF)
+  bool ITFgiven;             // given flag for ITF (spice)
+  bool JTFgiven;             // given flag for ITF (hspice)
+  double excessPhase;        //excess phase at freq=1.0/(TF*2PI) Hz (PTF)
 
-    double depCapBC;           //BC zero bias depletion capacitance (CJC)
-    double potBC;              //BC built-in potential (VJC)
-    bool VJCgiven;             // given flag for BC built-in potential (VJE,spice)
-    bool PCgiven;              // given flag for BC built-in potential (PE,pspice, hspice)
+  double depCapBC;           //BC zero bias depletion capacitance (CJC)
+  double potBC;              //BC built-in potential (VJC)
+  bool VJCgiven;             // given flag for BC built-in potential (VJE,spice)
+  bool PCgiven;              // given flag for BC built-in potential (PE,pspice, hspice)
 
-    double juncExpBC;          //BC junction exponential factor (MJC)
-    bool MJCgiven;             // given flag for BC exponential factor (MJC,spice)
-    bool MCgiven;              // given flag for BC exponential factor (MC,pspice, hspice)
+  double juncExpBC;          //BC junction exponential factor (MJC)
+  bool MJCgiven;             // given flag for BC exponential factor (MJC,spice)
+  bool MCgiven;              // given flag for BC exponential factor (MC,pspice, hspice)
 
-    double baseFracBCCap;      //fraction of BC cap. to int. base node (XCJC)
-    bool XCJCgiven;            // given flag for spice/pspice.
-    bool CDISgiven;            // given flag for hspice
+  double baseFracBCCap;      //fraction of BC cap. to int. base node (XCJC)
+  bool XCJCgiven;            // given flag for spice/pspice.
+  bool CDISgiven;            // given flag for hspice
 
-    double transTimeR;         //ideal reverse transit time (TR)
+  double transTimeR;         //ideal reverse transit time (TR)
 
-    double CJS;                //zero-bias coll-subst capacitance (CJS)
-    bool CJSgiven;             //zero-bias coll-subst capacitance (CJS) given flag (spice)
-    bool CCSgiven;             //zero-bias coll-subst capacitance (CCS) given flag (Pspice/Hspice)
-    bool CSUBgiven;            //zero-bias coll-subst capacitance (CSUB) given flag (Hspice)
+  double CJS;                //zero-bias coll-subst capacitance (CJS)
+  bool CJSgiven;             //zero-bias coll-subst capacitance (CJS) given flag (spice)
+  bool CCSgiven;             //zero-bias coll-subst capacitance (CCS) given flag (Pspice/Hspice)
+  bool CSUBgiven;            //zero-bias coll-subst capacitance (CSUB) given flag (Hspice)
 
-    double potSubst;           //substrate junction built-in potential (VJS)
-    bool VJSgiven;             // given flag for spice format (VJS)
-    bool PSgiven;              // given flag for spice format (PS)
-    bool PSUBgiven;            // given flag for spice format (PSUB)
+  double potSubst;           //substrate junction built-in potential (VJS)
+  bool VJSgiven;             // given flag for spice format (VJS)
+  bool PSgiven;              // given flag for spice format (PS)
+  bool PSUBgiven;            // given flag for spice format (PSUB)
 
-    double expSubst;           //subst. junction exponential factor (MJS)
-    bool MJSgiven;             // given flag for spice format (MJS)
-    bool MSgiven;              // given flag for spice format (MS)
-    bool ESUBgiven;            // given flag for spice format (ESUB)
+  double expSubst;           //subst. junction exponential factor (MJS)
+  bool MJSgiven;             // given flag for spice format (MJS)
+  bool MSgiven;              // given flag for spice format (MS)
+  bool ESUBgiven;            // given flag for spice format (ESUB)
 
-    double betaExp;            //beta temperature exponent (XTB)
-    bool XTBgiven;             // given for spice/pspice
-    bool TBgiven;              // given for hspice
-    bool TCBgiven;             // given for hspice
+  double betaExp;            //beta temperature exponent (XTB)
+  bool XTBgiven;             // given for spice/pspice
+  bool TBgiven;              // given for hspice
+  bool TCBgiven;             // given for hspice
 
-    double energyGap;          //energy gap for temp. effect on IS (EG)
-    double tempExpIS;          //temp. exponent for IS (XTI)
-    bool XTIgiven;             // given for spice/hspice
-    bool PTgiven;              // given for pspice
+  double energyGap;          //energy gap for temp. effect on IS (EG)
+  double tempExpIS;          //temp. exponent for IS (XTI)
+  bool XTIgiven;             // given for spice/hspice
+  bool PTgiven;              // given for pspice
 
-    double depCapCoeff;        //coeff. for fwd bias depletion cap. (FC)
-    double fNCoeff;            //flicker-noise coeff. (KF)
-    double fNExp;              //flicker-noise exponent (AF)
+  double depCapCoeff;        //coeff. for fwd bias depletion cap. (FC)
+  double fNCoeff;            //flicker-noise coeff. (KF)
+  double fNExp;              //flicker-noise exponent (AF)
 
-    double rollOffExp;         //Pspice high-current rolloff parameter (NK)
-    bool NKgiven;              // spice/pspice
-    bool NKFgiven;             // hspice
+  double rollOffExp;         //Pspice high-current rolloff parameter (NK)
+  bool NKgiven;              // spice/pspice
+  bool NKFgiven;             // hspice
 
-    double c2;
-    double c4;
+  double c2;
+  double c4;
 
-    bool leakBECurrentGiven; // specified as ISE (spice)
-    bool JLEgiven; // hspice version of leakBECurrent
-    bool leakBCCurrentGiven; // specified as ISC (spice)
-    bool JLCgiven; // hspice version of leakBCCurrent
+  bool leakBECurrentGiven; // specified as ISE (spice)
+  bool JLEgiven; // hspice version of leakBECurrent
+  bool leakBCCurrentGiven; // specified as ISC (spice)
+  bool JLCgiven; // hspice version of leakBCCurrent
 
-    bool c2Given;
-    bool c4Given;
-    bool minBaseResistGiven;
+  bool c2Given;
+  bool c4Given;
+  bool minBaseResistGiven;
 
-    //generated model params
-    double invEarlyVoltF;      //inverse of fwd early voltage
-    double invEarlyVoltR;      //inverse of rvs early voltage
-    double invRollOffF;        //inverse of fwd high curr. roll-off
-    double invRollOffR;        //inverse of rvs high curr. roll-off
-    double collectorConduct;   //collector conductance
-    double emitterConduct;     //emitter conductance
-    double transTimeVBCFac;    //VBC transit time factor
-    double excessPhaseFac;     //excess phase factor
+  //generated model params
+  double invEarlyVoltF;      //inverse of fwd early voltage
+  double invEarlyVoltR;      //inverse of rvs early voltage
+  double invRollOffF;        //inverse of fwd high curr. roll-off
+  double invRollOffR;        //inverse of rvs high curr. roll-off
+  double collectorConduct;   //collector conductance
+  double emitterConduct;     //emitter conductance
+  double transTimeVBCFac;    //VBC transit time factor
+  double excessPhaseFac;     //excess phase factor
 
-    double f2;
-    double f3;
-    double f6;
-    double f7;
+  double f2;
+  double f3;
+  double f6;
+  double f7;
 };
 
 
@@ -729,34 +745,32 @@ class Model : public DeviceModel
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 11/26/08
 //-----------------------------------------------------------------------------
-class Master : public Xyce::Device::DeviceTemplate<Model, Instance>
+class Master : public DeviceMaster<Traits>
 {
-  public:
-    Master (
-      const std::string &dn,
-      const std::string &cn,
-      const std::string &dmName,
-      LinearDevice linearDev,
-      SolverState & ss1,
-      DeviceOptions & do1)
-      : Xyce::Device::DeviceTemplate<Model, Instance>(
-        dn, cn, dmName, linearDev, ss1, do1)
-    {
+public:
+  Master(
+     const Configuration &       configuration,
+     const FactoryBlock &      factory_block,
+     const SolverState & ss1,
+     const DeviceOptions & do1)
+    : DeviceMaster<Traits>(configuration, factory_block, ss1, do1)
+  {}
 
-    }
+  virtual bool updateState (double * solVec, double * staVec, double * stoVec);
+  virtual bool updateSecondaryState (double * staDeriv, double * stoVec);
 
-    virtual bool updateState (double * solVec, double * staVec, double * stoVec);
-    virtual bool updateSecondaryState (double * staDeriv, double * stoVec);
+  // load functions, residual:
+  virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
 
-    // load functions, residual:
-    virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
+  // load functions, Jacobian:
+  virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
 
-    // load functions, Jacobian:
-    virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
-
-    friend class Instance;
-    friend class Model;
+  friend class Instance;
+  friend class Traits;
+  friend class Model;
 };
+
+void registerDevice();
 
 } // namespace BJT
 } // namespace Device

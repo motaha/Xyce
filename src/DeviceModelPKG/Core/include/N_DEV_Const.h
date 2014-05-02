@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.17.6.2 $
+// Revision Number: $Revision: 1.21 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/24 23:49:14 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -100,15 +100,10 @@
 
 // end of the BSIM3 constants.
 
-// This constant is taken from 3f5's hw_ieee.h include file.
-// The smaller value, 100.0 was arbitrarily chosen, mainly to
+// This value, 100.0 was arbitrarily chosen, mainly to
 // avoid ieee errors when running Xyce without spice-style
 // voltage limiters.
-#ifdef Xyce_USE_CHILESPICE_MAX_EXP
-  #define CONSTMAX_EXP_ARG 709.0
-#else
-  #define CONSTMAX_EXP_ARG 100.0
-#endif
+#define CONSTMAX_EXP_ARG 100.0
 
 // tanh threshold constant (value for which tanh(x) - 1.0 == 0.0) - this seems
 // to vary from machine to machine but the largest I found was 22.0 on g++2.96

@@ -36,11 +36,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.13.2.1 $
+// Revision Number: $Revision: 1.16 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:33 $
+// Revision Date  : $Date: 2014/01/23 16:19:04 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: dgbaur $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
@@ -68,7 +68,7 @@ namespace Device {
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 08/11/2010
 //-----------------------------------------------------------------------------
-MembraneHH::MembraneHH (SolverState & ss1, double cMem, double gMem, double vRest, double eK, double gK, double eNa, double gNa):
+MembraneHH::MembraneHH (const SolverState & ss1, double cMem, double gMem, double vRest, double eK, double gK, double eNa, double gNa):
   MembraneModel(ss1), gMem_(gMem), cMem_(cMem), vRest_(vRest), eK_(eK), gK_(gK), eNa_(eNa), gNa_(gNa)
 {
   // Hodgkin-Huxley has the following unknows for the membrane
@@ -88,7 +88,7 @@ MembraneHH::MembraneHH (SolverState & ss1, double cMem, double gMem, double vRes
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 08/11/2010
 //-----------------------------------------------------------------------------
-void MembraneHH::setJacStamp( int numExtVars, int segmentNumber, int vOffset, vector< vector< int > > & segmentJacStamp )
+void MembraneHH::setJacStamp( int numExtVars, int segmentNumber, int vOffset, std::vector< std::vector< int > > & segmentJacStamp )
 {
   // caller sets up size of row of jac stamp to numIndependentVars_ + extra's needed for
   // its modeling.  So for a cable based device this is Vpre, Vseg, (other membrane vars), Vnext.
@@ -139,7 +139,7 @@ void MembraneHH::setJacStamp( int numExtVars, int segmentNumber, int vOffset, ve
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 08/11/2010
 //-----------------------------------------------------------------------------
-void MembraneHH::loadDAEQVector( int segmentNumber, vector< int > & lidIndexVector, N_LAS_Vector * solnVecPtr, N_LAS_Vector * daeQVecPtr, double segArea)
+void MembraneHH::loadDAEQVector( int segmentNumber, std::vector< int > & lidIndexVector, N_LAS_Vector * solnVecPtr, N_LAS_Vector * daeQVecPtr, double segArea)
 {
   // Each segment will have numIndependentVars_ with segment voltage being the first
   // so, the cMem dV/dt term will be at segmentNumber * numIndependentVars_.
@@ -161,7 +161,7 @@ void MembraneHH::loadDAEQVector( int segmentNumber, vector< int > & lidIndexVect
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 08/11/2010
 //-----------------------------------------------------------------------------
-void MembraneHH::loadDAEFVector( int segmentNumber, vector< int > & lidIndexVector, N_LAS_Vector * solnVecPtr, N_LAS_Vector * daeFVecPtr, double segArea)
+void MembraneHH::loadDAEFVector( int segmentNumber, std::vector< int > & lidIndexVector, N_LAS_Vector * solnVecPtr, N_LAS_Vector * daeFVecPtr, double segArea)
 {
 // Each segment will have numIndependentVars_ with segment voltage being the first
   // so, the cMem dV/dt term will be at segmentNumber * numIndependentVars_.
@@ -197,8 +197,8 @@ void MembraneHH::loadDAEFVector( int segmentNumber, vector< int > & lidIndexVect
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 08/11/2010
 //-----------------------------------------------------------------------------
-void MembraneHH::loadDAEdQdx( int segmentNumber, int vOffset, vector< int > & lidIndexVector,
-                                    vector< vector< int > > & jacobianOffsets,
+void MembraneHH::loadDAEdQdx( int segmentNumber, int vOffset, std::vector< int > & lidIndexVector,
+                                    std::vector< std::vector< int > > & jacobianOffsets,
                                     N_LAS_Vector * solnVecPtr,
                                     N_LAS_Matrix * dQdxMatPtr,
                                     double segArea)
@@ -237,8 +237,8 @@ void MembraneHH::loadDAEdQdx( int segmentNumber, int vOffset, vector< int > & li
 // Creator       : Richard Schiek, Electrical and Microsytem Modeling
 // Creation Date : 08/11/2010
 //-----------------------------------------------------------------------------
-void MembraneHH::loadDAEdFdx( int segmentNumber, int vOffset, vector< int > & lidIndexVector,
-                                    vector< vector< int > > & jacobianOffsets,
+void MembraneHH::loadDAEdFdx( int segmentNumber, int vOffset, std::vector< int > & lidIndexVector,
+                                    std::vector< std::vector< int > > & jacobianOffsets,
                                     N_LAS_Vector * solnVecPtr,
                                     N_LAS_Matrix * dFdxMatPtr,
                                     double segArea)

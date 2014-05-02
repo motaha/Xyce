@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -32,8 +32,8 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.87.2.5 $
-// Revision Date  : $Date: 2013/10/03 17:23:31 $
+// Revision Number: $Revision: 1.113.2.1 $
+// Revision Date  : $Date: 2014/03/04 23:50:53 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
@@ -60,8 +60,7 @@
 
 #include <sstream>
 
-// ----------   Xyce Includes   ----------
-
+#include <N_UTL_fwd.h>
 #include <N_TIA_Assembler.h>
 #include <N_ANP_AnalysisManager.h>
 
@@ -73,6 +72,7 @@
 #include <N_ANP_HB.h>
 #include <N_ANP_AC.h>
 #include <N_ANP_MOR.h>
+#include <N_ANP_Report.h>
 
 #include <N_TIA_TimeIntegrationMethods.h>
 #include <N_TIA_StepErrorControl.h>
@@ -111,8 +111,11 @@
 
 #include <N_MPDE_Manager.h>
 
+namespace Xyce {
+namespace Analysis {
+
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::N_ANP_AnalysisManager
+// Function      : AnalysisManager::AnalysisManager
 // Purpose       : constructor
 // Special Notes :
 // Scope         : public
@@ -120,7 +123,7 @@
 // Creation Date : 01/24/08
 //-----------------------------------------------------------------------------
 
-N_ANP_AnalysisManager::N_ANP_AnalysisManager(N_IO_CmdParse & cp, N_ANP_AnalysisInterface * anaIntPtr_tmp)
+AnalysisManager::AnalysisManager(N_IO_CmdParse & cp, AnalysisInterface * anaIntPtr_tmp)
   :
   calledBeforeTwoLevelTran_(false),
   breakPointRestartStep(0),
@@ -183,7 +186,7 @@ N_ANP_AnalysisManager::N_ANP_AnalysisManager(N_IO_CmdParse & cp, N_ANP_AnalysisI
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::~N_ANP_AnalysisManager
+// Function      : AnalysisManager::~AnalysisManager
 //
 // Purpose       : destructor
 // Special Notes :
@@ -191,13 +194,12 @@ N_ANP_AnalysisManager::N_ANP_AnalysisManager(N_IO_CmdParse & cp, N_ANP_AnalysisI
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 01/24/08
 //-----------------------------------------------------------------------------
-N_ANP_AnalysisManager::~N_ANP_AnalysisManager()
-
+AnalysisManager::~AnalysisManager()
 {
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::resetAll
+// Function      : AnalysisManager::resetAll
 //
 // Purpose       : just like a destructor without the death
 // Special Notes :
@@ -205,10 +207,10 @@ N_ANP_AnalysisManager::~N_ANP_AnalysisManager()
 // Creator       : Todd Coffey, Rich Schiek, Ting Mei
 // Creation Date : 7/24/08
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::resetAll()
+void AnalysisManager::resetAll()
 {
-  // dsPtr_ is created in initializeAll
-  dsPtr_ = Teuchos::null;
+  // tiaDataStore_ is created in initializeAll
+  tiaDataStore_ = Teuchos::null;
   // secPtr_ is created in initializeAll
   secPtr_ = Teuchos::null;
   // wimPtr is created in initializeAll
@@ -217,7 +219,7 @@ void N_ANP_AnalysisManager::resetAll()
   // xyceTranTimerPtr_ is created in run
   xyceTranTimerPtr_ = Teuchos::null;
 
-  // tiaMPDEIfacePtr_'s copy to dsPtr_ and secPtr_ are reset in intializeAll, we don't need to delete it.
+  // tiaMPDEIfacePtr_'s copy to tiaDataStore_ and secPtr_ are reset in intializeAll, we don't need to delete it.
 
   // assemblerPtr is created in initializeAll
   assemblerPtr = Teuchos::null;
@@ -230,14 +232,14 @@ void N_ANP_AnalysisManager::resetAll()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getBlockAnalysisFlag
+// Function      : AnalysisManager::getBlockAnalysisFlag
 // Purpose       : "get" function for MPDE flag. (true if not IC)
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 01/31/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getBlockAnalysisFlag () const
+bool AnalysisManager::getBlockAnalysisFlag () const
 {
   if (Teuchos::is_null(mpdeMgrPtr_))
   {
@@ -247,14 +249,14 @@ bool N_ANP_AnalysisManager::getBlockAnalysisFlag () const
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getMPDEFlag
+// Function      : AnalysisManager::getMPDEFlag
 // Purpose       : "get" function for MPDE flag. (true if not IC)
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 01/31/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getMPDEFlag ()
+bool AnalysisManager::getMPDEFlag ()
 {
   if (Teuchos::is_null(mpdeMgrPtr_))
   {
@@ -264,14 +266,14 @@ bool N_ANP_AnalysisManager::getMPDEFlag ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getMPDEStartupFlag
+// Function      : AnalysisManager::getMPDEStartupFlag
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, Rich Schiek, Ting Mei
 // Creation Date : 7/24/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getMPDEStartupFlag ()
+bool AnalysisManager::getMPDEStartupFlag ()
 {
   if (Teuchos::is_null(mpdeMgrPtr_))
   {
@@ -281,14 +283,14 @@ bool N_ANP_AnalysisManager::getMPDEStartupFlag ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getMPDEIcFlag
+// Function      : AnalysisManager::getMPDEIcFlag
 // Purpose       : get function for MPDE initial condition flag (true if MPDE & IC
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 01/31/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getMPDEIcFlag()
+bool AnalysisManager::getMPDEIcFlag()
 {
   if (Teuchos::is_null(mpdeMgrPtr_))
   {
@@ -299,14 +301,14 @@ bool N_ANP_AnalysisManager::getMPDEIcFlag()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getWaMPDEFlag ()
+// Function      : AnalysisManager::getWaMPDEFlag ()
 // Purpose       : "get" function for WaMPDE flag. (true if not IC)
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 01/31/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getWaMPDEFlag ()
+bool AnalysisManager::getWaMPDEFlag ()
 {
   if (Teuchos::is_null(mpdeMgrPtr_))
   {
@@ -316,7 +318,7 @@ bool N_ANP_AnalysisManager::getWaMPDEFlag ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::isPaused
+// Function      : AnalysisManager::isPaused
 //
 // Purpose       : return the true if the simulation is currently paused
 //
@@ -325,13 +327,13 @@ bool N_ANP_AnalysisManager::getWaMPDEFlag ()
 // Creator       : Rich Schiek, SNL, Electrical and Microsystems Simulation
 // Creation Date : 02/18/2008
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::isPaused()
+bool AnalysisManager::isPaused()
 {
   return secPtr_->isPauseTime();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::initializeAll
+// Function      : AnalysisManager::initializeAll
 // Purpose       : This function performs the final initializations.  Mainly,
 //                 it initializes the two data container classes, DataStore and
 //                 StepErrorControl.  It also registers the neccessary vectors
@@ -344,15 +346,14 @@ bool N_ANP_AnalysisManager::isPaused()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/09/00
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::initializeAll()
+bool AnalysisManager::initializeAll()
 {
-  string msg;
+  std::string msg;
 
   if (Teuchos::is_null(lasSysPtr))
   {
-    msg = "N_ANP_AnalysisManager::initializeAll ";
-    msg += " You need to register the LAS system first.\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
+    Report::DevelFatal0().in("AnalysisManager::initializeAll")
+      << "Register LAS system first.";
   }
 
   tiaParams.solutionSize = lasSysPtr->getSolutionSize();
@@ -362,23 +363,23 @@ bool N_ANP_AnalysisManager::initializeAll()
 #ifdef Xyce_DEBUG_ANALYSIS
   if (tiaParams.debugLevel > 0)
   {
-    std::cout << "N_ANP_AnalysisManager::initializeAll.  " ;
-    std::cout << "  maximum order = " << tiaParams.maxOrder << std::endl;
+    Xyce::dout() << "AnalysisManager::initializeAll.  " ;
+    Xyce::dout() << "  maximum order = " << tiaParams.maxOrder << std::endl;
   }
 #endif
 
-  dsPtr_ = rcp(new N_TIA_DataStore(&tiaParams, &*lasSysPtr));
+  tiaDataStore_ = rcp(new N_TIA_DataStore(&tiaParams, &*lasSysPtr));
   secPtr_ = rcp(new N_TIA_StepErrorControl(commandLine_,*this,tiaParams));
 
   // Now that data store has been created, we can also create the
   // working integration method object.
-  wimPtr = rcp(new N_TIA_WorkingIntegrationMethod (tiaParams,*secPtr_,*dsPtr_));
+  wimPtr = rcp(new N_TIA_WorkingIntegrationMethod (tiaParams,*secPtr_,*tiaDataStore_));
 
   secPtr_->registerWIMPtr(&*wimPtr);
 
-  assemblerPtr = rcp(new N_TIA_DAE_Assembler(*dsPtr_, *loaderPtr, *wimPtr, *pdsMgrPtr, daeStateDerivFlag_));
+  assemblerPtr = rcp(new N_TIA_DAE_Assembler(*tiaDataStore_, *loaderPtr, *wimPtr, *pdsMgrPtr, daeStateDerivFlag_));
 
-  tiaMPDEIfacePtr_->registerTIADataStore(&*dsPtr_);
+  tiaMPDEIfacePtr_->registerTIADataStore(&*tiaDataStore_);
   tiaMPDEIfacePtr_->registerTIAStepErrorControl(&*secPtr_);
   // The final time has to be forced to be a "paused" breakpoint,
   // after any registerTIAParams call.
@@ -390,53 +391,52 @@ bool N_ANP_AnalysisManager::initializeAll()
   registerRestartIntervals();
 
   // register current:
-  lasSysPtr->registerCurrStaVector(&(dsPtr_->currStatePtr));
-  lasSysPtr->registerCurrSolVector(&(dsPtr_->currSolutionPtr));
+  lasSysPtr->registerCurrStaVector(&(tiaDataStore_->currStatePtr));
+  lasSysPtr->registerCurrSolVector(&(tiaDataStore_->currSolutionPtr));
 
   // register next:
-  lasSysPtr->registerNextStaVector(&(dsPtr_->nextStatePtr));
-  lasSysPtr->registerNextSolVector(&(dsPtr_->nextSolutionPtr));
+  lasSysPtr->registerNextStaVector(&(tiaDataStore_->nextStatePtr));
+  lasSysPtr->registerNextSolVector(&(tiaDataStore_->nextSolutionPtr));
 
   // register last:
-  lasSysPtr->registerLastStaVector(&(dsPtr_->lastStatePtr));
-  lasSysPtr->registerLastSolVector(&(dsPtr_->lastSolutionPtr));
+  lasSysPtr->registerLastStaVector(&(tiaDataStore_->lastStatePtr));
+  lasSysPtr->registerLastSolVector(&(tiaDataStore_->lastSolutionPtr));
 
-  lasSysPtr->registerFlagSolVector(&(dsPtr_->flagSolutionPtr));
+  lasSysPtr->registerFlagSolVector(&(tiaDataStore_->flagSolutionPtr));
 
   // register temporaries:
-  lasSysPtr->registerTmpSolVector(&(dsPtr_->tmpSolVectorPtr));
-  lasSysPtr->registerTmpStaVector(&(dsPtr_->tmpStaVectorPtr));
-  lasSysPtr->registerTmpStaDerivVector(&(dsPtr_->tmpStaDerivPtr));
-  lasSysPtr->registerTmpStaDivDiffVector(&(dsPtr_->tmpStaDivDiffPtr));
+  lasSysPtr->registerTmpSolVector(&(tiaDataStore_->tmpSolVectorPtr));
+  lasSysPtr->registerTmpStaVector(&(tiaDataStore_->tmpStaVectorPtr));
+  lasSysPtr->registerTmpStaDerivVector(&(tiaDataStore_->tmpStaDerivPtr));
+  lasSysPtr->registerTmpStaDivDiffVector(&(tiaDataStore_->tmpStaDivDiffPtr));
 
   // register next derivatives:
-  lasSysPtr->registerNextSolDerivVector(&(dsPtr_->nextSolutionDerivPtr));
-  lasSysPtr->registerNextStaDerivVector(&(dsPtr_->nextStateDerivPtr));
+  lasSysPtr->registerNextSolDerivVector(&(tiaDataStore_->nextSolutionDerivPtr));
+  lasSysPtr->registerNextStaDerivVector(&(tiaDataStore_->nextStateDerivPtr));
 
   // register the device mask
-  lasSysPtr->registerDeviceMaskVector(&(dsPtr_->deviceMaskPtr));
+  lasSysPtr->registerDeviceMaskVector(&(tiaDataStore_->deviceMaskPtr));
 
   // Get the RHS and the Jacobian
-  dsPtr_->JMatrixPtr    = lasSysPtr->getJacobianMatrix();
-  dsPtr_->RHSVectorPtr  = lasSysPtr->getRHSVector();
+  tiaDataStore_->JMatrixPtr    = lasSysPtr->getJacobianMatrix();
+  tiaDataStore_->RHSVectorPtr  = lasSysPtr->getRHSVector();
 
-  //RefCountPtr<N_TIA_DataStore> dsDaePtr = Teuchos::rcp_dynamic_cast<N_TIA_DataStore>(dsPtr_);
   // DAE formulation vectors
-  lasSysPtr->registerDAEQVector     ( dsPtr_->daeQVectorPtr );
-  lasSysPtr->registerDAEFVector     ( dsPtr_->daeFVectorPtr );
+  lasSysPtr->registerDAEQVector     ( tiaDataStore_->daeQVectorPtr );
+  lasSysPtr->registerDAEFVector     ( tiaDataStore_->daeFVectorPtr );
 
   // DAE formulation matrices
-  lasSysPtr->registerDAEdQdxMatrix  ( dsPtr_->dQdxMatrixPtr );
-  lasSysPtr->registerDAEdFdxMatrix  ( dsPtr_->dFdxMatrixPtr );
+  lasSysPtr->registerDAEdQdxMatrix  ( tiaDataStore_->dQdxMatrixPtr );
+  lasSysPtr->registerDAEdFdxMatrix  ( tiaDataStore_->dFdxMatrixPtr );
 
   // Get the RHS and the Jacobian
-  //dsPtr_->JMatrixPtr    = lasSysPtr->getJacobianMatrix();
-  //dsPtr_->RHSVectorPtr  = lasSysPtr->getRHSVector();
+  //tiaDataStore_->JMatrixPtr    = lasSysPtr->getJacobianMatrix();
+  //tiaDataStore_->RHSVectorPtr  = lasSysPtr->getRHSVector();
 
-  dsPtr_->dFdxdVpVectorPtr = lasSysPtr->getdFdxdVpVector ();
-  dsPtr_->dQdxdVpVectorPtr = lasSysPtr->getdQdxdVpVector ();
+  tiaDataStore_->dFdxdVpVectorPtr = lasSysPtr->getdFdxdVpVector ();
+  tiaDataStore_->dQdxdVpVectorPtr = lasSysPtr->getdQdxdVpVector ();
 
-  dsPtr_->limiterFlag = loaderPtr->getLimiterFlag ();
+  tiaDataStore_->limiterFlag = loaderPtr->getLimiterFlag ();
 
   // This should probably be moved elsewhere later.  If the user has
   // specified that steps should only be accepted when the nonlinear solver
@@ -468,8 +468,8 @@ bool N_ANP_AnalysisManager::initializeAll()
     }
     else // flag an error.
     {
-      string msg =  "No analysis statement in the netlist\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, msg);
+      Report::UserError0() << "No analysis statement in the netlist";
+      return false;
     }
   }
 
@@ -481,54 +481,52 @@ bool N_ANP_AnalysisManager::initializeAll()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::run
+// Function      : AnalysisManager::run
 // Purpose       : Execute the control loop for the set analysis type.
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 01/24/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::run()
+bool AnalysisManager::run()
 {
-  string msg;
+  std::string msg;
 
   if (initializeAllFlag_ == false)
   {
-    msg = "N_ANP_AnalysisManager::run - "
-      "you need to call the initializeAll function first\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
+    Report::DevelFatal0().in("AnalysisManager::run")
+      << "Call the initializeAll function first";
   }
 
-  if (analysisParamsRegistered == false)
+  if (!analysisParamsRegistered)
   {
-    msg = "N_ANP_AnalysisManager::run: "
-      "no analysis statement in the netlist\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, msg);
+    Report::UserError0() << "No analysis statement in the netlist";
+    return false;
   }
 
   // now that the problem is set up, we can tell the datastore what the var type are
   // this info can be used by the time integrator to control error in a way that is
   // appropriate for different variable types (like V's and I's).
-  vector<char> varTypes;
+  std::vector<char> varTypes;
   topoMgrPtr->returnVarTypeVec( varTypes );
-  dsPtr_->varTypeVec = varTypes;
+  tiaDataStore_->varTypeVec = varTypes;
 
   // This checks to make sure that all quantities in the .print are valid before
   // we continue.
-  outputMgrAdapterRCPtr_->check_output( analysis ); //, *dsPtr_->currSolutionPtr, *dsPtr_->currStatePtr, *dsPtr_->currStorePtr );
+  outputMgrAdapterRCPtr_->check_output( analysis );
 
 #ifdef Xyce_VERBOSE_TIME
-  tiaParams.printParams(anpAnalysisModeToNLS(analysis));
+  tiaParams.printParams(Xyce::lout(), anpAnalysisModeToNLS(analysis));
 #endif
 
 #ifndef Xyce_NO_MASKED_WRMS_NORMS
   if (loaderPtr->loadDeviceMask())
   {
-     //std::cout << " Nontrivial mask! " << std::endl;
+     //Xyce::dout() << " Nontrivial mask! " << std::endl;
   }
   else
   {
-    // std::cout << " Trivial mask! " << std::endl;
+    // Xyce::dout() << " Trivial mask! " << std::endl;
   }
 #endif
 //
@@ -542,7 +540,7 @@ bool N_ANP_AnalysisManager::run()
   // I recently moved some stuff from the analysis manager down into specific analysis type
   // classes, which is where they really belong.  However, doing this required that the
   // order of setup change somewhat.  DC and sweep parameters now cannot be processed until
-  // the N_ANP_DCSweep or N_ANP_Step classes are allocated.  They are now primarily allocated
+  // the DCSweep or Step classes are allocated.  They are now primarily allocated
   // in the intializeAll function.  They need to be allocated prior to this ::run function,
   // because they need to happen before restart files are read in.
   //
@@ -554,6 +552,8 @@ bool N_ANP_AnalysisManager::run()
     allocateAnalysisObject_ ();
   }
 
+  Report::safeBarrier(pdsMgrPtr->getPDSComm()->comm());
+  
   solverStartTime_ = elapsedTimerPtr_->elapsedTime();
 
   // Start the solvers timers.
@@ -570,28 +570,28 @@ bool N_ANP_AnalysisManager::run()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::allocateAnalysisObject_
+// Function      : AnalysisManager::allocateAnalysisObject_
 // Purpose       : Allocate analysis objects, and also setup params.
 // Special Notes :
 // Scope         : private
 // Creator       : Eric Keiter, SNL
 // Creation Date : 06/24/10
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::allocateAnalysisObject_ ()
+void AnalysisManager::allocateAnalysisObject_ ()
 {
-  string msg("");
+  std::string msg("");
 
   if( !tiaParams.resume )
   {
     if (analysis == ANP_MODE_TRANSIENT )
     {
-      analysisObject_ = Teuchos::rcp(new N_ANP_Transient(this));
+      analysisObject_ = Teuchos::rcp(new Transient(this));
       analysisObject_->setAnalysisParams(tranParamsBlock);
       secPtr_->resetAll();
     }
     else if (analysis == ANP_MODE_DC_SWEEP)
     {
-      analysisObject_ = Teuchos::rcp(new N_ANP_DCSweep(this));
+      analysisObject_ = Teuchos::rcp(new DCSweep(this));
       for (int i=0;i<(int)dcParamsBlockVec.size();++i)
       {
         analysisObject_->setAnalysisParams(dcParamsBlockVec[i]);
@@ -599,32 +599,32 @@ void N_ANP_AnalysisManager::allocateAnalysisObject_ ()
     }
     else if (analysis == ANP_MODE_MPDE)
     {
-      analysisObject_ = Teuchos::rcp(new N_ANP_MPDE(this));
+      analysisObject_ = Teuchos::rcp(new MPDE(this));
       analysisObject_->setAnalysisParams(mpdeParamsBlock);
     }
     else if (analysis == ANP_MODE_HB)
     {
-      analysisObject_ = Teuchos::rcp(new N_ANP_HB(this));
+      analysisObject_ = Teuchos::rcp(new HB(this));
       analysisObject_->setAnalysisParams(hbParamsBlock);
-      Teuchos::rcp_dynamic_cast<N_ANP_HB>(analysisObject_)->setHBOptions(hbOptionsBlock);
-      Teuchos::rcp_dynamic_cast<N_ANP_HB>(analysisObject_)->setHBLinSol(hbLinSolBlock);
-      Teuchos::rcp_dynamic_cast<N_ANP_HB>(analysisObject_)->setLinSol(linSolBlock);
+      Teuchos::rcp_dynamic_cast<HB>(analysisObject_)->setHBOptions(hbOptionsBlock);
+      Teuchos::rcp_dynamic_cast<HB>(analysisObject_)->setHBLinSol(hbLinSolBlock);
+      Teuchos::rcp_dynamic_cast<HB>(analysisObject_)->setLinSol(linSolBlock);
       setHBFlag( true );
     }
     else if ( analysis == ANP_MODE_AC)
     {
-      analysisObject_ = Teuchos::rcp(new N_ANP_AC(this));
+      analysisObject_ = Teuchos::rcp(new AC(this));
       analysisObject_->setAnalysisParams(acParamsBlock);
     }
     else if ( analysis == ANP_MODE_MOR)
     {
-      analysisObject_ = Teuchos::rcp(new N_ANP_MOR(this));
+      analysisObject_ = Teuchos::rcp(new MOR(this));
       analysisObject_->setAnalysisParams(morParamsBlock);
     }
     else
     {
-      msg = "N_ANP_AnalysisManager::initializeAll : unknown type of analysis\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
+      Report::UserError0() <<  "Unknown type of analysis";
+      return;
     }
 
     if( !is_null(analysisObject_) )
@@ -635,8 +635,8 @@ void N_ANP_AnalysisManager::allocateAnalysisObject_ ()
     // need to throw an error here as this really shouldn't happen.
     if( is_null( analysisObject_ ) )
     {
-      msg = "N_ANP_AnalysisManager::initializeAll : unable to allocate analysis type.\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
+      Report::DevelFatal0().in("AnalysisManager::initializeAll")
+        << "Unable to allocate analysis type";
     }
 
     // ultimately sensitivity calculation should get its own analysis object.
@@ -654,7 +654,7 @@ void N_ANP_AnalysisManager::allocateAnalysisObject_ ()
     if( stepLoopFlag_ )
     {
       stepAnalysisTarget_ = analysisObject_;
-      analysisObject_ = Teuchos::rcp(new N_ANP_Step(this, stepAnalysisTarget_.get()));
+      analysisObject_ = Teuchos::rcp(new Step(this, stepAnalysisTarget_.get()));
       for (int i=0;i<(int)stepParamsBlockVec.size();++i)
       {
         analysisObject_->setAnalysisParams(stepParamsBlockVec[i]);
@@ -665,7 +665,7 @@ void N_ANP_AnalysisManager::allocateAnalysisObject_ ()
     if (dakotaRunFlag_ && is_null(dakotaAnalysisTarget_) )
     {
       dakotaAnalysisTarget_ = analysisObject_;
-      analysisObject_ = Teuchos::rcp(new N_ANP_Dakota(this, dakotaAnalysisTarget_.get()));
+      analysisObject_ = Teuchos::rcp(new Dakota(this, dakotaAnalysisTarget_.get()));
       analysisObject_->setAnalysisParams(dakotaParamsBlock);
       analysisObject_->setParamsWithOutputMgrAdapter ( outputMgrAdapterRCPtr_ );
     }
@@ -673,7 +673,7 @@ void N_ANP_AnalysisManager::allocateAnalysisObject_ ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::printLoopInfo
+// Function      : AnalysisManager::printLoopInfo
 // Purpose       : Prints out time loop information.
 // Special Notes : Prints stats from save point start to save point finish.
 //                 Special case 0,0 is entire run to this point
@@ -681,13 +681,13 @@ void N_ANP_AnalysisManager::allocateAnalysisObject_ ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/26/00
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::printLoopInfo(int start, int finish)
+bool AnalysisManager::printLoopInfo(int start, int finish)
 {
   return primaryAnalysisObject_->printLoopInfo (start,finish);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::testDCOPOutputTime_
+// Function      : AnalysisManager::testDCOPOutputTime_
 // Purpose       : Similar to testOutputTime, except that this is for
 //                 DCOP restart files.
 // Special Notes :
@@ -695,7 +695,7 @@ bool N_ANP_AnalysisManager::printLoopInfo(int start, int finish)
 // Creator       : Eric Keiter, SNL
 // Creation Date : 10/18/07
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::testDCOPOutputTime_()
+bool AnalysisManager::testDCOPOutputTime_()
 {
   bool flag(true);
 
@@ -708,7 +708,7 @@ bool N_ANP_AnalysisManager::testDCOPOutputTime_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::testSaveOutputTime_
+// Function      : AnalysisManager::testSaveOutputTime_
 // Purpose       : Similar to testOutputTime, except that this is for
 //                 .SAVE files.
 // Special Notes : Only outputs 1x.
@@ -716,7 +716,7 @@ bool N_ANP_AnalysisManager::testDCOPOutputTime_()
 // Creator       : Eric Keiter, SNL
 // Creation Date : 10/18/07
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::testSaveOutputTime_()
+bool AnalysisManager::testSaveOutputTime_()
 {
   bool flag(true);
 
@@ -736,37 +736,37 @@ bool N_ANP_AnalysisManager::testSaveOutputTime_()
   if (flag==true)
   {
     savedAlready_ = true;
-    std::cout <<"Calling SAVE outputs!" <<std::endl;
+    Xyce::dout() <<"Calling SAVE outputs!" <<std::endl;
   }
 
   return flag;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::testRestartSaveTime_
+// Function      : AnalysisManager::testRestartSaveTime_
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel ComputationalSciences.
 // Creation Date : 07/31/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::testRestartSaveTime_()
+bool AnalysisManager::testRestartSaveTime_()
 {
   bool flag;
 
 #ifdef Xyce_DEBUG_RESTART
-  std::cout << "TESTING FOR RESTART SAVE\n";
-  std::cout << "------------------------\n";
-  std::cout << "secPtr_->currentTime: " << secPtr_->currentTime << std::endl;
-  std::cout << "nextSaveTime: " << nextRestartSaveTime_ << std::endl;
-  std::cout << "initialRestartInterval_: " << initialRestartInterval_ << std::endl;
+  Xyce::dout() << "TESTING FOR RESTART SAVE" << std::endl
+               << Xyce::subsection_divider << std::endl
+               << "secPtr_->currentTime: " << secPtr_->currentTime << std::endl
+               << "nextSaveTime: " << nextRestartSaveTime_ << std::endl
+               << "initialRestartInterval_: " << initialRestartInterval_ << std::endl;
   if (!(restartIntervals_.empty()))
   {
-    std::cout << "First restart interval: " << restartIntervals_[0].first << std::endl;
+    Xyce::dout() << "First restart interval: " << restartIntervals_[0].first << std::endl;
   }
   else
   {
-    std::cout << "restartIntervals_ is empty" << std::endl;
+    Xyce::dout() << "restartIntervals_ is empty" << std::endl;
   }
 #endif
 
@@ -800,7 +800,7 @@ bool N_ANP_AnalysisManager::testRestartSaveTime_()
   }
   else
   {
-    pair<double, double> currInterval, nextInterval;
+    std::pair<double, double> currInterval, nextInterval;
     int size = restartIntervals_.size();
     for (int i = 0; i < size; ++i)
     {
@@ -826,9 +826,9 @@ bool N_ANP_AnalysisManager::testRestartSaveTime_()
   }
 
 #ifdef Xyce_DEBUG_RESTART
-  std::cout << "new nextSaveTime: " << nextRestartSaveTime_ << std::endl;
-  std::cout << "restart flag: " << flag << std::endl;
-  std::cout << "-----------------------\n";
+  Xyce::dout() << "new nextSaveTime: " << nextRestartSaveTime_ << std::endl
+               << "restart flag: " << flag << std::endl
+               << Xyce::subsection_divider << std::endl;
 #endif
 
   return flag;
@@ -836,7 +836,7 @@ bool N_ANP_AnalysisManager::testRestartSaveTime_()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::partialTimeDerivative
+// Function      : AnalysisManager::partialTimeDerivative
 // Purpose       : Returns the current partial time derivative for either the
 //                 solution or state vector.
 // Special Notes :
@@ -844,7 +844,7 @@ bool N_ANP_AnalysisManager::testRestartSaveTime_()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/12/00
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisManager::partialTimeDerivative()
+double AnalysisManager::partialTimeDerivative()
 {
   double partDT = wimPtr->partialTimeDeriv();
 
@@ -855,8 +855,8 @@ double N_ANP_AnalysisManager::partialTimeDerivative()
 #ifdef Xyce_DEBUG_ANALYSIS
     if (tiaParams.debugLevel > 0)
     {
-      std::cout << "N_ANP_AnalysisManager::partialTimeDerivative.";
-      std::cout << "   Using jac limit = " << tiaParams.jacLimit << std::endl;
+      Xyce::dout() << "AnalysisManager::partialTimeDerivative.";
+      Xyce::dout() << "   Using jac limit = " << tiaParams.jacLimit << std::endl;
     }
 #endif
     if (partDT > tiaParams.jacLimit)
@@ -869,43 +869,43 @@ double N_ANP_AnalysisManager::partialTimeDerivative()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getBreakpointTol
+// Function      : AnalysisManager::getBreakpointTol
 // Purpose       : Returns the breakpoint tolerance.
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 03/7/02
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisManager::getBreakpointTol()
+double AnalysisManager::getBreakpointTol()
 {
   return N_UTL_BreakPoint::getBPTol();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setBreakpointTol
+// Function      : AnalysisManager::setBreakpointTol
 // Purpose       : Sets the breakpoint tolerance.
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 03/7/02
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::setBreakpointTol(double bptol)
+void AnalysisManager::setBreakpointTol(double bptol)
 {
   N_UTL_BreakPoint::setBPTol(bptol);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::registerRestartIntervals
+// Function      : AnalysisManager::registerRestartIntervals
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Computational Sciences
 // Creation Date : 07/31/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::registerRestartIntervals()
+bool AnalysisManager::registerRestartIntervals()
 {
   double initInt;
-  vector< pair<double,double> > intPairs;
+  std::vector< std::pair<double,double> > intPairs;
   restartPtr->getRestartIntervals(initInt, intPairs);
   initialRestartInterval_ = initInt;
   nextRestartSaveTime_    = secPtr_->initialTime;
@@ -914,17 +914,17 @@ bool N_ANP_AnalysisManager::registerRestartIntervals()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::registerOutputIntevals
+// Function      : AnalysisManager::registerOutputIntevals
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Computational Sciences
 // Creation Date : 07/31/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::registerOutputIntervals()
+bool AnalysisManager::registerOutputIntervals()
 {
   double initInt;
-  vector< pair<double,double> > intPairs;
+  std::vector< std::pair<double,double> > intPairs;
   outputMgrAdapterRCPtr_->getOutputIntervals( initInt, & intPairs );
   initialOutputInterval_ = initInt;
   nextOutputTime_ = secPtr_->initialTime;
@@ -933,14 +933,14 @@ bool N_ANP_AnalysisManager::registerOutputIntervals()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setTranAnalysisParams
+// Function      : AnalysisManager::setTranAnalysisParams
 // Purpose       : Sets transient analysis parameters (from .TRAN)
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 04/17/02
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setTranAnalysisParams(
+bool AnalysisManager::setTranAnalysisParams(
   const N_UTL_OptionBlock & paramsBlock)
 {
   analysisParamsRegistered = true;
@@ -950,7 +950,7 @@ bool N_ANP_AnalysisManager::setTranAnalysisParams(
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setDCAnalysisParams
+// Function      : AnalysisManager::setDCAnalysisParams
 // Purpose       : Sets the DC sweep calculation parameters (from .DC)
 //
 // Special Notes : This function will be called multiple times if there is more
@@ -961,7 +961,7 @@ bool N_ANP_AnalysisManager::setTranAnalysisParams(
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/18/02
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setDCAnalysisParams
+bool AnalysisManager::setDCAnalysisParams
   (const N_UTL_OptionBlock & paramsBlock)
 {
   analysisParamsRegistered = true;
@@ -972,8 +972,8 @@ bool N_ANP_AnalysisManager::setDCAnalysisParams
   // element that was resolved in later parsing.
 
   bool foundMatch = false;
-  vector<N_UTL_OptionBlock>::iterator paramsBlockVecItr = dcParamsBlockVec.begin();
-  vector<N_UTL_OptionBlock>::iterator paramsBlockVecEnd = dcParamsBlockVec.end();
+  std::vector<N_UTL_OptionBlock>::iterator paramsBlockVecItr = dcParamsBlockVec.begin();
+  std::vector<N_UTL_OptionBlock>::iterator paramsBlockVecEnd = dcParamsBlockVec.end();
   while( paramsBlockVecItr != paramsBlockVecEnd )
   {
     if( paramsBlockVecItr->compareParamLists( paramsBlock ) )
@@ -999,14 +999,14 @@ bool N_ANP_AnalysisManager::setDCAnalysisParams
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setOPAnalysisParams
+// Function      : AnalysisManager::setOPAnalysisParams
 // Purpose       : Handle OP statement. (.OP)
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 10/15/07
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setOPAnalysisParams(
+bool AnalysisManager::setOPAnalysisParams(
   const N_UTL_OptionBlock & paramsBlock)
 {
   dotOpSpecified_ = true;
@@ -1015,14 +1015,14 @@ bool N_ANP_AnalysisManager::setOPAnalysisParams(
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setSTEPAnalysisParams
+// Function      : AnalysisManager::setSTEPAnalysisParams
 // Purpose       : Sets the STEP calculation parameters. (from .STEP)
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 10/30/03
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setSTEPAnalysisParams(
+bool AnalysisManager::setSTEPAnalysisParams(
   const N_UTL_OptionBlock & paramsBlock)
 {
   stepLoopFlag_ = true;
@@ -1031,8 +1031,8 @@ bool N_ANP_AnalysisManager::setSTEPAnalysisParams(
   // This replacement is necessary if the first copy had an expression
   // element that was resolved in later parsing.
   bool foundMatch = false;
-  vector<N_UTL_OptionBlock>::iterator paramsBlockVecItr = stepParamsBlockVec.begin();
-  vector<N_UTL_OptionBlock>::iterator paramsBlockVecEnd = stepParamsBlockVec.end();
+  std::vector<N_UTL_OptionBlock>::iterator paramsBlockVecItr = stepParamsBlockVec.begin();
+  std::vector<N_UTL_OptionBlock>::iterator paramsBlockVecEnd = stepParamsBlockVec.end();
   while( paramsBlockVecItr != paramsBlockVecEnd )
   {
     if( paramsBlockVecItr->compareParamLists( paramsBlock ) )
@@ -1058,7 +1058,7 @@ bool N_ANP_AnalysisManager::setSTEPAnalysisParams(
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setSaveOptions
+// Function      : AnalysisManager::setSaveOptions
 // Purpose       : Sets the Save parameters.
 // Special Notes : Most of these parameters are handled in the output manager,
 //                 rather than here.  So, most params are a noop here, except
@@ -1067,25 +1067,25 @@ bool N_ANP_AnalysisManager::setSTEPAnalysisParams(
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 10/18/07
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setSaveOptions(
+bool AnalysisManager::setSaveOptions(
   const N_UTL_OptionBlock & OB)
 {
 #ifdef Xyce_DEBUG_ANALYSIS
   if (tiaParams.debugLevel > 0)
   {
-    std::cout << "In N_ANP_AnalysisManager::setSaveOptions" << std::endl;
+    Xyce::dout() << "In AnalysisManager::setSaveOptions" << std::endl;
   }
 #endif
 
   saveFlag_ = true;
 
-  list<N_UTL_Param>::const_iterator iterPL = OB.getParams().begin();
-  list<N_UTL_Param>::const_iterator iterPL_end = OB.getParams().end();
+  std::list<N_UTL_Param>::const_iterator iterPL = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator iterPL_end = OB.getParams().end();
 
   while (iterPL != iterPL_end)
   {
 #ifdef Xyce_DEBUG_IO
-    std::cout << "iterPL->tag = " << iterPL->tag() << std::endl;
+    Xyce::dout() << "iterPL->tag = " << iterPL->tag() << std::endl;
 #endif
     if (iterPL->tag() == "TYPE")
     {
@@ -1097,7 +1097,7 @@ bool N_ANP_AnalysisManager::setSaveOptions(
     }
     else if (iterPL->tag() == "TIME")
     {
-      saveTime_ = iterPL->dVal();
+      saveTime_ = iterPL->getImmutableValue<double>();
       saveTimeGiven_ = true;
     }
     else if (iterPL->tag() == "LEVEL")
@@ -1118,7 +1118,7 @@ bool N_ANP_AnalysisManager::setSaveOptions(
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setACAnalysisParams
+// Function      : AnalysisManager::setACAnalysisParams
 // Purpose       : Sets the AC sweep calculation parameters (from .AC)
 //
 // Special Notes :
@@ -1126,7 +1126,7 @@ bool N_ANP_AnalysisManager::setSaveOptions(
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/18/02
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setACAnalysisParams
+bool AnalysisManager::setACAnalysisParams
   (const N_UTL_OptionBlock & paramsBlock)
 {
   analysisParamsRegistered = true;
@@ -1136,7 +1136,7 @@ bool N_ANP_AnalysisManager::setACAnalysisParams
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setMORAnalysisParams
+// Function      : AnalysisManager::setMORAnalysisParams
 // Purpose       : Sets the MOR calculation parameters (from .MOR)
 //
 // Special Notes :
@@ -1144,7 +1144,7 @@ bool N_ANP_AnalysisManager::setACAnalysisParams
 // Creator       : Heidi Thornquist and Ting Mei, SNL
 // Creation Date : 05/29/12
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setMORAnalysisParams
+bool AnalysisManager::setMORAnalysisParams
   (const N_UTL_OptionBlock & paramsBlock)
 {
   analysisParamsRegistered = true;
@@ -1154,82 +1154,80 @@ bool N_ANP_AnalysisManager::setMORAnalysisParams
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setMOROptions
+// Function      : AnalysisManager::setMOROptions
 // Purpose       :
 // Special Notes : These are from '.options mor'
 // Scope         : public
 // Creator       : Heidi Thornquist and Ting Mei, SNL
 // Creation Date : 05/31/12
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setMOROptions(const N_UTL_OptionBlock & OB)
+bool AnalysisManager::setMOROptions(const N_UTL_OptionBlock & OB)
 {
-  list<N_UTL_Param>::const_iterator it_tpL;
-  list<N_UTL_Param>::const_iterator first = OB.getParams().begin();
-  list<N_UTL_Param>::const_iterator last  = OB.getParams().end();
+  std::list<N_UTL_Param>::const_iterator it_tpL;
+  std::list<N_UTL_Param>::const_iterator first = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator last  = OB.getParams().end();
 
   for (it_tpL = first; it_tpL != last; ++it_tpL)
   {
     if (it_tpL->uTag()=="METHOD")
     {
-      ExtendedString stringVal ( it_tpL->sVal() );
+      ExtendedString stringVal ( it_tpL->stringValue() );
       stringVal.toUpper();
       tiaParams.morMethod = stringVal;
     }
     else if (it_tpL->uTag()=="SAVEREDSYS")
     {
-      tiaParams.morSaveRedSys = static_cast<bool>(it_tpL->iVal());
+      tiaParams.morSaveRedSys = static_cast<bool>(it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag()=="COMPORIGTF")
     {
-      tiaParams.morCompOrigTF = static_cast<bool>(it_tpL->iVal());
+      tiaParams.morCompOrigTF = static_cast<bool>(it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag()=="COMPREDTF")
     {
-      tiaParams.morCompRedTF = static_cast<bool>(it_tpL->iVal());
+      tiaParams.morCompRedTF = static_cast<bool>(it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag()=="COMPTYPE")
     {
-      ExtendedString stringVal ( it_tpL->sVal() );
+      ExtendedString stringVal ( it_tpL->stringValue() );
       stringVal.toUpper();
       tiaParams.morCompType = stringVal;
     }
     else if (it_tpL->uTag()=="COMPNP")
     {
-      tiaParams.morCompNP = it_tpL->iVal();
+      tiaParams.morCompNP = it_tpL->getImmutableValue<int>();
     }
     else if (it_tpL->uTag()=="COMPFSTART")
     {
-      tiaParams.morCompFStart = it_tpL->dVal();
+      tiaParams.morCompFStart = it_tpL->getImmutableValue<double>();
     }
     else if (it_tpL->uTag()=="COMPFSTOP")
     {
-      tiaParams.morCompFStop = it_tpL->dVal();
+      tiaParams.morCompFStop = it_tpL->getImmutableValue<double>();
     }
     else if (it_tpL->uTag()=="EXPPOINT")
     {
-      tiaParams.morExpPoint = it_tpL->dVal();
+      tiaParams.morExpPoint = it_tpL->getImmutableValue<double>();
     }
     else if (it_tpL->uTag()=="SCALETYPE")
     {
-      tiaParams.morScaleType = it_tpL->iVal();
+      tiaParams.morScaleType = it_tpL->getImmutableValue<int>();
     }
     else if (it_tpL->uTag()=="SCALEFACTOR")
     {
-      tiaParams.morScaleFactor = it_tpL->dVal();
+      tiaParams.morScaleFactor = it_tpL->getImmutableValue<double>();
     }
     else if (it_tpL->uTag()=="SCALEFACTOR1")
     {
-      tiaParams.morScaleFactor1 = it_tpL->dVal();
+      tiaParams.morScaleFactor1 = it_tpL->getImmutableValue<double>();
     }
     else if (it_tpL->uTag()=="SPARSIFICATIONTYPE")
     {
-      tiaParams.morSparsificationType = it_tpL->iVal();
+      tiaParams.morSparsificationType = it_tpL->getImmutableValue<int>();
     }
     else
     {
-      string tmp = " ***** ERROR: " + it_tpL->uTag() +
-        " is not a recognized model-order reduction option.\n";
-      N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_FATAL_0, tmp);
+      Report::UserError0() << it_tpL->uTag() << " is not a recognized model-order reduction option.";
     }
   }
 
@@ -1238,9 +1236,7 @@ bool N_ANP_AnalysisManager::setMOROptions(const N_UTL_OptionBlock & OB)
   {
     if (tiaParams.morCompFStop < tiaParams.morCompFStart)
     {
-       ostringstream err("");
-       err << " ***** ERROR: .options mor COMPFSTART = " << tiaParams.morCompFStart << " > " << tiaParams.morCompFStop << " = COMPFSTOP!" << std::endl;
-       N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_FATAL_0, err.str());
+      Report::UserError() << ".options mor COMPFSTART = " << tiaParams.morCompFStart << " > " << tiaParams.morCompFStop << " = COMPFSTOP!";
     }
   }
 
@@ -1248,7 +1244,7 @@ bool N_ANP_AnalysisManager::setMOROptions(const N_UTL_OptionBlock & OB)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setDCOPRestartParams
+// Function      : AnalysisManager::setDCOPRestartParams
 // Purpose       : Sets the DCOP restart parameters.
 // Special Notes : Most of the dcop restart parameters are used and handled by
 //                 the N_IO_OutputMgr class, so this function here doens't need
@@ -1257,17 +1253,17 @@ bool N_ANP_AnalysisManager::setMOROptions(const N_UTL_OptionBlock & OB)
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 10/18/07
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setDCOPRestartParams(const N_UTL_OptionBlock & OB)
+bool AnalysisManager::setDCOPRestartParams(const N_UTL_OptionBlock & OB)
 {
   dcopRestartFlag_ = true;
 
-  list<N_UTL_Param>::const_iterator iterPL = OB.getParams().begin();
-  list<N_UTL_Param>::const_iterator iterPL_end = OB.getParams().end();
+  std::list<N_UTL_Param>::const_iterator iterPL = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator iterPL_end = OB.getParams().end();
 
   while (iterPL != iterPL_end)
   {
 #ifdef Xyce_DEBUG_IO
-    std::cout << "iterPL->tag = " << iterPL->tag() << std::endl;
+    Xyce::dout() << "iterPL->tag = " << iterPL->tag() << std::endl;
 #endif
 
     if (iterPL->tag() == "INPUT")
@@ -1280,7 +1276,7 @@ bool N_ANP_AnalysisManager::setDCOPRestartParams(const N_UTL_OptionBlock & OB)
     }
     else if (iterPL->tag() == "TIME")
     {
-      saveTime_ = iterPL->dVal();
+      saveTime_ = iterPL->getImmutableValue<double>();
       saveTimeGiven_ = true;
     }
     else
@@ -1297,18 +1293,18 @@ bool N_ANP_AnalysisManager::setDCOPRestartParams(const N_UTL_OptionBlock & OB)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setTranOptions
+// Function      : AnalysisManager::setTranOptions
 // Purpose       :
 // Special Notes : These are from '.options timeint'
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/18/02
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setTranOptions(const N_UTL_OptionBlock & OB)
+bool AnalysisManager::setTranOptions(const N_UTL_OptionBlock & OB)
 {
-  list<N_UTL_Param>::const_iterator it_tpL;
-  list<N_UTL_Param>::const_iterator first = OB.getParams().begin();
-  list<N_UTL_Param>::const_iterator last  = OB.getParams().end();
+  std::list<N_UTL_Param>::const_iterator it_tpL;
+  std::list<N_UTL_Param>::const_iterator first = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator last  = OB.getParams().end();
 
   for (it_tpL = first; it_tpL != last; ++it_tpL)
   {
@@ -1317,11 +1313,11 @@ bool N_ANP_AnalysisManager::setTranOptions(const N_UTL_OptionBlock & OB)
 //      tiaParams.integrationMethod=it_tpL->iVal();
 
       if (it_tpL->isInteger())
-        tiaParams.integrationMethod=it_tpL->iVal();
+        tiaParams.integrationMethod=it_tpL->getImmutableValue<int>();
       else
       {
 
-        ExtendedString stringVal ( it_tpL->sVal() );
+        ExtendedString stringVal ( it_tpL->stringValue() );
         stringVal.toUpper();
 
         if (stringVal == "TRAP" || stringVal == "TRAPEZOIDAL")
@@ -1332,9 +1328,7 @@ bool N_ANP_AnalysisManager::setTranOptions(const N_UTL_OptionBlock & OB)
           tiaParams.integrationMethod = 8;
         else
         {
-          string msg=
-        "N_ANP_AnalysisManager::setTranOptions: unsupported transient method type";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
+          Report::UserError0() << "Unsupported transient method type";
         }
       }
 
@@ -1343,58 +1337,58 @@ bool N_ANP_AnalysisManager::setTranOptions(const N_UTL_OptionBlock & OB)
     else if (it_tpL->uTag()=="CONSTSTEP")
     {
       tiaParams.constantStepSize
-        =  static_cast<bool> (it_tpL->iVal());
+        =  static_cast<bool> (it_tpL->getImmutableValue<int>());
     }
 #endif
     else if (it_tpL->uTag()=="USEDEVICEMAX")
     {
-      tiaParams.useDeviceTimeStepMax =  static_cast<bool> (it_tpL->iVal());
+      tiaParams.useDeviceTimeStepMax =  static_cast<bool> (it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag()=="RELTOL")
     {
-      tiaParams.relErrorTol=it_tpL->dVal();
+      tiaParams.relErrorTol=it_tpL->getImmutableValue<double>();
       tiaParams.relErrorTolGiven = true;
     }
     else if (it_tpL->uTag()=="ABSTOL")
     {
-      tiaParams.absErrorTol=it_tpL->dVal();
+      tiaParams.absErrorTol=it_tpL->getImmutableValue<double>();
     }
     else if (it_tpL->uTag()=="DOUBLEDCOPSTEP")
     {
-      tiaParams.doubleDCOPStep=it_tpL->iVal();
+      tiaParams.doubleDCOPStep=it_tpL->getImmutableValue<int>();
     }
     else if (it_tpL->uTag()=="FIRSTDCOPSTEP")
     {
-      tiaParams.firstDCOPStep=it_tpL->iVal();
+      tiaParams.firstDCOPStep=it_tpL->getImmutableValue<int>();
     }
     else if (it_tpL->uTag()=="LASTDCOPSTEP")
     {
-      tiaParams.lastDCOPStep=it_tpL->iVal();
+      tiaParams.lastDCOPStep=it_tpL->getImmutableValue<int>();
     }
     else if (it_tpL->uTag()=="BPENABLE" )
     {
-      tiaParams.bpEnable =  static_cast<bool> (it_tpL->iVal());
+      tiaParams.bpEnable =  static_cast<bool> (it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag()=="RESTARTSTEPSCALE" )
     {
-      tiaParams.restartTimeStepScale=it_tpL->dVal();
+      tiaParams.restartTimeStepScale=it_tpL->getImmutableValue<double>();
     }
     else if (it_tpL->uTag()=="EXITTIME" )
     {
-      tiaParams.exitTime=it_tpL->dVal();
+      tiaParams.exitTime=it_tpL->getImmutableValue<double>();
     }
     else if (it_tpL->uTag()=="EXITSTEP" )
     {
-      tiaParams.exitStep=it_tpL->iVal();
+      tiaParams.exitStep=it_tpL->getImmutableValue<int>();
     }
     else if (it_tpL->uTag() == "MINTIMESTEPSBP")
     {
-      tiaParams.minTimeStepsBP = it_tpL->iVal();
+      tiaParams.minTimeStepsBP = it_tpL->getImmutableValue<int>();
       tiaParams.minTimeStepsBPGiven = true;
     }
     else if (it_tpL->uTag()=="ERROPTION" )
     {
-      tiaParams.errorAnalysisOption=it_tpL->iVal();
+      tiaParams.errorAnalysisOption=it_tpL->getImmutableValue<int>();
       // tscoffe/tmei 12/7/07:  If error option = 1 (NO LTE) then make sure minTimeStepBP is enabled.
       if (tiaParams.errorAnalysisOption == 1)
       {
@@ -1406,113 +1400,102 @@ bool N_ANP_AnalysisManager::setTranOptions(const N_UTL_OptionBlock & OB)
     }
     else if (it_tpL->uTag()=="NLNEARCONV" )
     {
-      tiaParams.nlNearConvFlag = static_cast<bool> (it_tpL->iVal());
+      tiaParams.nlNearConvFlag = static_cast<bool> (it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag()=="NLSMALLUPDATE" )
     {
-      tiaParams.nlSmallUpdateFlag = static_cast<bool> (it_tpL->iVal());
+      tiaParams.nlSmallUpdateFlag = static_cast<bool> (it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag()=="JACLIMITFLAG" )
     {
-      tiaParams.jacLimitFlag= static_cast<bool> (it_tpL->iVal());
+      tiaParams.jacLimitFlag= static_cast<bool> (it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag()=="JACLIMIT" )
     {
-      tiaParams.jacLimit = it_tpL->dVal();
+      tiaParams.jacLimit = it_tpL->getImmutableValue<double>();
     }
     else if (it_tpL->uTag()=="DAESTATEDERIV" )
     {
-      daeStateDerivFlag_ = static_cast<bool> (it_tpL->iVal());
+      daeStateDerivFlag_ = static_cast<bool> (it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag()=="MAXORD" )
     {
-/*      if (tiaParams.integrationMethod == 7)
-      {
-        string msg = "***** ERROR: maxord is not a valid option for variable order Trapezoid method!";
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-      } */
-
-      tiaParams.maxOrder = it_tpL->iVal();
+      tiaParams.maxOrder = it_tpL->getImmutableValue<int>();
     }
     else if (it_tpL->uTag()=="MINORD" )
     {
-/*      if (tiaParams.integrationMethod == 7)
-      {
-        string msg = "***** ERROR: minord is not a valid option for variable order Trapezoid method!";
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-      } */
-      tiaParams.minOrder = it_tpL->iVal();
+      tiaParams.minOrder = it_tpL->getImmutableValue<int>();
     }
     else if (it_tpL->uTag()=="TIMESTEPSREVERSAL" )
     {
-      tiaParams.timestepsReversal =it_tpL->bVal();
+      tiaParams.timestepsReversal =it_tpL->getImmutableValue<bool>();
     }
     else if (it_tpL->uTag()=="TESTFIRSTSTEP" )
     {
-      tiaParams.testFirstStep = static_cast<bool> (it_tpL->iVal ());
+      tiaParams.testFirstStep = static_cast<bool> (it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag()=="DELMAX" )
     {
-      tiaParams.delmax =it_tpL->dVal();
+      tiaParams.delmax =it_tpL->getImmutableValue<double>();
       tiaParams.delmaxGiven = true;
 //      tiaParams.delmax =it_tpL->iVal();
     }
     else if (it_tpL->uTag()=="NLMIN" )
     {
-      tiaParams.NLmin=it_tpL->iVal();
+      tiaParams.NLmin=it_tpL->getImmutableValue<int>();
     }
     else if (it_tpL->uTag()=="NLMAX" )
     {
-      tiaParams.NLmax=it_tpL->iVal();
+      tiaParams.NLmax=it_tpL->getImmutableValue<int>();
     }
     else if (it_tpL->uTag()=="OUTPUTINTERPMPDE")
     {
-      tiaParams.outputInterpMPDE = static_cast<bool> (it_tpL->iVal ());
+      tiaParams.outputInterpMPDE = static_cast<bool> (it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag()=="NEWLTE")
     {
-      tiaParams.newLte =it_tpL->dVal();
+      tiaParams.newLte =it_tpL->getImmutableValue<double>();
     }
     else if (it_tpL->uTag()=="NEWBPSTEPPING")
     {
-      tiaParams.newBPStepping = it_tpL->dVal();
+      tiaParams.newBPStepping = it_tpL->getImmutableValue<double>();
     }
     else if (it_tpL->uTag()=="INTERPOUTPUT")
     {
-      tiaParams.interpOutputFlag = static_cast<bool> (it_tpL->iVal ());
+      tiaParams.interpOutputFlag = static_cast<bool> (it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag()=="CONDTEST")
     {
-      tiaParams.condTestFlag = static_cast<bool> (it_tpL->iVal ());
+      tiaParams.condTestFlag = static_cast<bool> (it_tpL->getImmutableValue<int>());
     }
     else if (it_tpL->uTag()=="CONDTESTDEVICENAME")
     {
-      tiaParams.condTestDeviceNames.push_back(it_tpL->sVal () );
+      tiaParams.condTestDeviceNames.push_back(it_tpL->stringValue() );
     }
     else if (it_tpL->uTag() == "DTMIN")
     {
-      tiaParams.userSpecMinTimeStep = it_tpL->dVal();
+      tiaParams.userSpecMinTimeStep = it_tpL->getImmutableValue<double>();
       tiaParams.userSpecMinTimeStepGiven = true;
     }
     else if (it_tpL->uTag() == "PASSNLSTALL")
     {
-      tiaParams.passNLStall = it_tpL->bVal();
+      tiaParams.passNLStall = it_tpL->getImmutableValue<bool>();
     }
     else if (it_tpL->uTag() == "FASTTESTS")
     {
-      tiaParams.fastTests = it_tpL->bVal();
+      tiaParams.fastTests = it_tpL->getImmutableValue<bool>();
     }
     else if (it_tpL->uTag() == "MINTIMESTEPRECOVERY")
     {
-      tiaParams.minTimeStepRecoveryCounter = it_tpL->iVal();
+      tiaParams.minTimeStepRecoveryCounter = it_tpL->getImmutableValue<int>();
     }
     else if (it_tpL->uTag()=="VOLTZEROTOL" )
     {
-      tiaParams.voltZeroTol=it_tpL->dVal();
+      tiaParams.voltZeroTol=it_tpL->getImmutableValue<double>();
     }
     else if (it_tpL->uTag()=="CURRZEROTOL" )
     {
-      tiaParams.currZeroTol=it_tpL->dVal();
+      tiaParams.currZeroTol=it_tpL->getImmutableValue<double>();
     }
     else if (it_tpL->uTag()=="DEBUGLEVEL" )
     {
@@ -1525,27 +1508,23 @@ bool N_ANP_AnalysisManager::setTranOptions(const N_UTL_OptionBlock & OB)
 
       else
       {
-        tiaParams.debugLevel = it_tpL->iVal();
+        tiaParams.debugLevel = it_tpL->getImmutableValue<int>();
       }
 #endif
     }
     else if (it_tpL->uTag()=="HISTORYTRACKINGDEPTH" )
     {
-      tiaParams.historyTrackingDepth = it_tpL->iVal();
+      tiaParams.historyTrackingDepth = it_tpL->getImmutableValue<int>();
     }
     else
     {
-      string tmp = " ***** ERROR: " + it_tpL->uTag() +
-        " is not a recognized time integration option.\n";
-      N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_FATAL_0, tmp);
+      Report::UserError() << it_tpL->uTag() << " is not a recognized time integration option";
     }
   }
 
   if (tiaParams.NLmin > tiaParams.NLmax)
   {
-     ostringstream err("");
-      err << " ***** ERROR: .options timeint NLMIN = " << tiaParams.NLmin << " > " << tiaParams.NLmax << " = NLMAX!" << std::endl;
-      N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_FATAL_0, err.str());
+    Report::UserError() << ".options timeint NLMIN = " << tiaParams.NLmin << " > " << tiaParams.NLmax << " = NLMAX!";
   }
 
   if (tiaParams.firstDCOPStep < 0) tiaParams.firstDCOPStep = 0;
@@ -1556,11 +1535,6 @@ bool N_ANP_AnalysisManager::setTranOptions(const N_UTL_OptionBlock & OB)
   // check for maximum order on the command line
   if ( commandLine_.argExists ("-maxord") )
   {
-/*    if (tiaParams.integrationMethod == 7)
-    {
-      string msg = "***** ERROR: maxord is not a valid option for variable order Trapezoid method!";
-       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-    } */
 
     tiaParams.maxOrder =
       atoi( commandLine_.getArgumentValue( "-maxord" ).c_str() );
@@ -1575,30 +1549,19 @@ bool N_ANP_AnalysisManager::setTranOptions(const N_UTL_OptionBlock & OB)
       tiaParams.relErrorTol = 1.0e-3;
   }
 
-//  if (tiaParams.integrationMethod == 7)
-//  {
-//     string msg = "***** ERROR: maxord is not a valid option for variable order Trapezoid method!"
-//     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-//  }
-
-/*  if (tiaParams.errorAnalysisOption == 1 && tiaParams.maxTimeStepGiven == false)
-  {
-    tiaParams.maxTimeStep = 0.01 * tiaParams.finalTime;
-  }
-*/
   return true;
 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setMPDEAnalysisParams
+// Function      : AnalysisManager::setMPDEAnalysisParams
 // Purpose       : Sets the MPDE sweep calculation parameters (from .MPDE)
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, 1414
 // Creation Date : 7/23/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setMPDEAnalysisParams(const N_UTL_OptionBlock & OB)
+bool AnalysisManager::setMPDEAnalysisParams(const N_UTL_OptionBlock & OB)
 {
   if (Teuchos::is_null(mpdeMgrPtr_))
   {
@@ -1612,14 +1575,14 @@ bool N_ANP_AnalysisManager::setMPDEAnalysisParams(const N_UTL_OptionBlock & OB)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setMPDEOptions
+// Function      : AnalysisManager::setMPDEOptions
 // Purpose       :
 // Special Notes : from '.options mpdeint'
 // Scope         : public
 // Creator       : Todd Coffey, 1414
 // Creation Date : 7/23/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setMPDEOptions(const N_UTL_OptionBlock & OB)
+bool AnalysisManager::setMPDEOptions(const N_UTL_OptionBlock & OB)
 {
   if (Teuchos::is_null(mpdeMgrPtr_))
   {
@@ -1630,58 +1593,44 @@ bool N_ANP_AnalysisManager::setMPDEOptions(const N_UTL_OptionBlock & OB)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setHBAnalysisParams
+// Function      : AnalysisManager::setHBAnalysisParams
 // Purpose       : Sets the HB sweep calculation parameters (from .HB)
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, Ting Mei
 // Creation Date : 7/30/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setHBAnalysisParams(const N_UTL_OptionBlock & OB)
+bool AnalysisManager::setHBAnalysisParams(const N_UTL_OptionBlock & OB)
 {
-  list<N_UTL_Param>::const_iterator it_tpL;
-  list<N_UTL_Param>::const_iterator first = OB.getParams().begin();
-  list<N_UTL_Param>::const_iterator last  = OB.getParams().end();
+  std::list<N_UTL_Param>::const_iterator it_tpL;
+  std::list<N_UTL_Param>::const_iterator first = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator last  = OB.getParams().end();
 
   for (it_tpL = first; it_tpL != last; ++it_tpL)
   {
     if (it_tpL->uTag() == "FREQ")
     {
-      tiaParams.freq= it_tpL->dVal();
+
+      tiaParams.freqs = it_tpL->getValue<std::vector<double> >();
       tiaParams.freqGiven = true;
     }
   }
 
-  if (tiaParams.freq <= 0.0 )
+  if (tiaParams.freqs[0] <= 0.0 )
   {
-    ostringstream ost;
-    ost << " N_ANP_AnalysisManager::setHBAnalysisParams: " << std::endl;
-    ost << " Frequency of oscillation " << tiaParams.freq
-        << " is less than or equal to zero.  "
-        << " Check netlist for invalid .HB specification " << std::endl;
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, ost.str());
+    Report::UserError() << "Frequency of oscillation " << tiaParams.freqs[0] << " is less than or equal to zero, invalid .HB specification";
   }
 
-#ifdef Xyce_DEBUG_ANALYSIS
-  string dashedline = "-------------------------------------------------"
-                       "----------------------------\n";
-
-  if (tiaParams.debugLevel > 0)
+  if ((DEBUG_ANALYSIS & tiaParams.debugLevel) > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       "  HB transient simulation parameters");
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  HB frequency = ",
-            tiaParams.freq);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       dashedline);
+    dout() << section_divider << std::endl
+           << "HB transient simulation parameters" 
+           //<< Util::push << std::endl
+           << std::endl
+           << "HB frequency = " << tiaParams.freqs[0] << std::endl
+           //<< Util::pop << std::endl;
+           << std::endl;
   }
-#endif
 
   setBlockAnalysisFlag( true );
   devInterfacePtr->setBlockAnalysisFlag( true );
@@ -1692,56 +1641,56 @@ bool N_ANP_AnalysisManager::setHBAnalysisParams(const N_UTL_OptionBlock & OB)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setHBOptions
+// Function      : AnalysisManager::setHBOptions
 // Purpose       :
 // Special Notes : from '.options hb'
 // Scope         : public
 // Creator       : Todd Coffey, 1414
 // Creation Date : 7/23/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setHBOptions(const N_UTL_OptionBlock & OB)
+bool AnalysisManager::setHBOptions(const N_UTL_OptionBlock & OB)
 {
   hbOptionsBlock = OB;
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setLinSol
+// Function      : AnalysisManager::setLinSol
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 07/12/2013
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setLinSol(const N_UTL_OptionBlock & OB)
+bool AnalysisManager::setLinSol(const N_UTL_OptionBlock & OB)
 {
   linSolBlock = OB;
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setHBLinSol
+// Function      : AnalysisManager::setHBLinSol
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Heidi Thornquist, 1437
 // Creation Date : 11/11/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setHBLinSol(const N_UTL_OptionBlock & OB)
+bool AnalysisManager::setHBLinSol(const N_UTL_OptionBlock & OB)
 {
   hbLinSolBlock = OB;
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setTRANMPDEOptions
+// Function      : AnalysisManager::setTRANMPDEOptions
 // Purpose       :
 // Special Notes : from '.options timeint-mpde'
 // Scope         : public
 // Creator       : Todd Coffey, 1414
 // Creation Date : 7/23/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setTRANMPDEOptions(const N_UTL_OptionBlock & OB)
+bool AnalysisManager::setTRANMPDEOptions(const N_UTL_OptionBlock & OB)
 {
   if (Teuchos::is_null(mpdeMgrPtr_))
   {
@@ -1752,21 +1701,21 @@ bool N_ANP_AnalysisManager::setTRANMPDEOptions(const N_UTL_OptionBlock & OB)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setSensOptions
+// Function      : AnalysisManager::setSensOptions
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, Sandia
 // Creation Date : 6/5/13
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setSensOptions(const N_UTL_OptionBlock & OB)
+bool AnalysisManager::setSensOptions(const N_UTL_OptionBlock & OB)
 {
   sensFlag_=true;
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::completeOPStartStep
+// Function      : AnalysisManager::completeOPStartStep
 // Purpose       : Call to rotate next state to current state following a
 //               : constrained DCOP solve when using a previous operating point
 // Special Notes : Called from the Xyce-LOCA interface.
@@ -1774,19 +1723,19 @@ bool N_ANP_AnalysisManager::setSensOptions(const N_UTL_OptionBlock & OB)
 // Creator       : Dave Shirley
 // Creation Date : 06/27/2006
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::completeOPStartStep  ( )
+bool AnalysisManager::completeOPStartStep  ( )
 {
   bool bsuccess = true;
 
-  bsuccess = dsPtr_->updateStateDataArrays ();
-  dsPtr_->setConstantHistory();
-  dsPtr_->equateTmpVectors();
+  bsuccess = tiaDataStore_->updateStateDataArrays ();
+  tiaDataStore_->setConstantHistory();
+  tiaDataStore_->equateTmpVectors();
 
   return bsuccess;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::completeHomotopyStep
+// Function      : AnalysisManager::completeHomotopyStep
 // Purpose       : Call to do final cleanup after a single,
 //                 successful homotopy step.
 // Special Notes : Called from the Xyce-LOCA interface.
@@ -1794,23 +1743,23 @@ bool N_ANP_AnalysisManager::completeOPStartStep  ( )
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/20/2006
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::completeHomotopyStep
-    ( const vector<string> & paramNames,
-      const vector<double> & paramVals,
+bool AnalysisManager::completeHomotopyStep
+    ( const std::vector<std::string> & paramNames,
+      const std::vector<double> & paramVals,
       N_LAS_Vector * solnVecPtr )
 {
   bool bsuccess = true;
 
 #ifdef Xyce_DEBUG_ANALYSIS
-  string netListFile = commandLine_.getArgumentValue("netlist");
-  std::cout << "\n " << netListFile;
-  std::cout << " N_ANP_AnalysisManager::completeHomotopyStep " << std::endl;
+  std::string netListFile = commandLine_.getArgumentValue("netlist");
+  Xyce::dout() << "\n " << netListFile;
+  Xyce::dout() << " AnalysisManager::completeHomotopyStep " << std::endl;
 #endif
 
   // Rotate the data vectors:
-  bool bs1 = dsPtr_->updateStateDataArrays ();    bsuccess = bsuccess && bs1;
-  dsPtr_->setConstantHistory();
-  dsPtr_->equateTmpVectors();
+  bool bs1 = tiaDataStore_->updateStateDataArrays ();    bsuccess = bsuccess && bs1;
+  tiaDataStore_->setConstantHistory();
+  tiaDataStore_->equateTmpVectors();
 
   // Pass info in to the lower level solver:
   loaderPtr->homotopyStepSuccess (paramNames,paramVals);
@@ -1822,7 +1771,7 @@ bool N_ANP_AnalysisManager::completeHomotopyStep
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::failHomotopyStep
+// Function      : AnalysisManager::failHomotopyStep
 // Purpose       : Call to do final cleanup after a single,
 //                 failed homotopy step.
 // Special Notes : Called from the Xyce-LOCA interface.
@@ -1830,14 +1779,14 @@ bool N_ANP_AnalysisManager::completeHomotopyStep
 // Creator       : Eric Keiter, SNL
 // Creation Date : 03/30/2006
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::failHomotopyStep ()
+bool AnalysisManager::failHomotopyStep ()
 {
   bool bsuccess = true;
 
 #ifdef Xyce_DEBUG_ANALYSIS
-  string netListFile = commandLine_.getArgumentValue("netlist");
-  std::cout << "\n " << netListFile;
-  std::cout << " N_ANP_AnalysisManager::failHomotopyStep " << std::endl;
+  std::string netListFile = commandLine_.getArgumentValue("netlist");
+  Xyce::dout() << "\n " << netListFile;
+  Xyce::dout() << " AnalysisManager::failHomotopyStep " << std::endl;
 #endif
 
   // Pass info in to the lower level solver:
@@ -1847,14 +1796,14 @@ bool N_ANP_AnalysisManager::failHomotopyStep ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setupMPDEMgr_
+// Function      : AnalysisManager::setupMPDEMgr_
 // Purpose       :
 // Special Notes :
 // Scope         : private
 // Creator       : Todd Coffey, 1414
 // Creation Date : 7/23/08
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::setupMPDEMgr_()
+void AnalysisManager::setupMPDEMgr_()
 {
 
   // Allocate new MPDE Manager
@@ -1882,33 +1831,32 @@ void N_ANP_AnalysisManager::setupMPDEMgr_()
 
   if (!bsuccess)
   {
-    string msg("N_ANP_AnalysisManager::setupMPDEMgr_ - Error!  A registration function failed!");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg );
+    Report::DevelFatal0().in("AnalysisManager::setupMPDEMgr_") << "Registration function failed";
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::initializeTransientModel
+// Function      : AnalysisManager::initializeTransientModel
 // Purpose       : ModelEvaluator Interface
 // Special Notes :
 // Scope         : private
 // Creator       : Coffey, Schiek, Mei
 // Creation Date : 05/29/09
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::initializeTransientModel()
+void AnalysisManager::initializeTransientModel()
 {
   wimPtr->createTimeIntegMethod(TIAMethod_BACKWARD_DIFFERENTIATION_15);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::evalTransientModel
+// Function      : AnalysisManager::evalTransientModel
 // Purpose       : ModelEvaluator Interface
 // Special Notes :
 // Scope         : private
 // Creator       : Coffey, Schiek, Mei
 // Creation Date : 05/27/09
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::evalTransientModel(
+bool AnalysisManager::evalTransientModel(
     double t,
     N_LAS_Vector * SolVectorPtr,
     N_LAS_Vector * CurrSolVectorPtr,
@@ -1959,14 +1907,14 @@ bool N_ANP_AnalysisManager::evalTransientModel(
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::evalTransientModelState
+// Function      : AnalysisManager::evalTransientModelState
 // Purpose       : ModelEvaluator Interface
 // Special Notes :
 // Scope         : private
 // Creator       : Coffey, Schiek, Mei
 // Creation Date : 05/29/09
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::evalTransientModelState(
+bool AnalysisManager::evalTransientModelState(
     double t,
     N_LAS_Vector * SolVectorPtr,
     N_LAS_Vector * StaVectorPtr,
@@ -1993,112 +1941,112 @@ bool N_ANP_AnalysisManager::evalTransientModelState(
 
 // ***** Accessor methods *****
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setBeginningIntegrationFlag
+// Function      : AnalysisManager::setBeginningIntegrationFlag
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::setBeginningIntegrationFlag(bool bif)
+void AnalysisManager::setBeginningIntegrationFlag(bool bif)
 {
   primaryAnalysisObject_->setBeginningIntegrationFlag(bif);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getBeginningIntegrationFlag
+// Function      : AnalysisManager::getBeginningIntegrationFlag
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getBeginningIntegrationFlag()
+bool AnalysisManager::getBeginningIntegrationFlag()
 {
   return primaryAnalysisObject_->getBeginningIntegrationFlag();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setIntegrationMethod
+// Function      : AnalysisManager::setIntegrationMethod
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::setIntegrationMethod(int im)
+void AnalysisManager::setIntegrationMethod(int im)
 {
   primaryAnalysisObject_->setIntegrationMethod (im);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getIntegrationMethod
+// Function      : AnalysisManager::getIntegrationMethod
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-unsigned int N_ANP_AnalysisManager::getIntegrationMethod ()
+unsigned int AnalysisManager::getIntegrationMethod ()
 {
   return primaryAnalysisObject_->getIntegrationMethod ();
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getTotalLinearSolutionTime
+// Function      : AnalysisManager::getTotalLinearSolutionTime
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisManager::getTotalLinearSolutionTime() const
+double AnalysisManager::getTotalLinearSolutionTime() const
 {
   return primaryAnalysisObject_->getTotalLinearSolutionTime();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getTotalResidualLoadTime
+// Function      : AnalysisManager::getTotalResidualLoadTime
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisManager::getTotalResidualLoadTime() const
+double AnalysisManager::getTotalResidualLoadTime() const
 {
   return primaryAnalysisObject_->getTotalResidualLoadTime();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getTotalJacobianLoadTime
+// Function      : AnalysisManager::getTotalJacobianLoadTime
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisManager::getTotalJacobianLoadTime() const
+double AnalysisManager::getTotalJacobianLoadTime() const
 {
   return primaryAnalysisObject_->getTotalJacobianLoadTime();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getDoubleDCOPEnabled ()
+// Function      : AnalysisManager::getDoubleDCOPEnabled ()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getDoubleDCOPEnabled ()
+bool AnalysisManager::getDoubleDCOPEnabled ()
 {
   return primaryAnalysisObject_->getDoubleDCOPEnabled ();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::simulationComplete
+// Function      : AnalysisManager::simulationComplete
 // Purpose       : return boolean signifying whether simulation complete or
 //                 not.
 //
@@ -2109,7 +2057,7 @@ bool N_ANP_AnalysisManager::getDoubleDCOPEnabled ()
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 05/06/2004
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::simulationComplete()
+bool AnalysisManager::simulationComplete()
 {
   if (analysis == ANP_MODE_TRANSIENT)
   {
@@ -2117,15 +2065,13 @@ bool N_ANP_AnalysisManager::simulationComplete()
   }
   else
   {
-    string msg = "N_ANP_AnalysisManager::simulationComplete called for non-transient run... not currently valid!";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-    // This return here solely to shut the SGI compiler up
-    return(true);
+    Report::DevelFatal0().in("AnalysisManager::simulationComplete") << "Called for non-transient run, not currently valid";
+    return false;
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getPauseTime
+// Function      : AnalysisManager::getPauseTime
 //
 // Purpose       : return the time at which the simulation will pause
 //
@@ -2134,20 +2080,20 @@ bool N_ANP_AnalysisManager::simulationComplete()
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 04/29/2004
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisManager::getPauseTime()
+double AnalysisManager::getPauseTime()
 {
   return(tiaParams.pauseTime);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getStepNumber
+// Function      : AnalysisManager::getStepNumber
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date : 12/16/2010
 //-----------------------------------------------------------------------------
-int N_ANP_AnalysisManager::getStepNumber ()
+int AnalysisManager::getStepNumber ()
 {
   int number=0;
   if( !is_null( primaryAnalysisObject_ ) )
@@ -2158,14 +2104,14 @@ int N_ANP_AnalysisManager::getStepNumber ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getTranStepNumber
+// Function      : AnalysisManager::getTranStepNumber
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date : 12/16/2010
 //-----------------------------------------------------------------------------
-int N_ANP_AnalysisManager::getTranStepNumber ()
+int AnalysisManager::getTranStepNumber ()
 {
   int number=0;
   if (analysis == ANP_MODE_TRANSIENT && !is_null(primaryAnalysisObject_) )
@@ -2176,14 +2122,14 @@ int N_ANP_AnalysisManager::getTranStepNumber ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setStepNumber
+// Function      : AnalysisManager::setStepNumber
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date : 12/16/2010
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::setStepNumber (int step)
+void AnalysisManager::setStepNumber (int step)
 {
   if( !is_null( primaryAnalysisObject_ ) )
   {
@@ -2192,14 +2138,14 @@ void N_ANP_AnalysisManager::setStepNumber (int step)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setTranStepNumber
+// Function      : AnalysisManager::setTranStepNumber
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date : 12/16/2010
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::setTranStepNumber (int step)
+void AnalysisManager::setTranStepNumber (int step)
 {
   if( !is_null( primaryAnalysisObject_ ) )
   {
@@ -2209,99 +2155,99 @@ void N_ANP_AnalysisManager::setTranStepNumber (int step)
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getInitTranFlag
+// Function      : AnalysisManager::getInitTranFlag
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       :
 // Creation Date : 12/16/2010
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getInitTranFlag()
+bool AnalysisManager::getInitTranFlag()
 {
   int stepNum =  getStepNumber();
   return (stepNum <= 0);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getTime
+// Function      : AnalysisManager::getTime
 // Purpose       : Gets the next time value.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/27/00
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisManager::getTime() const
+double AnalysisManager::getTime() const
 {
   return secPtr_->nextTime;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getCurrentTime
+// Function      : AnalysisManager::getCurrentTime
 // Purpose       : Gets the current time value.
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, Electrical and Mems Modeling
 // Creation Date : 8/21/2009
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisManager::getCurrentTime() const
+double AnalysisManager::getCurrentTime() const
 {
   return secPtr_->currentTime;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getFinalTime
+// Function      : AnalysisManager::getFinalTime
 // Purpose       : Gets the final time-step value.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/27/00
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisManager::getFinalTime() const
+double AnalysisManager::getFinalTime() const
 {
   return secPtr_->finalTime;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getInitialTime
+// Function      : AnalysisManager::getInitialTime
 // Purpose       : Gets the initial time-step value.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/27/00
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisManager::getInitialTime() const
+double AnalysisManager::getInitialTime() const
 {
   return secPtr_->initialTime;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getStartingTimeStep
+// Function      : AnalysisManager::getStartingTimeStep
 // Purpose       : Gets the starting time-step value.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/27/00
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisManager::getStartingTimeStep ()
+double AnalysisManager::getStartingTimeStep ()
 {
   return secPtr_->startingTimeStep;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getTimeIntMode
+// Function      : AnalysisManager::getTimeIntMode
 // Purpose       : Gets the time-integration method.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 03/02/01
 //-----------------------------------------------------------------------------
-int N_ANP_AnalysisManager::getTimeIntMode()
+int AnalysisManager::getTimeIntMode()
 {
   return primaryAnalysisObject_->getIntegrationMethod();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getSteadyStateFlag
+// Function      : AnalysisManager::getSteadyStateFlag
 // Purpose       : Gets a flag indicating we are in steady state.
 //                  (steady=true)
 // Special Notes :
@@ -2309,26 +2255,26 @@ int N_ANP_AnalysisManager::getTimeIntMode()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 03/02/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getSteadyStateFlag ()
+bool AnalysisManager::getSteadyStateFlag ()
 {
   return ((primaryAnalysisObject_->getIntegrationMethod())==TIAMethod_NONE);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getInputOPFlag
+// Function      : AnalysisManager::getInputOPFlag
 // Purpose       : Gets a flag indicating we are starting from a previous OP
 // Special Notes :
 // Scope         : public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 04/13/06
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getInputOPFlag ()
+bool AnalysisManager::getInputOPFlag ()
 {
   return primaryAnalysisObject_->getInputOPFlag();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getTranOPFlag
+// Function      : AnalysisManager::getTranOPFlag
 // Purpose       : Gets a flag indicating we are in a DCOP calculation that is
 //                 the initialization for a transient simulation.
 // Special Notes :
@@ -2336,14 +2282,14 @@ bool N_ANP_AnalysisManager::getInputOPFlag ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 02/28/05
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getTranOPFlag ()
+bool AnalysisManager::getTranOPFlag ()
 {
   return ((analysis == ANP_MODE_TRANSIENT || primaryAnalysisObject_->isAnalysis(ANP_MODE_TRANSIENT))
      && (primaryAnalysisObject_->getIntegrationMethod())==TIAMethod_NONE);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getACOPFlag
+// Function      : AnalysisManager::getACOPFlag
 // Purpose       : Gets a flag indicating we are in a DCOP calculation that is
 //                 the initialization for a transient simulation.
 // Special Notes :
@@ -2351,80 +2297,80 @@ bool N_ANP_AnalysisManager::getTranOPFlag ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/16/12
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getACOPFlag ()
+bool AnalysisManager::getACOPFlag ()
 {
   return ((analysis == ANP_MODE_AC || primaryAnalysisObject_->isAnalysis(ANP_MODE_AC))
      && (primaryAnalysisObject_->getIntegrationMethod())==TIAMethod_NONE);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getDCSweepFlag
+// Function      : AnalysisManager::getDCSweepFlag
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 02/28/05
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getDCSweepFlag ()
+bool AnalysisManager::getDCSweepFlag ()
 {
   return ((analysis == ANP_MODE_DC_SWEEP || primaryAnalysisObject_->isAnalysis(ANP_MODE_DC_SWEEP)));
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getTransientFlag
+// Function      : AnalysisManager::getTransientFlag
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 02/28/05
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getTransientFlag () const
+bool AnalysisManager::getTransientFlag () const
 {
   return (((analysis == ANP_MODE_TRANSIENT || primaryAnalysisObject_->isAnalysis(ANP_MODE_TRANSIENT))
      && (primaryAnalysisObject_->getIntegrationMethod()) !=TIAMethod_NONE));
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getDoubleDCOPStep
+// Function      : AnalysisManager::getDoubleDCOPStep
 // Purpose       : Gets the double DC Operating Point step value.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/25/01
 //-----------------------------------------------------------------------------
-int N_ANP_AnalysisManager::getDoubleDCOPStep()
+int AnalysisManager::getDoubleDCOPStep()
 {
   return primaryAnalysisObject_->getDoubleDCOPStep();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getCurrentStepSize
+// Function      : AnalysisManager::getCurrentStepSize
 // Purpose       : Returns the "current" time step size.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 07/15/01
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisManager::getCurrentStepSize()
+double AnalysisManager::getCurrentStepSize()
 {
   return secPtr_->currentTimeStep;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getLastStepSize
+// Function      : AnalysisManager::getLastStepSize
 // Purpose       : Returns the "last" time step size.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 07/15/01
 //-----------------------------------------------------------------------------
-double N_ANP_AnalysisManager::getLastStepSize()
+double AnalysisManager::getLastStepSize()
 {
   return secPtr_->lastTimeStep;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::updateDerivs
+// Function      : AnalysisManager::updateDerivs
 // Purpose       : Calls the time  int. method to update the corrector
 //                 derivatives.
 // Special Notes :
@@ -2432,257 +2378,257 @@ double N_ANP_AnalysisManager::getLastStepSize()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/13/00
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::updateDerivs()
+bool AnalysisManager::updateDerivs()
 {
   wimPtr->obtainCorrectorDeriv();
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::updateDivDiffs
+// Function      : AnalysisManager::updateDivDiffs
 // Purpose       : Updates the divided difference values.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/27/00
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::updateDivDiffs()
+bool AnalysisManager::updateDivDiffs()
 {
-  dsPtr_->computeDividedDifferences();
+  tiaDataStore_->computeDividedDifferences();
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::updateDerivsBlock
+// Function      : AnalysisManager::updateDerivsBlock
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 01/10/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::updateDerivsBlock(
-  const list<index_pair> & solGIDList,
-  const list<index_pair> & staGIDList)
+bool AnalysisManager::updateDerivsBlock(
+  const std::list<index_pair> & solGIDList,
+  const std::list<index_pair> & staGIDList)
 {
-  dsPtr_->computeDivDiffsBlock(solGIDList,staGIDList);
+  tiaDataStore_->computeDivDiffsBlock(solGIDList,staGIDList);
   wimPtr->updateDerivsBlock (solGIDList, staGIDList);
 
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::equateTmpVectors
+// Function      : AnalysisManager::equateTmpVectors
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 01/24/02
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::equateTmpVectors()
+bool AnalysisManager::equateTmpVectors()
 {
-  return dsPtr_->equateTmpVectors();
+  return tiaDataStore_->equateTmpVectors();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::registerElapsedTimer
+// Function      : AnalysisManager::registerElapsedTimer
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 02/24/06
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::registerElapsedTimer(N_UTL_Timer * et)
+bool AnalysisManager::registerElapsedTimer(N_UTL_Timer * et)
 {
   elapsedTimerPtr_ = rcp(et,false);
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::restartDataSize
+// Function      : AnalysisManager::restartDataSize
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Computational Sciences
 // Creation Date : 07/31/01
 //-----------------------------------------------------------------------------
-int N_ANP_AnalysisManager::restartDataSize( bool pack )
+int AnalysisManager::restartDataSize( bool pack )
 {
   return secPtr_->restartDataSize( pack );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::dumpRestartData
+// Function      : AnalysisManager::dumpRestartData
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Computational Sciences
 // Creation Date : 07/31/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::dumpRestartData
+bool AnalysisManager::dumpRestartData
   (char * buf, int bsize, int & pos, N_PDS_Comm * comm, bool pack)
 {
   return secPtr_->dumpRestartData(buf, bsize, pos, comm, pack);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::restoreRestartData
+// Function      : AnalysisManager::restoreRestartData
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Computational Sciences
 // Creation Date : 07/31/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::restoreRestartData
+bool AnalysisManager::restoreRestartData
   (char * buf, int bsize, int & pos, N_PDS_Comm * comm, bool pack)
 {
   return secPtr_->restoreRestartData(buf, bsize, pos, comm, pack);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getSolnVarData
+// Function      : AnalysisManager::getSolnVarData
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Computational Sciences
 // Creation Date : 07/31/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getSolnVarData( const int & gid,
-                                             vector<double> & varData )
+bool AnalysisManager::getSolnVarData( const int & gid,
+                                             std::vector<double> & varData )
 {
-  return dsPtr_->getSolnVarData( gid, varData );
+  return tiaDataStore_->getSolnVarData( gid, varData );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getStateVarData
+// Function      : AnalysisManager::getStateVarData
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Computational Sciences
 // Creation Date : 07/31/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getStateVarData( const int & gid,
-                                              vector<double> & varData )
+bool AnalysisManager::getStateVarData( const int & gid,
+                                              std::vector<double> & varData )
 {
-  return dsPtr_->getStateVarData( gid, varData );
+  return tiaDataStore_->getStateVarData( gid, varData );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getStoreVarData
+// Function      : AnalysisManager::getStoreVarData
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getStoreVarData( const int & gid,
-                                              vector<double> & varData )
+bool AnalysisManager::getStoreVarData( const int & gid,
+                                              std::vector<double> & varData )
 {
-  return dsPtr_->getStoreVarData( gid, varData );
+  return tiaDataStore_->getStoreVarData( gid, varData );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getOrder
+// Function      : AnalysisManager::getOrder
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Computational Sciences
 // Creation Date : 02/15/07
 //-----------------------------------------------------------------------------
-int N_ANP_AnalysisManager::getOrder ()
+int AnalysisManager::getOrder ()
 {
   return wimPtr->getOrder();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getNumberOfSteps
+// Function      : AnalysisManager::getNumberOfSteps
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Computational Sciences
 // Creation Date : 03/01/07
 //-----------------------------------------------------------------------------
-int N_ANP_AnalysisManager::getNumberOfSteps ()
+int AnalysisManager::getNumberOfSteps ()
 {
   return wimPtr->getNumberOfSteps();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getUsedOrder
+// Function      : AnalysisManager::getUsedOrder
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Computational Sciences
 // Creation Date : 03/01/07
 //-----------------------------------------------------------------------------
-int N_ANP_AnalysisManager::getUsedOrder ()
+int AnalysisManager::getUsedOrder ()
 {
   return wimPtr->getUsedOrder();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getNscsco
+// Function      : AnalysisManager::getNscsco
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Computational Sciences
 // Creation Date : 03/01/07
 //-----------------------------------------------------------------------------
-int N_ANP_AnalysisManager::getNscsco ()
+int AnalysisManager::getNscsco ()
 {
   return wimPtr->getNscsco();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setSolnVarData
+// Function      : AnalysisManager::setSolnVarData
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Computational Sciences
 // Creation Date : 07/31/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setSolnVarData( const int & gid,
-                                             const vector<double> & varData )
+bool AnalysisManager::setSolnVarData( const int & gid,
+                                             const std::vector<double> & varData )
 {
-  return dsPtr_->setSolnVarData( gid, varData );
+  return tiaDataStore_->setSolnVarData( gid, varData );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setStateVarData
+// Function      : AnalysisManager::setStateVarData
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Computational Sciences
 // Creation Date : 07/31/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setStateVarData( const int & gid,
-                                              const vector<double> & varData )
+bool AnalysisManager::setStateVarData( const int & gid,
+                                              const std::vector<double> & varData )
 {
-  return dsPtr_->setStateVarData( gid, varData );
+  return tiaDataStore_->setStateVarData( gid, varData );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setStoreVarData
+// Function      : AnalysisManager::setStoreVarData
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setStoreVarData( const int & gid,
-                                              const vector<double> & varData )
+bool AnalysisManager::setStoreVarData( const int & gid,
+                                              const std::vector<double> & varData )
 {
-  return dsPtr_->setStoreVarData( gid, varData );
+  return tiaDataStore_->setStoreVarData( gid, varData );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::registerTIAParams
+// Function      : AnalysisManager::registerTIAParams
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 09/06/01
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::registerTIAParams(const N_TIA_TIAParams & tiaParams_tmp)
+bool AnalysisManager::registerTIAParams(const N_TIA_TIAParams & tiaParams_tmp)
 {
   tiaParams = tiaParams_tmp;
 
@@ -2695,21 +2641,21 @@ bool N_ANP_AnalysisManager::registerTIAParams(const N_TIA_TIAParams & tiaParams_
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::registerMPDEInterface
+// Function      : AnalysisManager::registerMPDEInterface
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd S. Coffey, 9214
 // Creation Date : 03/26/04
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::registerMPDEInterface( N_TIA_MPDEInterface * tiaMPDEIface_tmp)
+bool AnalysisManager::registerMPDEInterface( N_TIA_MPDEInterface * tiaMPDEIface_tmp)
 {
   tiaMPDEIfacePtr_ = rcp(tiaMPDEIface_tmp,false);
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::registerLinearSystem
+// Function      : AnalysisManager::registerLinearSystem
 // Purpose       : Added to make it easier for the lasSysPtr pointer to be
 //                 non-static.
 // Special Notes :
@@ -2717,14 +2663,14 @@ bool N_ANP_AnalysisManager::registerMPDEInterface( N_TIA_MPDEInterface * tiaMPDE
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 04/17/02
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::registerLinearSystem(N_LAS_System * lasSysPtr_tmp)
+bool AnalysisManager::registerLinearSystem(N_LAS_System * lasSysPtr_tmp)
 {
   lasSysPtr = rcp(lasSysPtr_tmp,false);
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::registerNLSManager
+// Function      : AnalysisManager::registerNLSManager
 // Purpose       : Added to make it easier for the nlsSysPtr pointer to be
 //                 non-static.
 // Special Notes :
@@ -2732,14 +2678,14 @@ bool N_ANP_AnalysisManager::registerLinearSystem(N_LAS_System * lasSysPtr_tmp)
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 04/17/02
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::registerNLSManager(N_NLS_Manager * nlsMgrPtr_tmp)
+bool AnalysisManager::registerNLSManager(N_NLS_Manager * nlsMgrPtr_tmp)
 {
   nlsMgrPtr = rcp(nlsMgrPtr_tmp,false);
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::registerLoader
+// Function      : AnalysisManager::registerLoader
 // Purpose       : Added to make it easier for the loaderPtr pointer to be
 //                 non-static.
 // Special Notes :
@@ -2747,14 +2693,14 @@ bool N_ANP_AnalysisManager::registerNLSManager(N_NLS_Manager * nlsMgrPtr_tmp)
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 04/18/02
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::registerLoader(N_LOA_Loader * loaderPtr_tmp)
+bool AnalysisManager::registerLoader(N_LOA_Loader * loaderPtr_tmp)
 {
   loaderPtr = rcp(loaderPtr_tmp,false);
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::registerOutputMgr
+// Function      : AnalysisManager::registerOutputMgr
 // Purpose       : Added to make it easier for the outputPtr pointer to be
 //                 non-static.
 // Special Notes :
@@ -2762,17 +2708,17 @@ bool N_ANP_AnalysisManager::registerLoader(N_LOA_Loader * loaderPtr_tmp)
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 04/18/02
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::registerOutputMgr(N_IO_OutputMgr * outputPtr_tmp)
+bool AnalysisManager::registerOutputMgr(N_IO_OutputMgr * outputPtr_tmp)
 {
   outMgrPtr = rcp(outputPtr_tmp,false);
-  outputMgrAdapterRCPtr_ = rcp( new N_ANP_OutputMgrAdapter() );
+  outputMgrAdapterRCPtr_ = rcp( new OutputMgrAdapter() );
   outputMgrAdapterRCPtr_->registerOutputMgr( outputPtr_tmp );
 
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::registerRestartMgr
+// Function      : AnalysisManager::registerRestartMgr
 // Purpose       : Added to make it easier for the restartPtr pointer to be
 //                 non-static.
 // Special Notes :
@@ -2780,7 +2726,7 @@ bool N_ANP_AnalysisManager::registerOutputMgr(N_IO_OutputMgr * outputPtr_tmp)
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 04/18/02
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::registerRestartMgr(
+bool AnalysisManager::registerRestartMgr(
   N_IO_RestartMgr * restartPtr_tmp)
 {
   restartPtr = rcp(restartPtr_tmp,false);
@@ -2788,28 +2734,28 @@ bool N_ANP_AnalysisManager::registerRestartMgr(
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::registerNonlinearEquationLoader
+// Function      : AnalysisManager::registerNonlinearEquationLoader
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, 1414
 // Creation Date : 07/23/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::registerNonlinearEquationLoader( N_LOA_NonlinearEquationLoader * nonlinearEquationLoaderPtr_tmp )
+bool AnalysisManager::registerNonlinearEquationLoader( N_LOA_NonlinearEquationLoader * nonlinearEquationLoaderPtr_tmp )
 {
   nonlinearEquationLoaderPtr = rcp(nonlinearEquationLoaderPtr_tmp,false);
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::registerDeviceInterface
+// Function      : AnalysisManager::registerDeviceInterface
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, 1414
 // Creation Date : 07/23/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::registerDeviceInterface ( N_DEV_DeviceInterface * devInterfacePtr_tmp )
+bool AnalysisManager::registerDeviceInterface ( N_DEV_DeviceInterface * devInterfacePtr_tmp )
 {
   devInterfacePtr = rcp(devInterfacePtr_tmp,false);
   return true;
@@ -2817,14 +2763,14 @@ bool N_ANP_AnalysisManager::registerDeviceInterface ( N_DEV_DeviceInterface * de
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::registerTopology
+// Function      : AnalysisManager::registerTopology
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, 1414
 // Creation Date : 07/23/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::registerTopology( N_TOP_Topology * topoMgrPtr_tmp )
+bool AnalysisManager::registerTopology( N_TOP_Topology * topoMgrPtr_tmp )
 {
   topoMgrPtr = rcp(topoMgrPtr_tmp,false);
   return true;
@@ -2832,48 +2778,48 @@ bool N_ANP_AnalysisManager::registerTopology( N_TOP_Topology * topoMgrPtr_tmp )
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::registerApplicationBuilder
+// Function      : AnalysisManager::registerApplicationBuilder
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey, 1414
 // Creation Date : 07/23/08
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::registerApplicationBuilder( N_LAS_Builder * appBuilderPtr_tmp )
+bool AnalysisManager::registerApplicationBuilder( N_LAS_Builder * appBuilderPtr_tmp )
 {
   appBuilderPtr = rcp(appBuilderPtr_tmp,false);
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::registerParallelServices
+// Function      : AnalysisManager::registerParallelServices
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 04/19/02
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::registerParallelServices(N_PDS_Manager * pds_tmp)
+bool AnalysisManager::registerParallelServices(N_PDS_Manager * pds_tmp)
 {
   pdsMgrPtr = rcp(pds_tmp,false);
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setNextSolVectorPtr
+// Function      : AnalysisManager::setNextSolVectorPtr
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter,SNL, Computational Sciences
 // Creation Date : 04/22/2003
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::setNextSolVectorPtr (N_LAS_Vector * solVecPtr)
+bool AnalysisManager::setNextSolVectorPtr (N_LAS_Vector * solVecPtr)
 {
-  return dsPtr_->setNextSolVectorPtr (solVecPtr);
+  return tiaDataStore_->setNextSolVectorPtr (solVecPtr);
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setPauseTime
+// Function      : AnalysisManager::setPauseTime
 //
 // Purpose       : Set the time at which to pause the simulation
 //
@@ -2887,15 +2833,15 @@ bool N_ANP_AnalysisManager::setNextSolVectorPtr (N_LAS_Vector * solVecPtr)
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 04/29/2004
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::setPauseTime(double pauseTime)
+void AnalysisManager::setPauseTime(double pauseTime)
 {
-  secPtr_->setBreakPoint(N_UTL_BreakPoint(pauseTime,PAUSE_BREAKPOINT));
+  secPtr_->setBreakPoint(N_UTL_BreakPoint(pauseTime, Util::PAUSE_BREAKPOINT));
 }
 
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::resumeSimulation
+// Function      : AnalysisManager::resumeSimulation
 //
 // Purpose       : set flag to signify that simulation is continuation of
 //                 previously paused simulation.
@@ -2910,13 +2856,13 @@ void N_ANP_AnalysisManager::setPauseTime(double pauseTime)
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 04/29/2004
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::resumeSimulation()
+void AnalysisManager::resumeSimulation()
 {
   tiaParams.resume=true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::unset_resumeSimulation
+// Function      : AnalysisManager::unset_resumeSimulation
 // Purpose       : UN-set flag to signify that simulation is continuation of
 //                 previously paused simulation.
 // Special Notes :
@@ -2924,20 +2870,20 @@ void N_ANP_AnalysisManager::resumeSimulation()
 // Creator       : Eric Keiter
 // Creation Date : 06/12/2013
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::unset_resumeSimulation()
+void AnalysisManager::unset_resumeSimulation()
 {
   tiaParams.resume=false;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::outputIntervalSpecified_
+// Function      : AnalysisManager::outputIntervalSpecified_
 // Purpose       : Return true if user has specified output control options
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems modeling
 // Creation Date : 2/12/07
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::outputIntervalSpecified_()
+bool AnalysisManager::outputIntervalSpecified_()
 {
   // This is necessary and sufficient ---
   return (initialOutputInterval_ > 0.0);
@@ -2945,68 +2891,68 @@ bool N_ANP_AnalysisManager::outputIntervalSpecified_()
 
 // routines to get/set Dakota run flags and actually run a Dakota iteration
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getDakotaRunFlag
+// Function      : AnalysisManager::getDakotaRunFlag
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek
 // Creation Date :
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisManager::getDakotaRunFlag()
+bool AnalysisManager::getDakotaRunFlag()
 {
   return dakotaRunFlag_;
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setDakotaRunFlag
+// Function      : AnalysisManager::setDakotaRunFlag
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::setDakotaRunFlag( bool flag )
+void AnalysisManager::setDakotaRunFlag( bool flag )
 {
   dakotaRunFlag_ = flag;
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getDakotaIteration
+// Function      : AnalysisManager::getDakotaIteration
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek
 // Creation Date :
 //-----------------------------------------------------------------------------
-int N_ANP_AnalysisManager::getDakotaIteration()
+int AnalysisManager::getDakotaIteration()
 {
   return dakotaIterationNumber_;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::setDakotaIteration
+// Function      : AnalysisManager::setDakotaIteration
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::setDakotaIteration( int iterNumber )
+void AnalysisManager::setDakotaIteration( int iterNumber )
 {
     dakotaIterationNumber_ = iterNumber;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::getTimeIntInfo
+// Function      : AnalysisManager::getTimeIntInfo
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter
 // Creation Date :
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::getTimeIntInfo (N_TIA_TimeIntInfo & tiInfo)
+void AnalysisManager::getTimeIntInfo (N_TIA_TimeIntInfo & tiInfo)
 {
   tiInfo.currentOrder         = getOrder ();
   tiInfo.numberOfSteps        = getNumberOfSteps ();
@@ -3047,28 +2993,30 @@ void N_ANP_AnalysisManager::getTimeIntInfo (N_TIA_TimeIntInfo & tiInfo)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::silenceProgress
+// Function      : AnalysisManager::silenceProgress
 // Purpose       : Shut up "Percent Complete" noises
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo
 // Creation Date : 11 Feb 2009
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::silenceProgress()
+void AnalysisManager::silenceProgress()
 {
   progressFlag_ = false;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisManager::enableProgress
+// Function      : AnalysisManager::enableProgress
 // Purpose       : stop shutting up "Percent Complete" noises
 // Special Notes :
 // Scope         : public
 // Creator       : Tom Russo
 // Creation Date : 11 Feb 2009
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisManager::enableProgress()
+void AnalysisManager::enableProgress()
 {
   progressFlag_ = true;
 }
 
+} // namespace Analysis
+} // namespace Xyce

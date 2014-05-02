@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -42,9 +42,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.40.2.2 $
+// Revision Number: $Revision: 1.50 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:47 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -52,20 +52,11 @@
 #ifndef Xyce_N_NLS_Sensitivity_h
 #define Xyce_N_NLS_Sensitivity_h
 
-// ---------- Standard Includes ----------
 #include<vector>
 
-// ----------   Xyce Includes   ----------
+#include <N_UTL_fwd.h>
 #include <N_NLS_NLParams.h>
 #include <N_NLS_NonLinearSolver.h>
-
-// ---------- Forward Declarations ----------
-
-// topology
-class N_TOP_Topology;
-
-// expression library
-class N_UTL_Expression;
 
 enum sensDiffMode
 {
@@ -91,9 +82,37 @@ public:
 
   ~N_NLS_Sensitivity ();
 
-   int solve (N_NLS_NonLinearSolver * nlsTmpPtr=NULL);
+   int solve (N_NLS_NonLinearSolver * nlsTmpPtr=NULL) {return -1;};
+   int solve (
+       std::vector<double> & objectiveVec,
+       std::vector<double> & dOdpVec, 
+       std::vector<double> & dOdpAdjVec,
+       std::vector<double> & scaled_dOdpVec, 
+       std::vector<double> & scaled_dOdpAdjVec);
+
    int solveDirect  ();
    int solveAdjoint ();
+
+   void stdOutput (
+       std::string idString,
+       std::vector<double> & paramVals,
+       std::vector<double> & sensitivities,
+       std::vector<double> & scaled_sensitivities
+       );
+
+   void fileOutput (
+       std::string idString,
+       std::vector<double> & paramVals,
+       std::vector<double> & sensitivities,
+       std::vector<double> & scaled_sensitivities
+       );
+
+   void dakOutput (
+       std::string idString,
+       std::vector<double> & paramVals,
+       std::vector<double> & sensitivities,
+       std::vector<double> & scaled_sensitivities
+       );
 
    bool calcSensitivities ();
 
@@ -141,10 +160,17 @@ private:
   int solutionSize_;
   bool solveDirectFlag_;
   bool solveAdjointFlag_;
+  bool outputScaledFlag_; // include scaled sensitivities in IO 
+  bool outputUnscaledFlag_; // include unscaled sensitivities in IO
   int maxParamStringSize_;
 
+  bool stdOutputFlag_;
+  bool fileOutputFlag_;
+  bool dakotaFileOutputFlag_;
+  int numSolves_;
+
   // expression related stuff:
-  bool difference;
+  int difference;
   bool objFuncGiven_;
   bool objFuncGIDsetup_;
   int            expNumVars_;
@@ -154,6 +180,7 @@ private:
   std::vector<double> expVarVals_;
   std::vector<double> expVarDerivs_;
   double         expVal_;
+  std::string objFuncString_;
 
   double curValue_;   // current value of the variable.
   double objFuncEval_;// value of the evaluated objective function.
@@ -167,6 +194,11 @@ private:
   N_LAS_Vector* dOdXVectorPtr_; // size of solution std::vector.
   std::vector<double> dOdpVec_; // size = number of sensitivity params.
   std::vector<double> dOdpAdjVec_; // size = number of sensitivity params.
+
+  std::vector<double> scaled_dOdpVec_; // size = number of sensitivity params.
+  std::vector<double> scaled_dOdpAdjVec_; // size = number of sensitivity params.
+
+  std::vector<double> paramOrigVals_; // size = number of sensitivity params.
 
   N_LAS_Vector * lambdaVectorPtr_;
   N_LAS_Vector * savedRHSVectorPtr_;

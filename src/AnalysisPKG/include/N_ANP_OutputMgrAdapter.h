@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -35,9 +35,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.26.2.3 $
+// Revision Number: $Revision: 1.38 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:30 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -50,42 +50,43 @@ using Teuchos::RefCountPtr;
 using Teuchos::rcp;
 #include <Teuchos_SerialDenseMatrix.hpp>
 
-// ----------   Xyce Includes   ----------
 #include <N_UTL_Xyce.h>
-#include <N_UTL_NoCase.h>
+#include <N_ANP_fwd.h>
+#include <N_PDS_fwd.h>
+
 #include <N_IO_OutputMgr.h>
 
-// ---------- Forward Declarations ----------
-class N_ANP_SweepParam;
 class N_LAS_Vector;
-class N_PDS_Comm;
+
+namespace Xyce {
+namespace Analysis {
 
 //-------------------------------------------------------------------------
-// Class         : N_ANP_OutputMgrAdapter
+// Class         : OutputMgrAdapter
 // Purpose       : Inteface class for the output manager
 // Special Notes :
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 01/24/08
 //-------------------------------------------------------------------------
-class N_ANP_OutputMgrAdapter
+class OutputMgrAdapter
 {
 
   public:
-    N_ANP_OutputMgrAdapter( );
+    OutputMgrAdapter( );
 
-    virtual ~N_ANP_OutputMgrAdapter() {}
+    virtual ~OutputMgrAdapter() {}
 
     void registerOutputMgr( N_IO_OutputMgr * outputMgrPtr )
     {
-      outputMgrRCPtr_ = rcp( outputMgrPtr, false );
+      outputManager_ = outputMgrPtr;
     }
 
-    void setStepParamVec( const RefCountPtr< vector<N_ANP_SweepParam> > & paramVec )
+    void setStepParamVec( const RefCountPtr< std::vector<SweepParam> > & paramVec )
     {
       stepParamVecRCPtr_ = paramVec;
     }
 
-    void setDCParamVec( const RefCountPtr< vector<N_ANP_SweepParam> > & paramVec )
+    void setDCParamVec( const RefCountPtr< std::vector<SweepParam> > & paramVec )
     {
       dcParamVecRCPtr_ = paramVec;
     }
@@ -103,14 +104,16 @@ class N_ANP_OutputMgrAdapter
     int getDCAnalysisMaxSteps()
     { return dcAnalysisMaxSteps_; }
 
-#ifdef Xyce_PARALLEL_MPI
-    N_PDS_Comm * getCommPtr () {return outputMgrRCPtr_->getCommPtr();}
-#endif
+    N_PDS_Comm * getCommPtr () {
+      return outputManager_->getCommPtr();
+    }
 
     // this is only used to construct ExpressionData objects so they have a way
     // to connect to the OutputMgr.  Need to refactor this so they can take
-    // an N_ANP_OutputMgrAdapter reference or RCP.
-    N_IO_OutputMgr * getOutputMgrPtr() { return outputMgrRCPtr_.getRawPtr(); }
+    // an OutputMgrAdapter reference or RCP.
+    N_IO_OutputMgr * getOutputMgrPtr() {
+      return outputManager_;
+    }
 
     void setStepAnalysisStepNumber( int num )
     { stepAnalysisStepNumber_ = num; }
@@ -124,118 +127,136 @@ class N_ANP_OutputMgrAdapter
     void setDCAnalysisMaxSteps( int num )
     { dcAnalysisMaxSteps_ = num; }
 
-    void check_output(ANP_Analysis_Mode analysis_mode)
+    void check_output(Xyce::Analysis::Analysis_Mode analysis_mode)
     {
-      outputMgrRCPtr_->prepareOutput(analysis_mode, *stepParamVecRCPtr_, *dcParamVecRCPtr_);
+      outputManager_->prepareOutput(analysis_mode, *stepParamVecRCPtr_, *dcParamVecRCPtr_);
     }
 
     void tranOutput(double time, N_LAS_Vector & currSolutionPtr,
-      N_LAS_Vector & stateVecPtr, N_LAS_Vector & storeVecPtr, bool skipPrintLineOutput=false )
+      N_LAS_Vector & stateVecPtr, N_LAS_Vector & storeVecPtr, 
+      std::vector<double> & objectiveVec_, 
+      std::vector<double> & dOdpVec_, 
+      std::vector<double> & dOdpAdjVec_,
+      std::vector<double> & scaled_dOdpVec_, 
+      std::vector<double> & scaled_dOdpAdjVec_,
+      bool skipPrintLineOutput=false )
     {
-      outputMgrRCPtr_->output(time,
+      outputManager_->output(time,
           stepAnalysisStepNumber_, stepAnalysisMaxSteps_, *stepParamVecRCPtr_,
           dcAnalysisStepNumber_, dcAnalysisMaxSteps_, *dcParamVecRCPtr_,
-          & currSolutionPtr, & stateVecPtr, & storeVecPtr, skipPrintLineOutput);
+          & currSolutionPtr, & stateVecPtr, & storeVecPtr, objectiveVec_,
+          dOdpVec_, dOdpAdjVec_, scaled_dOdpVec_, scaled_dOdpAdjVec_,
+          skipPrintLineOutput);
     }
 
-    void dcOutput( int dcStepNumber, N_LAS_Vector & currSolutionPtr, N_LAS_Vector & stateVecPtr, N_LAS_Vector & storeVecPtr )
+    void dcOutput( 
+        int dcStepNumber, 
+        N_LAS_Vector & currSolutionPtr, N_LAS_Vector & stateVecPtr, N_LAS_Vector & storeVecPtr,
+        std::vector<double> & objectiveVec_, 
+        std::vector<double> & dOdpVec_, 
+        std::vector<double> & dOdpAdjVec_, 
+        std::vector<double> & scaled_dOdpVec_, 
+        std::vector<double> & scaled_dOdpAdjVec_)
     {
-      outputMgrRCPtr_->output(0.0,
+      outputManager_->output(0.0,
           stepAnalysisStepNumber_, stepAnalysisMaxSteps_, *stepParamVecRCPtr_,
           dcStepNumber, dcAnalysisMaxSteps_, *dcParamVecRCPtr_,
-          & currSolutionPtr, & stateVecPtr, & storeVecPtr);
+          & currSolutionPtr, & stateVecPtr, & storeVecPtr, objectiveVec_,
+            dOdpVec_, dOdpAdjVec_, scaled_dOdpVec_, scaled_dOdpAdjVec_);
     }
 
 
     void outputRESULT( N_LAS_Vector & currSolutionPtr, N_LAS_Vector & currStatePtr, N_LAS_Vector & currStorePtr )
     {
-      outputMgrRCPtr_->outputRESULT( & currSolutionPtr, & currStatePtr, & currStorePtr );
+      outputManager_->outputRESULT( & currSolutionPtr, & currStatePtr, & currStorePtr );
     }
 
     void finishOutputSTEP()
     {
-      outputMgrRCPtr_->finishOutputSTEP ();
+      outputManager_->finishOutputSTEP ();
     }
 
     void finishOutput()
     {
-      outputMgrRCPtr_->finishOutput();
+      outputManager_->finishOutput();
     }
 
     bool setupInitialConditions ( N_LAS_Vector & solnVec, N_LAS_Vector & flagVec)
     {
-      return outputMgrRCPtr_->setupInitialConditions( solnVec, flagVec);
+      return outputManager_->setupInitialConditions( solnVec, flagVec);
     }
 
     void outputDCOP( N_LAS_Vector & currSolutionPtr )
     {
-      outputMgrRCPtr_->outputDCOP( currSolutionPtr );
+      outputManager_->outputDCOP( currSolutionPtr );
     }
 
 
     void outputMPDE ( double time, const N_LAS_Vector & solnVecPtr )
     {
-      outputMgrRCPtr_->outputMPDE(time, & solnVecPtr);
+      outputManager_->outputMPDE(time, & solnVecPtr);
     }
 
     void outputHB (
-        const vector< double > & timePoints, const vector< double > & freqPoints,
+        const std::vector< double > & timePoints, const std::vector< double > & freqPoints,
         const N_LAS_BlockVector & timeDomainSolnVec, const N_LAS_BlockVector & freqDomainSolnVecReal,
-        const N_LAS_BlockVector & freqDomainSolnVecImaginary)
+        const N_LAS_BlockVector & freqDomainSolnVecImaginary, const N_LAS_BlockVector & timeDomainStoreVec,
+        const N_LAS_BlockVector & freqDomainStoreVecReal, const N_LAS_BlockVector & freqDomainStoreVecImaginary)
     {
-      outputMgrRCPtr_->outputHB(
+      outputManager_->outputHB(
           stepAnalysisStepNumber_, stepAnalysisMaxSteps_, *stepParamVecRCPtr_,
           timePoints, freqPoints, timeDomainSolnVec, freqDomainSolnVecReal, freqDomainSolnVecImaginary);
     }
 
     void outputAC (double freq, const N_LAS_Vector & solnVecRealPtr, const N_LAS_Vector & solnVecImaginaryPtr)
     {
-      outputMgrRCPtr_->outputAC(freq, & solnVecRealPtr, & solnVecImaginaryPtr);
+      outputManager_->outputAC(freq, & solnVecRealPtr, & solnVecImaginaryPtr);
     }
 
     void outputMORTF ( bool origSys, const double & freq, const Teuchos::SerialDenseMatrix<int, std::complex<double> >& H )
     {
-      outputMgrRCPtr_->outputMORTF( origSys, freq, H );
+      outputManager_->outputMORTF( origSys, freq, H );
     }
 
     void resetOutputMORTF()
     {
-      outputMgrRCPtr_->resetOutput();
+      outputManager_->resetOutput();
     }
 
     void outputROM( const Teuchos::SerialDenseMatrix<int, double>& Ghat, const Teuchos::SerialDenseMatrix<int, double>& Chat,
                     const Teuchos::SerialDenseMatrix<int, double>& Bhat, const Teuchos::SerialDenseMatrix<int, double>& Lhat )
     {
-      outputMgrRCPtr_->outputROM( Ghat, Chat, Bhat, Lhat );
+      outputManager_->outputROM( Ghat, Chat, Bhat, Lhat );
     }
 
     void outputROM( const N_LAS_Matrix& Ghat, const N_LAS_Matrix& Chat,
                     const Teuchos::SerialDenseMatrix<int, double>& Bhat,
                     const Teuchos::SerialDenseMatrix<int, double>& Lhat )
     {
-      outputMgrRCPtr_->outputROM( Ghat, Chat, Bhat, Lhat );
+      outputManager_->outputROM( Ghat, Chat, Bhat, Lhat );
     }
 
-    bool getOutputIntervals(double & initialInterval, vector < pair < double, double > > * intervalPairs)
+    bool getOutputIntervals(double & initialInterval, std::vector<std::pair< double, double > > * intervalPairs)
     {
-      return outputMgrRCPtr_->getOutputIntervals( initialInterval, *intervalPairs );
+      return outputManager_->getOutputIntervals( initialInterval, *intervalPairs );
     }
 
 
-    void outputHomotopy( const vector<string> & paramNames, const vector<double> & paramVals, N_LAS_Vector & solnVecPtr )
+    void outputHomotopy( const std::vector<std::string> & paramNames, const std::vector<double> & paramVals, N_LAS_Vector & solnVecPtr )
     {
-      outputMgrRCPtr_->outputHomotopy ( paramNames, paramVals, & solnVecPtr );
+      outputManager_->outputHomotopy ( paramNames, paramVals, & solnVecPtr );
     }
 
     Xyce::NodeNamePairMap & getAllNodes ( )
     {
-      return outputMgrRCPtr_->getAllNodes ();
+      return outputManager_->getAllNodes ();
     }
 
   private:
-    RefCountPtr< N_IO_OutputMgr > outputMgrRCPtr_;
-    RefCountPtr< vector<N_ANP_SweepParam> > stepParamVecRCPtr_;
-    RefCountPtr< vector<N_ANP_SweepParam> > dcParamVecRCPtr_;
+    N_IO_OutputMgr *            outputManager_;
+    
+    RefCountPtr< std::vector<SweepParam> > stepParamVecRCPtr_;
+    RefCountPtr< std::vector<SweepParam> > dcParamVecRCPtr_;
 
     int stepAnalysisStepNumber_;
     int stepAnalysisMaxSteps_;
@@ -244,5 +265,10 @@ class N_ANP_OutputMgrAdapter
 
 };
 
-#endif
+} // namespace Analysis
+} // namespace Xyce
+
+typedef Xyce::Analysis::OutputMgrAdapter N_ANP_OutputMgrAdapter;
+
+#endif // Xyce_N_ANP_OutputMgrAdapter_h
 

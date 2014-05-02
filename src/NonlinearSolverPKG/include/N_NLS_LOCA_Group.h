@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.21.2.2 $
+// Revision Number: $Revision: 1.26 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:47 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -56,6 +56,7 @@
 #endif
 #include <N_IO_fwd.h>
 #include <N_UTL_fwd.h>
+#include <N_ANP_fwd.h>
 
 // ----------   NOX Includes   ----------
 
@@ -85,7 +86,6 @@ namespace NOX {
 }
 
 class N_LOA_Loader;
-class N_ANP_AnalysisInterface;
 class N_LAS_Matrix;
 
 // N_NLS_LOCA namespace is for all LOCA-related classes in the Xyce
@@ -153,9 +153,9 @@ public:
 
   double getParam(int paramID) const;
 
-  void setParam(string paramID, double value);
+  void setParam(std::string paramID, double value);
 
-  double getParam(string paramID) const;
+  double getParam(std::string paramID) const;
 
   void setScaleVec(const NOX::Abstract::Vector& s);
 
@@ -194,7 +194,7 @@ private:
   // dcop restart data.
   bool outputLinear_;
   int serialNumber_;
-  map<int, double> oldSol_;
+  std::map<int, double> oldSol_;
   Xyce::NodeNamePairMap *op_;
   Xyce::NodeNamePairMap *allNodes_;
 #ifdef Xyce_PARALLEL_MPI

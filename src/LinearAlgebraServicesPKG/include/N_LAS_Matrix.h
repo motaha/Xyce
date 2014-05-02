@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.61.2.2 $
+// Revision Number: $Revision: 1.69 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:44 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -89,7 +89,7 @@ class N_LAS_Matrix
 public:
 
   //Constructors
-  N_LAS_Matrix( N_PDS_ParMap & map, vector<int> & diagArray);
+    N_LAS_Matrix( N_PDS_ParMap & map, std::vector<int> & diagArray);
 
   N_LAS_Matrix( Epetra_CrsGraph * overlapGraph,
                 Epetra_CrsGraph * baseGraph );
@@ -105,7 +105,7 @@ public:
   bool useTranspose ();
 
   //Accumulate off processor fill contributions if necessary
-  void fillComplete();
+  virtual void fillComplete();
 
   // Sparse-matrix vector multiply - multivector version.  If transA is true,
   // multiply by the transpose of matrix, otherwise just use matrix.
@@ -124,7 +124,7 @@ public:
   void filterRowSum(const double & threshold);
 
   // Put function for the sparse-matrix.
-  void put(double s);
+  virtual void put(double s);
 
   // Scale the matrix
   void scale(double scaleFactor);
@@ -190,19 +190,19 @@ public:
   // Sum values into a row into the sparse matrix.
   bool sumIntoLocalRow( int row,
                         int length,
-                        const vector<double> & vals,
-                        const vector<int> & colIndices);
+                        const std::vector<double> & vals,
+                        const std::vector<int> & colIndices);
 #endif
 
   double * operator[]( int row );
-  double * const & operator[]( int row ) const;
+  double * const operator[]( int row ) const;
 
   Epetra_CrsMatrix & epetraObj() { return *aDCRSMatrix_; }
 
   // Output the matrix to a file
   void writeToFile(char * filename, bool useLIDs = false, bool mmFormat=false );
   // Print the underlying Epetra objects
-  virtual void printPetraObject() const;
+  virtual void printPetraObject(std::ostream &os) const;
 
   // Friend in the N_LAS_MultiVector and N_LAS_IterativeSolver classes so their
   // member functions can access our private members.
@@ -242,7 +242,7 @@ private:
 
 #if defined(Xyce_DEBUG_LINEAR) || defined(Xyce_DEBUG_DEVICE)
   // Process library error codes.
-  void processError(string methodMsg, int error) const;
+  void processError(std::string methodMsg, int error) const;
 #endif
 
 };

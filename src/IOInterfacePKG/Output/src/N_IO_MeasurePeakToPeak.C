@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,67 +31,63 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.3.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Number: $Revision: 1.10 $
+// Revision Date  : $Date: 2014/02/24 23:49:20 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
-
-// ----------   Xyce Includes   ----------
 #include <N_IO_MeasurePeakToPeak.h>
 #include <N_ERH_ErrorMgr.h>
 
+namespace Xyce {
+namespace IO {
+namespace Measure {
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasurePeakToPeak::N_IO_MeasurePeakToPeak()
+// Function      : PeakToPeak::PeakToPeak()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-N_IO_MeasurePeakToPeak::N_IO_MeasurePeakToPeak( const N_UTL_OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr ):
-  N_IO_MeasureBase(measureBlock, outputMgr),
+PeakToPeak::PeakToPeak( const Util::OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr ):
+  Base(measureBlock, outputMgr),
   minimumValue_(0.0),
   maximumValue_(0.0),
   initialized_(false)
 {
   // indicate that this measure type is supported and should be processed in simulation
   typeSupported_ = true;
+}
 
-  // this measurement should have only one dependent variable.
+void PeakToPeak::prepareOutputVariables() 
+{
+// this measurement should have only one dependent variable.
   // Error for now if it doesn't
-  numOutVars_ = depSolVarIterVector_.size();
+  numOutVars_ = outputVars_.size();
 
   if ( numOutVars_ > 1 )
   {
-    string msg = "Too many dependent variables for statistical measure, \"" + name_ + "\" Exiting.";
+    std::string msg = "Too many dependent variables for statistical measure, \"" + name_ + "\" Exiting.";
     N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL, msg);
   }
 
-  outVarValues_.resize( numOutVars_ );
-  for( int i=0; i< numOutVars_; i++ )
-  {
-    outVarValues_[i] = 0.0;
-  }
-
+  outVarValues_.resize( numOutVars_, 0.0 );
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasurePeakToPeak::updateTran()
+// Function      : PeakToPeak::updateTran()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-void N_IO_MeasurePeakToPeak::updateTran( const double circuitTime, RCP< N_LAS_Vector > solnVecRCP)
+void PeakToPeak::updateTran( const double circuitTime, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec)
 {
   if( !calculationDone_ && withinTransientWindow( circuitTime ) )
   {
@@ -102,7 +98,7 @@ void N_IO_MeasurePeakToPeak::updateTran( const double circuitTime, RCP< N_LAS_Ve
     // update our outVarValues_ vector
     for( int i=0; i< numOutVars_; i++ )
     {
-      outVarValues_[i] = getOutputValue(depSolVarIterVector_[i], solnVecRCP);
+      outVarValues_[i] = getOutputValue(outputVars_[i], solnVec, stateVec, storeVec, 0);
     }
 
     if( !initialized_  )
@@ -124,31 +120,35 @@ void N_IO_MeasurePeakToPeak::updateTran( const double circuitTime, RCP< N_LAS_Ve
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasurePeakToPeak::updateDC()
+// Function      : PeakToPeak::updateDC()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-void N_IO_MeasurePeakToPeak::updateDC( const vector<N_ANP_SweepParam> & dcParamsVec, RCP< N_LAS_Vector > solnVecRCP)
+void PeakToPeak::updateDC( const std::vector<N_ANP_SweepParam> & dcParamsVec, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec)
 {
 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasurePeakToPeak::getMeasureResult()
+// Function      : PeakToPeak::getMeasureResult()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-double N_IO_MeasurePeakToPeak::getMeasureResult()
+double PeakToPeak::getMeasureResult()
 {
   if( initialized_ )
   {
     calculationResult_ =  maximumValue_ - minimumValue_;
   }
   return calculationResult_;
-};
+}
+
+} // namespace Measure
+} // namespace IO
+} // namespace Xyce

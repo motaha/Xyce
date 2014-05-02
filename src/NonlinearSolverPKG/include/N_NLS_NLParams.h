@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ----------------------
 //
-// Revision Number: $Revision: 1.75.4.2 $
+// Revision Number: $Revision: 1.82 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:47 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author $
 //-------------------------------------------------------------------------
@@ -64,14 +64,10 @@
 #include <limits.h>
 #endif
 
-// ----------   Xyce Includes   ----------
 #include <N_UTL_Xyce.h>
+#include <N_IO_fwd.h>
 #include <N_NLS_Manager.h>
 #include <N_ERH_ErrorMgr.h>
-
-// ---------- Forward Declarations ----------
-
-class N_IO_CmdParse;
 
 // ---------- Enumerated Types ----------
 
@@ -122,11 +118,9 @@ public:
 
   // ***** Accessor functions *****
 
-#ifdef Xyce_VERBOSE_NONLINEAR
   void setPrintParamsFlag();
   void clearPrintParamsFlag();
   bool getPrintParamsFlag() const;
-#endif
 
   bool setOptions(const N_UTL_OptionBlock & OB);
   bool setCmdLineOptions ();
@@ -209,11 +203,8 @@ public:
   inline void     resetGlobalBTChange();
   inline double   getGlobalBTChange() const;
 
-#ifdef Xyce_VERBOSE_NONLINEAR
-  void printParams();
-#endif
+    void printParams(std::ostream &os);
 
-#ifdef Xyce_DEBUG_NONLINEAR
   inline void setDebugLevel(int value);
   inline void resetDebugLevel();
   inline int  getDebugLevel() const;
@@ -241,7 +232,6 @@ public:
   inline void setMMFormat(bool value);
   inline void resetMMFormat();
   inline bool getMMFormat() const;
-#endif
 
 protected:
 private:
@@ -249,15 +239,11 @@ private:
 public:
 
 protected:
-
-#ifdef Xyce_VERBOSE_NONLINEAR
-
   // Print control flag
   bool printParamsFlag_;
-#endif
 
   // command line parser
-  N_IO_CmdParse & commandLine_;
+  N_IO_CmdParse * commandLine_;
 
   // Calling solution method (e.g., DC Operation Point, Transient, etc.)
   AnalysisMode analysisMode_;
@@ -321,7 +307,6 @@ protected:
   double globalBTMin_;
   double globalBTChange_;
 
-#ifdef Xyce_DEBUG_NONLINEAR
   // Debug output options:
   int debugLevel_;
   int debugMinTimeStep_;
@@ -330,13 +315,7 @@ protected:
   double debugMaxTime_;
   bool screenOutputFlag_;
   bool matrixMarketFormat_;
-#endif
-
-private:
-
 };
-
-#ifdef Xyce_VERBOSE_NONLINEAR
 
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_NLParams::setPrintParamsFlag
@@ -380,8 +359,6 @@ inline bool N_NLS_NLParams::getPrintParamsFlag() const
 {
   return printParamsFlag_;
 }
-
-#endif
 
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_NLParams::setNLStrategy
@@ -1217,7 +1194,6 @@ inline double N_NLS_NLParams::getGlobalBTChange() const
   return globalBTChange_;
 }
 
-#ifdef Xyce_DEBUG_NONLINEAR
 //-----------------------------------------------------------------------------
 // Function      : N_NLS_NLParams::setDebugLevel
 // Purpose       :
@@ -1492,6 +1468,4 @@ inline bool N_NLS_NLParams::getMMFormat() const
   return matrixMarketFormat_;
 }
 
-#endif
-
-#endif
+#endif // Xyce_N_NLS_NLParams_h

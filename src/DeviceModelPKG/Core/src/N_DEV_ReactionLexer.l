@@ -24,18 +24,22 @@
 #include <vector>
 #include <N_DEV_Specie.h>
 #include <N_DEV_ReactionNetwork.h>
-class N_DEV_ReactionLexer;
+namespace Xyce {
+namespace Device {
+class ReactionLexer;
+}}
 // now we can include this without errors from bison 2.4
 #include "N_DEV_ReactionParser.hxx"
-// BLEAH!   This is here DUPLICATED from N_DEV_ReactionParser.yxx
+// BLEAH!   This is here DUPLICATED from ReactionParser.yxx
 // because of STUPID choice in Bison 2.3 to put the post-prologue into the
 // .cxx file instead of the .hxx file that Bison 2.1 used to put it in.
 #undef yyFlexLexer
-  /* CAREFUL watch continuations! */
+/* CAREFUL watch continuations! */
+#undef YY_DECL
 #define YY_DECL \
-  int N_DEV_ReactionLexer::getToken(N_DEV::N_DEV_ReactionParser::semantic_type *lvalp, \
-                                       N_DEV::location *llocp, \
-                                       map<string,int> &theSpeciesIDs)
+  int Xyce::Device::ReactionLexer::getToken(XyceDevice::ReactionParser::semantic_type *lvalp, \
+                                            XyceDevice::location *llocp, \
+                                            std::map<std::string, int> &theSpeciesIDs)
 
   // YECH!  Work around very stupid way that multiple parsers/lexers are 
   // handled.
@@ -48,14 +52,14 @@ class N_DEV_ReactionLexer;
 #include <N_DEV_ReactionLexer.h>
   // undo that kludge.  Note that because of this stupidity, if the 
   // "%name-prefix" is changed, this line needs to be changed, too.
-#define yylex N_DEVlex
-//#include <N_DEV_ReactionLexer.h>
+#define yylex XyceDevicelex
+//#include <ReactionLexer.h>
 #include "location.hh"
 #include "position.hh"
 
 %}
 %option noyywrap
-%option yyclass="N_DEV_ReactionLexer"
+%option yyclass="Xyce::Device::ReactionLexer"
 %s speciedef
 %s reactdef
 %s sourcedef
@@ -75,69 +79,69 @@ ID [a-zA-Z][a-zA-Z0-9_]*
 
 [\-]?{DIGIT}+ {
         lvalp->ival=strtol(YYText(),0,10);
-        return N_DEV::N_DEV_ReactionParser::token::RXN_INT;
+        return XyceDevice::ReactionParser::token::RXN_INT;
         }
 
 [\-]?{DIGIT}*"."{DIGIT}* {
         lvalp->dval=strtod(YYText(),0);
-        return N_DEV::N_DEV_ReactionParser::token::RXN_FLOAT;
+        return XyceDevice::ReactionParser::token::RXN_FLOAT;
         }
 
 [\-]?{DIGIT}*"."?{DIGIT}*[eE][\-\+]?{DIGIT}{1,3} {
         lvalp->dval=strtod(YYText(), 0);
-        return N_DEV::N_DEV_ReactionParser::token::RXN_FLOAT;
+        return XyceDevice::ReactionParser::token::RXN_FLOAT;
        }
 
 <INITIAL>species {
   BEGIN(speciedef);
-  return (N_DEV::N_DEV_ReactionParser::token::SPECIES_BEGIN);
+  return (XyceDevice::ReactionParser::token::SPECIES_BEGIN);
   }
 
 <INITIAL>reactions {
   BEGIN(reactdef);
-  return (N_DEV::N_DEV_ReactionParser::token::REACTIONS_BEGIN);
+  return (XyceDevice::ReactionParser::token::REACTIONS_BEGIN);
   }
 
 <INITIAL>sources {
   BEGIN(sourcedef);
-  return (N_DEV::N_DEV_ReactionParser::token::SOURCES_BEGIN);
+  return (XyceDevice::ReactionParser::token::SOURCES_BEGIN);
   }
 
 <INITIAL>initial_conditions {
   BEGIN(ics_def);
-  return (N_DEV::N_DEV_ReactionParser::token::ICS_BEGIN);
+  return (XyceDevice::ReactionParser::token::ICS_BEGIN);
   }
 
 end {
   BEGIN(INITIAL);
-  return (N_DEV::N_DEV_ReactionParser::token::KEY_END);
+  return (XyceDevice::ReactionParser::token::KEY_END);
   }
 
-electron_capture  { return(N_DEV::N_DEV_ReactionParser::token::KEY_ECAPTURE);}
-electron_emission { return(N_DEV::N_DEV_ReactionParser::token::KEY_EEMISSION);}
-hole_capture  { return(N_DEV::N_DEV_ReactionParser::token::KEY_HCAPTURE);}
-hole_emission { return(N_DEV::N_DEV_ReactionParser::token::KEY_HEMISSION);}
-simple   { return(N_DEV::N_DEV_ReactionParser::token::KEY_SIMPLE);}
-complex  { return(N_DEV::N_DEV_ReactionParser::token::KEY_COMPLEX);}
-decomplex  { return(N_DEV::N_DEV_ReactionParser::token::KEY_DECOMPLEX);}
-capture  { return(N_DEV::N_DEV_ReactionParser::token::KEY_CAPTURE);}
-emission { return(N_DEV::N_DEV_ReactionParser::token::KEY_EMISSION);}
-const { return(N_DEV::N_DEV_ReactionParser::token::KEY_CONST);}
+electron_capture  { return(XyceDevice::ReactionParser::token::KEY_ECAPTURE);}
+electron_emission { return(XyceDevice::ReactionParser::token::KEY_EEMISSION);}
+hole_capture  { return(XyceDevice::ReactionParser::token::KEY_HCAPTURE);}
+hole_emission { return(XyceDevice::ReactionParser::token::KEY_HEMISSION);}
+simple   { return(XyceDevice::ReactionParser::token::KEY_SIMPLE);}
+complex  { return(XyceDevice::ReactionParser::token::KEY_COMPLEX);}
+decomplex  { return(XyceDevice::ReactionParser::token::KEY_DECOMPLEX);}
+capture  { return(XyceDevice::ReactionParser::token::KEY_CAPTURE);}
+emission { return(XyceDevice::ReactionParser::token::KEY_EMISSION);}
+const { return(XyceDevice::ReactionParser::token::KEY_CONST);}
 
 <speciedef>{ID}   {
      lvalp->sval=new std::string(YYText());
-    return N_DEV::N_DEV_ReactionParser::token::SPECIE;
+    return XyceDevice::ReactionParser::token::SPECIE;
      }
 
 <reactdef,sourcedef,ics_def>{ID}   {
   lvalp->sval=new std::string(YYText());
      if (theSpeciesIDs.find(YYText()) != theSpeciesIDs.end())
      { 
-       return N_DEV::N_DEV_ReactionParser::token::SPECIE;
+       return XyceDevice::ReactionParser::token::SPECIE;
      }
      else
      {
-       return N_DEV::N_DEV_ReactionParser::token::IDENTIFIER;
+       return XyceDevice::ReactionParser::token::IDENTIFIER;
      }
 }
 
@@ -145,7 +149,7 @@ const { return(N_DEV::N_DEV_ReactionParser::token::KEY_CONST);}
   lvalp->sval=new std::string(YYText()); 
   (lvalp->sval)->erase(0,1);// lop off open brace
   (lvalp->sval)->erase((lvalp->sval)->length()-1); // lop of close brase
-  return N_DEV::N_DEV_ReactionParser::token::XYCE_EXPRESSION;
+  return XyceDevice::ReactionParser::token::XYCE_EXPRESSION;
 }
 
 [+;,()]   {
@@ -154,7 +158,7 @@ const { return(N_DEV::N_DEV_ReactionParser::token::KEY_CONST);}
 
 
 "->" {
-     return(N_DEV::N_DEV_ReactionParser::token::ARROW);
+     return(XyceDevice::ReactionParser::token::ARROW);
     }
  
 

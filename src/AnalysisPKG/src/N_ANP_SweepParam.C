@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,8 +31,8 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.6.4.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:31 $
+// Revision Number: $Revision: 1.14 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
@@ -42,6 +42,7 @@
 // ---------- Standard Includes ----------
 
 #include <N_UTL_Misc.h>
+#include <N_UTL_fwd.h>
 
 #include <iostream>
 
@@ -64,8 +65,11 @@
 
 // ----------- Forward declarations ------------
 
+namespace Xyce {
+namespace Analysis {
+
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_SweepParam::updateCurrentVal
+// Function      : SweepParam::updateCurrentVal
 //
 // Purpose       : Updates the values of the parameters used in a sweep.
 //
@@ -76,7 +80,7 @@
 // Creator       : Eric R. Keiter,SNL, Computational Sciences
 // Creation Date : 10/31/2003
 //-----------------------------------------------------------------------------
-bool N_ANP_SweepParam::updateCurrentVal (int stepNumberArg)
+bool SweepParam::updateCurrentVal (int stepNumberArg)
 {
   outerStepNumber  = stepNumberArg/interval;
   int inum            = outerStepNumber/maxStep;
@@ -117,26 +121,28 @@ bool N_ANP_SweepParam::updateCurrentVal (int stepNumberArg)
   }
   else
   {
-    string msg = "N_ANP_SweepParam::updateCurrentVal: ";
+    std::string msg = "SweepParam::updateCurrentVal: ";
     msg += " Unsupported type specified.\n";
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
   }
-
 #ifdef Xyce_DEBUG_TIME
-  cout << endl;
-  cout << "----------------------" << endl;
-  cout << "updateCurrentVal" << endl;
-  cout << "  name             = " << name << endl;
-  cout << "  stepNumberArg    = " << stepNumberArg<< endl;
-  cout << "  interval         = " << interval  << endl;
-  cout << "  outerStepNumber  = " << outerStepNumber << endl;
-  cout << "  localStepNumber  = " << localStepNumber << endl;
-  cout << "  inum             = " << inum      << endl;
-  cout << "  sweepResetFlag   = " << sweepResetFlag_ << endl;
-  cout << "  currentVal       = " << currentVal << endl;
-  cout << "----------------------" << endl;
+  Xyce::dout() << std::endl
+               << Xyce::subsection_divider << std::endl
+               << "updateCurrentVal" << std::endl
+               << "  name             = " << name << std::endl
+               << "  stepNumberArg    = " << stepNumberArg<< std::endl
+               << "  interval         = " << interval  << std::endl
+               << "  outerStepNumber  = " << outerStepNumber << std::endl
+               << "  localStepNumber  = " << localStepNumber << std::endl
+               << "  inum             = " << inum      << std::endl
+               << "  sweepResetFlag   = " << sweepResetFlag_ << std::endl
+               << "  currentVal       = " << currentVal << std::endl
+               << Xyce::subsection_divider << std::endl;
 #endif
 
   return true;
 }
+
+} // namespace Analysis
+} // namespace Xyce
 

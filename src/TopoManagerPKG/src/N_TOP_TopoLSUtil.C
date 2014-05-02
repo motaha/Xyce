@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,20 +36,18 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.120.2.2 $
+// Revision Number: $Revision: 1.136.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/03/06 04:01:46 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: erkeite $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
 #include <iostream>
-
-// ---------- Xyce Includes     ----------
+#include <numeric>
+#include <assert.h>
 
 #include <N_TOP_TopoLSUtil.h>
 #include <N_TOP_Topology.h>
@@ -75,25 +73,25 @@
 #include <N_UTL_OptionBlock.h>
 
 #include <N_IO_CmdParse.h>
+#include <N_IO_PkgOptionsMgr.h>
 
 #include <N_ERH_ErrorMgr.h>
 
 #include <Epetra_Util.h>
 #include <Teuchos_Utils.hpp>
 
-#include <assert.h>
-
-#include <numeric>
+namespace Xyce {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_TopoLSUtil::N_TOP_TopoLSUtil
+// Function      : TopoLSUtil::TopoLSUtil
 // Purpose       : constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter  SNL, Parallel Computational Sciences
 // Creation Date : 5/25/05
 //-----------------------------------------------------------------------------
-N_TOP_TopoLSUtil::N_TOP_TopoLSUtil(N_TOP_Topology * topo, N_IO_CmdParse & cp)
+TopoLSUtil::TopoLSUtil(Topology * topo, IO::CmdParse & cp)
   : topoPtr_(topo),
     commandLine_ (cp),
     pdsMgrPtr_(0),
@@ -122,118 +120,123 @@ N_TOP_TopoLSUtil::N_TOP_TopoLSUtil(N_TOP_Topology * topo, N_IO_CmdParse & cp)
     numGlobalNZs_(0),
     numLocalNZs_(0),
     checkConnectivity_(true),
-    supernode_(false)
+    supernode_(false),
+#ifdef Xyce_TEST_SOLN_VAR_MAP
+    namesFile_(true)
+#else
+    namesFile_(false)
+#endif
 {
 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_TopoLSUtil::operator<<
+// Function      : TopoLSUtil::operator<<
 // Purpose       : generate utility with reference to topology
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/15/00
 //-----------------------------------------------------------------------------
-ostream & operator<< (ostream & os, const N_TOP_TopoLSUtil & tlsu )
+std::ostream & operator<< (std::ostream & os, const TopoLSUtil & tlsu )
 {
-  os << "Topology LS Utility" << endl;
-  os << "-------------------" << endl;
-  os << "ProcID: " << tlsu.pdsMgrPtr_->getPDSComm()->procID() << endl;
-  os << "Num Global Nodes: " << tlsu.numGlobalNodes_ << endl;
-  os << "Num Local Nodes: " << tlsu.numLocalNodes_ << endl;
-  os << "Num Global Rows: " << tlsu.numGlobalRows_ << endl;
-  os << "Num Local Rows: " << tlsu.numLocalRows_ << endl;
-  os << "Num Extern Rows: " << tlsu.numExternRows_ << endl;
-  os << "Num Global Extern Rows: " << tlsu.numGlobalExternRows_ << endl;
-  os << "Row GID Base: " << tlsu.baseRowGID_ << endl;
+  os << "Topology LS Utility" << std::endl;
+  os << "-------------------" << std::endl;
+  os << "ProcID: " << tlsu.pdsMgrPtr_->getPDSComm()->procID() << std::endl;
+  os << "Num Global Nodes: " << tlsu.numGlobalNodes_ << std::endl;
+  os << "Num Local Nodes: " << tlsu.numLocalNodes_ << std::endl;
+  os << "Num Global Rows: " << tlsu.numGlobalRows_ << std::endl;
+  os << "Num Local Rows: " << tlsu.numLocalRows_ << std::endl;
+  os << "Num Extern Rows: " << tlsu.numExternRows_ << std::endl;
+  os << "Num Global Extern Rows: " << tlsu.numGlobalExternRows_ << std::endl;
+  os << "Row GID Base: " << tlsu.baseRowGID_ << std::endl;
 
-  os << "Num Global State Vars: " << tlsu.numGlobalStateVars_ << endl;
-  os << "Num Local State Vars: " << tlsu.numLocalStateVars_ << endl;
-  os << "Num Extern State Vars: " << tlsu.numExternStateVars_ << endl;
-  os << "Num Global Extern State Vars: " << tlsu.numGlobalExternStateVars_ << endl;
-  os << "State Var GID Base: " << tlsu.baseStateVarGID_ << endl;
+  os << "Num Global State Vars: " << tlsu.numGlobalStateVars_ << std::endl;
+  os << "Num Local State Vars: " << tlsu.numLocalStateVars_ << std::endl;
+  os << "Num Extern State Vars: " << tlsu.numExternStateVars_ << std::endl;
+  os << "Num Global Extern State Vars: " << tlsu.numGlobalExternStateVars_ << std::endl;
+  os << "State Var GID Base: " << tlsu.baseStateVarGID_ << std::endl;
 
-  os << "Num Global Store Vars: " << tlsu.numGlobalStoreVars_ << endl;
-  os << "Num Local Store Vars: " << tlsu.numLocalStoreVars_ << endl;
-  os << "Num Extern Store Vars: " << tlsu.numExternStoreVars_ << endl;
-  os << "Num Global Extern Store Vars: " << tlsu.numGlobalExternStoreVars_ << endl;
-  os << "Store Var GID Base: " << tlsu.baseStoreVarGID_ << endl;
+  os << "Num Global Store Vars: " << tlsu.numGlobalStoreVars_ << std::endl;
+  os << "Num Local Store Vars: " << tlsu.numLocalStoreVars_ << std::endl;
+  os << "Num Extern Store Vars: " << tlsu.numExternStoreVars_ << std::endl;
+  os << "Num Global Extern Store Vars: " << tlsu.numGlobalExternStoreVars_ << std::endl;
+  os << "Store Var GID Base: " << tlsu.baseStoreVarGID_ << std::endl;
 
-  os << "Num Global NZs: " << tlsu.numGlobalNZs_ << endl;
-  os << "Num Local NZs: " << tlsu.numLocalNZs_ << endl;
+  os << "Num Global NZs: " << tlsu.numGlobalNZs_ << std::endl;
+  os << "Num Local NZs: " << tlsu.numLocalNZs_ << std::endl;
 
   os << "Node Array: ";
   for( int i = 0; i < tlsu.numLocalNodes_; ++i )
     os << tlsu.nodeList_GID_[i] << " ";
-  os << endl;
+  os << std::endl;
 
   os << "Extern Node Array: ";
   for( unsigned int i = 0; i < tlsu.nodeList_ExternGID_.size(); ++i )
     os << tlsu.nodeList_ExternGID_[i].first << " " <<
 	tlsu.nodeList_ExternGID_[i].second << "   ";
-  os << endl;
+  os << std::endl;
 
   os << "GID Array: ";
   for( int i = 0; i < tlsu.numLocalRows_; ++i )
     os << tlsu.rowList_GID_[i] << " ";
-  os << endl;
+  os << std::endl;
 
   os << "Extern GID Array: ";
   for( unsigned int i = 0; i < tlsu.rowList_ExternGID_.size(); ++i )
     os << tlsu.rowList_ExternGID_[i].first << " " <<
 	tlsu.rowList_ExternGID_[i].second << "   ";
-  os << endl;
+  os << std::endl;
 
   os << "State GID Array: ";
   for( int i = 0; i < tlsu.numLocalStateVars_; ++i )
     os << tlsu.rowList_StateGID_[i] << " ";
-  os << endl;
+  os << std::endl;
 
   os << "Extern State GID Array: ";
   for( unsigned int i = 0; i < tlsu.rowList_ExternStateGID_.size(); ++i )
     os << tlsu.rowList_ExternStateGID_[i].first << " " <<
 	tlsu.rowList_ExternStateGID_[i].second << "   ";
-  os << endl;
+  os << std::endl;
 
   os << "Store GID Array: ";
   for( int i = 0; i < tlsu.numLocalStoreVars_; ++i )
     os << tlsu.rowList_StoreGID_[i] << " ";
-  os << endl;
+  os << std::endl;
 
   os << "Extern Store GID Array: ";
   for( unsigned int i = 0; i < tlsu.rowList_ExternStoreGID_.size(); ++i )
     os << tlsu.rowList_ExternStoreGID_[i].first << " " <<
 	tlsu.rowList_ExternStoreGID_[i].second << "   ";
-  os << endl;
+  os << std::endl;
 
   os << "NZ Array: ";
   for( int i = 0; i < tlsu.numLocalRows_; ++i )
     os << tlsu.rowList_NumNZs_[i] << " ";
-  os << endl;
+  os << std::endl;
 
-  os << "Col Index Array: " << endl;
+  os << "Col Index Array: " << std::endl;
   for( int i = 0; i < tlsu.numLocalRows_; ++i )
   {
     os << tlsu.rowList_GID_[i] << ": ";
-    for( list<int>::const_iterator it_iL = tlsu.rowList_ColList_[i].begin();
+    for( std::list<int>::const_iterator it_iL = tlsu.rowList_ColList_[i].begin();
 	it_iL != tlsu.rowList_ColList_[i].end(); ++it_iL )
       os << (*it_iL) << " ";
-    os << endl;
+    os << std::endl;
   }
 
   return os;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_TopoLSUtil::setupRowCol
+// Function      : TopoLSUtil::setupRowCol
 // Purpose       : Setup row/col data for linear solver including reorder
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 2/1/01
 //-----------------------------------------------------------------------------
-bool N_TOP_TopoLSUtil::setupRowCol()
+bool TopoLSUtil::setupRowCol()
 {
   topoPtr_->setOrderedNodeList();
 
@@ -242,37 +245,37 @@ bool N_TOP_TopoLSUtil::setupRowCol()
   int procID = comm.procID();
 
 #ifdef Xyce_DEBUG_PIO_TOPO
-  cout << "DEBUGGING NEW TOPOLOGY SETUP FOR PARALLEL IO: " << procID << "\n";
-  cout << "--------------------------------------------\n";
-  cout << "<<<<<<<<<<<<<<<<<NODES>>>>>>>>>>>>>>>>>>>>>> " << procID << "\n";
-  list<N_TOP_CktNode*>::iterator itL = topoPtr_->orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator endL = topoPtr_->orderedNodeListPtr_->end();
-  for( int i = 0 ; itL != endL; ++itL, ++i )
+  Xyce::dout() << "DEBUGGING NEW TOPOLOGY SETUP FOR PARALLEL IO: " << procID << "\n";
+  Xyce::dout() << Xyce::section_divider << std::endl;
+  Xyce::dout() << "<<<<<<<<<<<<<<<<<NODES>>>>>>>>>>>>>>>>>>>>>> " << procID << "\n";
+  std::list<CktNode*>::iterator itL = topoPtr_->orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator std::endl = topoPtr_->orderedNodeListPtr_->end();
+  for( int i = 0 ; itL != std::endl; ++itL, ++i )
   {
-    cout << "Proc: " << procID << "\t" << "Node: " << i << endl;
-    cout << **itL;
+    Xyce::dout() << "Proc: " << procID << "\t" << "Node: " << i << std::endl;
+    Xyce::dout() << **itL;
   }
-  cout << "<<<<<<<<<<<<<<NODES END>>>>>>>>>>>>>>>>>>>>>> " << procID << "\n";
+  Xyce::dout() << "<<<<<<<<<<<<<<NODES END>>>>>>>>>>>>>>>>>>>>>> " << procID << "\n";
 #endif
 
   //construct v-node and d-node directories
   typedef RCP< Xyce::Parallel::IndexNode > IndexNodePtr;
 
-  typedef multimap< string, IndexNodePtr > VNodeContainer;
-  typedef map< string, IndexNodePtr > DNodeContainer;
+  typedef std::multimap< std::string, IndexNodePtr > VNodeContainer;
+  typedef std::map< std::string, IndexNodePtr > DNodeContainer;
 
-  typedef map< string, IndexNodePtr > INodeContainer;
+  typedef std::map< std::string, IndexNodePtr > INodeContainer;
 
-  typedef Xyce::Parallel::Hash<string> StringHash;
-  typedef Xyce::Parallel::Migrate<string,Xyce::Parallel::IndexNode> INMigrate;
+  typedef Xyce::Parallel::Hash<std::string> StringHash;
+  typedef Xyce::Parallel::Migrate<std::string,Xyce::Parallel::IndexNode> INMigrate;
 
-  typedef Xyce::Parallel::Directory< string,
+  typedef Xyce::Parallel::Directory< std::string,
                              Xyce::Parallel::IndexNode,
                              StringHash,
                              VNodeContainer,
                              INMigrate >
           VNodeDir;
-  typedef Xyce::Parallel::Directory< string,
+  typedef Xyce::Parallel::Directory< std::string,
                              Xyce::Parallel::IndexNode,
                              StringHash,
                              DNodeContainer,
@@ -293,23 +296,23 @@ bool N_TOP_TopoLSUtil::setupRowCol()
   INodeContainer DData;
 
   //vectors for retrieval
-  vector<string> VNames;
-  vector<string> DNames;
+  std::vector<std::string> VNames;
+  std::vector<std::string> DNames;
 
   //find all voltage nodes connected to a voltage source in case we
   // need to force these nodes to be on the same processor
-  set<string> Vsrc_Connected_Nodes_;
-  list<N_TOP_CktNode*>::iterator it_cnL = topoPtr_->orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator end_cnL = topoPtr_->orderedNodeListPtr_->end();
+  std::set<std::string> Vsrc_Connected_Nodes_;
+  std::list<CktNode*>::iterator it_cnL = topoPtr_->orderedNodeListPtr_->begin();
+  std::list<CktNode*>::iterator end_cnL = topoPtr_->orderedNodeListPtr_->end();
   for( ; it_cnL != end_cnL; ++it_cnL )
   {
-    vector<NodeID> adj_ids;
+    std::vector<NodeID> adj_ids;
 
-    const string & id = (*it_cnL)->get_id();
-    string::size_type col = id.find_first_of(':');
+    const std::string & id = (*it_cnL)->get_id();
+    std::string::size_type col = id.find_first_of(':');
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-      cout << "Considering nodes for: " << id << endl;
+      Xyce::dout() << "Considering nodes for: " << id << std::endl;
 #endif
     int type = (*it_cnL)->type();
     if  (type == _DNODE)
@@ -321,14 +324,14 @@ bool N_TOP_TopoLSUtil::setupRowCol()
                           || id.substr(col+1,col+6) == "Y%EXT" )
       {
 #ifdef Xyce_DEBUG_TOPOLOGY
-        cout << "Getting adjacent nodes for: " << id << endl;
+        Xyce::dout() << "Getting adjacent nodes for: " << id << std::endl;
 #endif
         topoPtr_->mainGraphPtr_->returnAdjIDs( NodeID(id,type), adj_ids );
         int adjSize = adj_ids.size();
         for( int i = 0; i < adjSize; ++i )
         {
 #ifdef Xyce_DEBUG_TOPOLOGY
-          cout << "adj_ids["<<i<<"] = " << adj_ids[i] << endl;
+          Xyce::dout() << "adj_ids["<<i<<"] = " << adj_ids[i] << std::endl;
 #endif
           if( adj_ids[i].first != "0" )
           {
@@ -340,16 +343,16 @@ bool N_TOP_TopoLSUtil::setupRowCol()
   }
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "Vsrc_Connected_Nodes:"<<endl;
-  set<string>::iterator its = Vsrc_Connected_Nodes_.begin();
-  set<string>::iterator fts = Vsrc_Connected_Nodes_.end();
-  for( ; its != fts; ++its ) cout << *its << endl;
+  Xyce::dout() << "Vsrc_Connected_Nodes:"<<std::endl;
+  std::set<std::string>::iterator its = Vsrc_Connected_Nodes_.begin();
+  std::set<std::string>::iterator fts = Vsrc_Connected_Nodes_.end();
+  for( ; its != fts; ++its ) Xyce::dout() << *its << std::endl;
 #endif
 
   it_cnL = topoPtr_->orderedNodeListPtr_->begin();
   for( ; it_cnL != end_cnL; ++it_cnL )
   {
-    const string & id = (*it_cnL)->get_id();
+    const std::string & id = (*it_cnL)->get_id();
     int type = (*it_cnL)->type();
 
     if( id != "0" )
@@ -361,7 +364,7 @@ bool N_TOP_TopoLSUtil::setupRowCol()
         if( Vsrc_Connected_Nodes_.count(id) ) inode->gid = -98;
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-        if( inode->gid == -98 ) cout << "Node: " << id << endl;
+        if( inode->gid == -98 ) Xyce::dout() << "Node: " << id << std::endl;
 #endif
 
         VData[id] = inode;
@@ -374,7 +377,7 @@ bool N_TOP_TopoLSUtil::setupRowCol()
       }
       else
         N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL,
-          "N_TOP_TopoLSUtil::setupRowCol - Unrecoqnized Node Type: " + id + "\n" );
+          "TopoLSUtil::setupRowCol - Unrecoqnized Node Type: " + id + "\n" );
     }
   }
 
@@ -388,7 +391,7 @@ bool N_TOP_TopoLSUtil::setupRowCol()
   VNodeContainer::iterator iterVN = VNodes.begin();
   VNodeContainer::iterator endVN = VNodes.end();
   VNodeContainer OwnedVNodes;
-  string id("");
+  std::string id("");
   while( iterVN != endVN )
   {
       int proc = -1;
@@ -401,7 +404,7 @@ bool N_TOP_TopoLSUtil::setupRowCol()
       ++iterVN;
       if( (iterVN != endVN) && (id == iterVN->first) )
       {
-        vector<int> intVec;
+        std::vector<int> intVec;
         intVec.push_back(inode->pid);
         while( (iterVN != endVN) && (iterVN->first == id) )
         {
@@ -416,7 +419,7 @@ bool N_TOP_TopoLSUtil::setupRowCol()
         {
           inode->pid = proc;
 #ifdef Xyce_DEBUG_TOPOLOGY
-          cout << "pNode: " << id << " " << proc << endl;
+          Xyce::dout() << "pNode: " << id << " " << proc << std::endl;
 #endif
         }
         else
@@ -478,8 +481,8 @@ bool N_TOP_TopoLSUtil::setupRowCol()
   it_cnL = topoPtr_->orderedNodeListPtr_->begin();
   for( ; it_cnL != end_cnL; ++it_cnL )
   {
-    N_TOP_CktNode & cn = **it_cnL;
-    const string & id = cn.get_id();
+    CktNode & cn = **it_cnL;
+    const std::string & id = cn.get_id();
     int type = cn.type();
 
     if( id != "0" )
@@ -508,15 +511,15 @@ bool N_TOP_TopoLSUtil::setupRowCol()
   {
     if( i == procID )
     {
-      cout << "<<<<<<<<<<<<<REINDEXED NODES>>>>>>>>>>>>>>>>>>>>>> " << procID << "\n";
-      list<N_TOP_CktNode*>::iterator itL2 = topoPtr_->orderedNodeListPtr_->begin();
-      list<N_TOP_CktNode*>::iterator endL2 = topoPtr_->orderedNodeListPtr_->end();
-      for( int i = 0 ; itL2 != endL2; ++itL2, ++i )
+      Xyce::dout() << "<<<<<<<<<<<<<REINDEXED NODES>>>>>>>>>>>>>>>>>>>>>> " << procID << "\n";
+      std::list<CktNode*>::iterator itL2 = topoPtr_->orderedNodeListPtr_->begin();
+      std::list<CktNode*>::iterator std::endl2 = topoPtr_->orderedNodeListPtr_->end();
+      for( int i = 0 ; itL2 != std::endl2; ++itL2, ++i )
       {
-        cout << "Proc: " << procID << "\t" << "Node: " << i << endl;
-        cout << **itL2;
+        Xyce::dout() << "Proc: " << procID << "\t" << "Node: " << i << std::endl;
+        Xyce::dout() << **itL2;
       }
-      cout << "<<<<<<<<REINDEXED NODES END>>>>>>>>>>>>>>>>>>>>>> " << procID << "\n";
+      Xyce::dout() << "<<<<<<<<REINDEXED NODES END>>>>>>>>>>>>>>>>>>>>>> " << procID << "\n";
     }
     comm.barrier();
   }
@@ -537,17 +540,17 @@ bool N_TOP_TopoLSUtil::setupRowCol()
   //Reset of RowCol Data?
 
 #ifdef Xyce_PARALLEL_IO_GHOST
-  typedef RCP<N_TOP_NodeDevBlock> NodeDevBlockPtr;
-  typedef vector<NodeDevBlockPtr> GhostContainer;
+  typedef RCP<NodeDevBlock> NodeDevBlockPtr;
+  typedef std::vector<NodeDevBlockPtr> GhostContainer;
 
-  vector<int> pids;
+  std::vector<int> pids;
   GhostContainer Ghosts;
 
   it_cnL = topoPtr_->orderedNodeListPtr_->begin();
   end_cnL = topoPtr_->orderedNodeListPtr_->end();
   for( ; it_cnL != end_cnL; ++it_cnL )
   {
-    const string & id = (*it_cnL)->get_id();
+    const std::string & id = (*it_cnL)->get_id();
     int type = (*it_cnL)->type();
     bool owned = (*it_cnL)->get_IsOwned();
     int proc = (*it_cnL)->get_ProcNum();
@@ -556,7 +559,7 @@ bool N_TOP_TopoLSUtil::setupRowCol()
     if( type == _VNODE && !owned  )
     {
       //find all connected devices to be ghosted
-      vector<int> adj_gids;
+      std::vector<int> adj_gids;
       topoPtr_->mainGraphPtr_->returnAdjGIDs( gid, adj_gids );
 
       for( int i = 0; i < adj_gids.size(); ++i )
@@ -569,7 +572,7 @@ bool N_TOP_TopoLSUtil::setupRowCol()
     }
   }
 
-  typedef Xyce::Parallel::Migrate<N_TOP_NodeDevBlock> NDBMigrateType;
+  typedef Xyce::Parallel::Migrate<NodeDevBlock> NDBMigrateType;
   NDBMigrateType NDBMigrate( comm );
 
   GhostContainer RecdGhosts;
@@ -589,15 +592,15 @@ bool N_TOP_TopoLSUtil::setupRowCol()
   {
     if( i == procID )
     {
-      cout << "<<<<<<<<<<<<<REINDEXED NODES>>>>>>>>>>>>>>>>>>>>>> " << procID << "\n";
-      list<N_TOP_CktNode*>::iterator itL2 = topoPtr_->orderedNodeListPtr_->begin();
-      list<N_TOP_CktNode*>::iterator endL2 = topoPtr_->orderedNodeListPtr_->end();
-      for( int i = 0 ; itL2 != endL2; ++itL2, ++i )
+      Xyce::dout() << "<<<<<<<<<<<<<REINDEXED NODES>>>>>>>>>>>>>>>>>>>>>> " << procID << "\n";
+      std::list<CktNode*>::iterator itL2 = topoPtr_->orderedNodeListPtr_->begin();
+      std::list<CktNode*>::iterator std::endl2 = topoPtr_->orderedNodeListPtr_->end();
+      for( int i = 0 ; itL2 != std::endl2; ++itL2, ++i )
       {
-        cout << "Proc: " << procID << "\t" << "Node: " << i << endl;
-        cout << **itL2;
+        Xyce::dout() << "Proc: " << procID << "\t" << "Node: " << i << std::endl;
+        Xyce::dout() << **itL2;
       }
-      cout << "<<<<<<<<REINDEXED NODES END>>>>>>>>>>>>>>>>>>>>>> " << procID << "\n";
+      Xyce::dout() << "<<<<<<<<REINDEXED NODES END>>>>>>>>>>>>>>>>>>>>>> " << procID << "\n";
     }
     comm.barrier();
   }
@@ -608,7 +611,7 @@ bool N_TOP_TopoLSUtil::setupRowCol()
   setupSolnAndStateGIDs();
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << *topoPtr_ << endl;
+  Xyce::dout() << *topoPtr_ << std::endl;
 #endif
 
   topoPtr_->registerGIDswithDevs();
@@ -618,14 +621,14 @@ bool N_TOP_TopoLSUtil::setupRowCol()
 #else
 
 #ifdef Xyce_VERBOSE_SETUPTOPO
-  cout << "Generating Row Col Data" << endl;
+  Xyce::dout() << "Generating Row Col Data" << std::endl;
 #endif
   //Get initial row/col data
   //------------------------
   generateRowColData();
 
 #ifdef Xyce_VERBOSE_SETUPTOPO
-  cout << "Generating initial Global Accessors" << endl;
+  Xyce::dout() << "Generating initial Global Accessors" << std::endl;
 #endif
   //Setup temp global accessors
   //---------------------------
@@ -642,28 +645,28 @@ bool N_TOP_TopoLSUtil::setupRowCol()
   storeGlobalAccessorPtr_->generateMigrationPlan();
 
 #ifdef Xyce_VERBOSE_SETUPTOPO
-  cout << "Reordering GIDs" << endl;
+  Xyce::dout() << "Reordering GIDs" << std::endl;
 #endif
   //Reorder GIDs
   //------------
   reorderGIDs();
 
 #ifdef Xyce_VERBOSE_SETUPTOPO
-  cout << "Registering GIDs" << endl;
+  Xyce::dout() << "Registering GIDs" << std::endl;
 #endif
   //Register GIDs with Devices
   //--------------------------
   topoPtr_->registerGIDswithDevs();
 
 #ifdef Xyce_VERBOSE_SETUPTOPO
-  cout << "Generating Row Col Data" << endl;
+  Xyce::dout() << "Generating Row Col Data" << std::endl;
 #endif
   //Get final row/col data
   //------------------------
   generateRowColData();
 
 #ifdef Xyce_VERBOSE_SETUPTOPO
-  cout << "Deleting initial Global Accessors" << endl;
+  Xyce::dout() << "Deleting initial Global Accessors" << std::endl;
 #endif
   //delete temporary global accessors
   //---------------------------------
@@ -701,13 +704,11 @@ bool N_TOP_TopoLSUtil::setupRowCol()
   //nodes owned by that machine.
 
 #ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::startSafeBarrier();
-
   //Need to compute and store the number of nodes in noDCPathGIDVector_ on
   //each processor
 
-  vector<int> nodclength_local(procCnt,0);
-  vector<int> nodclength_sum(procCnt,0);
+  std::vector<int> nodclength_local(procCnt,0);
+  std::vector<int> nodclength_sum(procCnt,0);
   int j;
 
   for (j=0; j < procCnt ; j++)
@@ -717,8 +718,7 @@ bool N_TOP_TopoLSUtil::setupRowCol()
     else
       nodclength_local[j] = noDCPathIDVector_.size();
   }
-  N_ERH_ErrorMgr::safeBarrier(0);
-  N_ERH_ErrorMgr::startSafeBarrier();
+  N_ERH_ErrorMgr::safeBarrier(pdsMgrPtr_->getPDSComm()->comm());
   //  for (j=0; j < procCnt; j++)
   //  comm.sumAll(&nodclength_local[j],&nodclength_sum[j],procCnt);
 
@@ -727,8 +727,8 @@ bool N_TOP_TopoLSUtil::setupRowCol()
   //Broadcast the nodes to proc 0....
   if (procID != 0)
   {
-    vector<string>::iterator nodcit = noDCPathIDVector_.begin();
-    vector<string>::iterator nodcend = noDCPathIDVector_.end();
+    std::vector<std::string>::iterator nodcit = noDCPathIDVector_.begin();
+    std::vector<std::string>::iterator nodcend = noDCPathIDVector_.end();
     int templength;
 
     while (nodcit != nodcend)
@@ -748,20 +748,20 @@ bool N_TOP_TopoLSUtil::setupRowCol()
       for (int i=0; i < nodclength_sum[j]; i++)
       {
         comm.recv(&templength,1,j);
-        string tempstring;
+        std::string tempstring;
         tempstring.resize(templength);
         comm.recv(&tempstring[0],templength,j);
         noDCPathIDVector_.push_back(tempstring);
       }
     }
   }
-  N_ERH_ErrorMgr::safeBarrier(0);
+  N_ERH_ErrorMgr::safeBarrier(pdsMgrPtr_->getPDSComm()->comm());
 
   //Need to compute and store the number of nodes in connToOneTermGIDVector_ on
   //each processor
 
-  vector<int> connoneterm_local(procCnt,0);
-  vector<int> connoneterm_sum(procCnt,0);
+  std::vector<int> connoneterm_local(procCnt,0);
+  std::vector<int> connoneterm_sum(procCnt,0);
 
   for (j=0; j < procCnt ; j++)
     {
@@ -770,8 +770,7 @@ bool N_TOP_TopoLSUtil::setupRowCol()
       else
         connoneterm_local[j] = connToOneTermIDVector_.size();
     }
-  N_ERH_ErrorMgr::safeBarrier(0);
-  N_ERH_ErrorMgr::startSafeBarrier();
+  N_ERH_ErrorMgr::safeBarrier(pdsMgrPtr_->getPDSComm()->comm());
   //for (j=0; j < procCnt; j++)
   //  comm.sumAll(&connoneterm_local[j],&connoneterm_sum[j],procCnt);
 
@@ -780,8 +779,8 @@ bool N_TOP_TopoLSUtil::setupRowCol()
   //Broadcast the nodes to proc 0....
   if (procID != 0)
   {
-    vector<string>::iterator connoneit = connToOneTermIDVector_.begin();
-    vector<string>::iterator connoneend = connToOneTermIDVector_.end();
+    std::vector<std::string>::iterator connoneit = connToOneTermIDVector_.begin();
+    std::vector<std::string>::iterator connoneend = connToOneTermIDVector_.end();
     int templength2;
 
     while (connoneit != connoneend)
@@ -801,14 +800,14 @@ bool N_TOP_TopoLSUtil::setupRowCol()
       for (int i=0; i < connoneterm_sum[j]; i++)
       {
 	comm.recv(&templength2,1,j);
-	string tempstring2;
+	std::string tempstring2;
 	tempstring2.resize(templength2);
 	comm.recv(&tempstring2[0],templength2,j);
 	connToOneTermIDVector_.push_back(tempstring2);
       }
     }
   }
-  N_ERH_ErrorMgr::safeBarrier(0);
+  N_ERH_ErrorMgr::safeBarrier(pdsMgrPtr_->getPDSComm()->comm());
 
 #endif
 
@@ -821,8 +820,8 @@ bool N_TOP_TopoLSUtil::setupRowCol()
   {
 
 #endif
-    bool netlistcopy=commandLine_.getNetlistCopy();
-    string netlistFile("");
+    bool netlistcopy = commandLine_.getHangingResistor().getNetlistCopy();
+    std::string netlistFile("");
     if (commandLine_.getArgumentValue("netlist") != "")
     {
       netlistFile = commandLine_.getArgumentValue("netlist");
@@ -838,7 +837,7 @@ bool N_TOP_TopoLSUtil::setupRowCol()
 
     if (netlistcopy && !connToOneTermIDVector_.empty())
     {
-      string onetermres(commandLine_.getOneTermRes());
+      std::string onetermres(commandLine_.getHangingResistor().getOneTermRes());
       topoPtr_->addResistors(connToOneTermIDVector_,onetermres,netlistFile,
                 oneTermNotNoDCPath);
     }
@@ -847,7 +846,7 @@ bool N_TOP_TopoLSUtil::setupRowCol()
     //append resistors to nodes with no dc path to ground.
     if (netlistcopy && !noDCPathIDVector_.empty())
     {
-     string nodcpathres(commandLine_.getNoDCPathRes());
+     std::string nodcpathres(commandLine_.getHangingResistor().getNoDCPathRes());
      topoPtr_->addResistors(noDCPathIDVector_,nodcpathres,netlistFile,
            !oneTermNotNoDCPath);
 
@@ -871,20 +870,20 @@ bool N_TOP_TopoLSUtil::setupRowCol()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_TopoLSUtil::testVoltageNodeConnectivity
+// Function      : TopoLSUtil::testVoltageNodeConnectivity
 // Purpose       : testing of voltage node connectivity for problems
 // Special Notes : initially, just warn if a voltage node has only 1 connection
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 10/31/03
 //-----------------------------------------------------------------------------
-bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
+bool TopoLSUtil::testVoltageNodeConnectivity_()
 {
-  map<int,string> cName;
+  std::map<int,std::string> cName;
 
-  list<N_TOP_CktNode*>::iterator it_cnL =
+  std::list<CktNode*>::iterator it_cnL =
     topoPtr_->orderedNodeListPtr_->begin();
-  list<N_TOP_CktNode*>::iterator end_cnL =
+  std::list<CktNode*>::iterator end_cnL =
     topoPtr_->orderedNodeListPtr_->end();
 
 #if defined(Xyce_PARALLEL_MPI)
@@ -897,11 +896,11 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
   int i, j, k;
   int max_gid=0;
   int gid, num_gid;
-  list<int> gidList;
-  list<int> svGIDList;
-  list<int> procList;
-  list<NodeID> idList;
-  vector<int> a,b;
+  std::list<int> gidList;
+  std::list<int> svGIDList;
+  std::list<int> procList;
+  std::list<NodeID> idList;
+  std::vector<int> a,b;
 
 #ifdef DEBUG_TOPO_DIAGS
 #if defined(Xyce_PARALLEL_MPI)
@@ -910,18 +909,18 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
   {
     if (i == procID)
     {
-      cout << endl << "In N_TOP_TopoLSUtil::testVoltageNodeConnectivity_:"
-       " Processing data on PE: " << i << endl;
+      Xyce::dout() << std::endl << "In TopoLSUtil::testVoltageNodeConnectivity_:"
+       " Processing data on PE: " << i << std::endl;
 #endif
 
       for( ; it_cnL != end_cnL; ++it_cnL )
       {
-        const string & id = ((*it_cnL)->get_id()).first;
+        const std::string & id = ((*it_cnL)->get_id()).first;
         int type = (*it_cnL)->type();
         int owned = (*it_cnL)->get_IsOwned();
         int proc = (*it_cnL)->get_ProcNum();
         gid = (*it_cnL)->get_gID();
-        cout << id << " : type: " << type << " owned: " << owned
+        Xyce::dout() << id << " : type: " << type << " owned: " << owned
              << " proc: " << proc << " gid: " << gid << " connections:";
         gidList.clear();
         svGIDList.clear();
@@ -930,36 +929,36 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
         topoPtr_->mainGraphPtr_->returnAdjNodes
           (gid, gidList, svGIDList, procList, idList);
         k = 0;
-        list<int>::iterator gl = gidList.begin();
-        list<int>::iterator end_gl = gidList.end();
+        std::list<int>::iterator gl = gidList.begin();
+        std::list<int>::iterator end_gl = gidList.end();
         for ( ;gl != end_gl; ++gl)
         {
           if (k++ >= 20)
           {
-            cout << " [connections terminated because > 20]";
+            Xyce::dout() << " [connections terminated because > 20]";
             break;
           }
-          cout << " " << *gl;
+          Xyce::dout() << " " << *gl;
         }
         if ((*it_cnL)->type() == _DNODE)
         {
-          const list<int> & GIDs = (*it_cnL)->get_ExtSolnVarGIDList();
-          cout << " Ext:";
-          list<int>::const_iterator ext_i=GIDs.begin();
-          list<int>::const_iterator end_i= GIDs.end();
+          const std::list<int> & GIDs = (*it_cnL)->get_ExtSolnVarGIDList();
+          Xyce::dout() << " Ext:";
+          std::list<int>::const_iterator ext_i=GIDs.begin();
+          std::list<int>::const_iterator end_i= GIDs.end();
           for ( ; ext_i!=end_i; ++ext_i)
           {
-            cout << " " << *ext_i;
+            Xyce::dout() << " " << *ext_i;
           }
-          cout << "  Connected leads:";
-          vector<int> lead_conn;
+          Xyce::dout() << "  Connected leads:";
+          std::vector<int> lead_conn;
           (*it_cnL)->leadConnect(lead_conn);
           for (j=0 ; j<(int)lead_conn.size() ; ++j)
           {
-            cout << " " << lead_conn[j];
+            Xyce::dout() << " " << lead_conn[j];
           }
         }
-        cout << endl;
+        Xyce::dout() << std::endl;
       }
 #if defined(Xyce_PARALLEL_MPI)
     }
@@ -969,19 +968,19 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
 
 #endif
 
-  vector<int> candidates;
-  map<int,int> my_vnodes;
-  map<int, vector<int> > gid_map;
-  map<int, vector<int> >::iterator gm_i;
-  map<int, vector<int> >::iterator gm_end;
+  std::vector<int> candidates;
+  std::map<int,int> my_vnodes;
+  std::map<int, std::vector<int> > gid_map;
+  std::map<int, std::vector<int> >::iterator gm_i;
+  std::map<int, std::vector<int> >::iterator gm_end;
 
 #if defined(Xyce_PARALLEL_MPI)
-  vector<int> comm_pe;
-  map< int, set<int> > comm_gid;
-  map< int, set<int> >::iterator cg_i;
-  map< int, set<int> >::iterator cg_end;
-  set<int>::iterator vm_i;
-  set<int>::iterator vm_end;
+  std::vector<int> comm_pe;
+  std::map< int, std::set<int> > comm_gid;
+  std::map< int, std::set<int> >::iterator cg_i;
+  std::map< int, std::set<int> >::iterator cg_end;
+  std::set<int>::iterator vm_i;
+  std::set<int>::iterator vm_end;
 
   it_cnL = topoPtr_->orderedNodeListPtr_->begin();
   for( ; it_cnL != end_cnL; ++it_cnL )
@@ -1002,10 +1001,10 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
   comm.maxAll (&num_proc, &max_num_proc, 1);
 
   int tmpSize = procCnt*max_num_proc;
-  vector<int> pcomm    (tmpSize,0);
-  vector<int> pcomm_all(tmpSize,0);
-  vector<int> ncomm    (tmpSize,0);
-  vector<int> ncomm_all(tmpSize,0);
+  std::vector<int> pcomm    (tmpSize,0);
+  std::vector<int> pcomm_all(tmpSize,0);
+  std::vector<int> ncomm    (tmpSize,0);
+  std::vector<int> ncomm_all(tmpSize,0);
 
   i = 0;
   cg_i   = comm_gid.begin();
@@ -1019,9 +1018,9 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
   comm.sumAll(&pcomm[0], &pcomm_all[0], tmpSize);
   comm.sumAll(&ncomm[0], &ncomm_all[0], tmpSize);
 
-  vector<vector<int> > buf;
-  vector<int> sendBuf;
-  vector<int> src;
+  std::vector<std::vector<int> > buf;
+  std::vector<int> sendBuf;
+  std::vector<int> src;
   int numMsg = 0;
 
   // Allocate receive buffers
@@ -1072,9 +1071,9 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
   }
 
   int n_bufs = comm_gid.size();
-  vector<int> buf_dest(n_bufs), buf_len(n_bufs);
-  vector<int *> buf_in(n_bufs), buf_out(n_bufs);
-  vector< vector<int> > buf_gid(n_bufs);
+  std::vector<int> buf_dest(n_bufs), buf_len(n_bufs);
+  std::vector<int *> buf_in(n_bufs), buf_out(n_bufs);
+  std::vector< std::vector<int> > buf_gid(n_bufs);
 
   int buf_tot = 0;
   cg_i   = comm_gid.begin();
@@ -1084,8 +1083,8 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
     buf_tot += (*cg_i).second.size();
   }
 
-  vector<int> actual_buf_in(buf_tot);
-  vector<int> actual_buf_out(buf_tot);
+  std::vector<int> actual_buf_in(buf_tot);
+  std::vector<int> actual_buf_out(buf_tot);
 
   i = 0;
   m = 0;
@@ -1122,27 +1121,27 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
   {
     if (i == procID)
     {
-      cout << "Connections for PE: " << i << endl;
+      Xyce::dout() << "Connections for PE: " << i << std::endl;
       cg_i=comm_gid.begin();
       cg_end=comm_gid.end();
       for ( ; cg_i!=cg_end ; ++cg_i)
       {
-        cout << "owner: " << (*cg_i).first << " :: ";
+        Xyce::dout() << "owner: " << (*cg_i).first << " :: ";
         k = 0;
         vm_i   = (*cg_i).second.begin();
         vm_end = (*cg_i).second.end();
         for ( ; vm_i !=vm_end; ++vm_i)
         {
-          cout << "  " << *vm_i << "(" << gid_map[*vm_i][0];
+          Xyce::dout() << "  " << *vm_i << "(" << gid_map[*vm_i][0];
           for (j=1 ; j<(int)gid_map[*vm_i].size() ; ++j)
           {
-            cout << "," << gid_map[*vm_i][j];
+            Xyce::dout() << "," << gid_map[*vm_i][j];
           }
-          cout << ")";
+          Xyce::dout() << ")";
           if (++k%20 == 0)
-            cout << endl;
+            Xyce::dout() << std::endl;
         }
-        cout << endl;
+        Xyce::dout() << std::endl;
       }
     }
     comm.barrier();
@@ -1184,7 +1183,7 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
                    buf_len, buf_dest, buf_in, buf_out, 1);
 #endif
 
-  bool oneTerm = commandLine_.getOneTerm();
+  bool oneTerm = commandLine_.getHangingResistor().getOneTerm();
 
   candidates.clear();
   it_cnL = topoPtr_->orderedNodeListPtr_->begin();
@@ -1228,12 +1227,12 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
   }
 
   outputTopoWarnings (candidates, cName,
-  string("connected to only 1 device Terminal"));
+  std::string("connected to only 1 device Terminal"));
 
 
-  map<int, int> gid_pos;
-  map<int, int>::iterator gp_i;
-  map<int, int>::iterator gp_end;
+  std::map<int, int> gid_pos;
+  std::map<int, int>::iterator gp_i;
+  std::map<int, int>::iterator gp_end;
   candidates.clear();
 
   it_cnL = topoPtr_->orderedNodeListPtr_->begin();
@@ -1247,8 +1246,8 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
         gid_pos[gid] = num_nodes++;
     }
   }
-  vector<int> node_val (num_nodes,0);
-  vector<int> ext_gid  (gid_pos.size(),0);
+  std::vector<int> node_val (num_nodes,0);
+  std::vector<int> ext_gid  (gid_pos.size(),0);
 
   gp_i   = gid_pos.begin();
   gp_end = gid_pos.end();
@@ -1269,8 +1268,8 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
     }
     else
     {
-      N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0, string(
-      "N_TOP_TopoLSUtil::testVoltageNodeConnectivity_: External GID not found internally" ) );
+      N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0, std::string(
+      "TopoLSUtil::testVoltageNodeConnectivity_: External GID not found internally" ) );
     }
   }
 #endif
@@ -1278,7 +1277,7 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
   it_cnL = topoPtr_->orderedNodeListPtr_->begin();
   cName.clear();
 #ifdef DEBUG_TOPO_DIAGS
-  cout << endl;
+  Xyce::dout() << std::endl;
 #endif
   for( ; it_cnL != end_cnL; ++it_cnL )
   {
@@ -1291,12 +1290,12 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
       idList.clear();
       topoPtr_->mainGraphPtr_->returnAdjNodes
         (gid, gidList, svGIDList, procList, idList);
-      list<int>::iterator gl = gidList.begin();
-      const list<int> & solnList = (*it_cnL)->get_ExtSolnVarGIDList();
-      vector<int> GIDs;
+      std::list<int>::iterator gl = gidList.begin();
+      const std::list<int> & solnList = (*it_cnL)->get_ExtSolnVarGIDList();
+      std::vector<int> GIDs;
 
-      list<int>::const_iterator sol_i   = solnList.begin();
-      list<int>::const_iterator sol_end = solnList.end();
+      std::list<int>::const_iterator sol_i   = solnList.begin();
+      std::list<int>::const_iterator sol_end = solnList.end();
       for ( ; sol_i!=sol_end; ++sol_i)
       {
         if (*sol_i == -1)
@@ -1308,7 +1307,7 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
           GIDs.push_back(*(gl++));
         }
       }
-      vector<int> lead_conn;
+      std::vector<int> lead_conn;
       (*it_cnL)->leadConnect(lead_conn);
       i = lead_conn.size();
       for (k=0 ; k<(int)lead_conn.size() ; ++k)
@@ -1364,7 +1363,7 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
       if (i != 0)
       {
         N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,
-        string( " Connectivity checker: lead index not found.  This checker is limited to devices with less than ten leads.  If you have gotten this error, and the circuit contains a device with more connections than this, you may need to run Xyce with this diagnostic turned off, via:\n  .options topology CHECK_CONNECTIVITY=0 " ) );
+        std::string( " Connectivity checker: lead index not found.  This checker is limited to devices with less than ten leads.  If you have gotten this error, and the circuit contains a device with more connections than this, you may need to run Xyce with this diagnostic turned off, via:\n  .options topology CHECK_CONNECTIVITY=0 " ) );
       }
     }
   }
@@ -1438,7 +1437,7 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
 #endif
   }
 
-  bool noDCPath = commandLine_.getNoDCPath();
+  bool noDCPath = commandLine_.getHangingResistor().getNoDCPath();
 
   cName.clear();
   candidates.clear();
@@ -1455,7 +1454,7 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
           if (gid >= 0 && node_val[gid_pos[gid]] >= 0)
           {
             candidates.push_back(gid);
-            const string & id = (*it_cnL)->get_id();
+            const std::string & id = (*it_cnL)->get_id();
             cName[gid] = id;
             if (!(*it_cnL)->getConnToOneTermVar() && noDCPath)
                                                 //We let 'connected to one
@@ -1470,7 +1469,7 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
   }
 
   outputTopoWarnings (candidates, cName,
-      string("does not have a DC path to ground"));
+      std::string("does not have a DC path to ground"));
 
   return true;
 
@@ -1521,8 +1520,8 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
   comm.maxAll (&j, &max_gid, 1);
   nc_base -= nc;
 
-  vector<int> candidates_all(nc_all,0);
-  vector<int> candidates_sum(nc_all,0);
+  std::vector<int> candidates_all(nc_all,0);
+  std::vector<int> candidates_sum(nc_all,0);
 
   for (i=0 ; i<nc ; ++i)
     candidates_all[nc_base+i] = candidates[i];
@@ -1554,9 +1553,9 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
   candidates.resize(k);
 #endif
 
-  outputTopoWarnings (candidates, cName, string("CONNECTED to only 1 device Terminal"));
+  outputTopoWarnings (candidates, cName, std::string("CONNECTED to only 1 device Terminal"));
 
-  vector<int> gmin (max_gid+1,0);
+  std::vector<int> gmin (max_gid+1,0);
 
   for (i=0 ; i<=max_gid ; ++i)
   {
@@ -1565,7 +1564,7 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
   it_cnL = topoPtr_->orderedNodeListPtr_->begin();
   cName.clear();
 #ifdef DEBUG_TOPO_DIAGS
-  cout << endl;
+  Xyce::dout() << std::endl;
 #endif
   for( ; it_cnL != end_cnL; ++it_cnL )
   {
@@ -1577,12 +1576,12 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
       procList.clear();
       idList.clear();
       topoPtr_->mainGraphPtr_->returnAdjNodes(gid, gidList, svGIDList, procList, idList);
-      list<int>::iterator gl = gidList.begin();
-      const list<int> & solnList = (*it_cnL)->get_ExtSolnVarGIDList();
-      vector<int> GIDs;
+      std::list<int>::iterator gl = gidList.begin();
+      const std::list<int> & solnList = (*it_cnL)->get_ExtSolnVarGIDList();
+      std::vector<int> GIDs;
 
-      list<int>::const_iterator sol_i=solnList.begin() ;
-      list<int>::const_iterator sol_end=solnList.end();
+      std::list<int>::const_iterator sol_i=solnList.begin() ;
+      std::list<int>::const_iterator sol_end=solnList.end();
       for ( ; sol_i!=sol_end; ++sol_i)
       {
         if (*sol_i == -1)
@@ -1590,7 +1589,7 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
         else
           GIDs.push_back(*(gl++));
       }
-      vector<int> lead_conn;
+      std::vector<int> lead_conn;
       (*it_cnL)->leadConnect(lead_conn);
       i = lead_conn.size();
       for (k=0 ; k<(int)lead_conn.size() ; ++k)
@@ -1621,7 +1620,7 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
                 a.push_back(last);
                 b.push_back(GIDs[k]);
 #ifdef DEBUG_TOPO_DIAGS
-                cout << "Pair: " << a[a.size()-1] << " : " << b[b.size()-1] << endl;
+                Xyce::dout() << "Pair: " << a[a.size()-1] << " : " << b[b.size()-1] << std::endl;
 #endif
               }
               else if (last > GIDs[k])
@@ -1629,7 +1628,7 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
                 a.push_back(GIDs[k]);
                 b.push_back(last);
 #ifdef DEBUG_TOPO_DIAGS
-                cout << "Pair: " << a[a.size()-1] << " : " << b[b.size()-1] << endl;
+                Xyce::dout() << "Pair: " << a[a.size()-1] << " : " << b[b.size()-1] << std::endl;
 #endif
               }
               last = GIDs[k];
@@ -1642,7 +1641,7 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
       if (i != 0)
       {
         N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,
-        string( " Connectivity checker: lead index not found.  This checker is limited to devices with less than ten leads.  If you have gotten this error, and the circuit contains a device with more connections than this, you may need to run Xyce with this diagnostic turned off, via:\n  .options topology CHECK_CONNECTIVITY=0 " ) );
+        std::string( " Connectivity checker: lead index not found.  This checker is limited to devices with less than ten leads.  If you have gotten this error, and the circuit contains a device with more connections than this, you may need to run Xyce with this diagnostic turned off, via:\n  .options topology CHECK_CONNECTIVITY=0 " ) );
       }
     }
     else if ((*it_cnL)->type() == _VNODE)
@@ -1650,7 +1649,7 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
       gid = (*it_cnL)->get_gID();
       if (gid >= 0)
       {
-        const string & id = (*it_cnL)->get_id();
+        const std::string & id = (*it_cnL)->get_id();
         cName[gid] = id;
       }
     }
@@ -1661,8 +1660,8 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
   int diff, diff_g;
   diff_g = 1;
 
-  vector<int> gmin_g (max_gid+1,0);
-  vector<int> gmin_t (max_gid+1,0);
+  std::vector<int> gmin_g (max_gid+1,0);
+  std::vector<int> gmin_t (max_gid+1,0);
 
   while (diff_g > 0)
   {
@@ -1717,39 +1716,39 @@ bool N_TOP_TopoLSUtil::testVoltageNodeConnectivity_()
 #endif
 
   candidates.resize(0);
-  map<int,string>::iterator cn = cName.begin() ;
-  map<int,string>::iterator cn_end = cName.end() ;
+  std::map<int,std::string>::iterator cn = cName.begin() ;
+  std::map<int,std::string>::iterator cn_end = cName.end() ;
   for ( ; cn != cn_end; ++cn)
   {
     if (gmin[cn->first] >= 0)
       candidates.push_back(cn->first);
   }
 
-  outputTopoWarnings (candidates, cName, string("DOES NOT have a DC path to ground"));
+  outputTopoWarnings (candidates, cName, std::string("DOES NOT have a DC path to ground"));
 
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_TopoLSUtil::comm_boundaries
+// Function      : TopoLSUtil::comm_boundaries
 // Purpose       : communicate boundary node data for topological checks
 // Special Notes : mode=1 is sum, mode=2 is min
 // Scope         : private
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 09/09/05
 //-----------------------------------------------------------------------------
-void N_TOP_TopoLSUtil::comm_boundaries (map<int, vector<int> > & gid_map,
-                      vector<int> & actual_buf_in, vector<int> & actual_buf_out,
-                      vector<int> & buf_len, vector<int> & buf_dest,
-                      vector<int *> & buf_in, vector<int *> & buf_out, int mode)
+void TopoLSUtil::comm_boundaries (std::map<int, std::vector<int> > & gid_map,
+                      std::vector<int> & actual_buf_in, std::vector<int> & actual_buf_out,
+                      std::vector<int> & buf_len, std::vector<int> & buf_dest,
+                      std::vector<int *> & buf_in, std::vector<int *> & buf_out, int mode)
 
 {
   N_PDS_Comm & comm = *(pdsMgrPtr_->getPDSComm());
   unsigned int i;
   unsigned int n_bufs = buf_len.size();
-  map< int, map<int, bool> >::iterator cg_i;
-  map<int, vector<int> >::iterator g_i = gid_map.begin() ;
-  map<int, vector<int> >::iterator g_end = gid_map.end();
+  std::map< int, std::map<int, bool> >::iterator cg_i;
+  std::map<int, std::vector<int> >::iterator g_i = gid_map.begin() ;
+  std::map<int, std::vector<int> >::iterator g_end = gid_map.end();
   for ( ; g_i != g_end; ++g_i)
   {
     if ((*g_i).second.size() > 1)
@@ -1792,26 +1791,26 @@ void N_TOP_TopoLSUtil::comm_boundaries (map<int, vector<int> > & gid_map,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_TopoLSUtil::outputTopoWarnings
+// Function      : TopoLSUtil::outputTopoWarnings
 // Purpose       : Output warnings from node connectivity checks
 // Special Notes :
 // Scope         : private
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/21/05
 //-----------------------------------------------------------------------------
-void N_TOP_TopoLSUtil::outputTopoWarnings(vector<int> & candidates,
-                                          map<int,string> & cName,
-                                          string errMsg)
+void TopoLSUtil::outputTopoWarnings(std::vector<int> & candidates,
+                                          std::map<int,std::string> & cName,
+                                          std::string errMsg)
 {
-  set<string> warnings;
+  std::set<std::string> warnings;
 
 #if defined(Xyce_PARALLEL_MPI)
   N_PDS_Comm & comm = *(pdsMgrPtr_->getPDSComm());
   int procCnt = comm.numProc();
   int procID = comm.procID();
 
-  vector<int> candidates_all (procCnt,0);
-  vector<int> candidates_sum (procCnt,0);
+  std::vector<int> candidates_all (procCnt,0);
+  std::vector<int> candidates_sum (procCnt,0);
 
   int bs;
 
@@ -1828,7 +1827,7 @@ void N_TOP_TopoLSUtil::outputTopoWarnings(vector<int> & candidates,
     {
       if (procID == 0)
       {
-        string msg("Voltage Node (" + cName[candidates[i]] + ") " + errMsg);
+        std::string msg("Voltage Node (" + cName[candidates[i]] + ") " + errMsg);
         warnings.insert(msg);
       }
 #if defined(Xyce_PARALLEL_MPI)
@@ -1845,8 +1844,8 @@ void N_TOP_TopoLSUtil::outputTopoWarnings(vector<int> & candidates,
 #if defined(Xyce_PARALLEL_MPI)
   if (procID == 0)
   {
-    string bad;
-    string buf;
+    std::string bad;
+    std::string buf;
 
     for (int i=1 ; i<procCnt ; ++i)
     {
@@ -1856,7 +1855,7 @@ void N_TOP_TopoLSUtil::outputTopoWarnings(vector<int> & candidates,
         buf.resize(bs);
         comm.recv (&buf[0], bs, i);
         bad = buf;
-        string msg("Voltage Node (" + bad + ") " + errMsg);
+        std::string msg("Voltage Node (" + bad + ") " + errMsg);
         warnings.insert(msg);
       }
     }
@@ -1864,7 +1863,7 @@ void N_TOP_TopoLSUtil::outputTopoWarnings(vector<int> & candidates,
 #endif
   if (procID == 0 && !warnings.empty())
   {
-    set<string>::iterator warn = warnings.begin();
+    std::set<std::string>::iterator warn = warnings.begin();
     for ( ; warn != warnings.end() ; ++warn)
     {
       N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_WARNING_0, *warn );
@@ -1873,14 +1872,14 @@ void N_TOP_TopoLSUtil::outputTopoWarnings(vector<int> & candidates,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_TopoLSUtil::setupNodeGIDs
+// Function      : TopoLSUtil::setupNodeGIDs
 // Purpose       : Generate Ordering and Var GIDs.
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 2/22/01
 //-----------------------------------------------------------------------------
-bool N_TOP_TopoLSUtil::setupNodeGIDs()
+bool TopoLSUtil::setupNodeGIDs()
 {
   //get lists of owned and boundary/ghost node GIDs
   topoPtr_->returnNodeGIDVec( nodeList_GID_ );
@@ -1902,41 +1901,41 @@ bool N_TOP_TopoLSUtil::setupNodeGIDs()
   nodeGlobalAccessorPtr_->registerExternGIDVector( nodeList_ExternGID_ );
   nodeGlobalAccessorPtr_->generateMigrationPlan();
 
-  map<int,int> nodeGIDMap;
+  std::map<int,int> nodeGIDMap;
   for( int iSV = 0; iSV < numLocalNodes_; ++iSV )
     nodeGIDMap[ nodeList_GID_[ iSV ] ] = iSV + baseNodeGID_;
 
 /*
-cout << "Before" << endl;
-cout << "---------------------" << endl;
-cout << pdsMgrPtr_->getPDSComm()->procID() << " Int Map ";
-for( map<int,int>::iterator iter = nodeGIDMap.begin();
+Xyce::dout() << "Before" << std::endl;
+Xyce::dout() << "---------------------" << std::endl;
+Xyce::dout() << pdsMgrPtr_->getPDSComm()->procID() << " Int Map ";
+for( std::map<int,int>::iterator iter = nodeGIDMap.begin();
      iter != nodeGIDMap.end(); ++iter )
-  cout << " " << iter->first << " " << iter->second << endl;
-cout << "---------------------" << endl;
+  Xyce::dout() << " " << iter->first << " " << iter->second << std::endl;
+Xyce::dout() << "---------------------" << std::endl;
 */
 
-  map<int,int> externGIDMap;
+  std::map<int,int> externGIDMap;
   nodeGlobalAccessorPtr_->migrateIntArray( nodeGIDMap, externGIDMap );
 
 /*
-cout << "After" << endl;
-cout << "---------------------" << endl;
-cout << pdsMgrPtr_->getPDSComm()->procID() << " Int Map ";
-for( map<int,int>::iterator iter = nodeGIDMap.begin();
+Xyce::dout() << "After" << std::endl;
+Xyce::dout() << "---------------------" << std::endl;
+Xyce::dout() << pdsMgrPtr_->getPDSComm()->procID() << " Int Map ";
+for( std::map<int,int>::iterator iter = nodeGIDMap.begin();
      iter != nodeGIDMap.end(); ++iter )
-  cout << " " << iter->first << " " << iter->second << endl;
-cout << pdsMgrPtr_->getPDSComm()->procID() << " Ext Map ";
-for( map<int,int>::iterator iter = externGIDMap.begin();
+  Xyce::dout() << " " << iter->first << " " << iter->second << std::endl;
+Xyce::dout() << pdsMgrPtr_->getPDSComm()->procID() << " Ext Map ";
+for( std::map<int,int>::iterator iter = externGIDMap.begin();
      iter != externGIDMap.end(); ++iter )
-  cout << " " << iter->first << " " << iter->second << endl;
-cout << "---------------------" << endl;
+  Xyce::dout() << " " << iter->first << " " << iter->second << std::endl;
+Xyce::dout() << "---------------------" << std::endl;
 */
 
-//cout << "Before Node GIDs" << endl << *topoPtr_;
+//Xyce::dout() << "Before Node GIDs" << std::endl << *topoPtr_;
 
   //loop over nodes and reset all GIDs to new lex. ordering
-  list<N_TOP_CktNode*>::iterator it_cnL, end_cnL;
+  std::list<CktNode*>::iterator it_cnL, end_cnL;
   it_cnL = topoPtr_->orderedNodeListPtr_->begin();
   end_cnL = topoPtr_->orderedNodeListPtr_->end();
   for( ; it_cnL != end_cnL; ++it_cnL )
@@ -1946,7 +1945,7 @@ cout << "---------------------" << endl;
       (*it_cnL)->set_gID( nodeGIDMap[ (*it_cnL)->get_gID() ] );
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-cout << "Node: " << (*it_cnL)->get_id() << " " << (*it_cnL)->get_gID() << endl;
+Xyce::dout() << "Node: " << (*it_cnL)->get_id() << " " << (*it_cnL)->get_gID() << std::endl;
 #endif
 
     }
@@ -1961,7 +1960,7 @@ cout << "Node: " << (*it_cnL)->get_id() << " " << (*it_cnL)->get_gID() << endl;
     }
   }
 
-//cout << "Finished Node GIDs" << endl << *topoPtr_;
+//Xyce::dout() << "Finished Node GIDs" << std::endl << *topoPtr_;
 
   //Reset global accessor for new lex. indexing
   topoPtr_->returnNodeGIDVec( nodeList_GID_ );
@@ -1986,20 +1985,20 @@ cout << "Node: " << (*it_cnL)->get_id() << " " << (*it_cnL)->get_gID() << endl;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_TopoLSUtil::setupSolnAndStateGIDs
+// Function      : TopoLSUtil::setupSolnAndStateGIDs
 // Purpose       : Generate Ordering and Var GIDs.
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 3/2/01
 //-----------------------------------------------------------------------------
-bool N_TOP_TopoLSUtil::setupSolnAndStateGIDs()
+bool TopoLSUtil::setupSolnAndStateGIDs()
 {
   //get soln and state var counts from all owned v-nodes and d-nodes
-  vector<int> rowCountVec(numLocalNodes_);
-  vector<int> stateCountVec(numLocalNodes_);
-  vector<int> storeCountVec(numLocalNodes_);
-  list<N_TOP_CktNode*>::iterator it_cnL, end_cnL;
+  std::vector<int> rowCountVec(numLocalNodes_);
+  std::vector<int> stateCountVec(numLocalNodes_);
+  std::vector<int> storeCountVec(numLocalNodes_);
+  std::list<CktNode*>::iterator it_cnL, end_cnL;
   it_cnL = topoPtr_->orderedNodeListPtr_->begin();
   end_cnL = topoPtr_->orderedNodeListPtr_->end();
   int Loc = 0;
@@ -2041,12 +2040,12 @@ bool N_TOP_TopoLSUtil::setupSolnAndStateGIDs()
   numGlobalStoreVars_ = static_cast<int>(tmpVar2);
 
   //Use Global Accessors to get GIDs for boundary/ghost nodes
-  map< int,vector<int> > rowGIDMap, stateGIDMap;
-  map< int,vector<int> > externRowGIDMap, externStateGIDMap;
-  map< int,vector<int> > storeGIDMap;
-  map< int,vector<int> > externStoreGIDMap;
+  std::map< int,std::vector<int> > rowGIDMap, stateGIDMap;
+  std::map< int,std::vector<int> > externRowGIDMap, externStateGIDMap;
+  std::map< int,std::vector<int> > storeGIDMap;
+  std::map< int,std::vector<int> > externStoreGIDMap;
 
-  vector<int> tmpVec;
+  std::vector<int> tmpVec;
   int currRowLoc = baseRowGID_;
   int currStateLoc = baseStateVarGID_;
   int currStoreLoc = baseStoreVarGID_;
@@ -2073,8 +2072,8 @@ bool N_TOP_TopoLSUtil::setupSolnAndStateGIDs()
   nodeGlobalAccessorPtr_->migrateIntVecs( storeGIDMap, externStoreGIDMap );
 
   //calculate number of boundary/ghost soln and state vars
-  map< int,vector<int> >::iterator iterIVM = externRowGIDMap.begin();
-  map< int,vector<int> >::iterator endIVM = externRowGIDMap.end();
+  std::map< int,std::vector<int> >::iterator iterIVM = externRowGIDMap.begin();
+  std::map< int,std::vector<int> >::iterator endIVM = externRowGIDMap.end();
   numExternRows_ = 0;
   for( ; iterIVM != endIVM; ++iterIVM )
     numExternRows_ += iterIVM->second.size();
@@ -2118,7 +2117,7 @@ bool N_TOP_TopoLSUtil::setupSolnAndStateGIDs()
       (*it_cnL)->set_StoreVarGIDVec( externStoreGIDMap[ (*it_cnL)->get_gID() ] );
     }
     else if( (*it_cnL)->get_gID() == -1 )
-      (*it_cnL)->set_SolnVarGIDVec( vector<int>(1,-1) );
+      (*it_cnL)->set_SolnVarGIDVec( std::vector<int>(1,-1) );
     else
     {
        std::string err = "P" +  Teuchos::Utils::toString(pdsMgrPtr_->getPDSComm()->procID())
@@ -2133,20 +2132,20 @@ bool N_TOP_TopoLSUtil::setupSolnAndStateGIDs()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_TopoLSUtil::generateRowColData
+// Function      : TopoLSUtil::generateRowColData
 // Purpose       : Generate row/col data for linear solver.
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/26/00
 //-----------------------------------------------------------------------------
-void N_TOP_TopoLSUtil::generateRowColData()
+void TopoLSUtil::generateRowColData()
 {
   int procID = pdsMgrPtr_->getPDSComm()->procID();
 
   double tmpVar1, tmpVar2;
 
-  list<index_pair> tmpIPList;
+  std::list<index_pair> tmpIPList;
 
   //--- extract ordered list of GIDs from node list
   topoPtr_->returnSVarGIDVec( rowList_GID_ );
@@ -2155,9 +2154,9 @@ void N_TOP_TopoLSUtil::generateRowColData()
   topoPtr_->returnVarTypeVec( rowList_VarType_ );
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "------------------------------" << endl;
-  cout << "Ordered List of GIDs extracted" << endl;
-  cout << "------------------------------" << endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
+  Xyce::dout() << "Ordered List of GIDs extracted" << std::endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
 #endif
 
   //--- extract ordered list of extern GIDs from node list
@@ -2166,9 +2165,9 @@ void N_TOP_TopoLSUtil::generateRowColData()
   //--- add in dep soln var stuff
   if( !topoPtr_->depSolnGIDMap_.empty() )
   {
-    map<int,int> tmpMap;
-    map<int,int>::iterator iterIIM = topoPtr_->depSolnGIDMap_.begin();
-    map<int,int>::iterator endIIM = topoPtr_->depSolnGIDMap_.end();
+    std::map<int,int> tmpMap;
+    std::map<int,int>::iterator iterIIM = topoPtr_->depSolnGIDMap_.begin();
+    std::map<int,int>::iterator endIIM = topoPtr_->depSolnGIDMap_.end();
     for( ; iterIIM != endIIM; ++iterIIM )
       if( iterIIM->second != procID ) tmpMap.insert( *iterIIM );
 
@@ -2179,29 +2178,22 @@ void N_TOP_TopoLSUtil::generateRowColData()
     rowList_ExternGID_.resize( tmpMap.size() );
     iterIIM = tmpMap.begin();
     for( unsigned int i = 0; i < tmpMap.size(); ++iterIIM, ++i )
-#ifdef BAD_STL
-	{
-		pair<int, int> tmpPair( (*iterIIM).first, (*iterIIM).second );
-		rowList_ExternGID_[i] = tmpPair;
-	}
-#else
       rowList_ExternGID_[i] = *iterIIM;
-#endif
   }
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "------------------------------" << endl;
-  cout << "Ordered List of Extern GIDs extracted" << endl;
-  cout << "------------------------------" << endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
+  Xyce::dout() << "Ordered List of Extern GIDs extracted" << std::endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
 #endif
 
   //--- extract ordered list of State Var GIDs from node list
   topoPtr_->returnStateVarGIDVec( rowList_StateGID_ );
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "------------------------------" << endl;
-  cout << "Ordered List of State GIDs extracted" << endl;
-  cout << "------------------------------" << endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
+  Xyce::dout() << "Ordered List of State GIDs extracted" << std::endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
 #endif
 
   //--- extract ordered list of extern state GIDs from node list
@@ -2210,9 +2202,9 @@ void N_TOP_TopoLSUtil::generateRowColData()
   //--- add in dep state var stuff
   if( !topoPtr_->depStateGIDMap_.empty() )
   {
-    map<int,int> tmpMap;
-    map<int,int>::iterator iterIIM = topoPtr_->depStateGIDMap_.begin();
-    map<int,int>::iterator endIIM = topoPtr_->depStateGIDMap_.end();
+    std::map<int,int> tmpMap;
+    std::map<int,int>::iterator iterIIM = topoPtr_->depStateGIDMap_.begin();
+    std::map<int,int>::iterator endIIM = topoPtr_->depStateGIDMap_.end();
     for( ; iterIIM != endIIM; ++iterIIM )
       if( iterIIM->second != procID ) tmpMap.insert( *iterIIM );
 
@@ -2224,20 +2216,13 @@ void N_TOP_TopoLSUtil::generateRowColData()
     iterIIM = tmpMap.begin();
     endIIM = tmpMap.end();
     for( int i = 0; iterIIM != endIIM; ++iterIIM, ++i )
-#ifdef BAD_STL
-	{
-		pair<int, int> tmpPair( (*iterIIM).first, (*iterIIM).second );
-		rowList_ExternStateGID_[i] = tmpPair;
-	}
-#else
       rowList_ExternStateGID_[i] = *iterIIM;
-#endif
   }
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "------------------------------" << endl;
-  cout << "Ordered List of Extern State GIDs extracted" << endl;
-  cout << "------------------------------" << endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
+  Xyce::dout() << "Ordered List of Extern State GIDs extracted" << std::endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
 #endif
 
 
@@ -2245,9 +2230,9 @@ void N_TOP_TopoLSUtil::generateRowColData()
   topoPtr_->returnStoreVarGIDVec( rowList_StoreGID_ );
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "------------------------------" << endl;
-  cout << "Ordered List of Store GIDs extracted" << endl;
-  cout << "------------------------------" << endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
+  Xyce::dout() << "Ordered List of Store GIDs extracted" << std::endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
 #endif
 
   //--- extract ordered list of extern store GIDs from node list
@@ -2256,9 +2241,9 @@ void N_TOP_TopoLSUtil::generateRowColData()
   //--- add in dep store var stuff
   if( !topoPtr_->depStoreGIDMap_.empty() )
   {
-    map<int,int> tmpMap;
-    map<int,int>::iterator iterIIM = topoPtr_->depStoreGIDMap_.begin();
-    map<int,int>::iterator endIIM = topoPtr_->depStoreGIDMap_.end();
+    std::map<int,int> tmpMap;
+    std::map<int,int>::iterator iterIIM = topoPtr_->depStoreGIDMap_.begin();
+    std::map<int,int>::iterator endIIM = topoPtr_->depStoreGIDMap_.end();
     for( ; iterIIM != endIIM; ++iterIIM )
       if( iterIIM->second != procID ) tmpMap.insert( *iterIIM );
 
@@ -2270,20 +2255,13 @@ void N_TOP_TopoLSUtil::generateRowColData()
     iterIIM = tmpMap.begin();
     endIIM = tmpMap.end();
     for( int i = 0; iterIIM != endIIM; ++iterIIM, ++i )
-#ifdef BAD_STL
-	{
-		pair<int, int> tmpPair( (*iterIIM).first, (*iterIIM).second );
-		rowList_ExternStoreGID_[i] = tmpPair;
-	}
-#else
       rowList_ExternStoreGID_[i] = *iterIIM;
-#endif
   }
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "------------------------------" << endl;
-  cout << "Ordered List of Extern Store GIDs extracted" << endl;
-  cout << "------------------------------" << endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
+  Xyce::dout() << "Ordered List of Extern Store GIDs extracted" << std::endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
 #endif
 
 
@@ -2322,8 +2300,8 @@ void N_TOP_TopoLSUtil::generateRowColData()
   //--- block extern gids by processor to support aztec requirements
   if( numExternRows_ )
   {
-    vector<int> externGIDs( numExternRows_ );
-    vector<int> PIDs( numExternRows_ );
+    std::vector<int> externGIDs( numExternRows_ );
+    std::vector<int> PIDs( numExternRows_ );
     for( int i = 0; i < numExternRows_; ++i )
     {
       externGIDs[i] = rowList_ExternGID_[i].first;
@@ -2337,14 +2315,14 @@ void N_TOP_TopoLSUtil::generateRowColData()
     delete [] listPtr;
 
     for( int i = 0; i < numExternRows_; ++i )
-      rowList_ExternGID_[i] = pair<int,int>( externGIDs[i], PIDs[i] );
+      rowList_ExternGID_[i] = std::pair<int,int>( externGIDs[i], PIDs[i] );
   }
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "TopoUtil Vals: " << endl;
-  cout << numGlobalRows_ << " " << numLocalRows_ << endl;
-  cout << numGlobalStateVars_ << " " << numLocalStateVars_ << endl;
-  cout << numGlobalStoreVars_ << " " << numLocalStoreVars_ << endl;
+  Xyce::dout() << "TopoUtil Vals: " << std::endl;
+  Xyce::dout() << numGlobalRows_ << " " << numLocalRows_ << std::endl;
+  Xyce::dout() << numGlobalStateVars_ << " " << numLocalStateVars_ << std::endl;
+  Xyce::dout() << numGlobalStoreVars_ << " " << numLocalStoreVars_ << std::endl;
 #endif
 
   int numRows = numLocalRows_ + numExternRows_ + 1;
@@ -2366,7 +2344,7 @@ void N_TOP_TopoLSUtil::generateRowColData()
   if( commandLine_.getArgumentValue( "-dma" ) == "off" )
   {
     //    to compile a list of col indices for each row
-    list<N_TOP_CktNode*>::iterator it_cnL, end_cnL;
+    std::list<CktNode*>::iterator it_cnL, end_cnL;
     it_cnL = topoPtr_->orderedNodeListPtr_->begin();
     end_cnL = topoPtr_->orderedNodeListPtr_->end();
     for( ; it_cnL != end_cnL; ++it_cnL )
@@ -2377,8 +2355,8 @@ void N_TOP_TopoLSUtil::generateRowColData()
 
         if( tmpIPList.size() > 0 )
         {
-          list<index_pair>::iterator it_ipL = tmpIPList.begin();
-          list<index_pair>::iterator it_ipL_end = tmpIPList.end();
+          std::list<index_pair>::iterator it_ipL = tmpIPList.begin();
+          std::list<index_pair>::iterator it_ipL_end = tmpIPList.end();
           for( ; it_ipL != it_ipL_end; ++it_ipL )
           {
             rowList_ColList_[ GtoL_Map_[it_ipL->row] ].push_back
@@ -2390,45 +2368,22 @@ void N_TOP_TopoLSUtil::generateRowColData()
   else
   {
     //    to compile a list of col indices for each row
-    list<N_TOP_CktNode*>::iterator it_cnL = topoPtr_->orderedNodeListPtr_->begin();
-    list<N_TOP_CktNode*>::iterator end_cnL = topoPtr_->orderedNodeListPtr_->end();
+    std::list<CktNode*>::iterator it_cnL = topoPtr_->orderedNodeListPtr_->begin();
+    std::list<CktNode*>::iterator end_cnL = topoPtr_->orderedNodeListPtr_->end();
     for( ; it_cnL != end_cnL; ++it_cnL )
     {
       if( (*it_cnL)->type() == _DNODE )
       {
-        const vector< vector<int> > & stamp = (*it_cnL)->jacobianStamp();
-        const list<int> & intGIDs = (*it_cnL)->get_SolnVarGIDList();
-        const list<int> & extGIDs = (*it_cnL)->get_ExtSolnVarGIDList();
-        const vector<int> & depGIDs = (*it_cnL)->get_DepSolnGIDJacVec();
-        vector<int> gids( intGIDs.size() + extGIDs.size() + depGIDs.size() );
+        const std::vector< std::vector<int> > & stamp = (*it_cnL)->jacobianStamp();
+        const std::list<int> & intGIDs = (*it_cnL)->get_SolnVarGIDList();
+        const std::list<int> & extGIDs = (*it_cnL)->get_ExtSolnVarGIDList();
+        const std::vector<int> & depGIDs = (*it_cnL)->get_DepSolnGIDJacVec();
+        std::vector<int> gids( intGIDs.size() + extGIDs.size() + depGIDs.size() );
         copy( extGIDs.begin(), extGIDs.end(), gids.begin() );
         copy( intGIDs.begin(), intGIDs.end(), gids.begin() + extGIDs.size() );
         copy( depGIDs.begin(), depGIDs.end(), gids.begin() + extGIDs.size() + intGIDs.size() );
 
         assert( ( extGIDs.size() + intGIDs.size() ) == stamp.size() );
-
-#ifdef Xyce_DEBUG_DIRECT_ACCESS_MATRIX
-        cout << "----------------------\n";
-        cout << (*it_cnL)->get_id() << endl;
-        list<int>::const_iterator it_tmp = extGIDs.begin();
-        list<int>::const_iterator end_tmp = extGIDs.end();
-        for( ; it_tmp != end_tmp; ++it_tmp ) cout << " " << *it_tmp;
-        cout << endl;
-        it_tmp = intGIDs.begin();
-        end_tmp = intGIDs.end();
-        for( ; it_tmp != end_tmp; ++it_tmp ) cout << " " << *it_tmp;
-        cout << endl;
-        for( int i = 0; i < depGIDs.size(); ++i ) cout << " " << depGIDs[i];
-        cout << endl;
-        cout << "----------------------\n";
-        for( int i = 0; i < stamp.size(); ++i )
-        {
-          cout << i << " " << gids[i] << " " << GtoL_Map_[gids[i]] << ": ";
-          for( int j = 0; j < stamp[i].size(); ++j ) cout << stamp[i][j] << " " << gids[stamp[i][j]] << "  ";
-          cout << endl;
-        }
-        cout << "----------------------\n";
-#endif
 
         for( unsigned int i = 0; i < stamp.size(); ++i )
         {
@@ -2442,28 +2397,13 @@ void N_TOP_TopoLSUtil::generateRowColData()
       }
     }
 
-#ifdef Xyce_DEBUG_DIRECT_ACCESS_MATRIX
-    cout << "----------------------\n";
-    cout << "rowList_ColList_:\n";
-    list<int>::const_iterator it_tmp;
-    list<int>::const_iterator it_tmp_end;
-    for( unsigned int i = 0; i < rowList_ColList_.size(); ++i )
-    {
-      it_tmp = rowList_ColList_[i].begin();
-      it_tmp_end = rowList_ColList_[i].end();
-      for( ; it_tmp != it_tmp_end; ++it_tmp ) cout << " " << *it_tmp;
-      cout << endl;
-    }
-    cout << "----------------------\n";
-#endif
-
   }
 
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "------------------------------" << endl;
-  cout << "Row List of NZ Cols extracted" << endl;
-  cout << "------------------------------" << endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
+  Xyce::dout() << "Row List of NZ Cols extracted" << std::endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
 #endif
 
   numLocalNZs_ = 0;
@@ -2490,26 +2430,26 @@ void N_TOP_TopoLSUtil::generateRowColData()
   }
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "------------------------------" << endl;
-  cout << "Row List of NZ Cols cleaned up" << endl;
-  cout << "------------------------------" << endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
+  Xyce::dout() << "Row List of NZ Cols cleaned up" << std::endl;
+  Xyce::dout() << Xyce::section_divider << std::endl;
 #endif
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << *this;
+  Xyce::dout() << *this;
 #endif
 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_TopoLSUtil::setupGlobalAccessors
+// Function      : TopoLSUtil::setupGlobalAccessors
 // Purpose       : Register External GIDs and generate Migration Plans.
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/18/00
 //-----------------------------------------------------------------------------
-bool N_TOP_TopoLSUtil::setupGlobalAccessors()
+bool TopoLSUtil::setupGlobalAccessors()
 {
   solnGlobalAccessorPtr_ = pdsMgrPtr_->createGlobalAccessor( "SOLUTION" );
   stateGlobalAccessorPtr_ = pdsMgrPtr_->createGlobalAccessor( "STATE" );
@@ -2527,17 +2467,17 @@ bool N_TOP_TopoLSUtil::setupGlobalAccessors()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_TopoLSUtil::reorderGIDs
+// Function      : TopoLSUtil::reorderGIDs
 // Purpose       : Reorder GIDs using based on orderedNodeList.
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/18/00
 //-----------------------------------------------------------------------------
-void N_TOP_TopoLSUtil::reorderGIDs()
+void TopoLSUtil::reorderGIDs()
 {
-  map<int,int> GIDMap, stateGIDMap;
-  map<int,int> storeGIDMap;
+  std::map<int,int> GIDMap, stateGIDMap;
+  std::map<int,int> storeGIDMap;
 
   for( int iSV = 0; iSV < numLocalRows_; ++iSV )
   {
@@ -2553,64 +2493,64 @@ void N_TOP_TopoLSUtil::reorderGIDs()
     storeGIDMap[ rowList_StoreGID_[ iStV ] ] = iStV + baseStoreVarGID_;
   }
 
-  map<int,int> externGIDMap, externStateGIDMap;
+  std::map<int,int> externGIDMap, externStateGIDMap;
   solnGlobalAccessorPtr_->migrateIntArray( GIDMap, externGIDMap );
   stateGlobalAccessorPtr_->migrateIntArray( stateGIDMap, externStateGIDMap );
 
-  map<int,int> externStoreGIDMap;
+  std::map<int,int> externStoreGIDMap;
   storeGlobalAccessorPtr_->migrateIntArray( storeGIDMap, externStoreGIDMap );
 
-  map<int,int>::iterator it_iiM;
-  map<int,int>::iterator it_iiM_end;
+  std::map<int,int>::iterator it_iiM;
+  std::map<int,int>::iterator it_iiM_end;
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "GIDMap" << endl;
+  Xyce::dout() << "GIDMap" << std::endl;
   it_iiM = GIDMap.begin();
   it_iiM_end = GIDMap.end();
   for( ; it_iiM != it_iiM_end; ++it_iiM )
-    cout << it_iiM->first << " " << it_iiM->second << endl;
-  cout << "externGIDMap" << endl;
+    Xyce::dout() << it_iiM->first << " " << it_iiM->second << std::endl;
+  Xyce::dout() << "externGIDMap" << std::endl;
   it_iiM = externGIDMap.begin();
   it_iiM_end = externGIDMap.end();
   for( ; it_iiM != it_iiM_end; ++it_iiM )
-    cout << it_iiM->first << " " << it_iiM->second << endl;
+    Xyce::dout() << it_iiM->first << " " << it_iiM->second << std::endl;
 
-  cout << "stateGIDMap" << endl;
+  Xyce::dout() << "stateGIDMap" << std::endl;
   it_iiM = stateGIDMap.begin();
   it_iiM_end = stateGIDMap.end();
   for( ; it_iiM != it_iiM_end; ++it_iiM )
-    cout << it_iiM->first << " " << it_iiM->second << endl;
-  cout << "externStateGIDMap" << endl;
+    Xyce::dout() << it_iiM->first << " " << it_iiM->second << std::endl;
+  Xyce::dout() << "externStateGIDMap" << std::endl;
   it_iiM = externStateGIDMap.begin();
   it_iiM_end = externStateGIDMap.end();
   for( ; it_iiM != it_iiM_end; ++it_iiM )
-    cout << it_iiM->first << " " << it_iiM->second << endl;
-  cout << endl;
+    Xyce::dout() << it_iiM->first << " " << it_iiM->second << std::endl;
+  Xyce::dout() << std::endl;
 
-  cout << "storeGIDMap" << endl;
+  Xyce::dout() << "storeGIDMap" << std::endl;
   it_iiM = storeGIDMap.begin();
   it_iiM_end = storeGIDMap.end();
   for( ; it_iiM != it_iiM_end; ++it_iiM )
-    cout << it_iiM->first << " " << it_iiM->second << endl;
-  cout << "externStoreGIDMap" << endl;
+    Xyce::dout() << it_iiM->first << " " << it_iiM->second << std::endl;
+  Xyce::dout() << "externStoreGIDMap" << std::endl;
   it_iiM = externStoreGIDMap.begin();
   it_iiM_end = externStoreGIDMap.end();
   for( ; it_iiM != it_iiM_end; ++it_iiM )
-    cout << it_iiM->first << " " << it_iiM->second << endl;
-  cout << endl;
+    Xyce::dout() << it_iiM->first << " " << it_iiM->second << std::endl;
+  Xyce::dout() << std::endl;
 
 #endif
 
-  list<int> tmpIList;
+  std::list<int> tmpIList;
 
-  list<N_TOP_CktNode*>::iterator it_cnL, end_cnL;
+  std::list<CktNode*>::iterator it_cnL, end_cnL;
   it_cnL = topoPtr_->orderedNodeListPtr_->begin();
   end_cnL = topoPtr_->orderedNodeListPtr_->end();
   for( ; it_cnL != end_cnL; ++it_cnL )
   {
     tmpIList.clear();
 
-    list<int>::const_iterator it_iL, end_iL;
+    std::list<int>::const_iterator it_iL, end_iL;
     it_iL = (*it_cnL)->get_SolnVarGIDList().begin();
     end_iL = (*it_cnL)->get_SolnVarGIDList().end();
     for( ; it_iL != end_iL ; ++it_iL )
@@ -2630,7 +2570,7 @@ void N_TOP_TopoLSUtil::reorderGIDs()
           else
           {
             N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,
-              string( " Global index not found " ) );
+              std::string( " Global index not found " ) );
           }
         }
       }
@@ -2663,7 +2603,7 @@ void N_TOP_TopoLSUtil::reorderGIDs()
           else
           {
             N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,
-              string( " State Global index not found " ) );
+              std::string( " State Global index not found " ) );
           }
         }
       }
@@ -2696,7 +2636,7 @@ void N_TOP_TopoLSUtil::reorderGIDs()
           else
           {
             N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0,
-              string( " Store Global index not found " ) );
+              std::string( " Store Global index not found " ) );
           }
         }
       }
@@ -2712,71 +2652,75 @@ void N_TOP_TopoLSUtil::reorderGIDs()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_TopoLSUtil::registerTimeOptions
+// Function      : TopoLSUtil::registerTimeOptions
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/29/05
 //-----------------------------------------------------------------------------
-bool N_TOP_TopoLSUtil::registerTimeOptions(const N_UTL_OptionBlock & OB)
+bool TopoLSUtil::registerTimeOptions(const N_UTL_OptionBlock & OB)
 {
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_TopoLSUtil::registerPkgOptionsMgr
+// Function      : TopoLSUtil::registerPkgOptionsMgr
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, 1437
 // Creation Date : 10/21/08
 //-----------------------------------------------------------------------------
-bool N_TOP_TopoLSUtil::registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr )
+bool TopoLSUtil::registerPkgOptionsMgr( IO::PkgOptionsMgr *pkgOptPtr )
 {
   pkgOptMgrPtr_ = pkgOptPtr;
-  string netListFile("");
+  std::string netListFile("");
   if (commandLine_.getArgumentValue("netlist") != "")
   {
     netListFile = commandLine_.getArgumentValue("netlist");
   }
 
   pkgOptMgrPtr_->submitRegistration( "TIMEINT", netListFile,
-                                  new N_TOP_TopoLSUtil_TimeOptionsReg( *this ) );
+                                  new TopoLSUtil_TimeOptionsReg( *this ) );
 
   pkgOptMgrPtr_->submitRegistration( "TOPOLOGY", netListFile,
-                                  new N_TOP_TopoLSUtil_OptionsReg( *this ) );
+                                  new TopoLSUtil_OptionsReg( *this ) );
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_TopoLSUtil::registerOptions
+// Function      : TopoLSUtil::registerOptions
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/20/05
 //-----------------------------------------------------------------------------
-bool N_TOP_TopoLSUtil::registerOptions(const N_UTL_OptionBlock & OB)
+bool TopoLSUtil::registerOptions(const N_UTL_OptionBlock & OB)
 {
-  list<N_UTL_Param>::const_iterator it_tpL;
-  list<N_UTL_Param>::const_iterator first = OB.getParams().begin();
-  list<N_UTL_Param>::const_iterator last  = OB.getParams().end();
+  std::list<N_UTL_Param>::const_iterator it_tpL;
+  std::list<N_UTL_Param>::const_iterator first = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator last  = OB.getParams().end();
 
   for (it_tpL = first; it_tpL != last; ++it_tpL)
   {
     if (it_tpL->uTag()=="CHECK_CONNECTIVITY")
     {
-      checkConnectivity_ = static_cast<bool> (it_tpL->iVal ());
+      checkConnectivity_ = static_cast<bool> (it_tpL->getImmutableValue<int>());
     }
     else if(it_tpL->uTag()=="SUPERNODE")
     {
-      supernode_ = static_cast<bool>(it_tpL->bVal ());
+      supernode_ = static_cast<bool>(it_tpL->getImmutableValue<bool>());
+    }
+    else if(it_tpL->uTag()=="OUTPUTNAMESFILE")
+    {
+      namesFile_ = static_cast<bool>(it_tpL->getImmutableValue<bool>());
     }
   }
 
   return true;
 }
 
-
-
+} // namespace Topo
+} // namespace Xyce

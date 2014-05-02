@@ -47,6 +47,9 @@ module PSP103VA(D, G, S, B)
   revision = `VREV
   simkit:name = "psp103"
   simkit:desc = "psp_103"
+  xyceModelGroup="MOSFET"
+  xyceLevelNumber="103"
+  xyceDeviceName="PSP103VA MOSFET"
 );
 
 `include "PSP103_module.include"

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.2.6.2 $
+// Revision Number: $Revision: 1.6 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -105,7 +105,7 @@ public:
   Type at_from_head( int index ) const
   {
     int modIndex = (headIndex_ - index) % queueLength_;
-    //std::cout << "tailIndex_ = " << tailIndex_ << " headIndex_ = " 
+    //Xyce::dout() << "tailIndex_ = " << tailIndex_ << " headIndex_ = " 
     //  << headIndex_ << " queueLength_ = " << queueLength_ 
     //  << " index = " << index << " modIndex = " << modIndex << std::endl;
     return queueData_[ modIndex ];
@@ -114,7 +114,7 @@ public:
   Type at_from_tail( int index ) const
   {
     int modIndex = (index + tailIndex_) % queueLength_;
-    //std::cout << "tailIndex_ = " << tailIndex_ << " headIndex_ = " 
+    //Xyce::dout() << "tailIndex_ = " << tailIndex_ << " headIndex_ = " 
     //  << headIndex_ << " queueLength_ = " << queueLength_ 
     //  << " index = " << index << " modIndex = " << modIndex << std::endl;
     return queueData_[ modIndex ];

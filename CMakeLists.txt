@@ -483,8 +483,6 @@ endif ( Xyce_Dakota  )
 # -- search for header files
 
 # system headers
-CHECK_INCLUDE_FILE_CXX ( algorithm HAVE_ALGORITHM )
-CHECK_INCLUDE_FILE_CXX ( algo.h HAVE_ALGO_H )
 CHECK_INCLUDE_FILE_CXX ( cctype HAVE_CCTYPE )
 CHECK_INCLUDE_FILE_CXX ( climits HAVE_CLIMITS )
 CHECK_INCLUDE_FILE_CXX ( cmath HAVE_CMATH )
@@ -611,24 +609,9 @@ endif ( Xyce_FORTRAN_TEST )
 CHECK_FUNCTION_EXISTS ( sqrt HAVE_SQRT )
 CHECK_FUNCTION_EXISTS ( getopts HAVE_GETOPTS )
 
-## DEBUG... no longer necessary? 
-## try_compile ( HAVE_STL_MEMBER_TEMPLATES 
-##               ${CMAKE_BINARY_DIR}
-##               ${CMAKE_SOURCE_DIR}/config/cmake_check_stl_member_templates.cxx)
-
-try_compile ( HAVE_NUMERIC_LIMITS 
-              ${CMAKE_BINARY_DIR}
-              ${CMAKE_SOURCE_DIR}/config/cmake_check_numeric_limits.cxx )
-
 try_compile ( HAVE_IOTA           
               ${CMAKE_BINARY_DIR}
               ${CMAKE_SOURCE_DIR}/config/cmake_check_iota.cxx )
-
-try_compile ( HAVE_FLEXIBLE_INSERT
-              ${CMAKE_BINARY_DIR}
-              ${CMAKE_SOURCE_DIR}/config/cmake_check_flexible_insert.cxx )
-
-
 
 
 # -- post-processing ----------------------------------------------------------
@@ -724,6 +707,6 @@ add_subdirectory ( src )
 # DEBUG: should this be in Xyce_Regression as an include() instead?
 set ( DROP_METHOD "http" )
 set ( DROP_SITE "s858869.sandia.gov" )
-set ( DROP_LOCATION "/CDash/submit.php?project=RELEASE_6_0" )
+set ( DROP_LOCATION "/CDash/submit.php?project=RELEASE_6_1" )
 include ( CTest )
 

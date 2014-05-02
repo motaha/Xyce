@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,31 +36,17 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.134.2.3 $
+// Revision Number: $Revision: 1.152 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/02/24 23:49:15 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ----------   Std Includes  ------------
-
-#include <N_UTL_Misc.h>
-
-#ifdef HAVE_ALGORITHM
 #include <algorithm>
-#else
-#ifdef HAVE_ALGO_H
-#include <algo.h>
-#else
-#error Must have either <algorithm> or <algo.h>!
-#endif
-#endif
 
-// ----------   Xyce Includes   ----------
 #include <N_DEV_DeviceInterface.h>
 #include <N_DEV_DeviceMgr.h>
 #include <N_ERH_ErrorMgr.h>
@@ -108,20 +94,6 @@ DeviceInterface::DeviceInterface(N_IO_CmdParse & cp)
 DeviceInterface::~DeviceInterface()
 {
   delete devMgrPtr_;
-}
-
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceInterface::returnDevicePtr
-// Purpose       :
-// Special Notes :
-// Scope         : public
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 03/05/02
-//-----------------------------------------------------------------------------
-Device * DeviceInterface::returnDevicePtr (int Index)
-{
-  return devMgrPtr_->returnDevicePtr(Index);
 }
 
 //-----------------------------------------------------------------------------
@@ -197,7 +169,7 @@ bool DeviceInterface::registerNonlinearSolver (N_NLS_Manager * tmp_nlsMgrPtr)
 // Creator       : Richard Schiek, Electrical and Mems Modeling
 // Creation Date : 10/20/2008
 //-----------------------------------------------------------------------------
-bool DeviceInterface::registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr )
+bool DeviceInterface::registerPkgOptionsMgr( N_IO_PkgOptionsMgr *pkgOptPtr )
 {
   return devMgrPtr_->registerPkgOptionsMgr(pkgOptPtr);
 }
@@ -210,7 +182,7 @@ bool DeviceInterface::registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr )
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 03/27/04
 //-----------------------------------------------------------------------------
-vector<double> DeviceInterface::getFastSourcePeriod (vector<string>& sourceNames)
+std::vector<double> DeviceInterface::getFastSourcePeriod (std::vector<std::string>& sourceNames)
 {
   return devMgrPtr_->getFastSourcePeriod (sourceNames);
 }
@@ -223,7 +195,7 @@ vector<double> DeviceInterface::getFastSourcePeriod (vector<string>& sourceNames
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 03/27/04
 //-----------------------------------------------------------------------------
-vector<double> DeviceInterface::registerFastSources(vector<string>& sourceNames)
+std::vector<double> DeviceInterface::registerFastSources(std::vector<std::string>& sourceNames)
 {
   return devMgrPtr_->registerFastSources (sourceNames);
 }
@@ -236,7 +208,7 @@ vector<double> DeviceInterface::registerFastSources(vector<string>& sourceNames)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 06/12/2013
 //-----------------------------------------------------------------------------
-void DeviceInterface::deRegisterFastSources(vector<string>& sourceNames)
+void DeviceInterface::deRegisterFastSources(std::vector<std::string>& sourceNames)
 {
   return devMgrPtr_->deRegisterFastSources (sourceNames);
 }
@@ -253,7 +225,7 @@ void DeviceInterface::deRegisterFastSources(vector<string>& sourceNames)
 // Creator       : Richard Schiek, SNL, Electrical Systems Modeling
 // Creation Date : 03/20/13
 //-----------------------------------------------------------------------------
-bool DeviceInterface::setLeadCurrentRequests( const set<string> & deviceNames )
+bool DeviceInterface::setLeadCurrentRequests( const std::set<std::string> & deviceNames )
 {
   return devMgrPtr_->setLeadCurrentRequests( deviceNames );
 }
@@ -353,47 +325,6 @@ void DeviceInterface::resetForStepAnalysis ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : DeviceInterface::createDeviceByNetlistDeviceType
-// Purpose       : 
-// Special Notes :
-// Scope         : protected
-// Creator       : Dave Baur, SNL
-// Creation Date : 04/18/2013
-//-----------------------------------------------------------------------------
-Device * DeviceInterface::createDeviceByNetlistDeviceType(const std::string &name, const int level)
-{
-  return devMgrPtr_->createDeviceByNetlistDeviceType(name, level);
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceInterface::getNumSupportedDevices
-// Purpose       :
-// Special Notes :
-// Scope         : public
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 10/16/05
-//-----------------------------------------------------------------------------
-int DeviceInterface::getNumSupportedDevices ()
-{
-  return devMgrPtr_->getNumSupportedDevices ();
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceInterface::flushDevices
-// Purpose       : This function deletes all the allocated devices, and resets
-//                 the array of device pointers to all point to the dummy
-//                 (placeholder) device class pointer.
-// Special Notes :
-// Scope         : protected
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 03/05/02
-//-----------------------------------------------------------------------------
-bool DeviceInterface::flushDevices ()
-{
-  return devMgrPtr_->flushDevices ();
-}
-
-//-----------------------------------------------------------------------------
 // Function      : DeviceInterface::addDeviceModel
 // Purpose       :
 // Special Notes :
@@ -401,9 +332,9 @@ bool DeviceInterface::flushDevices ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 03/05/02
 //-----------------------------------------------------------------------------
-bool DeviceInterface::addDeviceModel (const ModelBlock & MB)
+bool DeviceInterface::addDeviceModel (const ModelBlock & model_block)
 {
-  return devMgrPtr_->addDeviceModel(MB);
+  return devMgrPtr_->addDeviceModel(model_block);
 }
 
 
@@ -425,9 +356,9 @@ bool DeviceInterface::addDeviceModel (const ModelBlock & MB)
 // Creator       : Richard Schiek, Electrical and Microsystems Modeling
 // Creation Date : 2/18/2010
 //-----------------------------------------------------------------------------
-bool DeviceInterface::verifyDeviceInstance(InstanceBlock & IB)
+bool DeviceInterface::verifyDeviceInstance(InstanceBlock & instance_block)
 {
-  return devMgrPtr_->verifyDeviceInstance( IB );
+  return devMgrPtr_->verifyDeviceInstance( instance_block );
 }
 
 //-----------------------------------------------------------------------------
@@ -443,10 +374,9 @@ bool DeviceInterface::verifyDeviceInstance(InstanceBlock & IB)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 03/05/02
 //-----------------------------------------------------------------------------
-DeviceInstance * DeviceInterface::addDeviceInstance
-                                        (InstanceBlock & IB)
+DeviceInstance * DeviceInterface::addDeviceInstance(InstanceBlock & instance_block)
 {
-  return devMgrPtr_->addDeviceInstance(IB);
+  return devMgrPtr_->addDeviceInstance(instance_block);
 }
 
 //-----------------------------------------------------------------------------
@@ -457,37 +387,10 @@ DeviceInstance * DeviceInterface::addDeviceInstance
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 03/05/02
 //-----------------------------------------------------------------------------
-bool DeviceInterface::deleteDeviceInstance (const string & name)
+bool DeviceInterface::deleteDeviceInstance (const std::string & name)
 {
   return devMgrPtr_->deleteDeviceInstance(name);
 }
-
-// //----------------------------------------------------------------------------
-// // Function       : DeviceInterface::getDeviceIndex
-// // Purpose        :
-// // Special Notes  :
-// // Scope          : public
-// // Creator        : Lon Waters
-// // Creation Date  : 06/09/2003
-// //----------------------------------------------------------------------------
-// int DeviceInterface::getDeviceIndex(string const& type)
-// {
-//   return devMgrPtr_->getDeviceIndex(type);
-// }
-
-// //----------------------------------------------------------------------------
-// // Function       : DeviceInterface::getDeviceTypeOffset
-// // Purpose        :
-// // Special Notes  :
-// // Scope          : public
-// // Creator        : Dave Shirley, PSSI
-// // Creation Date  : 10/04/2005
-// //----------------------------------------------------------------------------
-// int DeviceInterface::getDeviceTypeOffset
-//     (const string & name, const int level, const string & type)
-// {
-//   return devMgrPtr_->getDeviceTypeOffset(name, level, type);
-// }
 
 //----------------------------------------------------------------------------
 // Function       : DeviceInterface::getDeviceCountMap
@@ -497,9 +400,14 @@ bool DeviceInterface::deleteDeviceInstance (const string & name)
 // Creator        : Eric R. Keiter, SNL.
 // Creation Date  : 05/07/2010
 //----------------------------------------------------------------------------
-const map<string,int> & DeviceInterface::getDeviceCountMap()
+const std::map<std::string,int> & DeviceInterface::getDeviceCountMap()
 {
   return devMgrPtr_->getDeviceCountMap();
+}
+
+void DeviceInterface::addDeviceToCount(const std::string & device_name)
+{
+  devMgrPtr_->addDeviceToCount(device_name);
 }
 
 //-----------------------------------------------------------------------------
@@ -511,10 +419,10 @@ const map<string,int> & DeviceInterface::getDeviceCountMap()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 03/05/02
 //-----------------------------------------------------------------------------
-void DeviceInterface::printOutLists()
-{
-  devMgrPtr_->printOutLists();
-}
+// void DeviceInterface::printOutLists()
+// {
+//   devMgrPtr_->printOutLists();
+// }
 
 //-----------------------------------------------------------------------------
 // Function      : DeviceInterface::loadDeviceMask
@@ -528,6 +436,11 @@ void DeviceInterface::printOutLists()
 bool DeviceInterface::loadDeviceMask()
 {
   return devMgrPtr_->loadDeviceMask();
+}
+
+const EntityTypeIdDeviceMap &
+DeviceInterface::getDeviceMap() const {
+  return devMgrPtr_->getDeviceMap();
 }
 
 //-----------------------------------------------------------------------------
@@ -552,7 +465,7 @@ bool DeviceInterface::setInitialGuess
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 05/02/03
 //-----------------------------------------------------------------------------
-bool DeviceInterface::setParam(string & name, double val)
+bool DeviceInterface::setParam(std::string & name, double val)
 {
   return devMgrPtr_->setParam (name,val);
 }
@@ -565,9 +478,9 @@ bool DeviceInterface::setParam(string & name, double val)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 05/02/03
 //-----------------------------------------------------------------------------
-double DeviceInterface::getParam(const string & name)
+double DeviceInterface::getParamAndReduce(const std::string & name)
 {
-  return devMgrPtr_->getParam (name);
+  return devMgrPtr_->getParamAndReduce(name);
 }
 
 //-----------------------------------------------------------------------------
@@ -578,10 +491,30 @@ double DeviceInterface::getParam(const string & name)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 05/02/03
 //-----------------------------------------------------------------------------
-bool DeviceInterface::getParam(const string & name, double & val)
+bool DeviceInterface::getParamAndReduce(const std::string & name, double & val)
 {
-  return devMgrPtr_->getParam (name, val);
+  return devMgrPtr_->getParamAndReduce(name, val);
 }
+
+bool DeviceInterface::findParam(const std::string & name) const
+{
+  return devMgrPtr_->findParam (name);
+}
+
+double DeviceInterface::getParamNoReduce(const std::string &name) const
+{
+  return devMgrPtr_->getParamNoReduce(name);
+}
+
+const DeviceSensitivities &DeviceInterface::getDeviceSensitivities() const {
+  return devMgrPtr_->getDeviceSensitivities();
+}
+
+DeviceEntity * DeviceInterface::getDeviceEntity(const std::string & full_param_name) const 
+{
+  return devMgrPtr_->getDeviceEntity(full_param_name);
+}
+
 
 //-----------------------------------------------------------------------------
 // Function      : DeviceInterface::getVsrcLIDs
@@ -592,7 +525,7 @@ bool DeviceInterface::getParam(const string & name, double & val)
 // Creation Date : 03/05/06
 //-----------------------------------------------------------------------------
 bool DeviceInterface::getVsrcLIDs
-    (string & srcName, int & li_Pos, int & li_Neg, int & li_Bra)
+    (std::string & srcName, int & li_Pos, int & li_Neg, int & li_Bra)
 {
   return devMgrPtr_-> getVsrcLIDs (srcName,li_Pos,li_Neg,li_Bra);
 }
@@ -699,7 +632,7 @@ bool DeviceInterface::getPDESystemFlag()
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 03/05/02
 //-----------------------------------------------------------------------------
-bool DeviceInterface::runParameterTests(string & deviceName)
+bool DeviceInterface::runParameterTests(std::string & deviceName)
 {
   return devMgrPtr_->runParameterTests(deviceName);
 }
@@ -764,7 +697,7 @@ void DeviceInterface::setGlobalFlags()
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 03/05/02
 //-----------------------------------------------------------------------------
-bool DeviceInterface::getBreakPoints ( vector<N_UTL_BreakPoint> & breakPointTimes )
+bool DeviceInterface::getBreakPoints ( std::vector<N_UTL_BreakPoint> & breakPointTimes )
 {
 
   return devMgrPtr_->getBreakPoints (breakPointTimes);
@@ -792,7 +725,7 @@ double DeviceInterface::getMaxTimeStepSize ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 03/05/02
 //-----------------------------------------------------------------------------
-bool DeviceInterface::registerOptions(const N_UTL_OptionBlock & OB)
+bool DeviceInterface::registerOptions(const Util::OptionBlock & OB)
 
 {
   return devMgrPtr_->registerOptions(OB);
@@ -806,7 +739,7 @@ bool DeviceInterface::registerOptions(const N_UTL_OptionBlock & OB)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 06/03/02
 //-----------------------------------------------------------------------------
-bool DeviceInterface::registerSensParams (const N_UTL_OptionBlock & OB)
+bool DeviceInterface::registerSensParams (const Util::OptionBlock & OB)
 
 {
   return devMgrPtr_->registerSensParams (OB);
@@ -820,7 +753,7 @@ bool DeviceInterface::registerSensParams (const N_UTL_OptionBlock & OB)
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 03/05/02
 //-----------------------------------------------------------------------------
-bool DeviceInterface::registerICLoads( vector< pair<int,double> > * icLoads )
+bool DeviceInterface::registerICLoads( std::vector< std::pair<int,double> > * icLoads )
 {
   return devMgrPtr_->registerICLoads(icLoads);
 }
@@ -859,7 +792,7 @@ bool DeviceInterface::disablePDEContinuation ()
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 12/03/02
 //-----------------------------------------------------------------------------
-void DeviceInterface::getNumInterfaceNodes (vector<int> & numINodes)
+void DeviceInterface::getNumInterfaceNodes (std::vector<int> & numINodes)
 {
   devMgrPtr_->getNumInterfaceNodes (numINodes);
 }
@@ -1006,10 +939,10 @@ bool DeviceInterface::updateState      (
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 04/20/04
 //-----------------------------------------------------------------------------
-void DeviceInterface::setVoltageLimiterFlag ()
+/*void DeviceInterface::setVoltageLimiterFlag ()
 {
   devMgrPtr_->setVoltageLimiterFlag ();
-}
+}*/
 
 //-----------------------------------------------------------------------------
 // Function      : DeviceInterface::unsetVoltageLimiterFlag
@@ -1023,6 +956,22 @@ void DeviceInterface::unsetVoltageLimiterFlag ()
 {
   devMgrPtr_->unsetVoltageLimiterFlag ();
 }
+void setVoltageLimiterFlag (bool flagVal);
+
+
+//-----------------------------------------------------------------------------
+// Function      : DeviceInterface::setVoltageLimiterFlag
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       :  Ting Mei, SNL
+// Creation Date : 02/18/14
+//-----------------------------------------------------------------------------
+void DeviceInterface::setVoltageLimiterFlag ( bool flagVal)
+{
+  devMgrPtr_->setVoltageLimiterFlag ( flagVal );
+}
+
 
 //-----------------------------------------------------------------------------
 // Function      : DeviceInterface::loadBVectorsforAC
@@ -1052,7 +1001,7 @@ bool DeviceInterface::getBMatrixEntriesforMOR(std::vector<int>& bMatEntriesVec,
 // Creator       : Tom Russo, SNL, Component Information and MOdels
 // Creation Date : 05/05/04
 //-----------------------------------------------------------------------------
-bool DeviceInterface::getDACDeviceNames(vector < string > & dacNames)
+bool DeviceInterface::getDACDeviceNames(std::vector< std::string > & dacNames)
 {
   return devMgrPtr_->getDACDeviceNames(dacNames);
 }
@@ -1065,7 +1014,7 @@ bool DeviceInterface::getDACDeviceNames(vector < string > & dacNames)
 // Creator       : Tom Russo, SNL, Component Information and MOdels
 // Creation Date : 05/05/04
 //-----------------------------------------------------------------------------
-bool DeviceInterface::getADCMap(map<string,map<string,double> >&ADCMap)
+bool DeviceInterface::getADCMap(std::map<std::string,std::map<std::string,double> >&ADCMap)
 {
   return devMgrPtr_->getADCMap(ADCMap);
 }
@@ -1085,7 +1034,7 @@ bool DeviceInterface::getADCMap(map<string,map<string,double> >&ADCMap)
 // Creation Date  : 05/07/2004
 //----------------------------------------------------------------------------
 bool DeviceInterface::updateTimeVoltagePairs(
-   map< string, vector< pair<double,double> >* > const & timeVoltageUpdateMap)
+   std::map< std::string, std::vector< std::pair<double,double> >* > const & timeVoltageUpdateMap)
 {
   return devMgrPtr_->updateTimeVoltagePairs(timeVoltageUpdateMap);
 }
@@ -1099,7 +1048,7 @@ bool DeviceInterface::updateTimeVoltagePairs(
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 07/29/2002
 //----------------------------------------------------------------------------
-bool DeviceInterface::setADCWidths(map<string,int> const & ADCWidthMap)
+bool DeviceInterface::setADCWidths(std::map<std::string,int> const & ADCWidthMap)
 {
   return devMgrPtr_->setADCWidths(ADCWidthMap);
 }
@@ -1113,7 +1062,7 @@ bool DeviceInterface::setADCWidths(map<string,int> const & ADCWidthMap)
 // Creation Date : 05/05/04
 //-----------------------------------------------------------------------------
 bool DeviceInterface::getTimeVoltagePairs(
-   map<string, vector< pair<double,double> > >&TimeVoltageMap)
+   std::map<std::string, std::vector< std::pair<double,double> > >&TimeVoltageMap)
 {
   return devMgrPtr_->getTimeVoltagePairs(TimeVoltageMap);
 }
@@ -1122,15 +1071,15 @@ bool DeviceInterface::getTimeVoltagePairs(
 // Function      : DeviceInterface::getDeviceNames
 // Purpose       : Get a list of names of all devices of given type in the
 //                 circuit
-// Special Notes : "deviceType" is string of the form that an actual
+// Special Notes : "deviceType" is std::string of the form that an actual
 //                 device in the netlist would have, e.g. "R1" for a resistor
 //                 or "Y%XYGRA%DUMMY" for a Xygra device.
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/25/08
 //-----------------------------------------------------------------------------
-bool DeviceInterface::getDeviceNames(const string & deviceType,
-                                           vector < string > & deviceNames)
+bool DeviceInterface::getDeviceNames(const std::string & deviceType,
+                                           std::vector< std::string > & deviceNames)
 {
   return devMgrPtr_->getDeviceNames(deviceType, deviceNames);
 }
@@ -1144,7 +1093,7 @@ bool DeviceInterface::getDeviceNames(const string & deviceType,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/27/08
 //-----------------------------------------------------------------------------
-int DeviceInterface::xygraGetNumNodes(const string & deviceName)
+int DeviceInterface::xygraGetNumNodes(const std::string & deviceName)
 {
   return devMgrPtr_->xygraGetNumNodes(deviceName);
 }
@@ -1158,7 +1107,7 @@ int DeviceInterface::xygraGetNumNodes(const string & deviceName)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/27/08
 //-----------------------------------------------------------------------------
-int DeviceInterface::xygraGetNumWindings(const string & deviceName)
+int DeviceInterface::xygraGetNumWindings(const std::string & deviceName)
 {
   return devMgrPtr_->xygraGetNumWindings(deviceName);
 }
@@ -1173,8 +1122,8 @@ int DeviceInterface::xygraGetNumWindings(const string & deviceName)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/27/08
 //-----------------------------------------------------------------------------
-void DeviceInterface::xygraGetCoilWindings(const string & deviceName,
-                                                vector<int> & cW)
+void DeviceInterface::xygraGetCoilWindings(const std::string & deviceName,
+                                                std::vector<int> & cW)
 {
   devMgrPtr_->xygraGetCoilWindings(deviceName,cW);
 }
@@ -1188,8 +1137,8 @@ void DeviceInterface::xygraGetCoilWindings(const string & deviceName,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 09/29/08
 //-----------------------------------------------------------------------------
-void DeviceInterface::xygraGetCoilNames(const string & deviceName,
-                                                vector<string> & cN)
+void DeviceInterface::xygraGetCoilNames(const std::string & deviceName,
+                                                std::vector<std::string> & cN)
 {
   devMgrPtr_->xygraGetCoilNames(deviceName,cN);
 }
@@ -1202,8 +1151,8 @@ void DeviceInterface::xygraGetCoilNames(const string & deviceName,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/27/08
 //-----------------------------------------------------------------------------
-bool DeviceInterface::xygraSetConductances(const string & deviceName,
-                                            const vector<vector<double> > &cM)
+bool DeviceInterface::xygraSetConductances(const std::string & deviceName,
+                                            const std::vector<std::vector<double> > &cM)
 {
   return devMgrPtr_->xygraSetConductances(deviceName, cM);
 }
@@ -1216,8 +1165,8 @@ bool DeviceInterface::xygraSetConductances(const string & deviceName,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/27/08
 //-----------------------------------------------------------------------------
-bool DeviceInterface::xygraSetK(const string & deviceName,
-                                      const vector<vector<double> > &kM,
+bool DeviceInterface::xygraSetK(const std::string & deviceName,
+                                      const std::vector<std::vector<double> > &kM,
                                       const double t)
 {
   return devMgrPtr_->xygraSetK(deviceName, kM,t);
@@ -1231,8 +1180,8 @@ bool DeviceInterface::xygraSetK(const string & deviceName,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/27/08
 //-----------------------------------------------------------------------------
-bool DeviceInterface::xygraSetSources(const string & deviceName,
-                                            const vector<double> &sV,
+bool DeviceInterface::xygraSetSources(const std::string & deviceName,
+                                            const std::vector<double> &sV,
                                             const double t)
 {
   return devMgrPtr_->xygraSetSources(deviceName, sV, t);
@@ -1246,8 +1195,8 @@ bool DeviceInterface::xygraSetSources(const string & deviceName,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/27/08
 //-----------------------------------------------------------------------------
-bool DeviceInterface::xygraGetVoltages(const string & deviceName,
-                                             vector<double> &vN)
+bool DeviceInterface::xygraGetVoltages(const std::string & deviceName,
+                                             std::vector<double> &vN)
 {
   return devMgrPtr_->xygraGetVoltages(deviceName, vN);
 }
@@ -1274,7 +1223,7 @@ int DeviceInterface::getHomotopyBlockSize() const
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 11/18/2005
 //----------------------------------------------------------------------------
-void DeviceInterface::addGlobalPar(N_UTL_Param & par)
+void DeviceInterface::addGlobalPar(Util::Param & par)
 {
   devMgrPtr_->addGlobalPar(par);
 }
@@ -1288,9 +1237,14 @@ void DeviceInterface::addGlobalPar(N_UTL_Param & par)
 // Creator       : Rich Schiek, SNL, Electrical Systems Modeling
 // Creation Date : 01/25/2013
 //----------------------------------------------------------------------------
-double DeviceInterface::getGlobalPar( const string & parName  ) const
+double DeviceInterface::getGlobalPar( const std::string & parName  ) const
 {
   return devMgrPtr_->getGlobalPar( parName );
+}
+
+const double *DeviceInterface::findGlobalPar(const std::string & parName) const
+{
+  return devMgrPtr_->findGlobalPar(parName);
 }
 
 //-----------------------------------------------------------------------------
@@ -1345,8 +1299,8 @@ void DeviceInterface::setupExternalDevices()
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
 void DeviceInterface::homotopyStepSuccess
-      (const vector<string> & paramNames,
-       const vector<double> & paramVals)
+      (const std::vector<std::string> & paramNames,
+       const std::vector<double> & paramVals)
 {
   return devMgrPtr_->homotopyStepSuccess (paramNames, paramVals);
 }
@@ -1411,7 +1365,7 @@ void DeviceInterface::acceptStep ()
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 03/18/07
 //-----------------------------------------------------------------------------
-bool DeviceInterface::getInitialQnorm (vector<N_TIA_TwoLevelError> & tleVec )
+bool DeviceInterface::getInitialQnorm (std::vector<N_TIA_TwoLevelError> & tleVec )
 {
   return devMgrPtr_->getInitialQnorm (tleVec);
 }
@@ -1424,7 +1378,7 @@ bool DeviceInterface::getInitialQnorm (vector<N_TIA_TwoLevelError> & tleVec )
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 03/15/06
 //-----------------------------------------------------------------------------
-bool DeviceInterface::getInnerLoopErrorSums (vector <N_TIA_TwoLevelError> & tleVec)
+bool DeviceInterface::getInnerLoopErrorSums (std::vector<N_TIA_TwoLevelError> & tleVec)
 {
   return devMgrPtr_->getInnerLoopErrorSums (tleVec);
 }

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.43.2.2 $
+// Revision Number: $Revision: 1.54 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -57,6 +57,7 @@
 
 #include <N_LAS_AztecOOSolver.h>
 
+#include <N_UTL_fwd.h>
 #include <N_UTL_OptionBlock.h>
 
 #include <N_UTL_Timer.h>
@@ -220,7 +221,7 @@ bool N_LAS_AztecOOSolver::setDefaultOptions()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/18/04
 //-----------------------------------------------------------------------------
-bool N_LAS_AztecOOSolver::setDefaultOption( const string & option )
+bool N_LAS_AztecOOSolver::setDefaultOption( const std::string & option )
 {
   if( option == "AZ_tol" ) resetTolerance();
   else return false;
@@ -253,8 +254,8 @@ bool N_LAS_AztecOOSolver::setOptions(const N_UTL_OptionBlock & OB)
     setAztecParam_( "AZ_tol", tolerance_ );
     setAztecOption_( "AZ_max_iter", maxIter_ );
 
-    list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
-    list<N_UTL_Param>::const_iterator end_tpL = OB.getParams().end();
+    std::list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
+    std::list<N_UTL_Param>::const_iterator end_tpL = OB.getParams().end();
     for (; it_tpL != end_tpL; ++it_tpL)
     {
       setParam( *it_tpL );
@@ -291,7 +292,7 @@ bool N_LAS_AztecOOSolver::setOptions(const N_UTL_OptionBlock & OB)
     if( Teuchos::is_null(transform_) ) transform_ = N_LAS_TransformTool()( *options_ );
   }
 
-  return STATUS_SUCCESS;
+  return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -304,25 +305,25 @@ bool N_LAS_AztecOOSolver::setOptions(const N_UTL_OptionBlock & OB)
 //-----------------------------------------------------------------------------
 bool N_LAS_AztecOOSolver::setParam( const N_UTL_Param & param )
 {
-  string tag = param.tag();
-  string uTag = param.uTag();
+  std::string tag = param.tag();
+  std::string uTag = param.uTag();
 
   // Set our copies of these parameters that get passed to the solver in the
   // "iterate" command
   if( tag == "AZ_max_iter" )
-    setMaxIter(param.iVal());
+    setMaxIter(param.getImmutableValue<int>());
   else if( tag == "AZ_tol" )
-    setTolerance(param.dVal());
+    setTolerance(param.getImmutableValue<double>());
   else if( uTag == "TR_FILTER" )
-    filterThreshold_ = param.dVal();
+    filterThreshold_ = param.getImmutableValue<double>();
   else if( uTag == "ADAPTIVE_SOLVE" )
-    adaptiveFlag_ = param.iVal();
+    adaptiveFlag_ = param.getImmutableValue<int>();
   else if( uTag == "USE_AZTEC_PRECOND" )
-    useAztecPrecond_ = param.iVal();
+    useAztecPrecond_ = param.getImmutableValue<int>();
   else if( uTag == "OUTPUT_LS" )
-    outputLS_ = param.iVal();
+    outputLS_ = param.getImmutableValue<int>();
   else if( uTag == "OUTPUT_BASE_LS" )
-    outputBaseLS_ = param.iVal();
+    outputBaseLS_ = param.getImmutableValue<int>();
   else
     setAztecCntl_( param );
 
@@ -413,25 +414,14 @@ bool N_LAS_AztecOOSolver::setAztecParam_(const char * paramName,
 //-----------------------------------------------------------------------------
 void N_LAS_AztecOOSolver::printParams_() const
 {
-
-  string dashedline =  "------------------------------------------------"
-    "-----------------------------";
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\n");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\n***** Linear solver options:\n");
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\tPreconditioner:\t\t",
-                         preCond_);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\tTolerance:\t\t",
-                         tolerance_);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\tMax Iterations:\t\t",
-                         maxIter_);
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\n");
-
+  Xyce::lout() << "\n" << std::endl
+               << Xyce::section_divider << std::endl
+               << "\n***** Linear solver options:\n" << std::endl
+               << "\tPreconditioner:\t\t" << preCond_ << std::endl
+               << "\tTolerance:\t\t" << tolerance_ << std::endl
+               << "\tMax Iterations:\t\t" << maxIter_ << std::endl
+               << Xyce::section_divider << std::endl
+               << "\n" << std::endl;
 }
 
 //-----------------------------------------------------------------------------
@@ -465,14 +455,14 @@ int N_LAS_AztecOOSolver::solve( bool ReuseFactors )
       tProblem_->SetPDL(unsure);
       if( solver_ ) delete solver_;
     }
-    swap( tProblem_, problem_ );
+    std::swap( tProblem_, problem_ );
     transform_->fwd();
   }
 
 
 #ifdef Xyce_DETAILED_LINSOLVE_TIMES
   double time2 = timer_->wallTime();
-  cout << "Fwd Trans Time: " << time2-time1 << endl;
+  cout << "Fwd Trans Time: " << time2-time1 << std::endl;
 #endif
 
   if( !solver_ )
@@ -492,23 +482,23 @@ int N_LAS_AztecOOSolver::solve( bool ReuseFactors )
     if (Teuchos::OrdinalTraits<int>::max() == Teuchos::OrdinalTraits<long>::max())
     {
       int memcheck = (KSpaceDefault_+1) * aligned_dim * sizeof(double);
-      //std::cout << "aligned_dim = " << aligned_dim << ", memcheck = " << memcheck << ", max = " << Teuchos::OrdinalTraits<int>::max() << std::endl;
+      //Xyce::dout() << "aligned_dim = " << aligned_dim << ", memcheck = " << memcheck << ", max = " << Teuchos::OrdinalTraits<int>::max() << std::endl;
       if ( memcheck < 0 )
       {
         maxKSpace_ = Teuchos::OrdinalTraits<int>::max() / (aligned_dim * sizeof(double)) - 1;
         reduceKSpace_ = true;
       }
     }
-    else 
-    {  
+    else
+    {
       long int memcheck = (KSpaceDefault_+1) * (long int)(aligned_dim) * sizeof(double);
-      //std::cout << "aligned_dim = " << aligned_dim << ", memcheck = " << memcheck << ", max = " << Teuchos::OrdinalTraits<int>::max() << std::endl;
+      //Xyce::dout() << "aligned_dim = " << aligned_dim << ", memcheck = " << memcheck << ", max = " << Teuchos::OrdinalTraits<int>::max() << std::endl;
       if ( memcheck > Teuchos::OrdinalTraits<int>::max() )
       {
         maxKSpace_ = Teuchos::OrdinalTraits<int>::max() / (aligned_dim * sizeof(double)) - 1;
         reduceKSpace_ = true;
       }
-    }  
+    }
 
     solver_ = new AztecOO( *problem_ );
     setDefaultOptions();
@@ -579,7 +569,7 @@ int N_LAS_AztecOOSolver::solve( bool ReuseFactors )
 			     "N_LAS_Preconditioner::initValues() preconditioner could not be initialized!\n");
 #ifdef Xyce_DETAILED_LINSOLVE_TIMES
     time2 = timer_->wallTime();
-    cout << "Ifpack Value Initialization Time: " << time2-time1 << endl;
+    cout << "Ifpack Value Initialization Time: " << time2-time1 << std::endl;
 #endif
 
     // Compute the preconditioner
@@ -589,7 +579,7 @@ int N_LAS_AztecOOSolver::solve( bool ReuseFactors )
 			     "N_LAS_Preconditioner::compute() preconditioner could not be computed!\n");
 #ifdef Xyce_DETAILED_LINSOLVE_TIMES
     time3 = timer_->wallTime();
-    cout << "Ifpack Factorization Time: " << time3-time2 << endl;
+    cout << "Ifpack Factorization Time: " << time3-time2 << std::endl;
 #endif
     // Set the preconditioner as an operator if it was just constructed
     if( !isPrecSet_ && precond_->epetraObj()!=Teuchos::null ) {
@@ -604,14 +594,13 @@ int N_LAS_AztecOOSolver::solve( bool ReuseFactors )
 
 #ifdef Xyce_DETAILED_LINSOLVE_TIMES
   time3 = timer_->wallTime();
-  cout << "Total Ifpack Time: " << time3-time1 << endl;
+  cout << "Total Ifpack Time: " << time3-time1 << std::endl;
 #endif
 
   if( adaptiveFlag_ )
   {
 #ifdef Xyce_VERBOSE_LINEAR
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0,
-                           "Running with Adaptive Solver Options\n" );
+    Xyce::dout() << "Running with Adaptive Solver Options" << std::endl;
 #endif
     solver_->SetUseAdaptiveDefaultsTrue();
     linearStatus = solver_->AdaptiveIterate(maxIter_, adaptMaxAttempts, tolerance_);
@@ -621,7 +610,7 @@ int N_LAS_AztecOOSolver::solve( bool ReuseFactors )
 
 #ifdef Xyce_DETAILED_LINSOLVE_TIMES
   time1 = timer_->wallTime();
-  cout << "Total Aztec Time: " << time1-time3 << endl;
+  cout << "Total Aztec Time: " << time1-time3 << std::endl;
 #endif
 /*
   Epetra_MultiVector* b = problem_->GetRHS();
@@ -633,18 +622,18 @@ int N_LAS_AztecOOSolver::solve( bool ReuseFactors )
   resid.Norm2( &actual_resids[0] );
   b->Norm2( &rhs_norm[0] );
   for (int i=0; i<numrhs; i++ ) {
-    std::cout << "Problem (before transform) " << i << " : \t" << actual_resids[i]/rhs_norm[i] << std::endl;
+    Xyce::dout() << "Problem (before transform) " << i << " : \t" << actual_resids[i]/rhs_norm[i] << std::endl;
   }
 */
   if( transform_.get() )
   {
     transform_->rvs();
-    swap( tProblem_, problem_ );
+    std::swap( tProblem_, problem_ );
   }
 
 #ifdef Xyce_DETAILED_LINSOLVE_TIMES
   time2 = timer_->wallTime();
-  cout << "Rvs Trans Time: " << time2-time1 << endl;
+  cout << "Rvs Trans Time: " << time2-time1 << std::endl;
 #endif
 
   // Output computed solution vectors, if requested.
@@ -673,7 +662,7 @@ int N_LAS_AztecOOSolver::solve( bool ReuseFactors )
   resid2.Norm2( &actual_resids[0] );
   b->Norm2( &rhs_norm[0] );
   for (int i=0; i<numrhs; i++ ) {
-    std::cout << "Problem (after transform)" << i << " : \t" << actual_resids[i]/rhs_norm[i] << std::endl;
+    Xyce::dout() << "Problem (after transform)" << i << " : \t" << actual_resids[i]/rhs_norm[i] << std::endl;
   }
 */
 
@@ -684,12 +673,12 @@ int N_LAS_AztecOOSolver::solve( bool ReuseFactors )
   // Update the total solution time
   solutionTime_ = timer_->elapsedTime();
 #ifdef Xyce_DETAILED_LINSOLVE_TIMES
-  cout << "Solve Time: " << solutionTime_ << endl;
+  cout << "Solve Time: " << solutionTime_ << std::endl;
 #endif
   linearStatus = 0;
 
 #ifdef Xyce_DEBUG_LINEAR
-  string msg = "N_NLS_IterativeSolver::solve: ";
+  static const char *trace = "N_NLS_IterativeSolver::solve";
 
   // Process the flag returned from the linear solver.  Currently these are
   // based upon what's returned from Trilinos - eventually we will probably
@@ -698,49 +687,37 @@ int N_LAS_AztecOOSolver::solve( bool ReuseFactors )
   {
     // Nominal
   case (0):
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
-                           "Linear solver was successful.\n");
+    Xyce::dout() << trace << "Linear solver was successful." << std::endl;
     break;
 
     // Invalid option
   case (-1):
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_ERROR_0, msg +
-                           "Linear solve failed - User requested option is "
-                           "not available.\n");
+    Xyce::dout() << trace << " Linear solve failed - User requested option is not available." << std::endl;
+    Xyce::Report::UserError0() << "Linear solve failed - User requested option is not available.";
     break;
 
     // Numerical breakdown
   case (-2):
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
-                           "Linear solve failed - Numerical breakdown "
-                           "occurred.\n");
+    Xyce::dout() << trace << " Linear solve failed - Numerical breakdown occurred." << std::endl;
     break;
 
     // Numerical loss of precision
   case (-3):
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
-                           "Linear solve failed - Numerical loss of "
-                           "precision occurred.\n");
+    Xyce::dout() << trace << " Linear solve failed - Numerical loss of precision occurred." << std::endl;
     break;
 
     // Hessenberg matrix illconditioned
   case (-4):
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
-                           "Linear solve failed - The Hessenberg matrix is "
-                           "illconditioned (GMRES).\n");
+    Xyce::dout() << trace << " Linear solve failed - The Hessenberg matrix is illconditioned (GMRES)." << std::endl;
     break;
 
     // Maximum iterations taken without convergence
   case (1):
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_DEBUG_0, msg +
-                           "Linear solve failed - Maximum iterations taken "
-                           "without convergence");
+    Xyce::dout() << trace << " Linear solve failed - Maximum iterations taken without convergence" << std::endl;
     break;
 
   default:
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_ERROR_0, msg +
-                           "Linear solve failed - Solver returned unknown "
-                           "status code.");
+    Xyce::Report::DevelFatal0().in(trace) << "Linear solve failed - Solver returned unknown status code.";
   }
 
 #endif  // Xyce_DEBUG_LINEAR
@@ -761,25 +738,25 @@ bool N_LAS_AztecOOSolver::setAztecCntl_( const N_UTL_Param & param )
 {
   bool found = false;
 
-  if( param.tag() == "AZ_precond" )         preCond_ = param.iVal();
-  if( param.tag() == "AZ_subdomain_solve" ) subdomainSolve_ = param.iVal();
-  if( param.tag() == "AZ_kspace" )          KSpace_ = param.iVal();
-  if( param.tag() == "AZ_athresh" )         aThresh_ = param.dVal();
-  if( param.tag() == "AZ_rthresh" )         rThresh_ = param.dVal();
-  if( param.tag() == "AZ_ilut_fill" )       ilutFill_ = param.dVal();
-  if( param.tag() == "AZ_drop" )            drop_ = param.dVal();
-  if( param.tag() == "AZ_overlap" )         overlap_ = param.iVal();
-  if( param.tag() == "AZ_output" )          output_ = param.iVal();
-  if( param.tag() == "AZ_diagnostics" )     diagnostics_ = param.iVal();
-  if( param.tag() == "AZ_max_iter" )        maxIter_ = param.iVal();
-  if( param.tag() == "AZ_tol" )             tolerance_ = param.dVal();
+  if( param.tag() == "AZ_precond" )         preCond_ = param.getImmutableValue<int>();
+  if( param.tag() == "AZ_subdomain_solve" ) subdomainSolve_ = param.getImmutableValue<int>();
+  if( param.tag() == "AZ_kspace" )          KSpace_ = param.getImmutableValue<int>();
+  if( param.tag() == "AZ_athresh" )         aThresh_ = param.getImmutableValue<double>();
+  if( param.tag() == "AZ_rthresh" )         rThresh_ = param.getImmutableValue<double>();
+  if( param.tag() == "AZ_ilut_fill" )       ilutFill_ = param.getImmutableValue<double>();
+  if( param.tag() == "AZ_drop" )            drop_ = param.getImmutableValue<double>();
+  if( param.tag() == "AZ_overlap" )         overlap_ = param.getImmutableValue<int>();
+  if( param.tag() == "AZ_output" )          output_ = param.getImmutableValue<int>();
+  if( param.tag() == "AZ_diagnostics" )     diagnostics_ = param.getImmutableValue<int>();
+  if( param.tag() == "AZ_max_iter" )        maxIter_ = param.getImmutableValue<int>();
+  if( param.tag() == "AZ_tol" )             tolerance_ = param.getImmutableValue<double>();
 
   if( solver_ )
   {
     for( int i = 0; (i < num_AZ_options_) && !found; ++i )
       if( param.tag() == AZ_options_[i] )
       {
-        solver_->SetAztecOption( i, param.iVal() );
+        solver_->SetAztecOption( i, param.getImmutableValue<int>() );
         found = true;
         continue;
       }
@@ -788,7 +765,7 @@ bool N_LAS_AztecOOSolver::setAztecCntl_( const N_UTL_Param & param )
       for( int i = 0; (i < num_AZ_params_) && !found; ++i )
         if( param.tag() == AZ_params_[i] )
         {
-          solver_->SetAztecParam( i, param.dVal() );
+          solver_->SetAztecParam( i, param.getImmutableValue<double>() );
           found = true;
           continue;
         }

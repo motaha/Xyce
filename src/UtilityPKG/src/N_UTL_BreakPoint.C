@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.6.6.2 $
+// Revision Number: $Revision: 1.11 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -52,56 +52,56 @@
 #include <math.h>
 #endif
 
-// These are included because the SGI won't accept "using namespace std;" 
-// in N_UTL_Xyce.h unless there's something that actually uses the std
-// namespace.  Apparently the math header doesn't.
 #include <iostream>
 #include <string>
 
 #include <N_UTL_Xyce.h>
 #include <N_UTL_BreakPoint.h>
 
+namespace Xyce {
+namespace Util {
+
 // Set the thing for the first time, so the static (class) variable gets
 // instantiated
-double N_UTL_BreakPoint::bptol_=1.0e-20;
+double BreakPoint::bptol_=1.0e-20;
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_BreakPoint::N_UTL_BreakPoint
+// Function      : BreakPoint::BreakPoint
 // Purpose       : constructor
 // Special Notes : 
 // Scope         : public
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 04/28/2004
 //-----------------------------------------------------------------------------
-N_UTL_BreakPoint::N_UTL_BreakPoint(double t, BreakpointType ty):time(t),type(ty)
+BreakPoint::BreakPoint(double t, BreakpointType ty):time(t),type(ty)
 {}
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_BreakPoint::N_UTL_BreakPoint
+// Function      : BreakPoint::BreakPoint
 // Purpose       : copy constructor
 // Special Notes : 
 // Scope         : public
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 04/28/2004
 //-----------------------------------------------------------------------------
-N_UTL_BreakPoint::N_UTL_BreakPoint(const N_UTL_BreakPoint& right)
+BreakPoint::BreakPoint(const BreakPoint& right)
   :time(right.time),
    type(right.type)
 {}
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_BreakPoint::operator=
+// Function      : BreakPoint::operator=
 // Purpose       : copy assignment
 // Special Notes : 
 // Scope         : public
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 04/28/2004
 //-----------------------------------------------------------------------------
-N_UTL_BreakPoint&  N_UTL_BreakPoint::operator= ( const N_UTL_BreakPoint& b)
+BreakPoint&  BreakPoint::operator= ( const BreakPoint& b)
 { time=b.time; type=b.type; return *this;}
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_BreakPoint::N_UTL_BreakPoint
+// Function      : BreakPoint::BreakPoint
 // Purpose       : conversion assignment from double
 // Special Notes : allows one to assign a double to a breakpoint, defaults
 //                 the type to simple
@@ -110,12 +110,12 @@ N_UTL_BreakPoint&  N_UTL_BreakPoint::operator= ( const N_UTL_BreakPoint& b)
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 04/28/2004
 //-----------------------------------------------------------------------------
-N_UTL_BreakPoint&  N_UTL_BreakPoint::operator= ( const double& t)
+BreakPoint&  BreakPoint::operator= ( const double& t)
 { time=t; type=SIMPLE_BREAKPOINT; return *this;}
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_BreakPoint::set
+// Function      : BreakPoint::set
 // Purpose       : Set function that lets one give an int instead of an enum
 //                 for the type.  Does that by kludging.
 // Special Notes : 
@@ -123,7 +123,7 @@ N_UTL_BreakPoint&  N_UTL_BreakPoint::operator= ( const double& t)
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 04/28/2004
 //-----------------------------------------------------------------------------
-void N_UTL_BreakPoint::set(double t, int ty)
+void BreakPoint::set(double t, int ty)
 {
   time=t;
   switch (ty)
@@ -138,3 +138,6 @@ void N_UTL_BreakPoint::set(double t, int ty)
     type=SIMPLE_BREAKPOINT;
   }
 }
+
+} // namespace Util
+} // namespace Xyce

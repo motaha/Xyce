@@ -1,0 +1,5 @@
+<map id="Xyce::Device::ADC::Instance" name="Xyce::Device::ADC::Instance">
+<area shape="rect" id="node2" href="$classXyce_1_1Device_1_1DeviceInstance.html" title="N_DEV_DeviceInstance" alt="" coords="21,155,195,181"/>
+<area shape="rect" id="node3" href="$classXyce_1_1Device_1_1DeviceEntity.html" title="Xyce::Device::DeviceEntity" alt="" coords="15,80,201,107"/>
+<area shape="rect" id="node4" href="$classXyce_1_1Device_1_1ParameterBase.html" title="Base class for all parameters." alt="" coords="5,5,211,32"/>
+</map>

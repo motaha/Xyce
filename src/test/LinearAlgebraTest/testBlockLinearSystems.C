@@ -120,20 +120,20 @@ int main(int argc, char* argv[])
         *(comm.petraComm()) // communicator
         );
   N_PDS_ParMap oBaseMap( &oPetraBaseMap, &comm );
-  baseMap.petraMap()->Print(std::cout);
-  oBaseMap.petraMap()->Print(std::cout);
+  baseMap.petraMap()->Print(Xyce::dout());
+  oBaseMap.petraMap()->Print(Xyce::dout());
 
   // Create block maps for a map including ground nodes.
   std::vector<Teuchos::RCP<N_PDS_ParMap> > blockMaps = 
     createBlockParMaps( numBlocks, baseMap, oBaseMap );
-  blockMaps[0]->petraMap()->Print(std::cout);
-  blockMaps[1]->petraMap()->Print(std::cout);
+  blockMaps[0]->petraMap()->Print(Xyce::dout());
+  blockMaps[1]->petraMap()->Print(Xyce::dout());
 
-  std::cout << "CREATING NEW BLOCK MAPS!!!" << std::endl;
+  Xyce::dout() << "CREATING NEW BLOCK MAPS!!!" << std::endl;
   std::vector<Teuchos::RCP<N_PDS_ParMap> > blockMaps2 = 
     createBlockParMaps2( numBlocks, baseMap, oBaseMap );
-  blockMaps2[0]->petraMap()->Print(std::cout);
-  blockMaps2[1]->petraMap()->Print(std::cout);
+  blockMaps2[0]->petraMap()->Print(Xyce::dout());
+  blockMaps2[1]->petraMap()->Print(Xyce::dout());
 
   // Create a block of vectors using the baseMap and oBaseMap
   std::vector<Teuchos::RCP<N_LAS_Vector> > blockVectors2( numBlocks );
@@ -218,13 +218,13 @@ int main(int argc, char* argv[])
   Teuchos::RCP<Amesos_BaseSolver> solver = Teuchos::rcp( amesosFactory.Create( "Klu", problem ) );
 
   int linearStatus = solver->SymbolicFactorization();
-  if (linearStatus != 0) std::cout << "Amesos symbolic factorization exited with error: " << linearStatus;
+  if (linearStatus != 0) Xyce::dout() << "Amesos symbolic factorization exited with error: " << linearStatus;
 
   linearStatus = solver->NumericFactorization();
-  if (linearStatus != 0) std::cout << "Amesos numeric factorization exited with error: " << linearStatus;
+  if (linearStatus != 0) Xyce::dout() << "Amesos numeric factorization exited with error: " << linearStatus;
   
   linearStatus = solver->Solve();
-  if (linearStatus != 0) std::cout << "Amesos solve exited with error: " << linearStatus;
+  if (linearStatus != 0) Xyce::dout() << "Amesos solve exited with error: " << linearStatus;
 
   origSoln.printPetraObject();
 
@@ -233,13 +233,13 @@ int main(int argc, char* argv[])
   Teuchos::RCP<Amesos_BaseSolver> blockSolver = Teuchos::rcp( amesosFactory.Create( "Klu", blockProblem ) );
 
   linearStatus = blockSolver->SymbolicFactorization();
-  if (linearStatus != 0) std::cout << "Amesos symbolic factorization exited with error: " << linearStatus;
+  if (linearStatus != 0) Xyce::dout() << "Amesos symbolic factorization exited with error: " << linearStatus;
 
   linearStatus = blockSolver->NumericFactorization();
-  if (linearStatus != 0) std::cout << "Amesos numeric factorization exited with error: " << linearStatus;
+  if (linearStatus != 0) Xyce::dout() << "Amesos numeric factorization exited with error: " << linearStatus;
   
   linearStatus = blockSolver->Solve();
-  if (linearStatus != 0) std::cout << "Amesos solve exited with error: " << linearStatus;
+  if (linearStatus != 0) Xyce::dout() << "Amesos solve exited with error: " << linearStatus;
  
   blockSoln.printPetraObject();
   

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright(C) 2002-2013  Sandia Corporation
+//    Copyright(C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,21 +36,19 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.374.2.23 $
+// Revision Number: $Revision: 1.419.2.2 $
 //
-// Revision Date  : $Date: 2013/12/12 20:59:21 $
+// Revision Date  : $Date: 2014/03/18 21:43:40 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: erkeite $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
-// ---------- Standard Includes ----------
 
 #include <N_UTL_Misc.h>
 
 #include <iostream>
 #include <fstream>
-
 #include <sstream>
 
 #ifdef HAVE_CMATH
@@ -59,44 +57,42 @@
 #include <math.h>
 #endif
 
-//------- Xyce Includes ----------
-#include <N_IO_CmdParse.h>
-#include <N_IO_OutputMgr.h>
-
-#include <N_TOP_Topology.h>
-
-#include <N_DEV_DeviceInterface.h>
-
-#include <N_LAS_System.h>
-#include <N_LAS_Matrix.h>
-#include <N_LAS_Vector.h>
-#include <N_LAS_BlockVector.h>
-
 #include <N_ANP_AnalysisInterface.h>
 #include <N_ANP_AnalysisManager.h>
+#include <N_DEV_DeviceInterface.h>
+#include <N_DEV_DeviceSensitivities.h>
+#include <N_ERH_ErrorMgr.h>
+#include <N_IO_CmdParse.h>
+#include <N_IO_FourierMgr.h>
+#include <N_IO_Objective.h>
+#include <N_IO_Op.h>
+#include <N_IO_OutputFileBase.h>
+#include <N_IO_OutputMgr.h>
+#include <N_IO_OutputPrn.h>
+#include <N_IO_mmio.h>
+#include <N_LAS_BlockVector.h>
+#include <N_LAS_Matrix.h>
+#include <N_LAS_System.h>
+#include <N_LAS_Vector.h>
 #include <N_MPDE_Manager.h>
-
 #include <N_PDS_Comm.h>
 #include <N_PDS_ParMap.h>
-#include <N_ERH_ErrorMgr.h>
-
-#include <N_UTL_Version.h>
+#include <N_PDS_Serial.h>
+#include <N_PDS_MPI.h>
+#include <N_TOP_Topology.h>
+#include <N_UTL_Algorithm.h>
 #include <N_UTL_Expression.h>
-#include <N_UTL_LogStream.h>
-#include <N_IO_Objective.h>
 #include <N_UTL_ExpressionData.h>
-#include <N_IO_mmio.h>
+#include <N_UTL_LogStream.h>
+#include <N_UTL_Version.h>
 
-//------ Misc Includes --------
 #include <Teuchos_as.hpp>
 #include <Teuchos_SerialDenseMatrix.hpp>
 #include <Teuchos_oblackholestream.hpp>
 
+#undef HAVE_LIBPARMETIS
 #include <EpetraExt_RowMatrixOut.h>
 #include <Epetra_CrsMatrix.h>
-
-#include <N_IO_OutputFileBase.h>
-#include <N_IO_OutputPrn.h>
 
 #ifdef Xyce_USE_HDF5
 #ifdef Xyce_PARALLEL_MPI
@@ -109,42 +105,11 @@
 #include <N_IO_OutputHDF5.h>
 #endif // Xyce_USE_HDF5
 
-
-//------ Extern Declarations --------
-
 namespace Xyce {
 namespace IO {
 
-namespace {
-
-void fixupExpressions(ParameterList::iterator begin, ParameterList::iterator end, OutputMgr &output_manager)
-{
-  // set up expressions.  This needs to be done on each processor.
-  // expressions should have been fully resolved by this point.  We
-  // can check that by look at the tag() and value() of the parameter.
-  // if the N_UTL_Param has been fully resolved, then both the
-  // hasExpressionTag() and hasExpressionValue() will be true.
-  for (ParameterList::iterator it = begin ; it != end; ++it)
-  {
-    if ((*it).hasExpressionTag()) // check for expression.
-    {
-      if ((*it).getType() == EXPR)
-      {
-        (*it).setSimContextAndData(EXPRESSION, rcp(new N_UTL_ExpressionData((*it).ePtr(), &output_manager)));
-      }
-      else if( ((*it).getType() == DBLE) || ((*it).getType() == INT) )
-      {
-        (*it).setSimContextAndData(CONSTANT, (*it).dVal() );
-      }
-      else
-      {
-        (*it).setSimContextAndData(EXPRESSION, rcp(new N_UTL_ExpressionData((*it).tag(), &output_manager)));
-      }
-    }
-  }
-}
-
-} // namespace <unnnamed>
+void gatherGlobalDeviceCount(Parallel::Machine comm, std::map<std::string,int> &globalDeviceMap, const std::map<std::string,int> &local_device_count_map );
+std::ostream &printDeviceCount(std::ostream &os, const std::map<std::string, int> &device_count_map);
 
 //-----------------------------------------------------------------------------
 // Function      : OutputMgr::factory
@@ -159,7 +124,7 @@ void fixupExpressions(ParameterList::iterator begin, ParameterList::iterator end
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 10/10/00
 //-----------------------------------------------------------------------------
-OutputMgr * OutputMgr::factory(N_IO_CmdParse & cp)
+OutputMgr * OutputMgr::factory(CmdParse & cp)
 {
   OutputMgr * OM_ptr = new OutputMgr(cp);
   return OM_ptr;
@@ -173,7 +138,7 @@ OutputMgr * OutputMgr::factory(N_IO_CmdParse & cp)
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 10/10/00
 //-----------------------------------------------------------------------------
-OutputMgr::OutputMgr(N_IO_CmdParse & cp)
+OutputMgr::OutputMgr(CmdParse & cp)
   : commandLine_(cp),
     ACFlag_(false),
     rawFlag_(false),
@@ -182,11 +147,13 @@ OutputMgr::OutputMgr(N_IO_CmdParse & cp)
     DCSweepFlag_(false),
     HBFlag_(false),
     homotopyFlag_(false),
+    sensitivityFlag_(false),
     enableHomotopyFlag_(false),
+    enableSensitivityFlag_(false),
     format_(Format::STD),
     noIndex_(false),
     formatResult_(Format::STD),
-    printParameters_(0),
+    printParameters_(&defaultPrintParameters_),
     PRINTType_(PrintType::NONE),
     PRINTdcstart_(0.0),
     PRINTdcstop_(0.0),
@@ -194,55 +161,70 @@ OutputMgr::OutputMgr(N_IO_CmdParse & cp)
     PRINTdcname_(""),
     ICflag_(false),
     saveFlag_(false),
-  loadFlag_(false),
-  outputOnceAlreadyFlag_(false),
-  nodesetflag_(false),
-  stepLoopNumber_(0),
-  maxParamSteps_(0),
-  dcLoopNumber_(0),
-  maxDCSteps_(0),
-  circuitTime_(0.0),
-  circuitTemp_(27.0),
-  circuitFrequency_(0.0),
-  output_op_(false),
-  input_op_(false),
-  output_op_file_(""),
-  input_op_file_(""),
-  saveFileLevel_("ALL"),
-  saveFileType_(".NODESET"),
-  saveOutputFile_(""),
-  topPtr_(0),
-  devPtr_(0),
-  anaIntPtr_(0),
-  initialOutputInterval_(0.0),
-  filter_(0.0),
-  filterGiven_(false),
-  staticIndex_(0),
-  netListFilename_(cp.getArgumentValue("netlist")),
-  title_(cp.getArgumentValue("netlist")),
-  measureManager_(*this),
-  fourierManager_(*this),
-  filenameSuffix_(""),            // set using an inlined accessor function
-  responseFileName_(""),          // set using inlined accessor function
-  responseFileNameGiven_(false),
-  tempSweepFlag_(false),
-  outputCalledBefore_(false),
-  STEPEnabledFlag_(false),
-  STEPcounter_(0),
-  printEndOfSimulationLine_(true),
-  RESULTinitialized_(false),
-  resultStreamPtr_(0),
-  op_found_(0),
-  total_soln_(0),
-  numResponseVars_(0),
-  detailedDeviceCountFlag_(false),
-  pdsCommPtr_(0),
-  icType_(-1),
-  hdf5FileNameGiven_(false),
-  hdf5HeaderWritten_(false),
-  hdf5IndexValue_(0)
+    loadFlag_(false),
+    outputOnceAlreadyFlag_(false),
+    nodesetflag_(false),
+    stepLoopNumber_(0),
+    maxParamSteps_(0),
+    dcLoopNumber_(0),
+    maxDCSteps_(0),
+    circuitTime_(0.0),
+    circuitTemp_(27.0),
+    circuitFrequency_(0.0),
+    output_op_(false),
+    input_op_(false),
+    output_op_file_(""),
+    input_op_file_(""),
+    saveFileLevel_("ALL"),
+    saveFileType_(".NODESET"),
+    saveOutputFile_(""),
+    topology_(0),
+    deviceInterface_(0),
+    analysisInterface_(0),
+    initialOutputInterval_(0.0),
+    staticIndex_(0),
+    netListFilename_(cp.getArgumentValue("netlist")),
+    title_(cp.getArgumentValue("netlist")),
+    measureManager_(*this),
+    fourierManager_(*this),
+    filenameSuffix_(""),            // set using an inlined accessor function
+    responseFileName_(""),          // set using inlined accessor function
+    responseFileNameGiven_(false),
+    tempSweepFlag_(false),
+    outputCalledBefore_(false),
+    STEPEnabledFlag_(false),
+    STEPcounter_(0),
+    printEndOfSimulationLine_(true),
+    outputVersionInRawFile_(false),
+    RESULTinitialized_(false),
+    resultStreamPtr_(0),
+    op_found_(0),
+    total_soln_(0),
+    numResponseVars_(0),
+    detailedDeviceCountFlag_(false),
+    pdsCommPtr_(0),
+    icType_(-1),
+    hdf5FileNameGiven_(false),
+    hdf5HeaderWritten_(false),
+    hdf5IndexValue_(0),
+    sensObjFunction_(""),
+    sensObjFuncGiven_(false)
 {
-  activeOutputterStack_.push_back(std::vector<Outputter::Interface *>());
+  if (commandLine_.getArgumentValue("-delim") == "TAB")
+    defaultPrintParameters_.delimiter_ = "\t";
+  else if (commandLine_.getArgumentValue("-delim") == "COMMA")
+    defaultPrintParameters_.delimiter_ = ",";
+  else
+    defaultPrintParameters_.delimiter_ = commandLine_.getArgumentValue("-delim");
+
+  defaultPrintParameters_.rawOverride_ = commandLine_.argExists("-r");
+
+  // If the output file is specified on the command line it takes
+  // precedence, reset the value of netListFilename_
+  if (commandLine_.argExists("-o"))
+  {
+    defaultPrintParameters_.filename_ = commandLine_.getArgumentValue("-o");
+  }
 }
 
 //-----------------------------------------------------------------------------
@@ -255,7 +237,7 @@ OutputMgr::OutputMgr(N_IO_CmdParse & cp)
 //-----------------------------------------------------------------------------
 OutputMgr::~OutputMgr()
 {
-  for (std::vector< N_IO_OutputFileBase *>::iterator it = outputHandlersVec_.begin(); it != outputHandlersVec_.end(); ++it)
+  for (std::vector< OutputFileBase *>::iterator it = outputHandlersVec_.begin(); it != outputHandlersVec_.end(); ++it)
     delete (*it);
 
   for (OutputterMap::iterator it = outputterMap_.begin(); it != outputterMap_.end(); ++it)
@@ -263,14 +245,25 @@ OutputMgr::~OutputMgr()
 
   for (OpenPathStreamMap::iterator it = openPathStreamMap_.begin(); it != openPathStreamMap_.end(); ++it)
     delete (*it).second.second;
+
+  for (Util::OpList::iterator it = responseVarList_.begin(); it != responseVarList_.end(); ++it)
+    delete *it;
 }
 
+//-----------------------------------------------------------------------------
+// Function      : OutputMgr::openFile
+// Purpose       : open named file in given mode, create stream
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur, Raytheon
+// Creation Date : 07/08/2013
+//-----------------------------------------------------------------------------
 std::ostream *OutputMgr::openFile(const std::string &path, std::ios_base::openmode mode)
 {
   OpenPathStreamMap::iterator it = openPathStreamMap_.find(path);
 
   if (path == "CONSOLE")
-    return &std::cout;
+    return &Xyce::dout();
   else if (it != openPathStreamMap_.end()) {
     ++(*it).second.first;
     return (*it).second.second;
@@ -281,8 +274,7 @@ std::ostream *OutputMgr::openFile(const std::string &path, std::ios_base::openmo
 
     if (!os->good())
     {
-      std::string msg("Failure opening " + path + "\n");
-      N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0, msg);
+      Report::UserFatal0() << "Failure opening " << path;
     }
 
     return os;
@@ -290,19 +282,44 @@ std::ostream *OutputMgr::openFile(const std::string &path, std::ios_base::openmo
 
 }
 
+//-----------------------------------------------------------------------------
+// Function      : OutputMgr::openFile
+// Purpose       : open named file for output only, create stream
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur, Raytheon
+// Creation Date : 07/08/2013
+//-----------------------------------------------------------------------------
 std::ostream *OutputMgr::openFile(const std::string &path)
 {
-  return openFile(path, ios_base::out);
+  return openFile(path, std::ios_base::out);
 }
 
+//-----------------------------------------------------------------------------
+// Function      : OutputMgr::openBinaryFile
+// Purpose       : open named file in binary mode for output only, create 
+//                 stream
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur, Raytheon
+// Creation Date : 07/08/2013
+//-----------------------------------------------------------------------------
 std::ostream *OutputMgr::openBinaryFile(const std::string &path)
 {
-  return openFile(path, ios_base::out | ios_base::binary);
+  return openFile(path, std::ios_base::out | std::ios_base::binary);
 }
 
+//-----------------------------------------------------------------------------
+// Function      : OutputMgr::closeFile
+// Purpose       : Close given stream
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur, Raytheon
+// Creation Date : 07/08/2013
+//-----------------------------------------------------------------------------
 int OutputMgr::closeFile(std::ostream *os)
 {
-  if (os == &std::cout)
+  if (os == &Xyce::dout())
     return 1;
 
   int open_count = 0;
@@ -322,7 +339,7 @@ int OutputMgr::closeFile(std::ostream *os)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : OutputMgr::check_output
+// Function      : OutputMgr::prepareOutput
 // Purpose       : checks to make sure requested values can be output
 // Special Notes : Primary purpose is for error checking BEFORE calculation.
 //                 Also allows any name translation for output, if needed.
@@ -339,54 +356,72 @@ int OutputMgr::closeFile(std::ostream *os)
 // function.  This whole functionality really should be refactored, or
 // at least made more transparent to other developers.
 //
+// Function renamed from check_output to prepareOutput and heavily reorganized
+// by David Baur on 6/28/2013.
+//
 // Scope         : public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 06/01/05
 //-----------------------------------------------------------------------------
 void OutputMgr::prepareOutput(
-  ANP_Analysis_Mode                     analysis_mode,
+  Analysis::Analysis_Mode               analysis_mode,
   const std::vector<N_ANP_SweepParam> & step_sweep_parameters,
   const std::vector<N_ANP_SweepParam> & dc_sweep_parameters)
 {
+  fixupNodeNames();
+
   setSweepParameters(step_sweep_parameters, dc_sweep_parameters);
 
   // Setup rawfile if requested
   if (commandLine_.argExists("-r"))
   {
+    if (activeOutputterStack_.empty())
+      activeOutputterStack_.push_back(std::vector<Outputter::Interface *>());
+
     enableOverrideRawOutput(*printParameters_);
   }
   else {
     switch (analysis_mode) {
-      case ANP_MODE_DC_OP:
+      case Analysis::ANP_MODE_DC_OP:
         break;
 
-      case ANP_MODE_DC_SWEEP:
+      case Analysis::ANP_MODE_DC_SWEEP:
         enableDCSweepOutput();
         break;
 
-      case ANP_MODE_TRANSIENT:
+      case Analysis::ANP_MODE_TRANSIENT:
         enableTransientOutput();
         break;
 
-      case ANP_MODE_MPDE:
+      case Analysis::ANP_MODE_MPDE:
 //      enableTransientOutput(step_sweep_parameters, dc_sweep_parameters);
         enableMPDEOutput();
         break;
 
-      case ANP_MODE_HB:
+      case Analysis::ANP_MODE_HB:
         enableHBOutput();
         break;
 
-      case ANP_MODE_AC:
+      case Analysis::ANP_MODE_AC:
         enableACOutput();
         break;
 
-      case ANP_MODE_MOR:
+      case Analysis::ANP_MODE_MOR:
+        break;
+
+      default:     // silence warnings from clang about uncaught cases in enum
         break;
     }
 
     if (enableHomotopyFlag_)
+    {
       enableHomotopyOutput(analysis_mode);
+    }
+
+    if (enableSensitivityFlag_)
+    {
+      enableSensitivityOutput(analysis_mode);
+    }
   }
 
   if (outputterMap_.empty()) {
@@ -394,6 +429,9 @@ void OutputMgr::prepareOutput(
     outputter->parse();
     outputterMap_[PrintType::TRAN] = outputter;
   }
+
+  measureManager_.fixupMeasureParameters();
+  fourierManager_.fixupFourierParameters();
 }
 
 //-----------------------------------------------------------------------------
@@ -411,222 +449,407 @@ bool OutputMgr::registerParallelServices(N_PDS_Comm * tmp_pds_ptr)
   return pdsCommPtr_;
 }
 
+//-----------------------------------------------------------------------------
+// Namespace     : Unnamed
+// Purpose       : file-local scoped methods and data
+// Special Notes :
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
 namespace {
-struct OutputMgr_STEPOptionsReg : public N_IO_PkgOptionsReg
+
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_STEPOptionsReg
+// Purpose       : functor for registering STEP options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+struct OutputMgr_STEPOptionsReg : public PkgOptionsReg
 {
   OutputMgr_STEPOptionsReg( OutputMgr &mgr )
     : outputManager_(mgr)
   {}
 
-  bool operator()( const N_UTL_OptionBlock & options )
+  bool operator()( const Util::OptionBlock & options )
   { return outputManager_.registerSTEPOptions( options ); }
 
   OutputMgr &outputManager_;
 };
 
-struct OutputMgr_DCOptionsReg : public N_IO_PkgOptionsReg
+
+
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_DCOptionsReg
+// Purpose       : functor for registering DC options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+struct OutputMgr_DCOptionsReg : public PkgOptionsReg
 {
   OutputMgr_DCOptionsReg( OutputMgr &mgr )
     : outputManager_(mgr)
   {}
 
-  bool operator()( const N_UTL_OptionBlock & options )
+  bool operator()( const Util::OptionBlock & options )
   { return outputManager_.registerDCOptions( options ); }
 
   OutputMgr &outputManager_;
 };
 
-struct OutputMgr_DCOPOptionsReg : public N_IO_PkgOptionsReg
+
+
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_DCOPOptionsReg
+// Purpose       : functor for registering DCOP options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+struct OutputMgr_DCOPOptionsReg : public PkgOptionsReg
 {
   OutputMgr_DCOPOptionsReg( OutputMgr &mgr )
     : outputManager_(mgr)
   {}
 
-  bool operator()( const N_UTL_OptionBlock & options )
+  bool operator()( const Util::OptionBlock & options )
   { return outputManager_.registerDCOPOptions( options ); }
 
   OutputMgr &outputManager_;
 };
 
-struct OutputMgr_TranOptionsReg : public N_IO_PkgOptionsReg
+
+
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_TranOptionsReg
+// Purpose       : functor for registering transient options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+struct OutputMgr_TranOptionsReg : public PkgOptionsReg
 {
   OutputMgr_TranOptionsReg( OutputMgr &mgr )
     : outputManager_(mgr)
   {}
 
-  bool operator()( const N_UTL_OptionBlock & options )
+  bool operator()( const Util::OptionBlock & options )
   { return outputManager_.registerTranOptions( options ); }
 
   OutputMgr &outputManager_;
 };
 
-struct OutputMgr_MPDETranOptionsReg : public N_IO_PkgOptionsReg
+
+
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_TranOptionsReg
+// Purpose       : functor for registering transient options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+struct OutputMgr_MPDETranOptionsReg : public PkgOptionsReg
 {
   OutputMgr_MPDETranOptionsReg( OutputMgr &mgr )
     : outputManager_(mgr)
   {}
 
-  bool operator()( const N_UTL_OptionBlock & options )
+  bool operator()( const Util::OptionBlock & options )
   { return outputManager_.registerMPDETranOptions( options ); }
 
   OutputMgr &outputManager_;
 };
 
-struct OutputMgr_HBOptionsReg : public N_IO_PkgOptionsReg
+
+
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_HBOptionsReg
+// Purpose       : functor for registering HB options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+struct OutputMgr_HBOptionsReg : public PkgOptionsReg
 {
   OutputMgr_HBOptionsReg( OutputMgr &mgr )
     : outputManager_(mgr)
   {}
 
-  bool operator()( const N_UTL_OptionBlock & options )
+  bool operator()( const Util::OptionBlock & options )
   { return outputManager_.registerHBOptions( options ); }
 
   OutputMgr &outputManager_;
 };
 
-struct OutputMgr_OptionsReg : public N_IO_PkgOptionsReg
+
+
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_OptionsReg
+// Purpose       : functor for registering Output options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+struct OutputMgr_OptionsReg : public PkgOptionsReg
 {
   OutputMgr_OptionsReg( OutputMgr &mgr )
     : outputManager_(mgr)
   {}
 
-  bool operator()( const N_UTL_OptionBlock & options )
+  bool operator()( const Util::OptionBlock & options )
   { return outputManager_.registerOutputOptions( options ); }
 
   OutputMgr &outputManager_;
 };
 
-struct OutputMgr_DeviceOptionsReg : public N_IO_PkgOptionsReg
+
+
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_DeviceOptionsReg
+// Purpose       : functor for registering Device options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+struct OutputMgr_DeviceOptionsReg : public PkgOptionsReg
 {
   OutputMgr_DeviceOptionsReg( OutputMgr &mgr )
     : outputManager_(mgr)
   {}
 
-  bool operator()( const N_UTL_OptionBlock & options )
+  bool operator()( const Util::OptionBlock & options )
   { return outputManager_.registerDeviceOptions( options ); }
 
   OutputMgr &outputManager_;
 };
 
-struct OutputMgr_PrintOptionsReg : public N_IO_PkgOptionsReg
+
+
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_PrintOptionsReg
+// Purpose       : functor for registering Print options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+struct OutputMgr_PrintOptionsReg : public PkgOptionsReg
 {
   OutputMgr_PrintOptionsReg( OutputMgr &mgr )
     : outputManager_(mgr)
   {}
 
-  bool operator()( const N_UTL_OptionBlock & options )
+  bool operator()( const Util::OptionBlock & options )
   { return outputManager_.registerPRINTSet
       ( options ); }
 
   OutputMgr &outputManager_;
 };
 
-struct OutputMgr_ICOptionsReg : public N_IO_PkgOptionsReg
+
+
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_ICOptionsReg
+// Purpose       : functor for registering IC options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+struct OutputMgr_ICOptionsReg : public PkgOptionsReg
 {
   OutputMgr_ICOptionsReg( OutputMgr &mgr )
     : outputManager_(mgr)
   {}
 
-  bool operator()( const N_UTL_OptionBlock & options )
+  bool operator()( const Util::OptionBlock & options )
   { return outputManager_.registerIC ( options ); }
 
   OutputMgr &outputManager_;
 };
 
-struct OutputMgr_NodeSetOptionsReg : public N_IO_PkgOptionsReg
+
+
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_NodeSetOptionsReg
+// Purpose       : functor for registering NodeSet options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+struct OutputMgr_NodeSetOptionsReg : public PkgOptionsReg
 {
   OutputMgr_NodeSetOptionsReg( OutputMgr &mgr )
     : outputManager_(mgr)
   {}
 
-  bool operator()( const N_UTL_OptionBlock & options )
+  bool operator()( const Util::OptionBlock & options )
   { return outputManager_.registerNodeSet( options ); }
 
   OutputMgr &outputManager_;
 };
 
-struct OutputMgr_ResultOptionsReg : public N_IO_PkgOptionsReg
+
+
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_ResultOptionsReg
+// Purpose       : functor for registering Result options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+struct OutputMgr_ResultOptionsReg : public PkgOptionsReg
 {
   OutputMgr_ResultOptionsReg( OutputMgr &mgr )
     : outputManager_(mgr)
   {}
 
-  bool operator()( const N_UTL_OptionBlock & options )
+  bool operator()( const Util::OptionBlock & options )
   { return outputManager_.setRESULTParams( options ); }
 
   OutputMgr &outputManager_;
 };
 
-struct OutputMgr_ObjectiveOptionsReg : public N_IO_PkgOptionsReg
+
+
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_ObjectiveOptionsReg
+// Purpose       : functor for registering Objective options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+struct OutputMgr_ObjectiveOptionsReg : public PkgOptionsReg
 {
   OutputMgr_ObjectiveOptionsReg( OutputMgr &mgr )
     : outputManager_(mgr)
   {}
 
-  bool operator()( const N_UTL_OptionBlock & options )
+  bool operator()( const Util::OptionBlock & options )
   { return outputManager_.setOBJECTIVEParams( options ); }
 
   OutputMgr &outputManager_;
 };
 
-struct OutputMgr_SaveOptionsReg : public N_IO_PkgOptionsReg
+
+
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_SaveOptionsReg
+// Purpose       : functor for registering Save options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+struct OutputMgr_SaveOptionsReg : public PkgOptionsReg
 {
   OutputMgr_SaveOptionsReg( OutputMgr &mgr )
     : outputManager_(mgr)
   {}
 
-  bool operator()( const N_UTL_OptionBlock & options )
+  bool operator()( const Util::OptionBlock & options )
   { return outputManager_.registerSave( options ); }
 
   OutputMgr &outputManager_;
 };
 
-struct OutputMgr_LoadOptionsReg : public N_IO_PkgOptionsReg
+
+
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_LoadOptionsReg
+// Purpose       : functor for registering Load options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+struct OutputMgr_LoadOptionsReg : public PkgOptionsReg
 {
   OutputMgr_LoadOptionsReg( OutputMgr &mgr )
     : outputManager_(mgr)
   {}
 
-  bool operator()( const N_UTL_OptionBlock & options )
+  bool operator()( const Util::OptionBlock & options )
   { return outputManager_.registerLoad( options ); }
 
   OutputMgr &outputManager_;
 };
 
-struct OutputMgr_OPOptionsReg : public N_IO_PkgOptionsReg
+
+
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_OPOptionsReg
+// Purpose       : functor for registering OP options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+struct OutputMgr_OPOptionsReg : public PkgOptionsReg
 {
   OutputMgr_OPOptionsReg( OutputMgr &mgr )
     : outputManager_(mgr)
   {}
 
-  bool operator()( const N_UTL_OptionBlock & options )
+  bool operator()( const Util::OptionBlock & options )
   { return outputManager_.registerOP ( options ); }
 
   OutputMgr &outputManager_;
 };
 
-struct OutputMgr_MeasureOptionsReg : public N_IO_PkgOptionsReg
+
+
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_MeasureOptionsReg
+// Purpose       : functor for registering Measure options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+struct OutputMgr_MeasureOptionsReg : public PkgOptionsReg
 {
-  OutputMgr_MeasureOptionsReg( N_IO_MeasureManager &mgr )
+  OutputMgr_MeasureOptionsReg( Measure::Manager &mgr )
     : measureManager_(mgr)
   {}
 
-  bool operator()( const N_UTL_OptionBlock & options )
+  bool operator()( const Util::OptionBlock & options )
   { return measureManager_.addMeasure( options ); }
 
-  N_IO_MeasureManager &measureManager_;
+  Measure::Manager &measureManager_;
 };
 
-struct OutputMgr_FourierOptionsReg : public N_IO_PkgOptionsReg
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_FourierOptionsReg
+// Purpose       : functor for registering Fourier options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : dgbaur
+// Creation Date : 06/28/2013
+//-----------------------------------------------------------------------------
+struct OutputMgr_FourierOptionsReg : public PkgOptionsReg
 {
-  OutputMgr_FourierOptionsReg( N_IO_FourierMgr &mgr )
+  OutputMgr_FourierOptionsReg( FourierMgr &mgr )
     : fourierManager_(mgr)
   {}
 
-  bool operator()( const N_UTL_OptionBlock & options )
+  bool operator()( const Util::OptionBlock & options )
   { return fourierManager_.addFourierAnalysis( options ); }
 
-  N_IO_FourierMgr &fourierManager_;
+  FourierMgr &fourierManager_;
+};
+
+//-----------------------------------------------------------------------------
+// Class         : OutputMgr_SensOptionsReg
+// Purpose       : functor for registering sensitivity options
+// Special Notes : Used by package manager submitRegistration method
+// Creator       : Eric Keiter
+// Creation Date : 02/10/2014
+//-----------------------------------------------------------------------------
+struct OutputMgr_SensOptionsReg : public PkgOptionsReg
+{
+  OutputMgr_SensOptionsReg( OutputMgr &mgr )
+    : outputManager_(mgr)
+  {}
+
+  bool operator()( const Util::OptionBlock & options )
+  { return outputManager_.registerSens( options ); }
+
+  OutputMgr &outputManager_;
 };
 
 } // namespace <unnamed>
@@ -639,7 +862,7 @@ struct OutputMgr_FourierOptionsReg : public N_IO_PkgOptionsReg
 // Creator       : Rich Schiek, 1437
 // Creation Date : 10/21/08
 //-----------------------------------------------------------------------------
-bool OutputMgr::registerPkgOptionsMgr(N_IO_PkgOptionsMgr &pkgOpt)
+bool OutputMgr::registerPkgOptionsMgr(PkgOptionsMgr &pkgOpt)
 {
   pkgOpt.submitRegistration(
     "DC", netListFilename_, new OutputMgr_DCOptionsReg(*this));
@@ -695,6 +918,9 @@ bool OutputMgr::registerPkgOptionsMgr(N_IO_PkgOptionsMgr &pkgOpt)
   pkgOpt.submitRegistration(
     "FOUR", netListFilename_, new OutputMgr_FourierOptionsReg(fourierManager_));
 
+  pkgOpt.submitRegistration(
+      "SENS", netListFilename_, new OutputMgr_SensOptionsReg(*this)); 
+
   return true;
 }
 
@@ -706,19 +932,19 @@ bool OutputMgr::registerPkgOptionsMgr(N_IO_PkgOptionsMgr &pkgOpt)
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 05/08/06
 //-----------------------------------------------------------------------------
-bool OutputMgr::registerDCOPOptions(const N_UTL_OptionBlock & option_block)
+bool OutputMgr::registerDCOPOptions(const Util::OptionBlock & option_block)
 {
   for (ParameterList::const_iterator iterPL = option_block.getParams().begin(); iterPL != option_block.getParams().end(); ++iterPL)
   {
     if (iterPL->tag() == "INPUT")
     {
       input_op_ = true;
-      input_op_file_ = iterPL->sVal();
+      input_op_file_ = iterPL->stringValue();
     }
     else if (iterPL->tag() == "OUTPUT")
     {
       output_op_ = true;
-      output_op_file_ = iterPL->sVal();
+      output_op_file_ = iterPL->stringValue();
     }
     else if (iterPL->tag() == "TIME")
     {
@@ -726,9 +952,7 @@ bool OutputMgr::registerDCOPOptions(const N_UTL_OptionBlock & option_block)
     }
     else
     {
-      std::string msg("Parameter not recognized in .DCOP line: ");
-      msg += iterPL->tag();
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg);
+      Report::UserWarning0() << "Parameter " << iterPL->tag() << " not recognized in .DCOP command";
     }
   }
 
@@ -743,11 +967,17 @@ bool OutputMgr::registerDCOPOptions(const N_UTL_OptionBlock & option_block)
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 08/21/06
 //-----------------------------------------------------------------------------
-bool OutputMgr::registerDCOptions(const N_UTL_OptionBlock & option_block)
+bool OutputMgr::registerDCOptions(const Util::OptionBlock & option_block)
 {
-  for (ParameterList::const_iterator iterPL = option_block.getParams().begin(); iterPL != option_block.getParams().end(); ++iterPL)
+  for (ParameterList::const_iterator 
+       iterPL = option_block.getParams().begin(); 
+       iterPL != option_block.getParams().end(); ++iterPL)
+  {
     if (iterPL->tag() == "PARAM")
-      dcParams_.push_back(iterPL->sVal());
+    {
+      dcParams_.push_back(iterPL->stringValue());
+    }
+  }
 
   return true;
 }
@@ -760,7 +990,7 @@ bool OutputMgr::registerDCOptions(const N_UTL_OptionBlock & option_block)
 // Creator       : Eric Keiter, SNL
 // Creation Date : 09/25/07
 //-----------------------------------------------------------------------------
-bool OutputMgr::registerTranOptions(const N_UTL_OptionBlock & OB)
+bool OutputMgr::registerTranOptions(const Util::OptionBlock & OB)
 {
 //  PRINTType_ = PrintType::TRAN;
   return true;
@@ -774,7 +1004,7 @@ bool OutputMgr::registerTranOptions(const N_UTL_OptionBlock & OB)
 // Creator       : Todd Coffey, Rich Schiek, Ting Mei
 // Creation Date : 7/24/08
 //-----------------------------------------------------------------------------
-bool OutputMgr::registerMPDETranOptions(const N_UTL_OptionBlock & OB)
+bool OutputMgr::registerMPDETranOptions(const Util::OptionBlock & OB)
 {
 //  PRINTType_ = PrintType::TRAN;
   return true;
@@ -788,7 +1018,7 @@ bool OutputMgr::registerMPDETranOptions(const N_UTL_OptionBlock & OB)
 // Creator       : Todd Coffey, Rich Schiek, Ting Mei
 // Creation Date : 7/24/08
 //-----------------------------------------------------------------------------
-bool OutputMgr::registerHBOptions(const N_UTL_OptionBlock & OB)
+bool OutputMgr::registerHBOptions(const Util::OptionBlock & OB)
 {
 //  PRINTType_ = PrintType::HB;
   return true;
@@ -802,11 +1032,18 @@ bool OutputMgr::registerHBOptions(const N_UTL_OptionBlock & OB)
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 08/21/06
 //-----------------------------------------------------------------------------
-bool OutputMgr::registerSTEPOptions(const N_UTL_OptionBlock & option_block)
+bool OutputMgr::registerSTEPOptions(const Util::OptionBlock & option_block)
 {
-  for (ParameterList::const_iterator iterPL = option_block.getParams().begin(); iterPL != option_block.getParams().end(); ++iterPL)
+  for (ParameterList::const_iterator 
+      iterPL = option_block.getParams().begin(); 
+      iterPL != option_block.getParams().end(); 
+      ++iterPL)
+  {
     if (iterPL->tag() == "PARAM")
-      stepParams_.push_back(iterPL->sVal());
+    {
+      stepParams_.push_back(iterPL->stringValue());
+    }
+  }
 
   return true;
 }
@@ -819,11 +1056,18 @@ bool OutputMgr::registerSTEPOptions(const N_UTL_OptionBlock & option_block)
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 5/10/10
 //-----------------------------------------------------------------------------
-bool OutputMgr::registerDeviceOptions(const N_UTL_OptionBlock & option_block)
+bool OutputMgr::registerDeviceOptions(const Util::OptionBlock & option_block)
 {
-  for (ParameterList::const_iterator iter = option_block.getParams().begin(); iter != option_block.getParams().end(); ++iter)
+  for (ParameterList::const_iterator 
+      iter = option_block.getParams().begin(); 
+      iter != option_block.getParams().end(); 
+      ++iter)
+  {
     if (iter->tag() == "DETAILED_DEVICE_COUNTS")
-      detailedDeviceCountFlag_ = iter->bVal();
+    {
+      detailedDeviceCountFlag_ = iter->getImmutableValue<bool>();
+    }
+  }
 
   return true;
 }
@@ -837,7 +1081,7 @@ bool OutputMgr::registerDeviceOptions(const N_UTL_OptionBlock & option_block)
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 8/30/01
 //-----------------------------------------------------------------------------
-bool OutputMgr::registerOutputOptions(const N_UTL_OptionBlock & OB)
+bool OutputMgr::registerOutputOptions(const Util::OptionBlock & OB)
 {
 
   // Need to capture a variable length of output intervals.  The use case is:
@@ -854,16 +1098,15 @@ bool OutputMgr::registerOutputOptions(const N_UTL_OptionBlock & OB)
   ParameterList::const_iterator iterPL = OB.getParams().begin();
   while (iterPL != OB.getParams().end())
   {
-
     if (iterPL->tag() == "INITIAL_INTERVAL")
     {
       // start handling a list of intervals
       // set interval value
-      initialOutputInterval_ = iterPL->dVal();
+      initialOutputInterval_ = iterPL->getImmutableValue<double>();
       // look for optional time pairs.
       outputIntervalPairs_.clear();
       bool doneWithTimePairs = false;
-
+      
       // need to point at next parameter
       ++iterPL;
 
@@ -871,12 +1114,12 @@ bool OutputMgr::registerOutputOptions(const N_UTL_OptionBlock & OB)
       {
         if (iterPL->tag() == "TIME")
         {
-          double t = iterPL->dVal();
+          double t = iterPL->getImmutableValue<double>();
           ++iterPL;
-          double iv = iterPL->dVal();
+          double iv = iterPL->getImmutableValue<double>();
           ++iterPL;
 
-          outputIntervalPairs_.push_back(pair<double, double>(t, iv));
+          outputIntervalPairs_.push_back(std::pair<double, double>(t, iv));
         }
         else
         {
@@ -885,24 +1128,29 @@ bool OutputMgr::registerOutputOptions(const N_UTL_OptionBlock & OB)
         }
       }
     }
-    // look for other option tags
     else if (iterPL->tag()=="HDF5FILENAME")
-
     {
+    // look for other option tags
       hdf5FileNameGiven_=true;
-      hdf5FileName_=iterPL->sVal();
-      ++iterPL;
-    }
+      hdf5FileName_=iterPL->stringValue();
+      ++iterPL;    
+    } 
     else if (iterPL->tag()=="PRINTENDOFSIMLINE")
     {
       // look for flag to turn off "End of Xyce(TM) Simulation" line
-      printEndOfSimulationLine_=iterPL->bVal();
-      ++iterPL;
+      printEndOfSimulationLine_=iterPL->getImmutableValue<bool>();
+      ++iterPL;    
+    }
+    else if (iterPL->tag()=="OUTPUTVERSIONINRAWFILE")
+    {
+      // look for flag to toggle output of version in header of RAW file 
+     outputVersionInRawFile_=iterPL->getImmutableValue<bool>();
+     ++iterPL;    
     }
     else
     {
-      //silently ignore unrecognized parameters
-      ++iterPL;
+      // silently ignore?
+      ++iterPL;    
     }
   }
 
@@ -917,12 +1165,15 @@ bool OutputMgr::registerOutputOptions(const N_UTL_OptionBlock & OB)
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 11/16/01
 //-----------------------------------------------------------------------------
-bool OutputMgr::registerDistribNodes(const N_UTL_OptionBlock & option_block)
+bool OutputMgr::registerDistribNodes(const Util::OptionBlock & option_block)
 {
-  for (ParameterList::const_iterator iterPL = option_block.getParams().begin(); iterPL != option_block.getParams().end(); ++iterPL)
+  for (ParameterList::const_iterator 
+      iterPL = option_block.getParams().begin(); 
+      iterPL != option_block.getParams().end(); 
+      ++iterPL)
   {
     distribVnodeSet_.insert(iterPL->tag());
-    distribVsrcSet_.insert(iterPL->sVal());
+    distribVsrcSet_.insert(iterPL->stringValue());
   }
 
   return true;
@@ -936,8 +1187,9 @@ bool OutputMgr::registerDistribNodes(const N_UTL_OptionBlock & option_block)
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 08/18/06
 //-----------------------------------------------------------------------------
-void OutputMgr::registerNodeDevNames(const std::set<std::string> * nodeNamesIn,
-                                     const std::map<std::string, RefCountPtr<N_DEV_InstanceBlock> > * devNamesIn)
+void OutputMgr::registerNodeDevNames(
+    const std::set<std::string> * nodeNamesIn,
+    const std::map<std::string, RefCountPtr<N_DEV_InstanceBlock> > * devNamesIn)
 {
   nodeNames_ = nodeNamesIn;
   devNames_ = devNamesIn;
@@ -954,7 +1206,8 @@ void OutputMgr::registerNodeDevNames(const std::set<std::string> * nodeNamesIn,
 // Creator       : Rich Schiek, Electrical Systems Modeling
 // Creation Date : 08/07/2012
 //-----------------------------------------------------------------------------
-void OutputMgr::setExternalNetlistParams(std::vector< pair< std::string, std::string> > & externalNetlistParams)
+void OutputMgr::setExternalNetlistParams(
+  std::vector< std::pair< std::string, std::string> > & externalNetlistParams)
 {
 
   //  externalParams can contain section names from dakota like
@@ -963,8 +1216,8 @@ void OutputMgr::setExternalNetlistParams(std::vector< pair< std::string, std::st
   // if we find tags, then use the "responses" section to record what response functions
   // need to be reported.
   std::string sectionTag="variables";
-  std::vector< pair< std::string, std::string > >::iterator externalParamsIter = externalNetlistParams.begin();
-  std::vector< pair< std::string, std::string > >::iterator externalParamsEnd = externalNetlistParams.end();
+  std::vector< std::pair< std::string, std::string > >::iterator externalParamsIter = externalNetlistParams.begin();
+  std::vector< std::pair< std::string, std::string > >::iterator externalParamsEnd = externalNetlistParams.end();
   while (externalParamsIter != externalParamsEnd)
   {
     if (externalParamsIter->first == "variables")
@@ -1026,7 +1279,9 @@ void OutputMgr::setExternalNetlistParams(std::vector< pair< std::string, std::st
 void OutputMgr::printLineDiagnostics()
 {
   if (!printParameters_ || printParameters_->variableList_.empty())
+  {
     return;
+  }
 
   std::map<std::string, bool> stringStat;
   std::map<std::string, bool> nodeStat;
@@ -1034,7 +1289,7 @@ void OutputMgr::printLineDiagnostics()
 
   for (ParameterList::const_iterator iterParam = printParameters_->variableList_.begin() ; iterParam != printParameters_->variableList_.end(); ++iterParam)
   {
-    if ((*iterParam).getSimContext() == UNDEFINED)
+    if (true) // (*iterParam).getSimContext() == Util::UNDEFINED)
     {
       std::string varType(iterParam->tag());
 
@@ -1044,37 +1299,34 @@ void OutputMgr::printLineDiagnostics()
       std::vector<std::string> leads;
       std::vector<std::string> strings;
       std::vector<std::string> special;
-      if (iterParam->hasExpressionTag() )
+      if (Util::hasExpressionTag(*iterParam) )
       {
         // parameter starts with "{" but may not have been been parsed into an expression.
         // check if there is an underlying expression object with the parameter
-        if (iterParam->getType() == EXPR)
+        if (iterParam->getType() == Util::EXPR)
         {
-          iterParam->ePtr()->get_names(XEXP_NODE, nodes);
-          iterParam->ePtr()->get_names(XEXP_INSTANCE, instances);
-          iterParam->ePtr()->get_names(XEXP_LEAD, leads);
-          iterParam->ePtr()->get_names(XEXP_STRING, strings);
-          iterParam->ePtr()->get_names(XEXP_SPECIAL, special);  // special returns vars like TIME
+          iterParam->getValue<Util::Expression>().get_names(XEXP_NODE, nodes);
+          iterParam->getValue<Util::Expression>().get_names(XEXP_INSTANCE, instances);
+          iterParam->getValue<Util::Expression>().get_names(XEXP_LEAD, leads);
+          iterParam->getValue<Util::Expression>().get_names(XEXP_STRING, strings);
+          iterParam->getValue<Util::Expression>().get_names(XEXP_SPECIAL, special);  // special returns vars like TIME
         }
-        else if ( ((iterParam->getType()) == DBLE) || ((iterParam->getType()) == INT) )
+        else if ( ((iterParam->getType()) == Util::DBLE) || ((iterParam->getType()) == Util::INT) )
         {
-          // an expression that has been resolved to a constant, usually on another processor
-          // (*iterParam).setSimContextAndData( CONSTANT, iterParam->dVal());
         }
         instances.insert(instances.end(), leads.begin(), leads.end());
         strings.insert(strings.end(), special.begin(), special.end());  // add specials to strings
       }
       else
       {
-        int numIndices = iterParam->iVal();
+        int numIndices = iterParam->getImmutableValue<int>();
         if (numIndices > 0 &&(varType == "I" ||(varType.size() == 2 && varType[0] == 'I')))
         {
           // any devices found in this I(xxx) structure need to be communicated to the device manager
           // so that the lead currents can be calculated
           if (numIndices != 1)
           {
-            std::string msg("Only one device argument allowed in I() in .print");
-            N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
+            Report::DevelFatal0() << "Only one device argument allowed in I() in .PRINT command";
           }
           ++iterParam;
           if (varType.size() == 2)
@@ -1090,8 +1342,7 @@ void OutputMgr::printLineDiagnostics()
         {
           if (numIndices < 1 || numIndices > 2)
           {
-            std::string msg("Only one or two node arguments allowed in V() in .print");
-            N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
+            Report::DevelFatal0() << "Only one or two node arguments allowed in V() in .PRINT command";
           }
           for (; numIndices > 0 ; --numIndices)
           {
@@ -1109,8 +1360,7 @@ void OutputMgr::printLineDiagnostics()
           // internal vars).
           if (numIndices != 1)
           {
-            std::string msg("Only one device argument allowed in N() in .print");
-            N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
+            Report::DevelFatal0() << "Only one device argument allowed in N() in .PRINT command";
           }
           ++iterParam;
         }
@@ -1120,11 +1370,14 @@ void OutputMgr::printLineDiagnostics()
         }
       }
 
-      for (std::vector<std::string>::iterator iter_s = strings.begin(); iter_s != strings.end(); ++iter_s)
+      for (std::vector<std::string>::iterator 
+          iter_s = strings.begin(); 
+          iter_s != strings.end(); ++iter_s)
       {
         done = false;
 
-        if (*iter_s == "TEMP" || *iter_s == "TIME" || *iter_s == "FREQUENCY" || *iter_s == "INDEX")
+        if (*iter_s == "TEMP" || *iter_s == "TIME" || 
+            *iter_s == "FREQUENCY" || *iter_s == "INDEX")
           done = true;
         std::vector<std::string>::iterator step_i;
         std::vector<std::string>::iterator step_end;
@@ -1167,7 +1420,7 @@ void OutputMgr::printLineDiagnostics()
         if (!done)
         {
           double result;
-          done = devPtr_->getParam(*iter_s, result);
+          done = deviceInterface_->getParamAndReduce(*iter_s, result);
 
           // Note:  when this is called, the devices haven't been allocated
           // yet.  So, this particular check isn't reliable.  If the device and/or
@@ -1183,12 +1436,15 @@ void OutputMgr::printLineDiagnostics()
       }
 
 
-      for (std::vector<std::string>::iterator iter_s = nodes.begin(); iter_s != nodes.end(); ++iter_s)
+      for (std::vector<std::string>::iterator 
+          iter_s = nodes.begin(); 
+          iter_s != nodes.end(); ++iter_s)
       {
         bool tmpBool = false;
-        // ERK: in rare cases, nodeNames_ can be NULL.  The function registerNodeDevNames is only called
-        // on processors with greater than zero devices.  Occasionally, Xyce will give a processor
-        // nothing to do.
+        // ERK: in rare cases, nodeNames_ can be NULL.  The function 
+        // registerNodeDevNames is only called
+        // on processors with greater than zero devices.  Occasionally, Xyce 
+        // will give a processor nothing to do.
         if (nodeNames_ !=0)
         {
           // allow * to pass
@@ -1202,9 +1458,10 @@ void OutputMgr::printLineDiagnostics()
         if ((*iter_s).substr((*iter_s).size()-1, 1) == "}")
         {
           bool tmpBool = false;
-          // ERK: in rare cases, devNames_ can be NULL.  The function registerNodeDevNames is only called
-          // on processors with greater than zero devices.  Occasionally, Xyce will give a processor
-          // nothing to do.
+          // ERK: in rare cases, devNames_ can be NULL.  The function 
+          // registerNodeDevNames is only called
+          // on processors with greater than zero devices.  Occasionally, Xyce 
+          // will give a processor nothing to do.
           if (devNames_ !=0)
           {
             // allow * to pass
@@ -1215,9 +1472,10 @@ void OutputMgr::printLineDiagnostics()
         else
         {
           bool tmpBool = false;
-          // ERK: in rare cases, devNames_ can be NULL.  The function registerNodeDevNames is only called
-          // on processors with greater than zero devices.  Occasionally, Xyce will give a processor
-          // nothing to do.
+          // ERK: in rare cases, devNames_ can be NULL.  The function 
+          // registerNodeDevNames is only called
+          // on processors with greater than zero devices.  Occasionally, Xyce 
+          // will give a processor nothing to do.
           if (devNames_ !=0)
           {
             // allow * to pass
@@ -1228,6 +1486,7 @@ void OutputMgr::printLineDiagnostics()
       }
     }
   }
+
   // Sum results if parallel
   if (!pdsCommPtr_->isSerial())
   {
@@ -1242,18 +1501,26 @@ void OutputMgr::printLineDiagnostics()
     for (; stat_i != stat_end ; ++stat_i)
     {
       if ((*stat_i).second)
+      {
         stat[i++] = 1;
+      }
       else
+      {
         stat[i++] = 0;
+      }
     }
     stat_i = instanceStat.begin();
     stat_end = instanceStat.end();
     for (; stat_i != stat_end ; ++stat_i)
     {
       if ((*stat_i).second)
+      {
         stat[i++] = 1;
+      }
       else
+      {
         stat[i++] = 0;
+      }
     }
     pdsCommPtr_->sumAll(&stat[0], &stat_g[0], totSize);
     i = 0;
@@ -1262,61 +1529,86 @@ void OutputMgr::printLineDiagnostics()
     for (; stat_i != stat_end ; ++stat_i)
     {
       if (stat_g[i++] > 0)
+      {
         (*stat_i).second = true;
+      }
     }
     stat_i = instanceStat.begin();
     stat_end = instanceStat.end();
     for (; stat_i != stat_end ; ++stat_i)
     {
       if (stat_g[i++] > 0)
+      {
         (*stat_i).second = true;
+      }
     }
   }
 
   // Generate message
-  std::map<std::string, bool>::iterator stat_i, stat_end;
-  std::string msg("Undefined item(s) in .print: ");
-  int mlen = msg.size();
-  stat_i = nodeStat.begin();
-  stat_end = nodeStat.end();
-  for (; stat_i != stat_end ; ++stat_i)
+  std::ostringstream oss;
+  int count = 0;
+
+  for (std::map<std::string, bool>::iterator 
+      stat_i = nodeStat.begin(); 
+      stat_i != nodeStat.end(); ++stat_i)
   {
     if (!(*stat_i).second)
     {
-      msg += "V(" +(*stat_i).first + ") ";
+      if (count != 0)
+      {
+        oss << ", ";
+      }
+      oss << "node " << (*stat_i).first;
+      ++count;
     }
   }
-  stat_i = instanceStat.begin();
-  stat_end = instanceStat.end();
-  for (; stat_i != stat_end ; ++stat_i)
+
+  for (std::map<std::string, bool>::iterator 
+      stat_i = instanceStat.begin(); 
+      stat_i != instanceStat.end(); ++stat_i)
   {
     if (!(*stat_i).second)
     {
+      if (count != 0)
+      {
+        oss << ", ";
+      }
       if (((*stat_i).first)[((*stat_i).first).size()-1] == '}')
       {
-        msg += "I" +((*stat_i).first).substr(((*stat_i).first).size()-2, 1);
-        msg += "(";
-        msg +=((*stat_i).first).substr(0, ((*stat_i).first).size()-3);
-        msg += ") ";
+        oss << "I" << ((*stat_i).first).substr(((*stat_i).first).size()-2, 1)
+            << "("
+            << ((*stat_i).first).substr(0, ((*stat_i).first).size()-3)
+            << ")";
+        ++count;
       }
       else
       {
-        msg += "I(" +(*stat_i).first + ") ";
+        oss << "I(" << (*stat_i).first << ")";
+        ++count;
       }
     }
   }
-  stat_i = stringStat.begin();
-  stat_end = stringStat.end();
-  for (; stat_i != stat_end ; ++stat_i)
+
+  for (std::map<std::string, bool>::iterator 
+      stat_i = stringStat.begin(); 
+      stat_i != stringStat.end(); ++stat_i)
   {
     if (!(*stat_i).second)
     {
-      msg +=(*stat_i).first + " ";
+      if (count != 0)
+      {
+        oss << ", ";
+      }
+      oss << (*stat_i).first;
+      ++count;
     }
   }
-  if (mlen < msg.size())
+
+  if (count != 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, msg);
+    Report::UserError0().at(printParameters_->netlistLocation_) << "There " 
+      << (count == 1 ? "was " : "were ") << count << " undefined symbol" 
+      << (count == 1 ? "" : "s") << " in .PRINT command: " << oss.str();
   }
 }
 
@@ -1351,6 +1643,12 @@ void OutputMgr::printLineDiagnostics()
 //                 a long time, and it is often useful to get diagnostics earlier
 //                 than that.
 //
+//                 Note from TVR 10/22/2013:  "check_output", referred to
+//                 above, has been broken apart and renamed "prepareOutput".
+//                 The notes from ERK above are therefore somewhat out of date.
+//                 The refactor, though, is not complete, and the replacement
+//                 code is not well documented.
+//
 // Scope         : public
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 01/17/07
@@ -1360,25 +1658,31 @@ void OutputMgr::delayedPrintLineDiagnostics()
   if (deviceParamCheck.empty())
     return;
 
-  std::string badParams;
-  for (std::set<std::string>::iterator iter = deviceParamCheck.begin(); iter != deviceParamCheck.end(); ++iter)
+  std::ostringstream oss;
+  int count = 0;
+  for (std::set<std::string>::iterator 
+      iter = deviceParamCheck.begin(); 
+      iter != deviceParamCheck.end(); ++iter)
   {
-    std::string s(*iter);
+    std::string s = *iter;
+
     double result = 0.0;
-    bool done = devPtr_->getParam(s , result);
+    bool done = deviceInterface_->getParamAndReduce(s, result);
     if (!done)
     {
-      badParams += *iter + "  ";
+      if (count != 0)
+        oss << ", ";
+      oss << *iter;
+      ++count;
     }
   }
 
-  if (badParams != "")
+  if (count != 0)
   {
-    std::string msg("Undefined parameter(s) in .print: ");
-    msg += badParams;
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, msg);
+    Report::UserFatal0() << "There " << (count == 1 ? "was " : "were ") 
+      << count << " undefined symbol" << (count == 1 ? "" : "s") 
+      << " in .PRINT command: " << oss.str();
   }
-
 }
 
 //-----------------------------------------------------------------------------
@@ -1389,7 +1693,9 @@ void OutputMgr::delayedPrintLineDiagnostics()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 8/30/01
 //-----------------------------------------------------------------------------
-bool OutputMgr::getOutputIntervals(double & initialInterval, std::vector< pair<double, double> > & intervalPairs)
+bool OutputMgr::getOutputIntervals(
+    double & initialInterval, 
+    std::vector< std::pair<double, double> > & intervalPairs)
 {
   initialInterval = initialOutputInterval_;
   intervalPairs = outputIntervalPairs_;
@@ -1405,10 +1711,10 @@ bool OutputMgr::getOutputIntervals(double & initialInterval, std::vector< pair<d
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 08/29/04
 //-----------------------------------------------------------------------------
-bool OutputMgr::setRESULTParams(const N_UTL_OptionBlock & OB)
+bool OutputMgr::setRESULTParams(const Util::OptionBlock & OB)
 {
 #ifdef Xyce_DEBUG_IO
-  cout << "In N_IO OutputMgr::setRESULTParams" << std::endl;
+  Xyce::dout() << "In N_IO OutputMgr::setRESULTParams" << std::endl;
 #endif
 
   ParameterList::const_iterator it_tp;
@@ -1431,34 +1737,30 @@ bool OutputMgr::setRESULTParams(const N_UTL_OptionBlock & OB)
   }
   if (countPar > 1)
   {
-    msg =  "N_IO OutputMgr::setRESULTParams\n";
-    msg += "You have more than one result expression on a single line.\n";
-    msg += "Each parameter needs its own line.\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
+    Report::DevelFatal0() << "Only one expression per .RESULT command.  Each parameter needs its own .RESULT line.";
   }
 
-  N_UTL_ExpressionData * expDataPtr;
+  Util::ExpressionData * expDataPtr;
 
   for (it_tp = first; it_tp != last; ++it_tp)
   {
-    N_UTL_Param expParam = *it_tp;
+    Util::Param expParam = *it_tp;
 
     if (!expParam.hasExpressionValue())
     {
-      msg = "Non-Expression specified in .RESULT\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
+      Report::DevelFatal0() << "Parameter must be an expression in .RESULT command";
     }
     else
     {
       // expression should have already been resolved.  Check for this
       // case before we try and create a new expression.
-      if (expParam.getType() == EXPR)
+      if (expParam.getType() == Util::EXPR)
       {
-        expDataPtr = new N_UTL_ExpressionData(expParam.ePtr(), this);
+        expDataPtr = new Util::ExpressionData(expParam.getValue<Util::Expression>(), *this);
       }
       else
       {
-        expDataPtr = new N_UTL_ExpressionData(expParam.sVal(), this);
+        expDataPtr = new Util::ExpressionData(expParam.stringValue(), *this);
       }
       resultVector_.push_back(expDataPtr);
     }
@@ -1475,10 +1777,10 @@ bool OutputMgr::setRESULTParams(const N_UTL_OptionBlock & OB)
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 11/07/05
 //-----------------------------------------------------------------------------
-bool OutputMgr::setOBJECTIVEParams(const N_UTL_OptionBlock & OB)
+bool OutputMgr::setOBJECTIVEParams(const Util::OptionBlock & OB)
 {
 #ifdef Xyce_DEBUG_IO
-  cout << "In N_IO OutputMgr::setOBJECTIVEParams" << std::endl;
+  Xyce::dout() << "In N_IO OutputMgr::setOBJECTIVEParams" << std::endl;
 #endif
 
   ParameterList::const_iterator it_tp;
@@ -1494,16 +1796,14 @@ bool OutputMgr::setOBJECTIVEParams(const N_UTL_OptionBlock & OB)
     if (it_tp->uTag() == "NAME")
     {
       name = it_tp->usVal();
-      if (objective.find(name) != objective.end())
+      if (objective_.find(name) != objective_.end())
       {
-        std::string msg("Duplicate objective name: ");
-        msg += name;
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
+        Report::DevelFatal0() << "Duplicate objective name " << name;
       }
       break;
     }
   }
-  objective[name].initialize(OB, this);
+  objective_[name].initialize(OB, this);
 
   return true;
 }
@@ -1523,28 +1823,28 @@ bool OutputMgr::setOBJECTIVEParams(const N_UTL_OptionBlock & OB)
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 10/10/00
 //-----------------------------------------------------------------------------
-bool OutputMgr::registerPRINTSet(const N_UTL_OptionBlock &print_block)
+bool OutputMgr::registerPRINTSet(const Util::OptionBlock &print_block)
 {
-#ifdef Xyce_DEBUG_IO
-  cout << " PRINTSET Registered::" << std::endl;
-#endif
+//  TraceIO trace__("bool OutputMgr::registerPRINTSet(const Util::OptionBlock &print_block)");
 
   PrintParameters print_parameters;
 
+  print_parameters.netlistLocation_ = print_block.getNetlistLocation();
+  
   ParameterList::const_iterator iterParam = print_block.getParams().begin();
   for (; iterParam != print_block.getParams().end(); ++iterParam)
   {
 
 #ifdef Xyce_DEBUG_IO
-    cout << "iterParam->tag = " << iterParam->tag() << std::endl;
+    Xyce::dout() << "iterParam->tag = " << iterParam->tag() << std::endl;
 #endif
 
     if (iterParam->tag() == "WIDTH") {
-      print_parameters.streamWidth_ = iterParam->iVal();
+      print_parameters.streamWidth_ = iterParam->getImmutableValue<int>();
     }
 
     else if (iterParam->tag() == "TYPE") {
-      std::string s = iterParam->sVal();
+      std::string s = iterParam->stringValue();
       if (s == "TRAN")
         PRINTType_ = PrintType::TRAN;
       else if (s == "AC")
@@ -1555,24 +1855,22 @@ bool OutputMgr::registerPRINTSet(const N_UTL_OptionBlock &print_block)
         PRINTType_ = PrintType::DC;
       else
       {
-        std::string msg("Unrecognized analysis type, " + s);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
+        Report::DevelFatal0() << "Unrecognized analysis type " << s;
       }
       print_parameters.printType_ = PRINTType_;
     }
 
     else if (iterParam->tag() == "PRECISION") {
-      print_parameters.streamPrecision_ = iterParam->iVal();
+      print_parameters.streamPrecision_ = iterParam->getImmutableValue<int>();
     }
 
     else if (iterParam->tag() == "FILTER")
     {
-      filterGiven_ = true;
-      filter_ = iterParam->dVal();
+      print_parameters.filter_ = iterParam->getImmutableValue<double>();
     }
     else if (iterParam->tag() == "FORMAT")
     {
-      std::string s = iterParam->sVal();
+      std::string s = iterParam->stringValue();
 
       if (s == "STD")
         format_ = Format::STD;
@@ -1595,46 +1893,44 @@ bool OutputMgr::registerPRINTSet(const N_UTL_OptionBlock &print_block)
         format_ = Format::RAW;
       else
       {
-        std::string msg("Unrecognized print format, " + s);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
+        Report::DevelFatal0() << "Unrecognized print format " << s;
       }
       print_parameters.format_ = format_;
     }
 
     else if (iterParam->tag() == "TIMEWIDTH")
     {
-      print_parameters.timeWidth_ = iterParam->iVal();
+      print_parameters.timeWidth_ = iterParam->getImmutableValue<int>();
     }
 
     else if (iterParam->tag() == "TIMESCALEFACTOR")
     {
-      print_parameters.outputTimeScaleFactor_ = iterParam->dVal();
+      print_parameters.outputTimeScaleFactor_ = iterParam->getImmutableValue<double>();
     }
 
     else if (iterParam->tag() == "FILE")
     {
       // netListFilename_ should be the default unless FILE was set to
       // something other than "" which is its default value.
-      if (iterParam->sVal() != "")
+      if (iterParam->stringValue() != "")
       {
-        print_parameters.filename_ = iterParam->sVal();
+        print_parameters.filename_ = iterParam->stringValue();
       }
     }
 
     else if (iterParam->tag() == "DELIMITER")
     {
-      if (iterParam->sVal() == "TAB") {
+      if (iterParam->stringValue() == "TAB") {
         print_parameters.delimiter_ = "\t";
       }
 
-      else if (iterParam->sVal() == "COMMA") {
+      else if (iterParam->stringValue() == "COMMA") {
         print_parameters.delimiter_ = ",";
       }
 
-      else if (iterParam->sVal() != "")
+      else if (iterParam->stringValue() != "")
       {
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0,
-                                "Invalid value of DELIMITER in .PRINT statment, ignoring");
+        Report::UserWarning0() << "Invalid value of DELIMITER in .PRINT statment, ignoring";
       }
     }
 
@@ -1673,14 +1969,18 @@ bool OutputMgr::registerPRINTSet(const N_UTL_OptionBlock &print_block)
     print_parameters.filename_ = commandLine_.getArgumentValue("-o");
   }
 
-  print_parameters.index_ = !noIndex_ && print_parameters.format_ != Format::PROBE && print_parameters.format_ != Format::TECPLOT
-                            && print_parameters.format_ != Format::RAW && print_parameters.format_ != Format::RAW_ASCII;
+  print_parameters.index_ = !noIndex_ 
+                            && print_parameters.format_ != Format::PROBE 
+                            && print_parameters.format_ != Format::TECPLOT
+                            && print_parameters.format_ != Format::RAW 
+                            && print_parameters.format_ != Format::RAW_ASCII;
 
   // Assemble the apropriate flavors of output variable lists based on the PRINT type and format
   if (PRINTType_ == PrintType::AC) {
     outputParameterMap_[OutputType::AC] = print_parameters;
     outputParameterMap_[OutputType::AC_IC] = print_parameters;
     outputParameterMap_[OutputType::HOMOTOPY] = print_parameters;
+    outputParameterMap_[OutputType::SENS] = print_parameters;
     printParameters_ = &outputParameterMap_[OutputType::AC];
   }
   else if (PRINTType_ == PrintType::HB) {
@@ -1693,21 +1993,24 @@ bool OutputMgr::registerPRINTSet(const N_UTL_OptionBlock &print_block)
   else if (PRINTType_ == PrintType::TRAN) {
     outputParameterMap_[OutputType::TRAN] = print_parameters;
     outputParameterMap_[OutputType::HOMOTOPY] = print_parameters;
+    outputParameterMap_[OutputType::SENS] = print_parameters;
     printParameters_ = &outputParameterMap_[OutputType::TRAN];
   }
   else if (PRINTType_ == PrintType::DC) {
     outputParameterMap_[OutputType::DC] = print_parameters;
     outputParameterMap_[OutputType::HOMOTOPY] = print_parameters;
+    outputParameterMap_[OutputType::SENS] = print_parameters;
     printParameters_ = &outputParameterMap_[OutputType::DC];
   }
   else {
-    std::string msg("Unrecognized PRINTType_");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, msg);
+    Report::UserError0() << "Unrecognized .PRINT type";
   }
 
+  activeOutputterStack_.push_back(std::vector<Outputter::Interface *>());
+
 #ifdef Xyce_DEBUG_IO
-  cout << "netListFilename_ = " << netListFilename_ << std::endl;
-  cout << " PRINTSET Registered:: finished" << std::endl;
+  Xyce::dout() << "netListFilename_ = " << netListFilename_ << std::endl;
+  Xyce::dout() << " PRINTSET Registered:: finished" << std::endl;
 #endif
 
   return true;
@@ -1721,10 +2024,10 @@ bool OutputMgr::registerPRINTSet(const N_UTL_OptionBlock &print_block)
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 09/06/07
 //-----------------------------------------------------------------------------
-bool OutputMgr::registerIC(const N_UTL_OptionBlock & OB)
+bool OutputMgr::registerIC(const Util::OptionBlock & OB)
 {
 #ifdef Xyce_DEBUG_IO
-  cout << " IC Registered::" << std::endl;
+  Xyce::dout() << " IC Registered::" << std::endl;
 #endif
 
   ICflag_ = true;
@@ -1741,7 +2044,7 @@ bool OutputMgr::registerIC(const N_UTL_OptionBlock & OB)
 
   while (iterParam != endParam)
   {
-    cout << "iterParam->tag = " << iterParam->tag() << std::endl;
+   Xyce::dout() << "iterParam->tag = " << iterParam->tag() << std::endl;
      ++iterParam;
   }
 #endif
@@ -1757,10 +2060,10 @@ bool OutputMgr::registerIC(const N_UTL_OptionBlock & OB)
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 09/06/07
 //-----------------------------------------------------------------------------
-bool OutputMgr::registerNodeSet(const N_UTL_OptionBlock & OB)
+bool OutputMgr::registerNodeSet(const Util::OptionBlock & OB)
 {
 #ifdef Xyce_DEBUG_IO
-  cout << " NODESET Registered::" << std::endl;
+ Xyce::dout() << " NODESET Registered::" << std::endl;
 #endif
 
   nodesetflag_ = true;
@@ -1777,7 +2080,7 @@ bool OutputMgr::registerNodeSet(const N_UTL_OptionBlock & OB)
 
   while (iterParam != endParam)
   {
-    cout << "iterParam->tag = " << iterParam->tag() << std::endl;
+   Xyce::dout() << "iterParam->tag = " << iterParam->tag() << std::endl;
      ++iterParam;
   }
 #endif
@@ -1793,10 +2096,10 @@ bool OutputMgr::registerNodeSet(const N_UTL_OptionBlock & OB)
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 10/11/07
 //-----------------------------------------------------------------------------
-bool OutputMgr::registerSave(const N_UTL_OptionBlock & OB)
+bool OutputMgr::registerSave(const Util::OptionBlock & OB)
 {
 #ifdef Xyce_DEBUG_IO
-  cout << " SAVE Registered::" << std::endl;
+ Xyce::dout() << " SAVE Registered::" << std::endl;
 #endif
 
   saveFlag_ = true;
@@ -1809,11 +2112,11 @@ bool OutputMgr::registerSave(const N_UTL_OptionBlock & OB)
   while (iterPL != iterPL_end)
   {
 #ifdef Xyce_DEBUG_IO
-    cout << "iterPL->tag = " << iterPL->tag() << std::endl;
+   Xyce::dout() << "iterPL->tag = " << iterPL->tag() << std::endl;
 #endif
     if (iterPL->tag() == "TYPE")
     {
-      sval = iterPL->sVal();
+      sval = iterPL->stringValue();
       sval.toUpper();
 
       if (sval == "NODESET" || sval == ".NODESET")
@@ -1826,13 +2129,12 @@ bool OutputMgr::registerSave(const N_UTL_OptionBlock & OB)
       }
       else
       {
-        std::string msg("Unrecognized type specified on .SAVE line.  Defaulting to .NODESET");
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg);
+        Report::UserWarning0() << "Unrecognized type specified on .SAVE command.  Defaulting to .NODESET";
       }
     }
     else if (iterPL->tag() == "FILE")
     {
-      saveOutputFile_ = iterPL->sVal();
+      saveOutputFile_ = iterPL->stringValue();
     }
     else if (iterPL->tag() == "TIME")
     {
@@ -1840,7 +2142,7 @@ bool OutputMgr::registerSave(const N_UTL_OptionBlock & OB)
     }
     else if (iterPL->tag() == "LEVEL")
     {
-      sval = iterPL->sVal();
+      sval = iterPL->stringValue();
       sval.toUpper();
 
       if (sval == "ALL")
@@ -1855,21 +2157,16 @@ bool OutputMgr::registerSave(const N_UTL_OptionBlock & OB)
       }
       else if (sval == "TOP")
       {
-        std::string msg("LEVEL=TOP in .SAVE line not supported.  Ignoring. ");
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg);
+        Report::UserWarning0() << "LEVEL=TOP in .SAVE line not supported.  Ignoring. ";
       }
       else
       {
-        std::string msg("Unrecognized LEVEL specified in .SAVE line: ");
-        msg += sval;
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg);
+        Report::UserWarning0() << "Unrecognized LEVEL " << sval << " specified in .SAVE command";
       }
     }
     else
     {
-      std::string msg("Parameter not recognized in .SAVE line: ");
-      msg += iterPL->tag();
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg);
+      Report::UserWarning0() << "Parameter " << iterPL->tag() << " not recognized in .SAVE command";
     }
 
 
@@ -1887,15 +2184,11 @@ bool OutputMgr::registerSave(const N_UTL_OptionBlock & OB)
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 10/11/07
 //-----------------------------------------------------------------------------
-bool OutputMgr::registerLoad(const N_UTL_OptionBlock & OB)
+bool OutputMgr::registerLoad(const Util::OptionBlock & OB)
 {
-#ifdef Xyce_DEBUG_IO
-  cout << " Load Registered::" << std::endl;
-#endif
-
   loadFlag_ = true;
-  std::string msg(".LOAD not supported yet.  Use .INCLUDE instead");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg);
+
+  Report::UserWarning0() << ".LOAD not supported yet.  Use .INCLUDE instead";
 
   return true;
 }
@@ -1909,16 +2202,49 @@ bool OutputMgr::registerLoad(const N_UTL_OptionBlock & OB)
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 10/15/07
 //-----------------------------------------------------------------------------
-bool OutputMgr::registerOP(const N_UTL_OptionBlock & OB)
+bool OutputMgr::registerOP(const Util::OptionBlock & OB)
 {
-#ifdef Xyce_DEBUG_IO
-  cout << " OP Registered::" << std::endl;
-#endif
-
-  //  std::string msg(".OP is still under construction and not fully supported yet. ");
-  //  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
-
   return true;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : OutputMgr::registerSens
+// Purpose       : registers set of variables to set for .SENS.
+// Special Notes :
+// Scope         : public
+// Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
+// Creation Date : 2/10/2014
+//-----------------------------------------------------------------------------
+bool OutputMgr::registerSens(const Util::OptionBlock & OB)
+{
+  bool bsuccess = true;
+  std::list<N_UTL_Param>::const_iterator iter = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator end   = OB.getParams().end();
+
+  for ( ; iter != end; ++ iter)
+  {
+    if (iter->uTag() == "OBJFUNC")
+    {
+      ExtendedString func = iter->stringValue();
+      func.toUpper();
+      sensObjFunction_ = func;
+      sensObjFuncGiven_ = true;
+    }
+    else if ( std::string( iter->uTag() ,0,5) == "PARAM") // this is a vector
+    {
+      ExtendedString tag = iter->stringValue();
+      tag.toUpper();
+      sensParamNameVec_.push_back(tag);
+    }
+    else
+    {
+      Xyce::Report::UserWarning() << iter->uTag() << " is not a recognized sensitivity solver option.\n" << std::endl;
+    }
+  }
+  enableSensitivityFlag_ = true;
+
+
+  return bsuccess;
 }
 
 //-----------------------------------------------------------------------------
@@ -1929,40 +2255,51 @@ bool OutputMgr::registerOP(const N_UTL_OptionBlock & OB)
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 10/10/00
 //-----------------------------------------------------------------------------
-void OutputMgr::enableHomotopyOutput(ANP_Analysis_Mode analysis_mode)
+void OutputMgr::enableHomotopyOutput(Analysis::Analysis_Mode analysis_mode)
 {
   // prepare output manager to write
   if (homotopyFlag_)
   {
-    std::string msg("homotopyfile already initialized.  Contents may be overwritten.\n");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
+    Report::UserWarning0() << "Homotopyfile already initialized.  Contents may be overwritten.";
   }
-
   else
   {
     homotopyFlag_ = true;
 
     PrintParameters homotopy_print_parameters = outputParameterMap_[OutputType::HOMOTOPY];
 
-    if (analysis_mode == ANP_MODE_TRANSIENT)
-      homotopy_print_parameters.variableList_.push_front(N_UTL_Param("TIME", 0.0));
+    if (analysis_mode == Analysis::ANP_MODE_TRANSIENT)
+      homotopy_print_parameters.variableList_.push_front(Util::Param("TIME", 0.0));
     if (homotopy_print_parameters.index_)
-      homotopy_print_parameters.variableList_.push_front(N_UTL_Param("INDEX", 0.0));
+      homotopy_print_parameters.variableList_.push_front(Util::Param("INDEX", 0.0));
 
-    fixupPrintParameters(DOMAIN_TIME, homotopy_print_parameters);
+    fixupPrintParameters(homotopy_print_parameters);
 
     Outputter::Interface *outputter;
     if (homotopy_print_parameters.format_ == Format::STD) {
+      homotopy_print_parameters.defaultExtension_ = ".HOMOTOPY.prn";
+      homotopy_print_parameters.extraExtension_ = ".HOMOTOPY.prn";
       outputter = new Outputter::HomotopyPrn(*this, homotopy_print_parameters);
     }
-    // else if (format_ == Format::TECPLOT) {
-    //   outputter = new Outputter::HomotopyTecPlot(*this, print_parameters);
+    else if (homotopy_print_parameters.format_ == Format::TECPLOT) {
+      homotopy_print_parameters.defaultExtension_ = ".HOMOTOPY.dat";
+      homotopy_print_parameters.extraExtension_ = ".HOMOTOPY.dat";
+      outputter = new Outputter::HomotopyTecPlot(*this, homotopy_print_parameters);
+    }
+    // else if (homotopy_print_parameters.format_ == Format::CSV) {
+    //   homotopy_print_parameters.defaultExtension_ = ".HOMOTOPY.csv";
+    //   outputter                            = new Outputter::HomotopyTecplot(*this, homotopy_print_parameters);
     // }
+    else if (homotopy_print_parameters.format_ == Format::PROBE) {
+      homotopy_print_parameters.defaultExtension_ = ".HOMOTOPY.csd";
+      homotopy_print_parameters.extraExtension_ = ".HOMOTOPY.csd";
+      outputter = new Outputter::HomotopyProbe(*this, homotopy_print_parameters);
+    }
     else
     {
-      string msg("Homotopy output can only use tecplot or gnuplot format.");
-      msg += "  Resetting to gnuplot format.\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING, msg);
+      Report::UserWarning0() 
+        << "Homotopy output cannot be written in " 
+        << homotopy_print_parameters.format_ << " format, using standard format";
 
       outputter = new Outputter::HomotopyPrn(*this, homotopy_print_parameters);
     }
@@ -1974,25 +2311,81 @@ void OutputMgr::enableHomotopyOutput(ANP_Analysis_Mode analysis_mode)
 }
 
 //-----------------------------------------------------------------------------
+// Function      : OutputMgr::enableSensitivityOutput
+// Purpose       : turns on sensitivity output
+// Special Notes :
+// Scope         : public
+// Creator       : Eric Keiter
+// Creation Date : 2/10/2014
+//-----------------------------------------------------------------------------
+void OutputMgr::enableSensitivityOutput (Analysis::Analysis_Mode analysis_mode)
+{
+  // prepare output manager to write
+  if (sensitivityFlag_)
+  {
+    Report::UserWarning0() << "Sensfile already initialized.  Contents may be overwritten.";
+  }
+  else
+  {
+    sensitivityFlag_ = true;
+
+    PrintParameters sensitivity_print_parameters = outputParameterMap_[OutputType::SENS];
+
+    if (analysis_mode == Analysis::ANP_MODE_TRANSIENT)
+      sensitivity_print_parameters.variableList_.push_front(Util::Param("TIME", 0.0));
+    if (sensitivity_print_parameters.index_)
+      sensitivity_print_parameters.variableList_.push_front(Util::Param("INDEX", 0.0));
+
+    fixupPrintParameters(sensitivity_print_parameters);
+
+    Outputter::Interface *outputter;
+    if (sensitivity_print_parameters.format_ == Format::STD) {
+      sensitivity_print_parameters.defaultExtension_ = ".SENS.prn";
+      sensitivity_print_parameters.extraExtension_ = ".SENS.prn";
+      outputter = new Outputter::SensitivityPrn(*this, sensitivity_print_parameters);
+    }
+    else if (sensitivity_print_parameters.format_ == Format::TECPLOT) {
+      sensitivity_print_parameters.defaultExtension_ = ".SENS.dat";
+      sensitivity_print_parameters.extraExtension_ = ".SENS.dat";
+      outputter = new Outputter::SensitivityTecPlot(*this, sensitivity_print_parameters);
+    }
+#if 0
+    else if (sensitivity_print_parameters.format_ == Format::PROBE) {
+      sensitivity_print_parameters.defaultExtension_ = ".SENS.csd";
+      sensitivity_print_parameters.extraExtension_ = ".SENS.csd";
+      outputter = new Outputter::SensitivityProbe(*this, sensitivity_print_parameters);
+    }
+#endif
+    else
+    {
+      Report::UserWarning0() 
+        << "Sensitivity output cannot be written in requested format, using standard format";
+
+      sensitivity_print_parameters.defaultExtension_ = ".SENS.prn";
+      sensitivity_print_parameters.extraExtension_ = ".SENS.prn";
+      outputter = new Outputter::SensitivityPrn(*this, sensitivity_print_parameters);
+    }
+
+    outputter->parse();
+    outputterMap_[PrintType::SENS] = outputter;
+    addActiveOutputter(PrintType::SENS);
+  }
+}
+
+//-----------------------------------------------------------------------------
 // Function      : OutputMgr::enableACoutput
 // Purpose       : turns on AC output
 // Special Notes :
 // Scope         : public
-// Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 10/10/00
+// Creator       : David Baur, Raytheon
+// Creation Date : 5/22/2013
 //-----------------------------------------------------------------------------
 void OutputMgr::enableACOutput()
 {
-  if (getNumProcs() > 1) {
-    std::string msg("Parallel processing is not supported in A/C analysis");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, msg);
-  }
-
   // prepare output manager to write
   if (ACFlag_)
   {
-    std::string msg("ACfile already initialized.  Contents may be overwritten.\n");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
+    Report::UserWarning0() << "AC file already initialized.  Contents may be overwritten.";
   }
 
   else
@@ -2004,57 +2397,52 @@ void OutputMgr::enableACOutput()
 
     if (freq_print_parameters.format_ != Format::PROBE)
     {
-      freq_print_parameters.variableList_.push_front(N_UTL_Param("FREQUENCY", 0.0));
+      freq_print_parameters.variableList_.push_front(Util::Param("FREQUENCY", 0.0));
     }
     if (freq_print_parameters.index_)
     {
-      freq_print_parameters.variableList_.push_front(N_UTL_Param("INDEX", 0.0));
+      freq_print_parameters.variableList_.push_front(Util::Param("INDEX", 0.0));
     }
-    
+    freq_print_parameters.expandComplexTypes_ = freq_print_parameters.format_ != Format::PROBE
+                                                && freq_print_parameters.format_ != Format::RAW
+                                                && freq_print_parameters.format_ != Format::RAW_ASCII;
+
     if (ac_ic_print_parameters.format_ != Format::PROBE)
     {
-      ac_ic_print_parameters.variableList_.push_front(N_UTL_Param("TIME", 0.0));
+      ac_ic_print_parameters.variableList_.push_front(Util::Param("TIME", 0.0));
     }
     if (ac_ic_print_parameters.index_)
     {
-      ac_ic_print_parameters.variableList_.push_front(N_UTL_Param("INDEX", 0.0));
+      ac_ic_print_parameters.variableList_.push_front(Util::Param("INDEX", 0.0));
     }
 
-    if( (freq_print_parameters.format_ == Format::PROBE) ||
-        (freq_print_parameters.format_ == Format::RAW)   ||
-        (freq_print_parameters.format_ == Format::RAW_ASCII) )
-    {
-      // for probe and raw output formats the output has a complex 
-      // type so we don't need to expand V(a)
-      // into Re(V(a)) Im(V(a)).  Thus we override the default 
-      // parameter expandComplexTypes to false.
-      fixupPrintParameters(DOMAIN_FREQUENCY, freq_print_parameters, false);
-    }
-    else
-    {
-      fixupPrintParameters(DOMAIN_FREQUENCY, freq_print_parameters);
-    }
-    fixupPrintParameters(DOMAIN_TIME, ac_ic_print_parameters);
+    fixupPrintParameters(freq_print_parameters);
+    fixupPrintParameters(ac_ic_print_parameters);
 
     Outputter::Interface *outputter_fd;
     Outputter::Interface *outputter_prn;
     if (freq_print_parameters.format_ == Format::STD) {
+      ac_ic_print_parameters.extraExtension_ = ".TD.prn";
       outputter_fd = new Outputter::FrequencyPrn(*this, freq_print_parameters);
       outputter_prn = new Outputter::TimePrn(*this, ac_ic_print_parameters);
     }
     else if (freq_print_parameters.format_ == Format::CSV) {
+      ac_ic_print_parameters.extraExtension_ = ".TD.csv";
       outputter_fd = new Outputter::FrequencyCSV(*this, freq_print_parameters);
       outputter_prn = new Outputter::TimeCSV(*this, ac_ic_print_parameters);
     }
     else if (freq_print_parameters.format_ == Format::PROBE) {
+      ac_ic_print_parameters.extraExtension_ = ".TD.csd";
       outputter_fd = new Outputter::FrequencyProbe(*this, freq_print_parameters);
       outputter_prn = new Outputter::TimeProbe(*this, ac_ic_print_parameters);
     }
     else if (freq_print_parameters.format_ == Format::TECPLOT) {
+      ac_ic_print_parameters.extraExtension_ = ".TD.dat";
       outputter_fd = new Outputter::FrequencyTecPlot(*this, freq_print_parameters);
       outputter_prn = new Outputter::TimeTecPlot(*this, ac_ic_print_parameters);
     }
     else if (freq_print_parameters.format_ == Format::RAW) {
+      ac_ic_print_parameters.extraExtension_ = ".TD.raw";
       if (commandLine_.argExists("-a")) {
         outputter_fd = new Outputter::FrequencyRawAscii(*this, freq_print_parameters);
         outputter_prn = new Outputter::TimeRawAscii(*this, ac_ic_print_parameters);
@@ -2066,9 +2454,7 @@ void OutputMgr::enableACOutput()
     }
     else
     {
-      string msg("AC output can only use tecplot or gnuplot format.");
-      msg += "  Resetting to gnuplot format.\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING, msg);
+      Report::UserWarning0() << "AC output cannot be written in " << freq_print_parameters.format_ << " format, using standard format";
 
       outputter_fd = new Outputter::FrequencyPrn(*this, freq_print_parameters);
       outputter_prn = new Outputter::TimePrn(*this, ac_ic_print_parameters);
@@ -2085,20 +2471,19 @@ void OutputMgr::enableACOutput()
 
 
 //-----------------------------------------------------------------------------
-// Function      : OutputMgr::enableACoutput
-// Purpose       : turns on AC output
+// Function      : OutputMgr::enableTransientOutput
+// Purpose       : turns on Transient output
 // Special Notes :
 // Scope         : public
-// Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 10/10/00
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/26/2013
 //-----------------------------------------------------------------------------
 void OutputMgr::enableTransientOutput()
 {
   // prepare output manager to write
   if (tranFlag_)
   {
-    std::string msg("ACfile already initialized.  Contents may be overwritten.\n");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
+    Report::UserWarning0() << "Transient file already initialized.  Contents may be overwritten.";
   }
 
   else
@@ -2108,11 +2493,11 @@ void OutputMgr::enableTransientOutput()
     PrintParameters transient_print_parameters = outputParameterMap_[OutputType::TRAN];
 
     if (transient_print_parameters.format_ != Format::PROBE)
-      transient_print_parameters.variableList_.push_front(N_UTL_Param("TIME", 0.0));
+      transient_print_parameters.variableList_.push_front(Util::Param("TIME", 0.0));
     if (transient_print_parameters.index_)
-      transient_print_parameters.variableList_.push_front(N_UTL_Param("INDEX", 0.0));
+      transient_print_parameters.variableList_.push_front(Util::Param("INDEX", 0.0));
 
-    fixupPrintParameters(DOMAIN_TIME, transient_print_parameters);
+    fixupPrintParameters(transient_print_parameters);
 
     Outputter::Interface *outputter;
     if (transient_print_parameters.format_ == Format::STD) {
@@ -2133,12 +2518,9 @@ void OutputMgr::enableTransientOutput()
       else
         outputter = new Outputter::TimeRaw(*this, transient_print_parameters);
     }
-
     else
     {
-      string msg("AC output can only use tecplot or gnuplot format.");
-      msg += "  Resetting to gnuplot format.\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING, msg);
+      Report::UserWarning0() << "Transient output cannot be written in " << transient_print_parameters.format_ << " format, using standard format";
 
       outputter = new Outputter::TimePrn(*this, transient_print_parameters);
     }
@@ -2149,13 +2531,20 @@ void OutputMgr::enableTransientOutput()
   }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : OutputMgr::enableMPDEOutput
+// Purpose       : turns on MPDE output
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur, Raytheon
+// Creation Date : 5/21/2013
+//-----------------------------------------------------------------------------
 void OutputMgr::enableMPDEOutput()
 {
   // prepare output manager to write
   if (MPDEFlag_)
   {
-    std::string msg("ACfile already initialized.  Contents may be overwritten.\n");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
+    Report::UserWarning0() << "MPDE file already initialized.  Contents may be overwritten.";
   }
 
   else
@@ -2165,15 +2554,15 @@ void OutputMgr::enableMPDEOutput()
     PrintParameters mpde_print_parameters = outputParameterMap_[OutputType::TRAN];
     PrintParameters mpde_ic_print_parameters = outputParameterMap_[OutputType::TRAN];
 
-    mpde_ic_print_parameters.extension_ = ".mpde_ic.prn";
+    mpde_ic_print_parameters.defaultExtension_ = ".mpde_ic.prn";
 
     if (mpde_ic_print_parameters.format_ != Format::PROBE)
-      mpde_ic_print_parameters.variableList_.push_front(N_UTL_Param("TIME", 0.0));
+      mpde_ic_print_parameters.variableList_.push_front(Util::Param("TIME", 0.0));
     if (mpde_ic_print_parameters.index_)
-      mpde_ic_print_parameters.variableList_.push_front(N_UTL_Param("INDEX", 0.0));
+      mpde_ic_print_parameters.variableList_.push_front(Util::Param("INDEX", 0.0));
 
-    fixupPrintParameters(DOMAIN_TIME, mpde_print_parameters);
-    fixupPrintParameters(DOMAIN_TIME, mpde_ic_print_parameters);
+    fixupPrintParameters(mpde_print_parameters);
+    fixupPrintParameters(mpde_ic_print_parameters);
 
     Outputter::Interface *outputter_mpde;
     Outputter::Interface *outputter_mpde_ic;
@@ -2193,9 +2582,7 @@ void OutputMgr::enableMPDEOutput()
     // }
     else
     {
-      string msg("MPDE output can only use tecplot or gnuplot format.");
-      msg += "  Resetting to gnuplot format.\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING, msg);
+      Report::UserWarning0() << "MPDE output cannot be written in " << mpde_print_parameters.format_ << " format, using standard format";
 
       outputter_mpde = new Outputter::MPDEPrn(*this, mpde_print_parameters);
       outputter_mpde_ic = new Outputter::TimePrn(*this, mpde_ic_print_parameters);
@@ -2209,14 +2596,20 @@ void OutputMgr::enableMPDEOutput()
   }
 }
 
-
+//-----------------------------------------------------------------------------
+// Function      : OutputMgr::enableDCSweepOutput
+// Purpose       : Enable output for DC sweeps
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/26/2013
+//-----------------------------------------------------------------------------
 void OutputMgr::enableDCSweepOutput()
 {
   // prepare output manager to write
   if (DCSweepFlag_)
   {
-    std::string msg("ACfile already initialized.  Contents may be overwritten.\n");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
+    Report::UserWarning0() << "DC file already initialized.  Contents may be overwritten.";
   }
 
   else
@@ -2226,13 +2619,13 @@ void OutputMgr::enableDCSweepOutput()
     PrintParameters dc_print_parameters = outputParameterMap_[OutputType::DC];
 
     if (dc_print_parameters.index_)
-      dc_print_parameters.variableList_.push_front(N_UTL_Param("INDEX", 0.0));
+      dc_print_parameters.variableList_.push_front(Util::Param("INDEX", 0.0));
 
-    fixupPrintParameters(DOMAIN_TIME, dc_print_parameters);
+    fixupPrintParameters(dc_print_parameters);
 
     Outputter::Interface *outputter_prn;
     if (dc_print_parameters.format_ == Format::STD) {
-      dc_print_parameters.extension_ = ".prn";
+      dc_print_parameters.defaultExtension_ = ".prn";
       outputter_prn = new Outputter::TimePrn(*this, dc_print_parameters);
     }
     else if (dc_print_parameters.format_ == Format::CSV) {
@@ -2249,9 +2642,7 @@ void OutputMgr::enableDCSweepOutput()
     }
     else
     {
-      string msg("AC output can only use tecplot or gnuplot format.");
-      msg += "  Resetting to gnuplot format.\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING, msg);
+      Report::UserWarning0() << "DC output cannot be written in " << dc_print_parameters.format_ << " format, using standard format";
 
       outputter_prn = new Outputter::TimePrn(*this, dc_print_parameters);
     }
@@ -2268,16 +2659,21 @@ void OutputMgr::enableDCSweepOutput()
 // Purpose       : turns on HB output
 // Special Notes :
 // Scope         : public
-// Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 10/10/00
+// Creator       : David Baur
+// Creation Date : 5/21/2013
 //-----------------------------------------------------------------------------
 void OutputMgr::enableHBOutput()
 {
+  /*
+  if (getNumProcs() > 1) {
+    Report::UserFatal0() << "Parallel processing is not supported in HB analysis";
+  }
+  */
+
   // prepare output manager to write
   if (HBFlag_)
   {
-    std::string msg("HBfile already initialized.  Contents may be overwritten.\n");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
+    Report::UserWarning0() << "HBfile already initialized.  Contents may be overwritten.";
   }
 
   else
@@ -2286,62 +2682,63 @@ void OutputMgr::enableHBOutput()
 
     PrintParameters freq_print_parameters = outputParameterMap_[OutputType::HB_FD];
     if (freq_print_parameters.format_ != Format::PROBE)
-      freq_print_parameters.variableList_.push_front(N_UTL_Param("FREQUENCY", 0.0));
+      freq_print_parameters.variableList_.push_front(Util::Param("FREQUENCY", 0.0));
     if (freq_print_parameters.index_)
-      freq_print_parameters.variableList_.push_front(N_UTL_Param("INDEX", 0.0));
+      freq_print_parameters.variableList_.push_front(Util::Param("INDEX", 0.0));
+    freq_print_parameters.expandComplexTypes_ = freq_print_parameters.format_ != Format::PROBE
+                                                && freq_print_parameters.format_ != Format::RAW
+                                                && freq_print_parameters.format_ != Format::RAW_ASCII;
 
     PrintParameters time_print_parameters = outputParameterMap_[OutputType::HB_TD];
     if (time_print_parameters.format_ != Format::PROBE)
-      time_print_parameters.variableList_.push_front(N_UTL_Param("TIME", 0.0));
+      time_print_parameters.variableList_.push_front(Util::Param("TIME", 0.0));
     if (time_print_parameters.index_)
-      time_print_parameters.variableList_.push_front(N_UTL_Param("INDEX", 0.0));
+      time_print_parameters.variableList_.push_front(Util::Param("INDEX", 0.0));
 
     PrintParameters hb_ic_print_parameters = outputParameterMap_[OutputType::HB_IC];
     if (hb_ic_print_parameters.format_ != Format::PROBE)
-      hb_ic_print_parameters.variableList_.push_front(N_UTL_Param("TIME", 0.0));
+      hb_ic_print_parameters.variableList_.push_front(Util::Param("TIME", 0.0));
     if (hb_ic_print_parameters.index_)
-      hb_ic_print_parameters.variableList_.push_front(N_UTL_Param("INDEX", 0.0));
+      hb_ic_print_parameters.variableList_.push_front(Util::Param("INDEX", 0.0));
 
     PrintParameters hb_startup_print_parameters = outputParameterMap_[OutputType::HB_STARTUP];
     if (hb_startup_print_parameters.format_ != Format::PROBE)
-      hb_startup_print_parameters.variableList_.push_front(N_UTL_Param("TIME", 0.0));
+      hb_startup_print_parameters.variableList_.push_front(Util::Param("TIME", 0.0));
     if (hb_startup_print_parameters.index_)
-      hb_startup_print_parameters.variableList_.push_front(N_UTL_Param("INDEX", 0.0));
+      hb_startup_print_parameters.variableList_.push_front(Util::Param("INDEX", 0.0));
 
-    fixupPrintParameters(DOMAIN_FREQUENCY, freq_print_parameters);
-    fixupPrintParameters(DOMAIN_TIME, time_print_parameters);
-    fixupPrintParameters(DOMAIN_TIME, hb_ic_print_parameters);
-    fixupPrintParameters(DOMAIN_TIME, hb_startup_print_parameters);
+    fixupPrintParameters(freq_print_parameters);
+    fixupPrintParameters(time_print_parameters);
+    fixupPrintParameters(hb_ic_print_parameters);
+    fixupPrintParameters(hb_startup_print_parameters);
 
     Outputter::Interface *outputter_hb;
     Outputter::Interface *outputter_init;
     Outputter::Interface *outputter_startup;
     if (freq_print_parameters.format_ == Format::STD) {
-      hb_ic_print_parameters.extension_ = ".hb_ic.prn";
-      hb_startup_print_parameters.extension_ = ".startup.prn";
+      hb_ic_print_parameters.defaultExtension_ = ".hb_ic.prn";
+      hb_startup_print_parameters.defaultExtension_ = ".startup.prn";
       outputter_hb = new Outputter::HBPrn(*this, freq_print_parameters, time_print_parameters);
       outputter_init = new Outputter::TimePrn(*this, hb_ic_print_parameters);
       outputter_startup = new Outputter::TimePrn(*this, hb_startup_print_parameters);
     }
     else if (freq_print_parameters.format_ == Format::CSV) {
-      hb_ic_print_parameters.extension_ = ".hb_ic.csv";
-      hb_startup_print_parameters.extension_ = ".startup.csv";
+      hb_ic_print_parameters.defaultExtension_ = ".hb_ic.csv";
+      hb_startup_print_parameters.defaultExtension_ = ".startup.csv";
       outputter_hb = new Outputter::HBCSV(*this, freq_print_parameters, time_print_parameters);
       outputter_init = new Outputter::TimeCSV(*this, hb_ic_print_parameters);
       outputter_startup = new Outputter::TimeCSV(*this, hb_startup_print_parameters);
     }
     else if (freq_print_parameters.format_ == Format::TECPLOT) {
-      hb_ic_print_parameters.extension_ = ".hb_ic.dat";
-      hb_startup_print_parameters.extension_ = ".startup.dat";
+      hb_ic_print_parameters.defaultExtension_ = ".hb_ic.dat";
+      hb_startup_print_parameters.defaultExtension_ = ".startup.dat";
       outputter_hb = new Outputter::HBTecPlot(*this, freq_print_parameters, time_print_parameters);
       outputter_init = new Outputter::TimeTecPlot(*this, hb_ic_print_parameters);
       outputter_startup = new Outputter::TimeTecPlot(*this, hb_startup_print_parameters);
     }
     else
     {
-      string msg("HB output can only use tecplot or gnuplot format.");
-      msg += "  Resetting to gnuplot format.\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING, msg);
+      Report::UserWarning0() << "HB output cannot be written in " << freq_print_parameters.format_ << " format, using standard format";
 
       outputter_hb = new Outputter::HBPrn(*this, freq_print_parameters, time_print_parameters);
       outputter_init = new Outputter::TimePrn(*this, hb_ic_print_parameters);
@@ -2360,20 +2757,20 @@ void OutputMgr::enableHBOutput()
 
 
 //-----------------------------------------------------------------------------
-// Function      : OutputMgr::enableRawOutput
-// Purpose       : turns on RAW output
-// Special Notes :
+// Function      : OutputMgr::enableOverrideRawOutput
+// Purpose       : turns on RAW output from the "-r" command line override
+// Special Notes : "Override" raw is different from "format=raw" on the
+//                 .print line.
 // Scope         : public
-// Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
-// Creation Date : 10/10/00
+// Creator       : David Baur, Raytheon
+// Creation Date : 7/2/2013
 //-----------------------------------------------------------------------------
 void OutputMgr::enableOverrideRawOutput(const PrintParameters &print_parameters)
 {
   // prepare output manager to write
   if (rawFlag_)
   {
-    std::string msg("Rawfile already initialized.  Contents may be overwritten.\n");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
+    Report::UserWarning0() << "Rawfile already initialized.  Contents may be overwritten.";
   }
 
   else
@@ -2383,7 +2780,7 @@ void OutputMgr::enableOverrideRawOutput(const PrintParameters &print_parameters)
     PrintParameters raw_print_parameters = print_parameters;
     raw_print_parameters.filename_ = commandLine_.getArgumentValue("-r");
 
-    fixupPrintParameters(DOMAIN_FREQUENCY, raw_print_parameters);
+    fixupPrintParameters(raw_print_parameters);
 
     Outputter::Interface *outputter;
     if (commandLine_.argExists("-a"))
@@ -2454,7 +2851,7 @@ bool OutputMgr::updateHDF5Output(
     // processors and then write it distributed over all processors.
     //std::map<int, std::string> nodeRef;
     //std::vector<char> typeRef;
-    //topPtr_->getRawData(nodeRef, typeRef);
+    //topology_->getRawData(nodeRef, typeRef);
 
     // in parallel we can't write an array of variale length node names.
     // Thus we need to make an array of fixed length strings the longest
@@ -2477,7 +2874,7 @@ bool OutputMgr::updateHDF5Output(
     pdsCommPtr_->barrier();
     pdsCommPtr_->maxAll(&maxNodeNameLength, &globalMaxNodeNameLength, 1);
 
-    globalMaxNodeNameLength+1;  // add one for string terminator
+    globalMaxNodeNameLength++;  // add one for string terminator
     // now make a char[][] array of size [numLocalNodes][maxNodeNameLength]
     int numLocalNodes = solnVecPtr->localLength();
     char* nodeNameSpace = new char[ numLocalNodes * globalMaxNodeNameLength ];
@@ -2521,7 +2918,7 @@ bool OutputMgr::updateHDF5Output(
     // in parallel, all processors must create groups and datasets.
     hid_t solVarMapGroup = H5Gcreate(hdf5FileId_, "SolVarMap", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     if (solVarMapGroup < 0)
-      std::cout << "Error in making solVarMapGroup on procID_ " << getProcID() << std::endl;
+      Xyce::dout() << "Error in making solVarMapGroup on procID_ " << getProcID() << std::endl;
 
     // make the file data space
     hsize_t nodeNamesDim[1] = {solnVecPtr->globalLength()};
@@ -2566,21 +2963,21 @@ bool OutputMgr::updateHDF5Output(
 
     status = H5Tclose(fixedLenString);
     if (status < 0)
-      std::cout << "Error closing fixedLenString. on " << getProcID() << std::endl;
+      Xyce::dout() << "Error closing fixedLenString. on " << getProcID() << std::endl;
     status = H5Dclose(nodeNameDataSet);
     if (status < 0)
-      std::cout << "Error closing nodeNameDataSet. on " << getProcID() << std::endl;
+      Xyce::dout() << "Error closing nodeNameDataSet. on " << getProcID() << std::endl;
     status = H5Sclose(fileDataspace);
     if (status < 0)
-      std::cout << "Error closing solVarMapDataspace. on " << getProcID() << std::endl;
+      Xyce::dout() << "Error closing solVarMapDataspace. on " << getProcID() << std::endl;
     status = H5Gclose(solVarMapGroup);
     if (status < 0)
-      std::cout << "Error closing solVarMapGroup. on " << getProcID() << std::endl;
+      Xyce::dout() << "Error closing solVarMapGroup. on " << getProcID() << std::endl;
 
     // now output the independent variables
     hid_t independentVarGroup = H5Gcreate(hdf5FileId_, "IndepVars", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     if (independentVarGroup < 0)
-      std::cout << "Error in making independentVarGroup on getProcID() " << getProcID() << std::endl;
+      Xyce::dout() << "Error in making independentVarGroup on getProcID() " << getProcID() << std::endl;
 
     // filespace & memspace
     hsize_t independentDataDim[1] = {1};
@@ -2620,7 +3017,7 @@ bool OutputMgr::updateHDF5Output(
     // now output the first solution vector
     hid_t solutionVecGroup = H5Gcreate(hdf5FileId_, "SolutionVec", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     if (solutionVecGroup < 0)
-      std::cout << "Error in making solutionVecGroup on getProcID() " << getProcID() << std::endl;
+      Xyce::dout() << "Error in making solutionVecGroup on getProcID() " << getProcID() << std::endl;
 
     // filespace & memspace
     hsize_t dependentDataLocalDim[2] = {1, solnVecPtr->localLength()};
@@ -2786,15 +3183,24 @@ bool OutputMgr::closeHDF5Output()
   H5Pclose(hdf5PlistId_);
   status = H5Fclose(hdf5FileId_);
   if (status < 0)
-      std::cout << "Error closing hdf5FileId_. on " << getProcID() << std::endl;
+      Xyce::dout() << "Error closing hdf5FileId_. on " << getProcID() << std::endl;
 #endif  // Xyce_USE_HDF5
 
   return result;
 }
 
 
+//-----------------------------------------------------------------------------
+// Function      : Xyce::IO::removeStarVariables
+// Purpose       : Process V(*) and I(*) on .print line
+// Special Notes : Replaces v(*) and i(*) that appears on the .print line
+//                 with a list of all v() or i() variables as appropriate.
+// Scope         :
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/28/2013
+//-----------------------------------------------------------------------------
 void
-removeStarVariables(ParameterList &variable_list, N_PDS_Comm &communicator, const NodeNamePairMap &allNodes_, const NodeNamePairMap &externNodes_)
+removeStarVariables(ParameterList &variable_list, N_PDS_Comm &communicator, const NodeNamePairMap &all_nodes, const NodeNamePairMap &external_nodes)
 {
   bool vStarFound = false;
   bool iStarFound = false;
@@ -2846,7 +3252,7 @@ removeStarVariables(ParameterList &variable_list, N_PDS_Comm &communicator, cons
 
     ParameterList vStarList;
 
-    for (NodeNamePairMap::const_iterator it = externNodes_.begin(); it != externNodes_.end() ; ++it)
+    for (NodeNamePairMap::const_iterator it = external_nodes.begin(); it != external_nodes.end() ; ++it)
     {
       ExtendedString tmpStr((*it).first);
       tmpStr.toUpper();
@@ -2855,8 +3261,8 @@ removeStarVariables(ParameterList &variable_list, N_PDS_Comm &communicator, cons
 
       if (pos == std::string::npos && vStarFound)
       {
-        vStarList.push_back(N_UTL_Param("V", 1.0));
-        vStarList.push_back(N_UTL_Param(tmpStr, 0.0));
+        vStarList.push_back(Util::Param("V", 1.0));
+        vStarList.push_back(Util::Param(tmpStr, 0.0));
 
         if (!communicator.isSerial())
         {
@@ -2868,7 +3274,7 @@ removeStarVariables(ParameterList &variable_list, N_PDS_Comm &communicator, cons
 
     ParameterList iStarList;
 
-    for (NodeNamePairMap::const_iterator iter_a = allNodes_.begin(); iter_a != allNodes_.end() ; ++iter_a)
+    for (NodeNamePairMap::const_iterator iter_a = all_nodes.begin(); iter_a != all_nodes.end() ; ++iter_a)
     {
       ExtendedString tmpStr((*iter_a).first);
       tmpStr.toUpper();
@@ -2880,8 +3286,8 @@ removeStarVariables(ParameterList &variable_list, N_PDS_Comm &communicator, cons
       {
         tmpStr = tmpStr.substr(0, pos - 1);
 
-        iStarList.push_back(N_UTL_Param("I", 1.0));
-        iStarList.push_back(N_UTL_Param(tmpStr, 0.0));
+        iStarList.push_back(Util::Param("I", 1.0));
+        iStarList.push_back(Util::Param(tmpStr, 0.0));
 
         if (!communicator.isSerial())
         {
@@ -2923,7 +3329,7 @@ removeStarVariables(ParameterList &variable_list, N_PDS_Comm &communicator, cons
             std::string tmpStr(tmpBuffer + p, length);
             p += length;
 
-            N_UTL_Param param;
+            Util::Param param;
             param.setTag("V");
             param.setVal(1.0);
             vStarList.push_back(param);
@@ -2943,7 +3349,7 @@ removeStarVariables(ParameterList &variable_list, N_PDS_Comm &communicator, cons
             std::string tmpStr(tmpBuffer + p, length);
             p += length;
 
-            N_UTL_Param param;
+            Util::Param param;
             param.setTag("I");
             param.setVal(1.0);
             iStarList.push_back(param);
@@ -3065,7 +3471,7 @@ removeStarVariables(ParameterList &variable_list, N_PDS_Comm &communicator, cons
           std::string tmpStr(tmpBuffer + p, length);
           p += length;
 
-          N_UTL_Param param;
+          Util::Param param;
           param.setTag("V");
           param.setVal(1.0);
           vStarList.push_back(param);
@@ -3083,7 +3489,7 @@ removeStarVariables(ParameterList &variable_list, N_PDS_Comm &communicator, cons
           std::string tmpStr(tmpBuffer + p, length);
           p += length;
 
-          N_UTL_Param param;
+          Util::Param param;
           param.setTag("I");
           param.setVal(1.0);
           iStarList.push_back(param);
@@ -3108,6 +3514,15 @@ removeStarVariables(ParameterList &variable_list, N_PDS_Comm &communicator, cons
   }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : OutputMgr::setSweepParameters
+// Purpose       : Copy .DC or .STEP sweep parameters, and set up flags if
+//                 sweeping the TEMP variable.
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/28/2013
+//-----------------------------------------------------------------------------
 
 void
 OutputMgr::setSweepParameters(const std::vector<N_ANP_SweepParam> &step_sweep_parameters, const std::vector<N_ANP_SweepParam> &dc_sweep_parameters)
@@ -3149,82 +3564,46 @@ OutputMgr::setSweepParameters(const std::vector<N_ANP_SweepParam> &step_sweep_pa
   }
 }
 
-
-void OutputMgr::fixupPrintParameters(Domain domain, PrintParameters &print_parameters, bool expandComplexTypes)
+//-----------------------------------------------------------------------------
+// Function      : OutputMgr::fixupNodeNames
+// Purpose       : obtain names of nodes from topology
+// Special Notes : Why is this named "fixup"?  It does no fixing?
+// Scope         : public
+// Creator       : David Baur, Raytheon
+// Creation Date : 11/15/2013
+//-----------------------------------------------------------------------------
+void OutputMgr::fixupNodeNames()
 {
-  fixupExpressions(print_parameters.variableList_.begin(), print_parameters.variableList_.end(), *this);
+  topology_->getNodeNames(allNodes_);
+  topology_->getStateNodeNames(stateNodes_);
+  topology_->getStoreNodeNames(storeNodes_);
+  topology_->getExternNodeNames(externNodes_);
+}
 
-  topPtr_->getNodeNames(allNodes_);
-  topPtr_->getStateNodeNames(stateNodes_);
-  topPtr_->getStoreNodeNames(storeNodes_);
-  topPtr_->getExternNodeNames(externNodes_);
+//-----------------------------------------------------------------------------
+// Function      : OutputMgr::fixupPrintParameters
+// Purpose       : Perform some .print line checks and munging, primarily
+//                 dealing with use of V(*) and I(*)
+// Special Notes : Mostly a re-wrapping of work that used to be done in the
+//                 check_output function, which was too sprawling to remain
+//                 as a single function.
+// Scope         : public
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/26/2013
+//-----------------------------------------------------------------------------
 
+void OutputMgr::fixupPrintParameters(PrintParameters &print_parameters)
+{
+
+  // Handle v(*) and i(*) print line options, by replacing with complete list
   removeStarVariables(print_parameters.variableList_, *pdsCommPtr_, allNodes_, externNodes_);
 
-  // setup hdf5 output if requeted
+  // setup hdf5 output if requested
   if (hdf5FileNameGiven_)
   {
 #ifdef Xyce_USE_HDF5
     enableHDF5Output();
 #endif // Xyce_USE_HDF5
-  }
-
-  for (ParameterList::iterator it = print_parameters.variableList_.begin(); it != print_parameters.variableList_.end(); )
-  {
-    if ((*it).getSimContext() == UNDEFINED)
-    {
-      bool result = setParamContextType_(it);
-      if (!result)
-      {
-        std::string msg("Can't find context for print variable ");
-        msg += (*it).tag() + " " + (*it).tag() + " " + (*it).tag();
-        // msg is not quite complete at this stage.  it could be that it has two tags
-        // need better error report in this case.
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, msg);
-
-      }
-    }
-
-    // If frequency domain and time domain 'V' specifies copy and make this one real and next one imaginary
-    if (expandComplexTypes && ((*it).getSimContext() == SOLUTION_VAR && domain == DOMAIN_FREQUENCY)) {
-      ParameterList::iterator next_it = it;
-      ++next_it;
-
-      print_parameters.variableList_.insert(next_it, (*it));
-      (*it).setTag(std::string("Re(") + (*it).tag() + ")");
-      (*it).setSimContextAndData(SOLUTION_VAR_REAL);
-      ++it;
-      (*it).setTag(std::string("Im(") + (*it).tag() + ")");
-      (*it).setSimContextAndData(SOLUTION_VAR_IMAG);
-    }
-
-    // If frequency domain and time domain 'V' specifies copy and make this one real and next one imaginary
-    if (expandComplexTypes && ((*it).getSimContext() == VOLTAGE_DIFFERENCE && domain == DOMAIN_FREQUENCY)) {
-      ParameterList::iterator next_it = it;
-      ++next_it;
-
-      print_parameters.variableList_.insert(next_it, (*it));
-      (*it).setTag(std::string("Re(") + (*it).tag() + ")");
-      (*it).setSimContextAndData(VOLTAGE_DIFFERENCE_REAL);
-      ++it;
-      (*it).setTag(std::string("Im(") + (*it).tag() + ")");
-      (*it).setSimContextAndData(VOLTAGE_DIFFERENCE_IMAG);
-    }
-
-    // in seting the context of the PRINTblock_ params, some of them will no
-    // longer be needed. for example V(a) is stored in two parameters one for "V"
-    // and the second for "a".  After setParamContextType_ is called, the first
-    // param will have all the data needed to evalueate V(a) and the second one will
-    // be labeled as NODE_OR_DEVICE_NAME.  If it is, then we can safely erase it
-    // from the PRINTblock_.params
-    if ((*it).getSimContext() == NODE_OR_DEVICE_NAME)
-    {
-      it = print_parameters.variableList_.erase(it);
-    }
-    else
-    {
-      ++it;
-    }
   }
 }
 
@@ -3252,12 +3631,13 @@ void OutputMgr::output(
   N_LAS_Vector *                        solnVecPtr,
   N_LAS_Vector *                        stateVecPtr,
   N_LAS_Vector *                        storeVecPtr,
+  const std::vector<double>           & objectiveVec,
+  const std::vector<double>           & dOdpVec, 
+  const std::vector<double>           & dOdpAdjVec,
+  const std::vector<double>           & scaled_dOdpVec, 
+  const std::vector<double>           & scaled_dOdpAdjVec,
   bool                                  skipPrintLineOutput)
 {
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::startSafeBarrier();
-#endif
-
   // copy over time:
   circuitTime_ = time;
 
@@ -3279,15 +3659,13 @@ void OutputMgr::output(
   dcLoopNumber_ = dcNumber;
   maxDCSteps_ = maxDC;
 
-  if (!anaIntPtr_->getBlockAnalysisFlag()) {
+  if (!analysisInterface_->getBlockAnalysisFlag()) {
     // This error test should not be used in the MPDE case, as at least
     // one of the initial conditions that can be
     // used by MPDE is a DC sweep.
     if (maxDCSteps_ > 0 && PRINTType_ == PrintType::TRAN)
     {
-      std::string msg("Print type is inconsistent.");
-      msg += " maxDCSteps = ";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg, maxDCSteps_);
+      Report::DevelFatal0() << "Print type is inconsistent, maxDCSteps = " << maxDCSteps_;
     }
   }
 
@@ -3313,26 +3691,110 @@ void OutputMgr::output(
   }
 
   // Check for temperature:
-  circuitTemp_ = devPtr_->getParam("TEMP");
+  circuitTemp_ = deviceInterface_->getParamAndReduce("TEMP");
 
   // call on the measure manager to update any active measures
-  RCP< N_LAS_Vector > solnVecRCP(solnVecPtr, false);
+  // update .measure functions before outputting the .print line
   if (PRINTType_ == PrintType::TRAN)
   {
-    measureManager_.updateTranMeasures(circuitTime_, solnVecRCP);
-    fourierManager_.updateFourierData(circuitTime_, solnVecRCP);
+    measureManager_.updateTranMeasures(circuitTime_, solnVecPtr, stateVecPtr, storeVecPtr);
+    fourierManager_.updateFourierData(circuitTime_, solnVecPtr);
   }
   else
   {
-    measureManager_.updateDcMeasures(dcParamVec_, solnVecRCP);
+    measureManager_.updateDcMeasures(dcParamVec_, solnVecPtr, stateVecPtr, storeVecPtr);
   }
 
   // Needs to pass skipPrintLineOutput
   if (!skipPrintLineOutput)
   {
     if (!activeOutputterStack_.empty())
-      for (std::vector<Outputter::Interface *>::const_iterator it = activeOutputterStack_.back().begin(); it != activeOutputterStack_.back().end(); ++it)
+    {
+      for (std::vector<Outputter::Interface *>::const_iterator 
+          it = activeOutputterStack_.back().begin(); 
+          it != activeOutputterStack_.back().end(); ++it)
+      {
         (*it)->output(solnVecPtr, stateVecPtr, storeVecPtr);
+      }
+    }
+  }
+
+  if (sensitivityFlag_)
+  {
+    if (sensParFullNames_.empty())
+    {
+      // include the objective function in the output
+      if (!objectiveVec.empty())
+      {
+        sensParFullNames_.push_back(sensObjFunction_);
+      }
+
+      // set up the parameter names
+      std::vector<std::string> parNamesDirect = sensParamNameVec_;
+      std::vector<std::string> parNamesDirectScaled = sensParamNameVec_;
+      std::vector<std::string> parNamesAdjoint = sensParamNameVec_;
+      std::vector<std::string> parNamesAdjointScaled = sensParamNameVec_;
+
+      if (!(dOdpVec.empty()))
+      {
+        for (std::vector<std::string>::iterator itN = parNamesDirect.begin(); 
+            itN != parNamesDirect.end(); ++itN)
+        {
+          (*itN) = "  d" + sensObjFunction_ + "/d(" + (*itN) + ")";
+          (*itN) += std::string("_Dir");
+           sensParFullNames_.push_back((*itN));
+        }
+      }
+
+      if (!(scaled_dOdpVec.empty()))
+      {
+        for (std::vector<std::string>::iterator itN = parNamesDirectScaled.begin(); 
+            itN != parNamesDirectScaled.end(); ++itN)
+        {
+          (*itN) = "  d" + sensObjFunction_ + "/d(" + (*itN) + ")";
+          (*itN) += std::string("_Dir_scaled");
+           sensParFullNames_.push_back((*itN));
+        }
+      }
+   
+      if(!(dOdpAdjVec.empty()))
+      {
+        for (std::vector<std::string>::iterator itN = parNamesAdjoint.begin(); 
+            itN != parNamesAdjoint.end(); ++itN)
+        {
+          (*itN) = "  d" + sensObjFunction_ + "/d(" + (*itN) + ")";
+          (*itN) += std::string("_Adj");
+           sensParFullNames_.push_back((*itN));
+        }
+      }
+
+ 
+      if(!(scaled_dOdpAdjVec.empty()))
+      {
+        for (std::vector<std::string>::iterator itN = parNamesAdjointScaled.begin(); 
+            itN != parNamesAdjointScaled.end(); ++itN)
+        {
+          (*itN) = "  d" + sensObjFunction_ + "/d(" + (*itN) + ")";
+          (*itN) += std::string("_Adj_scaled");
+           sensParFullNames_.push_back((*itN));
+        }
+      }
+
+    }
+
+    if (!activeOutputterStack_.empty())
+    {
+      for (std::vector<Outputter::Interface *>::const_iterator 
+          it = activeOutputterStack_.back().begin(); 
+          it != activeOutputterStack_.back().end(); ++it)
+      {
+        (*it)->outputSensitivity(sensParFullNames_, 
+            objectiveVec, 
+            dOdpVec, dOdpAdjVec, 
+            scaled_dOdpVec, scaled_dOdpAdjVec, 
+            solnVecPtr, stateVecPtr, storeVecPtr);
+      }
+    }
   }
 
 #ifdef Xyce_USE_HDF5
@@ -3341,7 +3803,6 @@ void OutputMgr::output(
     updateHDF5Output(solnVecPtr);
   }
 #endif // Xyce_USE_HDF5
-
 
   // if any variables are needed for a response function
   // save them now.
@@ -3353,7 +3814,7 @@ void OutputMgr::output(
   // transient or dc values for the objective function call.
   double arg1 = 0.0;
   double arg2 = 0.0;
-  if (PRINTType_ == PrintType::TRAN || anaIntPtr_->getAnalysisMgr()->getTransientFlag())
+  if (PRINTType_ == PrintType::TRAN || analysisInterface_->getAnalysisMgr()->getTransientFlag())
   {
     arg1 = circuitTime_;
   }
@@ -3371,245 +3832,12 @@ void OutputMgr::output(
 
   // if there are any simulation level functions(objective objects)
   // that need data from this time step, send it to them as well
-  for (ObjectiveMap::iterator ob = objective.begin(); ob != objective.end(); ++ob)
+  for (ObjectiveMap::iterator ob = objective_.begin(); ob != objective_.end(); ++ob)
+  {
     (*ob).second.save(arg1, arg2, solnVecPtr, stateVecPtr, storeVecPtr);
+  }
 
   outputCalledBefore_ = true;
-
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::safeBarrier(0);
-#endif
-}
-
-//-----------------------------------------------------------------------------
-// Function      : OutputMgr::printDeviceCounts
-// Purpose       : Print device summary
-// Special Notes :
-// Scope         : public
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 08/15/06
-//-----------------------------------------------------------------------------
-void OutputMgr::printDeviceCounts()
-{
-  std::string msg;
-  std::map<std::string,int> globalDeviceCountMap;
-
-  if (localDeviceCountMap_.empty())
-  {
-    // get device count from device package.
-    const std::map<std::string, int> & localDeviceCount = devPtr_->getDeviceCountMap();
-    gatherGlobalDeviceCount_(globalDeviceCountMap , localDeviceCount);
-    formatPrintDeviceCount_ (globalDeviceCountMap, msg);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg);
-
-    if (detailedDeviceCountFlag_)
-    {
-      outputLocalDeviceCount_(localDeviceCount);
-    }
-  }
-  else
-  {
-    gatherGlobalDeviceCount_(globalDeviceCountMap , localDeviceCountMap_);
-    formatPrintDeviceCount_ (globalDeviceCountMap, msg);
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg);
-
-    if (detailedDeviceCountFlag_)
-    {
-      outputLocalDeviceCount_(localDeviceCountMap_);
-    }
-  }
-}
-
-//-----------------------------------------------------------------------------
-// Function      : OutputMgr::gatherGlobalDeviceCount_
-//
-// Purpose       : In parallel, gathers the local device counts and sums them
-//                 into the global device count map.
-//
-// Special Notes : In serial, just copies the local map into the global one.
-//
-// Scope         : private
-// Creator       : Eric R. Keiter, SNL
-// Creation Date : 05/10/10
-//-----------------------------------------------------------------------------
-void OutputMgr::gatherGlobalDeviceCount_(
-      std::map<std::string, int> & globalDeviceCount ,
-      const std::map<std::string, int> & localDeviceCount)
-{
-
-  if (!pdsCommPtr_->isSerial())
-  {
-    std::map<std::string, int>::const_iterator dc;
-    std::map<std::string, int>::const_iterator dc_end = localDeviceCount.end();
-
-    int i, len = 0;
-    int procID = pdsCommPtr_->procID();
-    int numProc = pdsCommPtr_->numProc();
-    int lowestKnown;
-    int numDev, numDevTot;
-    std::set<std::string> known;
-    std::string curr;
-
-    lowestKnown = numProc;
-    if (!localDeviceCount.empty())
-    {
-      lowestKnown = procID;
-    }
-    i = lowestKnown;
-    pdsCommPtr_->minAll(&i, &lowestKnown, 1);
-    dc = localDeviceCount.begin();
-    while (lowestKnown < numProc)
-    {
-      if (lowestKnown == procID)
-      {
-        curr =(*dc).first;
-        len = curr.size();
-      }
-      pdsCommPtr_->bcast(&len, 1, lowestKnown);
-      curr.resize(len);
-      pdsCommPtr_->bcast(&curr[0], len, lowestKnown);
-      dc = localDeviceCount.find(curr);
-      numDev = 0;
-      if (dc != dc_end)
-      {
-        numDev =(*dc).second;
-      }
-      known.insert(curr);
-      pdsCommPtr_->sumAll(&numDev, &numDevTot, 1);
-      globalDeviceCount[curr] = numDevTot;
-      lowestKnown = numProc;
-      dc = localDeviceCount.begin();
-      for (; dc != dc_end ; ++dc)
-      {
-        if (known.find((*dc).first) == known.end())
-        {
-          lowestKnown = procID;
-          curr =(*dc).first;
-          break;
-        }
-      }
-      i = lowestKnown;
-      pdsCommPtr_->minAll(&i, &lowestKnown, 1);
-    }
-  }
-  else
-  {
-    globalDeviceCount = localDeviceCount;
-  }
-}
-
-//-----------------------------------------------------------------------------
-// Function      : OutputMgr::formatPrintDeviceCount_
-//
-// Purpose       : takes the(passed) device count map, and formats a string
-//                 that can be output, either via the error handler or std::cout.
-//
-// Special Notes :
-//
-// Scope         : private
-// Creator       : Eric R. Keiter, SNL
-// Creation Date : 05/10/10
-//-----------------------------------------------------------------------------
-void OutputMgr::formatPrintDeviceCount_(const std::map<std::string, int> & deviceCountMap_, std::string & msg)
-{
-  int i, len = 0, maxLen = 15, totDev = 0, width = 0;
-  std::map<std::string, int>::const_iterator dc = deviceCountMap_.begin();
-  std::map<std::string, int>::const_iterator dc_end = deviceCountMap_.end();
-  msg = "";
-
-  for (; dc != dc_end ; ++dc)
-  {
-    len =(*dc).first.size();
-    if (len > maxLen)
-      maxLen = len;
-    totDev +=(*dc).second;
-  }
-  i = totDev;
-  while (i > 0)
-  {
-    width++;
-    i /= 10;
-  }
-
-  dc = deviceCountMap_.begin();
-  for (; dc != dc_end ; ++dc)
-  {
-    len =(*dc).first.size();
-    msg += "       " +(*dc).first;
-    for (i=0 ; i<maxLen-len+1 ; ++i)
-      msg += " ";
-  std::ostringstream ost;
-    ost.width(width);
-    ost.setf(ios::right);
-    ost <<(*dc).second;
-    msg += ost.str();
-    msg += "\n";
-  }
-  msg += "       ";
-  for (i=0 ; i<maxLen+width+1 ; ++i)
-    msg += "-";
-  msg += "\n       Total Devices";
-  for (i=0 ; i<maxLen-12 ; ++i)
-  {
-    msg += " ";
-  }
-  std::ostringstream ost;
-  ost.width(width);
-  ost.setf(ios::right);
-  ost << totDev;
-  msg += ost.str();
-}
-
-//-----------------------------------------------------------------------------
-// Function      : OutputMgr::outputLocalDeviceCount_
-//
-// Purpose       : If running in parallel, this function can be used to output
-//                 the local count on each processor.
-//
-// Special Notes : debug only.
-//
-// Scope         : private
-// Creator       : Eric R. Keiter
-// Creation Date : 05/10/10
-//-----------------------------------------------------------------------------
-void OutputMgr::outputLocalDeviceCount_(const std::map<std::string, int> & localDeviceCount)
-{
-  int masterRank = 0;
-  int numProcs = pdsCommPtr_->numProc();
-  int thisProc = pdsCommPtr_->procID();
-
-  pdsCommPtr_->barrier();
-
-  for (int p = 0; p < numProcs; ++p)
-  {
-    pdsCommPtr_->barrier();
-    if (p==thisProc)
-    {
-      std::string msg1="\n\tDevice Count for proc=";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT, msg1, p);
-
-      std::string msg="";
-      formatPrintDeviceCount_(localDeviceCount , msg);
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT, msg);
-    }
-  }
-  pdsCommPtr_->barrier();
-
-}
-
-//-----------------------------------------------------------------------------
-// Function      : OutputMgr::addDeviceToCount
-// Purpose       : Add a device for device count report
-// Special Notes :
-// Scope         : public
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 08/15/06
-//-----------------------------------------------------------------------------
-void OutputMgr::addDeviceToCount(std::string & devNameIn)
-{
-  localDeviceCountMap_[devNameIn]++;
-
-  return;
 }
 
 //-----------------------------------------------------------------------------
@@ -3655,7 +3883,7 @@ void OutputMgr::outputDCOP_restartFile(N_LAS_Vector & solnVec)
 {
   NodeNamePairMap::iterator name_i, name_end;
   int ind;
-  ofstream opOut;
+  std::ofstream opOut;
 
   if (!output_op_)
     return;
@@ -3738,22 +3966,19 @@ void OutputMgr::outputDCOP_restartFile(N_LAS_Vector & solnVec)
     }
     if (pos != mySize)
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL,
-        std::string("Internal error 1 in OutputMgr::outputDCOP"));
+      Report:: UserFatal0() << "Internal error 1 in OutputMgr::outputDCOP";
     }
     int flag;
     pdsCommPtr_->recv(&flag, 1, 0);
     if (flag != 1)
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL,
-        std::string("Internal error 2 in OutputMgr::outputDCOP"));
+      Report:: UserFatal0() << "Internal error 3 in OutputMgr::outputDCOP";
     }
     pdsCommPtr_->send(&mySize, 1, 0);
     pdsCommPtr_->recv(&flag, 1, 0);
     if (flag != 2)
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL,
-        std::string("Internal error 3 in OutputMgr::outputDCOP"));
+      Report:: UserFatal0() << "Internal error 3 in OutputMgr::outputDCOP";
     }
     pdsCommPtr_->send(&buffer[0], mySize, 0);
   }
@@ -3775,7 +4000,7 @@ void OutputMgr::outputIC_or_NODESET(N_LAS_Vector & solnVec)
 {
   NodeNamePairMap::iterator name_i, name_end;
   int ind;
-  ofstream saveOutputStream;
+  std::ofstream saveOutputStream;
 
   name_i = allNodes_.begin();
   name_end = allNodes_.end();
@@ -3882,22 +4107,19 @@ void OutputMgr::outputIC_or_NODESET(N_LAS_Vector & solnVec)
     }
     if (pos != mySize)
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL,
-        std::string("Internal error 1 in OutputMgr::outputIC_or_NODESET"));
+      Report:: UserFatal0() << "Internal error 1 in OutputMgr::outputIC_or_NODESET";
     }
     int flag;
     pdsCommPtr_->recv(&flag, 1, 0);
     if (flag != 1)
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL,
-        std::string("Internal error 2 in OutputMgr::outputIC_or_NODESET"));
+      Report:: UserFatal0() << "Internal error 2 in OutputMgr::outputIC_or_NODESET";
     }
     pdsCommPtr_->send(&mySize, 1, 0);
     pdsCommPtr_->recv(&flag, 1, 0);
     if (flag != 2)
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL,
-        std::string("Internal error 3 in OutputMgr::outputIC_or_NODESET"));
+      Report:: UserFatal0() << "Internal error 3 in OutputMgr::outputIC_or_NODESET";
     }
     pdsCommPtr_->send(&buffer[0], mySize, 0);
   }
@@ -3922,7 +4144,7 @@ bool OutputMgr::inputDCOP_(N_LAS_Vector & nextSolnVec,
 {
   int ind;
   double value;
-  ifstream opIn;
+  std::ifstream opIn;
   bool success = false;
   bool fileFound = false;
   int nodesMatched = 0;
@@ -3969,11 +4191,11 @@ bool OutputMgr::inputDCOP_(N_LAS_Vector & nextSolnVec,
     {
       inputFileName = input_op_file_;
     }
-    opIn.open(inputFileName.c_str(), ios::in);
+    opIn.open(inputFileName.c_str(), std::ios::in);
 
     if (opIn.good())
     {
-      cout << "Reading in operating point initial estimate from: " << inputFileName << std::endl;
+     Xyce::dout() << "Reading in operating point initial estimate from: " << inputFileName << std::endl;
       fileFound = true;
       while (1)
       {
@@ -4126,7 +4348,7 @@ bool OutputMgr::inputDCOP_(N_LAS_Vector & nextSolnVec,
 
 #ifdef Xyce_PARALLEL_MPI
   int numBad = notMatched.size();
-//  cout << "PE: " << getProcID() << " has " << numBad << " mismatched nodes" << std::endl;
+// Xyce::dout() << "PE: " << getProcID() << " has " << numBad << " mismatched nodes" << std::endl;
   int myFlag, minProc;
   int myBufSize = 0;
   if (numBad > 0 && getProcID() > 0)
@@ -4190,25 +4412,25 @@ bool OutputMgr::inputDCOP_(N_LAS_Vector & nextSolnVec,
     if (fileFound)
     {
       if (totalNodes > nodesMatched)
-        cout << "DCOP restart:  Initialized " << nodesMatched << " of a possible " << totalNodes << " nodes" << std::endl;
+       Xyce::dout() << "DCOP restart:  Initialized " << nodesMatched << " of a possible " << totalNodes << " nodes" << std::endl;
       else
-        cout << "DCOP restart:  All " << totalNodes << " nodes initialized" << std::endl;
+       Xyce::dout() << "DCOP restart:  All " << totalNodes << " nodes initialized" << std::endl;
 
       if (notFound.size() > 0)
       {
-        cout << "DCOP restart:  Nodes specified in " << inputFileName << " but not present in circuit:" << std::endl;
+       Xyce::dout() << "DCOP restart:  Nodes specified in " << inputFileName << " but not present in circuit:" << std::endl;
         nm_i = notFound.begin();
         nm_end = notFound.end();
         for (; nm_i != nm_end ; ++nm_i)
-          cout << *nm_i << std::endl;
+         Xyce::dout() << *nm_i << std::endl;
       }
       if (notMatched.size() > 0)
       {
-        cout << "DCOP restart:  Nodes present in circuit, but not specified in " << inputFileName << ":" << std::endl;
+       Xyce::dout() << "DCOP restart:  Nodes present in circuit, but not specified in " << inputFileName << ":" << std::endl;
         nm_i = notMatched.begin();
         nm_end = notMatched.end();
         for (; nm_i != nm_end ; ++nm_i)
-          cout << *nm_i << std::endl;
+         Xyce::dout() << *nm_i << std::endl;
       }
     }
 #ifdef Xyce_PARALLEL_MPI
@@ -4252,20 +4474,6 @@ NodeNamePairMap & OutputMgr::getICData(int & op_found, std::string & icType)
   return opData_;
 }
 
-//-----------------------------------------------------------------------------
-// Function      : OutputMgr::getAllNodes
-// Purpose       : provides a map of node names.  Needed by a variety of
-//                 things, including LOCA.
-// Special Notes :
-// Scope         : public
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 05/25/06
-//-----------------------------------------------------------------------------
-NodeNamePairMap & OutputMgr::getAllNodes()
-{
-  return allNodes_;
-}
-
 
 //-----------------------------------------------------------------------------
 // Function      : OutputMgr::setupIC_or_NODESET
@@ -4279,7 +4487,7 @@ bool OutputMgr::setupIC_or_NODESET(N_LAS_Vector & nextSolnVec,
                                 N_LAS_Vector & flagSolnVec,
                                 bool & useFlag,
                                 std::string & icType,
-                                std::vector<N_UTL_OptionBlock> & initBlockVec)
+                                std::vector<Util::OptionBlock> & initBlockVec)
 {
   int lid(0);
   bool success(false);
@@ -4319,7 +4527,7 @@ bool OutputMgr::setupIC_or_NODESET(N_LAS_Vector & nextSolnVec,
       double value(0.0);
 
       // the first tag is always "V".  At this point I variables are not supported,
-      // and there is an error trap for them in the N_IO_OptionBlock.C file.
+      // and there is an error trap for them in the OptionBlock.C file.
       ++itPar;
       node = itPar->tag();
       ++itPar;
@@ -4331,8 +4539,7 @@ bool OutputMgr::setupIC_or_NODESET(N_LAS_Vector & nextSolnVec,
       }
       else
       {
-        std::string msg("Problems processing" + icType +  " values");
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, msg);
+        Report::UserFatal0() << "Problems processing " << icType << " values";
       }
 
       bool globalFound(false);
@@ -4349,8 +4556,8 @@ bool OutputMgr::setupIC_or_NODESET(N_LAS_Vector & nextSolnVec,
 #ifdef Xyce_DEBUG_IC
       if (localFound)
       {
-        cout.width(10);cout.precision(3);cout.setf(ios::scientific);
-        cout
+        Xyce::dout().width(10);Xyce::dout().precision(3);Xyce::dout().setf(std::ios::scientific);
+        Xyce::dout()
 #ifdef Xyce_PARALLEL_MPI
           << "procID="<<getProcID() << "  "
 #endif
@@ -4371,9 +4578,9 @@ bool OutputMgr::setupIC_or_NODESET(N_LAS_Vector & nextSolnVec,
 
 #ifdef Xyce_DEBUG_IC
       if (globalFound)
-        cout << "procID="<<getProcID() << "  globalFound = true" << std::endl;
+        Xyce::dout() << "procID="<<getProcID() << "  globalFound = true" << std::endl;
       else
-        cout << "procID="<<getProcID() << "  globalFound = false" << std::endl;
+        Xyce::dout() << "procID="<<getProcID() << "  globalFound = false" << std::endl;
 #endif
 
 #else
@@ -4506,25 +4713,23 @@ bool OutputMgr::setupIC_or_NODESET(N_LAS_Vector & nextSolnVec,
 #ifdef Xyce_DEBUG_IO
     if (totalNodes > matched.size())
     {
-      cout << icType << ":  Initialized " << matched.size() << " of a possible " << totalNodes << " nodes" << std::endl;
+      Xyce::dout() << icType << ":  Initialized " << matched.size() << " of a possible " << totalNodes << " nodes" << std::endl;
     }
     else
     {
-      cout << icType << ":  All " << totalNodes << " nodes initialized" << std::endl;
+      Xyce::dout() << icType << ":  All " << totalNodes << " nodes initialized" << std::endl;
     }
 #endif
 
     if (notFoundInCkt.size() > 0)
     {
-      std::string msg1(icType + ":  Nodes specified on ." + icType +" line, but not present in circuit. (ignoring):");
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg1);
+      lout() << icType << ":  Nodes specified on ." << icType << " line, but not present in circuit. (ignoring):" << std::endl;
 
       nm_i = notFoundInCkt.begin();
       nm_end = notFoundInCkt.end();
       for (; nm_i != nm_end ; ++nm_i)
       {
-        std::string msg2(*nm_i);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg2);
+        lout() << *nm_i << std::endl;
       }
     }
 
@@ -4533,18 +4738,16 @@ bool OutputMgr::setupIC_or_NODESET(N_LAS_Vector & nextSolnVec,
     // a very long list.  So, don't output except in debug mode.
     if (notSpecified.size() > 0)
     {
-      std::string msg1(icType + ":  Nodes present in circuit, but not specified on ." + icType + " line(ignoring):");
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg1);
+      dout() << icType << ":  Nodes present in circuit, but not specified on ." << icType << " line(ignoring):" << std::endl;
 
       nm_i = notSpecified.begin();
       nm_end = notSpecified.end();
       for (; nm_i != nm_end ; ++nm_i)
       {
-        std::string msg2(*nm_i);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg2);
+        dout() << *nm_i << std::endl;
       }
     }
-#endif // debug io
+#endif // Xyce_DEBUG_IO
 
   }
 
@@ -4580,20 +4783,17 @@ bool OutputMgr::setupInitialConditions
 
     if (input_op_ && ICflag_)
     {
-      std::string msg("Cannot set both DCOP restart and .IC simultaneously.");
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, msg);
+      Report::UserFatal0() << "Cannot set both DCOP restart and .IC simultaneously.";
     }
 
     if (input_op_ && nodesetflag_)
     {
-      std::string msg("Cannot set both DCOP restart and .NODESET simultaneously.");
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, msg);
+      Report::UserFatal0() << "Cannot set both DCOP restart and .NODESET simultaneously.";
     }
 
     if (ICflag_ && nodesetflag_)
     {
-      std::string msg("Cannot set both .IC and .NODESET simultaneously.");
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, msg);
+      Report::UserFatal0() << "Cannot set both .IC and .NODESET simultaneously.";
     }
 
     if (input_op_)
@@ -4668,7 +4868,7 @@ void OutputMgr::outputDakotaResults()
   int i, j, num = responseNames_.size();
   std::vector<bool> done(num, false);
 
-  ofstream dakOut;
+  std::ofstream dakOut;
   dakOut.open(std::string(responseFileName_ + ".result").c_str());
 
   dakOut << "Dakota optimization results:" << std::endl;
@@ -4679,7 +4879,7 @@ void OutputMgr::outputDakotaResults()
       std::string::size_type cpos = responseNames_[i].find_first_of(':');
       if (cpos == std::string::npos)
       {
-        devPtr_->getParam(responseNames_[i], val);
+        deviceInterface_->getParamAndReduce(responseNames_[i], val);
         dakOut << i << " : " << responseNames_[i] << " = " << val << std::endl;
       }
       else
@@ -4693,7 +4893,7 @@ void OutputMgr::outputDakotaResults()
           if (responseNames_[j].substr(0, cpos+1) == prefix)
           {
             done[j] = true;
-            devPtr_->getParam(responseNames_[j], val);
+            deviceInterface_->getParamAndReduce(responseNames_[j], val);
             if (parNum > 0)
               dakOut << "  ";
             if (parNum%4 == 0)
@@ -4712,7 +4912,7 @@ void OutputMgr::outputDakotaResults()
   }
   dakOut.close();
 }
-#endif
+#endif  // Xyce_Dakota
 
 //-----------------------------------------------------------------------------
 // Function      : OutputMgr::getVariableNames
@@ -4732,1259 +4932,6 @@ std::vector<std::string> OutputMgr::getVariableNames()
   return names;
 }
 
-
-//-----------------------------------------------------------------------------
-// Function      : OutputMgr::setParamContextType_
-// Purpose       : This routine looks at the N_UTL_Param object passed in
-//                 and sets its context type.  This makes looking up the
-//                 param's value faster as once it is done, no further
-//                 context searches are needed.  Much of this code originally
-//                 resided in getPrintValue_() but is now here to streamline
-//                 the lookup process.
-// Special Notes :
-// Scope         : private
-// Creator       : Rich Schiek, Electrical Systems Modeling, SNL
-// Creation Date : 11/6/12
-//-----------------------------------------------------------------------------
-bool OutputMgr::setParamContextType_(ParameterList::iterator originalParamItr)
-{
-  bool foundAndSetContext=false;
-  int index1 = -1;
-  int index2 = -1;
-  // rather than change the status of the passed in originalParamItr,
-  // make a copy for advancement called nextParamItr.
-  // in some cases we need to look ahead to the next one or two
-  // iterators in the ParameterList objects.  Once all the nodes have
-  // their context set, we can remove the extra nodes that were used for
-  // holding part of the context.
-  ParameterList::iterator nextParamItr = originalParamItr;
-
-  std::ostringstream ost;
-  ost << getProcID();
-  string pN(ost.str());
-
-#ifdef Xyce_DEBUG_IO
-    cout << " Proc " <<  pN  << ": In setParamContextType_ with:";
-    cout << originalParamItr->tag() << " : " << originalParamItr->sVal() << std::endl;
-#endif
-
-  // varType should be I, V, N, B, H as in I(name), V(name), or V(name, name)
-  string varType(originalParamItr->tag());
-  char type1, type2;
-
-  double result=0;
-#ifdef Xyce_PARALLEL_MPI
-  double final=0;
-#endif
-
-  bool resultFound = false;
-
-  // If this is "TEMP", we know where to find it.
-  if (varType == "TEMP")
-  {
-    originalParamItr->setSimContextAndData(TEMPERATURE);
-    foundAndSetContext=true;
-  }
-
-  // if this is TIME.  We know where to find it.
-  if (varType == "TIME")
-  {
-    originalParamItr->setSimContextAndData(TIME_VAR);
-    foundAndSetContext=true;
-  }
-
-  // if this is FREQ.  We know where to find it.
-  if (varType == "FREQUENCY" || varType == "FREQUENCY")
-  {
-    originalParamItr->setSimContextAndData(FREQUENCY);
-    foundAndSetContext=true;
-  }
-
-  // if this is INDEX.  We know where to find it.
-  if (varType == "INDEX")
-  {
-    originalParamItr->setSimContextAndData(INDEX);
-    foundAndSetContext=true;
-  }
-
-  // check if this is a step sweep value.
-  if (!foundAndSetContext)
-  {
-    int numParams = stepParamVec_.size();
-    for (int i=0; i<numParams; i++)
-    {
-      if (varType == stepParamVec_.at(i).name)
-      {
-        originalParamItr->setSimContextAndData(STEP_SWEEP_VAR, i);
-        foundAndSetContext=true;
-        break;
-      }
-    }
-  }
-
-  // check if this is a dc sweep value.
-  if (!foundAndSetContext)
-  {
-    int numParams = dcParamVec_.size();
-    for (int i=0; i<numParams; i++)
-    {
-      if (varType == dcParamVec_.at(i).name)
-      {
-        originalParamItr->setSimContextAndData(DC_SWEEP_VAR, i);
-        foundAndSetContext=true;
-        break;
-      }
-    }
-  }
-
-  // Last easy check. Global params
-  if (!foundAndSetContext)
-  {
-    if (varType == "GLOBAL_PARAMETER")
-    {
-      originalParamItr->setSimContextAndData(GLOBAL_PARAMETER);
-      foundAndSetContext=true;
-    }
-  }
-
-#ifdef Xyce_DEBUG_IO
-  cout << "\nsetParamContextType_: varType = " << varType;
-  if (!foundAndSetContext)
-    cout << "\tIS NOT a Sweep variable\n";
-  else
-    cout << "\tIS a Sweep variable\n";
-  cout << std::endl;
-#endif
-
-  // erkeite note:  12/16/2007.  This needs to be handled a lot more cleanly.
-  bool thisIsAnExpression = false;
-  bool thisIsA_V_or_I_Var = false;
-  bool thisIsProbablyALeadCurrent = false;
-  bool thisIsANodeVar = false;
-  bool iteraterAdvanced = false;
-
-  if (!foundAndSetContext)
-  {
-    // now check for expressions and/or solution variables:
-    //
-    // If we get to this point, then this is not a sweep variable.
-    // If not a sweep value, other valid print variables
-    // include '{', 'I', 'V' and 'N'.  The current variables(for
-    // BJT lead currents, etc) can be 'IB', 'IC' etc.
-    // and for AC, we also have VR, VI, VM and VDB
-    thisIsAnExpression = originalParamItr->hasExpressionTag();
-
-    if (!thisIsAnExpression && originalParamItr->iVal() > 0 &&
-       ((varType[0] == 'I') ||(varType[0] == 'V') ) )
-    {
-      thisIsA_V_or_I_Var = true;
-    }
-
-    if (!thisIsAnExpression && originalParamItr->iVal() > 0 && varType=="N")
-    {
-      thisIsANodeVar = true;
-    }
-  }
-
-#ifdef Xyce_DEBUG_IO
-  cout << "setParamContextType_: varType = " << varType;
-  if (thisIsAnExpression)
-    cout << "\tIS an expression.";
-  else
-    cout << "\tIS NOT an expression.";
-  cout << std::endl;
-  cout << "setParamContextType_: varType = " << varType;
-  if (thisIsA_V_or_I_Var)
-    cout << "\tIS a voltage or current variable(either solution or lead current)";
-  else
-    cout << "\tIS NOT a voltage or current variable(either solution or lead current)";
-  cout << std::endl;
-  if (thisIsANodeVar)
-    cout << "\tIS a node variable";
-  else
-    cout << "\tIS NOT a node variable";
-  cout << std::endl;
-#endif
-
-  // If the print value is an expression, process here.
-  if (!foundAndSetContext && thisIsAnExpression)
-  {
-#ifdef Xyce_DEBUG_IO
-    cout << "\nsetParamContextType_: processing expression" << std::endl;
-#endif
-    // This context is set in registerPRINTSet() because at that time expressions are flesed out
-    std::cout << "OutputMgr::setParamContextType_ In expression block with unresolved context!" << std::endl;
-    foundAndSetContext=true;
-  }
-
-  // One wrinkle in this is that the list of N_UTL_Param objects stores
-  // I(name), V(name) and N(name) as two sequential N_UTL_Param ojects one for the
-  // I, V or N and the following one for the "name".
-  // Likewise V(name1, name2) uses three N_UTL_Param objects, one for V
-  // and two for name1 and name2.
-  // These following N_UTL_Param objects which hold names are needed once to
-  // find indicies but not after that.  Thus there is an enum NODE_OR_DEVICE_NAME
-  // to categorize those N_UTL_Param objects that can be dropped after context
-  // resolution(or at least ignored when later processing things in getPrintValue()
-  string nodeName("");    // node name of originalParamItr
-  string nodeName2("");                        // node name of 2nd paramItr(needed for V(a, b))
-
-  // Advance the parameter iterator and set up the node name(s).
-  int numIndices = 0;
-  if (!foundAndSetContext &&(thisIsA_V_or_I_Var || thisIsANodeVar))
-  {
-    // calling this only makes sense for non expressions so
-    // wait to call it until we're sure we don't have an expression.
-    string printVarName;
-    numIndices = originalParamItr->iVal();
-    ++nextParamItr;
-    nodeName = nextParamItr->tag();
-    // we know the context of the nextParamItr at this point so set it.
-    nextParamItr->setSimContextAndData(NODE_OR_DEVICE_NAME);
-    if (numIndices==2)
-    {
-      ++nextParamItr;
-      nodeName2 = nextParamItr->tag();
-      // we know the context of the nextParamItr at this point so set it.
-      nextParamItr->setSimContextAndData(NODE_OR_DEVICE_NAME);
-      printVarName =originalParamItr->tag() + "(" + nodeName + "," + nodeName2 + ")";
-    }
-    else
-    {
-      printVarName =originalParamItr->tag() + "(" + nodeName + ")";
-    }
-    originalParamItr->setTag(printVarName);
-
-    iteraterAdvanced = true;
-  }
-
-  // If this is a node value('N'), attempt determine the value.
-  // Note, a N(node) value is the same as a V(node) value, it is just less
-  // error-checked, and thus can refer to internal device variables, not just
-  // user-specified voltage nodes.  N() can also access values in the state
-  // and store vectors.
-  // if (!foundAndSetContext &&(thisIsANodeVar || thisIsA_V_or_I_Var)) -- not a good check here
-  if (!foundAndSetContext && thisIsANodeVar)
-  {
-    NodeNamePairMap::iterator iterCI = allNodes_.find(nodeName);
-    if (iterCI != allNodes_.end())
-    {
-      // object is part of a solution var
-      int ind = iterCI->second.first;
-      originalParamItr->setSimContextAndData(SOLUTION_VAR, ind);
-      foundAndSetContext = true;
-      //std::cout << " found context as sol-var at index " << ind << std::endl;
-    }
-    else
-    {
-      // check state vars.
-      iterCI = stateNodes_.find(nodeName);
-      if (iterCI != stateNodes_.end())
-      {
-        int ind = iterCI->second.first;
-        originalParamItr->setSimContextAndData(STATE_VAR, ind);
-        foundAndSetContext = true;
-      }
-      else
-      {
-        // check store vars
-        iterCI = storeNodes_.find(nodeName);
-        if (iterCI != storeNodes_.end())
-        {
-          int ind = iterCI->second.first;
-          originalParamItr->setSimContextAndData(STORE_VAR, ind);
-          foundAndSetContext = true;
-        }
-      }
-    }
-  }
-
-
-  // Determine value if this a 'I' or a 'V' variable.  If it is a V-variable, it is
-  // definately a solution variable and not a lead current.
-  if (!foundAndSetContext && thisIsA_V_or_I_Var)
-  {
-    list<int> svGIDList1, svGIDList2, dummyList;
-    svGIDList1.clear();
-    svGIDList2.clear();
-    dummyList.clear();
-
-    if (varType[0] == 'I')
-    {
-      std::string::size_type pos = nodeName.find_last_of(":");
-      if (pos == std::string::npos)
-        pos = 0;
-      else
-        ++pos;
-      // The level 3 resistor is really just a voltage source with a zero volt difference
-      // Thus, it has a real branch current that is in the solution vector.  By putting
-      // nodeName[pos] =='R' in the following conditional, a later block of code will
-      // be executed(just a few lines down that starts:)
-      //   if ((!(svGIDList1.empty()) || nodeName == "0") && !thisIsProbablyALeadCurrent)
-      // If this is a level 3 resistor, then its branch current will be found in that
-      // block of code.  If it's not a level 3 resistor, then its current will not be found
-      // and a later block of code for finding lead currents will be executed because
-      // resultFound will still be false.  Thus, it's safe to add 'R' to this if statement.
-      //
-      if (nodeName[pos] == 'V' || nodeName[pos] == 'L' ||
-          nodeName[pos] == 'B' || nodeName[pos] == 'E' || nodeName[pos] == 'R')
-      {
-        thisIsProbablyALeadCurrent = false;
-      }
-      else
-      {
-        thisIsProbablyALeadCurrent = true;
-      }
-    }
-    else
-    {
-      thisIsProbablyALeadCurrent = false;
-    }
-
-#ifdef Xyce_DEBUG_IO
-    cout << "\nsetParamContextType_: doing the old stuff" << std::endl;
-#endif
-
-    if ((varType == "I" && distribVsrcSet_.count(nodeName))  ||
-        (varType[0] == 'V' && distribVnodeSet_.count(nodeName)))
-    {
-      nodeName += "__" + pN;
-    }
-
-    // Need to get the solution variables from topology with the known node type.
-    if (varType == "I")
-      topPtr_->getNodeSVarGIDs(NodeID(nodeName, _DNODE), svGIDList1, dummyList, type1);
-    if (varType[0] == 'V')
-      topPtr_->getNodeSVarGIDs(NodeID(nodeName, _VNODE), svGIDList1, dummyList, type1);
-
-#ifdef Xyce_DEBUG_IO
-    cout << "nodeName = "<< nodeName << " nodeName2 = " << nodeName2 <<std::endl;
-    list<int>::iterator isvg = svGIDList1.begin();
-    for (;isvg!=svGIDList1.end();++isvg)
-    {
-      cout << "svGID: " << *isvg << std::endl;
-    }
-#endif
-
-    if (numIndices == 2)
-    {
-      if (distribVnodeSet_.count(nodeName))
-      {
-        nodeName2 += "__" + pN;
-      }
-      // Only "V" allows for numIndices to be larger than 1.
-      topPtr_->getNodeSVarGIDs(NodeID(nodeName2, _VNODE), svGIDList2, dummyList, type2);
-    }
-
-    // this is an awkward check.  In parallel if a node is not on the local processor
-    // then svGIDList1 will be empty.  If the node tag was "V" and the next nodeName was "0"
-    // then the user wanted the ground node, which isn't calculated but is zero.
-    // Thus, what this conditional is asking is:
-    //   NOT(var found in local solution vec OR V(GROUND)) AND NOT a Lead Current
-    //if ((!(svGIDList1.empty()) || nodeName == "0") && !thisIsProbablyALeadCurrent)
-    // would this a better check?  looking for "0" will default to an index of -1 as will svGIDList1.empty==true.
-    //    if (!thisIsProbablyALeadCurrent)
-    // no because if svGIDList is empty then type is not correctly set and we can't make good decisions.
-
-    if ((!(svGIDList1.empty()) || nodeName == "0") && !thisIsProbablyALeadCurrent)
-    {
-      if (varType[0] == 'V')
-      {
-        if (!svGIDList1.empty())
-          index1 = *(svGIDList1.begin());
-
-        if (numIndices == 1)
-        {
-          if (type1 != 'V')
-          {
-            string msg("Voltage Output requested for device node(" + nodeName + ") by PRINT statement\n");
-            N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-          }
-          // before we set the context need to check for additional
-          // letters after V as in VR, VI, VM and VDB as they change
-          // how we process the voltage.
-          if (varType == "V" )
-          {
-            originalParamItr->setSimContextAndData(SOLUTION_VAR, index1);
-            foundAndSetContext = true;
-          }
-          else if (varType == "VR" )
-          {
-            originalParamItr->setSimContextAndData(SOLUTION_VAR_REAL, index1);
-            foundAndSetContext = true;
-          }
-          else if (varType == "VI" )
-          {
-            originalParamItr->setSimContextAndData(SOLUTION_VAR_IMAG, index1);
-            foundAndSetContext = true;
-          }
-          else if (varType == "VM" )
-          {
-            originalParamItr->setSimContextAndData(SOLUTION_VAR_MAG, index1);
-            foundAndSetContext = true;
-          }
-          else if (varType == "VP" )
-          {
-            originalParamItr->setSimContextAndData(SOLUTION_VAR_PHASE, index1);
-            foundAndSetContext = true;
-          }
-          else if (varType == "VDB" )
-          {
-            originalParamItr->setSimContextAndData(SOLUTION_VAR_DB, index1);
-            foundAndSetContext = true;
-          }
-        }
-        else if (numIndices == 2)
-        {
-          // check to ensure that User asked for a voltage as that's the
-          // only thing that takes two args
-          if (type1 != 'V')
-          {
-            string msg("Voltage Output requested for device node(" + nodeName2 + ") by PRINT statement\n");
-            N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-          }
-
-          // user requested a voltage difference V(node1, node2)
-          // report V(node1) and -V(node2) depending on what's on
-          // this processor
-          if (svGIDList2.size() > 0)
-            index2 = *(svGIDList2.begin());
-
-          originalParamItr->setSimContextAndData(VOLTAGE_DIFFERENCE, index1, index2);
-          foundAndSetContext = true;
-        }
-        else
-        {
-          // In the serial case, we know for sure there was a request for
-          // output at a non-existent voltage node.
-          string msg("Output requested for non-existent node \"" + nodeName + nodeName2);
-          msg += "\" by PRINT statement\n";
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-        }
-      }
-      else if (varType == "I")
-      {
-#ifdef Xyce_DEBUG_IO
-        cout <<"Processing varType == I" << std::endl;
-#endif
-        char ch_type = nodeName[0];
-        if (nodeName.find_last_of(":") != string::npos)
-          ch_type = nodeName[nodeName.find_last_of(":")+1];
-        if (type1 != 'D')
-        {
-          string msg("Current Output requested for voltage node(" + nodeName + ") by PRINT statement\n");
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-        }
-
-        if (!svGIDList1.empty())
-          index1 = *(svGIDList1.begin());
-
-        // need this conditional as this could be I(Rmyresistor).  Only the level 3 resistor has
-        // a current in the solution vector.  I'll need this check untill lead currents are properly
-        // handled by the store vector
-        if (index1 != -1)
-        {
-          originalParamItr->setSimContextAndData(SOLUTION_VAR, index1);
-          foundAndSetContext = true;
-        }
-#ifdef Xyce_DEBUG_IO
-        cout <<"index1 = " << index1 << "  foundAndSetContext = " << foundAndSetContext << std::endl;
-#endif
-      }
-    }
-    else if (svGIDList1.empty() && varType[0] == 'V' && numIndices == 2)
-    {
-      // This case is *extremely* unfortunate, but is a result of the
-      // design of this function being very fragile with respect to parallel
-      // implementation.
-      //
-      // When we have V(a,b) (the only case where 2 indices are legal),
-      // and we're paralell, and on a processor where A is a node stored
-      // off-processor, the previous catch-all case misses it, and we would
-      // otherwise fall off and set this node to return "constant".  This
-      // is a serious flaw in the logic and makes V(A,B) be completely wrong
-      // in parallel.  It also makes V(A,B) invisible to all processors that
-      // don't own "A" --- meaning that all the clumsy logic in getPrintValue
-      // won't catch this case.  Unless we do this little game right here.
-      //
-      // Here, if any processor has V(A,B) and A is off processor, we
-      // *STILL* set its context as VOLTAGE_DIFFERENCE, and fudge the
-      // indices.
-      //
-      // Logic inside getPrintValue check these special cases and do The Right
-      // Thing.
-      //
-      // The *entire* handling of the print line needs to be refactored with
-      // parallelism in mind from the outset, and must not remain a hodge-podge
-      // of serial code with parallelism band-aided in.
-
-      index1 = -1;
-      index2 = -1;
-      if (!svGIDList2.empty())
-        index2 = *(svGIDList2.begin());
-
-      originalParamItr->setSimContextAndData(VOLTAGE_DIFFERENCE, index1, index2);
-      foundAndSetContext = true;
-    }
-
-#ifdef Xyce_DEBUG_IO
-    cout << "procID = " << getProcID() << ":";
-    cout << " nodeName = " << nodeName << ":";
-    cout << " nodeName2 = " << nodeName2 << ":";
-    cout << " index1 = " << index1;
-    cout << " result = " << result << std::endl;
-#endif
-  } // !resultFound &&(expression || solution var)
-
-  bool globalFound;
-
-#ifdef Xyce_PARALLEL_MPI
-  // need to check in parallel that any node not found locally
-  // was found on another processor.
-
-  // double dblFound = resultFound?1.0:0.0;
-  double dblFound = 0.0;
-  if (foundAndSetContext)
-    dblFound = 1.0;
-  double globalDblFound = 0.0;
-  pdsCommPtr_->maxAll(&dblFound, &globalDblFound, 1);
-  int globalContexFound=UNDEFINED;
-  int localContext = originalParamItr->getSimContext();
-  pdsCommPtr_->maxAll(&localContext, &globalContexFound, 1);
-  // resultFound =(globalDblFound!=0.0)?true:false;
-  if (globalDblFound != 0.0)
-  {
-    if (foundAndSetContext==false)
-    {
-      // a valid context was found on another processor,
-      // so set this context to CONSTANT and value of zero
-      if ( static_cast<SimulatorVariableContext>(globalContexFound) == SOLUTION_VAR )
-      {
-        // this is a hack to handle complex types from getPrintValue to in parallel 
-        // In parallel all procs need to call getPrintValue() twice to get the real
-        // and imaginary parts of a solution var.  But, if the context on processors 
-        // that don't own the var is set to CONSTANT then they won't know to make 
-        // two calls to getPrintValue() and Xyce will hang waiting on parallel 
-        // communication. The real solution to this is to have getPrintValue return
-        // complex types in one call.  But that is for a later release
-        originalParamItr->setSimContextAndData(static_cast<SimulatorVariableContext>(globalContexFound));
-      }
-      else
-      {
-        // a safe context assignment for all other cases.
-        originalParamItr->setSimContextAndData(CONSTANT, 0.0);
-      }
-      foundAndSetContext=true;
-    }
-  }
-  else
-  {
-    foundAndSetContext=false;
-  }
-#endif
-
-  // Handle lead currents, including PDE lead currents.
-  // Note; the devPtr_->getParam will work in parallel, so this can happen
-  // after the maxall, above.
-  if (!foundAndSetContext && thisIsA_V_or_I_Var)
-  {
-    string parTmp("");
-    string parTmp2("");
-    if (!iteraterAdvanced)
-    {
-      ++nextParamItr;
-      nodeName = nextParamItr->tag();
-    }
-
-    if (varType == "I" ||(varType.size() == 2 && varType[0] == 'I'))
-    {
-      // nodeName could be circuit_context:DeviceTypeDeviceName while
-      // internally it should be DeviceType:circuit_context:DeviceName.
-      // generate the modified nodename here
-      string modifiedName;
-      std::string::size_type lastColonInName = nodeName.find_last_of(":");
-      //std::cout << "==>lastColonInName = " << lastColonInName << std::endl;
-      if ((lastColonInName != string::npos) &&(lastColonInName+1 < nodeName.length()))
-      {
-        string::iterator deviceName = nodeName.begin()+lastColonInName+1;
-        string::iterator namePrefixEnd = nodeName.begin()+lastColonInName;
-        modifiedName.append(deviceName, deviceName+1);
-        modifiedName.append(":");
-        modifiedName.append(nodeName.begin(), namePrefixEnd+1);
-        modifiedName.append(deviceName+1, nodeName.end());
-        //std::cout << "modifiedName = " << modifiedName <<std::endl;
-      }
-      else
-      {
-        modifiedName = nodeName;
-      }
-      // could be a device lead current "DEV_I" or a branch current.
-      // so we don't have to duplicate solution vars(branch currents) in the
-      // store vector, look for each type.
-      parTmp = modifiedName + ":DEV_" + varType;  // if it is in the state/store vec.
-      parTmp2 = modifiedName + "_BRANCH";         // if it is in the solution vec.
-    }
-    else
-    {
-      // check for v(name) in allNodes_
-      // end up here when topology isn't completed(so svGIDList1.empty() == true)
-      NodeNamePairMap::iterator iterCI = allNodes_.find(nodeName);
-      if (iterCI != allNodes_.end())
-      {
-        // object is part of a solution var
-        int ind = iterCI->second.first;
-        originalParamItr->setSimContextAndData(SOLUTION_VAR, ind);
-        foundAndSetContext = true;
-        //std::cout << " found context as sol-var at index " << ind << std::endl;
-      }
-
-    }
-
-    // this if block allows for spaces in YPDE names as in I1(YPDE NAME)
-    // we try to find devices based on parTmp in the following blocks of code,
-    // so do this modification now.
-    std::string::size_type space = parTmp.find_first_of(" ");
-    if (space != std::string::npos)
-    {
-      if (space == 4 && parTmp.substr(0, 4) == "YPDE")
-      {
-        parTmp.replace(4, 1, "%");
-        parTmp.insert(1, "%");
-      }
-    }
-
-    // search the store vector for current.
-    NodeNamePairMap::iterator iterCI;
-#ifdef Xyce_DEBUG_IO
-    std::cout << "allNodes_: " << std::endl;
-    iterCI = allNodes_.begin();
-    while (iterCI != allNodes_.end())
-    {
-      std::cout << "allNode-map \"" << iterCI->first << "\" =(" << iterCI->second.first
-        << ", " << iterCI->second.second << ")" << std::endl;
-      iterCI++;
-    }
-
-    std::cout << "stateNodes_: " << std::endl;
-    iterCI = stateNodes_.begin();
-    while (iterCI != stateNodes_.end())
-    {
-      std::cout << "stateNode-map \"" << iterCI->first << "\" =(" << iterCI->second.first
-      << ", " << iterCI->second.second << ")" << std::endl;
-      iterCI++;
-    }
-
-    std::cout << "storeNodes_: " << std::endl;
-    iterCI = storeNodes_.begin();
-    while (iterCI != storeNodes_.end())
-    {
-      std::cout << "storeNode-map \"" << iterCI->first << "\" =(" << iterCI->second.first
-      << ", " << iterCI->second.second << ")" << std::endl;
-      iterCI++;
-    }
-
-    std::cout << " parTmp = \"" << parTmp << "\"" << std::endl;
-    std::cout << " parTmp2 = \"" << parTmp2 << "\"" << std::endl;
-#endif // Xyce_DEBUG_IO
-
-    iterCI = storeNodes_.find(parTmp);
-    if (iterCI != storeNodes_.end())
-    {
-      int ind = iterCI->second.first;
-      originalParamItr->setSimContextAndData(STORE_VAR, ind);
-      nextParamItr->setSimContextAndData(NODE_OR_DEVICE_NAME);
-      foundAndSetContext = true;
-#ifdef Xyce_DEBUG_IO
-      std::cout << " found store var context for " << parTmp << " index " << ind << std::endl;
-#endif
-    }
-
-    if (!foundAndSetContext)
-    {
-      iterCI = allNodes_.find(parTmp2);
-      if (iterCI != allNodes_.end())
-      {
-
-        int ind = iterCI->second.first;
-        originalParamItr->setSimContextAndData(SOLUTION_VAR, ind);
-        nextParamItr->setSimContextAndData(NODE_OR_DEVICE_NAME);
-#ifdef Xyce_DEBUG_IO
-        std::cout << " found solution var context for " << parTmp2 << " index " << ind << std::endl;
-#endif
-        foundAndSetContext = true;
-      }
-    }
-
-    // in parallel we may have found the variable in the state or store vectors
-    // sync up the foundAndSetContext flag before checking with the device
-    // package for a device parameter.
-#ifdef Xyce_PARALLEL_MPI
-    double foundParam = foundAndSetContext?1:0;
-    double finalParam = 0.0;
-    double globalVal;
-    pdsCommPtr_->barrier();
-    pdsCommPtr_->sumAll(&foundParam, &finalParam, 1);
-    if (!foundAndSetContext &&(finalParam != 0.0))
-    {
-      // context was found on another processor.
-      // it's safe to set this context to the store vec.
-      // and the index to -1.
-      foundAndSetContext=true;
-      originalParamItr->setSimContextAndData(STORE_VAR, -1);
-      nextParamItr->setSimContextAndData(NODE_OR_DEVICE_NAME);
-#ifdef Xyce_DEBUG_IO
-      std::cout << " found solution/state var context off proc for " << parTmp << " index -1" << std::endl;
-#endif
-    }
-#endif
-
-    if (!foundAndSetContext)
-    {
-      // this is confusing.  While the solution vector and state/store vector's
-      // use maps with modified device names(specifically where the device
-      // type is always first as in "D:subcircuitname:devciename" as apposed to
-      // "subcircuitname:Ddevicename", the device manager does not use the modified
-      // device name to find a device.  So, when we set up the device name below
-      // use the "nodeName" rather than the "modifiedDeviceName".
-      parTmp = nodeName + ":DEV_" + varType;
-      // have to repeat this check for spaces as in I(YPDE NAME)
-      std::string::size_type space = parTmp.find_first_of(" ");
-      if (space != std::string::npos)
-      {
-        if (space == 4 && parTmp.substr(0, 4) == "YPDE")
-        {
-          parTmp.replace(4, 1, "%");
-          parTmp.insert(1, "%");
-        }
-      }
-      originalParamItr->setSimContextAndData(DEVICE_PARAMETER, parTmp);
-      nextParamItr->setSimContextAndData(NODE_OR_DEVICE_NAME);
-
-      // This starts to querry the device manager to test if
-      // this parameter is real, or if it need further qualification
-
-#ifdef Xyce_DEBUG_IO
-      std::cout << " Checking device manager for " << parTmp << std::endl;
-#endif
-      foundAndSetContext = devPtr_->getParam(parTmp, result);
-      if (!foundAndSetContext)
-      {
-        string ppde("Y%PDE%" + parTmp);
-        originalParamItr->setSimContextAndData(DEVICE_PARAMETER, ppde);
-        foundAndSetContext = devPtr_->getParam(ppde, result);
-      }
-#ifdef Xyce_DEBUG_IO
-      if (foundAndSetContext)
-      {
-        std::cout << " found device parameter context for " << parTmp << std::endl;
-      }
-#endif
-    }
-  }
-  globalFound = foundAndSetContext;
-
-  // If the parameter is still "not found", then try to get it from
-  // the device package.  I added this as an afterthought. ERK.
-  if (!globalFound)
-  {
-    if (thisIsA_V_or_I_Var)
-    {
-      if (varType == "V")
-      {
-        string msg("VOLTAGE Output requested for non-existent node \"" + nodeName);
-        msg += "\" by PRINT or Expression statement\n";
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-      }
-      else if (varType == "I" ||(varType.size() == 2 && varType[0] == 'I'))
-      {
-        string msg("CURRENT Output requested for unsupported or non-existent device \"" + nodeName);
-        msg += "\" by PRINT or Expression statement\n";
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-      }
-    }
-    else
-    {
-      // possibly it is a global param or other known param
-      globalFound = devPtr_->getParam(varType, result);
-      if (globalFound)
-      {
-        originalParamItr->setSimContextAndData(DEVICE_PARAMETER, varType);
-        foundAndSetContext=true;
-      }
-    }
-  }
-
-  // Handle objective vars and measure vars.
-  if (!globalFound && !thisIsA_V_or_I_Var)
-  {
-    if (objective.find(varType) != objective.end())
-    {
-      originalParamItr->setSimContextAndData(OBJECTIVE_FUNCTION, varType);
-      foundAndSetContext=true;
-    }
-    else  // not an objective so potentially a measure var.
-    {
-      bool mFound;
-      measureManager_.getMeasureValue(varType, result, mFound);
-      if (!mFound) {
-        string msg("Can't find print variable "+varType+" "+nodeName);
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL_0, msg);
-      }
-      else
-      {
-        originalParamItr->setSimContextAndData(MEASURE_FUNCTION, varType);
-        foundAndSetContext=true;
-      }
-    }
-  }
-
-  return foundAndSetContext;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : OutputMgr::getPrintValue_
-// Purpose       :
-// Special Notes : The design of this method is defective.
-//                 We are doing an MPI reduce operation on Every. Single.
-//                 Element. on the print line, one at a time.
-//                 This is RIPE for refactor, as what we should be doing
-//                 is accumulating every processor's print element contributions
-//                 into a vector, and then doing a reduce on the whole
-//                 vector at once.  Further, some print options, e.g. V(A,B)
-//                 may require that we do a SUM across processors to get the
-//                 correct result.  This can be done with a custom reduction
-//                 operator rather than a generic maxAll vs. sumAll.  But
-//                 again, this requires a refactor of the outputMgr class
-//
-// Scope         : private
-// Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 08/11/04
-//-----------------------------------------------------------------------------
-double OutputMgr::getPrintValue(ParameterList::const_iterator iterParam, const N_LAS_Vector * solnVecPtr, const N_LAS_Vector * stateVecPtr, const N_LAS_Vector * storeVecPtr, const N_LAS_Vector * solnVecImagPtr)
-{
-  double result=0;
-  bool resultFound = false;
-  bool requireSum = false;
-
-  SimulatorVariableContext theParamsContext = iterParam->getSimContext();
-
-  switch (theParamsContext)
-  {
-    case INDEX:
-      result = currentOutputter_->getIndex();
-      resultFound = true;
-      break;
-
-    case CONSTANT:
-      result = iterParam->getFixedValue();
-      resultFound = true;
-      break;
-
-    case TEMPERATURE:
-      result = circuitTemp_;
-      resultFound = true;
-      break;
-
-    case TIME_VAR:
-      result = circuitTime_; // *print_parameters.outputTimeScaleFactor_;
-      resultFound = true;
-      break;
-
-    case FREQUENCY:
-      result = circuitFrequency_;
-      resultFound = true;
-      break;
-
-    case STEP_SWEEP_VAR:
-    {
-      int sweepVarIndex = iterParam->getExtraIndex1();
-      result = stepParamVec_.at(sweepVarIndex).currentVal;
-      resultFound = true;
-    }
-    break;
-
-    case DC_SWEEP_VAR:
-    {
-      int dcSweepVarIndex = iterParam->getExtraIndex1();
-      result = dcParamVec_.at(dcSweepVarIndex).currentVal;
-      resultFound = true;
-    }
-    break;
-
-    case GLOBAL_PARAMETER:
-      result = devPtr_->getGlobalPar(iterParam->sVal());
-      resultFound = true;
-      break;
-
-    case EXPRESSION:
-      result = iterParam->getExpressionDataPointer()->evaluate(solnVecPtr, stateVecPtr, storeVecPtr);
-      if( !(iterParam->getExpressionDataPointer()->numUnresolvedStringsChecked) )
-      {
-        // first time this expression has been resolved.  Check for unresolved symbols 
-        // emit a fatal error if no expression in parallel has zero unresolved symbols 
-        int numUnresolvedSymbols = iterParam->getExpressionDataPointer()->getNumUnresolvedStrings();
-        
-#ifdef Xyce_PARALLEL_MPI
-        pdsCommPtr_->barrier();
-        int minNumUnresolvedSymbols=0;
-        pdsCommPtr_->minAll(&numUnresolvedSymbols, &minNumUnresolvedSymbols, 1);
-        numUnresolvedSymbols=minNumUnresolvedSymbols;
-#endif
-
-        if (numUnresolvedSymbols > 0 )
-        {
-          string msg("Can't resolve all symbols in expression variable ");
-          msg += iterParam->getExpressionDataPointer()->expPtr->get_expression();
-          N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,msg);
-        }
-        // set numUnresolvedStringsChecked flag to true so we only do this extra work once.
-        iterParam->getExpressionDataPointer()->numUnresolvedStringsChecked = true;
-      }
-      resultFound = true;
-      break;
-
-    case SOLUTION_VAR:
-    {
-      int solVarIndex = iterParam->getExtraIndex1();
-      if (solVarIndex == -1)
-      {
-        // off processor result, so return zero
-        result = 0.0;
-      }
-      else
-      {
-        //result =(*solnVecPtr)[solVarIndex];
-        result = solnVecPtr->getElementByGlobalIndex(solVarIndex);
-      }
-      resultFound = true;
-    }
-    break;
-
-    case VOLTAGE_DIFFERENCE:
-    {
-      int solVarIndex1 = iterParam->getExtraIndex1();
-      int solVarIndex2 = iterParam->getExtraIndex2();
-
-      // the following may not be necessary as the epetra-map for the solution vector may just
-      // return zero for an index of "-1".
-      if (solVarIndex1 == -1 && solVarIndex2 == -1)
-      {
-        // off processor result, so return zero
-        result = 0.0;
-      }
-      else if (solVarIndex1 == -1)
-      {
-        // solVarIndex1 is off proc.
-        result = -solnVecPtr->getElementByGlobalIndex(solVarIndex2);
-      }
-      else if (solVarIndex2 == -1)
-      {
-        // solVarIndex2 is off proc.
-        result = solnVecPtr->getElementByGlobalIndex(solVarIndex1);
-      }
-      else
-      {
-        result = solnVecPtr->getElementByGlobalIndex(solVarIndex1) - solnVecPtr->getElementByGlobalIndex(solVarIndex2);
-      }
-      resultFound=true;
-      requireSum = true;
-    }
-    break;
-
-    case STATE_VAR:
-    {
-      int stateVarIndex = iterParam->getExtraIndex1();
-      // stateVecPtr can be NULL so check.
-      if (stateVecPtr != NULL)
-      {
-        if (stateVarIndex == -1)
-        {
-          // off processor result, so return zero
-          result = 0.0;
-        }
-        else
-        {
-          result =(*stateVecPtr)[stateVarIndex]; // stateVecPtr->getElementByGlobalIndex(stateVarIndex);
-        }
-      }
-      resultFound = true;
-    }
-    break;
-
-    case STORE_VAR:
-    {
-      int storeVarIndex = iterParam->getExtraIndex1();
-      // stoVecPtr can be NULL so check.
-      if (storeVecPtr != NULL)
-      {
-        if (storeVarIndex == -1)
-        {
-          // off processor result, so return zero
-          result = 0.0;
-        }
-        else
-        {
-          result = (*storeVecPtr)[storeVarIndex]; // storeVecPtr->getElementByGlobalIndex(storeVarIndex);
-        }
-      }
-      resultFound = true;
-    }
-    break;
-
-    case DEVICE_PARAMETER:
-    {
-      string varName(iterParam->getQualifiedParameterOrFunctionName());
-      result = devPtr_->getParam(varName);
-      resultFound=true;
-    }
-    break;
-
-    case OBJECTIVE_FUNCTION:
-    {
-      // this looks out of place here.  It should be in it's own update
-      // function like measureManager_.update...
-      string varType = iterParam->getQualifiedParameterOrFunctionName();
-      if (objective[varType].var1.empty() && objective[varType].var2.empty())
-      {
-        // saving single values(potentially all values) as there isn't
-        // any external data to tell us what needs to be saved
-        result = objective[varType].save(solnVecPtr, stateVecPtr, storeVecPtr);
-        resultFound=true;
-      }
-      else
-      {
-        // use user supplied external data to save only the simulation
-        // results we really need.
-        double v1=0.0;
-        double v2=0.0;
-        ParameterList vlist;
-        vlist.push_back(N_UTL_Param("", 0));
-        ParameterList::iterator it_vlist = vlist.begin();
-        if (!objective[varType].var1.empty())
-        {
-          it_vlist->setTag(objective[varType].var1);
-          v1 = getPrintValue(it_vlist, solnVecPtr, stateVecPtr, storeVecPtr);
-        }
-        if (!objective[varType].var2.empty())
-        {
-          it_vlist->setTag(objective[varType].var2);
-          v2 = getPrintValue(it_vlist, solnVecPtr);
-        }
-        result = objective[varType].save(v1, v2, solnVecPtr, stateVecPtr, storeVecPtr);
-        resultFound=true;
-      }
-    }
-    break;
-
-    case MEASURE_FUNCTION:
-    {
-      bool mFound=false;
-      measureManager_.getMeasureValue(iterParam->getQualifiedParameterOrFunctionName(), result, mFound);
-      resultFound=mFound;
-    }
-    break;
-
-    // these are for solution variables under AC analysis where
-    // solution is complex and could be printed as real, imaginary,
-    // magnitude or phase
-    case SOLUTION_VAR_REAL:
-    {
-      int solVarIndex = iterParam->getExtraIndex1();
-      if (solVarIndex == -1)
-      {
-        // off processor result, so return zero
-        result = 0.0;
-      }
-      else
-      {
-        result = solnVecPtr->getElementByGlobalIndex(solVarIndex);
-      }
-      resultFound = true;
-    }
-    break;
-
-    case SOLUTION_VAR_IMAG:
-    {
-      int solVarIndex = iterParam->getExtraIndex1();
-      if (solVarIndex == -1 ||(solnVecImagPtr == 0))
-      {
-        // off processor result, so return zero
-        result = 0.0;
-      }
-      else
-      {
-        result = solnVecImagPtr->getElementByGlobalIndex(solVarIndex);
-      }
-      resultFound = true;
-    }
-    break;
-
-    case SOLUTION_VAR_MAG:
-    {
-      int solVarIndex = iterParam->getExtraIndex1();
-      if (solVarIndex == -1 )
-      {
-        // off processor result, so return zero
-        result = 0.0;
-      }
-      else
-      {
-        double realComp = solnVecPtr->getElementByGlobalIndex(solVarIndex);
-        double imagComp = 0.0;
-        if (solnVecImagPtr != 0 )
-          imagComp = solnVecImagPtr->getElementByGlobalIndex(solVarIndex);
-        result =  sqrt(pow(realComp, 2) + pow(imagComp, 2) );
-      }
-      resultFound = true;
-    }
-    break;
-
-    case SOLUTION_VAR_PHASE:
-    {
-      int solVarIndex = iterParam->getExtraIndex1();
-      if (solVarIndex == -1 )
-      {
-        // off processor result, so return zero
-        result = 0.0;
-      }
-      else
-      {
-        double realComp = solnVecPtr->getElementByGlobalIndex(solVarIndex);
-        double imagComp = 0.0;
-        if (solnVecImagPtr != 0 )
-          imagComp = solnVecImagPtr->getElementByGlobalIndex(solVarIndex);
-        // phase in radians is atan2(imag(z), real(z)).
-        result =  atan2(imagComp, realComp );
-      }
-      resultFound = true;
-    }
-    break;
-
-    case SOLUTION_VAR_DB:
-    {
-      int solVarIndex = iterParam->getExtraIndex1();
-      if (solVarIndex == -1 )
-      {
-        // off processor result, so return zero
-        result = 0.0;
-      }
-      else
-      {
-        double realComp = solnVecPtr->getElementByGlobalIndex(solVarIndex);
-        double imagComp = 0.0;
-        if (solnVecImagPtr != 0 )
-          imagComp = solnVecImagPtr->getElementByGlobalIndex(solVarIndex);
-        // DB = 20*log10(magnitude)
-        result =  20*log10(sqrt(pow(realComp, 2) + pow(imagComp, 2)) );
-      }
-      resultFound = true;
-    }
-    break;
-
-    case VOLTAGE_DIFFERENCE_REAL:
-    {
-      int solVarIndex1 = iterParam->getExtraIndex1();
-      int solVarIndex2 = iterParam->getExtraIndex2();
-      // the following may not be necessary as the epetra-map for the solution vector may just
-      // return zero for an index of "-1".
-      if (solVarIndex1 == -1 && solVarIndex2 == -1)
-      {
-        // off processor result, so return zero
-        result = 0.0;
-      }
-      else if (solVarIndex1 == -1)
-      {
-        // solVarIndex1 is off proc.
-        result = -solnVecPtr->getElementByGlobalIndex(solVarIndex2);
-      }
-      else if (solVarIndex2 == -1)
-      {
-        // solVarIndex2 is off proc.
-        result = solnVecPtr->getElementByGlobalIndex(solVarIndex1);
-      }
-      else
-      {
-        result = solnVecPtr->getElementByGlobalIndex(solVarIndex1) - solnVecPtr->getElementByGlobalIndex(solVarIndex2);
-      }
-      resultFound=true;
-      requireSum = true;
-    }
-    break;
-
-    case VOLTAGE_DIFFERENCE_IMAG:
-    {
-      int solVarIndex1 = iterParam->getExtraIndex1();
-      int solVarIndex2 = iterParam->getExtraIndex2();
-      // the following may not be necessary as the epetra-map for the solution vector may just
-      // return zero for an index of "-1".
-      if (solVarIndex1 == -1 && solVarIndex2 == -1)
-      {
-        // off processor result, so return zero
-        result = 0.0;
-      }
-      else if (solVarIndex1 == -1)
-      {
-        // solVarIndex1 is off proc.
-        result = -solnVecImagPtr->getElementByGlobalIndex(solVarIndex2);
-      }
-      else if (solVarIndex2 == -1)
-      {
-        // solVarIndex2 is off proc.
-        result = solnVecImagPtr->getElementByGlobalIndex(solVarIndex1);
-      }
-      else
-      {
-        result = solnVecImagPtr->getElementByGlobalIndex(solVarIndex1) - solnVecImagPtr->getElementByGlobalIndex(solVarIndex2);
-      }
-      resultFound=true;
-      requireSum = true;
-    }
-    break;
-
-    case NODE_OR_DEVICE_NAME:
-      // we can ignore this becasue it's the name associated with a prior
-      // I(), V() or N() param.
-      break;
-
-    case UNDEFINED:
-    default:
-      break;
-  }
-
-  // check filter option
-  if (filterGiven_ &&(fabs(result) < filter_))
-  {
-    result = 0.0;
-  }
-
-  // If running in parallel, make value of "result" be the same on
-  // each processor.
-#ifdef Xyce_PARALLEL_MPI
-  pdsCommPtr_->barrier();
-
-  double final=0;
-
-  // HACK ALERT:  Voltage differences are special, and could need to be a
-  // combination of data from off-processor rather than a global max/min.
-  // Those special cases require us to use sumAll instead.
-  //  This is RIPE for refactor and must be undertaken after release 6.0!
-  if (!requireSum)
-  {
-    pdsCommPtr_->maxAll(&result, &final, 1);
-    if (final == 0.0) pdsCommPtr_->minAll(&result, &final, 1);
-  }
-  else
-  {
-    pdsCommPtr_->sumAll(&result, &final, 1);
-  }
-
-  result = final;
-
-#endif
-
-  return result;
-}
-
 //-----------------------------------------------------------------------------
 // Function      : OutputMgr::outputAC
 // Purpose       : .PRINT output for ac runs
@@ -5993,43 +4940,70 @@ double OutputMgr::getPrintValue(ParameterList::const_iterator iterParam, const N
 // Creator       : Todd Coffey
 // Creation Date : 8/5/08
 //-----------------------------------------------------------------------------
-void OutputMgr::outputAC(double frequency, const N_LAS_Vector * real_solution_vector, const N_LAS_Vector *imaginary_solution_vector)
+void OutputMgr::outputAC(
+    double frequency, 
+    const N_LAS_Vector * real_solution_vector, 
+    const N_LAS_Vector *imaginary_solution_vector)
 {
   circuitFrequency_ = frequency;
 
+  measureManager_.updateAcMeasures(frequency, real_solution_vector, imaginary_solution_vector);
   if (!activeOutputterStack_.empty())
-    for (std::vector<Outputter::Interface *>::const_iterator it = activeOutputterStack_.back().begin(); it != activeOutputterStack_.back().end(); ++it)
+  {
+    for (std::vector<Outputter::Interface *>::const_iterator 
+        it = activeOutputterStack_.back().begin(); it != activeOutputterStack_.back().end(); ++it)
+    {
       (*it)->outputAC(frequency, real_solution_vector, imaginary_solution_vector);
+    }
+  }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : OutputMgr::outputAC
-// Purpose       : .PRINT output for ac runs
+// Function      : OutputMgr::outputHomotopy
+// Purpose       : 
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey
 // Creation Date : 8/5/08
 //-----------------------------------------------------------------------------
-void OutputMgr::outputHomotopy(const std::vector<string> & parameter_names, const std::vector<double> & param_values, const N_LAS_Vector * solution_vector)
+void OutputMgr::outputHomotopy(
+    const std::vector<std::string> & parameter_names, 
+    const std::vector<double> & param_values, 
+    const N_LAS_Vector * solution_vector)
 {
   if (!activeOutputterStack_.empty())
-    for (std::vector<Outputter::Interface *>::const_iterator it = activeOutputterStack_.back().begin(); it != activeOutputterStack_.back().end(); ++it)
+  {
+    for (std::vector<Outputter::Interface *>::const_iterator 
+        it = activeOutputterStack_.back().begin(); 
+        it != activeOutputterStack_.back().end(); ++it)
+    {
       (*it)->outputHomotopy(parameter_names, param_values, solution_vector);
+    }
+  }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : OutputMgr::outputAC
-// Purpose       : .PRINT output for ac runs
+// Function      : OutputMgr::outputMORTF
+// Purpose       : 
 // Special Notes :
 // Scope         : public
 // Creator       : Todd Coffey
 // Creation Date : 8/5/08
 //-----------------------------------------------------------------------------
-void OutputMgr::outputMORTF(bool origSystem, const double & freq, const Teuchos::SerialDenseMatrix<int, std::complex<double> >& H)
+void OutputMgr::outputMORTF(
+    bool origSystem, 
+    const double & freq, 
+    const Teuchos::SerialDenseMatrix<int, std::complex<double> >& H)
 {
   if (!activeOutputterStack_.empty())
-    for (std::vector<Outputter::Interface *>::const_iterator it = activeOutputterStack_.back().begin(); it != activeOutputterStack_.back().end(); ++it)
+  {
+    for (std::vector<Outputter::Interface *>::const_iterator 
+        it = activeOutputterStack_.back().begin(); 
+        it != activeOutputterStack_.back().end(); ++it)
+    {
       (*it)->outputMORTF(origSystem, freq, H);
+    }
+  }
 }
 
 //-----------------------------------------------------------------------------
@@ -6052,7 +5026,7 @@ void OutputMgr::outputROM(
     // Eliminate the ".cir" suffix from the filename.
     // Leaving ".cir" in the netListFilename_ causes issues when reading the files back in.
     int pos = netListFilename_.find(".cir");
-    string baseoutputname;
+    std::string baseoutputname;
     if (pos > 0)
     {
       baseoutputname = netListFilename_.substr(0, pos);
@@ -6064,19 +5038,19 @@ void OutputMgr::outputROM(
 
     // Open files for Ghat, Chat, Bhat, and Lhat
     FILE *c_file, *g_file, *b_file, *l_file;
-    N_IO_MMIO::MM_typecode matcode;
-    string cfile = baseoutputname + ".Chat";
-    string gfile = baseoutputname + ".Ghat";
-    string bfile = baseoutputname + ".Bhat";
-    string lfile = baseoutputname + ".Lhat";
+    MMIO::MM_typecode matcode;
+    std::string cfile = baseoutputname + ".Chat";
+    std::string gfile = baseoutputname + ".Ghat";
+    std::string bfile = baseoutputname + ".Bhat";
+    std::string lfile = baseoutputname + ".Lhat";
     c_file = fopen(cfile.c_str(), "w");
     g_file = fopen(gfile.c_str(), "w");
     b_file = fopen(bfile.c_str(), "w");
     l_file = fopen(lfile.c_str(), "w");
     if (c_file == NULL || g_file == NULL || b_file == NULL || l_file == NULL)
     {
-      string msg="Error: Cannot open one of the ROM files for output: " + cfile + ", " + gfile + ", " + bfile + ", " + lfile;
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
+      Report::DevelFatal0() << "Cannot open one of the ROM files for output: " 
+        << cfile << ", " << gfile << ", " << bfile << ", " << lfile;
     }
     mm_initialize_typecode(&matcode);
     mm_set_matrix(&matcode);
@@ -6087,16 +5061,16 @@ void OutputMgr::outputROM(
     int ret = 0;
 
     // Write the headers
-    ret = N_IO_MMIO::mm_write_banner(g_file, matcode);
-    ret = N_IO_MMIO::mm_write_banner(c_file, matcode);
-    ret = N_IO_MMIO::mm_write_banner(b_file, matcode);
-    ret = N_IO_MMIO::mm_write_banner(l_file, matcode);
+    ret = MMIO::mm_write_banner(g_file, matcode);
+    ret = MMIO::mm_write_banner(c_file, matcode);
+    ret = MMIO::mm_write_banner(b_file, matcode);
+    ret = MMIO::mm_write_banner(l_file, matcode);
 
     // Write the matrix array sizes
-    ret = N_IO_MMIO::mm_write_mtx_array_size(g_file, Ghat.numRows(), Ghat.numCols());
-    ret = N_IO_MMIO::mm_write_mtx_array_size(c_file, Chat.numRows(), Chat.numCols());
-    ret = N_IO_MMIO::mm_write_mtx_array_size(b_file, Bhat.numRows(), Bhat.numCols());
-    ret = N_IO_MMIO::mm_write_mtx_array_size(l_file, Lhat.numRows(), Lhat.numCols());
+    ret = MMIO::mm_write_mtx_array_size(g_file, Ghat.numRows(), Ghat.numCols());
+    ret = MMIO::mm_write_mtx_array_size(c_file, Chat.numRows(), Chat.numCols());
+    ret = MMIO::mm_write_mtx_array_size(b_file, Bhat.numRows(), Bhat.numCols());
+    ret = MMIO::mm_write_mtx_array_size(l_file, Lhat.numRows(), Lhat.numCols());
 
     // Write Ghat
     for (int j=0; j<Ghat.numCols(); j++) {
@@ -6151,7 +5125,7 @@ void OutputMgr::outputROM(
   // Eliminate the ".cir" suffix from the filename.
   // Leaving ".cir" in the netListFilename_ causes issues when reading the files back in.
   int pos = netListFilename_.find(".cir");
-  string baseoutputname;
+  std::string baseoutputname;
   if (pos > 0)
   {
     baseoutputname = netListFilename_.substr(0, pos);
@@ -6162,8 +5136,8 @@ void OutputMgr::outputROM(
   }
 
   // Create file string for Chat and Ghat
-  string gfile = baseoutputname + ".Ghat";
-  string cfile = baseoutputname + ".Chat";
+  std::string gfile = baseoutputname + ".Ghat";
+  std::string cfile = baseoutputname + ".Chat";
 
   // Get Epetra_CrsMatrix objects from Ghat and Chat
   Epetra_CrsMatrix& epetraGhat =(const_cast<N_LAS_Matrix*>(&Ghat))->epetraObj();
@@ -6181,17 +5155,17 @@ void OutputMgr::outputROM(
 
     // Open files for Bhat, and Lhat
     FILE *b_file, *l_file;
-    N_IO_MMIO::MM_typecode matcode;
+    MMIO::MM_typecode matcode;
 
-    string bfile = baseoutputname + ".Bhat";
-    string lfile = baseoutputname + ".Lhat";
+    std::string bfile = baseoutputname + ".Bhat";
+    std::string lfile = baseoutputname + ".Lhat";
 
     b_file = fopen(bfile.c_str(), "w");
     l_file = fopen(lfile.c_str(), "w");
     if (b_file == NULL || l_file == NULL)
     {
-      string msg="Error: Cannot open one of the ROM files for output: " + bfile + ", " + lfile;
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
+      Report::DevelFatal0() << "Cannot open one of the ROM files for output: " 
+        << bfile << ", " << lfile;
     }
     mm_initialize_typecode(&matcode);
     mm_set_matrix(&matcode);
@@ -6202,12 +5176,12 @@ void OutputMgr::outputROM(
     int ret = 0;
 
     // Write the headers
-    ret = N_IO_MMIO::mm_write_banner(b_file, matcode);
-    ret = N_IO_MMIO::mm_write_banner(l_file, matcode);
+    ret = MMIO::mm_write_banner(b_file, matcode);
+    ret = MMIO::mm_write_banner(l_file, matcode);
 
     // Write the matrix array sizes
-    ret = N_IO_MMIO::mm_write_mtx_array_size(b_file, Bhat.numRows(), Bhat.numCols());
-    ret = N_IO_MMIO::mm_write_mtx_array_size(l_file, Lhat.numRows(), Lhat.numCols());
+    ret = MMIO::mm_write_mtx_array_size(b_file, Bhat.numRows(), Bhat.numCols());
+    ret = MMIO::mm_write_mtx_array_size(l_file, Lhat.numRows(), Lhat.numCols());
 
     // Write Bhat
     for (int j=0; j<Bhat.numCols(); j++) {
@@ -6241,8 +5215,12 @@ void OutputMgr::outputROM(
 void OutputMgr::finishOutput()
 {
     if (!activeOutputterStack_.empty())
+    {
       for (std::vector<Outputter::Interface *>::const_iterator it = activeOutputterStack_.back().begin(); it != activeOutputterStack_.back().end(); ++it)
+      {
         (*it)->finishOutput();
+      }
+    }
 
 #ifdef Xyce_USE_HDF5
   if (hdf5FileNameGiven_)
@@ -6252,13 +5230,34 @@ void OutputMgr::finishOutput()
 #endif // Xyce_USE_HDF5
 }
 
+//-----------------------------------------------------------------------------
+// Function      : OutputMgr::resetOutput
+// Purpose       : Call outputter reset functions
+// Special Notes : In current implementation, few outputter classes actually
+//                 do anything in their reset methods.
+// Scope         : public
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/28/2013
+//-----------------------------------------------------------------------------
 void OutputMgr::resetOutput()
 {
   if (!activeOutputterStack_.empty())
+  {
     for (std::vector<Outputter::Interface *>::const_iterator it = activeOutputterStack_.back().begin(); it != activeOutputterStack_.back().end(); ++it)
+    {
       (*it)->resetOutput();
+    }
+  }
 }
 
+//-----------------------------------------------------------------------------
+// Function      : OutputMgr::outputHB
+// Purpose       : .print output for Harmonic Balance runs
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur, Raytheon
+// Creation Date : 6/5/2013
+//-----------------------------------------------------------------------------
 void OutputMgr::outputHB(
   const int                             stepNumber,
   const int                             maxStep,
@@ -6278,8 +5277,8 @@ void OutputMgr::outputHB(
   }
 
   // copy the new values into the locally owned vector:
-  vector <N_ANP_SweepParam>::const_iterator firstParam = step_sweep_parameters.begin();
-  vector <N_ANP_SweepParam>::const_iterator lastParam = step_sweep_parameters.end();
+  std::vector<N_ANP_SweepParam>::const_iterator firstParam = step_sweep_parameters.begin();
+  std::vector<N_ANP_SweepParam>::const_iterator lastParam = step_sweep_parameters.end();
 
   if (!(step_sweep_parameters.empty()))
   {
@@ -6287,8 +5286,12 @@ void OutputMgr::outputHB(
   }
 
   if (!activeOutputterStack_.empty())
+  {
     for (std::vector<Outputter::Interface *>::const_iterator it = activeOutputterStack_.back().begin(); it != activeOutputterStack_.back().end(); ++it)
+    {
       (*it)->outputHB(timePoints, freqPoints, timeDomainSolnVec, freqDomainSolnVecReal, freqDomainSolnVecImaginary);
+    }
+  }
 }
 
 //-----------------------------------------------------------------------------
@@ -6320,17 +5323,17 @@ void OutputMgr::outputRESULT(N_LAS_Vector * solnVecPtr, N_LAS_Vector * stateVecP
 {
 
 #ifdef Xyce_DEBUG_IO
-  cout << std::endl << "OutputMgr::outputRESULT" << std::endl;
+  Xyce::dout() << std::endl << "OutputMgr::outputRESULT" << std::endl;
 #endif
 
   std::vector<N_ANP_SweepParam>::iterator iterParam;
   std::vector<N_ANP_SweepParam>::iterator firstParam=stepParamVec_.begin();
   std::vector<N_ANP_SweepParam>::iterator lastParam=stepParamVec_.end();
 
-  N_UTL_ExpressionData * expDataPtr = NULL;
+  Util::ExpressionData * expDataPtr = NULL;
 
   int ires=0;
-  string delim("");
+  std::string delim("");
   int width = 17;
   int precision = 8;
 
@@ -6340,7 +5343,7 @@ void OutputMgr::outputRESULT(N_LAS_Vector * solnVecPtr, N_LAS_Vector * stateVecP
     {
       RESULTinitialized_ = true;
 
-      string resultfilename("");
+      std::string resultfilename("");
       if (netListFilename_  != "")
       {
         resultfilename = netListFilename_ + ".res";
@@ -6349,9 +5352,9 @@ void OutputMgr::outputRESULT(N_LAS_Vector * solnVecPtr, N_LAS_Vector * stateVecP
       {
         resultfilename = "output.res";
       }
-      resultStreamPtr_ = new ofstream(resultfilename.c_str());
+      resultStreamPtr_ = new std::ofstream(resultfilename.c_str());
 
-      resultStreamPtr_->setf(ios::scientific);
+      resultStreamPtr_->setf(std::ios::scientific);
       resultStreamPtr_->precision(precision);
 
       if (!noIndex_)
@@ -6378,7 +5381,7 @@ void OutputMgr::outputRESULT(N_LAS_Vector * solnVecPtr, N_LAS_Vector * stateVecP
          (*resultStreamPtr_) << printParameters_->delimiter_;
 
         expDataPtr = resultVector_[ires];
-       (*resultStreamPtr_) << delim << expDataPtr->expression;
+        (*resultStreamPtr_) << delim << expDataPtr->getExpression();
       }
 
      (*resultStreamPtr_) << "\n";
@@ -6387,7 +5390,7 @@ void OutputMgr::outputRESULT(N_LAS_Vector * solnVecPtr, N_LAS_Vector * stateVecP
 
     if (delim == "") resultStreamPtr_->width(8);
     else             resultStreamPtr_->width(0);
-    resultStreamPtr_->setf(ios::left, ios::adjustfield);
+    resultStreamPtr_->setf(std::ios::left, std::ios::adjustfield);
     if (!noIndex_)
     {
      (*resultStreamPtr_) << stepLoopNumber_;
@@ -6439,8 +5442,12 @@ void OutputMgr::finishOutputSTEP()
   if (getProcID() == 0)
   {
     if (!activeOutputterStack_.empty())
+    {
       for (std::vector<Outputter::Interface *>::const_iterator it = activeOutputterStack_.back().begin(); it != activeOutputterStack_.back().end(); ++it)
+      {
         (*it)->finishOutputStep();
+      }
+    }
 
     // Deal with the result file:
     if (resultStreamPtr_)
@@ -6448,7 +5455,7 @@ void OutputMgr::finishOutputSTEP()
       (*resultStreamPtr_) << "End of Xyce(TM) Parameter Sweep" << std::endl;
     }
 
-    if (resultStreamPtr_ != &cout && resultStreamPtr_)
+    if (resultStreamPtr_ != &Xyce::dout() && resultStreamPtr_)
     {
       delete resultStreamPtr_;
       resultStreamPtr_ = 0;
@@ -6462,8 +5469,8 @@ void OutputMgr::finishOutputSTEP()
 
 //-----------------------------------------------------------------------------
 // Function      : OutputMgr::outputMacroResults
-// Purpose       : if any macro analysis was specified(like objective or measure)
-//                 output results
+// Purpose       : if any post-process analysis was specified(like objective or measure)
+//                 output results.  Called after simulation is over.
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL Electrical and Microsystem Modeling
@@ -6471,23 +5478,21 @@ void OutputMgr::finishOutputSTEP()
 //-----------------------------------------------------------------------------
 void OutputMgr::outputMacroResults()
 {
-#ifdef Xyce_DEBUG_IO
-  if (!objective.empty())
+  if (!objective_.empty())
   {
-    std::cout << std::endl
+    Xyce::dout() << std::endl
       << " ***** Analysis Functions ***** " << std::endl
       << std::endl;
 
-    std::map<string, N_IO_Objective>::iterator ob = objective.begin();
-    std::map<string, N_IO_Objective>::iterator ob_end = objective.end();
+    std::map<std::string, Objective>::iterator ob = objective_.begin();
+    std::map<std::string, Objective>::iterator ob_end = objective_.end();
     for (; ob != ob_end ; ++ob)
     {
-      string name((*ob).first);
-      double val = objective[name].evaluate();
-      cout << name << " = " << val << std::endl;
+      std::string name((*ob).first);
+      double val = objective_[name].evaluate();
+      Xyce::dout() << name << " = " << val << std::endl;
     }
   }
-#endif
 
   // This is a null output stream that helps ensure a function that needs to be called
   // on every processor in parallel only outputs on one processor.
@@ -6497,11 +5502,11 @@ void OutputMgr::outputMacroResults()
   // Output the Measure results only if .measure is being performed on any variables.
   if (measureManager_.isMeasureActive())
   {
-    // Output the Measure results to std::cout.
+    // Output the Measure results to Xyce::dout().
     // Make sure the function gets called on all processors, but only one outputs it.
     if (getProcID() == 0)
     {
-      measureManager_.outputResults( std::cout );
+      measureManager_.outputResults( Xyce::dout() );
     }
     else
     {
@@ -6545,8 +5550,8 @@ void OutputMgr::outputMacroResults()
   // objectives and results.
   if (!responseFunctionsRequested_.empty())
   {
-    ofstream responseOFS;
-    string outputResponseFilename;
+    std::ofstream responseOFS;
+    std::string outputResponseFilename;
     if (responseFileNameGiven_)
     {
       // do need the suffix in this case as a name was specified
@@ -6554,20 +5559,20 @@ void OutputMgr::outputMacroResults()
     }
     else
     {
-      outputResponseFilename = "response.out"; // + filenameSuffix_;
+      outputResponseFilename = "response.out";
     }
 
     responseOFS.open(outputResponseFilename.c_str());
 
-    std::vector< pair< string, string> >::iterator currRespItr = responseFunctionsRequested_.begin();
-    std::vector< pair< string, string> >::iterator endRespItr = responseFunctionsRequested_.end();
+    std::vector< std::pair< std::string, std::string> >::iterator currRespItr = responseFunctionsRequested_.begin();
+    std::vector< std::pair< std::string, std::string> >::iterator endRespItr = responseFunctionsRequested_.end();
     while (currRespItr != endRespItr)
     {
-      double respvalue = 0.0;
+      double respvalue = -1.0;
       bool found = false;
       // need to parse name from XXX_X:name So find last ":" and extract
       // remaining string as value that dakota is looking for.
-      string tempName=currRespItr->first;
+      std::string tempName=currRespItr->first;
       std::string::size_type beginingOfVarName = tempName.find_last_of(":");
       //beginingOfVarName++;
 
@@ -6576,13 +5581,26 @@ void OutputMgr::outputMacroResults()
         int numChars =(currRespItr->first).length() - beginingOfVarName;
         tempName.assign(currRespItr->first, beginingOfVarName+1, numChars);
       }
+      //Xyce::dout() << " looking for " << currRespItr->first << std::endl;
       ExtendedString es(tempName);
-      std::cout << "Calling getMeasureValue with " << es.toUpper() << std::endl;
       measureManager_.getMeasureValue(es.toUpper(), respvalue, found);
       if (! found)
-        responseOFS << "not found" << "   " << currRespItr->first << std::endl;
-      else
-        responseOFS << respvalue   << "   " << currRespItr->first << std::endl;
+      {
+        // look for value in .objective functions
+        std::map<std::string, Objective>::iterator ob = objective_.begin();
+        std::map<std::string, Objective>::iterator ob_end = objective_.end();
+        for (; ob != ob_end ; ++ob)
+        {
+          ExtendedString name((*ob).first);
+          //Xyce::dout() << " looking for " << es.toUpper() << " in " << name.toUpper() << std::endl;
+          if( es.toUpper() == name.toUpper() )
+          {
+            respvalue = objective_[name].evaluate();
+            found = true;
+          }
+        }
+      }
+      responseOFS << respvalue   << "   " << tempName << std::endl;
       currRespItr++;
     }
     responseOFS.close();
@@ -6643,26 +5661,25 @@ bool OutputMgr::registerResponseVars(const std::string & objString, RCP<std::vec
 
   ExtendedString sVal(objString);
   ParameterList::iterator pl_i;
-  N_UTL_Param parameter;
+  Util::Param parameter;
 
   sVal.toUpper();
   if (sVal.size() < 3 || sVal[1] != '(' || sVal[sVal.size()-1] != ')') {
-    std::string msg("OutputMgr::registerResponseVars: response var not of format V() or I(): '");
-    msg += objString;
-    msg += "'";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
+    Report::DevelFatal0() << "OutputMgr::registerResponseVars: response var not of format V() or I(): '" << objString << "'";
   }
   numResponseVars_++;
-  responseVarList_.resize(numResponseVars_);
-  ParameterList & pList = responseVarList_[numResponseVars_-1];
+
+  ParameterList pList;
+
   parameter.setTag(sVal.substr(0, 1));
   parameter.setVal(1.0);
   pList.push_back(parameter);
+
   parameter.setTag(sVal.substr(2, sVal.size()-3));
   parameter.setVal(0.0);
   pList.push_back(parameter);
-  pl_i = pList.begin();
-  setParamContextType_(pl_i);
+
+  makeOps(*this, pList.begin(), pList.end(), std::back_inserter(responseVarList_));
 
   return result;
 }
@@ -6677,14 +5694,11 @@ bool OutputMgr::registerResponseVars(const std::string & objString, RCP<std::vec
 //-----------------------------------------------------------------------------
 void OutputMgr::saveResponseVarValues(N_LAS_Vector * solnVecPtr)
 {
-  std::vector<ParameterList >::iterator currentVar;
-  std::vector<ParameterList >::iterator endVar;
-  ParameterList::iterator pl_i;
   int expValue = 0;
 
   // save the resuts of any end point variables if there are any
   ParameterList vlist;
-  vlist.push_back(N_UTL_Param("", 0));
+  vlist.push_back(Util::Param("", 0));
   ParameterList::iterator it_vlist = vlist.begin();
 
   // save the independant variable
@@ -6695,20 +5709,14 @@ void OutputMgr::saveResponseVarValues(N_LAS_Vector * solnVecPtr)
   }
   else
   {
-    responseVarPtr_->at(varNumber) =
-      dcParamVec_[ dcLoopNumber_ ].currentVal;
+    responseVarPtr_->at(varNumber) = dcParamVec_[ dcLoopNumber_ ].currentVal;
   }
   varNumber++;
 
   // loop over the response variable list
-  currentVar = responseVarList_.begin();
-  endVar = responseVarList_.end();
-  for (; currentVar != endVar ; ++currentVar)
+  for (Util::OpList::const_iterator it = responseVarList_.begin(); it != responseVarList_.end(); ++it)
   {
-    pl_i =(*currentVar).begin();
-    double result = getPrintValue(pl_i, solnVecPtr);
-
-    //std::cout << result << std::endl;
+    double result = getValue(getCommPtr()->comm(), *(*it), solnVecPtr, 0, 0, 0).real();
 
     responseVarPtr_->at(varNumber) = result;
     varNumber++;
@@ -6722,7 +5730,7 @@ void OutputMgr::saveResponseVarValues(N_LAS_Vector * solnVecPtr)
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 4/29/10
 //-----------------------------------------------------------------------------
-void OutputMgr::getMeasureValue(const std::string &name, double &result, bool &found)
+void OutputMgr::getMeasureValue(const std::string &name, double &result, bool &found) const
 {
   found = false;
   measureManager_.getMeasureValue(name, result, found);
@@ -6738,15 +5746,15 @@ void OutputMgr::getMeasureValue(const std::string &name, double &result, bool &f
 //-----------------------------------------------------------------------------
 void OutputMgr::remeasure()
 {
-  std::cout << "In OutputMgr::remeasure " << std::endl;
+  Xyce::dout() << "In OutputMgr::remeasure " << std::endl;
 
   // get file to open for remeasure
   std::string existingDataFile = commandLine_.getArgumentValue("-remeasure");
-  std::cout << "file to reprocess through measure functions. " << existingDataFile << std::endl;
+  Xyce::dout() << "file to reprocess through measure functions. " << existingDataFile << std::endl;
 
   // open file for reading
   // just support PRN format for now
-  N_IO_OutputFileBase * fileToReMeasure = new N_IO_OutputPrn();
+  OutputFileBase * fileToReMeasure = new N_IO_OutputPrn();
   if (!fileToReMeasure->openFileForRead(existingDataFile))
   {
     // open failed.  report error and exit remeasure routine
@@ -6767,21 +5775,21 @@ void OutputMgr::remeasure()
   // regardless of what is on the print line.
   fileToReMeasure->convertOutputNamesToSolVarNames(fileVarNames);
 
-//   std::cout << "Original var names: " << std::endl;
+//   Xyce::dout() << "Original var names: " << std::endl;
 //   for (int i=0; i<fileVarNames.size(); i++)
 //   {
-//     std::cout << "\"" << fileVarNames[i] << "\", ";
+//     Xyce::dout() << "\"" << fileVarNames[i] << "\", ";
 //   }
-//   std::cout << std::endl;
+//   Xyce::dout() << std::endl;
 //
 //   fileToReMeasure->convertOutputNamesToSolVarNames(fileVarNames);
 //
-//   std::cout << "extracted var names: " << std::endl;
+//   Xyce::dout() << "extracted var names: " << std::endl;
 //   for (int i=0; i<fileVarNames.size(); i++)
 //   {
-//     std::cout << "\"" << fileVarNames[i] << "\", ";
+//     Xyce::dout() << "\"" << fileVarNames[i] << "\", ";
 //   }
-//   std::cout << std::endl;
+//   Xyce::dout() << std::endl;
 
   // assume analysis type is DC(Xyce hasn't processed the analysis type yet
   // when this function is called.  In the next loop if we find a column of
@@ -6793,10 +5801,10 @@ void OutputMgr::remeasure()
   int numVars = fileVarNames.size();
   for (int i=0; i<numVars; i++)
   {
-    allNodes_[fileVarNames[i]]=make_pair(i, 0);
+    allNodes_[fileVarNames[i]]=std::make_pair(i, 0);
     ExtendedString tmpStr(fileVarNames[i]);
     tmpStr.toUpper();
-    allNodes_[tmpStr]=make_pair(i, 0);
+    allNodes_[tmpStr]=std::make_pair(i, 0);
     // while scanning fileVarNames look for "TIME" as a name in the 0th or 1st
     // column.  We will use this as a key to figure out if the output file is
     // transient or DC data(no support for .measure in other analysis types yet)
@@ -6824,15 +5832,14 @@ void OutputMgr::remeasure()
   // run though lines in the file calling update measure as we go.
   while (fileToReMeasure->getOutputNextVarValues(varValuesVecPtr))
   {
-    RCP< N_LAS_Vector > varValuesVecRCP(varValuesVecPtr, false);
     if (PRINTType_ == PrintType::TRAN)
     {
       circuitTime_=(*varValuesVecPtr)[timeIndex];
-      measureManager_.updateTranMeasures(circuitTime_, varValuesVecRCP);
+      measureManager_.updateTranMeasures(circuitTime_, varValuesVecPtr, 0, 0 );
     }
     else
     {
-      measureManager_.updateDcMeasures(dcParamVec_, varValuesVecRCP);
+      measureManager_.updateDcMeasures(dcParamVec_, varValuesVecPtr, 0, 0 );
     }
     varValuesVecPtr->putScalar(0);
 
@@ -6846,11 +5853,11 @@ void OutputMgr::remeasure()
   Teuchos::oblackholestream outputBHS;
   std::ofstream outputFileStream;
 
-  // Output the Measure results to std::cout.
+  // Output the Measure results to Xyce::dout().
   // Make sure the function gets called on all processors, but only one outputs it.
   if (getProcID() == 0)
   {
-    measureManager_.outputResults( std::cout );
+    measureManager_.outputResults( Xyce::dout() );
   }
   else
   {
@@ -6906,6 +5913,196 @@ int getWidthFromStaticIndex(int index, const std::string &delim)
     }
   }
   return W;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : gatherGlobalDeviceCount
+//
+// Purpose       : In parallel, gathers the local device counts and sums them
+//                 into the global device count map.
+//
+// Special Notes : In serial, just copies the local map into the global one.
+//
+// Scope         : private
+// Creator       : Eric R. Keiter, SNL
+// Creation Date : 05/10/10
+//-----------------------------------------------------------------------------
+void gatherGlobalDeviceCount(
+  Parallel::Machine                     comm,
+  std::map<std::string, int> &          globalDeviceMap,
+  const std::map<std::string, int> &    localDeviceMap)
+{
+  if (Parallel::is_parallel_run(comm))
+  {
+    std::map<std::string, int>::const_iterator dc;
+    std::map<std::string, int>::const_iterator dc_end = localDeviceMap.end();
+
+    int i, len = 0;
+    const int size = Parallel::size(comm);
+    const int rank = Parallel::rank(comm);
+
+    std::set<std::string> known;
+
+    int lowestKnown = size;
+    if (!localDeviceMap.empty())
+    {
+      lowestKnown = rank;
+    }
+    Parallel::AllReduce(comm, MPI_MIN, &lowestKnown, 1);
+    dc = localDeviceMap.begin();
+    while (lowestKnown < size)
+    {
+      std::string curr;
+      if (lowestKnown == rank)
+      {
+        curr =(*dc).first;
+        len = curr.size();
+      }
+
+      // comm.bcast(&len, 1, lowestKnown);
+      Parallel::Broadcast(comm, &len, 1, lowestKnown);
+      curr.resize(len);
+      // comm.bcast(&curr[0], len, lowestKnown);
+      Parallel::Broadcast(comm, &curr[0], len, lowestKnown);
+      dc = localDeviceMap.find(curr);
+
+      int numDev = 0;
+      if (dc != dc_end)
+      {
+        numDev =(*dc).second;
+      }
+      known.insert(curr);
+
+      int numDevTot = 0;
+      // comm.sumAll(&numDev, &numDevTot, 1);
+      Parallel::AllReduce(comm, MPI_SUM, &numDev, &numDevTot, 1);
+      globalDeviceMap[curr] = numDevTot;
+      lowestKnown = size;
+      dc = localDeviceMap.begin();
+      for (; dc != dc_end ; ++dc)
+      {
+        if (known.find((*dc).first) == known.end())
+        {
+          lowestKnown = rank;
+          curr =(*dc).first;
+          break;
+        }
+      }
+      // i = lowestKnown;
+      // comm.minAll(&i, &lowestKnown, 1);
+      Parallel::AllReduce(comm, MPI_MIN, &lowestKnown, 1);
+    }
+  }
+  else
+  {
+    globalDeviceMap = localDeviceMap;
+  }
+}
+
+//-----------------------------------------------------------------------------
+// Function      : printDeviceCount
+//
+// Purpose       : takes the(passed) device count map, and formats a string
+//                 that can be output, either via the error handler or Xyce::dout().
+//
+// Special Notes :
+//
+// Scope         : private
+// Creator       : Eric R. Keiter, SNL
+// Creation Date : 05/10/10
+//-----------------------------------------------------------------------------
+std::ostream &printDeviceCount(std::ostream &os, const std::map<std::string, int> & device_count_map)
+{
+  int maxLen = 15;
+
+  int totDev = 0;
+  for (std::map<std::string, int>::const_iterator dc = device_count_map.begin(); dc != device_count_map.end(); ++dc)
+  {
+    int len = (*dc).first.size();
+    if (len > maxLen)
+      maxLen = len;
+    totDev += (*dc).second;
+  }
+
+  int width = 0;
+  for (int i = totDev; i != 0; i /= 10)
+    width++;
+
+  for (std::map<std::string, int>::const_iterator dc = device_count_map.begin(); dc != device_count_map.end(); ++dc)
+  {
+    int len = (*dc).first.size();
+    os << "       " << (*dc).first;
+    for (int i = 0; i < maxLen - len + 1 ; ++i)
+      os << " ";
+    os.width(width);
+    os.setf(std::ios::right);
+    os << (*dc).second << "\n";
+  }
+  os << "       ";
+  for (int i = 0; i < maxLen + width + 1; ++i)
+    os << "-";
+
+  os << "\n       Total Devices";
+  for (int i = 0; i < maxLen - 12; ++i)
+  {
+    os << " ";
+  }
+  os.width(width);
+  os.setf(std::ios::right);
+  os << totDev;
+
+  return os;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : OutputMgr::printDeviceCounts
+// Purpose       : Print device summary
+// Special Notes :
+// Scope         : public
+// Creator       : Dave Shirley, PSSI
+// Creation Date : 08/15/06
+//-----------------------------------------------------------------------------
+std::ostream &printGlobalDeviceCounts(std::ostream &os, Parallel::Machine comm, const std::map<std::string,int> &local_device_count_map)
+{
+  std::map<std::string,int> global_device_count_map;
+
+  gatherGlobalDeviceCount(comm, global_device_count_map, local_device_count_map);
+  printDeviceCount(os, global_device_count_map);
+
+  return os;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : printLocalDeviceCount
+//
+// Purpose       : If running in parallel, this function can be used to output
+//                 the local count on each processor.
+//
+// Special Notes : debug only.
+//
+// Scope         : private
+// Creator       : Eric R. Keiter
+// Creation Date : 05/10/10
+//-----------------------------------------------------------------------------
+std::ostream &printLocalDeviceCount(std::ostream &os, Parallel::Machine comm, const std::map<std::string, int> & local_device_count_map)
+{
+  const int size = Parallel::size(comm);
+  const int rank = Parallel::rank(comm);
+
+  for (int p = 0; p < size; ++p)
+  {
+    Parallel::Barrier(comm);
+    if (p == rank)
+    {
+      os << "\n\tDevice Count for Processor " << p << std::endl;
+
+      printDeviceCount(os, local_device_count_map);
+
+      os << std::endl;
+    }
+  }
+
+  return os;
 }
 
 } // namespace IO

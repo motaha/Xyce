@@ -1,0 +1,8 @@
+<map id="Xyce::Device::DeviceEntity" name="Xyce::Device::DeviceEntity">
+<area shape="rect" id="node2" href="$classXyce_1_1Device_1_1ParameterBase.html" title="Base class for all parameters." alt="" coords="238,5,445,32"/>
+<area shape="rect" id="node3" href="$classXyce_1_1Device_1_1DeviceOptions.html" title="Xyce::Device::DeviceOptions" alt="" coords="241,56,441,83"/>
+<area shape="rect" id="node4" href="$classXyce_1_1Device_1_1SolverState.html" title="Xyce::Device::SolverState" alt="" coords="251,107,432,133"/>
+<area shape="rect" id="node5" href="$classN__NLS__NonLinInfo.html" title="N_NLS_NonLinInfo" alt="" coords="5,81,149,108"/>
+<area shape="rect" id="node6" href="$classN__TIA__TimeIntInfo.html" title="N_TIA_TimeIntInfo" alt="" coords="7,132,148,159"/>
+<area shape="rect" id="node7" href="$classXyce_1_1Device_1_1ParametricData_3_01void_01_4.html" title="Class ParametricData&lt;void&gt; manages the configuration information and the parameter binding map..." alt="" coords="253,158,429,199"/>
+</map>

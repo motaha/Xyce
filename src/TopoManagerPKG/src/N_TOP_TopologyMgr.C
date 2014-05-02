@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,24 +36,20 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.11.6.2 $
+// Revision Number: $Revision: 1.18 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
 #ifdef HAVE_CASSERT
  #include <cassert>
 #else
  #include <assert.h>
 #endif
-
-// ---------- Xyce Includes --------------
 
 #include <N_TOP_TopologyMgr.h>
 
@@ -63,10 +59,10 @@
 #include <N_IO_PkgOptionsMgr.h>
 
 namespace Xyce {
-namespace Topology {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Function      : Xyce::Topology::Manager::~Manager
+// Function      : Xyce::Topo::Manager::~Manager
 // Purpose       : Destructor
 // Special Notes : 
 // Scope         : public
@@ -84,7 +80,7 @@ Manager::~Manager()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : Xyce::Topology::Manager::createSystem
+// Function      : Xyce::Topo::Manager::createSystem
 // Purpose       :
 // Special Notes : 
 // Scope         : public
@@ -92,7 +88,7 @@ Manager::~Manager()
 // Creation Date : 02/24/03
 //-----------------------------------------------------------------------------
 /*
-System & Manager::createSystem( const string & type, const string & name )
+System & Manager::createSystem( const std::string & type, const std::string & name )
 {
   //Check that a System of this 'name' has not been already created
   assert( systems_.count( name ) == 0 );
@@ -103,7 +99,7 @@ System & Manager::createSystem( const string & type, const string & name )
      newSys = dynamic_cast<System*>( new Circuit::System( name, pdsMgr_ ) );
   else
     N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL,
-     "Xyce::Topology::Manager::instantiateSystem(...) : System Type Not Recognized>> " + type );
+     "Xyce::Topo::Manager::instantiateSystem(...) : System Type Not Recognized>> " + type );
 
   systems_[name] = newSys;
 
@@ -112,7 +108,7 @@ System & Manager::createSystem( const string & type, const string & name )
 */
 
 //-----------------------------------------------------------------------------
-// Function      : Xyce::Topology::Manager::getSystem
+// Function      : Xyce::Topo::Manager::getSystem
 // Purpose       :
 // Special Notes : 
 // Scope         : public
@@ -120,7 +116,7 @@ System & Manager::createSystem( const string & type, const string & name )
 // Creation Date : 02/24/03
 //-----------------------------------------------------------------------------
 /*
-System & Manager::getSystem( const string & name )
+System & Manager::getSystem( const std::string & name )
 {
   assert( systems_.count( name ) != 0 );
 
@@ -129,7 +125,7 @@ System & Manager::getSystem( const string & name )
 */
 
 //-----------------------------------------------------------------------------
-// Function      : Xyce::Topology::Manager::deleteSystem
+// Function      : Xyce::Topo::Manager::deleteSystem
 // Purpose       :
 // Special Notes : 
 // Scope         : public
@@ -137,7 +133,7 @@ System & Manager::getSystem( const string & name )
 // Creation Date : 02/24/03
 //-----------------------------------------------------------------------------
 /*
-bool Manager::deleteSystem( const string & name )
+bool Manager::deleteSystem( const std::string & name )
 {
   //Check that the System to be deleted is in the Container 'systems_'
   assert( systems_.count( name ) != 0 );
@@ -148,7 +144,7 @@ bool Manager::deleteSystem( const string & name )
 */
     
 //-----------------------------------------------------------------------------
-// Function      : Xyce::Topology::Manager::getPartitionTool
+// Function      : Xyce::Topo::Manager::getPartitionTool
 // Purpose       :
 // Special Notes : 
 // Scope         : public
@@ -156,35 +152,35 @@ bool Manager::deleteSystem( const string & name )
 // Creation Date : 02/24/03
 //-----------------------------------------------------------------------------
 /*
-Parallel::PartitionTool * Manager::getPartitionTool( const string & sysName,
-                                                     const string & typeName )
+Parallel::PartitionTool * Manager::getPartitionTool( const std::string & sysName,
+                                                     const std::string & typeName )
 {
   return PartitionToolFactory::create( getSystem( sysName ), typeName );
 }
 */
 
 //-----------------------------------------------------------------------------
-// Function      : Xyce::Topology::Manager::createTopology
+// Function      : Xyce::Topo::Manager::createTopo
 // Purpose       :
 // Special Notes : 
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 02/24/03
 //-----------------------------------------------------------------------------
-N_TOP_Topology * Manager::createTopology(N_IO_CmdParse & cp)
+N_TOP_Topology * Manager::createTopology(IO::CmdParse & cp)
 {
   return (topo_ = new N_TOP_Topology(cp));
 }
 
 //-----------------------------------------------------------------------------
-// Function      : Xyce::Topology::Manager::getInsertionTool
+// Function      : Xyce::Topo::Manager::getInsertionTool
 // Purpose       :
 // Special Notes : 
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 02/24/03
 //-----------------------------------------------------------------------------
-InsertionTool * Manager::getInsertionTool( const string & sysName )
+InsertionTool * Manager::getInsertionTool( const std::string & sysName )
 {
 //  return InsertionToolFactory::create( getSystem( sysName ) );
   if( currentDevInsertionTool == NULL )
@@ -195,14 +191,14 @@ InsertionTool * Manager::getInsertionTool( const string & sysName )
 }
 
 //-----------------------------------------------------------------------------
-// Function      :  Xyce::Topology::Manager::registerPkgOptionsMgr
+// Function      :  Xyce::Topo::Manager::registerPkgOptionsMgr
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, 1437
 // Creation Date : 10/21/08
 //-----------------------------------------------------------------------------
-bool  Xyce::Topology::Manager::registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr )
+bool  Xyce::Topo::Manager::registerPkgOptionsMgr( IO::PkgOptionsMgr *pkgOptPtr )
 {
   pkgOptMgrPtr_ = pkgOptPtr;
   topo_->registerPkgOptionsMgr(pkgOptMgrPtr_);
@@ -211,40 +207,40 @@ bool  Xyce::Topology::Manager::registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pk
 
 /*
 //-----------------------------------------------------------------------------
-// Function      : Xyce::Topology::Manager::getRestartDataTool
+// Function      : Xyce::Topo::Manager::getRestartDataTool
 // Purpose       :
 // Special Notes : 
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 02/24/03
 //-----------------------------------------------------------------------------
-InputOutput::RestartDataTool * Manager::getRestartDataTool( const string & sysName )
+InputOutput::RestartDataTool * Manager::getRestartDataTool( const std::string & sysName )
 {
   return RestartDataToolFactory::create( getSystem( sysName ) );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : Xyce::Topology::Manager::getNodeTool
+// Function      : Xyce::Topo::Manager::getNodeTool
 // Purpose       :
 // Special Notes : 
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 02/24/03
 //-----------------------------------------------------------------------------
-NodeTool * Manager::getNodeTool( const string & sysName )
+NodeTool * Manager::getNodeTool( const std::string & sysName )
 {
   return new NodeTool( getSystem( sysName ) );
 }
 
 //-----------------------------------------------------------------------------
-// Function      : Xyce::Topology::Manager::getLASQueryUtil
+// Function      : Xyce::Topo::Manager::getLASQueryUtil
 // Purpose       :
 // Special Notes : 
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 02/24/03
 //-----------------------------------------------------------------------------
-N_LAS_QueryUtil * Manager::getLASQueryUtil( const string & sysName )
+N_LAS_QueryUtil * Manager::getLASQueryUtil( const std::string & sysName )
 {
   return getSystem( sysName ).getLASQueryUtil();
 }
@@ -263,5 +259,5 @@ ostream & operator<<( ostream & os, const Manager & mgr );
 }
 */
 
-} //namespace Topology
+} //namespace Topo
 } //namespace Xyce

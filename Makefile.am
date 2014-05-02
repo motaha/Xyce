@@ -6,7 +6,18 @@
 ACLOCAL_AMFLAGS=-I config
 
 # define which subdirectories to do recursive makes in.
-SUBDIRS=src
+SUBDIRS=src $(MAYBE_PLUGIN)
+
+if BUILD_XYCE_SHAREABLE
+
+plugin:
+	echo 'Making plugin in user_plugin'
+	cd user_plugin && $(MAKE) $(AM_MAKEFLAGS) plugin
+
+install-plugin:
+	echo 'Making install-plugin in user_plugin'
+	cd user_plugin && $(MAKE) $(AM_MAKEFLAGS) install-plugin
+endif
 
 # an ugly, ugly kludge
 if SGI
@@ -31,4 +42,3 @@ dist-hook::
 	rm -rf `find $(top_distdir) -type d -name .svn`
 	rm -rf `find $(top_distdir) -type d -name .git`
 	rm -rf `find $(top_distdir) -type d -name CVS`
-

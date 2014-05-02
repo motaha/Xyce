@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.19.2.2 $
+// Revision Number: $Revision: 1.26 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -168,7 +168,7 @@ bool N_LAS_IfpackPrecond::setOptions( const N_UTL_OptionBlock & OB )
       options_ = Teuchos::rcp( new N_UTL_OptionBlock(OB) );
     }
 
-  return STATUS_SUCCESS;
+  return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -187,21 +187,21 @@ bool N_LAS_IfpackPrecond::setParam( const N_UTL_Param & param )
   // Set our copies of these parameters that get passed to the solver in the
   // "iterate" command
   if( tag == "AZ_overlap" )
-    overlap_ = param.iVal();
+    overlap_ = param.getImmutableValue<int>();
   else if( tag == "AZ_athresh")
-    aThresh_ = param.dVal();
+    aThresh_ = param.getImmutableValue<double>();
   else if( tag == "AZ_rthresh")
-    rThresh_ = param.dVal();
+    rThresh_ = param.getImmutableValue<double>();
   else if( tag == "AZ_drop")
-    dropTol_ = param.dVal();
+    dropTol_ = param.getImmutableValue<double>();
   else if( tag == "AZ_ilut_fill")
-    ilutFill_ = param.dVal();
+    ilutFill_ = param.getImmutableValue<double>();
   else if( tag == "use_ifpack_factory")
-    useFactory_ = param.iVal();
+    useFactory_ = param.getImmutableValue<int>();
   else if( tag == "ifpack_type")
     ifpackType_ = param.usVal();
   else if( tag == "diag_perturb")
-    diagPerturb_ = param.dVal();
+    diagPerturb_ = param.getImmutableValue<double>();
   else
     return false;
 
@@ -232,8 +232,7 @@ bool N_LAS_IfpackPrecond::initGraph( const Teuchos::RCP<N_LAS_Problem> & problem
     ifpackPrecond_ = Teuchos::rcp( Factory.Create(ifpackType_, epetraA, overlap_) );
 
     if (ifpackPrecond_ == Teuchos::null) {
-      std::string msg = "N_LAS_IfpackPrecond::initGraph()";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_ERROR_0, msg + ", preconditioning type " + ifpackType_ + " unrecognized!\n");
+      Xyce::Report::DevelFatal0().in("N_LAS_IfpackPrecond::initGraph()") << "preconditioning type " << ifpackType_ << " unrecognized!";
     }
 
     // Pass solver type to Amesos.

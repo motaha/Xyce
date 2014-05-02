@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.14.2.2 $
+// Revision Number: $Revision: 1.21 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -56,36 +56,12 @@
 using Teuchos::RCP;
 using Teuchos::rcp;
 
-// ----------   Xyce Includes   ----------
-
 #include <N_UTL_Xyce.h>
-
-// ---------- Forward Declarations ----------
-
-class N_TOP_Topology;
-class N_IO_PkgOptionsMgr;
-
-/*
-class N_PDS_Manager;
-class N_ANP_AnalysisInterface;
-
-//class N_LAS_QueryUtil;
+#include <N_IO_fwd.h>
+#include <N_TOP_fwd.h>
 
 namespace Xyce {
-
-namespace Parallel {
- class PartitionTool;
-}
-
-namespace InputOutput {
- class RestartDataTool;
-}
-*/
-
-class N_IO_CmdParse;
-
-namespace Xyce {
-namespace Topology {
+namespace Topo {
 
 // class DeviceIface;
  class InsertionTool;
@@ -93,7 +69,7 @@ namespace Topology {
 //
 
 //-----------------------------------------------------------------------------
-// Class         : Xyce::Topology::Manager
+// Class         : Xyce::Topo::Manager
 // Purpose       : Management of Topology System construction and usage
 // Special Notes :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
@@ -113,11 +89,11 @@ class Manager
   // Destructor
   ~Manager();
 
-  N_TOP_Topology * createTopology(N_IO_CmdParse & cp);
+  Topology * createTopology(IO::CmdParse & cp);
 
-  InsertionTool * getInsertionTool( const string & sysName );
+  InsertionTool * getInsertionTool( const std::string & sysName );
   // Method to register the package options manager
-  bool registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr );
+  bool registerPkgOptionsMgr( IO::PkgOptionsMgr *pkgOptPtr );
 
  private:
 
@@ -130,12 +106,10 @@ class Manager
   Manager( const Manager & );
   Manager & operator=( const Manager & );
 
-  N_TOP_Topology * topo_;
+  Topology * topo_;
   
   // package options manager
-  RCP<N_IO_PkgOptionsMgr> pkgOptMgrPtr_;
-
-//  friend ostream & operator<<( ostream & os, const Manager & );
+  IO::PkgOptionsMgr *pkgOptMgrPtr_;
 
 //  getInsertionTool creates an object and returns a pointer to it
 //  so we need to track this so we can delete it.
@@ -143,7 +117,9 @@ class Manager
   InsertionTool * currentDevInsertionTool;
 };
 
-} //namespace Topology
+} //namespace Topo
 } //namespace Xyce
+
+typedef Xyce::Topo::Manager N_TOP_Manager;
 
 #endif //Xyce_Topology_Manager_h

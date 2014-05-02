@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.9.6.2 $
+// Revision Number: $Revision: 1.14 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,22 +46,13 @@
 #ifndef Xyce_N_PDS_Migrator_h
 #define Xyce_N_PDS_Migrator_h
 
-// ---------- Standard Includes ----------
-
 #include <string>
 #include <vector>
 
-// ---------- Forward Declarations -------
-
-class N_PDS_Comm;
-class Packable;
-
-// ----------   Xyce Includes   ----------
-
+#include <N_PDS_fwd.h>
 #include <N_UTL_Misc.h>
 
-// ----------   Other Includes   ----------
-
+class Packable;
 
 //-----------------------------------------------------------------------------
 // Class         : N_PDS_Migrator
@@ -100,30 +91,30 @@ public:
 
 #ifdef Xyce_PARALLEL_MPI
 
-  void migratePackable(const vector < int > & procVec,
-                       const vector < Packable * > & exportVec,
-                       vector < Packable * > & importVec);
-  void reverseMigratePackable(const vector < int > & procVec,
-                              const vector < Packable * > & exportVec,
-                              vector < Packable * > & importVec);
+  void migratePackable(const std::vector< int > & procVec,
+                       const std::vector< Packable * > & exportVec,
+                       std::vector< Packable * > & importVec);
+  void reverseMigratePackable(const std::vector< int > & procVec,
+                              const std::vector< Packable * > & exportVec,
+                              std::vector< Packable * > & importVec);
 
-  void migrateString(const vector < int > & procVec,
-                     const vector < string > & exportVec,
-                     vector < string > & importVec);
+  void migrateString(const std::vector< int > & procVec,
+                     const std::vector< std::string > & exportVec,
+                     std::vector< std::string > & importVec);
 
-  void migrateInt(const vector < int > & procVec,
-                  const vector < pair < string, int > > & exportVec,
-                  vector < pair < string, int > > & importVec);
-  void reverseMigrateInt(const vector < int > & procVec,
-                         const vector < pair < string, int > > & exportVec,
-                         vector < pair < string, int > > & importVec);
+  void migrateInt(const std::vector< int > & procVec,
+                  const std::vector< std::pair< std::string, int > > & exportVec,
+                  std::vector< std::pair< std::string, int > > & importVec);
+  void reverseMigrateInt(const std::vector< int > & procVec,
+                         const std::vector< std::pair< std::string, int > > & exportVec,
+                         std::vector< std::pair< std::string, int > > & importVec);
 
-  void migrateIntVec(const vector < int > & procVec,
-                  const vector < pair < string, vector < int > > > & exportVec,
-                     vector < pair < string, vector < int > > > & importVec);
-  void reverseMigrateIntVec(const vector < int > & procVec,
-  	const vector < pair < string, vector < int > > > & exportVec,
-  	vector < pair < string, vector < int > > > & importVec);
+  void migrateIntVec(const std::vector< int > & procVec,
+                  const std::vector< std::pair< std::string, std::vector< int > > > & exportVec,
+                     std::vector< std::pair< std::string, std::vector< int > > > & importVec);
+  void reverseMigrateIntVec(const std::vector< int > & procVec,
+  	const std::vector< std::pair< std::string, std::vector< int > > > & exportVec,
+  	std::vector< std::pair< std::string, std::vector< int > > > & importVec);
 
 #endif
 

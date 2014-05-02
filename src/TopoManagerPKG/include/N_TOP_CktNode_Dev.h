@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.37.2.2 $
+// Revision Number: $Revision: 1.42 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,68 +46,66 @@
 #ifndef N_TOP_CktNode_Dev_h
 #define N_TOP_CktNode_Dev_h 1
 
-// ---------- Standard Includes ----------
 #include <Teuchos_RefCountPtr.hpp>
 using Teuchos::RefCountPtr;
 using Teuchos::rcp;
 
-// ----------   Xyce Includes   ----------
-
 #include <N_TOP_CktNode.h>
 #include <N_DEV_fwd.h>
 
-// ---------- Forward Declarations ----------
+namespace Xyce {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Class         : N_TOP_CktNode_Dev
+// Class         : CktNode_Dev
 // Purpose       :
 // Special Notes :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-class N_TOP_CktNode_Dev : public N_TOP_CktNode
+class CktNode_Dev : public CktNode
 {
 
 private:
 
 
   // Default constructor (private).
-  N_TOP_CktNode_Dev() {}
+  CktNode_Dev() {}
 
   // Assignment operator (private).
-  N_TOP_CktNode_Dev & operator=(const N_TOP_CktNode_Dev & right) { return *this; }
+  CktNode_Dev & operator=(const CktNode_Dev & right) { return *this; }
 
 public:
 
   // Constructor
-  N_TOP_CktNode_Dev(N_DEV_DeviceInstance * devinstPtr,
-                    const string & ID = string(""), const int & gID = 0,
-                    const list < int > & varGIDList = list < int > (),
-                    const list < int > & statevarGIDList = list < int > (),
-                    const list < int > & storevarGIDList = list < int > (),
+  CktNode_Dev(Device::DeviceInstance * devinstPtr,
+                    const std::string & ID = std::string(""), const int & gID = 0,
+                    const std::list< int > & varGIDList = std::list< int > (),
+                    const std::list< int > & statevarGIDList = std::list< int > (),
+                    const std::list< int > & storevarGIDList = std::list< int > (),
                     const int & pNum = 0, const bool & owned = true)
-  : N_TOP_CktNode(ID, gID, varGIDList, statevarGIDList, storevarGIDList, pNum, owned),
+  : CktNode(ID, gID, varGIDList, statevarGIDList, storevarGIDList, pNum, owned),
     devPtr_(devinstPtr)
   {}
 
   // Constructor
-  N_TOP_CktNode_Dev(N_DEV_DeviceInstance * devinstPtr,
-                    const N_TOP_NodeBlock & nb)
-  : N_TOP_CktNode(nb),
+  CktNode_Dev(Device::DeviceInstance * devinstPtr,
+                    const NodeBlock & nb)
+  : CktNode(nb),
     devPtr_(devinstPtr)
   {}
 
-  N_TOP_CktNode_Dev( const N_TOP_NodeBlock & nb,
-		     const Teuchos::RefCountPtr<N_DEV_InstanceBlock> ibPtr,
-		     N_DEV_DeviceInterface & devIF )
-  : N_TOP_CktNode(nb),
+  CktNode_Dev( const NodeBlock & nb,
+		     const Teuchos::RefCountPtr<Device::InstanceBlock> ibPtr,
+		     Device::DeviceInterface & devIF )
+  : CktNode(nb),
     devPtr_(0),
     iface_(&devIF),
     instance_( ibPtr )
   {}
 
   // Destructor
-  ~N_TOP_CktNode_Dev();
+  ~CktNode_Dev();
 
   int type() const { return _DNODE; }
 
@@ -122,77 +120,82 @@ public:
   bool instantiated() const { return (devPtr_!=0); }
   bool instantiate();
 
-  Teuchos::RCP<N_DEV_InstanceBlock> devBlock() { return instance_; }
+  Teuchos::RCP<Device::InstanceBlock> devBlock() { return instance_; }
 
   // Get's the device state object.
-  N_DEV_DeviceState * getDevState();
+  Device::DeviceState * getDevState();
 
   // Set's the device state object.
-  bool setDevState(const N_DEV_DeviceState & state);
+  bool setDevState(const Device::DeviceState & state);
 
   // Registers int. and ext. global ids with dev instance.
-  void registerGIDswithDev(const list < index_pair > & intGIDList,
-  	const list < index_pair > & extGIDList);
+  void registerGIDswithDev(const std::list< index_pair > & intGIDList,
+  	const std::list< index_pair > & extGIDList);
 
   // Registers state global ids with dev instance.
-  void registerStateGIDswithDev(const list < index_pair > & stateGIDList);
-  void registerStoreGIDswithDev(const list < index_pair > & storeGIDList);
+  void registerStateGIDswithDev(const std::list< index_pair > & stateGIDList);
+  void registerStoreGIDswithDev(const std::list< index_pair > & storeGIDList);
 
-  void registerLIDswithDev( const vector<int> & intLIDVec,
-                            const vector<int> & extLIDVec );
-  void registerStateLIDswithDev( const vector<int> & stateLIDVec );
-  void registerStoreLIDswithDev( const vector<int> & storeLIDVec );
+  void registerLIDswithDev( const std::vector<int> & intLIDVec,
+                            const std::vector<int> & extLIDVec );
+  void registerStateLIDswithDev( const std::vector<int> & stateLIDVec );
+  void registerStoreLIDswithDev( const std::vector<int> & storeLIDVec );
 
-  void registerDepLIDswithDev( const vector< vector<int> > & depLIDVec );
-  void registerDepStateLIDswithDev( const vector< vector<int> > & depStateLIDVec );
-  void registerDepStoreLIDswithDev( const vector< vector<int> > & depStoreLIDVec );
+  void registerDepLIDswithDev( const std::vector< std::vector<int> > & depLIDVec );
+  void registerDepStateLIDswithDev( const std::vector< std::vector<int> > & depStateLIDVec );
+  void registerDepStoreLIDswithDev( const std::vector< std::vector<int> > & depStoreLIDVec );
 
   // Setup secondary dependencies.
-  void getDepSolnVars( vector< NodeID >& dsVars );
-  void registerDepSolnGIDs(const vector < vector < int > > & dsGIDs);
-  void getDepStateVars( vector< NodeID >& dsVars );
-  void registerDepStateGIDs(const vector < vector < int > > & dsGIDs);
-  void getDepStoreVars( vector< NodeID >& dsVars );
-  void registerDepStoreGIDs(const vector < vector < int > > & dsGIDs);
+  void getDepSolnVars( std::vector< NodeID >& dsVars );
+  void registerDepSolnGIDs(const std::vector< std::vector< int > > & dsGIDs);
+  void getDepStateVars( std::vector< NodeID >& dsVars );
+  void registerDepStateGIDs(const std::vector< std::vector< int > > & dsGIDs);
+  void getDepStoreVars( std::vector< NodeID >& dsVars );
+  void registerDepStoreGIDs(const std::vector< std::vector< int > > & dsGIDs);
 
-  const vector<string> & getDepStoreVars();
+  const std::vector<std::string> & getDepStoreVars();
 
 
   // Get RowCol pairs from devices.
-  void getRowColPairs(list < index_pair > & rcList);
+  void getRowColPairs(std::list< index_pair > & rcList);
 
   int solnVarCount();
   int stateVarCount();
   int storeVarCount();
-  void leadConnect(vector<int> &);
+  void leadConnect(std::vector<int> &);
 
   // Added for use with the outputFileName function.
-  map < int, string > & getIntNameMap();
-  map < int, string > & getStateNameMap();
-  map < int, string > & getStoreNameMap();
+  std::map< int, std::string > & getIntNameMap();
+  std::map< int, std::string > & getStateNameMap();
+  std::map< int, std::string > & getStoreNameMap();
 
-  const vector< vector<int> > & jacobianStamp() const;
-  void registerJacLIDswithDev( const vector< vector<int> > & jacLIDVec );
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDswithDev( const std::vector< std::vector<int> > & jacLIDVec );
 
   void registerGIDDataWithDev(
-        const vector<int> & counts,
-        const vector<int> & GIDs,
-  	const vector< vector<int> > & jacGIDs );
+        const std::vector<int> & counts,
+        const std::vector<int> & GIDs,
+  	const std::vector< std::vector<int> > & jacGIDs );
 
-  void varTypeList( vector<char> & varTypeVec );
+  void varTypeList( std::vector<char> & varTypeVec );
 
 private:
 
   // Pointer to a device instance.
-  N_DEV_DeviceInstance * devPtr_;
+  Device::DeviceInstance * devPtr_;
 
-  N_DEV_DeviceInterface * iface_;
-  Teuchos::RefCountPtr<N_DEV_InstanceBlock> instance_;
+  Device::DeviceInterface * iface_;
+  Teuchos::RefCountPtr<Device::InstanceBlock> instance_;
 
 public:
 
-  ostream & put(ostream & os) const;
+    std::ostream & put(std::ostream & os) const;
 
 };
+
+} // namespace Topo
+} // namespace Xyce
+
+typedef Xyce::Topo::CktNode_Dev N_TOP_CktNode_Dev;
 
 #endif

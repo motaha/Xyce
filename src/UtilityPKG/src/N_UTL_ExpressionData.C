@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,14 +36,15 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.13.2.6 $
+// Revision Number: $Revision: 1.28 $
 //
-// Revision Date  : $Date: 2013/12/03 23:30:12 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
-// Current Owner  : $Author: rlschie $
+// Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 #include <Xyce_config.h>
 #include <N_UTL_Misc.h>
+
 // ---------- Standard Includes ----------
 #include <iostream>
 #include <fstream>
@@ -55,37 +56,36 @@
 #include <N_UTL_ExpressionData.h>
 #include <N_UTL_Param.h>
 #include <N_IO_OutputMgr.h>
-#include<N_UTL_Expression.h>
+#include <N_IO_Op.h>
+#include <N_UTL_Expression.h>
 
+namespace Xyce {
+namespace Util {
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionData::N_UTL_ExpressionData
+// Function      : ExpressionData::ExpressionData
 // Purpose       : constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 08/09/04
 //-----------------------------------------------------------------------------
-N_UTL_ExpressionData::N_UTL_ExpressionData (
-    const string & expression1,
-    N_IO_OutputMgr * outputMgrPtr
+ExpressionData::ExpressionData (
+    const std::string & expression,
+    IO::OutputMgr &    output_manager
 ) :
-  expression (expression1),
-  expPtr (NULL),
-  outputMgrPtr_(outputMgrPtr),
+  expPtr_(0),
+  outputManager_(output_manager),
+  expression_(expression),
   setupCalled(false),
   val(0.0),
-  numVars(0),
-  numSpecialVars(0),
   numUnresolvedStrings(0),
-  numUnresolvedStringsChecked(false),
-  procID_(0)
-{
-}
+  numUnresolvedStringsChecked(false)
+{}
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionData::N_UTL_ExpressionData
+// Function      : ExpressionData::ExpressionData
 // Purpose       : constructor -- used to take an existing expression pointer
 //                 not a string that can be converted to an expression
 // Special Notes :
@@ -93,102 +93,77 @@ N_UTL_ExpressionData::N_UTL_ExpressionData (
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 08/09/04
 //-----------------------------------------------------------------------------
-N_UTL_ExpressionData::N_UTL_ExpressionData (
-    const N_UTL_Expression * expressionPointer,
-    N_IO_OutputMgr * outputMgrPtr
-) :
-  expPtr (NULL),
-  outputMgrPtr_(outputMgrPtr),
-  setupCalled(false),
-  val(0.0),
-  numVars(0),
-  numSpecialVars(0),
-  numUnresolvedStrings(0),
-  numUnresolvedStringsChecked(false),
-  procID_(0)
-{
-  // copy the expression object because the pointer passed in
-  // is owned by another object.
-  expPtr = new N_UTL_Expression( *expressionPointer );
-  // get a string version of the expression to fill in
-  // this data.
-  expression = expPtr->get_expression();
-}
+ExpressionData::ExpressionData (
+  const Expression &  expression,
+  IO::OutputMgr &    output_manager)
+  : expPtr_(new Expression( expression )),
+    outputManager_(output_manager),
+    expression_(expPtr_->get_expression()),
+    setupCalled(false),
+    val(0.0),
+    numUnresolvedStrings(0),
+    numUnresolvedStringsChecked(false)
+{}
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionData::~N_UTL_ExpressionData
+// Function      : ExpressionData::~ExpressionData
 // Purpose       : destructor
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 08/09/04
 //-----------------------------------------------------------------------------
-N_UTL_ExpressionData::~N_UTL_ExpressionData ()
+ExpressionData::~ExpressionData ()
 {
-  if (expPtr)
-  {
-    delete expPtr;
-  }
+  delete expPtr_;
 
-  varNames.clear();
-  specialVarNames.clear();
-  currentParam.clear();
-  varGIDs.clear();
-  varVals.clear();
-  expressionVars_.clear();
+  for (Util::OpList::iterator it = expressionVars_.begin(); it != expressionVars_.end(); ++it)
+    delete *it;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionData::evaluate
+// Function      : ExpressionData::evaluate
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 08/09/04
 //-----------------------------------------------------------------------------
-double N_UTL_ExpressionData::evaluate (const N_LAS_Vector * solnVecPtr, const N_LAS_Vector *stateVecPtr, const N_LAS_Vector * stoVecPtr)
+double ExpressionData::evaluate (const N_LAS_Vector * solnVecPtr, 
+                                 const N_LAS_Vector * stateVecPtr, 
+                                 const N_LAS_Vector * stoVecPtr,  
+                                 const N_LAS_Vector * solnVecImagPtr)
 {
   int i;
 
   if (!setupCalled)
   {
-    numUnresolvedStrings = setup ();
-    setupCalled = true;
+    numUnresolvedStrings = setup();
   }
-
-#ifdef Xyce_DEBUG_IO
-  cout << "N_UTL_ExpressionData::evaluate" << endl;
-#endif
 
   if( solnVecPtr != NULL )
   {
     // loop over expressionVars_ to get all the values.
-    list<N_UTL_Param>::iterator iterCur = expressionVars_.begin();
-    list<N_UTL_Param>::iterator iterEnd = expressionVars_.end();
-    int index=0;
-    while( iterCur != iterEnd )
-    {
-      varVals[index] = outputMgrPtr_->getPrintValue( iterCur, solnVecPtr, stateVecPtr, stoVecPtr );
-      index++;
-      iterCur++;
-    }
-    
+    varVals.clear();
+    for (OpList::const_iterator it = expressionVars_.begin(); it != expressionVars_.end(); ++it)
+      varVals.push_back(IO::getValue(outputManager_.getCommPtr()->comm(), *(*it), solnVecPtr, solnVecImagPtr, stateVecPtr, stoVecPtr ).real());
+
     // STD and DDT are implicitly time dependent.  Check the underlying expression 
     // for time dependence, and if it is get the current time with getPrgetImmutableValue<int>()
     // and set it in the underlying expression 
-    if( expPtr->isTimeDependent() )
+    if( expPtr_->isTimeDependent() )
     {
-      expPtr->set_sim_time(outputMgrPtr_->getCircuitTime());
+      expPtr_->set_sim_time(outputManager_.getTime());
     }
 
     // now get expression value and partial derivatives.
     // Note that for these purposes (.PRINT output) we only
     // really need the value, not the derivs.
     val = 0.0;
-    if (expPtr)
+    if (expPtr_)
     {
-      expPtr->evaluateFunction ( val, varVals );
+      expPtr_->evaluateFunction ( val, varVals );
     }
   }
 
@@ -196,7 +171,19 @@ double N_UTL_ExpressionData::evaluate (const N_LAS_Vector * solnVecPtr, const N_
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_UTL_ExpressionData::setup
+// Namespace     : Unnamed
+// Purpose       : file-local scoped methods and data
+// Special Notes : just the declaration, definition at end of file
+// Creator       : Tom Russo, SNL
+// Creation Date : 11/27/2013
+//-----------------------------------------------------------------------------
+namespace {
+void convertNodalComputation(std::string &nodalComputation, 
+                             std::list<Param> &paramList);
+} // namespace (unnamed)
+
+//-----------------------------------------------------------------------------
+// Function      : ExpressionData::setup
 //
 // Purpose       : Manages all the basic setup for this class.
 //
@@ -209,8 +196,14 @@ double N_UTL_ExpressionData::evaluate (const N_LAS_Vector * solnVecPtr, const N_
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 08/10/04
 //-----------------------------------------------------------------------------
-int N_UTL_ExpressionData::setup ()
+int ExpressionData::setup()
 {
+#ifdef Xyce_DEBUG_EXPRESSION
+  Xyce::dout() << "In ExpressionData::setup" << std::endl;
+#endif
+
+  setupCalled = true;
+
   // we return the number of unresolved strings on exit.  
   // we can't just exit with an error if there are unresolved strings 
   // because in parallel such strings could be resolved on another 
@@ -218,145 +211,165 @@ int N_UTL_ExpressionData::setup ()
   // numUnresolvedStrings and the class owner can check that at least 
   // one processor in parallel has 0 for numUnresolvedStrings.
   int returnVal = 0;
-  // setup the string pN.
-  ostringstream ost;
-  ost << procID_;
-  string pN (ost.str());
-
-#ifdef Xyce_DEBUG_IO
-  cout << endl << "N_UTL_ExpressionData::setup" << endl;
-#endif
 
   // allocate expression pointer if we need to
-  if( expPtr == NULL )
+  if( expPtr_ == NULL )
   {
-    expPtr = new N_UTL_Expression(expression);
+    expPtr_ = new Expression(expression_);
   }
 
   // clear out the STL containers:
   varNames.clear();
-  currentParam.clear();
-  varGIDs.clear();
   varVals.clear();
-  expressionVars_.clear();
 
-  // query the expression object for all of it's dependent vars.
-  expPtr->get_names(XEXP_ALL, varNames);
+  // query the expression object for all of its dependent vars.
+  expPtr_->get_names(XEXP_ALL, varNames);
 
-  // this varNames vec is a list of string representations of all of the vars in the expression.
-  // use this list to make a list of N_UTL_Param objects which we can then
-  // call the N_IO_OutputMgr::setParamContextType_() and then use getPrintValue_()
-  // to get the results.  This reuses code that is already in place to handle solution,
-  // state, store and lead currents.
+  // this varNames vec is a list of string representations of all of
+  // the vars in the expression.  use this list to make a list of
+  // Param objects which we can then call the
+  // IO::OutputMgr::setParamContextType() and then use
+  // getPrintValue_() to get the results.  This reuses code that is
+  // already in place to handle solution, state, store and lead
+  // currents.
 
-  vector<string>::iterator iterNode = varNames.begin();
-  vector<string>::iterator iterEnd = varNames.end();
-  while( iterNode != iterEnd )
+  std::list<Param> param_list;
+  
+  std::vector<std::string>::iterator iterNode = varNames.begin();
+  std::vector<std::string>::iterator iterEnd = varNames.end();
+  while(  iterNode != iterEnd )
   {
-    // based on the type of variable, create the needed N_UTL_Param
+    // based on the type of variable, create the needed Param
     // objects for setParmContextType_ to work.
-    int varType = expPtr->get_type( *iterNode );
-#ifdef Xyce_DEBUG_IO
-    std::cout << "N_UTL_ExpressionData::setup " << *iterNode << endl;
-#endif
+    int varType = expPtr_->get_type( *iterNode );
     switch (varType)
     {
+      case XEXP_NODAL_COMPUTATION:
+        // deconstruct the string and turn it into params, push back into
+        // param_list
+        convertNodalComputation(*iterNode,param_list);
+        break;
       case XEXP_NODE:
-        expressionVars_.push_back( N_UTL_Param( "V" , 1 ) );
-        expressionVars_.push_back( N_UTL_Param( *iterNode , 0.0 ) );
-#ifdef Xyce_DEBUG_IO
-        std::cout << " Type was XEXP_NODE " << endl;
-#endif
+        param_list.push_back( Param( "V" , 1 ) );
+        param_list.push_back( Param( *iterNode , 0.0 ) );
         break;
       case XEXP_INSTANCE:
       case XEXP_LEAD:
         {
-          char leadDesignator = expPtr->get_lead_designator( *iterNode);
-          string currentName("I");
+          char leadDesignator = expPtr_->get_lead_designator( *iterNode);
+          std::string currentName("I");
           if( (leadDesignator != 0) && (leadDesignator!=' ') )
           {
             currentName = currentName + leadDesignator;
           }
-          expressionVars_.push_back( N_UTL_Param( currentName , 1 ) );
-          expressionVars_.push_back( N_UTL_Param( *iterNode , 0.0 ) );
+          param_list.push_back( Param( currentName , 1 ) );
+          param_list.push_back( Param( *iterNode , 0.0 ) );
         }
-#ifdef Xyce_DEBUG_IO
-        std::cout << " Type was XEXP_LEAD " << endl;
-#endif
         break;
       case XEXP_SPECIAL:
       case XEXP_STRING:
-        expressionVars_.push_back( N_UTL_Param( *iterNode , 0.0 ) );
-#ifdef Xyce_DEBUG_IO
-        std::cout << " Type was XEXP_STRING " << endl;
-#endif
+        param_list.push_back( Param( *iterNode , 0.0 ) );
         break;
       case XEXP_VARIABLE:
         // this case is a global param that must be resolved at each use because
         // it can change during a simulation
-        expressionVars_.push_back( N_UTL_Param( "GLOBAL_PARAMETER" , *iterNode ) );
+        param_list.push_back( Param( "GLOBAL_PARAMETER" , *iterNode ) );
         break;
       default:
         {
-          string errorMsg("Can't find context for expression variable ");
+          std::string errorMsg("Can't find context for expression variable ");
           errorMsg += *iterNode;
           errorMsg += " in full expression ";
-          errorMsg += expression;
+          errorMsg += expression_;
           errorMsg += " Please check to ensure this parameter is correct and set in your netlist.";
           N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_WARNING_0,errorMsg);
           // increment the number of unresolved strings reported in the
           // return value.  
-          returnVal++;
+          ++returnVal;
           // Just issue the warning for now.  Trying to resolve the 
-          // string in expressionVars_ will cause problems in parallel 
+          // string in param_list will cause problems in parallel 
           // as not all expressions on all procs will have the same 
           // unresolved vars.  The class owner will have to check that
           // at least one of the processors with this expression has
           // all the strings resolved. 
-          // expressionVars_.push_back( N_UTL_Param( *iterNode , 0.0 ) );
+          // param_list.push_back( Param( *iterNode , 0.0 ) );
         }
     }
     iterNode++;
   }
 
-  list<N_UTL_Param>::iterator iterParam = expressionVars_.begin();
-  list<N_UTL_Param>::iterator paramEnd = expressionVars_.end();
-  while( iterParam != paramEnd )
-  {
-    // check if *iterParam has its context set.  if not then call setParamContextType_
-    SimulatorVariableContext theParamsContext = iterParam->getSimContext();
-    if( theParamsContext == UNDEFINED )
-    {
-      bool contextFound = outputMgrPtr_->setParamContextType_(iterParam);
-      if( !contextFound )
-      {
-        string msg("Can't find context for expression variable ");
-        msg += iterParam->tag() + " " + iterParam->tag() + " " + iterParam->tag();
-        // msg is not quite complete at this stage.  it could be that it has two tags
-        // need better error report in this case.
-        N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0,msg);
-      }
-    }
-    // in seting the context of the expressionVars_, some of them will no
-    // longer be needed. for example V( a ) is stored in two parameters one for "V"
-    // and the second for "a".  After setParamContextType_ is called, the first
-    // param will have all the data needed to evalueate V(a) and the second one will
-    // be labeled as NODE_OR_DEVICE_NAME.  IF it is, then we can safely erase it
-    // from the params
-    if( iterParam->getSimContext() == NODE_OR_DEVICE_NAME )
-    {
-      // this erases the element pointed to iterParam and then points
-      // iterParam at the next value.  Thus we don't need a ++iterParam.
-      iterParam = expressionVars_.erase( iterParam );
-    }
-    else
-    {
-      ++iterParam;
-    }
-  }
+  IO::makeOps(outputManager_, param_list.begin(), param_list.end(), std::back_inserter(expressionVars_));
+  
+  varVals.reserve( expressionVars_.size() );
 
-  // now resize the varVals vec
-  varVals.resize( expressionVars_.size() );
   return returnVal;
 }
+//-----------------------------------------------------------------------------
+// Namespace     : Unnamed
+// Purpose       : file-local scoped methods and data
+// Special Notes : 
+// Creator       : Tom Russo, SNL
+// Creation Date : 11/27/2013
+//-----------------------------------------------------------------------------
+namespace {
 
+//-----------------------------------------------------------------------------
+// Function      : convertNodalComputation
+// Purpose       : given a nodal expression string (e.g. "VM(A,B)"),
+//                 construct the set of Params that makeOps would expect for
+//                 it
+// Special Notes : 
+//
+// Scope         : file-local
+// Creator       : Tom Russo
+// Creation Date : 11/27/2013
+//-----------------------------------------------------------------------------
+void convertNodalComputation(std::string &nodalComputation, 
+                             std::list<Param> &paramList)
+{
+  std::list<Param> tempParamList;
+  
+  std::size_t firstParen = nodalComputation.find_first_of("(");
+  std::size_t lastParen = nodalComputation.find_first_of("(");
+  // the length of the name of the param is actually equal to the position
+  // of the first paren
+  std::string compName=nodalComputation.substr(0,firstParen);
+  std::string args=nodalComputation.substr(firstParen+1,nodalComputation.length()-compName.length()-2);
+
+#ifdef Xyce_DEBUG_EXPRESSION
+  Xyce::dout() << "Processing nodalComputation : " << nodalComputation 
+               << Util::push<< std::endl;
+  Xyce::dout() << "name of computation: " << compName << std::endl;
+  Xyce::dout() << "args: " << args << Util::push << std::endl;
+#endif // Xyce_DEBUG_EXPRESSION
+
+  std::size_t firstComma=args.find_first_of(",");
+  while (firstComma != std::string::npos)
+  {
+    std::string arg = args.substr(0,firstComma);
+    std::size_t argsLength = args.length();
+    args = args.substr(firstComma+1,argsLength-arg.length()-1);
+    firstComma = args.find_first_of(",");
+    tempParamList.push_back(Param(arg,0.0));
+#ifdef Xyce_DEBUG_EXPRESSION
+    Xyce::dout() << "arg " << arg << std::endl;
+#endif
+  }
+
+  tempParamList.push_back(Param(args,0.0));
+
+#ifdef Xyce_DEBUG_EXPRESSION
+  Xyce::dout() << "Remaining arg " << args << std::endl;
+  Xyce::dout() << "There were " << tempParamList.size() << " args." 
+               << Util::pop << std::endl;
+  Xyce::dout() << Util::pop << std::endl;
+#endif
+
+  paramList.push_back(Param(compName,static_cast<double>(tempParamList.size())));
+  std::copy (tempParamList.begin(), tempParamList.end(), std::back_inserter(paramList)); 
+
+} // namespace (unnammed)
+
+}
+} // namespace Util
+} // namespace Xyce

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.10.6.2 $
+// Revision Number: $Revision: 1.16 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,22 +46,17 @@
 #ifndef Xyce_N_PDS_ParDir_h
 #define Xyce_N_PDS_ParDir_h
 
-// ---------- Standard Includes ----------
 #include <string>
 #include <list>
 #include <map>
 #include <vector>
 
-// ---------- Forward Declarations -------
-class N_PDS_Comm;
-class N_PDS_Migrator;
-
-// ----------   Xyce Includes   ----------
 #include <N_UTL_Misc.h>
+#include <N_PDS_fwd.h>
+#include <N_TOP_fwd.h>
 #include <N_TOP_ParNode.h>
 
-// ----------   Other Includes   ----------
-
+class N_PDS_Migrator;
 
 //-----------------------------------------------------------------------------
 // Class         : N_PDS_ParDir
@@ -102,37 +97,37 @@ public:
   void registerPDSComm(N_PDS_Comm * comm);
 
   // Add objects from directory.
-  void addItems(const vector < N_TOP_ParNode * > & nodeVec);
+  void addItems(const std::vector< N_TOP_ParNode * > & nodeVec);
 
   // Remove objects from directory.
-  void deleteItems(const vector < NodeID > & idVec);
+    void deleteItems(const std::vector< NodeID > & idVec);
 
   // Access directory info.
 
   // Get the items in the directory.
-  void getItems(const vector < NodeID > & idVec,
-                vector < N_TOP_ParNode * > & nodeVec);
+  void getItems(const std::vector< NodeID > & idVec,
+                std::vector< N_TOP_ParNode * > & nodeVec);
 
   // Get the GIDs in the directory.
-  void getGIDs(const vector < NodeID > & idVec, vector < int > & gidVec);
+  void getGIDs(const std::vector< NodeID > & idVec, std::vector< int > & gidVec);
 
   // Get the processors in the directory.
-  void getProcs(const vector < NodeID > & idVec, vector < int > & procVec);
+  void getProcs(const std::vector< NodeID > & idVec, std::vector< int > & procVec);
 
-  bool debugDump(ostream & os) const;
+  bool debugDump(std::ostream & os) const;
 
 #ifdef Xyce_PARALLEL_MPI
 
   // Change ghost listing.
-  void addGhosts(const vector < pair < NodeID, int > > & idVec);
-  void deleteGhosts(const vector < pair < NodeID, int > > & idVec);
-  void clearGhosts(const vector < NodeID > & idVec);
+  void addGhosts(const std::vector< std::pair< NodeID, int > > & idVec);
+  void deleteGhosts(const std::vector< std::pair< NodeID, int > > & idVec);
+  void clearGhosts(const std::vector< NodeID > & idVec);
   void clearGhosts();
-  void getGhosts(const vector < NodeID > & idVec,
-                 vector < vector < int > > & ghostVec);
+  void getGhosts(const std::vector< NodeID > & idVec,
+                 std::vector< std::vector< int > > & ghostVec);
 
 protected:
-  int parKey(const string & token);
+  int parKey(const std::string & token);
 #endif
 
 protected:
@@ -145,7 +140,7 @@ protected:
   N_PDS_Migrator * pdsMigrator_;
   bool migratorOwned_;
 
-  map < string, N_TOP_ParNode > nodeMap_;
+    std::map< std::string, N_TOP_ParNode > nodeMap_;
 
 };
 

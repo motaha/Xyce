@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -59,9 +59,8 @@
 using Teuchos::RefCountPtr;
 using Teuchos::rcp;
 
-// ----------   Other Includes   ----------
-
-// ---------- Structure definitions ----------
+namespace Xyce {
+namespace Util {
 
 class ExpressionNode
 {
@@ -81,13 +80,13 @@ class ExpressionNode
 
   public:
     int type;                                   // One of EXPR_*
-    vector <ExpressionNode *> operands;         // list of pointers to operands
+    std::vector<ExpressionNode *> operands;         // list of pointers to operands
     double constant;                            // If EXPR_CONSTANT, or if a 
                                                 // table entry then
                                                 // use this as a cache for the 
                                                 // entry (which is
                                                 // required to be constant)
-    vector <double> state;                      // state data for operation 
+    std::vector<double> state;                      // state data for operation 
                                                 // (e.g. sdt or ddt)
     int valueIndex;                             // If EXPR_VAR, EXPR_ARGUMENT, 
                                                 // or (EXPR_FUNCTION and 
@@ -98,7 +97,7 @@ class ExpressionNode
                                                 // this is used as a cache to 
                                                 // record the section that the
                                                 // table last evaluated in
-    string funcname;                            // If EXPR_FUNCTION, name of 
+    std::string funcname;                            // If EXPR_FUNCTION, name of 
                                                 // function,
                                                 // If EXPR_VAR, name of var
     double eval_value;                          // Evaluated value at current 
@@ -128,7 +127,7 @@ class ExpressionElement
   public:
     int token;                 // see enum TOK_LIST
     int type;                  // see enum TYP_NODES 
-    string name;
+    std::string name;
     double number;
     ExpressionNode *node;
 }; 
@@ -223,7 +222,8 @@ enum EXPR_T_TYPES                 // These differentiate between different types
   EXPR_T_INSTANCE,        // 12
   EXPR_T_SPECIAL,         // 13
   EXPR_T_VARIABLE,        // 14
-  EXPR_T_FUNCTION         // 15
+  EXPR_T_FUNCTION,         // 15
+  EXPR_T_NODAL_COMPUTATION // 16
 };
 
 enum TOK_LIST
@@ -345,42 +345,47 @@ double EXPRuramp (double arg);
 double EXPRint (double arg);
 
 //-----------------------------------------------------------------------------
-// Class         : N_UTL_ExpressionInternals
+// Class         : ExpressionInternals
 // Purpose       :
 // Special Notes :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 04/20/08
 //-----------------------------------------------------------------------------
-class N_UTL_ExpressionInternals
+class ExpressionInternals
 {
 
 public:
 
-  N_UTL_ExpressionInternals (string const & exp = string());
-  N_UTL_ExpressionInternals (const N_UTL_ExpressionInternals & right);
-  //  N_UTL_ExpressionInternals& operator=(const N_UTL_ExpressionInternals& right) ;
-  ~N_UTL_ExpressionInternals (void);
+  ExpressionInternals (std::string const & exp = std::string());
+  ExpressionInternals (const ExpressionInternals & right);
+  //  ExpressionInternals& operator=(const ExpressionInternals& right) ;
+  ~ExpressionInternals (void);
 
-  bool set (string const & exp);
-  void get_names (int const & type, vector < string > & names);
-  int get_type (string const & var);
-  char get_lead_designator ( const string & var );
-  bool make_constant (string const & var, double const & val);
-  bool make_var (string const & var);
+  bool parsed() const 
+  {
+    return parsed_;
+  }
+
+  bool set (std::string const & exp);
+  void get_names (int const & type, std::vector< std::string > & names);
+  int get_type (std::string const & var);
+  char get_lead_designator ( const std::string & var );
+  bool make_constant (std::string const & var, double const & val);
+  bool make_var (std::string const & var);
 
   int differentiate();
 
-  bool set_var (const string &, const double &);
-  bool set_vars (const vector < double > &);
+  bool set_var (const std::string &, const double &);
+  bool set_vars (const std::vector< double > &);
 
-  string get_expression (void);
-  string get_derivative(string const & var);
+  std::string get_expression (void);
+  std::string get_derivative(std::string const & var);
   int get_num(int const & type);
 
-  int evaluate (double &result, vector < double > &derivs, vector < double > &vals);
-  int evaluateFunction (double &result, vector < double > &vals);
+  int evaluate (double &result, std::vector< double > &derivs, std::vector< double > &vals);
+  int evaluateFunction (double &result, std::vector< double > &vals);
 
-  int evaluate (double &result, vector < double > &derivs);
+  int evaluate (double &result, std::vector< double > &derivs);
   int evaluateFunction (double &result);
 
   bool set_sim_time (double const & time);
@@ -388,26 +393,26 @@ public:
   void set_accepted_time ();
   double get_break_time (void) {if(time_index == -2) return 0; else return(get_break_time_i());};
   double get_break_time_i (void);
-  const string & get_input (void);
-  int order_names (vector < string > const & new_names);
-  int replace_func (string const & func_name, 
-                    N_UTL_ExpressionInternals & func_def, int numArgs);
-  int replace_var (string const & var_name, 
-                   N_UTL_ExpressionInternals & subexpr);
-  bool replace_name (const string & old_name, const string & new_name);
+  const std::string & get_input (void);
+  int order_names (std::vector< std::string > const & new_names);
+  int replace_func (std::string const & func_name, 
+                    ExpressionInternals & func_def, int numArgs);
+  int replace_var (std::string const & var_name, 
+                   ExpressionInternals & subexpr);
+  bool replace_name (const std::string & old_name, const std::string & new_name);
   int getNumDdt();
-  void getDdtVals (vector<double> &);
-  void setDdtDerivs (vector<double> &);
+  void getDdtVals (std::vector<double> &);
+  void setDdtDerivs (std::vector<double> &);
   inline ExpressionNode *get_tree() {return tree_;};
-  inline int num_vars () {return num_N_+num_I_+num_lead_+num_string_+num_special_+num_var_+num_func_;};
+  inline int num_vars () {return num_N_+num_I_+num_lead_+num_string_+num_special_+num_var_+num_func_+num_node_computation_;};
   bool isTimeDepedent() const {return timeDependent_;};
-#ifdef Xyce_DEBUG_EXPRESSION
   void dumpParseTree();
-#endif
 
 private:
 
-  string Input_;
+  std::string Input_;
+
+  bool parsed_;
   bool differentiated_;
   bool ddxProcessed_;
 
@@ -418,55 +423,56 @@ private:
   int num_special_;
   int num_var_;
   int num_func_;
+  int num_node_computation_;
   double sim_time_;
   int time_index;
   bool timeDependent_;
   bool breakpointed_;
 
   int numVars_;
-  vector <int> varTypes_;                     // array of types of variables
-  vector <string> varValues_;                 // array of values of variables
-  string leadDesignator_;                     // lead designator for current variables
-  vector <double> var_vals_;                  // Values of variables, nodes, instances
+  std::vector<int> varTypes_;                     // array of types of variables
+  std::vector<std::string> varValues_;                 // array of values of variables
+  std::string leadDesignator_;                     // lead designator for current variables
+  std::vector<double> var_vals_;                  // Values of variables, nodes, instances
 
   ExpressionNode *tree_;                      // The real stuff
-  vector <ExpressionNode *> derivs_;          // The derivative parse trees
+  std::vector<ExpressionNode *> derivs_;          // The derivative parse trees
 
-  vector <ExpressionNode *> free_list_;       // List of ExpressionNodes to be freed
+  std::vector<ExpressionNode *> free_list_;       // List of ExpressionNodes to be freed
                                               // in destructor
-  vector <ExpressionNode *> done_list_;
-  vector <ExpressionElement *> ee_list_;      // List of ExpressionElements to be freed
+  std::vector<ExpressionNode *> done_list_;
+  std::vector<ExpressionElement *> ee_list_;      // List of ExpressionElements to be freed
                                               // at end of constructor
-  vector <ExpressionNode *> breaks_;
-  //vector <bool> refine_break_;
+  std::vector<ExpressionNode *> breaks_;
+  //std::vector<bool> refine_break_;
   ExpressionNode *PThead_;
   int Rmode_;
   int ind_replace_;
-  string Rstring_;
+  std::string Rstring_;
   double Rcval_;
   int curr_magic_;
   int curr_num_;
   bool values_changed_;
 
   // functions
-  int find_num_ (const string &);
+  int find_num_ (const std::string &);
 
   void set_nums_ ();
   void create_vars_ ();
-  void copy_elements_ (list <ExpressionElement *> &to, list <ExpressionElement *> *from);
+  void copy_elements_ (std::list<ExpressionElement *> &to, std::list<ExpressionElement *> *from);
   void copy_element_ (ExpressionElement *to, ExpressionElement *from);
   ExpressionNode *makepnode_ (ExpressionElement *elem);
-  ExpressionNode *mkfnode_ (const string & fname, int num_args, vector <ExpressionNode *> args);
-  ExpressionNode *mkfnode_ (const string & fname, int num_args, ExpressionNode *n);
-  ExpressionNode *mksnode_ (const string & name);
+  ExpressionNode *mkfnode_ (const std::string & fname, int num_args, std::vector<ExpressionNode *> args);
+  ExpressionNode *mkfnode_ (const std::string & fname, int num_args, ExpressionNode *n);
+  ExpressionNode *mksnode_ (const std::string & name);
   ExpressionNode *mkcon_ (double value);
   ExpressionNode *mkb_ (int type, ExpressionNode *left, ExpressionNode *right);
   ExpressionNode *mkf_(int type, ExpressionNode *arg);
   ExpressionNode *newExpressionNode_ ();
   void deleteExpressionNode_ (ExpressionNode *p);
   ExpressionElement *newExpressionElement_ ();
-  void RpTree_ (ExpressionNode * pt, ostringstream & s);
-  string varStr_ (int i);
+  void RpTree_ (ExpressionNode * pt, std::ostringstream & s);
+  std::string varStr_ (int i);
   ExpressionNode * PTcheck_(ExpressionNode *p);
   ExpressionNode * diffDDX_(ExpressionNode *p);
   ExpressionNode * PTdiffDDX_(ExpressionNode *p);
@@ -475,8 +481,8 @@ private:
 
   void Rconvert_ (ExpressionNode & node);
   void RcountDDT_ (ExpressionNode & node);
-  void RgetDDT_ (ExpressionNode & node, vector<double> & vals);
-  void RsetDDT_ (ExpressionNode & node, vector<double> & vals);
+  void RgetDDT_ (ExpressionNode & node, std::vector<double> & vals);
+  void RsetDDT_ (ExpressionNode & node, std::vector<double> & vals);
   void convert_to_constant_ (int i, double c_value);
   void convert_to_variable_ (int i);
 
@@ -491,48 +497,52 @@ private:
   bool arithmatic_ (ExpressionNode & node);
 
   // Methods to suupport order_names:
-  void Rmap_ (ExpressionNode & node, int mode, vector<int> &nmap);
-  int EXPRaddDummyString_ (string & dummy);
+  void Rmap_ (ExpressionNode & node, int mode, std::vector<int> &nmap);
+  int EXPRaddDummyString_ (std::string & dummy);
 
   // Methods to support replace_func:
   void addNode_ (ExpressionNode *n, int ind, ExpressionNode *f, 
-                 N_UTL_ExpressionInternals & func_expr,
+                 ExpressionInternals & func_expr,
                  int na_func,
-                 vector<ExpressionNode *> operands);
+                 std::vector<ExpressionNode *> operands);
   void Nreplace_ (ExpressionNode *n, ExpressionNode *f, 
-                  N_UTL_ExpressionInternals & func_expr,
+                  ExpressionInternals & func_expr,
                   int na_func,
-                  vector<ExpressionNode *> operands);
-  int Freplace_ (ExpressionNode *n, string const & func_name,
-                 N_UTL_ExpressionInternals & func_expr,
+                  std::vector<ExpressionNode *> operands);
+  int Freplace_ (ExpressionNode *n, std::string const & func_name,
+                 ExpressionInternals & func_expr,
                  int na_func);
   void RemoveFentry_ (ExpressionNode *n, int new_ind, int old_ind);
 
   // method to support replace_var
-  int Vreplace_ (ExpressionNode *n, string const & varName,
-                 N_UTL_ExpressionInternals & subexpr);
+  int Vreplace_ (ExpressionNode *n, std::string const & varName,
+                 ExpressionInternals & subexpr);
 
   // Methods to support evaluate:
-  void EXPReval_ (ExpressionNode & node, double & res, vector<double> &vals);
+  void EXPReval_ (ExpressionNode & node, double & res, std::vector<double> &vals);
   void clear_eval_num_ (ExpressionNode *n);
 
   // Miscellaneous utility routines
-  void compactLine_(string & inputLine, string & compactedLine);
-  void tokenize_(string & inputLine, list<ExpressionElement *> & tokenList);
-  void convertPolyToExpr_(list<ExpressionElement *> & tokenList);
-  void standardizeTable_(list<ExpressionElement *> & tokenList);
-#ifdef Xyce_DEBUG_EXPRESSION
+  void compactLine_(std::string & inputLine, std::string & compactedLine);
+  void tokenize_(std::string & inputLine, std::list<ExpressionElement *> & tokenList);
+  bool convertPolyToExpr_(std::list<ExpressionElement *> & tokenList);
+  void standardizeTable_(std::list<ExpressionElement *> & tokenList);
   // Debugging methods
 
   void dumpParseTree_(ExpressionNode *tree, int indentLevel=0);
   void indentWithDashes_(int level);
-#endif
 
   // Catch attempts to use operator= at compile time, by 
   // defining this null-op as a private member.
   // This doesn't work because parameters are often put inside of
   // STL objects, which rely on operator=.
-  //N_UTL_ExpressionInternals& operator=(const N_UTL_ExpressionInternals& right) ;
+  //ExpressionInternals& operator=(const ExpressionInternals& right) ;
 
 };
+
+} // namespace Util
+} // namespace Xyce
+
+typedef Xyce::Util::ExpressionInternals N_UTL_ExpressionInternals;
+
 #endif // N_UTL_EXPRESSION_H

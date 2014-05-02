@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.8.6.2 $
+// Revision Number: $Revision: 1.13 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,66 +46,62 @@
 #ifndef N_TOP_Indexor_h
 #define N_TOP_Indexor_h 1
 
-// ---------- Standard Includes ----------
-
 #include <vector>
 #include <map>
 
-// ----------   Xyce Includes   ----------
-
 #include <N_UTL_Xyce.h>
-
 #include <N_TOP_Misc.h>
 
-// ---------- Forward Declarations ----------
+#include <N_PDS_fwd.h>
 
-class N_PDS_Manager;
+namespace Xyce {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Class         : N_TOP_Indexor
+// Class         : Indexor
 // Purpose       :
 // Special Notes :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 6/12/02
 //-----------------------------------------------------------------------------
-class N_TOP_Indexor
+class Indexor
 {
 
 public:
 
   // Constructor
-  N_TOP_Indexor( N_PDS_Manager * pds = 0 )
+  Indexor( N_PDS_Manager * pds = 0 )
   : pdsMgr_(pds),
     accelMatrixIndex_(false)
   { }
 
   // Destructor
-  ~N_TOP_Indexor() {}
+  ~Indexor() {}
 
   // Registers the PDS manager.
   bool registerParallelServices(N_PDS_Manager * pds)
   { return (pdsMgr_ = pds); }
 
-  bool globalToLocal( const string & map_name, vector<int> & ids );
-  bool localToGlobal( const string & map_name, vector<int> & ids );
+  bool globalToLocal( const std::string & map_name, std::vector<int> & ids );
+  bool localToGlobal( const std::string & map_name, std::vector<int> & ids );
 
-  bool setupAcceleratedMatrixIndexing( const string & graph_name );
+  bool setupAcceleratedMatrixIndexing( const std::string & graph_name );
   bool deleteAcceleratedMatrixIndexing();
 
-  bool matrixGlobalToLocal( const string & graph_name,
-                            const vector<int> & gids,
-                            vector< vector<int> > & stamp );
+  bool matrixGlobalToLocal( const std::string & graph_name,
+                            const std::vector<int> & gids,
+                            std::vector< std::vector<int> > & stamp );
 
 private:
 
   // Copy constructor (private).
-  N_TOP_Indexor(const N_TOP_Indexor & right);
+  Indexor(const Indexor & right);
   // Assignment operator (private).
-  N_TOP_Indexor & operator=(const N_TOP_Indexor & right);
+  Indexor & operator=(const Indexor & right);
   // Equality operator.
-  bool operator==(const N_TOP_Indexor & right) const;
+  bool operator==(const Indexor & right) const;
   // Non-equality operator.
-  bool operator!=(const N_TOP_Indexor & right) const;
+  bool operator!=(const Indexor & right) const;
 
 private:
 
@@ -113,8 +109,13 @@ private:
   N_PDS_Manager * pdsMgr_;
 
   bool accelMatrixIndex_;
-  vector< map<int,int> > matrixIndexMap_;
+  std::vector< std::map<int,int> > matrixIndexMap_;
 
 };
+
+} // namespace Topo
+} // namespace Xyce
+
+typedef Xyce::Topo::Indexor N_TOP_Indexor;
 
 #endif

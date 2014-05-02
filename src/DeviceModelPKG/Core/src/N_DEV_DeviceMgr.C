@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,83 +36,58 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.557.2.6 $
+// Revision Number: $Revision: 1.597.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/11 18:50:03 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: dgbaur $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
-#ifdef Xyce_DEBUG_DEVICE
-#ifdef HAVE_CSTDIO
-#include <cstdio>
-#else
-#include <stdio.h>
-#endif
-#endif
-
 #include <algorithm>
 #include <sstream>
+#include <stdexcept>
 
-// ----------   Xyce Includes   ----------
-#include <N_DEV_Const.h>
 #include <N_DEV_DeviceMgr.h>
 
-#include <N_DEV_DeviceBld.h>
+#include <N_UTL_Algorithm.h>
 
-#include <N_DEV_PlaceHolder.h>
-#include <N_DEV_DeviceBlock.h>
+#include <N_DEV_Const.h>
 #include <N_DEV_Source.h>
-#include <N_DEV_SourceData.h>
-#include <N_DEV_Vsrc.h>
-#include <N_DEV_DAC.h>
+#include <N_DEV_RegisterDevices.h>
+#include <N_DEV_DeviceSensitivities.h>
+#include <N_DEV_Algorithm.h>
+#include <N_DEV_Print.h>
+
 #include <N_DEV_ADC.h>
+#include <N_DEV_BJT.h>
+#include <N_DEV_Bsrc.h>
+#include <N_DEV_DAC.h>
+#include <N_DEV_Diode.h>
+#include <N_DEV_ISRC.h>
+#include <N_DEV_MOSFET1.h>
+#include <N_DEV_MOSFET_B3.h>
+#include <N_DEV_MOSFET_B3SOI.h>
+#include <N_DEV_MOSFET_B4.h>
+#include <N_DEV_Resistor.h>
+#include <N_DEV_Resistor3.h>
+#include <N_DEV_Vsrc.h>
 #include <N_DEV_Xygra.h>
-
-#ifdef Xyce_EXTDEV
-#include <N_DEV_ExternDevice.h>
-#endif
-
-#include <N_DEV_DeviceModel.h>
-#include <N_DEV_DeviceInstance.h>
-#include <N_DEV_SolverState.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_DeviceOptions.h>
 
 #include <N_LAS_System.h>
 #include <N_LAS_Builder.h>
-#include <N_LAS_MultiVector.h>
-#include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
-
-
-#include <N_ANP_AnalysisInterface.h>
-#include <N_NLS_Manager.h>
-#include <N_TIA_TimeIntInfo.h>
-#include <N_NLS_NonLinInfo.h>
-#include <N_TIA_TwoLevelError.h>
-
-#include <N_UTL_Misc.h>
-#include <N_UTL_OptionBlock.h>
-#include <N_UTL_BreakPoint.h>
-#include <N_UTL_Expression.h>
-
-#include <N_IO_PkgOptionsMgr.h>
-
-#include <N_ERH_ErrorMgr.h>
-
-#include <N_MPDE_Manager.h>
 
 #include <N_PDS_Manager.h>
 #include <N_PDS_Comm.h>
 
 #include <N_IO_CmdParse.h>
 #include <N_IO_OutputMgr.h>
+
+#ifdef Xyce_EXTDEV
+#include <N_DEV_ExternDevice.h>
+#endif
 
 namespace Xyce {
 namespace Device {
@@ -125,7 +100,7 @@ namespace Device {
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
-DeviceMgr * DeviceMgr::factory (N_IO_CmdParse & cp)
+DeviceMgr * DeviceMgr::factory(IO::CmdParse & cp)
 {
    DeviceMgr * DM_ptr = new DeviceMgr(cp);
    DM_ptr->DevMgrPtr_ = DM_ptr;
@@ -141,16 +116,15 @@ DeviceMgr * DeviceMgr::factory (N_IO_CmdParse & cp)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
-DeviceMgr::DeviceMgr(N_IO_CmdParse & cp)
-  : commandLine_(cp),
-    devOptions_(cp),
+DeviceMgr::DeviceMgr(IO::CmdParse &command_line)
+  : commandLine_(command_line),
+    devOptions_(),
     icLoads_(NULL),
-    devSensPtr_ (NULL),
+    devSensPtr_(new DeviceSensitivities(*this, devOptions_)),
     jacobianLoadCalledBefore_(false),
     entityMapDone_ (false),
     numPDEDevices_(0),
     calledBeforeCSPI (false),
-    numSensParams_(0),
     allDevsConverged_(false),
     sensFlag_(false),
     linearSystemFlag_(true),
@@ -159,7 +133,6 @@ DeviceMgr::DeviceMgr(N_IO_CmdParse & cp)
     parameterChanged_(false),
     breakPointInstancesInitialized(false),
     timeParamsProcessed_(0.0),
-    devBuilder_(solState_, devOptions_),
     numThreads_(0),
     multiThreading_(false),
     nonTrivialDeviceMaskFlag(false),
@@ -169,53 +142,20 @@ DeviceMgr::DeviceMgr(N_IO_CmdParse & cp)
     numJacStoVectorPtr_(0),
     diagonalVectorPtr_(0)
 {
-
-  int i;
-  dummy_ptr = PlaceHolder::factory(solState_,devOptions_);
-
-  // instantiate the deviceAllocFlag array.
-  for (i = 0; i < ModelType::NUMDEV; ++i)
-  {
-    deviceAllocFlag_[i] = 0;
-    deviceUseFlag_[i]   = 0;
-    deviceArray_[i]     = dummy_ptr;
-    PDEDeviceFlag_[i]   = 0;
-  }
-
-
-  setUpDeviceIndexMap_();
-  setUpMOSFETLevelMap_();
-  setUpJFETLevelMap_();
-  setUpDiodeLevelMap_();
-  setUpBJTLevelMap_();
-  setUpPDELevelMap_();
-  setUpResistorLevelMap_();
-  setUpIndLevelMap_();
-  setUpNeuronLevelMap_();
-  setUpNeuronPopLevelMap_();
-  setUpSynapseLevelMap_();
-  setUpRadLevelMap_();
-  setUpDeviceModelTypeMap_();
-  setUpPDEDeviceFlagArray_ ();
+  devOptions_.setupDefaultOptions(command_line);
+  devOptions_.applyCmdLineOptions(command_line);
 
 #ifdef Xyce_EXTDEV
   setUpPassThroughParamsMap_();
 #endif
 
-  // set the solution-device map pointer:   does not exist anymore...
-  extData_.solDevInstMap = & solDevInstMap_;
-
-  extData_.devMgrPtr = this;
-
-#ifdef Xyce_DEBUG_DEVICE
   solState_.debugTimeFlag = true;
-#endif
 }
 
 //-----------------------------------------------------------------------------
 // Function      : DeviceMgr::~DeviceMgr
 // Purpose       : destructor
-// Special Notes : De-allocates all the devices pointed  to by deviceArray
+// Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/16/00
@@ -227,25 +167,17 @@ DeviceMgr::~DeviceMgr()
   delete numJacStoVectorPtr_;
   delete diagonalVectorPtr_;
 
-  delete extData_.numJacRHSVectorPtr;
-  delete extData_.numJacFVectorPtr;
-  delete extData_.numJacQVectorPtr;
-  delete extData_.perturbVectorPtr;
-  delete extData_.numJacLoadFlagPtr;
+  delete externData_.numJacRHSVectorPtr;
+  delete externData_.numJacFVectorPtr;
+  delete externData_.numJacQVectorPtr;
+  delete externData_.perturbVectorPtr;
+  delete externData_.numJacLoadFlagPtr;
 
-  delete extData_.tmpdIdXPtr;
-  delete extData_.tmpdQdXPtr;
+  delete externData_.tmpdIdXPtr;
+  delete externData_.tmpdQdXPtr;
 
-  for (int i = 0; i < ModelType::NUMDEV; ++i)
-  {
-    if (deviceAllocFlag_[i] == 1)
-    {
-      delete deviceArray_[i];
-      deviceAllocFlag_[i] = 0;
-      deviceUseFlag_[i]   = 0;
-    }
-    PDEDeviceFlag_[i]   = 0;
-  }
+  for (EntityTypeIdDeviceMap::iterator it = deviceMap_.begin(); it != deviceMap_.end(); ++it)
+    delete (*it).second;
 
 #ifdef Xyce_EXTDEV
   for (int i = 0; i < extDevIBPtrVec_.size(); ++i)
@@ -263,19 +195,6 @@ DeviceMgr::~DeviceMgr()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : DeviceMgr::createDeviceByNetlistDeviceType
-// Purpose       :
-// Special Notes :
-// Scope         : public
-// Creator       : Dave Baur, SNL
-// Creation Date : 04/18/2013
-//-----------------------------------------------------------------------------
-Device * DeviceMgr::createDeviceByNetlistDeviceType(const std::string &name, const int level)
-{
-  return devBuilder_.createDeviceByNetlistDeviceType(name, level);
-}
-
-//-----------------------------------------------------------------------------
 // Function      : DeviceMgr::registerPkgOptionsMgr
 // Purpose       :
 // Special Notes :
@@ -283,51 +202,51 @@ Device * DeviceMgr::createDeviceByNetlistDeviceType(const std::string &name, con
 // Creator       : Richard Schiek, Electrical and Mems Modeling
 // Creation Date : 10/20/2008
 //-----------------------------------------------------------------------------
-bool DeviceMgr::registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr )
+bool DeviceMgr::registerPkgOptionsMgr(IO::PkgOptionsMgr *pkgOptPtr)
 {
   pkgOptMgrPtr_ = pkgOptPtr;
-  string netListFile("");
-  if (commandLine_.getArgumentValue(string("netlist")) != "")
+  std::string netListFile("");
+  if (commandLine_.getArgumentValue(std::string("netlist")) != "")
   {
-    netListFile = commandLine_.getArgumentValue(string("netlist"));
+    netListFile = commandLine_.getArgumentValue(std::string("netlist"));
   }
   pkgOptMgrPtr_->submitRegistration(
-      "DEVICE", netListFile, new DeviceMgr_OptionsReg( this ) );
+      "DEVICE", netListFile, new DeviceMgr_OptionsReg(this));
 
   pkgOptMgrPtr_->submitRegistration(
-      "SENS", netListFile, new DeviceMgr_SensOptionsReg( this ) );
+      "SENS", netListFile, new DeviceMgr_SensOptionsReg(this));
 
   pkgOptMgrPtr_->submitRegistration(
-      "TIMEINT", netListFile, new DeviceMgr_TimeOptionsReg( this ) );
+      "TIMEINT", netListFile, new DeviceMgr_TimeOptionsReg(this));
 
   // different analysis types.
   pkgOptMgrPtr_->submitRegistration(
-      "TRAN", netListFile, new DeviceMgr_TransAnalysisReg( this ) );
+      "TRAN", netListFile, new DeviceMgr_TransAnalysisReg(this));
 
   pkgOptMgrPtr_->submitRegistration(
-      "DC", netListFile, new DeviceMgr_DCAnalysisReg( this ) );
+      "DC", netListFile, new DeviceMgr_DCAnalysisReg(this));
 
   pkgOptMgrPtr_->submitRegistration(
-      "OP", netListFile, new DeviceMgr_OPAnalysisReg( this ) );
+      "OP", netListFile, new DeviceMgr_OPAnalysisReg(this));
 
   pkgOptMgrPtr_->submitRegistration(
-      "STEP", netListFile, new DeviceMgr_STEPAnalysisReg( this ) );
+      "STEP", netListFile, new DeviceMgr_STEPAnalysisReg(this));
 
   // MPDE specific netlist lines
   pkgOptMgrPtr_->submitRegistration(
-      "MPDE", netListFile, new DeviceMgr_MPDE_AnalysisReg( this ) );
+      "MPDE", netListFile, new DeviceMgr_MPDE_AnalysisReg(this));
 
   // HB Specific netlist lines
   pkgOptMgrPtr_->submitRegistration(
-      "HB", netListFile, new DeviceMgr_HB_AnalysisReg( this ) );
+      "HB", netListFile, new DeviceMgr_HB_AnalysisReg(this));
 
   // AC Specific netlist lines
   pkgOptMgrPtr_->submitRegistration(
-      "AC", netListFile, new DeviceMgr_AC_AnalysisReg( this ) );
+      "AC", netListFile, new DeviceMgr_AC_AnalysisReg(this));
 
   // MOR Specific netlist lines
   pkgOptMgrPtr_->submitRegistration(
-      "MOR", netListFile, new DeviceMgr_MOR_AnalysisReg( this ) );
+      "MOR", netListFile, new DeviceMgr_MOR_AnalysisReg(this));
 
   return true;
 }
@@ -340,22 +259,13 @@ bool DeviceMgr::registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr )
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool DeviceMgr::registerSensParams (const N_UTL_OptionBlock & OB)
+bool DeviceMgr::registerSensParams (const Util::OptionBlock & OB)
 {
   sensFlag_ = true;
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
+  if (DEBUG_DEVICE && devOptions_.debugLevel > 0)
   {
-    std::cout << "DeviceMgr::registerSensParams called!" <<std::endl;
-  }
-#endif
-
-  // the devSensPtr will be deleted in the destructor.
-  if (devSensPtr_==0)
-  {
-    devSensPtr_ = new DeviceSensitivities
-      (devOptions_,extData_, solState_, *lasSysPtr_);
+    dout() << "DeviceMgr::registerSensParams called!" <<std::endl;
   }
 
   return devSensPtr_->registerSensParams (OB);
@@ -363,7 +273,7 @@ bool DeviceMgr::registerSensParams (const N_UTL_OptionBlock & OB)
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_DEV_DeviceMgr::registerLeadCurrentRequests
+// Function      : DeviceMgr::registerLeadCurrentRequests
 // Purpose       : this function is called from the output manager (through the
 //                 device interface) to inform the device package of the devices
 //                 for which lead currents have been requested.  The device
@@ -374,29 +284,28 @@ bool DeviceMgr::registerSensParams (const N_UTL_OptionBlock & OB)
 // Creator       : Richard Schiek, SNL, Electrical Systems Modeling
 // Creation Date : 03/20/13
 //-----------------------------------------------------------------------------
-bool N_DEV_DeviceMgr::setLeadCurrentRequests(const std::set<std::string> & deviceNames )
+bool DeviceMgr::setLeadCurrentRequests(const std::set<std::string> & deviceNames)
 {
   // this is called prior to fully constructing the devices.  So for now
   // save the list
   devicesNeedingLeadCurrentLoads_ = deviceNames;
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
+  if (DEBUG_DEVICE && devOptions_.debugLevel > 0)
   {
-    if( ! devicesNeedingLeadCurrentLoads_.empty() )
+    if (! devicesNeedingLeadCurrentLoads_.empty())
     {
-      set<string>::iterator currentDeviceNameItr = devicesNeedingLeadCurrentLoads_.begin();
-      set<string>::iterator endDeviceNameItr = devicesNeedingLeadCurrentLoads_.end();
-      std::cout << "N_DEV_DeviceMgr::registerLeadCurrentRequests Devices for which lead currents were requested: ";
-      while ( currentDeviceNameItr != endDeviceNameItr )
+      std::set<std::string>::iterator currentDeviceNameItr = devicesNeedingLeadCurrentLoads_.begin();
+      std::set<std::string>::iterator endDeviceNameItr = devicesNeedingLeadCurrentLoads_.end();
+      dout() << "DeviceMgr::registerLeadCurrentRequests Devices for which lead currents were requested: ";
+      while (currentDeviceNameItr != endDeviceNameItr)
       {
-        std::cout << *currentDeviceNameItr << "  ";
+        dout() << *currentDeviceNameItr << "  ";
         currentDeviceNameItr++;
       }
-      std::cout << std::endl;
+      dout() << std::endl;
     }
   }
-#endif
+
   return true;
 }
 
@@ -408,7 +317,7 @@ bool N_DEV_DeviceMgr::setLeadCurrentRequests(const std::set<std::string> & devic
 // Creator       : Eric Keiter, SNL
 // Creation Date : 10/14/11
 //-----------------------------------------------------------------------------
-bool DeviceMgr::setTranAnalysisParams (const N_UTL_OptionBlock & OB)
+bool DeviceMgr::setTranAnalysisParams (const Util::OptionBlock & OB)
 {
   solState_.TRANspecified = true;
   return true;
@@ -422,7 +331,7 @@ bool DeviceMgr::setTranAnalysisParams (const N_UTL_OptionBlock & OB)
 // Creator       : Eric Keiter, SNL
 // Creation Date : 10/14/11
 //-----------------------------------------------------------------------------
-bool DeviceMgr::setDCAnalysisParams (const N_UTL_OptionBlock & OB)
+bool DeviceMgr::setDCAnalysisParams (const Util::OptionBlock & OB)
 {
   solState_.DCspecified = true;
   return true;
@@ -436,7 +345,7 @@ bool DeviceMgr::setDCAnalysisParams (const N_UTL_OptionBlock & OB)
 // Creator       : Eric Keiter, SNL
 // Creation Date : 10/14/11
 //-----------------------------------------------------------------------------
-bool DeviceMgr::setOPAnalysisParams (const N_UTL_OptionBlock & OB)
+bool DeviceMgr::setOPAnalysisParams (const Util::OptionBlock & OB)
 {
   solState_.OPspecified = true;
   return true;
@@ -450,7 +359,7 @@ bool DeviceMgr::setOPAnalysisParams (const N_UTL_OptionBlock & OB)
 // Creator       : Eric Keiter, SNL
 // Creation Date : 10/14/11
 //-----------------------------------------------------------------------------
-bool DeviceMgr::setSTEPAnalysisParams (const N_UTL_OptionBlock & OB)
+bool DeviceMgr::setSTEPAnalysisParams (const Util::OptionBlock & OB)
 {
   solState_.STEPspecified = true;
   return true;
@@ -464,7 +373,7 @@ bool DeviceMgr::setSTEPAnalysisParams (const N_UTL_OptionBlock & OB)
 // Creator       : Eric Keiter, SNL
 // Creation Date : 10/14/11
 //-----------------------------------------------------------------------------
-bool DeviceMgr::setMPDEAnalysisParams (const N_UTL_OptionBlock & OB)
+bool DeviceMgr::setMPDEAnalysisParams (const Util::OptionBlock & OB)
 {
   solState_.MPDEspecified = true;
   return true;
@@ -478,7 +387,7 @@ bool DeviceMgr::setMPDEAnalysisParams (const N_UTL_OptionBlock & OB)
 // Creator       : Eric Keiter, SNL
 // Creation Date : 10/14/11
 //-----------------------------------------------------------------------------
-bool DeviceMgr::setHBAnalysisParams (const N_UTL_OptionBlock & OB)
+bool DeviceMgr::setHBAnalysisParams (const Util::OptionBlock & OB)
 {
   solState_.HBspecified = true;
   return true;
@@ -492,7 +401,7 @@ bool DeviceMgr::setHBAnalysisParams (const N_UTL_OptionBlock & OB)
 // Creator       : Eric Keiter, SNL
 // Creation Date : 10/14/11
 //-----------------------------------------------------------------------------
-bool DeviceMgr::setACAnalysisParams (const N_UTL_OptionBlock & OB)
+bool DeviceMgr::setACAnalysisParams (const Util::OptionBlock & OB)
 {
   solState_.ACspecified = true;
   return true;
@@ -506,7 +415,7 @@ bool DeviceMgr::setACAnalysisParams (const N_UTL_OptionBlock & OB)
 // Creator       : Heidi Thornquist and Ting Mei, SNL
 // Creation Date : 5/30/12
 //-----------------------------------------------------------------------------
-bool DeviceMgr::setMORAnalysisParams (const N_UTL_OptionBlock & OB)
+bool DeviceMgr::setMORAnalysisParams (const Util::OptionBlock & OB)
 {
   solState_.MORspecified = true;
   return true;
@@ -521,44 +430,41 @@ bool DeviceMgr::setMORAnalysisParams (const N_UTL_OptionBlock & OB)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/27/04
 //-----------------------------------------------------------------------------
-vector<double> DeviceMgr::getFastSourcePeriod (vector<string>& sourceNames)
+std::vector<double> DeviceMgr::getFastSourcePeriod (std::vector<std::string>& sourceNames)
 {
   int numFastSrcs = sourceNames.size();
 
   //Setup return of source periods
-  vector<double> srcPeriods(numFastSrcs);
+  std::vector<double> srcPeriods(numFastSrcs);
 
   // Now loop over them, and mark them.
-  for( int i = 0; i < numFastSrcs; ++i )
+  for(int i = 0; i < numFastSrcs; ++i)
   {
     ExtendedString tmpName(sourceNames[i]);
     tmpName.toUpper();
-    map <string,SourceInstance*>::iterator iterFS = indepSourcePtrMap_.find(tmpName);
-    if ( iterFS != indepSourcePtrMap_.end() )
+    std::map<std::string,SourceInstance*>::iterator iterFS = indepSourcePtrMap_.find(tmpName);
+    if (iterFS != indepSourcePtrMap_.end())
     {
       SourceInstance * SIPtr = iterFS->second;
       srcPeriods[i] = SIPtr->period();
     }
     else
     {
-      string msg("DeviceMgr::getFastSourcePeriod ");
-      msg += "Unable to find source: " + fastSourceNames_[i] + "\n";
-      msg += "Potential names are: ";
-      map <string,SourceInstance*>::iterator currentFS = indepSourcePtrMap_.begin();
-      map <string,SourceInstance*>::iterator endFS = indepSourcePtrMap_.end();
-      while( currentFS != endFS )
-      {
-        msg += (*currentFS).first;
-        msg += " ";
-        currentFS++;
-      }
-
-#ifdef Xyce_PARALLEL_MPI
-#else
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg);
+#ifndef Xyce_PARALLEL_MPI
+      Report::UserError message;
+      message << "Unable to find source: " <<  fastSourceNames_[i] << "\n"
+              << "Potential names are: ";
+      for (std::map<std::string,SourceInstance*>::const_iterator it = indepSourcePtrMap_.begin(); it != indepSourcePtrMap_.end(); ++it)
+        message << (*it).first << " ";
 #endif
     }
   }
+
+#ifdef Xyce_PARALLEL_MPI
+  // Collect all the periods from all the processors, assuming periods are positive values.
+  std::vector<double> tmpSrcPeriods( srcPeriods );
+  pdsMgrPtr_->getPDSComm()->maxAll( &tmpSrcPeriods[0], &srcPeriods[0], numFastSrcs );
+#endif
 
   return srcPeriods;
 }
@@ -572,27 +478,27 @@ vector<double> DeviceMgr::getFastSourcePeriod (vector<string>& sourceNames)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/27/04
 //-----------------------------------------------------------------------------
-vector<double> DeviceMgr::registerFastSources (vector<string>& sourceNames)
+std::vector<double> DeviceMgr::registerFastSources (std::vector<std::string>& sourceNames)
 {
   int numFastSrcs = sourceNames.size();
   //Setup return of source periods
-  vector<double> srcPeriods;
+  std::vector<double> srcPeriods;
 
   if (numFastSrcs > 0)
   {
-    srcPeriods.resize(numFastSrcs);
+    srcPeriods.resize(numFastSrcs, 0.0);
 
       // Default case, the sources are explicitely listed on the .option line
     fastSourceNames_.resize(numFastSrcs);
-    copy( sourceNames.begin(), sourceNames.end(), fastSourceNames_.begin());
+    copy(sourceNames.begin(), sourceNames.end(), fastSourceNames_.begin());
 
     // Now loop over them, and mark them.
-    for( int i = 0; i < numFastSrcs; ++i )
+    for(int i = 0; i < numFastSrcs; ++i)
     {
       ExtendedString tmpName(fastSourceNames_[i]);
       tmpName.toUpper();
-      map <string,SourceInstance*>::iterator iterFS = indepSourcePtrMap_.find(tmpName);
-      if ( iterFS != indepSourcePtrMap_.end() )
+      std::map<std::string,SourceInstance*>::iterator iterFS = indepSourcePtrMap_.find(tmpName);
+      if (iterFS != indepSourcePtrMap_.end())
       {
         SourceInstance * SIPtr = iterFS->second;
         SIPtr->setFastSourceFlag (true);
@@ -600,21 +506,12 @@ vector<double> DeviceMgr::registerFastSources (vector<string>& sourceNames)
       }
       else
       {
-        string msg("DeviceMgr::registerFastSources ");
-        msg += "Unable to find source: " + fastSourceNames_[i] + "\n";
-        msg += "Potential names are: ";
-        map <string,SourceInstance*>::iterator currentFS = indepSourcePtrMap_.begin();
-        map <string,SourceInstance*>::iterator endFS = indepSourcePtrMap_.end();
-        while( currentFS != endFS )
-        {
-          msg += (*currentFS).first;
-          msg += " ";
-          currentFS++;
-        }
-
-#ifdef Xyce_PARALLEL_MPI
-#else
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg);
+#ifndef Xyce_PARALLEL_MPI
+      Report::UserError message;
+      message << "Unable to find source: " << fastSourceNames_[i] << "\n"
+              << "Potential names are: ";
+      for (std::map<std::string,SourceInstance*>::const_iterator it = indepSourcePtrMap_.begin(); it != indepSourcePtrMap_.end(); ++it)
+        message << (*it).first << " ";
 #endif
       }
     }
@@ -624,13 +521,23 @@ vector<double> DeviceMgr::registerFastSources (vector<string>& sourceNames)
   {
     // tscoffe/tmei 09/16/08
     // Special case:  Use all sources
-    numFastSrcs = indepSourceInstancePtrVec_.size();
-    srcPeriods.resize(numFastSrcs);
-    for (int i=0 ; i<numFastSrcs ; ++i) {
+    // Compute the total number of fast sources for all processors.
+    // NOTE:  In parallel, this will not work correctly if more than one processor has fast sources.
+    int myNumFastSrcs = indepSourceInstancePtrVec_.size();
+    pdsMgrPtr_->getPDSComm()->sumAll( &myNumFastSrcs, &numFastSrcs, 1 );
+    srcPeriods.resize(numFastSrcs, -1.0);
+    for (int i=0 ; i<myNumFastSrcs ; ++i) {
       indepSourceInstancePtrVec_[i]->setFastSourceFlag(true);
       srcPeriods[i] = indepSourceInstancePtrVec_[i]->period();
     }
   }
+
+#ifdef Xyce_PARALLEL_MPI
+  // Collect all the periods from all the processors, assuming periods are positive values.
+  std::vector<double> tmpSrcPeriods( srcPeriods );
+  pdsMgrPtr_->getPDSComm()->maxAll( &tmpSrcPeriods[0], &srcPeriods[0], numFastSrcs );
+#endif
+
   return srcPeriods;
 }
 
@@ -643,7 +550,7 @@ vector<double> DeviceMgr::registerFastSources (vector<string>& sourceNames)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 06/12/2013
 //-----------------------------------------------------------------------------
-void DeviceMgr::deRegisterFastSources (vector<string>& sourceNames)
+void DeviceMgr::deRegisterFastSources (std::vector<std::string>& sourceNames)
 {
   int numFastSrcs = sourceNames.size();
 
@@ -651,40 +558,30 @@ void DeviceMgr::deRegisterFastSources (vector<string>& sourceNames)
   {
       // Default case, the sources are explicitely listed on the .option line
     fastSourceNames_.resize(numFastSrcs);
-    copy( sourceNames.begin(), sourceNames.end(), fastSourceNames_.begin());
+    copy(sourceNames.begin(), sourceNames.end(), fastSourceNames_.begin());
 
     // Now loop over them, and mark them.
-    for( int i = 0; i < numFastSrcs; ++i )
+    for(int i = 0; i < numFastSrcs; ++i)
     {
       ExtendedString tmpName(fastSourceNames_[i]);
       tmpName.toUpper();
-      map <string,SourceInstance*>::iterator iterFS = indepSourcePtrMap_.find(tmpName);
-      if ( iterFS != indepSourcePtrMap_.end() )
+      std::map<std::string,SourceInstance*>::iterator iterFS = indepSourcePtrMap_.find(tmpName);
+      if (iterFS != indepSourcePtrMap_.end())
       {
         SourceInstance * SIPtr = iterFS->second;
         SIPtr->setFastSourceFlag (false);
       }
       else
       {
-        string msg("DeviceMgr::registerFastSources ");
-        msg += "Unable to find source: " + fastSourceNames_[i] + "\n";
-        msg += "Potential names are: ";
-        map <string,SourceInstance*>::iterator currentFS = indepSourcePtrMap_.begin();
-        map <string,SourceInstance*>::iterator endFS = indepSourcePtrMap_.end();
-        while( currentFS != endFS )
-        {
-          msg += (*currentFS).first;
-          msg += " ";
-          currentFS++;
-        }
-
-#ifdef Xyce_PARALLEL_MPI
-#else
-        N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg);
+#ifndef Xyce_PARALLEL_MPI
+        Report::DevelFatal message;
+        message << "DeviceMgr::deRegisterFastSources: Unable to find source: " <<  fastSourceNames_[i] << "\n"
+                << "Potential names are: ";
+        for (std::map<std::string,SourceInstance*>::const_iterator it = indepSourcePtrMap_.begin(); it != indepSourcePtrMap_.end(); ++it)
+          message << (*it).first << " ";
 #endif
       }
     }
-
   }
   else
   {
@@ -710,22 +607,22 @@ void DeviceMgr::deactivateSlowSources()
 {
   // first back-up a copy of the deviceArray so we can edit out
   // the slow sources
-  indepSourceInstanceBackupPtrVec_.resize( indepSourceInstancePtrVec_.size() );
-  copy( indepSourceInstancePtrVec_.begin(), indepSourceInstancePtrVec_.end(),
+  indepSourceInstanceBackupPtrVec_.resize(indepSourceInstancePtrVec_.size());
+  copy(indepSourceInstancePtrVec_.begin(), indepSourceInstancePtrVec_.end(),
     indepSourceInstanceBackupPtrVec_.begin());
 
   // erase the existing list of sources
   indepSourceInstancePtrVec_.clear();
 
   // now copy back only those that are fast sources
-  vector<SourceInstance*>::iterator iter;
-  vector<SourceInstance*>::iterator begin =indepSourceInstanceBackupPtrVec_.begin();
-  vector<SourceInstance*>::iterator end =indepSourceInstanceBackupPtrVec_.end();
+  std::vector<SourceInstance*>::iterator iter;
+  std::vector<SourceInstance*>::iterator begin =indepSourceInstanceBackupPtrVec_.begin();
+  std::vector<SourceInstance*>::iterator end =indepSourceInstanceBackupPtrVec_.end();
   for (iter=begin; iter!=end;++iter)
   {
-    if( (*iter)->getFastSourceFlag() )
+    if ((*iter)->getFastSourceFlag())
     {
-      indepSourceInstancePtrVec_.push_back( *iter );
+      indepSourceInstancePtrVec_.push_back(*iter);
     }
   }
 
@@ -743,8 +640,8 @@ void DeviceMgr::activateSlowSources()
 {
   // restore the independent source list from backup
   indepSourceInstancePtrVec_.clear();
-  indepSourceInstancePtrVec_.resize( indepSourceInstanceBackupPtrVec_.size() );
-  copy( indepSourceInstanceBackupPtrVec_.begin(), indepSourceInstanceBackupPtrVec_.end(),
+  indepSourceInstancePtrVec_.resize(indepSourceInstanceBackupPtrVec_.size());
+  copy(indepSourceInstanceBackupPtrVec_.begin(), indepSourceInstanceBackupPtrVec_.end(),
     indepSourceInstancePtrVec_.begin());
 }
 
@@ -756,7 +653,7 @@ void DeviceMgr::activateSlowSources()
 // Creator       : Richard Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 07/21/08
 //-----------------------------------------------------------------------------
-void DeviceMgr::setMPDEFlag( bool flagVal )
+void DeviceMgr::setMPDEFlag(bool flagVal)
 {
   solState_.mpdeOnFlag  = flagVal;
 }
@@ -769,7 +666,7 @@ void DeviceMgr::setMPDEFlag( bool flagVal )
 // Creator       : Richard Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 07/21/08
 //-----------------------------------------------------------------------------
-void DeviceMgr::setBlockAnalysisFlag( bool flagVal )
+void DeviceMgr::setBlockAnalysisFlag(bool flagVal)
 {
   solState_.blockAnalysisFlag = flagVal;
   devOptions_.setBlockAnalysisFlag(flagVal);
@@ -783,7 +680,7 @@ void DeviceMgr::setBlockAnalysisFlag( bool flagVal )
 // Creator       : Richard Schiek, SNL, Parallel Computational Sciences
 // Creation Date : 07/21/08
 //-----------------------------------------------------------------------------
-void DeviceMgr::setFastTime( double timeVal )
+void DeviceMgr::setFastTime(double timeVal)
 {
   solState_.currFastTime = timeVal;
 }
@@ -801,68 +698,68 @@ bool DeviceMgr::initializeAll()
 {
   bool bsuccess = true;
 
-  extData_.lasSysPtr = lasSysPtr_;
+  externData_.lasSysPtr = lasSysPtr_;
 
   // nullify ptrs that are passed in at each step  (see the loadDAEVectors function args)
-  extData_.nextSolVectorPtr = 0;
-  extData_.currSolVectorPtr = 0;
-  extData_.lastSolVectorPtr = 0;
-  extData_.daeQVectorPtr    = 0;
-  extData_.daeFVectorPtr    = 0;
-  extData_.dFdxdVpVectorPtr = 0;
-  extData_.dQdxdVpVectorPtr = 0;
-  extData_.nextStaVectorPtr = 0;
-  extData_.currStaVectorPtr = 0;
-  extData_.lastStaVectorPtr = 0;
-  extData_.storeLeadCurrQCompPtr = 0;
-  extData_.nextStaDerivVectorPtr = 0;
-  extData_.nextStoVectorPtr =
-  extData_.currStoVectorPtr = 0;
-  extData_.lastStoVectorPtr = 0;
+  externData_.nextSolVectorPtr = 0;
+  externData_.currSolVectorPtr = 0;
+  externData_.lastSolVectorPtr = 0;
+  externData_.daeQVectorPtr    = 0;
+  externData_.daeFVectorPtr    = 0;
+  externData_.dFdxdVpVectorPtr = 0;
+  externData_.dQdxdVpVectorPtr = 0;
+  externData_.nextStaVectorPtr = 0;
+  externData_.currStaVectorPtr = 0;
+  externData_.lastStaVectorPtr = 0;
+  externData_.storeLeadCurrQCompPtr = 0;
+  externData_.nextStaDerivVectorPtr = 0;
+  externData_.nextStoVectorPtr =
+  externData_.currStoVectorPtr = 0;
+  externData_.lastStoVectorPtr = 0;
 
-#ifdef Xyce_DEBUG_DEVICE
-  // get f vector pointer:
-  extData_.fVectorPtr  = lasSysPtr_->getFVector();
-  bsuccess = bsuccess && (extData_.fVectorPtr != 0);
+  if (DEBUG_DEVICE) {
+    // get f vector pointer:
+    externData_.fVectorPtr  = lasSysPtr_->getFVector();
+    bsuccess = bsuccess && (externData_.fVectorPtr != 0);
 
-  // create Jdxp vector pointer:
-  extData_.JdxpVectorPtr = lasSysPtr_->getJDXPVector();
-  bsuccess = bsuccess && (extData_.JdxpVectorPtr != 0);
-#endif
+    // create Jdxp vector pointer:
+    externData_.JdxpVectorPtr = lasSysPtr_->getJDXPVector();
+    bsuccess = bsuccess && (externData_.JdxpVectorPtr != 0);
+  }
 
 #ifdef Xyce_DEBUG_VOLTLIM
   // get test matrix: (old DAE)
-  extData_.JTestMatrixPtr = lasSysPtr_->getJacTestMatrix();
-  bsuccess = bsuccess && (extData_.JTestMatrixPtr != 0);
+  externData_.JTestMatrixPtr = lasSysPtr_->getJacTestMatrix();
+  bsuccess = bsuccess && (externData_.JTestMatrixPtr != 0);
 
   // get test matrix:
-  extData_.FTestMatrixPtr = lasSysPtr_->getdFdxTestMatrix();
-  bsuccess = bsuccess && (extData_.FTestMatrixPtr != 0);
-  extData_.QTestMatrixPtr = lasSysPtr_->getdQdxTestMatrix();
-  bsuccess = bsuccess && (extData_.QTestMatrixPtr != 0);
+  externData_.FTestMatrixPtr = lasSysPtr_->getdFdxTestMatrix();
+  bsuccess = bsuccess && (externData_.FTestMatrixPtr != 0);
+  externData_.QTestMatrixPtr = lasSysPtr_->getdQdxTestMatrix();
+  bsuccess = bsuccess && (externData_.QTestMatrixPtr != 0);
 
   // get dxVoltlim vector pointer:
-  extData_.dxVoltlimVectorPtr = lasSysPtr_->getDxVoltlimVector() ;
-  bsuccess = bsuccess && (extData_.dxVoltlimVectorPtr != 0);
+  externData_.dxVoltlimVectorPtr = lasSysPtr_->getDxVoltlimVector() ;
+  bsuccess = bsuccess && (externData_.dxVoltlimVectorPtr != 0);
 
   // create Jdx2 vector pointer: (old DAE)
-  extData_.Jdx2VectorPtr = lasSysPtr_->getJDX2Vector();
-  bsuccess = bsuccess && (extData_.Jdx2VectorPtr != 0);
+  externData_.Jdx2VectorPtr = lasSysPtr_->getJDX2Vector();
+  bsuccess = bsuccess && (externData_.Jdx2VectorPtr != 0);
 
   // create Jdx2 vector pointer:
-  extData_.Fdx2VectorPtr = lasSysPtr_->getFDX2Vector();
-  bsuccess = bsuccess && (extData_.Fdx2VectorPtr != 0);
-  extData_.Qdx2VectorPtr = lasSysPtr_->getQDX2Vector();
-  bsuccess = bsuccess && (extData_.Qdx2VectorPtr != 0);
+  externData_.Fdx2VectorPtr = lasSysPtr_->getFDX2Vector();
+  bsuccess = bsuccess && (externData_.Fdx2VectorPtr != 0);
+  externData_.Qdx2VectorPtr = lasSysPtr_->getQDX2Vector();
+  bsuccess = bsuccess && (externData_.Qdx2VectorPtr != 0);
 #endif
 
   // get flag solution pointer-pointer:
-  extData_.flagSolVectorPtr = lasSysPtr_->getFlagSolVector();
-  bsuccess = bsuccess && (extData_.flagSolVectorPtr != 0);
+  externData_.flagSolVectorPtr = lasSysPtr_->getFlagSolVector();
+  bsuccess = bsuccess && (externData_.flagSolVectorPtr != 0);
 
   // get device mask pointer.
-  extData_.deviceMaskVectorPtr = lasSysPtr_->getDeviceMaskVector ();
-  bsuccess = bsuccess && (extData_.deviceMaskVectorPtr != 0);
+  externData_.deviceMaskVectorPtr = lasSysPtr_->getDeviceMaskVector ();
+  bsuccess = bsuccess && (externData_.deviceMaskVectorPtr != 0);
 
   // create the temporary numerical jacobian vectors
   if (devOptions_.numericalJacobianFlag || devOptions_.testJacobianFlag || sensFlag_)
@@ -871,27 +768,27 @@ bool DeviceMgr::initializeAll()
     numJacSolVectorPtr_ = lasSysPtr_->builder().createVector();
     numJacStoVectorPtr_ = lasSysPtr_->builder().createStoreVector();
 
-    extData_.numJacRHSVectorPtr = lasSysPtr_->builder().createVector();
-    extData_.numJacFVectorPtr   = lasSysPtr_->builder().createVector();
-    extData_.numJacQVectorPtr   = lasSysPtr_->builder().createVector();
-    extData_.perturbVectorPtr   = lasSysPtr_->builder().createVector();
-    extData_.numJacLoadFlagPtr  = lasSysPtr_->builder().createVector();
+    externData_.numJacRHSVectorPtr = lasSysPtr_->builder().createVector();
+    externData_.numJacFVectorPtr   = lasSysPtr_->builder().createVector();
+    externData_.numJacQVectorPtr   = lasSysPtr_->builder().createVector();
+    externData_.perturbVectorPtr   = lasSysPtr_->builder().createVector();
+    externData_.numJacLoadFlagPtr  = lasSysPtr_->builder().createVector();
   }
 
-  extData_.tmpdIdXPtr = lasSysPtr_->builder().createVector();
-  extData_.tmpdQdXPtr = lasSysPtr_->builder().createVector();
+  externData_.tmpdIdXPtr = lasSysPtr_->builder().createVector();
+  externData_.tmpdQdXPtr = lasSysPtr_->builder().createVector();
 
   // create a diagonal vector to be used for 2-level
   diagonalVectorPtr_  = lasSysPtr_->builder().createVector();
 
-  extData_.initializeAllFlag = true;
+  externData_.initializeAllFlag = true;
 
   // For Homotopy on block gainscale
   solState_.InitializeHomotopyBlockSize(devOptions_.numGainScaleBlocks);
 
 #ifdef Xyce_SIZEOF
   int size = sizeof(*this);
-  std::cout << "Size of device package after initializeAll  = " << size << std::endl;
+  dout() << "Size of device package after initializeAll  = " << size << std::endl;
 #endif
 
   return bsuccess;
@@ -899,8 +796,8 @@ bool DeviceMgr::initializeAll()
 
 //-----------------------------------------------------------------------------
 // Function      : DeviceMgr::resetForStepAnalysis
-// Purpose       : 
-// Special Notes : Some "resetForStep" functions (only HB so far) will 
+// Purpose       :
+// Special Notes : Some "resetForStep" functions (only HB so far) will
 //                 call dev->initializeAll.  So, this must be called first.
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
@@ -911,13 +808,13 @@ void DeviceMgr::resetForStepAnalysis()
   delete numJacStaVectorPtr_;
   delete numJacSolVectorPtr_;
   delete numJacStoVectorPtr_;
-  delete extData_.numJacRHSVectorPtr;
-  delete extData_.numJacFVectorPtr;
-  delete extData_.numJacQVectorPtr;
-  delete extData_.perturbVectorPtr;
-  delete extData_.numJacLoadFlagPtr;
-  delete extData_.tmpdIdXPtr;
-  delete extData_.tmpdQdXPtr;
+  delete externData_.numJacRHSVectorPtr;
+  delete externData_.numJacFVectorPtr;
+  delete externData_.numJacQVectorPtr;
+  delete externData_.perturbVectorPtr;
+  delete externData_.numJacLoadFlagPtr;
+  delete externData_.tmpdIdXPtr;
+  delete externData_.tmpdQdXPtr;
   delete diagonalVectorPtr_;
 
   solState_.ltraTimeIndex = 0;
@@ -934,66 +831,40 @@ void DeviceMgr::resetForStepAnalysis()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
-bool DeviceMgr::createDeviceByModelType(const int model_type)
+Device &DeviceMgr::getDeviceByModelType(const ModelTypeId model_type_id)
 {
-  bool itmp = true;
+  Device *device = 0;
 
-  if (model_type != 0)  // do not re-allocate the dummy.
+  if (model_type_id.defined())
   {
-    if (deviceArray_[model_type] == NULL || deviceArray_[model_type] == dummy_ptr || deviceAllocFlag_[model_type] == 0)
+    EntityTypeIdDeviceMap::const_iterator it = deviceMap_.find(model_type_id);
+    if (it == deviceMap_.end())
     {
-      deviceArray_[model_type] = devBuilder_.createDeviceByModelType(model_type);
-      deviceAllocFlag_[model_type] = 1;
+      FactoryBlock factory_block(devOptions_, solState_, mlData, externData_, commandLine_);
 
-      devicePtrVec_.push_back(deviceArray_[model_type]);
+      device = Configuration::createDevice(model_type_id, factory_block);
 
-      if (PDEDeviceFlag_[model_type] == 1)
+      deviceMap_[model_type_id] = device;
+      devicePtrVec_.push_back(device);
+
+      if (device->isPDEDevice())
       {
-        pdeDevicePtrVec_.push_back(deviceArray_[model_type]);
+        pdeDevicePtrVec_.push_back(device);
       }
       else
       {
-        nonPdeDevicePtrVec_.push_back(deviceArray_[model_type]);
+        nonPdeDevicePtrVec_.push_back(device);
       }
-
-      itmp = true;
     }
+    else
+      device = (*it).second;
   }
 
-  return itmp;
+  return *device;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : DeviceMgr::flushDevices
-// Purpose       : This function deletes all the allocated devices, and resets
-//                 the array of device pointers to all point to the dummy
-//                 (placeholder) device class pointer.
-// Special Notes :
-// Scope         : protected
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 3/16/00
-//-----------------------------------------------------------------------------
-bool DeviceMgr::flushDevices ()
-{
-  int i;
-  bool itmp = false;
-
-  for (i = 0; i < ModelType::NUMDEV; ++i)
-  {
-    if (deviceAllocFlag_[i] == 1)
-    {
-      delete deviceArray_[i];
-      deviceArray_    [i] = dummy_ptr;
-      deviceAllocFlag_[i] = 0;
-    }
-  }
-
-  itmp = true;
-  return itmp;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceMgr::getDeviceIndex
+// Function      : DeviceMgr::getModelGroup
 // Purpose       : This function returns the device type index for a given
 //                 named string.  This assumes that the device names used
 //                 in the simulation will obey the spice3f5 netlist language
@@ -1001,231 +872,44 @@ bool DeviceMgr::flushDevices ()
 //
 // Special Notes :
 // Scope         : public
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
+// Creator       :
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
-int DeviceMgr::getDeviceIndex (const string & Name)
+/**
+ * Return the ModelGroup of the device associated with the model type name or device type name.
+ *
+ * The model type to model group map is searched first.  If the model is not discovered, then the
+ *
+ * @param model_type_name model type name or device type name
+ *
+ * @return
+ *
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+ * @date   Mon Sep 23 07:53:04 2013
+ */
+EntityTypeId DeviceMgr::getModelGroup(const std::string &model_type_name)
 {
-  int type = 0;
-
-  DeviceIndexMap::const_iterator iterDI;
-  iterDI = deviceIndexMap_.find(Name);
-  if (iterDI != deviceIndexMap_.end())
-  {
-    return iterDI->second;
-  }
-
-  // first get the first letter of the name string.
-  string letter(Name.begin(),Name.begin()+1);
+  EntityTypeId model_group = Configuration::getModelGroup(model_type_name);
+  if (model_group.defined())
+    return model_group;
 
   // Use the letter as an index into the deviceIndex map.
-  if ( letter != "Y" )
+  std::string device_letter(model_type_name, 0, 1);
+  if (device_letter != "Y")
   {
-    type = deviceIndexMap_[letter];
+    model_group = Configuration::getModelGroup(device_letter);
   }
-  else
-  {
+  else {
     // "Y" device requires special handling. The device type was embedded in
     // the device name to fit the way things worked for ordinary devices.
     // The format of the device name for a "Y" device is
-    // "Y%<DeviceType>%<NetlistDeviceName>". Extract the device type and
-    // use as the index into the deviceIndexMap map.
-    string deviceType(Name.substr(Name.find_first_of("%")+1, Name.find_last_of("%")-2));
-    type = deviceIndexMap_[deviceType];
-  }
+    // "Y%<DeviceType>%<NetlistDevicename>". Extract the device type and
+    // use as the index into the modelTypeNameModelGroupMap map.
+    std::string device_name = model_type_name.substr(model_type_name.find_first_of("%") + 1, model_type_name.find_last_of("%") - 2);
+    model_group = Configuration::getModelGroup(device_name);
+  }  
 
-  return type;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceMgr::getModelTypeIndex
-// Purpose       : This function returns the device type index for a given
-//                 named string.  The named string corrsponds to a model
-//                 "type" name.
-//
-// Special Notes :
-// Scope         : public
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 5/06/00
-//-----------------------------------------------------------------------------
-int DeviceMgr::getModelTypeIndex(const string & ModelType)
-{
-  int type = 0;
-
-  // Obtain the device index using the deviceModelTypeMap.
-  type = deviceModelTypeMap_[ModelType];
-
-  return type;
-}
-
-// //-----------------------------------------------------------------------------
-// // Function      : DeviceMgr::getDeviceTypeOffset
-// // Purpose       :
-// // Special Notes :
-// // Scope         : public
-// // Creator       : Eric Keiter, SNL
-// // Creation Date : 10/26/11
-// //-----------------------------------------------------------------------------
-// int DeviceMgr::getDeviceTypeOffset(const string & name, const int level, const string & modelType)
-// {
-//   ModelBlock MB;
-//   MB.name = name;
-//   MB.type = modelType;
-//   MB.level = level;
-//   return getDeviceTypeOffset(MB);
-// }
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceMgr::getDeviceTypeOffset
-// Purpose       : Some devices (mainly MOSFETs) will have a different
-//                 device array index, depending on what level is specified
-//                 by their model statement.
-//
-//                 This version of the function determines the offset based
-//                 on the model type and level.
-//
-// Special Notes :
-// Scope         : public
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 5/16/00
-//-----------------------------------------------------------------------------
-int DeviceMgr::getDeviceTypeOffset (const ModelBlock & MB)
-{
-  int offset = 0;
-
-  ostringstream ost;
-
-  // is this a mosfet?  if so the offset is not zero.
-  ExtendedString tmpType(MB.type);
-  tmpType.toUpper ();
-
-  map<int,int>::iterator iterLevel;
-
-  // offset for MOSFET levels:
-  if (tmpType == "PMOS" || tmpType == "NMOS" || tmpType == "M")
-  {
-    iterLevel = MOSFETLevelMap_.find(MB.level);
-    if ( iterLevel == MOSFETLevelMap_.end() )
-    {
-      ost <<"This Xyce build doesn't include";
-      ost << " the MOSFET level=" << MB.level << " used by " << MB.name ;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, ost.str() );
-    }
-    offset = iterLevel->second;
-  }
-  else if (tmpType == "PJF" || tmpType == "NJF" || tmpType == "J")
-  {
-    iterLevel = JFETLevelMap_.find(MB.level);
-    if ( iterLevel == JFETLevelMap_.end() )
-    {
-      ost <<"This Xyce build doesn't include";
-      ost << " the JFET level=" << MB.level << " used by " << MB.name ;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, ost.str() );
-    }
-    offset = iterLevel->second;
-  }
-  else if (tmpType == "D")
-  {
-    iterLevel = DiodeLevelMap_.find(MB.level);
-    if ( iterLevel == DiodeLevelMap_.end() )
-    {
-      ost <<"This Xyce build doesn't include";
-      ost << " the DIODE level=" << MB.level << " used by " << MB.name ;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, ost.str() );
-    }
-    offset = iterLevel->second;
-  }
-  else if (tmpType == "PNP" || tmpType == "NPN" || tmpType == "Q" || tmpType == "VBIC")
-  {
-    iterLevel = BJTLevelMap_.find(MB.level);
-    if ( iterLevel == BJTLevelMap_.end() )
-    {
-      ost <<"This Xyce build doesn't include";
-      ost << " the BJT level=" << MB.level << " used by " << MB.name ;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, ost.str() );
-    }
-    offset = iterLevel->second;
-  }
-  // offset for PDE device levels.
-  else if (tmpType == "ZOD" || tmpType == "Y%PDE%" || tmpType == "PDE")
-  {
-    iterLevel = PDELevelMap_.find(MB.level);
-    if ( iterLevel == PDELevelMap_.end() )
-    {
-      ost <<"This Xyce build doesn't include";
-      ost << " the PDE level=" << MB.level << " used by " << MB.name ;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, ost.str() );
-    }
-    offset = iterLevel->second;
-  }
-  else if (tmpType == "R")
-  {
-    iterLevel = ResistorLevelMap_.find(MB.level);
-    if ( iterLevel == ResistorLevelMap_.end() )
-    {
-      ost <<"This Xyce build doesn't include";
-      ost << " the Resistor level=" << MB.level << " used by " << MB.name ;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, ost.str() );
-    }
-    offset = iterLevel->second;
-  }
-  else if (tmpType == "CORE")
-  {
-    iterLevel = INDLevelMap_.find(MB.level);
-    if ( iterLevel == INDLevelMap_.end() )
-    {
-      ost <<"This Xyce build doesn't include";
-      ost << " the Mutual Inductor level=" << MB.level << " used by " << MB.name ;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, ost.str() );
-    }
-    offset = iterLevel->second;
-  }
-  else if (tmpType == "NEURON")
-  {
-    iterLevel = NeuronLevelMap_.find(MB.level);
-    if ( iterLevel == NeuronLevelMap_.end() )
-    {
-      ost <<"This Xyce build doesn't include";
-      ost << " the Neuron level=" << MB.level << " used by " << MB.name ;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, ost.str() );
-    }
-    offset = iterLevel->second;
-  }
-  else if (tmpType == "SYNAPSE")
-  {
-    iterLevel = SynapseLevelMap_.find(MB.level);
-    if ( iterLevel == SynapseLevelMap_.end() )
-    {
-      ost <<"This Xyce build doesn't include";
-      ost << " the Synapse level=" << MB.level << " used by " << MB.name ;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, ost.str() );
-    }
-    offset = iterLevel->second;
-  }
-  else if (tmpType == "NEURONPOP")
-  {
-    iterLevel = NeuronPopLevelMap_.find(MB.level);
-    if ( iterLevel == NeuronPopLevelMap_.end() )
-    {
-      ost <<"This Xyce build doesn't include";
-      ost << " the NeuronPop level=" << MB.level << " used by " << MB.name ;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, ost.str() );
-    }
-    offset = iterLevel->second;
-  }
-  else if (tmpType=="RAD" || tmpType == "NEUTRON")
-  {
-    iterLevel = radLevelMap_.find(MB.level);
-    if ( iterLevel == radLevelMap_.end() )
-    {
-      ost <<"This Xyce build doesn't include";
-      ost << " the rad level=" << MB.level << " used by " << MB.name ;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, ost.str() );
-    }
-    offset = iterLevel->second;
-  }
-
-  return offset;
+  return model_group;
 }
 
 //-----------------------------------------------------------------------------
@@ -1236,41 +920,46 @@ int DeviceMgr::getDeviceTypeOffset (const ModelBlock & MB)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
-bool DeviceMgr::addDeviceModel (const ModelBlock & MB)
+bool DeviceMgr::addDeviceModel(const ModelBlock & model_block)
 {
-  int baseType = getModelTypeIndex(MB.type);
-  int offset = 0;
+  ModelTypeId model_type;
+  ModelTypeId model_group = Configuration::getModelGroup(model_block.type);
 
-  if (MB.name != "") offset = getDeviceTypeOffset(MB);
+  if (!model_block.name.empty()) {
+    model_type = Configuration::getModelType(model_block.type, model_block.level);
 
-  int type = baseType + offset;
-
-  // Just in case, call the device creator function - if it has already
-  // been allocated it won't create a redundant one.
-  createDeviceByModelType(type);
-
-  DeviceModel * dmPtr = deviceArray_[type]->addModel(MB);
-
-  deviceUseFlag_[type] = 1;
-
-  deviceModelNameMap_[MB.name] = type;
-  deviceModelNameBaseTypeMap_[MB.name] = baseType;
-
-  // add the various model vectors:
-  if (dmPtr != 0)
-  {
-    modelPtrVec_.push_back(dmPtr);
-
-    if ( baseType == ModelType::MOSFET1) mosfetModelPtrVec_.push_back(dmPtr);
-    if ( baseType == ModelType::BJT    ) bjtModelPtrVec_.push_back(dmPtr);
-
-    if ( type == ModelType::DIODE ) diodeModelPtrVec_.push_back(dmPtr);
-    if ( type == ModelType::MOSFET_B3 ) bsim3ModelPtrVec_.push_back(dmPtr);
-    if ( type == ModelType::MOSFET_B4 ) bsim4ModelPtrVec_.push_back(dmPtr);
-    if ( type == ModelType::MOSFET_B3SOI ) bsimsoiModelPtrVec_.push_back(dmPtr);
+    if (!model_type.defined()) 
+      Report::UserError() << "There is no device " << model_block.type << " of level " << model_block.level << " to define model " << model_block.name;
   }
 
-  return true;
+  if (!model_type.defined())
+    model_type = model_group;
+
+  if (!model_type.defined())
+    return false;
+
+  FactoryBlock factory_block(devOptions_, solState_, mlData, externData_, commandLine_);
+  Device &device = getDeviceByModelType(model_type);
+  DeviceModel *device_model = device.addModel(model_block, factory_block);
+
+  modelTypeMap_[model_block.name] = model_type;
+  modelGroupMap_[model_block.name] = model_group;
+
+  // add the various model vectors:
+  if (device_model != 0)
+  {
+    modelPtrVec_.push_back(device_model);
+
+    if (model_group == MOSFET1::Traits::modelGroup()) mosfetModelPtrVec_.push_back(device_model);
+    if (model_group == BJT::Traits::modelGroup()) bjtModelPtrVec_.push_back(device_model);
+
+    if (model_type == Diode::Traits::modelType()) diodeModelPtrVec_.push_back(device_model);
+    if (model_type == MOSFET_B3::Traits::modelType()) bsim3ModelPtrVec_.push_back(device_model);
+    if (model_type == MOSFET_B4::Traits::modelType()) bsim4ModelPtrVec_.push_back(device_model);
+    if (model_type == MOSFET_B3SOI::Traits::modelType()) bsimsoiModelPtrVec_.push_back(device_model);
+  }
+
+  return device_model != 0;
 }
 
 //-----------------------------------------------------------------------------
@@ -1294,83 +983,67 @@ bool DeviceMgr::addDeviceModel (const ModelBlock & MB)
 // Creator       : Richard Schiek, Electrical and Microsystems Modeling
 // Creation Date : 2/18/2010
 //-----------------------------------------------------------------------------
-bool DeviceMgr::verifyDeviceInstance(InstanceBlock & IB)
+bool DeviceMgr::verifyDeviceInstance(InstanceBlock & instance_block)
 {
-  int  type=0;
+  EntityTypeId model_type;
 
-  if (IB.getModelName() == "")
+  if (instance_block.getModelName().empty())
   {
-    if( IB.getName().find_last_of(":") != string::npos )
-    {
-      type = getDeviceIndex(
-        IB.getName().substr(IB.getName().find_last_of(":")+1,
-              string::npos) );
-    }
-    else
-    {
-      type = getDeviceIndex( IB.getName() );
-    }
+    model_type = getModelGroup(modelNameFromInstanceName(instance_block));
   }
   else
   {
-    type = deviceModelNameMap_[IB.getModelName()];
+    model_type = modelTypeMap_[instance_block.getModelName()];
   }
 
-  if (type == 0)
+  if (!model_type.defined())
   {
-     string msg("Device Manager::verifyDeviceInstance() could not correctly figure out what");
-     msg += " type of device " + IB.getName() + " is.\n";
-     if (IB.getModelName() != "")
-     {
-       msg += "Its model name is " + IB.getModelName() +", which was not found.\n";
-     }
-     else
-     {
-       msg += "Could not find this device name in the device index.\n";
-     }
-     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
+    Report::UserFatal message;
+
+    message << "Unable to determine model type of device for instance name " << instance_block.getName();
+    if (instance_block.getModelName() != "")
+    {
+      message<< " with model name" + instance_block.getModelName();
+    }
   }
-  else if (IB.bsourceFlag)
+  else if (instance_block.bsourceFlag)
   {
     // This is an E, F, G, or H source that is to be treated as a B source,
     // set its type now to BSRC.
-    type = ModelType::BSRC;
+    model_type = Bsrc::Traits::modelType();
   }
 
   // Check if this is a simple resistor, but with a resistance of zero. if so,
   // then return false so we don't make this device.
-  if( (devOptions_.checkForZeroResistance) && (type == ModelType::RESISTOR ) )
+  if ((devOptions_.checkForZeroResistance) && (model_type == Resistor::Traits::modelType()))
   {
     const double zeroResistanceValue = devOptions_.zeroResistanceTol;
     // loop over the parameters
-    vector<Param>::iterator currentParam = IB.params.begin();
-    vector<Param>::iterator endParam = IB.params.end();
-    while( currentParam != endParam )
+    std::vector<Param>::iterator currentParam = instance_block.params.begin();
+    std::vector<Param>::iterator endParam = instance_block.params.end();
+    while(currentParam != endParam)
     {
-#ifdef Xyce_DEBUG_DEVICE
-      //std::cout << "In addInstance:  Resistor parameter = " << currentParam->uTag()  << std::endl;
-#endif
-      if( (currentParam->uTag() == "R") )
+      if ((currentParam->uTag() == "R"))
       {
         if (currentParam->given())
         {
-          vector<string> variables, specials;
+          std::vector<std::string> variables, specials;
 
           // check if this is a time-dependent, or variable-dependent expression.
           // If it is, then skip.
           Param * devPar = &(*(currentParam));
-          N_UTL_Param * tmpPar = (dynamic_cast<N_UTL_Param*> (devPar));
+          Util::Param * tmpPar = (dynamic_cast<Util::Param*> (devPar));
           // only check if this is an expression-type parameter.
-          if (tmpPar->getType() == EXPR)
+          if (tmpPar->getType() == Util::EXPR)
           {
-            N_UTL_Expression tmpExp = tmpPar->eVal();
+            Util::Expression tmpExp = tmpPar->getValue<Util::Expression>();
             tmpExp.get_names(XEXP_VARIABLE, variables);
             tmpExp.get_names(XEXP_SPECIAL, specials);
           }
 
           if (specials.empty() && variables.empty())
           {
-            if (fabs(currentParam->dVal()) < devOptions_.zeroResistanceTol)
+            if (fabs(currentParam->getImmutableValue<double>()) < devOptions_.zeroResistanceTol)
             {
               // change device type to be the level 3 resistor
               return false;
@@ -1399,95 +1072,74 @@ bool DeviceMgr::verifyDeviceInstance(InstanceBlock & IB)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/16/00
 //-----------------------------------------------------------------------------
-DeviceInstance * DeviceMgr::addDeviceInstance(InstanceBlock & IB)
+DeviceInstance * DeviceMgr::addDeviceInstance(InstanceBlock & instance_block)
 {
-  DeviceInstance * DI_ptr;
-
-  int  type;
-  int  baseType;
-
   // If the ModelName string is not a null string, use it to get the
-  // device type index.
-  // Otherwise, use the name of the device itself to determine the device.
-
-  //if (IB.getModelName() == "") type = getDeviceIndex(IB.name);
-  //else                    type = deviceModelNameMap_[IB.getModelName()];
-
-  if (IB.getModelName() == "")
+  // device type index.  Otherwise, use the name of the device itself to determine the device.
+  ModelTypeId model_type;
+  ModelTypeId model_group;
+  if (instance_block.getModelName().empty())
   {
-    if( IB.getName().find_last_of(":") != string::npos )
-    {
-      type = getDeviceIndex(IB.getName().substr(IB.getName().find_last_of(":")+1, string::npos) );
-    }
-    else
-    {
-      type = getDeviceIndex( IB.getName() );
-    }
-    baseType = type;
+    model_type = getModelGroup(modelNameFromInstanceName(instance_block));
+    model_group = model_type;
   }
   else
   {
-    type = deviceModelNameMap_[IB.getModelName()];
-    baseType = deviceModelNameBaseTypeMap_[IB.getModelName()];
+    model_type = modelTypeMap_[instance_block.getModelName()];
+    model_group = modelGroupMap_[instance_block.getModelName()];
   }
 
-  if (type == 0)
+  if (!model_type.defined())
   {
-     string msg("Device Manager could not correctly figure out what");
-     msg += " type of device " + IB.getName() + " is.\n";
-     if (IB.getModelName() != "")
-     {
-       msg += "Its model name is " + IB.getModelName() +", which was not found.\n";
-     }
-     else
-     {
-       msg += "Could not find this device name in the device index.\n";
-     }
-     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
+    Report::UserError message;
+    message << "Unable to determine type of device for instance name " << instance_block.getName();
+    if (instance_block.getModelName() != "")
+    {
+      message << " with model name" + instance_block.getModelName();
+    }
   }
-  else if (IB.bsourceFlag)
+  else if (instance_block.bsourceFlag)
   {
     // This is an E, F, G, or H source that is to be treated as a B source,
     // set its type now to BSRC.
-    type = ModelType::BSRC;
+    model_type = Bsrc::Traits::modelType();
   }
-
 
   // Check if this is a simple resistor, but with a resistance of zero.  If so,
   // then change the type to RESISTOR3.  This variant of the resistor acts like
   // a voltage souce with zero voltage difference.
-  if( (devOptions_.checkForZeroResistance) && (type == ModelType::RESISTOR ) )
+  if ((devOptions_.checkForZeroResistance) && (model_type == Resistor::Traits::modelType()))
   {
     const double zeroResistanceValue = devOptions_.zeroResistanceTol;
     // loop over the parameters
-    vector<Param>::iterator currentParam = IB.params.begin();
-    vector<Param>::iterator endParam = IB.params.end();
-    while( currentParam != endParam )
+    std::vector<Param>::iterator currentParam = instance_block.params.begin();
+    std::vector<Param>::iterator endParam = instance_block.params.end();
+    while(currentParam != endParam)
     {
-      if( (currentParam->uTag() == "R") )
+      if ((currentParam->uTag() == "R"))
       {
         if (currentParam->given())
         {
-          vector<string> variables, specials;
+          std::vector<std::string> variables, specials;
 
           // check if this is a time-dependent, or variable-dependent expression.
           // If it is, then skip.
           Param * devPar = &(*(currentParam));
-          N_UTL_Param * tmpPar = (dynamic_cast<N_UTL_Param*> (devPar));
+          Util::Param * tmpPar = (dynamic_cast<Util::Param*> (devPar));
           // only check if this is an expression-type parameter.
-          if (tmpPar->getType() == EXPR)
+          if (tmpPar->getType() == Util::EXPR)
           {
-            N_UTL_Expression tmpExp = tmpPar->eVal();
+            Util::Expression tmpExp = tmpPar->getValue<Util::Expression>();
             tmpExp.get_names(XEXP_VARIABLE, variables);
             tmpExp.get_names(XEXP_SPECIAL, specials);
           }
 
           if (specials.empty() && variables.empty())
           {
-            if (fabs(currentParam->dVal()) < devOptions_.zeroResistanceTol)
+            if (fabs(currentParam->getImmutableValue<double>()) < devOptions_.zeroResistanceTol)
             {
               // change device type to be the level 3 resistor
-              type = ModelType::RESISTOR3;
+              model_type = Resistor3::Traits::modelType();
             }
           }
         }
@@ -1500,111 +1152,92 @@ DeviceInstance * DeviceMgr::addDeviceInstance(InstanceBlock & IB)
   // Just in case, call the device creator function - if it has already
   // been allocated it won't create a redundant one.
 
-  createDeviceByModelType(type);
-
-  string deviceTypeName;
   // Add an instance of this type.
-  DI_ptr = deviceArray_[type]->addInstance(IB, mlData, solState_, extData_,devOptions_, deviceTypeName);
+  Device &device = getDeviceByModelType(model_type);
+  DeviceInstance *instance = device.addInstance(instance_block, FactoryBlock(devOptions_, solState_, mlData, externData_, commandLine_));
 
-  // check if lead current were requested for this device
-  //if( (devicesNeedingLeadCurrentLoads_.find( DI_ptr->getName() ) != devicesNeedingLeadCurrentLoads_.end() ) ||
+  std::string outputName;
+  setupIOName(instance->getName(), outputName);
 
-  //string outputName = DI_ptr->getName();
-  string outputName;
-  setupIOName( DI_ptr->getName(), outputName);
-  if( (devicesNeedingLeadCurrentLoads_.find( outputName ) != devicesNeedingLeadCurrentLoads_.end() ) ||
-      (devOptions_.calculateAllLeadCurrents) )
+  if ((devicesNeedingLeadCurrentLoads_.find(outputName) != devicesNeedingLeadCurrentLoads_.end()) ||
+      (devOptions_.calculateAllLeadCurrents))
   {
-    DI_ptr->enableLeadCurrentCalc();
-#ifdef Xyce_DEBUG_DEVICE
-    if (devOptions_.debugLevel > 0)
+    instance->enableLeadCurrentCalc();
+
+    if (DEBUG_DEVICE && devOptions_.debugLevel > 0)
     {
-      std::cout << "N_DEV_DeviceMgr::addDeviceInstance Enabling lead current load for device \""
-        << DI_ptr->getName()
+      dout() << "DeviceMgr::addDeviceInstance Enabling lead current load for device \""
+        << instance->getName()
         << "\" ->  \""
         << outputName
         << "\"" << std::endl;
     }
-#endif
   }
-#ifdef Xyce_DEBUG_DEVICE
-  else
+  else if (DEBUG_DEVICE && devOptions_.debugLevel > 0)
   {
-    if (devOptions_.debugLevel > 0)
-    {
-      std::cout << "N_DEV_DeviceMgr::addDeviceInstance Cannot enable lead current load for device \""
-        << DI_ptr->getName()
-        << "\" ->  \""
-        << outputName
-        << "\""
-        << std::endl;
-    }
+    dout() << "DeviceMgr::addDeviceInstance Cannot enable lead current load for device \""
+           << instance->getName()
+           << "\" ->  \""
+           << outputName
+           << "\""
+           << std::endl;
   }
-#endif
 
-  localDeviceCountMap_[deviceTypeName]++;
-  deviceUseFlag_[type] = 1;
+  localDeviceCountMap_[device.getDefaultModelName()]++;
 
-  linearSystemFlag_ = linearSystemFlag_ && deviceArray_[type]->isLinearDevice();
+  linearSystemFlag_ = linearSystemFlag_ && device.isLinearDevice();
 
-  solState_.PDESystemFlag = solState_.PDESystemFlag || PDEDeviceFlag_[type]==1;
+  solState_.PDESystemFlag = solState_.PDESystemFlag || device.isPDEDevice();
 
-#if 0
-  std::cout << "In addDeviceInstance. PDESystemFlag = ";
-  if ( solState_.PDESystemFlag ) std::cout << "TRUE" <<std::endl;
-  else std::cout << "FALSE" <<std::endl;
-#endif
-
-  // Set up the instance vectors.  These are the main containers used in
-  // the load procedures.  (rather than deviceArray_).
-  instancePtrVec_.push_back(DI_ptr);
+  // Set up the instance vectors.  These are the main containers used in the load procedures.
+  instancePtrVec_.push_back(instance);
 
   // set up the list of pde device instances
   // and the list of non-pde devices instances.
-  if (PDEDeviceFlag_[type]==1)
+  if (device.isPDEDevice())
   {
-    pdeInstancePtrVec_.push_back(DI_ptr);
+    pdeInstancePtrVec_.push_back(instance);
   }
   else
   {
-    nonPdeInstancePtrVec_.push_back(DI_ptr);
+    nonPdeInstancePtrVec_.push_back(instance);
   }
 
   // set up the list of mosfet instances.
-  if (baseType == ModelType::MOSFET1)
+  if (model_group == MOSFET1::Traits::modelGroup())
   {
-    mosfetInstancePtrVec_.push_back(DI_ptr);
+    mosfetInstancePtrVec_.push_back(instance);
   }
 
-  if (baseType == ModelType::BJT )
+  if (model_group == BJT::Traits::modelGroup())
   {
-    bjtInstancePtrVec_.push_back (DI_ptr);
+    bjtInstancePtrVec_.push_back (instance);
   }
 
 
 #ifdef Xyce_EXTDEV
-  if (type == ModelType::EXTERN_DEVICE)
+  if (model_type == ExternDevice::Traits::modelType())
   {
-    extDevInstancePtrVec_.push_back(dynamic_cast<ExternDevice::Instance*>(DI_ptr));
-    extDevIBPtrVec_.push_back( new InstanceBlock( IB ) );
+    extDevInstancePtrVec_.push_back(dynamic_cast<ExternDevice::Instance*>(instance));
+    extDevIBPtrVec_.push_back(new InstanceBlock(instance_block));
   }
 #endif
 
   // set up the independent source map.
-  if (type == ModelType::VSRC || type == ModelType::ISRC )
+  if (model_type == Vsrc::Traits::modelType() || model_type == ISRC::Traits::modelType())
   {
-    ExtendedString tmpName(IB.getName());
+    ExtendedString tmpName(instance_block.getName());
     tmpName.toUpper ();
-    indepSourcePtrMap_[tmpName] = dynamic_cast<SourceInstance*>(DI_ptr);
-    indepSourceInstancePtrVec_.push_back( dynamic_cast<SourceInstance*>(DI_ptr) );
+    indepSourcePtrMap_[tmpName] = dynamic_cast<SourceInstance*>(instance);
+    indepSourceInstancePtrVec_.push_back(dynamic_cast<SourceInstance*>(instance));
   }
 
-  if (type == ModelType::VSRC)
+  if (model_type == Vsrc::Traits::modelType())
   {
-    vsrcInstancePtrVec_.push_back(DI_ptr);
-    ExtendedString tmpName(IB.getName());
+    vsrcInstancePtrVec_.push_back(instance);
+    ExtendedString tmpName(instance_block.getName());
     tmpName.toUpper ();
-    vsrcInstancePtrMap_[tmpName] = dynamic_cast<Vsrc::Instance*>(DI_ptr);
+    vsrcInstancePtrMap_[tmpName] = dynamic_cast<Vsrc::Instance*>(instance);
   }
 
 #if 0
@@ -1613,28 +1246,28 @@ DeviceInstance * DeviceMgr::addDeviceInstance(InstanceBlock & IB)
   // are not derrived from them.  The photocurrent capability in the PDE
   // devices is just an experiment, not a supported one, so I'll figure
   // out a fix for it later.
-  if( type == TWO_D_PDE )
+  if (model_type == TWO_D_PDE)
   {
     // a photocurrent addition to the two d pde can act like a souce
     // so add it to our list of independent sources
-    indepSourceInstancePtrVec_.push_back( dynamic_cast<Source::Instance*>(DI_ptr) );
+    indepSourceInstancePtrVec_.push_back(dynamic_cast<SourceInstance*>(instance));
   }
 #endif
 
-  if ( DI_ptr->plotfileFlag () )
+  if (instance->plotfileFlag ())
   {
-    plotFileInstancePtrVec_.push_back(DI_ptr);
+    plotFileInstancePtrVec_.push_back(instance);
   }
 
   ExtendedString tmpDevName =  devOptions_.testJacDeviceName;
   tmpDevName.toUpper();
   // Set up the vector of devices subject to the jacobian test.
-  if( DI_ptr->getName() == tmpDevName )
+  if (instance->getName() == tmpDevName)
   {
-    testJacDevicePtrVec_.push_back(DI_ptr);
+    testJacDevicePtrVec_.push_back(instance);
   }
 
-  return DI_ptr;
+  return instance;
 }
 
 //-----------------------------------------------------------------------------
@@ -1645,17 +1278,23 @@ DeviceInstance * DeviceMgr::addDeviceInstance(InstanceBlock & IB)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 3/08/01
 //-----------------------------------------------------------------------------
-bool DeviceMgr::deleteDeviceInstance (const string & name)
+bool DeviceMgr::deleteDeviceInstance(const std::string & name)
 {
-  bool bsuccess = true;
-  bool tmpBool = true;
-  int type    = getDeviceIndex (name);
+  Report::DevelFatal().in("DeviceMgr::deleteDeviceInstance") << "Not ready with the new boilerplate-free device package";
 
-  if (deviceUseFlag_[type] == 1)
-  {
-    tmpBool = deviceArray_[type]->deleteInstance(name);
-    bsuccess = bsuccess && tmpBool;
-  }
+  bool bsuccess = true;
+
+  // bool tmpBool = true;
+  // EntityTypeId type = getModelGroup(name);
+
+  // DeviceMap::iterator it = deviceMap_.find(type);
+  // if (it != deviceMap_.end()) {
+  //   // bsuccess &= (*it).second->deleteInstance(name);
+  //   DeviceEntity *entity = (*it).second->findEntity(name);
+  //   DeviceInstance *instance = dynamic_cast<DeviceInstance *>(entity);
+  //   if (instance)
+  //     bsuccess = (*it).second->deleteInstance(instance);
+  // }
 
   // note as this is written it ignores lots of other containers
   // this may be used for clean up at the end of a run, but
@@ -1663,23 +1302,19 @@ bool DeviceMgr::deleteDeviceInstance (const string & name)
   //
   // need to remove pointer to the instance "name" from other arrays
   // candidate lists are:
-  //     vector <DeviceInstance*> instancePtrVec_;
-  //     vector <DeviceInstance*> bpInstancePtrVec_; // instances with breakpoints functions
-  //     vector <DeviceInstance*> pdeInstancePtrVec_;
-  //     vector <DeviceInstance*> nonPdeInstancePtrVec_;
-  //     vector <DeviceInstance*> mosfetInstancePtrVec_;
-  //     vector <DeviceInstance*> vsrcInstancePtrVec_;
-  //     vector <DeviceInstance*> bjtInstancePtrVec_;
-  //     map <string, VsrcInstance*> vsrcInstancePtrMap_;
+  //     InstanceVector instancePtrVec_;
+  //     InstanceVector bpInstancePtrVec_; // instances with breakpoints functions
+  //     InstanceVector pdeInstancePtrVec_;
+  //     InstanceVector nonPdeInstancePtrVec_;
+  //     InstanceVector mosfetInstancePtrVec_;
+  //     InstanceVector vsrcInstancePtrVec_;
+  //     InstanceVector bjtInstancePtrVec_;
+  //     std::map<std::string, VsrcInstance*> vsrcInstancePtrMap_;
   //
-  //     vector <DeviceInstance*> plotFileInstancePtrVec_;
+  //     InstanceVector plotFileInstancePtrVec_;
   //
-  //     map <string,SourceInstance*> indepSourcePtrMap_;
-  //     vector <SourceInstance*> indepSourceInstancePtrVec_;
-
-  string msg("DeviceMgr::deleteDeviceInstance:");
-  msg += "  Not ready with the new boilerplate-free device package";
-  N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg);
+  //     std::map<std::string,SourceInstance*> indepSourcePtrMap_;
+  //     std::vector<SourceInstance*> indepSourceInstancePtrVec_;
 
   return bsuccess;
 }
@@ -1693,21 +1328,15 @@ bool DeviceMgr::deleteDeviceInstance (const string & name)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 4/03/00
 //-----------------------------------------------------------------------------
-void DeviceMgr::printOutLists()
-{
-#ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
-  {
-    int i;
-    for (i = 1; i < ModelType::NUMDEV; ++i)
-    {
-      if (deviceUseFlag_[i] == 1) deviceArray_[i]->printOutModels(std::cout);
-    }
-  }
-#endif
-}
+// void DeviceMgr::printOutLists()
+// {
+//   if (DEBUG_DEVICE && devOptions_.debugLevel > 0)
+//   {
+//     for (DeviceMap::const_iterator it = deviceMap_.begin(); it != deviceMap_.end(); ++it)
+//       printOutModels(dout(), *(*it).second);
+//   }
+// }
 
-#ifdef Xyce_DEBUG_DEVICE
 //-----------------------------------------------------------------------------
 // Function      : DeviceMgr::debugOutput1
 // Purpose       :
@@ -1730,25 +1359,25 @@ void DeviceMgr::debugOutput1()
     sprintf(fn_fv, "fvector.%03d.txt", outIter);
 
     // Note: this needs to change sign to match Spice.
-    (extData_.fVectorPtr)->scale(-1.0);
-    (extData_.fVectorPtr)->writeToFile(fn_fv);
-    (extData_.fVectorPtr)->scale(-1.0);
+    (externData_.fVectorPtr)->scale(-1.0);
+    (externData_.fVectorPtr)->writeToFile(fn_fv);
+    (externData_.fVectorPtr)->scale(-1.0);
 
     // jdxp-vector
     char fn_jdxp[256]; for (int ich = 0; ich < 256; ++ich) fn_jdxp[ich] = 0;
     sprintf(fn_jdxp, "Jdxp.%03d.txt", outIter);
-    (extData_.JdxpVectorPtr)->writeToFile(fn_jdxp);
+    (externData_.JdxpVectorPtr)->writeToFile(fn_jdxp);
 
 #ifdef Xyce_DEBUG_VOLTLIM
     // the voltlim dx vector.
     char fn_dxvl[256]; for (int ich = 0; ich < 256; ++ich) fn_dxvl[ich] = 0;
     sprintf(fn_dxvl, "dxVL.%03d.txt", outIter);
-    (extData_.dxVoltlimVectorPtr)->writeToFile(fn_dxvl);
+    (externData_.dxVoltlimVectorPtr)->writeToFile(fn_dxvl);
 
     // jdx2-vector
     char fn_jdx2[256]; for (int ich = 0; ich < 256; ++ich) fn_jdx2[ich] = 0;
     sprintf(fn_jdx2, "Jdx2.%03d.txt", outIter);
-    (extData_.Jdx2VectorPtr)->writeToFile(fn_jdx2);
+    (externData_.Jdx2VectorPtr)->writeToFile(fn_jdx2);
 #endif
 
   }
@@ -1789,22 +1418,21 @@ void DeviceMgr::debugOutput2()
     // the voltlim dx vector.
     char fn_dxvl[256]; for (int ich = 0; ich < 256; ++ich) fn_dxvl[ich] = 0;
     sprintf(fn_dxvl, "dxVL.%03d.%03d.txt", outputStepNumber, newtonIter);
-    (extData_.dxVoltlimVectorPtr)->writeToFile(fn_dxvl);
+    (externData_.dxVoltlimVectorPtr)->writeToFile(fn_dxvl);
 
     // Fdx2-vector
     char fn_fdx2[256]; for (int ich = 0; ich < 256; ++ich) fn_fdx2[ich] = 0;
     sprintf(fn_fdx2, "Fdx2.%03d.%03d.txt", outputStepNumber, newtonIter);
-    (extData_.Fdx2VectorPtr)->writeToFile(fn_fdx2);
+    (externData_.Fdx2VectorPtr)->writeToFile(fn_fdx2);
 
     // Qdx2-vector
     char fn_qdx2[256]; for (int ich = 0; ich < 256; ++ich) fn_qdx2[ich] = 0;
     sprintf(fn_qdx2, "Qdx2.%03d.%03d.txt", outputStepNumber, newtonIter);
-    (extData_.Qdx2VectorPtr)->writeToFile(fn_qdx2);
+    (externData_.Qdx2VectorPtr)->writeToFile(fn_qdx2);
 #endif
 
   }
 }
-#endif
 
 //-----------------------------------------------------------------------------
 // Function      : DeviceMgr::setInitialGuess
@@ -1823,12 +1451,12 @@ bool DeviceMgr::setInitialGuess (N_LAS_Vector * solVectorPtr)
 
   if (solVectorPtr != 0)
   {
-    extData_.nextSolVectorPtr = solVectorPtr;
+    externData_.nextSolVectorPtr = solVectorPtr;
 
     // if two-level, and just the inner problem, only load the PDE devices.
-    vector<DeviceInstance*>::iterator iter;
-    vector<DeviceInstance*>::iterator begin;
-    vector<DeviceInstance*>::iterator end;
+    InstanceVector::iterator iter;
+    InstanceVector::iterator begin;
+    InstanceVector::iterator end;
 
     begin = pdeInstancePtrVec_.begin ();
     end = pdeInstancePtrVec_.end ();
@@ -1892,36 +1520,34 @@ void DeviceMgr::setUpPassThroughParamsMap_()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/02/03
 //-----------------------------------------------------------------------------
-bool DeviceMgr::setParam (string & name, double val)
+bool DeviceMgr::setParam (std::string & name, double val)
 {
   bool bsuccess = true, success = true;
-  vector<DeviceInstance*>::const_iterator iter;
-  vector<DeviceInstance*>::const_iterator begin;
-  vector<DeviceInstance*>::const_iterator end;
+  InstanceVector::const_iterator iter;
+  InstanceVector::const_iterator begin;
+  InstanceVector::const_iterator end;
 
-  vector<DeviceModel*>::const_iterator iterM;
-  vector<DeviceModel*>::const_iterator beginM;
-  vector<DeviceModel*>::const_iterator endM;
+  ModelVector::const_iterator iterM;
+  ModelVector::const_iterator beginM;
+  ModelVector::const_iterator endM;
 
   ExtendedString tmpName(name);
   tmpName.toUpper ();
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0 )
+  if (DEBUG_DEVICE && devOptions_.debugLevel > 0)
   {
-    string netListFile("");
-    if (commandLine_.getArgumentValue(string("netlist")) != "")
+    std::string netListFile("");
+    if (commandLine_.getArgumentValue(std::string("netlist")) != "")
     {
-      netListFile = commandLine_.getArgumentValue(string("netlist"));
+      netListFile = commandLine_.getArgumentValue(std::string("netlist"));
     }
 
-    std::cout << netListFile << "\t\t";
-    std::cout << "DeviceMgr::setParam.  ";
-    std::cout << name;
-    std::cout << "  " << val;
-    std::cout << std::endl;
+    dout() << netListFile << "\t\t";
+    dout() << "DeviceMgr::setParam.  ";
+    dout() << name;
+    dout() << "  " << val;
+    dout() << std::endl;
   }
-#endif
 
   // There are numerous special cases.  Check these first:
   // check if this is one of the designated artificial parameters.
@@ -2052,7 +1678,7 @@ bool DeviceMgr::setParam (string & name, double val)
     end   = mosfetInstancePtrVec_.end ();
     for (iter=begin; iter!=end;++iter)
     {
-      string nameL("l");
+      std::string nameL("l");
       success = (*iter)->setParam (nameL, newL);
       success = success && (*iter)->processParams ();
     }
@@ -2068,7 +1694,7 @@ bool DeviceMgr::setParam (string & name, double val)
     end   = mosfetInstancePtrVec_.end ();
     for (iter=begin; iter!=end;++iter)
     {
-      string nameW("w");
+      std::string nameW("w");
       success = (*iter)->setParam (nameW, newW);
       success = success && (*iter)->processParams ();
     }
@@ -2090,8 +1716,8 @@ bool DeviceMgr::setParam (string & name, double val)
     end   = mosfetInstancePtrVec_.end ();
     for (iter=begin; iter!=end;++iter)
     {
-      string nameL("l");
-      string nameW("w");
+      std::string nameL("l");
+      std::string nameW("w");
 
       success = (*iter)->scaleParam(nameL, solState_.sizeScale, length0);
       success = success || (*iter)->scaleParam(nameW, solState_.sizeScale, width0);
@@ -2115,7 +1741,7 @@ bool DeviceMgr::setParam (string & name, double val)
     endM   = mosfetModelPtrVec_.end ();
     for (iterM=beginM; iterM!=endM;++iterM)
     {
-      string nameTOX("tox");
+      std::string nameTOX("tox");
 
       success = (*iterM)->scaleParam(nameTOX, solState_.sizeScale, tox0);
 
@@ -2146,17 +1772,15 @@ bool DeviceMgr::setParam (string & name, double val)
 
     if (!solState_.PDEcontinuationFlag)
     {
-      string msg("DeviceMgr::setParam:");
-      msg += " tried to set pdeAlpha without first calling";
-      msg += " enablePDEContinaution.";
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg);
+      Report::DevelFatal message;
+      message << "DeviceMgr::setParam: tried to set pdeAlpha without first calling enablePDEContinuation";
     }
 
     // This should be part of the inner level solve for a 2-level
     // algorithm.  Set this for the PDE devices.
-    vector<DeviceInstance*>::iterator iter;
-    vector<DeviceInstance*>::iterator begin;
-    vector<DeviceInstance*>::iterator end;
+    InstanceVector::iterator iter;
+    InstanceVector::iterator begin;
+    InstanceVector::iterator end;
     begin = instancePtrVec_.begin ();
     end = instancePtrVec_.end ();
 
@@ -2169,9 +1793,9 @@ bool DeviceMgr::setParam (string & name, double val)
   {
     solState_.PDEcontinuationFlag = true;
 
-    vector<DeviceInstance*>::iterator iter;
-    vector<DeviceInstance*>::iterator begin;
-    vector<DeviceInstance*>::iterator end;
+    InstanceVector::iterator iter;
+    InstanceVector::iterator begin;
+    InstanceVector::iterator end;
     begin = instancePtrVec_.begin ();
     end = instancePtrVec_.end ();
 
@@ -2188,7 +1812,7 @@ bool DeviceMgr::setParam (string & name, double val)
   else if (tmpName == "BJT:BF")
   {
     double scale = val;
-    string newBF("bf");
+    std::string newBF("bf");
 
     // loop over all the models and change bf
     beginM = bjtModelPtrVec_.begin ();
@@ -2203,7 +1827,7 @@ bool DeviceMgr::setParam (string & name, double val)
   else if (tmpName == "BJT:NF")
   {
     double scale = val;
-    string newNF("nf");
+    std::string newNF("nf");
 
     // loop over all the models and change nf
     beginM = bjtModelPtrVec_.begin ();
@@ -2218,7 +1842,7 @@ bool DeviceMgr::setParam (string & name, double val)
   else if (tmpName == "BJT:NR")
   {
     double scale = val;
-    string newNR("nr");
+    std::string newNR("nr");
 
     // loop over all the models and change nr
     beginM = bjtModelPtrVec_.begin ();
@@ -2243,7 +1867,7 @@ bool DeviceMgr::setParam (string & name, double val)
   else if (tmpName == "DIODE:N")
   {
     double scale = val;
-    string newN("n");
+    std::string newN("n");
 
     // loop over all the models and change n
     beginM = diodeModelPtrVec_.begin ();
@@ -2264,9 +1888,9 @@ bool DeviceMgr::setParam (string & name, double val)
     if (solState_.global_params[tmpName] != val)
     {
       solState_.global_params[tmpName] = val;
-      vector<DeviceEntity*>::iterator iter;
-      vector<DeviceEntity*>::iterator begin = dependentPtrVec_.begin();
-      vector<DeviceEntity*>::iterator end = dependentPtrVec_.end();
+      std::vector<DeviceEntity*>::iterator iter;
+      std::vector<DeviceEntity*>::iterator begin = dependentPtrVec_.begin();
+      std::vector<DeviceEntity*>::iterator end = dependentPtrVec_.end();
       for (iter=begin; iter!=end;++iter)
       {
         if ((*iter)->updateGlobalParameters (solState_.global_params));
@@ -2280,19 +1904,7 @@ bool DeviceMgr::setParam (string & name, double val)
   else
   {
     // If not artificial, then search for the appropriate natural param(s).
-
-    // the devSensPtr will be deleted in the destructor.
-    if (devSensPtr_==0)
-    {
-      devSensPtr_ = new DeviceSensitivities
-        (devOptions_,extData_, solState_, *lasSysPtr_);
-    }
-
-    string paramName;
-    string entityName;
-    devSensPtr_->stripParamName (name, paramName, entityName);
-
-    DeviceEntity * dePtr = devSensPtr_->getDeviceEntity(name);
+    DeviceEntity * dePtr = getDeviceEntity(name);
 
 #ifdef Xyce_PARALLEL_MPI
     double foundParam = 0.0;
@@ -2303,6 +1915,7 @@ bool DeviceMgr::setParam (string & name, double val)
     if (entityFound)
     {
       bool found;
+      std::string paramName = Util::paramNameFromFullParamName(name);
       if (paramName == "")
       {
         found = dePtr->setDefaultParam (val);
@@ -2334,8 +1947,8 @@ bool DeviceMgr::setParam (string & name, double val)
 
     if(!entityFound)
     {
-      string msg("Unable to find parameter " + name + "\n");
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg);
+      Report::UserFatal0 message;
+      message << "Unable to find parameter " << name;
     }
   }
 
@@ -2343,19 +1956,18 @@ bool DeviceMgr::setParam (string & name, double val)
    // if there is an inner circuit problem.  The names of parameters
    // that should be passed through are stored in the map.
 #ifdef Xyce_EXTDEV
-  if ( passThroughParamsMap_.find(tmpName) != passThroughParamsMap_.end())
+  if (passThroughParamsMap_.find(tmpName) != passThroughParamsMap_.end())
   {
 
-    vector<ExternDevice::Instance*>::iterator iter;
-    vector<ExternDevice::Instance*>::iterator begin;
-    vector<ExternDevice::Instance*>::iterator end;
+    std::vector<ExternDevice::Instance*>::iterator iter;
+    std::vector<ExternDevice::Instance*>::iterator begin;
+    std::vector<ExternDevice::Instance*>::iterator end;
     begin = extDevInstancePtrVec_.begin ();
     end = extDevInstancePtrVec_.end ();
 
     for (iter=begin; iter!=end;++iter)
     {
       bool bs1 = (*iter)->setInternalParam (name, val);
-      //bsuccess = bsuccess && bs1;
     }
 
   }
@@ -2378,13 +1990,12 @@ bool DeviceMgr::setParam (string & name, double val)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 9/13/04
 //-----------------------------------------------------------------------------
-bool DeviceMgr::getParam (const string & name, double & val)
+bool DeviceMgr::getParamAndReduce(const std::string & name, double & val)
 {
   val = 0.0;
   ExtendedString tmpName(name);
   tmpName.toUpper ();
   bool entityFound = false;
-
 
   // check if this is one of the designated artificial parameters.
   if (tmpName == "MOSFET:GAINSCALE")
@@ -2409,35 +2020,23 @@ bool DeviceMgr::getParam (const string & name, double & val)
   }
   else if (tmpName == "TEMP")
   {
-    val = devOptions_.temp.dVal();;
+    val = devOptions_.temp.getImmutableValue<double>();
     val -= CONSTCtoK;
     entityFound = true;
   }
-  else if (solState_.global_params.find(tmpName) !=
-      solState_.global_params.end())
+  else if (solState_.global_params.find(tmpName) != solState_.global_params.end())
   {
     val = solState_.global_params[tmpName];
     entityFound = true;
   }
   else
   {
-    // the devSensPtr will be deleted in the destructor.
-    if (devSensPtr_==0)
-    {
-      devSensPtr_ = new DeviceSensitivities
-        (devOptions_,extData_, solState_, *lasSysPtr_);
-    }
-
-    string paramName;
-    string entityName;
-    devSensPtr_->stripParamName (name, paramName, entityName);
-
-
-    DeviceEntity * dePtr = devSensPtr_->getDeviceEntity(name);
-    entityFound = (dePtr!=0)?true:false;
+    DeviceEntity * dePtr = getDeviceEntity(name);
+    entityFound = dePtr != 0;
 
     if (entityFound)
     {
+      std::string paramName = Util::paramNameFromFullParamName(name);
       entityFound = dePtr->getParam (paramName, val);
       if (paramName == "")
         entityFound = true;
@@ -2447,7 +2046,7 @@ bool DeviceMgr::getParam (const string & name, double & val)
       outputMgrPtr_->getMeasureValue(tmpName, val, entityFound);
 
 #ifdef Xyce_PARALLEL_MPI
-    double foundParam = entityFound?1:0;
+    double foundParam = entityFound ? 1 : 0;
     double finalParam = 0.0;
     double globalVal;
     N_PDS_Comm * pdsCommPtr = pdsMgrPtr_->getPDSComm();
@@ -2465,6 +2064,70 @@ bool DeviceMgr::getParam (const string & name, double & val)
   return entityFound;
 }
 
+bool DeviceMgr::findParam(const std::string & name) const
+{
+  ExtendedString tmpName(name);
+  tmpName.toUpper ();
+
+  bool entityFound = false;
+
+  // check if this is one of the designated artificial parameters.
+  if (tmpName == "MOSFET:GAINSCALE")
+  {
+    entityFound = true;
+  }
+  else if (tmpName == "MOSFET:NLTERMSCALE")
+  {
+    entityFound = true;
+  }
+  else if (tmpName == "MOSFET:L")
+  {
+    entityFound = true;
+  }
+  else if (tmpName == "MOSFET:W")
+  {
+    entityFound = true;
+  }
+  else if (tmpName == "TEMP")
+  {
+    entityFound = true;
+  }
+
+  return entityFound;
+}
+
+double DeviceMgr::getParamNoReduce(const std::string & name) const
+{
+  double val = 0.0;
+  ExtendedString tmpName(name);
+  tmpName.toUpper ();
+
+  // check if this is one of the designated artificial parameters.
+  if (tmpName == "MOSFET:GAINSCALE")
+  {
+    val = solState_.gainScale[0];
+  }
+  else if (tmpName == "MOSFET:NLTERMSCALE")
+  {
+    val = solState_.nltermScale;
+  }
+  else if (tmpName == "MOSFET:L")
+  {
+    val = devOptions_.defl;
+  }
+  else if (tmpName == "MOSFET:W")
+  {
+    val = devOptions_.defw;
+  }
+  else if (tmpName == "TEMP")
+  {
+    val = devOptions_.temp.getImmutableValue<double>();
+    val -= CONSTCtoK;
+  }
+
+  return val;
+}
+
 //-----------------------------------------------------------------------------
 // Function      : DeviceMgr::getParam
 // Purpose       : Returns the current value of a named parameter.
@@ -2479,16 +2142,16 @@ bool DeviceMgr::getParam (const string & name, double & val)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 7/26/03
 //-----------------------------------------------------------------------------
-double DeviceMgr::getParam (const string & name)
+double DeviceMgr::getParamAndReduce(const std::string & name)
 {
   bool bsuccess = false;
   double val = 0.0;
-  bsuccess = getParam(name,val);
+  bsuccess = getParamAndReduce(name,val);
 
   if(!bsuccess)
   {
-    string msg("Unable to find parameter " + name + "\n");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL_0, msg);
+    Report::UserFatal0 message;
+    message << "Unable to find parameter " << name;
   }
 
   return val;
@@ -2506,23 +2169,21 @@ double DeviceMgr::getParam (const string & name)
 // Creation Date : 7/26/03
 //-----------------------------------------------------------------------------
 bool DeviceMgr::getVsrcLIDs (
-    string & srcName, int & li_Pos, int & li_Neg, int & li_Bra)
+    std::string & srcName, int & li_Pos, int & li_Neg, int & li_Bra)
 {
   ExtendedString tmpName(srcName);
   tmpName.toUpper();
-  map <string, N_DEV_VsrcInstance*>::iterator iterVsrc = vsrcInstancePtrMap_.find(tmpName);
-  if ( iterVsrc != vsrcInstancePtrMap_.end())
+  std::map<std::string, Vsrc::Instance *>::iterator iterVsrc = vsrcInstancePtrMap_.find(tmpName);
+  if (iterVsrc != vsrcInstancePtrMap_.end())
   {
-    N_DEV_VsrcInstance * vsrcPtr = iterVsrc->second;
+    Vsrc::Instance * vsrcPtr = iterVsrc->second;
     vsrcPtr->getLIDs(li_Pos,li_Neg,li_Bra);
   }
   else
   {
-    string msg("DeviceMgr::getVoltageDropRow ");
-    msg += "Unable to find source: " + srcName + "\n";
-#ifdef Xyce_PARALLEL_MPI
-#else
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg);
+#ifndef Xyce_PARALLEL_MPI
+    Report::DevelFatal message;
+    message << "DeviceMgr::getVoltageDropRow: Unable to find source: " << srcName;
 #endif
   }
 
@@ -2547,72 +2208,40 @@ bool DeviceMgr::updateState (
      N_LAS_Vector * nextStoVectorPtr,
      N_LAS_Vector * currStoVectorPtr,
      N_LAS_Vector * lastStoVectorPtr
-     )
+    )
 {
   bool bsuccess = true;
   bool tmpBool = true;
-
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::startSafeBarrier();
-#endif
 
   tmpBool = setupSolverInfo_();
   bsuccess = bsuccess && tmpBool;
 
   // copy over the passed pointers:
-  extData_.nextSolVectorPtr = nextSolVectorPtr;
-  extData_.currSolVectorPtr = currSolVectorPtr;
-  extData_.lastSolVectorPtr = lastSolVectorPtr;
-  extData_.nextStaVectorPtr = nextStaVectorPtr;
-  extData_.currStaVectorPtr = currStaVectorPtr;
-  extData_.lastStaVectorPtr = lastStaVectorPtr;
-  extData_.nextStoVectorPtr = nextStoVectorPtr;
-  extData_.currStoVectorPtr = currStoVectorPtr;
-  extData_.lastStoVectorPtr = lastStoVectorPtr;
+  externData_.nextSolVectorPtr = nextSolVectorPtr;
+  externData_.currSolVectorPtr = currSolVectorPtr;
+  externData_.lastSolVectorPtr = lastSolVectorPtr;
+  externData_.nextStaVectorPtr = nextStaVectorPtr;
+  externData_.currStaVectorPtr = currStaVectorPtr;
+  externData_.lastStaVectorPtr = lastStaVectorPtr;
+  externData_.nextStoVectorPtr = nextStoVectorPtr;
+  externData_.currStoVectorPtr = currStoVectorPtr;
+  externData_.lastStoVectorPtr = lastStoVectorPtr;
 
 #ifdef Xyce_PARALLEL_MPI
-  extData_.nextSolVectorPtr->importOverlap();
+  externData_.nextSolVectorPtr->importOverlap();
 #endif
 
   // Now reset the relevant RAW pointers:
-  extData_.nextSolVectorRawPtr = &((*extData_.nextSolVectorPtr)[0]);
-  extData_.currSolVectorRawPtr = &((*extData_.currSolVectorPtr)[0]);
-  extData_.lastSolVectorRawPtr = &((*extData_.lastSolVectorPtr)[0]);
-  extData_.nextStaVectorRawPtr = &((*extData_.nextStaVectorPtr)[0]);
-  extData_.currStaVectorRawPtr = &((*extData_.currStaVectorPtr)[0]);
-  extData_.lastStaVectorRawPtr = &((*extData_.lastStaVectorPtr)[0]);
-  extData_.nextStoVectorRawPtr = &((*extData_.nextStoVectorPtr)[0]);
-  extData_.currStoVectorRawPtr = &((*extData_.currStoVectorPtr)[0]);
-  extData_.lastStoVectorRawPtr = &((*extData_.lastStoVectorPtr)[0]);
+  externData_.nextSolVectorRawPtr = &((*externData_.nextSolVectorPtr)[0]);
+  externData_.currSolVectorRawPtr = &((*externData_.currSolVectorPtr)[0]);
+  externData_.lastSolVectorRawPtr = &((*externData_.lastSolVectorPtr)[0]);
+  externData_.nextStaVectorRawPtr = &((*externData_.nextStaVectorPtr)[0]);
+  externData_.currStaVectorRawPtr = &((*externData_.currStaVectorPtr)[0]);
+  externData_.lastStaVectorRawPtr = &((*externData_.lastStaVectorPtr)[0]);
+  externData_.nextStoVectorRawPtr = &((*externData_.nextStoVectorPtr)[0]);
+  externData_.currStoVectorRawPtr = &((*externData_.currStoVectorPtr)[0]);
+  externData_.lastStoVectorRawPtr = &((*externData_.lastStoVectorPtr)[0]);
 
-#ifdef Xyce_OLD_LOOPING
-  // call all the intermediate vars loads:
-  vector<DeviceInstance*>::iterator iter;
-  vector<DeviceInstance*>::iterator begin;
-  vector<DeviceInstance*>::iterator end;
-
-  // if inner problem, only do the PDE loads.
-  if (solState_.twoLevelNewtonCouplingMode==INNER_PROBLEM)
-  {
-    begin = pdeInstancePtrVec_.begin ();
-    end   = pdeInstancePtrVec_.end ();
-  }
-  else
-  {
-    begin = instancePtrVec_.begin ();
-    end   = instancePtrVec_.end ();
-  }
-
-  updateDependentParameters_();
-
-  // updateIntermediateVars_();
-
-  for (iter=begin; iter!=end;++iter)
-  {
-    tmpBool = (*iter)->updatePrimaryState ();
-    bsuccess = bsuccess && tmpBool;
-  }
-#else
 
   updateDependentParameters_();
   // updateIntermediateVars_();
@@ -2621,13 +2250,13 @@ bool DeviceMgr::updateState (
   if (solState_.twoLevelNewtonCouplingMode==INNER_PROBLEM)
   {
     // call all the intermediate vars loads:
-    vector<Device*>::iterator iter;
-    vector<Device*>::iterator begin = pdeDevicePtrVec_.begin ();
-    vector<Device*>::iterator end = pdeDevicePtrVec_.end ();
+    std::vector<Device*>::iterator iter;
+    std::vector<Device*>::iterator begin = pdeDevicePtrVec_.begin ();
+    std::vector<Device*>::iterator end = pdeDevicePtrVec_.end ();
     for (iter=begin; iter!=end;++iter)
     {
-      tmpBool = (*iter)->updateState ( extData_.nextSolVectorRawPtr,
-                                      extData_.nextStaVectorRawPtr, extData_.nextStoVectorRawPtr);
+      tmpBool = (*iter)->updateState (externData_.nextSolVectorRawPtr,
+                                      externData_.nextStaVectorRawPtr, externData_.nextStoVectorRawPtr);
       bsuccess = bsuccess && tmpBool;
     }
   }
@@ -2636,25 +2265,21 @@ bool DeviceMgr::updateState (
     int numDevices = devicePtrVec_.size();
     for(int i=0; i< numDevices; ++i)
     {
-      bsuccess=devicePtrVec_.at(i)->updateState ( extData_.nextSolVectorRawPtr,
-                                                 extData_.nextStaVectorRawPtr, extData_.nextStoVectorRawPtr);
+      bsuccess=devicePtrVec_.at(i)->updateState (externData_.nextSolVectorRawPtr,
+                                                 externData_.nextStaVectorRawPtr, externData_.nextStoVectorRawPtr);
     }
   }
-
-#endif
 
 #ifdef Xyce_EXTDEV
   updateExternalDevices_();
 #endif
 
 #ifdef Xyce_PARALLEL_MPI
-  extData_.nextStaVectorPtr->importOverlap();
-  extData_.nextStoVectorPtr->importOverlap();
+  externData_.nextStaVectorPtr->importOverlap();
+  externData_.nextStoVectorPtr->importOverlap();
 #endif
 
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::safeBarrier(0);
-#endif
+  Report::safeBarrier(pdsMgrPtr_->getPDSComm()->comm());
 
   return true;
 }
@@ -2712,35 +2337,31 @@ bool DeviceMgr::loadDAEMatrices
   bool bsuccess = true;
   bool tmpBool = true;
 
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::startSafeBarrier();
-#endif
-
   // copy over the passed pointers:
-  (extData_.nextSolVectorPtr) = tmpSolVectorPtr;
+  (externData_.nextSolVectorPtr) = tmpSolVectorPtr;
   bool resetRawMatrixPointers = true;
   if (
-      (extData_.dQdxMatrixPtr == tmpdQdxMatrixPtr) &&
-      (extData_.dFdxMatrixPtr == tmpdFdxMatrixPtr)
-     )
+      (externData_.dQdxMatrixPtr == tmpdQdxMatrixPtr) &&
+      (externData_.dFdxMatrixPtr == tmpdFdxMatrixPtr)
+    )
   {
     resetRawMatrixPointers = false;
   }
   if (resetRawMatrixPointers)
   {
-    extData_.dQdxMatrixPtr = tmpdQdxMatrixPtr;
-    extData_.dFdxMatrixPtr = tmpdFdxMatrixPtr;
+    externData_.dQdxMatrixPtr = tmpdQdxMatrixPtr;
+    externData_.dFdxMatrixPtr = tmpdFdxMatrixPtr;
   }
 
-  extData_.nextStaVectorPtr = tmpStateVectorPtr;
-  extData_.nextStaDerivVectorPtr = tmpStateDerivVectorPtr;
-  extData_.nextStoVectorPtr = tmpStoreVectorPtr;
+  externData_.nextStaVectorPtr = tmpStateVectorPtr;
+  externData_.nextStaDerivVectorPtr = tmpStateDerivVectorPtr;
+  externData_.nextStoVectorPtr = tmpStoreVectorPtr;
 
   // setup the relevant RAW vector pointers:
-  extData_.nextSolVectorRawPtr = &((*extData_.nextSolVectorPtr)[0]);
-  extData_.nextStaVectorRawPtr = &((*extData_.nextStaVectorPtr)[0]);
-  extData_.nextStaDerivVectorRawPtr = &((*extData_.nextStaDerivVectorPtr)[0]);
-  extData_.nextStoVectorRawPtr = &((*extData_.nextStoVectorPtr)[0]);
+  externData_.nextSolVectorRawPtr = &((*externData_.nextSolVectorPtr)[0]);
+  externData_.nextStaVectorRawPtr = &((*externData_.nextStaVectorPtr)[0]);
+  externData_.nextStaDerivVectorRawPtr = &((*externData_.nextStaDerivVectorPtr)[0]);
+  externData_.nextStoVectorRawPtr = &((*externData_.nextStoVectorPtr)[0]);
 
 //#ifndef Xyce_NONPOINTER_MATRIX_LOAD
   // setup the relevant RAW matrix pointers (down in the devices that need them):
@@ -2750,9 +2371,9 @@ bool DeviceMgr::loadDAEMatrices
   }
 //#endif
 
-  vector<DeviceInstance*>::iterator iter;
-  vector<DeviceInstance*>::iterator begin;
-  vector<DeviceInstance*>::iterator end;
+  InstanceVector::iterator iter;
+  InstanceVector::iterator begin;
+  InstanceVector::iterator end;
 
   // if this is an "inner problem" phase of a Two-Level Newton
   // simulation, then only load the PDE devices.  Everything else just
@@ -2763,24 +2384,12 @@ bool DeviceMgr::loadDAEMatrices
 
   if (solState_.twoLevelNewtonCouplingMode==INNER_PROBLEM)
   {
-#if 1
     begin = nonPdeInstancePtrVec_.begin();
     end   = nonPdeInstancePtrVec_.end();
     for (iter=begin; iter!=end;++iter)
     {
       (*iter)->loadTrivialDAE_FMatrixStamp ();
     }
-#else
-    diagonalVectorPtr_->putScalar(1.0);
-    extData_.dFdxMatrixPtr->replaceDiagonal ( (*diagonalVectorPtr_) );
-
-    begin = pdeInstancePtrVec_.begin();
-    end   = pdeInstancePtrVec_.end();
-    for (iter=begin; iter!=end;++iter)
-    {
-      (*iter)->zeroMatrixDiagonal(extData_.dFdxMatrixPtr);
-    }
-#endif
 
     begin = pdeInstancePtrVec_.begin();
     end   = pdeInstancePtrVec_.end();
@@ -2793,34 +2402,24 @@ bool DeviceMgr::loadDAEMatrices
   // Else, do a normal analytical matrix load.
   else
   {
-#ifdef Xyce_OLD_LOOPING
-    begin = instancePtrVec_.begin();
-    end   = instancePtrVec_.end();
-    for (iter=begin; iter!=end;++iter)
-    {
-      tmpBool = (*iter)->loadDAEdQdx();bsuccess = bsuccess && tmpBool;
-      tmpBool = (*iter)->loadDAEdFdx();bsuccess = bsuccess && tmpBool;
-    }
-#else
     int numDevices = devicePtrVec_.size();
     for(int i=0; i< numDevices; ++i)
     {
-      bsuccess=devicePtrVec_.at(i)->loadDAEMatrices ( *(extData_.dFdxMatrixPtr) , *(extData_.dQdxMatrixPtr) );
+      bsuccess=devicePtrVec_.at(i)->loadDAEMatrices (*(externData_.dFdxMatrixPtr) , *(externData_.dQdxMatrixPtr));
     }
-#endif
   }
 
   // Run jacobian diagnostic.
   if (devOptions_.testJacobianFlag &&
       (solState_.timeStepNumber >= devOptions_.testJacStartStep &&
        solState_.timeStepNumber <= devOptions_.testJacStopStep)
-      )
+     )
   {
-#ifdef Xyce_DEBUG_DEVICE
-    devOptions_.debugLevel -= 2;
-#endif
+    if (DEBUG_DEVICE)
+      devOptions_.debugLevel -= 2;
+
     // Test just the specified device(s), if the user specified any.
-    if( (devOptions_.testJacDeviceNameGiven) )
+    if ((devOptions_.testJacDeviceNameGiven))
     {
       begin = testJacDevicePtrVec_.begin();
       end   = testJacDevicePtrVec_.end();
@@ -2835,9 +2434,9 @@ bool DeviceMgr::loadDAEMatrices
     {
       (*iter)->testDAEMatrices (nameVec_);
     }
-#ifdef Xyce_DEBUG_DEVICE
-    devOptions_.debugLevel += 2;
-#endif
+
+    if (DEBUG_DEVICE)
+      devOptions_.debugLevel += 2;
   }
 
 #if 0
@@ -2850,38 +2449,31 @@ bool DeviceMgr::loadDAEMatrices
       double diag = 10000.0;
       int size = icLoads_->size();
       for (int i = 0; i < size; ++i)
-        extData_.JMatrixPtr->sumIntoRow( (*icLoads_)[i].first, 1, &diag,
-                                         &((*icLoads_)[i].first) );
+        externData_.JMatrixPtr->sumIntoRow((*icLoads_)[i].first, 1, &diag,
+                                         &((*icLoads_)[i].first));
     }
   }
 #endif
 
   //Tell Jacobian, fill is complete allowing accumulation if necessary
-  extData_.dQdxMatrixPtr->fillComplete();
-  extData_.dFdxMatrixPtr->fillComplete();
+  externData_.dQdxMatrixPtr->fillComplete();
+  externData_.dFdxMatrixPtr->fillComplete();
 
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::safeBarrier(0);
-#endif
+  Report::safeBarrier(pdsMgrPtr_->getPDSComm()->comm());
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 1 && solState_.debugTimeFlag)
+  if (DEBUG_DEVICE && devOptions_.debugLevel > 1 && solState_.debugTimeFlag)
   {
     int newtonIter = solState_.newtonIter;
-    std::cout << "-----------------------------------------------" << std::endl;
-    std::cout <<  "Q-matrix: nonlinear iteration = " << newtonIter << "\n";
-    //tmpdQdxMatrixPtr->printPetraObject();
-    extData_.dQdxMatrixPtr->printPetraObject();
-    std::cout << std::endl;
-    std::cout << "-----------------------------------------------" << std::endl;
-    std::cout <<  "F-matrix: nonlinear iteration = " << newtonIter << "\n";
-    //tmpdFdxMatrixPtr->printPetraObject();
-    extData_.dFdxMatrixPtr->printPetraObject();
-    std::cout << std::endl;
-    std::cout << "-----------------------------------------------" << std::endl;
+    dout() << section_divider << std::endl;
+    dout() <<  "Q-matrix: nonlinear iteration = " << newtonIter << "\n";
+    externData_.dQdxMatrixPtr->printPetraObject(dout());
+    dout() << std::endl;
+    dout() << section_divider << std::endl;
+    dout() <<  "F-matrix: nonlinear iteration = " << newtonIter << "\n";
+    externData_.dFdxMatrixPtr->printPetraObject(dout());
+    dout() << std::endl;
+    dout() << section_divider << std::endl;
   }
-#endif
-
 
   return bsuccess;
 }
@@ -2945,68 +2537,36 @@ bool DeviceMgr::loadDAEVectors
   bool bsuccess = true;
   bool tmpBool = true;
 
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::startSafeBarrier();
-#endif
-
   // copy over the passed pointers:
-  extData_.nextSolVectorPtr = tmpSolVectorPtr;
-  extData_.currSolVectorPtr = tmpCurrSolVectorPtr;
-  extData_.lastSolVectorPtr = tmpLastSolVectorPtr;
-  extData_.daeQVectorPtr    = tmpQVectorPtr;
-  extData_.daeFVectorPtr    = tmpFVectorPtr;
-  extData_.dFdxdVpVectorPtr = tmpdFdxdVpVectorPtr;
-  extData_.dQdxdVpVectorPtr = tmpdQdxdVpVectorPtr;
-  extData_.nextStaVectorPtr = tmpStaVectorPtr;
-  extData_.currStaVectorPtr = tmpCurrStaVectorPtr;
-  extData_.lastStaVectorPtr = tmpLastStaVectorPtr;
-  extData_.storeLeadCurrQCompPtr = tmpStoLeadCurrQCompVectorPtr;
-  extData_.nextStaDerivVectorPtr = tmpStaDerivVectorPtr;
-  extData_.nextStoVectorPtr = tmpStoVectorPtr;
-  extData_.currStoVectorPtr = tmpCurrStoVectorPtr;
-  extData_.lastStoVectorPtr = tmpLastStoVectorPtr;
+  externData_.nextSolVectorPtr = tmpSolVectorPtr;
+  externData_.currSolVectorPtr = tmpCurrSolVectorPtr;
+  externData_.lastSolVectorPtr = tmpLastSolVectorPtr;
+  externData_.daeQVectorPtr    = tmpQVectorPtr;
+  externData_.daeFVectorPtr    = tmpFVectorPtr;
+  externData_.dFdxdVpVectorPtr = tmpdFdxdVpVectorPtr;
+  externData_.dQdxdVpVectorPtr = tmpdQdxdVpVectorPtr;
+  externData_.nextStaVectorPtr = tmpStaVectorPtr;
+  externData_.currStaVectorPtr = tmpCurrStaVectorPtr;
+  externData_.lastStaVectorPtr = tmpLastStaVectorPtr;
+  externData_.storeLeadCurrQCompPtr = tmpStoLeadCurrQCompVectorPtr;
+  externData_.nextStaDerivVectorPtr = tmpStaDerivVectorPtr;
+  externData_.nextStoVectorPtr = tmpStoVectorPtr;
+  externData_.currStoVectorPtr = tmpCurrStoVectorPtr;
+  externData_.lastStoVectorPtr = tmpLastStoVectorPtr;
 
   // Make sure all boundary data is valid in the solution vector
 #ifdef Xyce_PARALLEL_MPI
-  extData_.nextSolVectorPtr->importOverlap();
-  extData_.nextStaDerivVectorPtr->importOverlap();
+  externData_.nextSolVectorPtr->importOverlap();
+  externData_.nextStaDerivVectorPtr->importOverlap();
 #endif
 
   // Set up the relevant RAW Pointers:
   setupRawVectorPointers_ ();
 
-#ifdef Xyce_OLD_LOOPING
   // call all the intermediate vars loads:
-  vector<DeviceInstance*>::iterator iter;
-  vector<DeviceInstance*>::iterator begin;
-  vector<DeviceInstance*>::iterator end;
-
-  // if inner problem, only do the PDE loads.
-  if (solState_.twoLevelNewtonCouplingMode==INNER_PROBLEM)
-  {
-    begin = pdeInstancePtrVec_.begin ();
-    end   = pdeInstancePtrVec_.end ();
-  }
-  else
-  {
-    begin = instancePtrVec_.begin ();
-    end   = instancePtrVec_.end ();
-  }
-
-  //updateDependentParameters_();
-
-  for (iter=begin; iter!=end;++iter)
-  {
-    tmpBool = (*iter)->updateSecondaryState();
-    bsuccess = bsuccess && tmpBool;
-  }
-#else
-
-
-  // call all the intermediate vars loads:
-  vector<Device*>::iterator iter;
-  vector<Device*>::iterator begin;
-  vector<Device*>::iterator end;
+  std::vector<Device*>::iterator iter;
+  std::vector<Device*>::iterator begin;
+  std::vector<Device*>::iterator end;
 
   // if inner problem, only do the PDE loads.
   if (solState_.twoLevelNewtonCouplingMode==INNER_PROBLEM)
@@ -3025,37 +2585,26 @@ bool DeviceMgr::loadDAEVectors
 #ifndef Xyce_EXCLUDE_SECONDARY_STATE
   for (iter=begin; iter!=end;++iter)
   {
-    tmpBool = (*iter)->updateSecondaryState (extData_.nextStaDerivVectorRawPtr, extData_.nextStoVectorRawPtr);
+    tmpBool = (*iter)->updateSecondaryState (externData_.nextStaDerivVectorRawPtr, externData_.nextStoVectorRawPtr);
     bsuccess = bsuccess && tmpBool;
   }
 #endif // Xyce_EXCLUDE_SECONDARY_STATE
 
-#endif
-
 #ifdef Xyce_PARALLEL_MPI
-  extData_.nextStaVectorPtr->importOverlap();
-  extData_.nextStoVectorPtr->importOverlap();
+  externData_.nextStaVectorPtr->importOverlap();
+  externData_.nextStoVectorPtr->importOverlap();
 #endif
-
-
-#ifdef Xyce_OLD_LOOPING
-  for (iter=begin; iter!=end;++iter)
-  {
-    tmpBool=(*iter)->loadDAEQVector();bsuccess = bsuccess && tmpBool;
-    tmpBool=(*iter)->loadDAEFVector();bsuccess = bsuccess && tmpBool;
-  }
-#else
 
   if (solState_.twoLevelNewtonCouplingMode==INNER_PROBLEM)
   {
     int numDevices = pdeDevicePtrVec_.size();
     for(int i=0; i< numDevices; ++i)
     {
-      bsuccess=pdeDevicePtrVec_.at(i)->loadDAEVectors( extData_.nextSolVectorRawPtr,
-                                                       extData_.daeFVectorRawPtr,
-                                                       extData_.daeQVectorRawPtr,
-                                                       extData_.nextStoVectorRawPtr,
-                                                       extData_.storeLeadCurrQCompRawPtr);
+      bsuccess=pdeDevicePtrVec_.at(i)->loadDAEVectors(externData_.nextSolVectorRawPtr,
+                                                       externData_.daeFVectorRawPtr,
+                                                       externData_.daeQVectorRawPtr,
+                                                       externData_.nextStoVectorRawPtr,
+                                                       externData_.storeLeadCurrQCompRawPtr);
     }
   }
   else
@@ -3063,62 +2612,49 @@ bool DeviceMgr::loadDAEVectors
     int numDevices = devicePtrVec_.size();
     for(int i=0; i< numDevices; ++i)
     {
-      bsuccess=devicePtrVec_.at(i)->loadDAEVectors( extData_.nextSolVectorRawPtr,
-                                                    extData_.daeFVectorRawPtr,
-                                                    extData_.daeQVectorRawPtr,
-                                                    extData_.nextStoVectorRawPtr,
-                                                    extData_.storeLeadCurrQCompRawPtr);
-      // std::cout << "Device i = " << i << "  " << devicePtrVec_.at(i)->name << std::endl;
-      // std::cout.precision(15);
-      // std::cout << "F = " << std::endl;
-      // extData_.daeFVectorPtr->printPetraObject();
-      // std::cout << "Q = " << std::endl;
-      // extData_.daeQVectorPtr->printPetraObject();
+      bsuccess=devicePtrVec_.at(i)->loadDAEVectors(externData_.nextSolVectorRawPtr,
+                                                    externData_.daeFVectorRawPtr,
+                                                    externData_.daeQVectorRawPtr,
+                                                    externData_.nextStoVectorRawPtr,
+                                                    externData_.storeLeadCurrQCompRawPtr);
     }
   }
 
-#endif
-
   // dump to the screen:
-#ifdef Xyce_DEBUG_DEVICE
-  // note: this should eventually go away!
-  if (devOptions_.debugLevel > 1 && solState_.debugTimeFlag)
+  if (DEBUG_DEVICE && devOptions_.debugLevel > 1 && solState_.debugTimeFlag)
   {
     int newtonIter = solState_.newtonIter;
-    std::cout <<  "Q-vector: nonlinear iteration = " << newtonIter << "\n";
-    extData_.daeQVectorPtr->printPetraObject();
-    std::cout << std::endl;
-    std::cout <<  "F-vector: nonlinear iteration = " << newtonIter << "\n";
-    extData_.daeFVectorPtr->printPetraObject();
-    std::cout << std::endl;
+    dout() <<  "Q-vector: nonlinear iteration = " << newtonIter << "\n";
+    externData_.daeQVectorPtr->printPetraObject(std::cout);
+    dout() << std::endl;
+    dout() <<  "F-vector: nonlinear iteration = " << newtonIter << "\n";
+    externData_.daeFVectorPtr->printPetraObject(std::cout);
+    dout() << std::endl;
 
     if (devOptions_.voltageLimiterFlag)
     {
-      std::cout << "\n\n  dFdxdVp vector: nonlinear iteration = " << newtonIter << "\n";
-      extData_.dFdxdVpVectorPtr->printPetraObject();
-      std::cout << std::endl;
-      std::cout << "\n\n  dQdxdVp vector: nonlinear iteration = " << newtonIter << "\n";
-      extData_.dQdxdVpVectorPtr->printPetraObject();
-      std::cout << std::endl;
+      dout() << "\n\n  dFdxdVp vector: nonlinear iteration = " << newtonIter << "\n";
+      externData_.dFdxdVpVectorPtr->printPetraObject(std::cout);
+      dout() << std::endl;
+      dout() << "\n\n  dQdxdVp vector: nonlinear iteration = " << newtonIter << "\n";
+      externData_.dQdxdVpVectorPtr->printPetraObject(std::cout);
+      dout() << std::endl;
     }
+
+    debugOutput2();
   }
 
-  debugOutput2();
-#endif
-
   // Update parallel if necessary
-  extData_.daeQVectorPtr->fillComplete();
-  extData_.daeFVectorPtr->fillComplete();
-  extData_.dFdxdVpVectorPtr->fillComplete();
-  extData_.dQdxdVpVectorPtr->fillComplete();
+  externData_.daeQVectorPtr->fillComplete();
+  externData_.daeFVectorPtr->fillComplete();
+  externData_.dFdxdVpVectorPtr->fillComplete();
+  externData_.dQdxdVpVectorPtr->fillComplete();
 
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::safeBarrier(0);
-#endif
+  Report::safeBarrier(pdsMgrPtr_->getPDSComm()->comm());
 
 #ifdef Xyce_SIZEOF
   int size = sizeof(*this);
-  std::cout << "Size of device package after vector load = " << size << std::endl;
+  dout() << "Size of device package after vector load = " << size << std::endl;
 #endif
 
   return true;
@@ -3140,9 +2676,9 @@ bool DeviceMgr::loadDeviceMask()
 {
 
   // call all the intermediate vars loads:
-  vector<DeviceInstance*>::iterator iter;
-  vector<DeviceInstance*>::iterator begin;
-  vector<DeviceInstance*>::iterator end;
+  InstanceVector::iterator iter;
+  InstanceVector::iterator begin;
+  InstanceVector::iterator end;
 
   begin = instancePtrVec_.begin ();
   end   = instancePtrVec_.end ();
@@ -3154,10 +2690,10 @@ bool DeviceMgr::loadDeviceMask()
     nonTrivialDeviceMaskFlag |= (*iter)->loadDeviceMask();
   }
 
-  extData_.deviceMaskVectorPtr->fillComplete();
+  externData_.deviceMaskVectorPtr->fillComplete();
 
   // make sure the system's flag reflects ours:
-  extData_.lasSysPtr->setNonTrivialDeviceMaskFlag(nonTrivialDeviceMaskFlag);
+  externData_.lasSysPtr->setNonTrivialDeviceMaskFlag(nonTrivialDeviceMaskFlag);
 
   return nonTrivialDeviceMaskFlag;
 }
@@ -3170,19 +2706,19 @@ bool DeviceMgr::loadDeviceMask()
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 11/18/05
 //-----------------------------------------------------------------------------
-void DeviceMgr::addGlobalPar (N_UTL_Param & par)
+void DeviceMgr::addGlobalPar (Util::Param & par)
 {
   int pos;
-  if (par.getType() == EXPR)
+  if (par.getType() == Util::EXPR)
   {
-    vector<string> variables, specials;
-    vector<string>::iterator vs_i;
+    std::vector<std::string> variables, specials;
+    std::vector<std::string>::iterator vs_i;
     double val;
 
-    solState_.global_expressions.push_back(par.eVal());
+    solState_.global_expressions.push_back(par.getValue<Util::Expression>());
     solState_.global_exp_names.push_back(par.uTag());
     pos = solState_.global_expressions.size()-1;
-    N_UTL_Expression *e = &(solState_.global_expressions[pos]);
+    Util::Expression *e = &(solState_.global_expressions[pos]);
     e->get_names(XEXP_VARIABLE, variables);
     e->get_names(XEXP_SPECIAL, specials);
     if (!specials.empty())
@@ -3199,7 +2735,7 @@ void DeviceMgr::addGlobalPar (N_UTL_Param & par)
   }
   else
   {
-    solState_.global_params[par.uTag()] = par.dVal();
+    solState_.global_params[par.uTag()] = par.getImmutableValue<double>();
   }
 }
 
@@ -3212,43 +2748,30 @@ void DeviceMgr::addGlobalPar (N_UTL_Param & par)
 // Creator       : Rich Schie, SNL, Electrical Systems Modeling
 // Creation Date : 01/25/13
 //-----------------------------------------------------------------------------
-double DeviceMgr::getGlobalPar (const string & parName) const
+double DeviceMgr::getGlobalPar (const std::string & parName) const
 {
   double retVal = 0;
-  map<string,double>::const_iterator parLocItr = solState_.global_params.find(parName);
-  if( parLocItr != solState_.global_params.end() )
+  std::map<std::string,double>::const_iterator parLocItr = solState_.global_params.find(parName);
+  if (parLocItr != solState_.global_params.end())
   {
     // extract the value for return
     retVal = parLocItr->second;
   }
   else
   {
-    string msg = "Could not find global parameter \"" + parName + "\"";
-    N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_FATAL_0, msg);
+    Report::UserFatal0 message;
+    message << "Could not find global parameter \"" << parName << "\"";
   }
   return retVal;
 }
 
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceMgr::setUpPDEDeviceFlagArray ()
-// Purpose       : This function is intended to set which device types
-// Special Notes :
-// Scope         : private
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 05/18/02
-//-----------------------------------------------------------------------------
-
-bool DeviceMgr::setUpPDEDeviceFlagArray_ ()
+const double *DeviceMgr::findGlobalPar (const std::string & parName) const
 {
-  PDEDeviceFlag_[ModelType::DIODE_PDE]     = 1;
-  PDEDeviceFlag_[ModelType::TWO_D_PDE]     = 1;
+  std::map<std::string,double>::const_iterator it = solState_.global_params.find(parName);
+  if (it != solState_.global_params.end())
+    return &(*it).second;
 
-#ifdef Xyce_RAD_MODELS
-  ExtendedModelLevels::setUpPDEDeviceFlagArray_ (PDEDeviceFlag_);
-#endif
-
-  return true;
+  return 0;
 }
 
 #if 0
@@ -3272,9 +2795,9 @@ bool DeviceMgr::loadPerturbationVector_()
   int i;
   int isize = lasSysPtr_->getSolutionSize();
   for (i = 0; i < isize; ++i)
-    (*(extData_.perturbVectorPtr))[i]  =
+    (*(externData_.perturbVectorPtr))[i]  =
       solState_.numJacSqrtEta *
-        (1.0 + fabs( (*(extData_.nextSolVectorPtr))[i]));
+        (1.0 + fabs((*(externData_.nextSolVectorPtr))[i]));
 
   return true;
 }
@@ -3293,9 +2816,9 @@ bool DeviceMgr::updateIntermediateVars_()
 {
   bool bsuccess = true;
 
-  vector<DeviceInstance*>::iterator iter;
-  vector<DeviceInstance*>::iterator begin =instancePtrVec_.begin();
-  vector<DeviceInstance*>::iterator end =instancePtrVec_.end();
+  InstanceVector::iterator iter;
+  InstanceVector::iterator begin =instancePtrVec_.begin();
+  InstanceVector::iterator end =instancePtrVec_.end();
   for (iter=begin; iter!=end;++iter)
   {
     (*iter)->updateIntermediateVars ();
@@ -3317,9 +2840,9 @@ bool DeviceMgr::updatePrimaryState_()
 {
   bool bsuccess = true;
 
-  vector<DeviceInstance*>::iterator iter;
-  vector<DeviceInstance*>::iterator begin =instancePtrVec_.begin();
-  vector<DeviceInstance*>::iterator end =instancePtrVec_.end();
+  InstanceVector::iterator iter;
+  InstanceVector::iterator begin =instancePtrVec_.begin();
+  InstanceVector::iterator end =instancePtrVec_.end();
   for (iter=begin; iter!=end;++iter)
   {
     (*iter)->updatePrimaryState ();
@@ -3341,9 +2864,9 @@ bool DeviceMgr::updateSecondaryState_()
 {
   bool bsuccess = true;
 
-  vector<DeviceInstance*>::iterator iter;
-  vector<DeviceInstance*>::iterator begin =instancePtrVec_.begin();
-  vector<DeviceInstance*>::iterator end =instancePtrVec_.end();
+  InstanceVector::iterator iter;
+  InstanceVector::iterator begin =instancePtrVec_.begin();
+  InstanceVector::iterator end =instancePtrVec_.end();
   for (iter=begin; iter!=end;++iter)
   {
     (*iter)->updateSecondaryState ();
@@ -3365,26 +2888,26 @@ bool DeviceMgr::updateDependentParameters_()
 {
   bool bsuccess = true;
   bool tmpBool = true;
-  N_LAS_Vector * solVectorPtr = extData_.nextSolVectorPtr;
+  N_LAS_Vector * solVectorPtr = externData_.nextSolVectorPtr;
 
-  map<string,double> & gp = solState_.global_params;
-  vector<N_UTL_Expression> & ge = solState_.global_expressions;
+  std::map<std::string,double> & gp = solState_.global_params;
+  std::vector<Util::Expression> & ge = solState_.global_expressions;
 
   if (timeParamsProcessed_ != solState_.currTime)
     parameterChanged_ = true;
   if (!ge.empty())
   {
     // Update global params for new time and other global params
-    vector<string> variables;
-    vector<string>::iterator vs_i;
-    vector<string>::iterator vs_end;
+    std::vector<std::string> variables;
+    std::vector<std::string>::iterator vs_i;
+    std::vector<std::string>::iterator vs_end;
     double val;
     bool changed;
 
     int pos = 0;
-    vector<N_UTL_Expression>::iterator g_i = ge.begin();
-    vector<N_UTL_Expression>::iterator g_end = ge.end();
-    for ( ; g_i != g_end; ++g_i)
+    std::vector<Util::Expression>::iterator g_i = ge.begin();
+    std::vector<Util::Expression>::iterator g_end = ge.end();
+    for (; g_i != g_end; ++g_i)
     {
       changed = false;
       g_i->get_names(XEXP_VARIABLE, variables);
@@ -3394,7 +2917,7 @@ bool DeviceMgr::updateDependentParameters_()
       {
         vs_i=variables.begin();
         vs_end=variables.end();
-        for ( ; vs_i!=vs_end; ++vs_i)
+        for (; vs_i!=vs_end; ++vs_i)
         {
           if (g_i->set_var(*vs_i,gp[*vs_i]))
             changed = true;
@@ -3416,9 +2939,9 @@ bool DeviceMgr::updateDependentParameters_()
     dependentPtrVec_.clear();
     firstDependent = false;
 
-    vector<DeviceModel*>::iterator iterM;
-    vector<DeviceModel*>::iterator beginM =modelPtrVec_.begin();
-    vector<DeviceModel*>::iterator endM =modelPtrVec_.end();
+    ModelVector::iterator iterM;
+    ModelVector::iterator beginM =modelPtrVec_.begin();
+    ModelVector::iterator endM =modelPtrVec_.end();
     for (iterM=beginM; iterM!=endM;++iterM)
     {
       if (!(*iterM)->getDependentParams().empty())
@@ -3434,9 +2957,9 @@ bool DeviceMgr::updateDependentParameters_()
     }
 
     // do the instances
-    vector<DeviceInstance*>::iterator iter;
-    vector<DeviceInstance*>::iterator begin =instancePtrVec_.begin();
-    vector<DeviceInstance*>::iterator end =instancePtrVec_.end();
+    InstanceVector::iterator iter;
+    InstanceVector::iterator begin =instancePtrVec_.begin();
+    InstanceVector::iterator end =instancePtrVec_.end();
     for (iter=begin; iter!=end;++iter)
     {
       if (!(*iter)->getDependentParams().empty())
@@ -3453,9 +2976,9 @@ bool DeviceMgr::updateDependentParameters_()
   else
   {
     bool changed;
-    vector<DeviceEntity*>::iterator iter;
-    vector<DeviceEntity*>::iterator begin = dependentPtrVec_.begin();
-    vector<DeviceEntity*>::iterator end = dependentPtrVec_.end();
+    std::vector<DeviceEntity*>::iterator iter;
+    std::vector<DeviceEntity*>::iterator begin = dependentPtrVec_.begin();
+    std::vector<DeviceEntity*>::iterator end = dependentPtrVec_.end();
     for (iter=begin; iter!=end;++iter)
     {
       changed = false;
@@ -3498,22 +3021,22 @@ bool DeviceMgr::loadBVectorsforAC(N_LAS_Vector * bVecRealPtr,
 //  setupSolverInfo_ ();
 
 // copy over the passed pointers:
-  extData_.bVecRealPtr = bVecRealPtr;
-  extData_.bVecImagPtr = bVecImagPtr;
+  externData_.bVecRealPtr = bVecRealPtr;
+  externData_.bVecImagPtr = bVecImagPtr;
 
 #ifdef Xyce_PARALLEL_MPI
-  extData_.nextSolVectorPtr->importOverlap();
+  externData_.nextSolVectorPtr->importOverlap();
 #endif
   // Now reset the relevant RAW pointers:
-  extData_.bVecRealRawPtr = &((*extData_.bVecRealPtr)[0]);
-  extData_.bVecImagRawPtr = &((*extData_.bVecImagPtr)[0]);
+  externData_.bVecRealRawPtr = &((*externData_.bVecRealPtr)[0]);
+  externData_.bVecImagRawPtr = &((*externData_.bVecImagPtr)[0]);
 
-  vector<SourceInstance*>::iterator vIter;
-  vector<SourceInstance*>::iterator vBegin =indepSourceInstancePtrVec_.begin();
-  vector<SourceInstance*>::iterator vEnd =indepSourceInstancePtrVec_.end();
+  std::vector<SourceInstance*>::iterator vIter;
+  std::vector<SourceInstance*>::iterator vBegin =indepSourceInstancePtrVec_.begin();
+  std::vector<SourceInstance*>::iterator vEnd =indepSourceInstancePtrVec_.end();
   for (vIter=vBegin; vIter!=vEnd;++vIter)
   {
-    (*vIter)->loadBVectorsforAC(extData_.bVecRealRawPtr, extData_.bVecImagRawPtr);
+    (*vIter)->loadBVectorsforAC(externData_.bVecRealRawPtr, externData_.bVecImagRawPtr);
   }
 
   return bsuccess;
@@ -3528,23 +3051,23 @@ bool DeviceMgr::loadBVectorsforAC(N_LAS_Vector * bVecRealPtr,
 // Creation Date :
 //-----------------------------------------------------------------------------
 bool DeviceMgr::getBMatrixEntriesforMOR(std::vector<int>& bMatEntriesVec,
-                                              std::vector<int>& bMatPosEntriesVec)
+                                        std::vector<int>& bMatPosEntriesVec)
 {
   bool bsuccess = true;
 
   int lpos, lneg, lbra;
-  vector<N_DEV_SourceInstance*>::iterator vIter;
-  vector<N_DEV_SourceInstance*>::iterator vBegin =indepSourceInstancePtrVec_.begin();
-  vector<N_DEV_SourceInstance*>::iterator vEnd =indepSourceInstancePtrVec_.end();
+  std::vector<SourceInstance *>::iterator vIter;
+  std::vector<SourceInstance *>::iterator vBegin = indepSourceInstancePtrVec_.begin();
+  std::vector<SourceInstance *>::iterator vEnd = indepSourceInstancePtrVec_.end();
 
   for (vIter=vBegin; vIter!=vEnd;++vIter)
   {
-     N_DEV_VsrcInstance* vsrc = dynamic_cast<N_DEV_VsrcInstance *>(*vIter);
+    Vsrc::Instance* vsrc = dynamic_cast<Vsrc::Instance *>(*vIter);
      if (vsrc != 0)
      {
        vsrc->getLIDs(lpos, lneg, lbra);
-       bMatEntriesVec.push_back( lbra );
-       bMatPosEntriesVec.push_back( lpos );
+       bMatEntriesVec.push_back(lbra);
+       bMatPosEntriesVec.push_back(lpos);
      }
   }
 
@@ -3566,9 +3089,9 @@ bool DeviceMgr::updateSources()
 
   setupSolverInfo_ ();
 
-  vector<SourceInstance*>::iterator vIter;
-  vector<SourceInstance*>::iterator vBegin =indepSourceInstancePtrVec_.begin();
-  vector<SourceInstance*>::iterator vEnd =indepSourceInstancePtrVec_.end();
+  std::vector<SourceInstance*>::iterator vIter;
+  std::vector<SourceInstance*>::iterator vBegin =indepSourceInstancePtrVec_.begin();
+  std::vector<SourceInstance*>::iterator vEnd =indepSourceInstancePtrVec_.end();
   for (vIter=vBegin; vIter!=vEnd;++vIter)
   {
     (*vIter)->updateSource();
@@ -3603,39 +3126,35 @@ bool DeviceMgr::setICs(
 {
   bool bsuccess = true;
 
-#ifdef Xyce_PARALLEL_MPI
-  N_ERH_ErrorMgr::startSafeBarrier();
-#endif
-
   // copy over the passed pointers:
-  extData_.nextSolVectorPtr = tmpSolVectorPtr;
-  extData_.currSolVectorPtr = tmpCurrSolVectorPtr;
-  extData_.lastSolVectorPtr = tmpLastSolVectorPtr;
-  extData_.daeQVectorPtr    = tmpQVectorPtr;
-  extData_.daeFVectorPtr    = tmpFVectorPtr;
-  extData_.dFdxdVpVectorPtr = tmpdFdxdVpVectorPtr;
-  extData_.dQdxdVpVectorPtr = tmpdQdxdVpVectorPtr;
-  extData_.nextStaVectorPtr = tmpStaVectorPtr;
-  extData_.currStaVectorPtr = tmpCurrStaVectorPtr;
-  extData_.lastStaVectorPtr = tmpLastStaVectorPtr;
-  extData_.nextStaDerivVectorPtr = tmpStaDerivVectorPtr;
-  extData_.nextStoVectorPtr = tmpStoVectorPtr;
-  extData_.currStoVectorPtr = tmpCurrStoVectorPtr;
-  extData_.lastStoVectorPtr = tmpLastStoVectorPtr;
+  externData_.nextSolVectorPtr = tmpSolVectorPtr;
+  externData_.currSolVectorPtr = tmpCurrSolVectorPtr;
+  externData_.lastSolVectorPtr = tmpLastSolVectorPtr;
+  externData_.daeQVectorPtr    = tmpQVectorPtr;
+  externData_.daeFVectorPtr    = tmpFVectorPtr;
+  externData_.dFdxdVpVectorPtr = tmpdFdxdVpVectorPtr;
+  externData_.dQdxdVpVectorPtr = tmpdQdxdVpVectorPtr;
+  externData_.nextStaVectorPtr = tmpStaVectorPtr;
+  externData_.currStaVectorPtr = tmpCurrStaVectorPtr;
+  externData_.lastStaVectorPtr = tmpLastStaVectorPtr;
+  externData_.nextStaDerivVectorPtr = tmpStaDerivVectorPtr;
+  externData_.nextStoVectorPtr = tmpStoVectorPtr;
+  externData_.currStoVectorPtr = tmpCurrStoVectorPtr;
+  externData_.lastStoVectorPtr = tmpLastStoVectorPtr;
 
   // Make sure all boundary data is valid in the solution vector
 #ifdef Xyce_PARALLEL_MPI
-  extData_.nextSolVectorPtr->importOverlap();
-  extData_.nextStaDerivVectorPtr->importOverlap();
+  externData_.nextSolVectorPtr->importOverlap();
+  externData_.nextStaDerivVectorPtr->importOverlap();
 #endif
 
   // if IC's on devices are set, we need to ensure that the
   // raw pointers are up to date first.
   setupRawVectorPointers_ ();
 
-  vector<DeviceInstance*>::iterator iter;
-  vector<DeviceInstance*>::iterator begin =instancePtrVec_.begin();
-  vector<DeviceInstance*>::iterator end =instancePtrVec_.end();
+  InstanceVector::iterator iter;
+  InstanceVector::iterator begin =instancePtrVec_.begin();
+  InstanceVector::iterator end =instancePtrVec_.end();
   for (iter=begin; iter!=end;++iter)
   {
     (*iter)->setIC ();
@@ -3692,7 +3211,7 @@ bool DeviceMgr::getPDESystemFlag()
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 02/14/01
 //-----------------------------------------------------------------------------
-bool DeviceMgr::runParameterTests(string & deviceName)
+bool DeviceMgr::runParameterTests(std::string & deviceName)
 {
   bool bsuccess = true;
 
@@ -3712,9 +3231,9 @@ bool DeviceMgr::output ()
   bool bsuccess = true;
   bool tmpBool = true;
 
-  vector<DeviceInstance*>::iterator iter;
-  vector<DeviceInstance*>::iterator begin = plotFileInstancePtrVec_.begin ();
-  vector<DeviceInstance*>::iterator end = plotFileInstancePtrVec_.end ();
+  InstanceVector::iterator iter;
+  InstanceVector::iterator begin = plotFileInstancePtrVec_.begin ();
+  InstanceVector::iterator end = plotFileInstancePtrVec_.end ();
   for (iter=begin; iter!=end;++iter)
   {
     tmpBool = (*iter)->outputPlotFiles ();
@@ -3722,7 +3241,7 @@ bool DeviceMgr::output ()
   }
 
   // only output .OP information once.
-  if ( !dotOpOutputFlag && solState_.OPspecified )
+  if (!dotOpOutputFlag && solState_.OPspecified)
   {
     dotOpOutput();
   }
@@ -3765,23 +3284,21 @@ bool DeviceMgr::finishOutput ()
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 5/3/12
 //-----------------------------------------------------------------------------
-void  DeviceMgr::dotOpOutput ()
+void DeviceMgr::dotOpOutput ()
 {
   dotOpOutputFlag = true;
 
-  const string dashedline("--------------------------------------------------"
-    "---------------------------");
-  //std::cout << dashedline << std::endl;
-  string msg = dashedline + "\nOperating point information:";
-  N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_INFO_0, msg);
-  int i;
-  for (i = 1; i < ModelType::NUMDEV; ++i)
-  {
-    if (deviceUseFlag_[i] == 1) deviceArray_[i]->printDotOpOutput(std::cout);
-  }
-  msg = dashedline;
-  N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::USR_INFO_0, msg);
-  //outputParams (int mode, map <int, DeviceEntity *> & base )
+  std::map<std::string, Device *> device_map;
+  for (EntityTypeIdDeviceMap::const_iterator it = deviceMap_.begin(); it != deviceMap_.end(); ++it)
+    device_map[(*it).second->getName()] = (*it).second;
+
+  lout() << section_divider << "\n"
+         << "Operating point information:";
+
+  for (std::map<std::string, Device *>::const_iterator it = device_map.begin(); it != device_map.end(); ++it)
+    Xyce::Device::printDotOpOutput(lout(), *(*it).second);
+
+  lout() << section_divider << std::endl;
 }
 
 //-----------------------------------------------------------------------------
@@ -3806,9 +3323,9 @@ void DeviceMgr::setGlobalFlags()
 
 #if 0
   if (solState_.PDESystemFlag)
-    std::cout << "PDESystemFlag = TRUE"<<std::endl;
+    dout() << "PDESystemFlag = TRUE"<<std::endl;
   else
-    std::cout << "PDESystemFlag = FALSE"<<std::endl;
+    dout() << "PDESystemFlag = FALSE"<<std::endl;
 #endif
 #endif
 
@@ -3823,10 +3340,10 @@ void DeviceMgr::setGlobalFlags()
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/08/01
 //-----------------------------------------------------------------------------
-bool DeviceMgr::getBreakPoints ( vector<N_UTL_BreakPoint> & breakPointTimes )
+bool DeviceMgr::getBreakPoints (std::vector<Util::BreakPoint> & breakPointTimes)
 {
-  vector<DeviceInstance*>::iterator iterI;
-  vector<DeviceModel*>::iterator iterM;
+  InstanceVector::iterator iterI;
+  ModelVector::iterator iterM;
   bool bsuccess = true;
   bool tmpBool = true;
 
@@ -3856,11 +3373,11 @@ bool DeviceMgr::getBreakPoints ( vector<N_UTL_BreakPoint> & breakPointTimes )
   }
 
   // Breakpoints for global params:
-  vector<N_UTL_Expression>::iterator globalExp_i =
+  std::vector<Util::Expression>::iterator globalExp_i =
     solState_.global_expressions.begin();
-  vector<N_UTL_Expression>::iterator globalExp_end =
+  std::vector<Util::Expression>::iterator globalExp_end =
     solState_.global_expressions.end();
-  for ( ; globalExp_i != globalExp_end; ++globalExp_i)
+  for (; globalExp_i != globalExp_end; ++globalExp_i)
   {
     double bTime = globalExp_i->get_break_time();
     if (bTime > solState_.currTime)
@@ -3869,13 +3386,13 @@ bool DeviceMgr::getBreakPoints ( vector<N_UTL_BreakPoint> & breakPointTimes )
 
   if (!breakPointInstancesInitialized)
   {
-    vector<DeviceInstance*>::iterator beginI = instancePtrVec_.begin ();
-    vector<DeviceInstance*>::iterator endI = instancePtrVec_.end ();
+    InstanceVector::iterator beginI = instancePtrVec_.begin ();
+    InstanceVector::iterator endI = instancePtrVec_.end ();
 
     for (iterI=beginI;iterI!=endI;++iterI)
     {
       // this function returns false if it is the base class, and true otherwise.
-      bool functionSetup = (*iterI)->getInstanceBreakPoints ( breakPointTimes );
+      bool functionSetup = (*iterI)->getInstanceBreakPoints (breakPointTimes);
       if (functionSetup)
       {
         bpInstancePtrVec_.push_back(*iterI);
@@ -3885,23 +3402,23 @@ bool DeviceMgr::getBreakPoints ( vector<N_UTL_BreakPoint> & breakPointTimes )
   }
   else
   {
-    vector<DeviceInstance*>::iterator beginI = bpInstancePtrVec_.begin ();
-    vector<DeviceInstance*>::iterator endI = bpInstancePtrVec_.end ();
+    InstanceVector::iterator beginI = bpInstancePtrVec_.begin ();
+    InstanceVector::iterator endI = bpInstancePtrVec_.end ();
     for (iterI=beginI;iterI!=endI;++iterI)
     {
-      bool functionSetup = (*iterI)->getInstanceBreakPoints ( breakPointTimes );
+      bool functionSetup = (*iterI)->getInstanceBreakPoints (breakPointTimes);
     }
   }
 
 #ifdef Xyce_EXTDEV
-  vector<N_DEV_ExternDeviceInstance*>::iterator iter;
-  vector<N_DEV_ExternDeviceInstance*>::iterator begin;
-  vector<N_DEV_ExternDeviceInstance*>::iterator end;
+  std::vector<ExternDevice::Instance*>::iterator iter;
+  std::vector<ExternDevice::Instance*>::iterator begin;
+  std::vector<ExternDevice::Instance*>::iterator end;
   begin = extDevInstancePtrVec_.begin ();
   end = extDevInstancePtrVec_.end ();
   for (iter=begin; iter!=end;++iter)
   {
-    (*iter)->getBreakPoints ( breakPointTimes );
+    (*iter)->getBreakPoints (breakPointTimes);
   }
 #endif
 
@@ -3975,8 +3492,8 @@ bool DeviceMgr::setupSolverInfo_ ()
   if (solState_.mpdeOnFlag == 1)
   {
     solState_.dcopFlag = 0;
-    solState_.initTranFlag = 0;
-    solState_.beginIntegrationFlag = 0;
+    solState_.initTranFlag =  1;
+    solState_.beginIntegrationFlag =  1;
   }
   else
   {
@@ -4037,23 +3554,23 @@ bool DeviceMgr::setupSolverInfo_ ()
     resetFlag = resetFlag && (solState_.continuationStepNumber==0);
   }
 
-  solState_.initJctFlag = ( (solState_.dcopFlag) &&
+  solState_.initJctFlag = ((solState_.dcopFlag) &&
                             (solState_.newtonIter==0) &&
                              solState_.firstContinuationParam &&
-                             !solState_.firstSolveComplete && resetFlag );
+                             !solState_.firstSolveComplete && resetFlag);
 
   // initFixFlag: try to mimic "MODEINITFIX" of SPICE.  This is set if:
   //   DCOP or TranOP
   //   Not first iteration
   //   Any device not converged
 
-  solState_.initFixFlag = ( (solState_.dcopFlag) &&
+  solState_.initFixFlag = ((solState_.dcopFlag) &&
                             !(allDevsConverged()) &&
                             (solState_.newtonIter!=0) &&
                              solState_.firstContinuationParam &&
-                             !solState_.firstSolveComplete && resetFlag );
+                             !solState_.firstSolveComplete && resetFlag);
 
-  if ( solState_.dcopFlag )
+  if (solState_.dcopFlag)
   {
     solState_.ltraTimeIndex = 0;
     solState_.ltraTimeHistorySize = 10;
@@ -4094,25 +3611,24 @@ bool DeviceMgr::setupSolverInfo_ ()
     NodeNamePairMap::iterator mapI, mapEnd;
     mapEnd = nodeNames.end();
     mapI =  nodeNames.begin();
-    for ( ; mapI != mapEnd ; ++mapI)
+    for (; mapI != mapEnd ; ++mapI)
     {
       nameVec_[(*mapI).second.first] = (*mapI).first;
     }
   }
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
-  {
-    std::cout << solState_;
+  if (DEBUG_DEVICE) {
+    if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
+    {
+      dout() << solState_;
+    }
+
+    solState_.debugTimeFlag =
+      (solState_.currTime       >= devOptions_.debugMinTime &&
+       solState_.currTime       <= devOptions_.debugMaxTime) &&
+      (solState_.timeStepNumber >= devOptions_.debugMinTimestep &&
+       solState_.timeStepNumber <= devOptions_.debugMaxTimestep);
   }
-
-  solState_.debugTimeFlag =
-  (solState_.currTime       >= devOptions_.debugMinTime &&
-   solState_.currTime       <= devOptions_.debugMaxTime) &&
-  (solState_.timeStepNumber >= devOptions_.debugMinTimestep &&
-   solState_.timeStepNumber <= devOptions_.debugMaxTimestep);
-
-#endif  // Xyce_DEBUG_DEVICE
 
   return bsuccess;
 }
@@ -4127,79 +3643,79 @@ bool DeviceMgr::setupSolverInfo_ ()
 //-----------------------------------------------------------------------------
 bool DeviceMgr::setupRawVectorPointers_ ()
 {
-  if (extData_.daeQVectorPtr != 0)
+  if (externData_.daeQVectorPtr != 0)
   {
-    extData_.daeQVectorRawPtr    = &((*extData_.daeQVectorPtr)[0]);
+    externData_.daeQVectorRawPtr    = &((*externData_.daeQVectorPtr)[0]);
   }
 
-  if (extData_.daeFVectorPtr != 0)
+  if (externData_.daeFVectorPtr != 0)
   {
-    extData_.daeFVectorRawPtr    = &((*extData_.daeFVectorPtr)[0]);
+    externData_.daeFVectorRawPtr    = &((*externData_.daeFVectorPtr)[0]);
   }
 
-  if (extData_.dFdxdVpVectorPtr != 0)
+  if (externData_.dFdxdVpVectorPtr != 0)
   {
-    extData_.dFdxdVpVectorRawPtr = &((*extData_.dFdxdVpVectorPtr)[0]);
+    externData_.dFdxdVpVectorRawPtr = &((*externData_.dFdxdVpVectorPtr)[0]);
   }
 
-  if (extData_.dQdxdVpVectorPtr != 0)
+  if (externData_.dQdxdVpVectorPtr != 0)
   {
-    extData_.dQdxdVpVectorRawPtr = &((*extData_.dQdxdVpVectorPtr)[0]);
+    externData_.dQdxdVpVectorRawPtr = &((*externData_.dQdxdVpVectorPtr)[0]);
   }
 
-  if ( extData_.nextSolVectorPtr != 0 )
+  if (externData_.nextSolVectorPtr != 0)
   {
-    extData_.nextSolVectorRawPtr = &((*extData_.nextSolVectorPtr)[0]);
+    externData_.nextSolVectorRawPtr = &((*externData_.nextSolVectorPtr)[0]);
   }
 
-  if ( extData_.currSolVectorPtr != 0 )
+  if (externData_.currSolVectorPtr != 0)
   {
-    extData_.currSolVectorRawPtr = &((*extData_.currSolVectorPtr)[0]);
+    externData_.currSolVectorRawPtr = &((*externData_.currSolVectorPtr)[0]);
   }
 
-  if ( extData_.lastSolVectorPtr != 0 )
+  if (externData_.lastSolVectorPtr != 0)
   {
-    extData_.lastSolVectorRawPtr = &((*extData_.lastSolVectorPtr)[0]);
+    externData_.lastSolVectorRawPtr = &((*externData_.lastSolVectorPtr)[0]);
   }
 
-  if ( extData_.nextStaVectorPtr != 0 )
+  if (externData_.nextStaVectorPtr != 0)
   {
-    extData_.nextStaVectorRawPtr = &((*extData_.nextStaVectorPtr)[0]);
+    externData_.nextStaVectorRawPtr = &((*externData_.nextStaVectorPtr)[0]);
   }
 
-  if ( extData_.currStaVectorPtr != 0 )
+  if (externData_.currStaVectorPtr != 0)
   {
-    extData_.currStaVectorRawPtr = &((*extData_.currStaVectorPtr)[0]);
+    externData_.currStaVectorRawPtr = &((*externData_.currStaVectorPtr)[0]);
   }
 
-  if ( extData_.lastStaVectorPtr != 0 )
+  if (externData_.lastStaVectorPtr != 0)
   {
-    extData_.lastStaVectorRawPtr = &((*extData_.lastStaVectorPtr)[0]);
+    externData_.lastStaVectorRawPtr = &((*externData_.lastStaVectorPtr)[0]);
   }
 
-  if ( extData_.nextStaDerivVectorPtr != 0 )
+  if (externData_.nextStaDerivVectorPtr != 0)
   {
-    extData_.nextStaDerivVectorRawPtr = &((*extData_.nextStaDerivVectorPtr)[0]);
+    externData_.nextStaDerivVectorRawPtr = &((*externData_.nextStaDerivVectorPtr)[0]);
   }
 
-  if ( extData_.nextStoVectorPtr != 0 )
+  if (externData_.nextStoVectorPtr != 0)
   {
-    extData_.nextStoVectorRawPtr = &((*extData_.nextStoVectorPtr)[0]);
+    externData_.nextStoVectorRawPtr = &((*externData_.nextStoVectorPtr)[0]);
   }
 
-  if ( extData_.currStoVectorPtr != 0 )
+  if (externData_.currStoVectorPtr != 0)
   {
-    extData_.currStoVectorRawPtr = &((*extData_.currStoVectorPtr)[0]);
+    externData_.currStoVectorRawPtr = &((*externData_.currStoVectorPtr)[0]);
   }
 
-  if ( extData_.lastStoVectorPtr != 0 )
+  if (externData_.lastStoVectorPtr != 0)
   {
-    extData_.lastStoVectorRawPtr = &((*extData_.lastStoVectorPtr)[0]);
+    externData_.lastStoVectorRawPtr = &((*externData_.lastStoVectorPtr)[0]);
   }
 
-  if ( extData_.storeLeadCurrQCompPtr != 0 )
+  if (externData_.storeLeadCurrQCompPtr != 0)
   {
-    extData_.storeLeadCurrQCompRawPtr = &((*extData_.storeLeadCurrQCompPtr)[0]);
+    externData_.storeLeadCurrQCompRawPtr = &((*externData_.storeLeadCurrQCompPtr)[0]);
   }
 
   return true;
@@ -4215,9 +3731,9 @@ bool DeviceMgr::setupRawVectorPointers_ ()
 //-----------------------------------------------------------------------------
 bool DeviceMgr::setupRawMatrixPointers_ ()
 {
-    vector<DeviceInstance*>::iterator iter;
-    vector<DeviceInstance*>::iterator begin;
-    vector<DeviceInstance*>::iterator end;
+    InstanceVector::iterator iter;
+    InstanceVector::iterator begin;
+    InstanceVector::iterator end;
     begin = instancePtrVec_.begin();
     end   = instancePtrVec_.end();
     for (iter=begin; iter!=end;++iter)
@@ -4239,15 +3755,15 @@ double DeviceMgr::getMaxTimeStepSize ()
 {
   double maxStep = devOptions_.defaultMaxTimeStep;
 
-  vector<DeviceInstance*>::iterator iter;
-  vector<DeviceInstance*>::iterator begin =instancePtrVec_.begin();
-  vector<DeviceInstance*>::iterator end =instancePtrVec_.end();
+  InstanceVector::iterator iter;
+  InstanceVector::iterator begin =instancePtrVec_.begin();
+  InstanceVector::iterator end =instancePtrVec_.end();
   for (iter=begin; iter!=end;++iter)
   {
     double step = (*iter)->getMaxTimeStepSize ();
     SourceInstance * srcInst = dynamic_cast<SourceInstance*>(*iter);
-    if( !srcInst || !srcInst->getFastSourceFlag() )
-      maxStep = Xycemin( step, maxStep );
+    if (!srcInst || !srcInst->getFastSourceFlag())
+      maxStep = Xycemin(step, maxStep);
   }
 
   return maxStep;
@@ -4285,18 +3801,17 @@ void DeviceMgr::declareCurrentStepAsBreakpoint()
 //-----------------------------------------------------------------------------
 int DeviceMgr::enablePDEContinuation ()
 {
-#ifdef Xyce_DEBUG_DEVICE
-  std::cout << "DeviceMgr::enablePDEContinuation" << std::endl;
-#endif
+  if (DEBUG_DEVICE)
+    dout() << "DeviceMgr::enablePDEContinuation" << std::endl;
 
   bool bsuccess = true;
   solState_.PDEcontinuationFlag  = true;
   solState_.maxPDEContinuationSteps = 1;
   solState_.currPDEContinuationStep = 0;
 
-  vector<DeviceInstance*>::iterator iter;
-  vector<DeviceInstance*>::iterator begin =instancePtrVec_.begin();
-  vector<DeviceInstance*>::iterator end =instancePtrVec_.end();
+  InstanceVector::iterator iter;
+  InstanceVector::iterator begin =instancePtrVec_.begin();
+  InstanceVector::iterator end =instancePtrVec_.end();
 
   for (iter=begin; iter!=end;++iter)
   {
@@ -4336,9 +3851,9 @@ bool DeviceMgr::disablePDEContinuation ()
   bool bsuccess = true;
   solState_.PDEcontinuationFlag = false;
 
-  vector<DeviceInstance*>::iterator iter;
-  vector<DeviceInstance*>::iterator begin =instancePtrVec_.begin();
-  vector<DeviceInstance*>::iterator end =instancePtrVec_.end();
+  InstanceVector::iterator iter;
+  InstanceVector::iterator begin =instancePtrVec_.begin();
+  InstanceVector::iterator end =instancePtrVec_.end();
   for (iter=begin; iter!=end;++iter)
   {
     bool tmpSuccess = (*iter)->disablePDEContinuation();
@@ -4391,7 +3906,7 @@ bool DeviceMgr::calcPDESubProblemInfo ()
 // Creator       : Eric R. Keiter, SNL, Computational Sciences
 // Creation Date : 12/03/02
 //-----------------------------------------------------------------------------
-void DeviceMgr::getNumInterfaceNodes (vector<int> & numINodes)
+void DeviceMgr::getNumInterfaceNodes (std::vector<int> & numINodes)
 {
   if (!calledBeforeCSPI)
   {
@@ -4401,7 +3916,7 @@ void DeviceMgr::getNumInterfaceNodes (vector<int> & numINodes)
   int size = numINodes.size ();
   int size2 = numInterfaceNodes_.size();
 
-  if (size < size2 ) numINodes.resize(size2);
+  if (size < size2) numINodes.resize(size2);
 
   for (int i=0;i<size2;++i)
   {
@@ -4445,9 +3960,9 @@ bool DeviceMgr::calcCouplingTerms (int iPDEDevice, int iElectrode, const N_LAS_V
 //-----------------------------------------------------------------------------
 bool DeviceMgr::raiseDebugLevel(int increment)
 {
-#ifdef Xyce_DEBUG_DEVICE
-  devOptions_.debugLevel += increment;
-#endif
+  if (DEBUG_DEVICE)
+    devOptions_.debugLevel += increment;
+
   return true;
 }
 
@@ -4459,7 +3974,7 @@ bool DeviceMgr::raiseDebugLevel(int increment)
 // Creator       : Tom Russo, SNL, Component Information and MOdels
 // Creation Date : 05/05/04
 //-----------------------------------------------------------------------------
-bool DeviceMgr::getDACDeviceNames(vector < string > & dacNames)
+bool DeviceMgr::getDACDeviceNames(std::vector< std::string > & dacNames)
 {
 
   bool bSuccess = true;
@@ -4468,23 +3983,21 @@ bool DeviceMgr::getDACDeviceNames(vector < string > & dacNames)
 
   // find the device index for DAC devices:
 
-  int dacIndex = getDeviceIndex("Y%DAC%DUMMYDAC");
+  EntityTypeId dac_model_type_id = DAC::Traits::modelGroup(); // getModelGroup("Y%DAC%DUMMYDAC");
 
   // get the singleton for the DAC device
-  Device* devicePtr = returnDevicePtr(dacIndex);
+  Device* devicePtr = getDevice(dac_model_type_id);
 
   // If it wasn't found, there were no DAC devices
-  if (devicePtr == NULL || devicePtr == dummy_ptr)
+  if (!devicePtr)
   {
-    string msg("DeviceMgr::getDACDeviceNames:");
-    msg += "  No singleton found, circuit does not apparently have any DAC devices in it.\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
-    // this is not a failure, though
+    Report::UserWarning0 message;
+    message << "Circuit does not have any DAC devices";
   }
   else
   {
-    N_DEV_DACMaster* DACPtr = dynamic_cast<N_DEV_DACMaster*>(devicePtr);
-    bSuccess = DACPtr->getDACDeviceNames( dacNames );
+    DAC::Master* DACPtr = dynamic_cast<DAC::Master*>(devicePtr);
+    bSuccess = DACPtr->getDACDeviceNames(dacNames);
   }
 
   return bSuccess;
@@ -4498,7 +4011,7 @@ bool DeviceMgr::getDACDeviceNames(vector < string > & dacNames)
 // Creator       : Tom Russo, SNL, Component Information and MOdels
 // Creation Date : 05/05/04
 //-----------------------------------------------------------------------------
-bool DeviceMgr::getADCMap(map<string,map<string,double> >&ADCMap)
+bool DeviceMgr::getADCMap(std::map<std::string,std::map<std::string,double> >&ADCMap)
 {
 
   bool bSuccess = true;
@@ -4507,23 +4020,21 @@ bool DeviceMgr::getADCMap(map<string,map<string,double> >&ADCMap)
 
   // find the device index for ADC devices:
 
-  int adcIndex = getDeviceIndex("Y%ADC%DUMMYADC");
+  EntityTypeId adc_model_type_id = ADC::Traits::modelGroup(); // getModelGroup("Y%ADC%DUMMYADC");
 
   // get the singleton for the ADC device
-  Device* devicePtr = returnDevicePtr(adcIndex);
+  Device* devicePtr = getDevice(adc_model_type_id);
 
   // If it wasn't found, there were no ADC devices
-  if (devicePtr == NULL || devicePtr == dummy_ptr)
+  if (!devicePtr)
   {
-    string msg("DeviceMgr::getADCMap:");
-    msg += "  No singleton found, circuit does not apparently have any ADC devices in it.\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
-    // this is not a failure, though
+    Report::UserWarning0 message;
+    message << "Circuit does not have any ADC devices";
   }
   else
   {
-    N_DEV_ADCMaster* ADCPtr = dynamic_cast<N_DEV_ADCMaster*>(devicePtr);
-    bSuccess = ADCPtr->getADCMap( ADCMap );
+    ADC::Master* ADCPtr = dynamic_cast<ADC::Master*>(devicePtr);
+    bSuccess = ADCPtr->getADCMap(ADCMap);
   }
 
   return bSuccess;
@@ -4544,7 +4055,7 @@ bool DeviceMgr::getADCMap(map<string,map<string,double> >&ADCMap)
 // Creation Date  : 05/07/2004
 //----------------------------------------------------------------------------
 bool DeviceMgr::updateTimeVoltagePairs(
-   map< string, vector< pair<double,double> >* > const & timeVoltageUpdateMap)
+   std::map< std::string, std::vector< std::pair<double,double> >* > const & timeVoltageUpdateMap)
 {
   bool bSuccess = true;
 
@@ -4553,65 +4064,58 @@ bool DeviceMgr::updateTimeVoltagePairs(
   // Also note that the Device Instance name supplied here does
   // not have to be for an instance that really exists, just one
   // that meets the naming convention for the given type of device.
-  int dacIndex = getDeviceIndex("Y%DAC%DUMMYDAC");
+  EntityTypeId dac_model_type_id = DAC::Traits::modelGroup(); // getModelGroup("Y%DAC%DUMMYDAC");
 
   // Get the singleton for the "DAC" type of device.
-  Device* devicePtr = returnDevicePtr(dacIndex);
+  Device* devicePtr = getDevice(dac_model_type_id);
 
-  if (devicePtr == NULL || devicePtr == dummy_ptr)
+  if (!devicePtr)
   {
     // not a failure, there are no DACs
   }
   else
   {
     // Get all of the instances associated with devicePtr.
-    vector<DeviceInstance*> deviceInstances;
-    devicePtr->getInstances(deviceInstances);
+    std::vector<DeviceInstance*> deviceInstances;
+    getDeviceInstances(*devicePtr, std::back_inserter(deviceInstances));
 
     // Update each of the DAC device instances in turn.
-    vector<DeviceInstance*>::iterator iterI;
-    vector<DeviceInstance*>::iterator beginI = deviceInstances.begin();
-    vector<DeviceInstance*>::iterator endI = deviceInstances.end();
+    InstanceVector::iterator iterI;
+    InstanceVector::iterator beginI = deviceInstances.begin();
+    InstanceVector::iterator endI = deviceInstances.end();
     for (iterI = beginI; iterI != endI; ++iterI)
     {
-      N_DEV_DACInstance* dacInstancePtr = dynamic_cast<N_DEV_DACInstance*>(*iterI);
+      DAC::Instance* dacInstancePtr = dynamic_cast<DAC::Instance*>(*iterI);
       // Get the name of the given DAC device instance.
-      string const & dacName(dacInstancePtr->getName());
+      std::string const & dacName(dacInstancePtr->getName());
       // Try to find an entry for that DAC in the map.
-      map< string, vector< pair<double,double> >* >::const_iterator mapIter;
+      std::map< std::string, std::vector< std::pair<double,double> >* >::const_iterator mapIter;
       mapIter = timeVoltageUpdateMap.find(dacName);
       if (mapIter == timeVoltageUpdateMap.end())
       {
         // See if there is an entry for a stripped down version
         // of the DAC name.
         //string strippedDacName(dacName.substr(
-        //   dacName.find_last_of("%") + 1, dacName.length() - 1 ));
+        //   dacName.find_last_of("%") + 1, dacName.length() - 1));
 
         mapIter = timeVoltageUpdateMap.find(dacName);
         if (mapIter == timeVoltageUpdateMap.end())
         {
-          string msg("In N_CIR_Xyce::updateTimeVoltagePairs: ");
-          msg += "Failed to find a map entry for the DAC named ";
-          msg += dacName;
-          msg += "\n";
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
+          Report::UserWarning0 message;
+          message << "Could not find DAC " << dacName;
           continue;
         }
       }
 
-#ifdef Xyce_DEBUG_DEVICE
-      std::cout << "DeviceMgr::updateTimeVoltagePairs: found DAC with name: "
-           << dacName << "\n";
-#endif
+      if (DEBUG_DEVICE)
+        dout() << "DeviceMgr::updateTimeVoltagePairs: found DAC with name: "
+               << dacName << "\n";
 
       // Update the time-voltage pairs for the given DAC instance.
       if (!dacInstancePtr->updateTVVEC(*(*mapIter).second))
       {
-        string msg("In N_CIR_Xyce::updateTimeVoltagePairs: ");
-        msg += "Failed to update the time-voltage pairs for the DAC named ";
-        msg += dacName;
-        msg += "\n";
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
+        Report::UserWarning0 message;
+        message << "Failed to update the time-voltage pairs for the DAC " << dacName;
         continue;
       }
     }
@@ -4629,78 +4133,70 @@ bool DeviceMgr::updateTimeVoltagePairs(
 // Creator       : Tom Russo, SNL, Component Information and Models
 // Creation Date : 07/29/2002
 //----------------------------------------------------------------------------
-bool DeviceMgr::setADCWidths(map<string,int> const & ADCWidthMap)
+bool DeviceMgr::setADCWidths(std::map<std::string,int> const & ADCWidthMap)
 {
   bool bSuccess = true;
-#ifdef Xyce_DEBUG_DEVICE
-  std::cout << "entering DeviceMgr::setADCWidths " << std::endl;
-#endif
+  if (DEBUG_DEVICE)
+    dout() << "entering DeviceMgr::setADCWidths " << std::endl;
 
   // Get the device index for ADC devices. Note that Xyce's convention
   // for ADC device naming breaks the Netlist usual conventions.
   // Also note that the Device Instance name supplied here does
   // not have to be for an instance that really exists, just one
   // that meets the naming convention for the given type of device.
-  int adcIndex = getDeviceIndex("Y%ADC%DUMMYADC");
+  EntityTypeId adc_model_type_id = ADC::Traits::modelGroup(); // getModelGroup("Y%ADC%DUMMYADC");
 
   // Get the singleton for the "ADC" type of device.
-  Device* devicePtr = returnDevicePtr(adcIndex);
+  Device* devicePtr = getDevice(adc_model_type_id);
 
-  if (devicePtr == NULL || devicePtr == dummy_ptr)
+  if (!devicePtr)
   {
     // This is not a failure, just means there aren't any ADCs
   }
   else
   {
     // Get all of the instances associated with devicePtr.
-    vector<DeviceInstance*> deviceInstances;
-    devicePtr->getInstances(deviceInstances);
+    std::vector<DeviceInstance*> deviceInstances;
+    getDeviceInstances(*devicePtr, std::back_inserter(deviceInstances));
 
     // Update each of the ADC device instances in turn.
-    vector<DeviceInstance*>::iterator iterI;
-    vector<DeviceInstance*>::iterator beginI = deviceInstances.begin();
-    vector<DeviceInstance*>::iterator endI = deviceInstances.end();
+    InstanceVector::iterator iterI;
+    InstanceVector::iterator beginI = deviceInstances.begin();
+    InstanceVector::iterator endI = deviceInstances.end();
     for (iterI = beginI; iterI != endI; ++iterI)
     {
-      N_DEV_ADCInstance* adcInstancePtr = dynamic_cast<N_DEV_ADCInstance*>(*iterI);
+      ADC::Instance* adcInstancePtr = dynamic_cast<ADC::Instance*>(*iterI);
       // Get the name of the given ADC device instance.
-      string const & adcName(adcInstancePtr->getName());
+      std::string const & adcName(adcInstancePtr->getName());
       // Try to find an entry for that ADC in the map.
-      map< string, int >::const_iterator mapIter;
+      std::map< std::string, int >::const_iterator mapIter;
       mapIter = ADCWidthMap.find(adcName);
       if (mapIter == ADCWidthMap.end())
       {
         // See if there is an entry for a stripped down version
         // of the ADC name.
         //string strippedAdcName(adcName.substr(
-        //   adcName.find_last_of("%") + 1, adcName.length() - 1 ));
+        //   adcName.find_last_of("%") + 1, adcName.length() - 1));
 
         mapIter = ADCWidthMap.find(adcName);
         if (mapIter == ADCWidthMap.end())
         {
-          string msg("In N_CIR_Xyce::setADCWidths: ");
-          msg += "Failed to find a map entry for the ADC named ";
-          msg += adcName;
-          msg += "\n";
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
+          Report::UserWarning0 message;
+          message << "Could not find ADC " << adcName;
           continue;
         }
       }
 
-#ifdef Xyce_DEBUG_DEVICE
-      std::cout << "DeviceMgr::setADCWidths found ADC with name: "
-           << adcName << " and will set bit vector width to: "
-           << (*mapIter).second << "\n";
-#endif
+      if (DEBUG_DEVICE)
+        dout() << "DeviceMgr::setADCWidths found ADC with name: "
+               << adcName << " and will set bit vector width to: "
+               << (*mapIter).second << "\n";
 
       // Update the time-voltage pairs for the given DAC instance.
       if (!adcInstancePtr->setBitVectorWidth((*mapIter).second))
       {
-        string msg("In N_CIR_Xyce::setADCWidths: ");
-        msg += "Failed to update the bit vector width for the ADC named ";
-        msg += adcName;
-        msg += "\n";
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
+        Report::UserWarning0 message;
+        message << "Failed to update the width for ADC " << adcName;
         continue;
       }
     }
@@ -4718,7 +4214,7 @@ bool DeviceMgr::setADCWidths(map<string,int> const & ADCWidthMap)
 // Creation Date : 05/05/04
 //-----------------------------------------------------------------------------
 bool DeviceMgr::getTimeVoltagePairs(
-   map<string, vector< pair<double,double> > >&TimeVoltageMap)
+   std::map<std::string, std::vector< std::pair<double,double> > >&TimeVoltageMap)
 {
   bool bSuccess = true;
 
@@ -4726,24 +4222,16 @@ bool DeviceMgr::getTimeVoltagePairs(
 
   // find the device index for ADC devices:
 
-  int adcIndex = getDeviceIndex("Y%ADC%DUMMYADC");
+  EntityTypeId adc_model_type_id = ADC::Traits::modelGroup(); // getModelGroup("Y%ADC%DUMMYADC");
 
   // get the singleton for the ADC device
-  Device* devicePtr = returnDevicePtr(adcIndex);
+  Device* devicePtr = getDevice(adc_model_type_id);
 
   // If it wasn't found, there were no ADC devices
-  if (devicePtr == NULL || devicePtr == dummy_ptr)
+  if (devicePtr)
   {
-    // this is not a failure, though, and no point complaining
-    //    string msg("DeviceMgr::getADCDevices:");
-    //    msg += "  No singleton found, circuit does not apparently have any ADC devices in it.\n";
-    //    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
-
-  }
-  else
-  {
-    N_DEV_ADCMaster* ADCPtr = dynamic_cast<N_DEV_ADCMaster*>(devicePtr);
-    bSuccess = ADCPtr->getTimeVoltagePairs( TimeVoltageMap );
+    ADC::Master* ADCPtr = dynamic_cast<ADC::Master*>(devicePtr);
+    bSuccess = ADCPtr->getTimeVoltagePairs(TimeVoltageMap);
   }
 
   return bSuccess;
@@ -4760,33 +4248,30 @@ bool DeviceMgr::getTimeVoltagePairs(
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/25/08
 //-----------------------------------------------------------------------------
-bool DeviceMgr::getDeviceNames(const string & deviceType,
-                                     vector < string > & deviceNames)
+bool DeviceMgr::getDeviceNames(const std::string & model_type_name, std::vector< std::string > & deviceNames)
 {
 
   bool bSuccess = false;
 
   deviceNames.clear();
 
-  // find the device index for given type of devices:
-
-  int deviceIndex = getDeviceIndex(deviceType);
+  // find the device index for given type of device:
+  EntityTypeId device_model_type_id = getModelGroup(model_type_name);
 
   // get the singleton for the device
-  Device* devicePtr = returnDevicePtr(deviceIndex);
+  Device* devicePtr = getDevice(device_model_type_id);
 
   // If it wasn't found, there were no devices of this type
-  if (devicePtr == NULL || devicePtr == dummy_ptr)
+  if (!devicePtr)
   {
-    string msg("DeviceMgr::getDeviceNames:");
-    msg += "  No singleton found, circuit does not apparently have any devices matching " + deviceType + "in it.\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
-    bSuccess = false;
-    // this is not a failure, though
+    Report::UserWarning0 message;
+    message << "Circuit does not have any devices matching " << model_type_name;
+    bSuccess = false; // this is not a failure, though
   }
   else
   {
-    bSuccess = devicePtr -> getDeviceNames ( deviceNames );
+    bSuccess = true;
+    Xyce::Device::getDeviceNames(*devicePtr, std::back_inserter(deviceNames));
   }
 
   return bSuccess;
@@ -4800,9 +4285,9 @@ bool DeviceMgr::getDeviceNames(const string & deviceType,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/27/08
 //-----------------------------------------------------------------------------
-Xygra::Instance * DeviceMgr::getXygraInstancePtr_(const string & deviceName)
+Xygra::Instance * DeviceMgr::getXygraInstancePtr_(const std::string & deviceName)
 {
-  map<string,Xygra::Instance *>::iterator mapIter;
+  std::map<std::string,Xygra::Instance *>::iterator mapIter;
 
   // See if we've looked this up before.
   mapIter = xygraPtrMap_.find(deviceName);
@@ -4812,23 +4297,22 @@ Xygra::Instance * DeviceMgr::getXygraInstancePtr_(const string & deviceName)
 
     // we haven't looked it up before, do so now.
     // find the device index for given type of devices:
-    int deviceIndex = getDeviceIndex("Y%XYGRA%DUMMY");
+    EntityTypeId xygra_model_type_id = Xygra::Traits::modelGroup(); // getModelGroup("Y%XYGRA%DUMMY");
 
     // get the singleton for the device
-    Device* devicePtr = returnDevicePtr(deviceIndex);
+    Device* devicePtr = getDevice(xygra_model_type_id);
     // If it wasn't found, there were no devices of this type
-    if (devicePtr == NULL || devicePtr == dummy_ptr)
+    if (!devicePtr)
     {
-      string msg("DeviceMgr::getXygraInstancePtr_:");
-      msg += "  No singleton found, circuit does not apparently have any Xygra devices in it.\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+      Report::UserFatal message;
+      message << "Circuit does not have any Xygra devices";
       return 0; // never reached, just shut up compiler warnings
     }
     else
     {
       // we have some, so get 'em.
-      vector<DeviceInstance*> deviceInstances;
-      devicePtr->getInstances(deviceInstances);
+      std::vector<DeviceInstance*> deviceInstances;
+      getDeviceInstances(*devicePtr, std::back_inserter(deviceInstances));
 
       int theNamedInstanceIndex = -1;
 
@@ -4843,9 +4327,8 @@ Xygra::Instance * DeviceMgr::getXygraInstancePtr_(const string & deviceName)
       }
       if (theNamedInstanceIndex == -1)
       {
-        string msg("DeviceMgr::getXygraInstancePtr_:");
-        msg += "  No Xygra device named " + deviceName + " found.\n";
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+        Report::UserFatal message;
+        message << "No Xygra device named " << deviceName;
       }
       Xygra::Instance* xygraInstancePtr = dynamic_cast<Xygra::Instance*>(deviceInstances[theNamedInstanceIndex]);
       xygraPtrMap_[deviceName] = xygraInstancePtr;
@@ -4867,7 +4350,7 @@ Xygra::Instance * DeviceMgr::getXygraInstancePtr_(const string & deviceName)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/27/08
 //-----------------------------------------------------------------------------
-int DeviceMgr::xygraGetNumNodes(const string & deviceName)
+int DeviceMgr::xygraGetNumNodes(const std::string & deviceName)
 {
   Xygra::Instance * xygraInstancePtr = getXygraInstancePtr_(deviceName);
   return xygraInstancePtr -> getNumNodes();
@@ -4882,7 +4365,7 @@ int DeviceMgr::xygraGetNumNodes(const string & deviceName)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/27/08
 //-----------------------------------------------------------------------------
-int DeviceMgr::xygraGetNumWindings(const string & deviceName)
+int DeviceMgr::xygraGetNumWindings(const std::string & deviceName)
 {
   Xygra::Instance * xygraInstancePtr = getXygraInstancePtr_(deviceName);
   return xygraInstancePtr -> getNumWindings();
@@ -4898,8 +4381,8 @@ int DeviceMgr::xygraGetNumWindings(const string & deviceName)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 09/15/08
 //-----------------------------------------------------------------------------
-void DeviceMgr::xygraGetCoilWindings(const string & deviceName,
-                                           vector<int> & cW)
+void DeviceMgr::xygraGetCoilWindings(const std::string & deviceName,
+                                           std::vector<int> & cW)
 {
   Xygra::Instance * xygraInstancePtr = getXygraInstancePtr_(deviceName);
   xygraInstancePtr -> getCoilWindings(cW);
@@ -4914,8 +4397,8 @@ void DeviceMgr::xygraGetCoilWindings(const string & deviceName,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 09/29/08
 //-----------------------------------------------------------------------------
-void DeviceMgr::xygraGetCoilNames(const string & deviceName,
-                                           vector<string> & cN)
+void DeviceMgr::xygraGetCoilNames(const std::string & deviceName,
+                                           std::vector<std::string> & cN)
 {
   Xygra::Instance * xygraInstancePtr = getXygraInstancePtr_(deviceName);
   xygraInstancePtr -> getCoilNames(cN);
@@ -4929,8 +4412,8 @@ void DeviceMgr::xygraGetCoilNames(const string & deviceName,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/27/08
 //-----------------------------------------------------------------------------
-bool DeviceMgr::xygraSetConductances(const string & deviceName,
-                                           const vector<vector<double> > & cM)
+bool DeviceMgr::xygraSetConductances(const std::string & deviceName,
+                                           const std::vector<std::vector<double> > & cM)
 {
   Xygra::Instance * xygraInstancePtr = getXygraInstancePtr_(deviceName);
   return xygraInstancePtr -> setConductances(cM);
@@ -4944,8 +4427,8 @@ bool DeviceMgr::xygraSetConductances(const string & deviceName,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/27/08
 //-----------------------------------------------------------------------------
-bool DeviceMgr::xygraSetK(const string & deviceName,
-                                const vector<vector<double> > & kM,
+bool DeviceMgr::xygraSetK(const std::string & deviceName,
+                                const std::vector<std::vector<double> > & kM,
                                 const double t)
 {
   Xygra::Instance * xygraInstancePtr = getXygraInstancePtr_(deviceName);
@@ -4960,8 +4443,8 @@ bool DeviceMgr::xygraSetK(const string & deviceName,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/27/08
 //-----------------------------------------------------------------------------
-bool DeviceMgr::xygraSetSources(const string & deviceName,
-                                      const vector<double> & sV,
+bool DeviceMgr::xygraSetSources(const std::string & deviceName,
+                                      const std::vector<double> & sV,
                                       const double t)
 {
   Xygra::Instance * xygraInstancePtr = getXygraInstancePtr_(deviceName);
@@ -4977,8 +4460,8 @@ bool DeviceMgr::xygraSetSources(const string & deviceName,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 08/27/08
 //-----------------------------------------------------------------------------
-bool DeviceMgr::xygraGetVoltages(const string & deviceName,
-                                       vector<double> & vN)
+bool DeviceMgr::xygraGetVoltages(const std::string & deviceName,
+                                       std::vector<double> & vN)
 {
   Xygra::Instance * xygraInstancePtr = getXygraInstancePtr_(deviceName);
   return xygraInstancePtr -> getVoltages(vN);
@@ -5015,23 +4498,17 @@ bool DeviceMgr::updateTemperature (double val)
   double Ctemp = val;
   double Ktemp = val + CONSTCtoK;
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
-  {
-    std::cout << "In DeviceMgr::updateTemperature."
-      "  new C temp = " << Ctemp << " K temp = " << Ktemp;
-    std::cout << std::endl;
-  }
-#endif
+  if (DEBUG_DEVICE && devOptions_.debugLevel > 0 && solState_.debugTimeFlag)
+    dout() << "In DeviceMgr::updateTemperature.  new C temp = " << Ctemp << " K temp = " << Ktemp << std::endl;
 
   // First set the global temp.  This is used in each device if the "tempGiven"
   // variable is false.  This should be in Kelvin.
   devOptions_.temp.setVal(Ktemp);
 
   // loop over the bsim3 models and delete the size dep params.
-  vector<DeviceModel *>::const_iterator iterM;
-  vector<DeviceModel *>::const_iterator beginM = bsim3ModelPtrVec_.begin ();
-  vector<DeviceModel *>::const_iterator endM = bsim3ModelPtrVec_.end ();
+  std::vector<DeviceModel *>::const_iterator iterM;
+  std::vector<DeviceModel *>::const_iterator beginM = bsim3ModelPtrVec_.begin ();
+  std::vector<DeviceModel *>::const_iterator endM = bsim3ModelPtrVec_.end ();
   for (iterM=beginM;iterM!=endM;++iterM)
   {
     (*iterM)->clearTemperatureData ();
@@ -5059,9 +4536,9 @@ bool DeviceMgr::updateTemperature (double val)
   // temperature dependence through "$temperature" instead of a "TEMP"
   // parameter, to work properly.  If so, they need the temperature set in
   // Kelvin.
-  string tname("TEMP");
-  string tname2("XYCEADMSMODTEMP");
-  string tname3("XYCEADMSINSTTEMP");
+  std::string tname("TEMP");
+  std::string tname2("XYCEADMSMODTEMP");
+  std::string tname3("XYCEADMSINSTTEMP");
   beginM = modelPtrVec_.begin();
   endM   = modelPtrVec_.end();
   for (iterM=beginM; iterM!=endM;++iterM)
@@ -5074,9 +4551,9 @@ bool DeviceMgr::updateTemperature (double val)
   // Loop over device instances, and set the temperature.  This should be
   // in C, if going through processParams, and K if going through
   // the updateTemperature function.
-  vector<DeviceInstance*>::const_iterator iter;
-  vector<DeviceInstance*>::const_iterator begin;
-  vector<DeviceInstance*>::const_iterator end;
+  InstanceVector::const_iterator iter;
+  InstanceVector::const_iterator begin;
+  InstanceVector::const_iterator end;
 
   begin = instancePtrVec_.begin();
   end   = instancePtrVec_.end();
@@ -5110,9 +4587,9 @@ bool DeviceMgr::allDevsConverged()
 
   // if two-level, and just the inner problem, only check the PDE devices,
   // coz those are all we loaded.
-  vector<DeviceInstance*>::iterator iter;
-  vector<DeviceInstance*>::iterator begin;
-  vector<DeviceInstance*>::iterator end;
+  InstanceVector::iterator iter;
+  InstanceVector::iterator begin;
+  InstanceVector::iterator end;
   if (solState_.twoLevelNewtonCouplingMode==INNER_PROBLEM)
   {
     begin = pdeInstancePtrVec_.begin ();
@@ -5150,19 +4627,17 @@ bool DeviceMgr::allDevsConverged()
     allDevsConv = false;
 #endif
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (devOptions_.debugLevel > 0)
+  if (DEBUG_DEVICE && devOptions_.debugLevel > 0)
   {
     if (allDevsConv)
     {
-      std::cout << "All devices converged!" << std::endl;
+      dout() << "All devices converged!" << std::endl;
     }
     else
     {
-      std::cout << "At least one device NOT converged!" << std::endl;
+      dout() << "At least one device NOT converged!" << std::endl;
     }
   }
-#endif
 
   return allDevsConv;
 }
@@ -5186,9 +4661,9 @@ bool DeviceMgr::innerDevsConverged()
   double dc_glob;
 #endif
 
-  vector<N_DEV_ExternDeviceInstance*>::iterator iter;
-  vector<N_DEV_ExternDeviceInstance*>::iterator begin;
-  vector<N_DEV_ExternDeviceInstance*>::iterator end;
+  std::vector<ExternDevice::Instance*>::iterator iter;
+  std::vector<ExternDevice::Instance*>::iterator begin;
+  std::vector<ExternDevice::Instance*>::iterator end;
   begin = extDevInstancePtrVec_.begin ();
   end = extDevInstancePtrVec_.end ();
 
@@ -5236,57 +4711,58 @@ bool DeviceMgr::innerDevsConverged()
 //-----------------------------------------------------------------------------
 bool DeviceMgr::setupExternalDevices()
 {
-#ifdef Xyce_PARALLEL_MPI
     N_PDS_Comm * pdsCommPtr = pdsMgrPtr_->getPDSComm();
+
+#ifdef Xyce_PARALLEL_MPI
     int procID = pdsCommPtr->procID();
     int numProc = pdsCommPtr->numProc();
 
     int numExt = extDevInstancePtrVec_.size();
     int numExtTotal = 0;
-    pdsCommPtr->sumAll( &numExt, &numExtTotal, 1 );
+    pdsCommPtr->sumAll(&numExt, &numExtTotal, 1);
 
-    vector<ExternDevice::Instance*> tmpVec = extDevInstancePtrVec_;
+    std::vector<ExternDevice::Instance*> tmpVec = extDevInstancePtrVec_;
 
     //resetup the instance vector to have a size totally the global
     //number of ext devices
-    if( numExtTotal > 0 )
+    if (numExtTotal > 0)
     {
-      extDevInstancePtrVec_.resize( numExtTotal );
+      extDevInstancePtrVec_.resize(numExtTotal);
 
       int loc = 0;
       //      const int bufSize = 1000;
       //      char buf[bufSize];
-      for( int proc = 0; proc < numProc; ++proc )
+      for(int proc = 0; proc < numProc; ++proc)
       {
         int cnt = 0;
-        if( proc == procID ) cnt = numExt;
-        pdsCommPtr->bcast( &cnt, 1, proc );
+        if (proc == procID) cnt = numExt;
+        pdsCommPtr->bcast(&cnt, 1, proc);
 
-        for( int i = 0; i < cnt; ++i )
+        for(int i = 0; i < cnt; ++i)
         {
-          if( proc == procID )
+          if (proc == procID)
           {
             int size = extDevIBPtrVec_[i]->packedByteCount();
             int bufSize = size+100;
             char *buf=new char[bufSize];
-            pdsCommPtr->bcast( &size, 1, proc );
+            pdsCommPtr->bcast(&size, 1, proc);
             int pos = 0;
-            extDevIBPtrVec_[i]->pack( buf, bufSize, pos, pdsCommPtr );
-            pdsCommPtr->bcast( buf, size, proc );
+            extDevIBPtrVec_[i]->pack(buf, bufSize, pos, pdsCommPtr);
+            pdsCommPtr->bcast(buf, size, proc);
             extDevInstancePtrVec_[loc] = tmpVec[i];
             delete [] buf;
           }
           else
           {
             int size = 0;
-            pdsCommPtr->bcast( &size, 1, proc );
+            pdsCommPtr->bcast(&size, 1, proc);
             int bufSize = size+100;
             char *buf=new char[bufSize];
-            pdsCommPtr->bcast( buf, size, proc );
+            pdsCommPtr->bcast(buf, size, proc);
             int pos = 0;
-            InstanceBlock IB;
-            IB.unpack( buf, bufSize, pos, pdsCommPtr );
-            extDevInstancePtrVec_[loc] = addExtDeviceInstance_( IB );
+            InstanceBlock instance_block;
+            instance_block.unpack(buf, bufSize, pos, pdsCommPtr);
+            extDevInstancePtrVec_[loc] = addExtDeviceInstance_(instance_block);
             delete [] buf;
           }
           extDevInstancePtrVec_[loc]->setOwningProc(proc);
@@ -5295,9 +4771,11 @@ bool DeviceMgr::setupExternalDevices()
         }
       }
 
-      assert( loc == numExtTotal );
+      assert(loc == numExtTotal);
     }
-
+#else
+    for (std::vector<ExternDevice::Instance *>::iterator it = extDevInstancePtrVec_.begin(); it != extDevInstancePtrVec_.end(); ++it)
+      (*it)->setComm(pdsCommPtr);
 #endif
   return true;
 }
@@ -5312,9 +4790,9 @@ bool DeviceMgr::setupExternalDevices()
 //-----------------------------------------------------------------------------
 void DeviceMgr::updateExternalDevices_()
 {
-  vector<N_DEV_ExternDeviceInstance*>::iterator iter;
-  vector<N_DEV_ExternDeviceInstance*>::iterator begin;
-  vector<N_DEV_ExternDeviceInstance*>::iterator end;
+  std::vector<ExternDevice::Instance*>::iterator iter;
+  std::vector<ExternDevice::Instance*>::iterator begin;
+  std::vector<ExternDevice::Instance*>::iterator end;
   begin = extDevInstancePtrVec_.begin ();
   end = extDevInstancePtrVec_.end ();
   for (iter=begin; iter!=end;++iter)
@@ -5332,56 +4810,37 @@ void DeviceMgr::updateExternalDevices_()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 3/16/06
 //-----------------------------------------------------------------------------
-N_DEV_ExternDeviceInstance *
-DeviceMgr::addExtDeviceInstance_(InstanceBlock & IB)
+ExternDevice::Instance *
+DeviceMgr::addExtDeviceInstance_(InstanceBlock & instance_block)
 {
-  DeviceInstance * DI_ptr;
-  N_DEV_ExternDeviceInstance * EDI_ptr;
+  ModelTypeId model_type;
 
-  int  type;
-
-  if (IB.getModelName() == "")
+  if (instance_block.getModelName().empty())
   {
-    if( IB.getName().find_last_of(":") != string::npos )
-    {
-      type = getDeviceIndex(IB.getName().substr(IB.getName().find_last_of(":")+1, string::npos) );
-    }
-    else
-    {
-      type = getDeviceIndex( IB.getName() );
-    }
+    model_type = getModelGroup(modelNameFromInstanceName(instance_block));
   }
   else
   {
-    type = deviceModelNameMap_[IB.getModelName()];
+    model_type = modelTypeMap_[instance_block.getModelName()];
   }
 
-  if (type == 0)
+  if (!model_type.defined())
   {
-     string msg("Device Manager could not correctly figure out what");
-     msg += " type of device " + IB.getName() + " is.\n";
-     if (IB.getModelName() != "")
-     {
-       msg += "Its model name is " + IB.getModelName() +", which was not found.\n";
-     }
-     else
-     {
-       msg += "Could not find this device name in the device index.\n";
-     }
-     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
+    Report::UserError message;
+    message << "Unable to determine type of device for instance name " << instance_block.getName();
+    if (instance_block.getModelName() != "")
+    {
+      message << " with model name" + instance_block.getModelName();
+    }
   }
 
-  // Just in case, call the device creator function - if it has already
-  // been allocated it won't create a redundant one.
-
-  createDeviceByModelType(type);
-
-  string deviceTypeName;
   // Add an instance of this type.
-  DI_ptr = deviceArray_[type]->addInstance(IB, mlData, solState_, extData_,devOptions_, deviceTypeName);
-  EDI_ptr = dynamic_cast<N_DEV_ExternDeviceInstance*>(DI_ptr);
+  Device &device = getDeviceByModelType(model_type);
+  DeviceInstance *instance = device.addInstance(instance_block, FactoryBlock(devOptions_, solState_, mlData, externData_, commandLine_));
 
-  return EDI_ptr;
+  ExternDevice::Instance *external_instance = dynamic_cast<ExternDevice::Instance*>(instance);
+
+  return external_instance;
 }
 #endif // Xyce_EXTDEV
 
@@ -5394,14 +4853,14 @@ DeviceMgr::addExtDeviceInstance_(InstanceBlock & IB)
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
 void DeviceMgr::homotopyStepSuccess
-      (const vector<string> & paramNames,
-       const vector<double> & paramVals)
+      (const std::vector<std::string> & paramNames,
+       const std::vector<double> & paramVals)
 {
 #ifdef Xyce_EXTDEV
   int numExt = extDevInstancePtrVec_.size();
-  vector<N_DEV_ExternDeviceInstance*>::iterator iter;
-  vector<N_DEV_ExternDeviceInstance*>::iterator begin;
-  vector<N_DEV_ExternDeviceInstance*>::iterator end;
+  std::vector<ExternDevice::Instance*>::iterator iter;
+  std::vector<ExternDevice::Instance*>::iterator begin;
+  std::vector<ExternDevice::Instance*>::iterator end;
   begin = extDevInstancePtrVec_.begin ();
   end = extDevInstancePtrVec_.end ();
   for (iter=begin; iter!=end;++iter)
@@ -5425,9 +4884,9 @@ void DeviceMgr::homotopyStepFailure ()
 {
 #ifdef Xyce_EXTDEV
   int numExt = extDevInstancePtrVec_.size();
-  vector<N_DEV_ExternDeviceInstance*>::iterator iter;
-  vector<N_DEV_ExternDeviceInstance*>::iterator begin;
-  vector<N_DEV_ExternDeviceInstance*>::iterator end;
+  std::vector<ExternDevice::Instance*>::iterator iter;
+  std::vector<ExternDevice::Instance*>::iterator begin;
+  std::vector<ExternDevice::Instance*>::iterator end;
   begin = extDevInstancePtrVec_.begin ();
   end = extDevInstancePtrVec_.end ();
   for (iter=begin; iter!=end;++iter)
@@ -5451,9 +4910,9 @@ void DeviceMgr::stepSuccess (int analysis)
 {
 #ifdef Xyce_EXTDEV
   int numExt = extDevInstancePtrVec_.size();
-  vector<N_DEV_ExternDeviceInstance*>::iterator iter;
-  vector<N_DEV_ExternDeviceInstance*>::iterator begin;
-  vector<N_DEV_ExternDeviceInstance*>::iterator end;
+  std::vector<ExternDevice::Instance *>::iterator iter;
+  std::vector<ExternDevice::Instance *>::iterator begin;
+  std::vector<ExternDevice::Instance *>::iterator end;
   begin = extDevInstancePtrVec_.begin ();
   end = extDevInstancePtrVec_.end ();
   for (iter=begin; iter!=end;++iter)
@@ -5477,9 +4936,9 @@ void DeviceMgr::stepFailure (int analysis)
 {
 #ifdef Xyce_EXTDEV
   int numExt = extDevInstancePtrVec_.size();
-  vector<ExternDevice::Instance*>::iterator iter;
-  vector<ExternDevice::Instance*>::iterator begin;
-  vector<ExternDevice::Instance*>::iterator end;
+  std::vector<ExternDevice::Instance*>::iterator iter;
+  std::vector<ExternDevice::Instance*>::iterator begin;
+  std::vector<ExternDevice::Instance*>::iterator end;
   begin = extDevInstancePtrVec_.begin ();
   end = extDevInstancePtrVec_.end ();
   for (iter=begin; iter!=end;++iter)
@@ -5501,10 +4960,6 @@ void DeviceMgr::stepFailure (int analysis)
 //-----------------------------------------------------------------------------
 void DeviceMgr::acceptStep()
 {
-  vector<DeviceInstance*>::iterator iter;
-  vector<DeviceInstance*>::iterator begin;
-  vector<DeviceInstance*>::iterator end;
-
   // The time history for the LTRA device(s) has to be tracked
   // separately because it can be truncated if the user specifies that
   // option. This has to be called before
@@ -5537,10 +4992,7 @@ void DeviceMgr::acceptStep()
   bool tmpBool = setupSolverInfo_();
   solState_.acceptedTime = solState_.currTime;
 
-  begin = instancePtrVec_.begin ();
-  end   = instancePtrVec_.end ();
-
-  for (iter=begin; iter!=end;++iter)
+  for (InstanceVector::iterator iter = instancePtrVec_.begin(); iter != instancePtrVec_.end(); ++iter)
   {
     (*iter)->acceptStep();
   }
@@ -5570,7 +5022,7 @@ void DeviceMgr::acceptStep()
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 03/12/07
 //-----------------------------------------------------------------------------
-bool DeviceMgr::getInitialQnorm (vector <N_TIA_TwoLevelError> & tleVec)
+bool DeviceMgr::getInitialQnorm (std::vector<N_TIA_TwoLevelError> & tleVec)
 {
   bool bsuccess = true;
 
@@ -5579,9 +5031,9 @@ bool DeviceMgr::getInitialQnorm (vector <N_TIA_TwoLevelError> & tleVec)
 
   tleVec.resize(numExt);
 
-  vector<ExternDevice::Instance*>::iterator iter;
-  vector<ExternDevice::Instance*>::iterator begin;
-  vector<ExternDevice::Instance*>::iterator end;
+  std::vector<ExternDevice::Instance*>::iterator iter;
+  std::vector<ExternDevice::Instance*>::iterator begin;
+  std::vector<ExternDevice::Instance*>::iterator end;
   begin = extDevInstancePtrVec_.begin ();
   end = extDevInstancePtrVec_.end ();
 
@@ -5605,7 +5057,7 @@ bool DeviceMgr::getInitialQnorm (vector <N_TIA_TwoLevelError> & tleVec)
 // Creation Date : 03/12/06
 //-----------------------------------------------------------------------------
 bool DeviceMgr::getInnerLoopErrorSums (
-  vector <N_TIA_TwoLevelError> & tleVec)
+  std::vector<N_TIA_TwoLevelError> & tleVec)
 {
   bool bsuccess = true;
 
@@ -5614,9 +5066,9 @@ bool DeviceMgr::getInnerLoopErrorSums (
 
   tleVec.resize(numExt);
 
-  vector<ExternDevice::Instance*>::iterator iter;
-  vector<ExternDevice::Instance*>::iterator begin;
-  vector<ExternDevice::Instance*>::iterator end;
+  std::vector<ExternDevice::Instance*>::iterator iter;
+  std::vector<ExternDevice::Instance*>::iterator begin;
+  std::vector<ExternDevice::Instance*>::iterator end;
   begin = extDevInstancePtrVec_.begin ();
   end = extDevInstancePtrVec_.end ();
 
@@ -5645,9 +5097,9 @@ bool DeviceMgr::updateStateArrays()
 
 #ifdef Xyce_EXTDEV
 
-  vector<ExternDevice::Instance*>::iterator iter;
-  vector<ExternDevice::Instance*>::iterator begin;
-  vector<ExternDevice::Instance*>::iterator end;
+  std::vector<ExternDevice::Instance*>::iterator iter;
+  std::vector<ExternDevice::Instance*>::iterator begin;
+  std::vector<ExternDevice::Instance*>::iterator end;
   begin = extDevInstancePtrVec_.begin ();
   end = extDevInstancePtrVec_.end ();
 
@@ -5676,10 +5128,9 @@ bool DeviceMgr::startTimeStep ()
   bool tmpBool = setupSolverInfo_();
 
 #ifdef Xyce_EXTDEV
-
-  vector<ExternDevice::Instance*>::iterator iter;
-  vector<ExternDevice::Instance*>::iterator begin;
-  vector<ExternDevice::Instance*>::iterator end;
+  std::vector<ExternDevice::Instance*>::iterator iter;
+  std::vector<ExternDevice::Instance*>::iterator begin;
+  std::vector<ExternDevice::Instance*>::iterator end;
   begin = extDevInstancePtrVec_.begin ();
   end = extDevInstancePtrVec_.end ();
 
@@ -5710,495 +5161,14 @@ void DeviceMgr::setExternalSolverState (const SolverState & ss)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : DeviceMgr::setUpDeviceModelNameMap
-// Purpose       : This function initializes the deviceModelNameMap structure.
-// Special Notes :
-//                 This map sets up a relationship between the "type"
-//                 parameter, which is one of the manadatory fields in a model
-//                 statement, and indices into the device array.  The type
-//                 paramter is *not* the *name* of a model, and it says nothing
-//                 about the level of the model.  So it is possible that this
-//                 map will not fully resolve the deviceArray index for a given
-//                 model.
-//
-//                 For devices (such as MOSFETs) which require a
-//                 level-dependent offset to the device array index, it is
-//                 neccessary to call two functions to fully resolve the device
-//                 array index:
-//
-//                 int index  = getModelTypeIndex (string & ModelType)
-//                 int offset = getDeviceTypeOffset (string & ModelName)
-//                 index += offset
-//
-// Scope         : private
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 5/06/00
-//-----------------------------------------------------------------------------
-
-void DeviceMgr::setUpDeviceModelTypeMap_()
-{
-  deviceModelTypeMap_["r"   ] = ModelType::RESISTOR;
-  deviceModelTypeMap_["c"   ] = ModelType::CAPACITOR;
-  deviceModelTypeMap_["l"   ] = ModelType::INDUCTOR;
-
-#ifdef Xyce_OLD_SWITCH
-  deviceModelTypeMap_["sw"  ] = ModelType::SW;
-#else
-  deviceModelTypeMap_["switch"]  = ModelType::SW;
-  deviceModelTypeMap_["iswitch"] = ModelType::SW;
-  deviceModelTypeMap_["vswitch"] = ModelType::SW;
-#endif
-
-  deviceModelTypeMap_["d"   ] = ModelType::DIODE;
-  deviceModelTypeMap_["npn" ] = ModelType::BJT;
-  deviceModelTypeMap_["pnp" ] = ModelType::BJT;
-  deviceModelTypeMap_["njf" ] = ModelType::JFET;
-  deviceModelTypeMap_["pjf" ] = ModelType::JFET;
-
-  deviceModelTypeMap_["nmos"] = ModelType::MOSFET1;
-  deviceModelTypeMap_["pmos"] = ModelType::MOSFET1;
-
-  deviceModelTypeMap_["nmf" ] = ModelType::MESFET;
-  deviceModelTypeMap_["pmf" ] = ModelType::MESFET;
-
-  deviceModelTypeMap_["zod" ] = ModelType::DIODE_PDE;
-
-#ifdef Xyce_EXTDEV
-  deviceModelTypeMap_["ext"] = ModelType::EXTERN_DEVICE;
-#endif
-
-  deviceModelTypeMap_["ADC" ] = ModelType::ADC;
-  deviceModelTypeMap_["DAC" ] = ModelType::DAC;
-
-  deviceModelTypeMap_["mil"] = ModelType::MUTUAL_INDUCTOR_LINEAR;
-  deviceModelTypeMap_["min"] = ModelType::MUTUAL_INDUCTOR_NONLINEAR;
-  deviceModelTypeMap_["core"] = ModelType::MUTUAL_INDUCTOR_NONLINEAR;
-
-  deviceModelTypeMap_["opamp" ] = ModelType::OPAMP;
-  deviceModelTypeMap_["dig" ] = ModelType::DIGITAL;
-  deviceModelTypeMap_["neuron"] = ModelType::NEURON;
-  deviceModelTypeMap_["synapse"] = ModelType::SYNAPSE;
-  deviceModelTypeMap_["neuronpop"] = ModelType::NEURONPOP;
-  deviceModelTypeMap_["newd" ] = ModelType::NEW_DEVICE;
-  deviceModelTypeMap_["xygra" ] = ModelType::XYGRA;
-  deviceModelTypeMap_["vbic"  ] = ModelType::BJT;
-
-  deviceModelTypeMap_["rom"  ] = ModelType::ROM;
-  deviceModelTypeMap_["rxn"  ] = ModelType::RXNSET;
-
-  deviceModelTypeMap_["ltra"] = ModelType::LTRA;
-
-#ifdef Xyce_RAD_MODELS
-  ExtendedModelLevels::setUpExtendedDeviceModelTypeMap(deviceModelTypeMap_);
-#endif
-
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceMgr::setUpDeviceIndexMap
-// Purpose       : This function initializes the deviceIndexMap structure.
-//                 This map structure is used to determine, partially, the
-//                 index into deviceArray appropriate for a given device
-//                 instance name.  For devices that have multiple "levels", or
-//                 whatever, the deviceModelNameMap and the MOSFETLevelMap are
-//                 needed to further refine the index.
-// Special Notes :
-// Scope         : private
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 3/31/00
-//-----------------------------------------------------------------------------
-void DeviceMgr::setUpDeviceIndexMap_()
-{
-  // This list is of the "canonical" Spice3f5 devices.
-  //      lower case map                     upper case map
-  deviceIndexMap_["r"] = ModelType::RESISTOR;
-  deviceIndexMap_["c"] = ModelType::CAPACITOR;
-  deviceIndexMap_["l"] = ModelType::INDUCTOR;
-  deviceIndexMap_["d"] = ModelType::DIODE;
-  deviceIndexMap_["q"] = ModelType::BJT;
-  deviceIndexMap_["j"] = ModelType::JFET;
-  deviceIndexMap_["z"] = ModelType::MESFET;
-  deviceIndexMap_["m"] = ModelType::MOSFET1;
-  deviceIndexMap_["i"] = ModelType::ISRC;
-
-  deviceIndexMap_["e"] = ModelType::VCVS;
-  deviceIndexMap_["f"] = ModelType::BSRC;
-  deviceIndexMap_["g"] = ModelType::VCCS;
-  deviceIndexMap_["h"] = ModelType::BSRC;
-
-  deviceIndexMap_["v"] = ModelType::VSRC;
-  deviceIndexMap_["b"] = ModelType::BSRC;
-  deviceIndexMap_["o"] = ModelType::LTRA;
-  deviceIndexMap_["t"] = ModelType::TRA;
-  deviceIndexMap_["s"] = ModelType::SW;
-
-  // "Y" device types, breaks usual netlist syntax rules for devices.
-  // Specifed as (for example):  YPDE deviceName node1 node2 ...
-  //
-  // In the above example, the device instance name coming in from
-  // the parser will be Y%PDE%deviceName.
-
-  // PDE based devices.
-  deviceIndexMap_["pde"] = ModelType::DIODE_PDE;
-
-#ifdef Xyce_EXTDEV
-  deviceIndexMap_["ext"] = ModelType::EXTERN_DEVICE;
-#endif
-
-  //
-  deviceIndexMap_["adc"] = ModelType::ADC;
-  deviceIndexMap_["dac"] = ModelType::DAC;
-  deviceIndexMap_["mil"] = ModelType::MUTUAL_INDUCTOR_LINEAR;
-  deviceIndexMap_["min"] = ModelType::MUTUAL_INDUCTOR_NONLINEAR;
-  deviceIndexMap_["opamp"] = ModelType::OPAMP;
-  deviceIndexMap_["NOT"] = ModelType::DIGITAL;
-  deviceIndexMap_["AND"] = ModelType::DIGITAL;
-  deviceIndexMap_["NAND"] = ModelType::DIGITAL;
-  deviceIndexMap_["OR"] = ModelType::DIGITAL;
-  deviceIndexMap_["NOR"] = ModelType::DIGITAL;
-  deviceIndexMap_["ADD"] = ModelType::DIGITAL;
-  deviceIndexMap_["XOR"] = ModelType::DIGITAL;
-  deviceIndexMap_["NXOR"] = ModelType::DIGITAL;
-  deviceIndexMap_["DFF"] = ModelType::DIGITAL;
-  deviceIndexMap_["ACC"] = ModelType::ACC;
-  deviceIndexMap_["neuron"] = ModelType::NEURON;
-  deviceIndexMap_["synapse"] = ModelType::SYNAPSE;
-  deviceIndexMap_["neuronpop"] = ModelType::NEURONPOP;
-  deviceIndexMap_["newd"] = ModelType::NEW_DEVICE;
-  deviceIndexMap_["xygra"] = ModelType::XYGRA;
-  deviceIndexMap_["rom"] = ModelType::ROM;
-  deviceIndexMap_["rxn"] = ModelType::RXNSET;
-
-#ifdef Xyce_RAD_MODELS
-  ExtendedModelLevels::setUpExtendedDeviceIndexMap (deviceIndexMap_);
-#endif
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceMgr::setUpMESFETLevelMap
-// Purpose       : This function initializes the MESFETLevelMap structure.
-// Special Notes : These are integer offsets for the deviceArray, which
-//                 are determined by what MESFET subtype is being used.
-// Scope         : private
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 3/31/00
-//-----------------------------------------------------------------------------
-
-void DeviceMgr::setUpMESFETLevelMap_()
-
-{
-  modelLevelMap_[ModelType::MESFET] = &MESFETLevelMap_;
-
-  // Note:  Do not add to the map until your model is implemented - one of
-  // the parser tests in the code is to see if a level exists or not.
-
-  MESFETLevelMap_[1]  = ModelType::MESFET      - ModelType::MESFET;
-}
-
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceMgr::setUpMOSFETLevelMap
-// Purpose       : This function initializes the MOSFETLevelMap structure.
-// Special Notes : These are integer offsets for the deviceArray, which
-//                 are determined by what MOSFET subtype is being used.
-// Scope         : private
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 3/31/00
-//-----------------------------------------------------------------------------
-
-void DeviceMgr::setUpMOSFETLevelMap_()
-
-{
-  modelLevelMap_[ModelType::MOSFET1] = &MOSFETLevelMap_;
-
-  // The first MOSFET class corresponds to the level=1 MOSFET, so all of the
-  // offsets are relative to its index.
-
-  // Note:  Do not add to the map until your model is implemented - one of
-  // the parser tests in the code is to see if a level exists or not.
-
-  MOSFETLevelMap_[1]  = ModelType::MOSFET1      - ModelType::MOSFET1;
-  MOSFETLevelMap_[2]  = ModelType::MOSFET2      - ModelType::MOSFET1;
-  MOSFETLevelMap_[3]  = ModelType::MOSFET3      - ModelType::MOSFET1;
-  MOSFETLevelMap_[6]  = ModelType::MOSFET6      - ModelType::MOSFET1;
-  MOSFETLevelMap_[9]  = ModelType::MOSFET_B3    - ModelType::MOSFET1;
-  MOSFETLevelMap_[49]  = ModelType::MOSFET_B3    - ModelType::MOSFET1;
-
-  MOSFETLevelMap_[10] = ModelType::MOSFET_B3SOI - ModelType::MOSFET1;
-  MOSFETLevelMap_[57] = ModelType::MOSFET_B3SOI - ModelType::MOSFET1; // Hspice level number for bsoi
-
-  MOSFETLevelMap_[14] = ModelType::MOSFET_B4    - ModelType::MOSFET1;
-  MOSFETLevelMap_[54] = ModelType::MOSFET_B4    - ModelType::MOSFET1; // Hspice level number for b4
-
-  MOSFETLevelMap_[18] = ModelType::VDMOS        - ModelType::MOSFET1;
-  MOSFETLevelMap_[103] = ModelType::ADMS_PSP103 - ModelType::MOSFET1;
-#ifdef Xyce_NONFREE_MODELS
-  MOSFETLevelMap_[301] = ModelType::ADMS_EKV - ModelType::MOSFET1;
-#endif
-
-#ifdef Xyce_RAD_MODELS
-  ExtendedModelLevels::setUpMOSFETLevelMap(MOSFETLevelMap_);
-#endif
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceMgr::setUpJFETLevelMap
-// Purpose       : This function initializes the JFETLevelMap structure.
-// Special Notes : These are integer offsets for the deviceArray, which
-//                 are determined by what JFET subtype is being used.
-// Scope         : private
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 3/31/00
-//-----------------------------------------------------------------------------
-
-void DeviceMgr::setUpJFETLevelMap_()
-{
-  modelLevelMap_[ModelType::JFET] = &JFETLevelMap_;
-
-  // The first JFET class corresponds to the level=1 JFET, so all of the
-  // offsets are relative to its index.
-
-  // Note:  Do not add to the map until your model is implemented - one of
-  // the parser tests in the code is to see if a level exists or not.
-
-  JFETLevelMap_[1]  = ModelType::JFET      - ModelType::JFET;
-  JFETLevelMap_[2]  = ModelType::JFET      - ModelType::JFET;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceMgr::setUpDiodeLevelMap
-// Purpose       : This function initializes the DiodeLevelMap structure.
-// Special Notes : These are integer offsets for the deviceArray, which
-//                 are determined by what diode subtype is being used.
-// Scope         : private
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 3/31/00
-//-----------------------------------------------------------------------------
-
-void DeviceMgr::setUpDiodeLevelMap_()
-
-{
-  modelLevelMap_[ModelType::DIODE] = &DiodeLevelMap_;
-
-  // The first diode class corresponds to the level=1 Diode, so all of the
-  // offsets are relative to its index.
-
-  // Note:  Do not add to the map until your model is implemented - one of
-  // the parser tests in the code is to see if a level exists or not.
-
-  DiodeLevelMap_[1] = ModelType::DIODE - ModelType::DIODE;
-  DiodeLevelMap_[2] = ModelType::DIODE - ModelType::DIODE;
-#ifdef Xyce_RAD_MODELS
-  ExtendedModelLevels::setUpDiodeLevelMap(DiodeLevelMap_);
-#endif
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceMgr::setUpBJTLevelMap
-// Purpose       : This function initializes the BJTLevelMap structure.
-// Special Notes : These are integer offsets for the deviceArray, which
-//                 are determined by what BJT subtype is being used.
-// Scope         : private
-// Creator       : Tom Russo, SNL, Component Information and Models
-// Creation Date : 9/25/02
-//-----------------------------------------------------------------------------
-
-void DeviceMgr::setUpBJTLevelMap_()
-
-{
-  modelLevelMap_[ModelType::BJT] = &BJTLevelMap_;
-
-  // The first BJT class corresponds to the level=1 BJT, so all of the
-  // offsets are relative to its index.
-
-  // Note:  Do not add to the map until your model is implemented - one of
-  // the parser tests in the code is to see if a level exists or not.
-
-  BJTLevelMap_[1] = ModelType::BJT - ModelType::BJT;
-  BJTLevelMap_[10] = ModelType::ADMS_VBIC - ModelType::BJT;
-  BJTLevelMap_[23] = ModelType::ADMS_HBT_X - ModelType::BJT;
-
-#ifdef Xyce_RAD_MODELS
-  ExtendedModelLevels::setUpBJTLevelMap(BJTLevelMap_);
-#endif
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceMgr::setUpPDELevelMap
-// Purpose       : This function initializes the PDELevelMap structure.
-// Special Notes : These are integer offsets for the deviceArray, which
-//                 are determined by what PDE subtype is being used.
-// Scope         : private
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 3/31/00
-//-----------------------------------------------------------------------------
-void DeviceMgr::setUpPDELevelMap_()
-{
-  modelLevelMap_[ModelType::DIODE_PDE] = &PDELevelMap_;
-
-  // The first PDE class corresponds to the level=1 PDE, so all of the
-  // offsets are relative to its index.
-
-  // Note:  Do not add to the map until your model is implemented - one of
-  // the parser tests in the code is to see if a level exists or not.
-
-  PDELevelMap_[1] = ModelType::DIODE_PDE   - ModelType::DIODE_PDE;
-  PDELevelMap_[2] = ModelType::TWO_D_PDE   - ModelType::DIODE_PDE;
-#ifdef Xyce_RAD_MODELS
-  ExtendedModelLevels::setUpPDELevelMap(PDELevelMap_);
-#endif
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceMgr::setUpRadLevelMap
-// Purpose       : This function initializes the radLevelMap structure.
-// Special Notes :
-// Scope         : private
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 2/11/08
-//-----------------------------------------------------------------------------
-void DeviceMgr::setUpRadLevelMap_()
-{
-#ifdef Xyce_RAD_MODELS
-  ExtendedModelLevels::setUpRadLevelMap(modelLevelMap_, radLevelMap_);
-#endif
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceMgr::setUpResistorLevelMap
-// Purpose       : This function initializes the ResistorLevelMap structure.
-// Special Notes : These are integer offsets for the deviceArray, which
-//                 are determined by what resistor subtype is being used.
-// Scope         : private
-// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
-// Creation Date : 3/31/00
-//-----------------------------------------------------------------------------
-void DeviceMgr::setUpResistorLevelMap_()
-{
-  modelLevelMap_[ModelType::RESISTOR] = &ResistorLevelMap_;
-
-  // The first resistor class corresponds to the level=1 Resistor, so all of the
-  // offsets are relative to its index.
-
-  // Note:  Do not add to the map until your model is implemented - one of
-  // the parser tests in the code is to see if a level exists or not.
-
-  ResistorLevelMap_[1] = ModelType::RESISTOR - ModelType::RESISTOR;
-  ResistorLevelMap_[2] = ModelType::THERMAL_RESISTOR - ModelType::RESISTOR;
-  ResistorLevelMap_[3] = ModelType::RESISTOR3 - ModelType::RESISTOR;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceMgr::setUpInductorLevelMap
-// Purpose       : This function initializes the Indcutor Level Map structure.
-// Special Notes : These are integer offsets for the deviceArray, which
-//                 are determined by what nonlinear inductor subtype is being used.
-// Scope         : private
-// Creator       : Richard Schiek, SNL, Electrical and Microsystems Sim.
-// Creation Date : 2/27/08
-//-----------------------------------------------------------------------------
-void DeviceMgr::setUpIndLevelMap_()
-{
-  modelLevelMap_[ModelType::MUTUAL_INDUCTOR_NONLINEAR] = &INDLevelMap_;
-
-  // The first non-linear class corresponds to the level=1 non-linear mutual
-  // inductor, so all of the offsets are relative to its index.
-
-  // Note:  Do not add to the map until your model is implemented - one of
-  // the parser tests in the code is to see if a level exists or not.
-
-  INDLevelMap_[1] = ModelType::MUTUAL_INDUCTOR_NONLINEAR - ModelType::MUTUAL_INDUCTOR_NONLINEAR;
-  INDLevelMap_[2] = ModelType::MUTUAL_INDUCTOR_NONLINEAR_2 - ModelType::MUTUAL_INDUCTOR_NONLINEAR;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceMgr::setUpNeuronLevelMap
-// Purpose       : This function initializes the Neuron Level Map structure.
-// Special Notes : These are integer offsets for the deviceArray, which
-//                 are determined by what nonlinear inductor subtype is being used.
-// Scope         : private
-// Creator       : Richard Schiek, SNL, Electrical and Microsystems Sim.
-// Creation Date : 2/27/08
-//-----------------------------------------------------------------------------
-void DeviceMgr::setUpNeuronLevelMap_()
-{
-  modelLevelMap_[ModelType::NEURON] = &NeuronLevelMap_;
-
-  // The first  class corresponds to the level=1 neuron
-  // so all of the offsets are relative to its index.
-
-  // Note:  Do not add to the map until your model is implemented - one of
-  // the parser tests in the code is to see if a level exists or not.
-
-  NeuronLevelMap_[1] = ModelType::NEURON   - ModelType::NEURON;
-  NeuronLevelMap_[2] = ModelType::NEURON_2 - ModelType::NEURON;
-  NeuronLevelMap_[3] = ModelType::NEURON_3 - ModelType::NEURON;
-  NeuronLevelMap_[4] = ModelType::NEURON_4 - ModelType::NEURON;
-  NeuronLevelMap_[5] = ModelType::NEURON_5 - ModelType::NEURON;
-  NeuronLevelMap_[6] = ModelType::NEURON_6 - ModelType::NEURON;
-  NeuronLevelMap_[7] = ModelType::NEURON_7 - ModelType::NEURON;
-  NeuronLevelMap_[8] = ModelType::NEURON_8 - ModelType::NEURON;
-  NeuronLevelMap_[9] = ModelType::NEURON_9 - ModelType::NEURON;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceMgr::setUpNeuronPopLevelMap_
-// Purpose       : This function initializes the Neuron Level Map structure.
-// Special Notes : These are integer offsets for the deviceArray, which
-//                 are determined by what nonlinear inductor subtype is being used.
-// Scope         : private
-// Creator       : Richard Schiek, SNL, Electrical and Microsystems Sim.
-// Creation Date : 2/27/08
-//-----------------------------------------------------------------------------
-void DeviceMgr::setUpNeuronPopLevelMap_()
-{
-  modelLevelMap_[ModelType::NEURONPOP] = &NeuronPopLevelMap_;
-
-  // The first  class corresponds to the level=1 neuron pop
-  // so all of the offsets are relative to its index.
-
-  // Note:  Do not add to the map until your model is implemented - one of
-  // the parser tests in the code is to see if a level exists or not.
-
-  NeuronPopLevelMap_[1] = ModelType::NEURONPOP   - ModelType::NEURONPOP;
-
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceMgr::setUpSynapseLevelMap
-// Purpose       : This function initializes the Synapse Level Map structure.
-// Special Notes : These are integer offsets for the deviceArray, which
-//                 are determined by what nonlinear inductor subtype is being used.
-// Scope         : private
-// Creator       : Christy Warrender, SNL, Cognitive Modeling
-// Creation Date : 11/18/10
-//-----------------------------------------------------------------------------
-void DeviceMgr::setUpSynapseLevelMap_()
-{
-  modelLevelMap_[ModelType::SYNAPSE] = &SynapseLevelMap_;
-
-  // The first  class corresponds to the level=1 synapse
-  // so all of the offsets are relative to its index.
-
-  // Note:  Do not add to the map until your model is implemented - one of
-  // the parser tests in the code is to see if a level exists or not.
-
-  SynapseLevelMap_[1] = ModelType::SYNAPSE   - ModelType::SYNAPSE;
-  SynapseLevelMap_[2] = ModelType::SYNAPSE_2 - ModelType::SYNAPSE;
-  SynapseLevelMap_[3] = ModelType::SYNAPSE_3 - ModelType::SYNAPSE;
-  SynapseLevelMap_[4] = ModelType::SYNAPSE_4 - ModelType::SYNAPSE;
-}
-
-
-//-----------------------------------------------------------------------------
 // Function      : DeviceMgr::restartDataSize
 // Purpose       :
-// Special Notes : 
+// Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 06/26/2013
 //-----------------------------------------------------------------------------
-int DeviceMgr::restartDataSize( bool pack )
+int DeviceMgr::restartDataSize(bool pack)
 {
   int numdoubles = solState_.ltraTimePoints.size();
   int numSize_t = 3;
@@ -6206,7 +5176,7 @@ int DeviceMgr::restartDataSize( bool pack )
   count += sizeof(size_t) * numSize_t;
 
   // bump up size for unpacked data.  This is an empirical multiplier.
-  if( !pack ) 
+  if (!pack)
   {
     count *= 3;
   }
@@ -6221,38 +5191,38 @@ int DeviceMgr::restartDataSize( bool pack )
 //                 persistent data for the device package.  It should NOT
 //                 include any data from individual devices, as that restart
 //                 data is collected elsewhere.
-// Scope         : 
+// Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 06/26/2013
 //-----------------------------------------------------------------------------
 bool DeviceMgr::dumpRestartData
-(char * buf, int bsize, int & pos, N_PDS_Comm * comm, bool pack )
+(char * buf, int bsize, int & pos, N_PDS_Comm * comm, bool pack)
 {
   bool retval=true;
 
-  if ( pack )
+  if (pack)
   {
     size_t size=solState_.ltraTimePoints.size();
-    comm->pack( &(solState_.ltraTimeIndex), 1, buf, bsize, pos );
-    comm->pack( &(solState_.ltraTimeHistorySize), 1, buf, bsize, pos );
-    comm->pack( &(size), 1, buf, bsize, pos );
-    comm->pack( &(solState_.ltraTimePoints[0]), size, buf, bsize, pos );
+    comm->pack(&(solState_.ltraTimeIndex), 1, buf, bsize, pos);
+    comm->pack(&(solState_.ltraTimeHistorySize), 1, buf, bsize, pos);
+    comm->pack(&(size), 1, buf, bsize, pos);
+    comm->pack(&(solState_.ltraTimePoints[0]), size, buf, bsize, pos);
   }
   else
   {
-    int count = restartDataSize( false );
+    int count = restartDataSize(false);
     int startIndex = pos;
-    for( int i = startIndex; i < (startIndex+count); ++i) buf[i] = ' ';
+    for(int i = startIndex; i < (startIndex+count); ++i) buf[i] = ' ';
 
     size_t size=solState_.ltraTimePoints.size();
-    ostringstream ost;
-    ost.width(24);ost.precision(16);ost.setf(ios::scientific);
+    std::ostringstream ost;
+    ost.width(24);ost.precision(16);ost.setf(std::ios::scientific);
     ost << solState_.ltraTimeIndex << " ";
     ost << solState_.ltraTimeHistorySize << " ";
 #ifdef Xyce_DEBUG_RESTART
-    std::cout <<
+    dout() <<
       "DeviceMgr::getRestartData:  ltraTimeIndex = " << solState_.ltraTimeIndex <<std::endl;
-    std::cout <<
+    dout() <<
       "DeviceMgr::getRestartData:  ltraTimeHistorySize = " << solState_.ltraTimeHistorySize <<std::endl;
 #endif
     ost << size << " ";
@@ -6260,14 +5230,14 @@ bool DeviceMgr::dumpRestartData
     {
       ost << solState_.ltraTimePoints[i] << " ";
 #ifdef Xyce_DEBUG_RESTART
-    std::cout <<
-      "DeviceMgr::dumpRestartData:  ltraTimePoints["<<i<<"] =" 
+    dout() <<
+      "DeviceMgr::dumpRestartData:  ltraTimePoints["<<i<<"] ="
       << solState_.ltraTimePoints[i]<<std::endl;
 #endif
     }
 
-    string data( ost.str() );
-    for( unsigned int i = 0; i < data.length(); ++i ) buf[startIndex+i] = data[i];
+    std::string data(ost.str());
+    for(unsigned int i = 0; i < data.length(); ++i) buf[startIndex+i] = data[i];
 
     // The line above copies the characters of the data string into buf,
     // but doesn't null-terminate buf.
@@ -6283,17 +5253,16 @@ bool DeviceMgr::dumpRestartData
 //-----------------------------------------------------------------------------
 // Function      : DeviceMgr::restoreRestartData
 // Purpose       : Load restart data.
-// Special Notes : 
-// Scope         : 
+// Special Notes :
+// Scope         :
 // Creator       : Eric R. Keiter, SNL
 // Creation Date : 06/26/2013
 //-----------------------------------------------------------------------------
-bool DeviceMgr::restoreRestartData
-(char * buf, int bsize, int & pos, N_PDS_Comm * comm, bool pack )
+bool DeviceMgr::restoreRestartData(char * buf, int bsize, int & pos, N_PDS_Comm * comm, bool pack)
 {
   bool retval=true;
 
-  if( pack )
+  if (pack)
   {
     comm->unpack(buf, bsize, pos, &(solState_.ltraTimeIndex), 1);
     comm->unpack(buf, bsize, pos, &(solState_.ltraTimeHistorySize), 1);
@@ -6304,18 +5273,18 @@ bool DeviceMgr::restoreRestartData
   }
   else
   {
-    string str1(buf);
+    std::string str1(buf);
     int length = str1.size() - pos;
-    string str2(str1,pos,length);
+    std::string str2(str1,pos,length);
 
-    istringstream ist( str2 );
+    std::istringstream ist(str2);
 
     ist >> solState_.ltraTimeIndex;
     ist >> solState_.ltraTimeHistorySize;
 #ifdef Xyce_DEBUG_RESTART
-    std::cout <<
+    dout() <<
       "DeviceMgr::restoreRestartData:  ltraTimeIndex = " << solState_.ltraTimeIndex <<std::endl;
-    std::cout <<
+    dout() <<
       "DeviceMgr::restoreRestartData:  ltraTimeHistorySize = " << solState_.ltraTimeHistorySize <<std::endl;
 #endif
     size_t size=0;
@@ -6325,9 +5294,7 @@ bool DeviceMgr::restoreRestartData
     {
       ist >> solState_.ltraTimePoints[i];
 #ifdef Xyce_DEBUG_RESTART
-    std::cout <<
-      "DeviceMgr::restoreRestartData:  ltraTimePoints["<<i<<"] =" 
-      << solState_.ltraTimePoints[i]<<std::endl;
+    dout() << "DeviceMgr::restoreRestartData:  ltraTimePoints["<<i<<"] = " << solState_.ltraTimePoints[i] << std::endl;
 #endif
     }
 
@@ -6337,6 +5304,58 @@ bool DeviceMgr::restoreRestartData
   return retval;
 }
 
+// ----------------------------------------------------------------------------
+// Function      : setupIOName
+//
+// Purpose       : This function takes the device instance name and creates
+//                 an appropriate "outputName" to be used for file outputs.
+//
+// Special Notes :
+// Scope         : public
+// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
+// Creation Date : 04/26/2013
+// ----------------------------------------------------------------------------
+void setupIOName (const std::string & name, std::string & outputName)
+{
+  // get rid of the y-device prefix.
+  std::string::size_type pos1 = name.find_first_of("Y%");
+  std::string::size_type pos2 = name.find_last_of("%");
+
+  if (pos1 != std::string::npos && pos2 != std::string::npos)
+  {
+    std::string tmp1 = "";
+    if (pos1 > 0) tmp1 = name.substr(0,pos1);
+    std::string tmp2 = name.substr(pos2+1, name.length()-1);
+    outputName = tmp1 + tmp2;
+  }
+  else
+  {
+    outputName = name;
+  }
+
+  return;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : DeviceSensitivites::getDeviceEntity
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
+// Creation Date : 5/02/03
+//-----------------------------------------------------------------------------
+DeviceEntity * DeviceMgr::getDeviceEntity(const std::string & full_param_name) const
+{
+  DeviceEntityMap::iterator it = nameDevEntityMap_.find(full_param_name);
+  if (it == nameDevEntityMap_.end() || !(*it).second)
+  {
+    DeviceEntity *device_entity = findDeviceEntity(deviceMap_.begin(), deviceMap_.end(), Xyce::Util::entityNameFromFullParamName(full_param_name));
+    nameDevEntityMap_[full_param_name] = device_entity;
+    return device_entity;
+  }
+  else
+    return (*it).second;
+}
 
 } // namespace Device
 } // namespace Xyce

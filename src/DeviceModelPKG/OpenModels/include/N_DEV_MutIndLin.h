@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.54.2.2 $
+// Revision Number: $Revision: 1.71.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -47,12 +47,12 @@
 #define Xyce_N_DEV_MutIndLin_h
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_DeviceTemplate.h>
+#include <N_DEV_Configuration.h>
+#include <N_DEV_DeviceMaster.h>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceInstance.h>
 #include <N_DEV_DeviceModel.h>
-
-class N_UTL_Expression;
+#include <N_UTL_fwd.h>
 
 namespace Xyce {
 namespace Device {
@@ -68,71 +68,84 @@ namespace Device {
 //-----------------------------------------------------------------------------
 class InductorInstanceData
 {
-  public:
-    InductorInstanceData();
-    string name;    // name of inductor
-    double L;       // User specified inductance
-    double IC;      // Initial condition: initial, time-zero inductor current(A)
-    bool ICGiven;   // flag if IC was given
-    double baseL;   // the baseline inductance before temperature effects
-    // local row indicies for external variables
-    int li_Pos;     // positive node
-    int li_Neg;     // negative node
-    int li_Branch;  // branch equation
-    // offsets for jacobian enteries
-    int APosEquBraVarOffset;
-    int ANegEquBraVarOffset;
-    int ABraEquPosNodeOffset;
-    int ABraEquNegNodeOffset;
-    int ABraEquBraVarOffset;
-    vector< int > inductorCurrentOffsets;
-    // offsets for dependent variables
-    vector<int> ABraEquDepVarOffsets;
-    // keep track of which coupling coefficients' dependent vars map to
-    // our dependencies.
-    vector<pair<int,int> > depVarPairs;
-    // offsets only needed in nonlinear application
-    int magOffset;
-    int vPosOffset;
-    int vNegOffset;
+public:
+  InductorInstanceData();
+  std::string name;    // name of inductor
+  double L;       // User specified inductance
+  double IC;      // Initial condition: initial, time-zero inductor current(A)
+  bool ICGiven;   // flag if IC was given
+  double baseL;   // the baseline inductance before temperature effects
+  // local row indicies for external variables
+  int li_Pos;     // positive node
+  int li_Neg;     // negative node
+  int li_Branch;  // branch equation
+  // offsets for jacobian enteries
+  int APosEquBraVarOffset;
+  int ANegEquBraVarOffset;
+  int ABraEquPosNodeOffset;
+  int ABraEquNegNodeOffset;
+  int ABraEquBraVarOffset;
+  std::vector< int > inductorCurrentOffsets;
+  // offsets for dependent variables
+  std::vector<int> ABraEquDepVarOffsets;
+  // keep track of which coupling coefficients' dependent vars map to
+  // our dependencies.
+  std::vector<std::pair<int,int> > depVarPairs;
+  // offsets only needed in nonlinear application
+  int magOffset;
+  int vPosOffset;
+  int vNegOffset;
 
 #ifndef Xyce_NONPOINTER_MATRIX_LOAD
-    // Pointers for dFdx entries:
-    double * f_PosEquBraVarPtr;
-    double * f_NegEquBraVarPtr;
-    double * f_BraEquPosNodePtr;
-    double * f_BraEquNegNodePtr;
-    double * f_BraEquBraVarPtr;
-    vector< double * > f_inductorCurrentPtrs;
-    // offsets for dependent variables
-    vector<double *> f_BraEquDepVarPtrs;
+  // Pointers for dFdx entries:
+  double * f_PosEquBraVarPtr;
+  double * f_NegEquBraVarPtr;
+  double * f_BraEquPosNodePtr;
+  double * f_BraEquNegNodePtr;
+  double * f_BraEquBraVarPtr;
+  std::vector< double * > f_inductorCurrentPtrs;
+  // offsets for dependent variables
+  std::vector<double *> f_BraEquDepVarPtrs;
 
-    // offsets only needed in nonlinear application
-    double * f_magPtr;
-    double * f_vPosPtr;
-    double * f_vNegPtr;
+  // offsets only needed in nonlinear application
+  double * f_magPtr;
+  double * f_vPosPtr;
+  double * f_vNegPtr;
 
-    // Pointers for dQdx entries:
-    double * q_PosEquBraVarPtr;
-    double * q_NegEquBraVarPtr;
-    double * q_BraEquPosNodePtr;
-    double * q_BraEquNegNodePtr;
-    double * q_BraEquBraVarPtr;
-    vector< double * > q_inductorCurrentPtrs;
-    // offsets for dependent variables
-    vector<double *> q_BraEquDepVarPtrs;
+  // Pointers for dQdx entries:
+  double * q_PosEquBraVarPtr;
+  double * q_NegEquBraVarPtr;
+  double * q_BraEquPosNodePtr;
+  double * q_BraEquNegNodePtr;
+  double * q_BraEquBraVarPtr;
+  std::vector< double * > q_inductorCurrentPtrs;
+  // offsets for dependent variables
+  std::vector<double *> q_BraEquDepVarPtrs;
 
-    // offsets only needed in nonlinear application
-    double * q_magPtr;
-    double * q_vPosPtr;
-    double * q_vNegPtr;
+  // offsets only needed in nonlinear application
+  double * q_magPtr;
+  double * q_vPosPtr;
+  double * q_vNegPtr;
 #endif
 };
 
 namespace MutIndLin {
 
-// ---------- Forward Declarations ----------
 class Model;
+class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance>
+{
+  static const char *name() {return "Linear Mutual Inductor";}
+  static const char *deviceTypeName() {return "K level 1";}
+  static const int numNodes() {return 2;}
+  static const char *primaryParameter() {return "COUP_VAL";}
+  static const bool isLinearDevice() {return true;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : Instance
@@ -147,21 +160,15 @@ class Instance : public DeviceInstance
 {
   friend class ParametricData<Instance>;
   friend class Model;
-  friend class Master;
+  friend class Traits;friend class Master;
 
 public:
-  static ParametricData<Instance> &getParametricData();
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Instance(InstanceBlock & IB,
-                         Model & Iiter,
-                         MatrixLoadData & mlData1,
-                         SolverState &ss1,
-                         ExternData  &ed1,
-                         DeviceOptions & do1);
+  Instance(
+     const Configuration &       configuration,
+     const InstanceBlock &       IB,
+     Model &                     Iiter,
+     const FactoryBlock &        factory_block);
 
   ~Instance();
 
@@ -170,18 +177,18 @@ private:
   Instance &operator=(const Instance &);
 
 public:
-  void registerLIDs( const vector<int> & intLIDVecRef,
-                     const vector<int> & extLIDVecRef );
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
 
-  map<int,string> & getIntNameMap ();
-  void registerStateLIDs( const vector<int> & staLIDVecRef );
+  std::map<int,std::string> & getIntNameMap ();
+  void registerStateLIDs( const std::vector<int> & staLIDVecRef );
 
   const std::vector<std::string> & getDepSolnVars();
 
-  const vector< vector<int> > & jacobianStamp() const;
-  void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-  bool processParams (string param = "");
+  bool processParams ();
   bool updateTemperature(const double & temp_tmp);
   void updateInductanceMatrix();
   bool updateIntermediateVars ();
@@ -189,7 +196,7 @@ public:
   bool loadDeviceMask ();
   bool setIC ();
 
-  void varTypes( vector<char> & varTypeVec );
+  void varTypes( std::vector<char> & varTypeVec );
 
   void setupPointers();
 
@@ -205,7 +212,8 @@ public:
 
   // iterator reference to the inductor model which owns this instance.
   // Getters and setters
-  Model &getModel() {
+  Model &getModel() 
+  {
     return model_;
   }
 
@@ -216,41 +224,41 @@ private:
   // This container bundles up the physical data for each inductor
   // involved in this mutual inductor
   int numInductors;
-  vector< InductorInstanceData* > instanceData;
+  std::vector< InductorInstanceData* > instanceData;
 
   // These vectors let the new param options load and set inductor data
   // the parser passes all of these to us
-  vector< string > inductorNames;
-  vector< double > inductorInductances;
-  vector< string > inductorsNode1;
-  vector< string > inductorsNode2;
+  std::vector< std::string > inductorNames;
+  std::vector< double > inductorInductances;
+  std::vector< std::string > inductorsNode1;
+  std::vector< std::string > inductorsNode2;
   // and here's the list of ones we are coupling
-  vector< string > couplingInductor;
-  vector< double > couplingCoefficient;
+  std::vector< std::string > couplingInductor;
+  std::vector< double > couplingCoefficient;
   //Pointers to expressions used by coupling coefficients
-  vector<N_UTL_Expression *> expPtrs;
+  std::vector<N_UTL_Expression *> expPtrs;
   // derivatives with respect to expression variables:
-  vector< vector<double> > couplingCoefficientVarDerivs;
-  vector< vector<double> > couplingCoefficientVarDerivsDDT;
+  std::vector< std::vector<double> > couplingCoefficientVarDerivs;
+  std::vector< std::vector<double> > couplingCoefficientVarDerivsDDT;
   // count of number of variables each coupling coefficient depends on
-  vector<int> numCoupDepVars;
-  vector< vector< double > > mutualCouplingCoef;
-  vector< vector< double > > mutualCouplingCoefDerivs;
-  vector<pair<int,int> > indexPairs;
-  vector<int> li_coupling;              // for storage of coupling coeffs in
-                                        // state vector (needed for old DAE)
-  vector<vector<int> > li_couplingVarDerivs; // storing the derivatives
-                                             // of the coupling coefficients
-                                             // for old DAE
+  std::vector<int> numCoupDepVars;
+  std::vector< std::vector< double > > mutualCouplingCoef;
+  std::vector< std::vector< double > > mutualCouplingCoefDerivs;
+  std::vector<std::pair<int,int> > indexPairs;
+  std::vector<int> li_coupling;              // for storage of coupling coeffs in
+  // state vector (needed for old DAE)
+  std::vector<std::vector<int> > li_couplingVarDerivs; // storing the derivatives
+  // of the coupling coefficients
+  // for old DAE
   double mutualCup;    // mutual coupling value
   bool mutualCupGiven;
 
-  vector< double > inductanceVals;      // the inductances of the inductors
-  vector< vector< double > > LO;        // L' * L (matrix)
-  vector< double > inductorCurrents;    // currents through inductors (col vec.)
-  vector< double > dIdt;                // time derivatives of currents.
-                                        // (used by old DAE)
-  vector< double > LOI;                 // LO * I (col vector).
+  std::vector< double > inductanceVals;      // the inductances of the inductors
+  std::vector< std::vector< double > > LO;        // L' * L (matrix)
+  std::vector< double > inductorCurrents;    // currents through inductors (col vec.)
+  std::vector< double > dIdt;                // time derivatives of currents.
+  // (used by old DAE)
+  std::vector< double > LOI;                 // LO * I (col vector).
 
   double temp;         // temperature of this instance
   bool tempGiven;      // flag if temp was given
@@ -261,7 +269,7 @@ private:
   // this can't be static as each instance may have a different
   // number of inductors in it so they'll each have a different
   // size jacStamp
-  vector< vector<int> > jacStamp;
+  std::vector< std::vector<int> > jacStamp;
 };
 
 //-----------------------------------------------------------------------------
@@ -277,18 +285,13 @@ class Model : public DeviceModel
 
   friend class ParametricData<Model>;
   friend class Instance;
-  friend class Master;
+  friend class Traits;friend class Master;
 
 public:
-  static ParametricData<Model> &getParametricData();
-
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-  Model(const ModelBlock & MB,
-                       SolverState & ss1,
-                       DeviceOptions & do1);
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &          MB,
+     const FactoryBlock &        factory_block);
   ~Model();
 
 private:
@@ -297,23 +300,32 @@ private:
   Model &operator=(const Model &);
 
 public:
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
+
   virtual std::ostream &printOutInstances(std::ostream &os) const;
 
-  bool processParams (string param = "");
-  bool processInstanceParams (string param = "");
+  bool processParams ();
+  bool processInstanceParams ();
 
 
 public:
-  InstanceVector &getInstanceVector() {
+  void addInstance(Instance *instance) 
+  {
+    instanceContainer.push_back(instance);
+  }
+
+  InstanceVector &getInstanceVector() 
+  {
     return instanceContainer;
   }
 
-  const InstanceVector &getInstanceVector() const {
+  const InstanceVector &getInstanceVector() const 
+  {
     return instanceContainer;
   }
 
 private:
-  vector<Instance*> instanceContainer;
+  std::vector<Instance*> instanceContainer;
 
 private:
 
@@ -333,32 +345,29 @@ private:
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 12/12/08
 //-----------------------------------------------------------------------------
-class Master : public Xyce::Device::DeviceTemplate<Model, Instance>
+class Master : public DeviceMaster<Traits>
 {
-  public:
-    Master (
-      const std::string &dn,
-      const std::string &cn,
-      const std::string &dmName,
-           LinearDevice linearDev,
-           SolverState & ss1,
-           DeviceOptions & do1)
-      : Xyce::Device::DeviceTemplate<Model, Instance>(
-           dn, cn, dmName, linearDev, ss1, do1)
-    {
+  friend class Instance;
+  friend class Model;
 
-    }
+public:
+  Master(
+     const Configuration &       configuration,
+     const FactoryBlock &      factory_block,
+     const SolverState & ss1,
+     const DeviceOptions & do1)
+    : DeviceMaster<Traits>(configuration, factory_block, ss1, do1)
+  {}
 
-    virtual bool updateState (double * solVec, double * staVec, double * stoVec);
+  virtual bool updateState (double * solVec, double * staVec, double * stoVec);
 
-    // new DAE stuff:
-    // new DAE load functions:
-    virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
-    virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
-
-    friend class Instance;
-    friend class Model;
+  // new DAE stuff:
+  // new DAE load functions:
+  virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
+  virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
 };
+
+void registerDevice();
 
 } // namespace MutIndLin
 } // namespace Device

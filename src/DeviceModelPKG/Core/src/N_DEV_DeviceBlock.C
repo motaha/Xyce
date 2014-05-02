@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.23.2.3 $
+// Revision Number: $Revision: 1.33 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/02/24 23:49:15 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -55,6 +55,29 @@
 
 namespace Xyce {
 namespace Device {
+
+bool hasSubcircuitInInstanceName(const InstanceBlock &instance_block) 
+{
+  return instance_block.getName().find_last_of(":") != std::string::npos;
+}
+
+std::string subcircuitNameFromInstanceName(const InstanceBlock &instance_block) {
+  return hasSubcircuitInInstanceName(instance_block)
+    ? instance_block.getName().substr(0, instance_block.getName().find_last_of(":"))
+    : "";
+}
+
+
+std::string modelNameFromInstanceName(const InstanceBlock &instance_block) 
+{
+  if (!instance_block.getModelName().empty())
+    return instance_block.getModelName();
+  else
+    return hasSubcircuitInInstanceName(instance_block)
+      ? instance_block.getName().substr(instance_block.getName().find_last_of(":") + 1, std::string::npos)
+      : instance_block.getName();
+}
+
 
 //-----------------------------------------------------------------------------
 // Function      : ModelBlock::ModelBlock
@@ -158,28 +181,28 @@ int ModelBlock::operator!=(const ModelBlock &right) const
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 4/06/00
 //-----------------------------------------------------------------------------
-ostream& operator<<(ostream & os, const ModelBlock & mb)
+std::ostream& operator<<(std::ostream & os, const ModelBlock & mb)
 {
-  vector<Param>::const_iterator it_pL, end_pL;
+  std::vector<Param>::const_iterator it_pL, end_pL;
 
-  os << "Model Block" << endl;
-  os << "Model:  " << mb.name << endl;
-  os << " type:  " << mb.type << endl;
-  os << " Level: " << mb.level << endl;
-  os << " netlistFileName_: " << mb.netlistFileName_ << endl;
-  os << " lineNumber_: " << mb.lineNumber_ << endl;
-  os << " Tagged Params" << endl;
-  os << " -------------" << endl;
+  os << "Model Block" << std::endl;
+  os << "Model:  " << mb.name << std::endl;
+  os << " type:  " << mb.type << std::endl;
+  os << " Level: " << mb.level << std::endl;
+  os << " netlistFileName_: " << mb.netlistFileName_ << std::endl;
+  os << " lineNumber_: " << mb.lineNumber_ << std::endl;
+  os << " Tagged Params" << std::endl;
+  os << " -------------" << std::endl;
 
   it_pL=mb.params.begin();
   end_pL=mb.params.end();
   for ( ; it_pL != end_pL; ++it_pL)
   {
-    os << it_pL->tag() << "\t" << it_pL->sVal() << endl;
+    os << it_pL->tag() << "\t" << it_pL->stringValue() << std::endl;
   }
 
-  os << " -------------" << endl;
-  os << endl;
+  os << " -------------" << std::endl;
+  os << std::endl;
 
   return os;
 }
@@ -233,7 +256,7 @@ int ModelBlock::packedByteCount() const
 
   int size, length, i;
 
-  vector<Param>::const_iterator it_tpL;
+  std::vector<Param>::const_iterator it_tpL;
 
   //----- count name
   length = name.length();
@@ -282,7 +305,7 @@ void ModelBlock::pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) const
 
   int size, length;
   int i;
-  vector<Param>::const_iterator it_tpL;
+  std::vector<Param>::const_iterator it_tpL;
 #ifdef Xyce_COUNT_PACKED_BYTES
   int predictedPos = pos+packedByteCount();
 #endif
@@ -318,14 +341,14 @@ void ModelBlock::pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) const
   comm->pack(&lineNumber_, 1, buf, bsize, pos );
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "Packed " << pos << " bytes for ModelBlock: " <<
-    name << endl;
+  Xyce::dout() << "Packed " << pos << " bytes for ModelBlock: " <<
+    name << std::endl;
 #endif
+  
 #ifdef Xyce_COUNT_PACKED_BYTES
   if (pos != predictedPos)
   {
-    string msg = "Predicted pos does not match actual pos in ModelBlock::pack";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING, msg );
+    DevelFatal(*this, "ModelBlock::pack") << "Predicted pos does not match actual pos";
   }
 #endif
 
@@ -347,12 +370,12 @@ void ModelBlock::unpack(char * pB, int bsize,int & pos, N_PDS_Comm * comm)
 
   //----- unpack name
   comm->unpack( pB, bsize, pos, &length, 1 );
-  name = string( (pB+pos), length);
+  name = std::string( (pB+pos), length);
   pos += length;
 
   //----- unpack type
   comm->unpack( pB, bsize, pos, &length, 1 );
-  type = string( (pB+pos), length);
+  type = std::string( (pB+pos), length);
   pos += length;
 
   //----- unpack level
@@ -370,15 +393,15 @@ void ModelBlock::unpack(char * pB, int bsize,int & pos, N_PDS_Comm * comm)
 
   //----- unpack netlistFileName_
   comm->unpack( pB, bsize, pos, &length, 1 );
-  netlistFileName_ = string( (pB+pos), length);
+  netlistFileName_ = std::string( (pB+pos), length);
   pos += length;
 
   //----- unpack lineNumber_
   comm->unpack( pB, bsize, pos, &lineNumber_, 1 );
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "Unpacked " << pos << " bytes for ModelBlock: " <<
-    name << endl;
+  Xyce::dout() << "Unpacked " << pos << " bytes for ModelBlock: " <<
+    name << std::endl;
 #endif
 
 }
@@ -391,8 +414,8 @@ void ModelBlock::unpack(char * pB, int bsize,int & pos, N_PDS_Comm * comm)
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/18/00
 //-----------------------------------------------------------------------------
-InstanceBlock::InstanceBlock (const std::string & n_str)
-  : name_(n_str),
+InstanceBlock::InstanceBlock (const std::string &name)
+  : name_(name),
     modelName_(),
     iNumNodes(0),
     numIntVars(0),
@@ -534,36 +557,36 @@ void InstanceBlock::clear ()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 4/06/00
 //-----------------------------------------------------------------------------
-ostream& operator<<(ostream & os, const InstanceBlock & ib)
+std::ostream& operator<<(std::ostream & os, const InstanceBlock & ib)
 {
-  vector<Param>::const_iterator it_tpL, end_tpL;
+  std::vector<Param>::const_iterator it_tpL, end_tpL;
 
-  os << "Instance Block" << endl;
-  os << "Name:    " << ib.name_ << endl;
-  os << " Model:  " << ib.getModelName() << endl;
-  os << " # Nodes: " << ib.iNumNodes << endl;
-  os << " # Int Vars: " << ib.numIntVars << endl;
-  os << " # Ext Vars: " << ib.numExtVars << endl;
-  os << " # State Vars: " << ib.numStateVars << endl;
-  os << " modelFlag: " << ib.modelFlag << endl;
-  os << " sourceFlag: " << ib.sourceFlag << endl;
-  os << " bsourceFlag: " << ib.bsourceFlag << endl;
-  os << " offFlag: " << ib.offFlag << endl;
-  os << " off: " << ib.off << endl;
-  os << " netlistFileName_: " << ib.netlistFileName_ << endl;
-  os << " lineNumber_: " << ib.lineNumber_ << endl;
-  os << " Tagged Params" << endl;
-  os << " -------------" << endl;
+  os << "Instance Block" << std::endl;
+  os << "Name:    " << ib.name_ << std::endl;
+  os << " Model:  " << ib.getModelName() << std::endl;
+  os << " # Nodes: " << ib.iNumNodes << std::endl;
+  os << " # Int Vars: " << ib.numIntVars << std::endl;
+  os << " # Ext Vars: " << ib.numExtVars << std::endl;
+  os << " # State Vars: " << ib.numStateVars << std::endl;
+  os << " modelFlag: " << ib.modelFlag << std::endl;
+  os << " sourceFlag: " << ib.sourceFlag << std::endl;
+  os << " bsourceFlag: " << ib.bsourceFlag << std::endl;
+  os << " offFlag: " << ib.offFlag << std::endl;
+  os << " off: " << ib.off << std::endl;
+  os << " netlistFileName_: " << ib.netlistFileName_ << std::endl;
+  os << " lineNumber_: " << ib.lineNumber_ << std::endl;
+  os << " Tagged Params" << std::endl;
+  os << " -------------" << std::endl;
 
   it_tpL=ib.params.begin();
   end_tpL=ib.params.end();
   for ( ; it_tpL != end_tpL; ++it_tpL)
   {
-    os << it_tpL->tag() << "\t" << it_tpL->sVal() << endl;
+    os << it_tpL->tag() << "\t" << it_tpL->stringValue() << std::endl;
   }
 
-  os << " -------------" << endl;
-  os << endl;
+  os << " -------------" << std::endl;
+  os << std::endl;
 
   return os;
 }
@@ -595,7 +618,7 @@ int InstanceBlock::packedByteCount() const
   int byteCount = 0;
 
   int size, length, i;
-  vector<Param>::const_iterator it_tpL;
+  std::vector<Param>::const_iterator it_tpL;
 
   //----- count name
   length = getName().length();
@@ -668,7 +691,7 @@ void InstanceBlock::pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) co
 
   int size, length;
   int i;
-  vector<Param>::const_iterator it_tpL;
+  std::vector<Param>::const_iterator it_tpL;
 #ifdef Xyce_COUNT_PACKED_BYTES
   int predictedPos = pos+packedByteCount();
 #endif
@@ -733,14 +756,13 @@ void InstanceBlock::pack(char * buf, int bsize, int & pos, N_PDS_Comm * comm) co
   comm->pack(&lineNumber_, 1, buf, bsize, pos );
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "Packed " << pos << " bytes for InstanceBlock: " <<
-    getName() << endl;
+  Xyce::dout() << "Packed " << pos << " bytes for InstanceBlock: " <<
+    getName() << std::endl;
 #endif
 #ifdef Xyce_COUNT_PACKED_BYTES
   if (pos != predictedPos)
   {
-    string msg = "Predicted pos does not match actual pos in InstanceBlock::pack";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING, msg );
+    DevelFatal(*this, "InstanceBlock::pack") << "Predicted pos does not match actual pos";
   }
 #endif
 }
@@ -761,12 +783,12 @@ void InstanceBlock::unpack(char * pB, int bsize, int & pos, N_PDS_Comm * comm)
 
   //----- unpack name
   comm->unpack( pB, bsize, pos, &length, 1 );
-  name_ = string( (pB+pos), length);
+  name_ = std::string( (pB+pos), length);
   pos += length;
 
   //----- unpack getModelName()
   comm->unpack( pB, bsize, pos, &length, 1 );
-  modelName_ = string( (pB+pos), length);
+  modelName_ = std::string( (pB+pos), length);
   pos += length;
 
   //----- unpack params
@@ -813,15 +835,15 @@ void InstanceBlock::unpack(char * pB, int bsize, int & pos, N_PDS_Comm * comm)
 
   //----- unpack netlistFileName_
   comm->unpack( pB, bsize, pos, &length, 1 );
-  netlistFileName_ = string( (pB+pos), length);
+  netlistFileName_ = std::string( (pB+pos), length);
   pos += length;
 
   //----- unpack lineNumber_
   comm->unpack( pB, bsize, pos, &lineNumber_, 1 );
 
 #ifdef Xyce_DEBUG_TOPOLOGY
-  cout << "Unpacked " << pos << " bytes for InstanceBlock: " <<
-    getName() << endl;
+  Xyce::dout() << "Unpacked " << pos << " bytes for InstanceBlock: " <<
+    getName() << std::endl;
 #endif
 
 }

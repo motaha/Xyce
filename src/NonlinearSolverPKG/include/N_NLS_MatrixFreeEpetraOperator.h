@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.3.6.2 $
+// Revision Number: $Revision: 1.7 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:47 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -98,7 +98,7 @@ public:
         affects only the Apply() and ApplyInverse() methods.  If the implementation of this interface 
 	does not support transpose use, this method should return a value of -1.
       
-    \param In
+    \param[in]
 	   UseTranspose -If true, multiply by the transpose of operator, otherwise just use operator.
 
     \return Integer error code, set to 0 if successful.  Set to -1 if this implementation does not support transpose.
@@ -107,9 +107,9 @@ public:
 
     //! Returns the result of a Epetra_Operator applied to a Epetra_MultiVector X in Y.
     /*
-    \param In
+    \param[in]
 	   X - A Epetra_MultiVector of dimension NumVectors to multiply with matrix.
-    \param Out
+    \param[out]
 	   Y -A Epetra_MultiVector of dimension NumVectors containing result.
 
     \return Integer error code, set to 0 if successful.
@@ -119,9 +119,9 @@ public:
 
     //! Returns the result of a Epetra_Operator inverse applied to an Epetra_MultiVector X in Y.
     /*
-    \param In
+    \param[in]
 	   X - A Epetra_MultiVector of dimension NumVectors to solve for.
-    \param Out
+    \param[out]
 	   Y -A Epetra_MultiVector of dimension NumVectors containing result.
 
     \return Integer error code, set to 0 if successful.

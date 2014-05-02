@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,8 +31,8 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.86.2.4 $
-// Revision Date  : $Date: 2013/10/03 17:23:31 $
+// Revision Number: $Revision: 1.112.2.1 $
+// Revision Date  : $Date: 2014/03/04 23:50:53 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
@@ -56,6 +56,7 @@
 #include <N_TIA_StepErrorControl.h>
 #include <N_UTL_Timer.h>
 #include <N_UTL_NoCase.h>
+#include <N_ERH_Progress.h>
 
 #include <N_IO_CmdParse.h>
 
@@ -64,16 +65,19 @@
 #include<N_UTL_ExpressionData.h>
 #include<N_NLS_ReturnCodes.h>
 
+namespace Xyce {
+namespace Analysis {
+
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::N_ANP_Transient( N_ANP_AnalysisManager * )
+// Function      : Transient::Transient( AnalysisManager * )
 // Purpose       : constructor
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-N_ANP_Transient::N_ANP_Transient( N_ANP_AnalysisManager * anaManagerPtr ) :
-  N_ANP_AnalysisBase(anaManagerPtr),
+Transient::Transient( AnalysisManager * anaManagerPtr ) :
+  AnalysisBase(anaManagerPtr),
   initialIntegrationMethod_(TIAMethod_ONESTEP),
   firstTranOutput_(true),
   isPaused(false),
@@ -98,32 +102,32 @@ N_ANP_Transient::N_ANP_Transient( N_ANP_AnalysisManager * anaManagerPtr ) :
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::setAnalysisParams
+// Function      : Transient::setAnalysisParams
 // Purpose       :
 // Special Notes : These are from the .TRAN statement.
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 6/21/10
 //-----------------------------------------------------------------------------
-bool N_ANP_Transient::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
+bool Transient::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
 {
-  list<N_UTL_Param>::const_iterator it_tp;
-  list<N_UTL_Param>::const_iterator first = paramsBlock.getParams().begin();
-  list<N_UTL_Param>::const_iterator last = paramsBlock.getParams().end();
+  std::list<N_UTL_Param>::const_iterator it_tp;
+  std::list<N_UTL_Param>::const_iterator first = paramsBlock.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator last = paramsBlock.getParams().end();
   for (it_tp = first; it_tp != last; ++it_tp)
   {
     if (it_tp->uTag()      == "TSTART")
     {
-      tiaParams.tStart = it_tp->dVal();
+      tiaParams.tStart = it_tp->getImmutableValue<double>();
       tiaParams.tStartGiven = true;
     }
     else if (it_tp->uTag() == "TSTOP")
     {
-      tiaParams.finalTime   = it_tp->dVal();
+      tiaParams.finalTime   = it_tp->getImmutableValue<double>();
     }
     else if (it_tp->uTag() == "TSTEP")
     {
-      tiaParams.userSpecified_startingTimeStep = it_tp->dVal();
+      tiaParams.userSpecified_startingTimeStep = it_tp->getImmutableValue<double>();
     }
     else if (it_tp->uTag() == "NOOP" ||
              it_tp->uTag() == "UIC")
@@ -132,12 +136,12 @@ bool N_ANP_Transient::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
     }
     else if (it_tp->uTag() == "DTMAX")
     {
-      tiaParams.maxTimeStep = it_tp->dVal();
+      tiaParams.maxTimeStep = it_tp->getImmutableValue<double>();
       tiaParams.maxTimeStepGiven = true;
 #ifdef Xyce_DEBUG_ANALYSIS
       if (tiaParams.debugLevel > 0)
       {
-	      std::cout << "setting maxTimeStep = " << tiaParams.maxTimeStep << std::endl;
+        dout() << "setting maxTimeStep = " << tiaParams.maxTimeStep << std::endl;
       }
 #endif
     }
@@ -150,15 +154,15 @@ bool N_ANP_Transient::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
       // we'll just store the expression as a string for now
       // as we need to make sure other classes are up and running
       // before we can create the actual expression.  That will
-      // happen in N_ANP_Transient class as it will ultimately use this
+      // happen in Transient class as it will ultimately use this
       maxTimeStepExpressionGiven_ = true;
-      maxTimeStepExpressionAsString_ = it_tp->sVal();
+      maxTimeStepExpressionAsString_ = it_tp->stringValue();
     }
   }
 
   if (tiaParams.finalTime <= tiaParams.tStart || tiaParams.finalTime <= 0 || tiaParams.tStart < 0)
   {
-    ostringstream ost;
+    std::ostringstream ost;
     ost << " In N_TIA_StepErrorControl::setTranAnalysisParams: " << std::endl;
     ost << "Final time of " << tiaParams.finalTime
         << " is earlier or same as start time of "
@@ -176,46 +180,26 @@ bool N_ANP_Transient::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
   }
 
 #ifdef Xyce_DEBUG_ANALYSIS
-  string dashedline = "-------------------------------------------------"
-                       "----------------------------\n";
-
   if (tiaParams.debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       "  Transient simulation parameters");
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  initial time = ",
-            tiaParams.initialTime);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  final time   = ",
-            tiaParams.finalTime);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  starting time step = ",
-            tiaParams.userSpecified_startingTimeStep);
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  tStart (time of first output) = ",
-            tiaParams.tStart);
-
+    dout() << std::endl
+           << section_divider << std::endl
+           << "  Transient simulation parameters" << std::endl
+           << "  initial time = " << tiaParams.initialTime << std::endl
+           << "  final time   = " << tiaParams.finalTime << std::endl
+           << "  starting time step = " << tiaParams.userSpecified_startingTimeStep << std::endl
+           << "  tStart (time of first output) = " << tiaParams.tStart << std::endl;
+    
     if (!(tiaParams.NOOP))
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-         "  NOOP/UIC is NOT set");
+      dout() << "  NOOP/UIC is NOT set" << std::endl;
     }
     else
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "  NOOP/UIC is set");
+      dout() << "  NOOP/UIC is set" << std::endl;
     }
 
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-       dashedline);
+    dout() << section_divider << std::endl;
   }
 #endif
 
@@ -224,7 +208,7 @@ bool N_ANP_Transient::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
     // set-up expression object for getting a user specified, time dependent
     // max time step value
     maxTimeStepExpressionGiven_ = true;
-	  maxTimeStepExpressionRCPtr_ = rcp( new N_UTL_ExpressionData( maxTimeStepExpressionAsString_,  outputMgrAdapterRCPtr_->getOutputMgrPtr() ) );
+    maxTimeStepExpressionRCPtr_ = rcp( new N_UTL_ExpressionData( maxTimeStepExpressionAsString_,  *outputMgrAdapterRCPtr_->getOutputMgrPtr() ) );
   }
 
   // queueSize_ should can be set from the .options timeint line.  Use default in tiaParams
@@ -256,21 +240,21 @@ bool N_ANP_Transient::setAnalysisParams(const N_UTL_OptionBlock & paramsBlock)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::run()
+// Function      : Transient::run()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_Transient::run()
+bool Transient::run()
 {
   bool bsuccess = true;
   isPaused = false;
 
   if (anaManagerRCPtr_->getHBFlag() && !anaManagerRCPtr_->getMPDEStartupFlag())
-    resetForHB();  
-    
+    resetForHB();
+
   bsuccess = bsuccess & init();
   bsuccess = bsuccess & loopProcess();
 
@@ -285,14 +269,14 @@ bool N_ANP_Transient::run()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::init()
+// Function      : Transient::init()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_Transient::init()
+bool Transient::init()
 {
   bool bsuccess = true;
 
@@ -319,7 +303,7 @@ bool N_ANP_Transient::init()
 
     if (restartMgrRCPtr_->isRestart())
     {
-      loaderRCPtr_->getInitialQnorm(dsRCPtr_->innerErrorInfoVec);
+      loaderRCPtr_->getInitialQnorm(anaManagerRCPtr_->getTIADataStore()->innerErrorInfoVec);
 
 //      secRCPtr_->initialTime = secRCPtr_->currentTime;
       wimRCPtr_->createTimeIntegMethod(integrationMethod_);
@@ -330,12 +314,12 @@ bool N_ANP_Transient::init()
 
 #ifdef Xyce_PARALLEL_MPI
       // Update vectors with off proc values.
-      lasSystemRCPtr_->updateExternValsSolnVector(dsRCPtr_->nextSolutionPtr);
-      lasSystemRCPtr_->updateExternValsSolnVector(dsRCPtr_->currSolutionPtr);
-      lasSystemRCPtr_->updateExternValsStateVector(dsRCPtr_->nextStatePtr);
-      lasSystemRCPtr_->updateExternValsStateVector(dsRCPtr_->currStatePtr);
-      lasSystemRCPtr_->updateExternValsStoreVector(dsRCPtr_->nextStorePtr);
-      lasSystemRCPtr_->updateExternValsStoreVector(dsRCPtr_->currStorePtr);
+      lasSystemRCPtr_->updateExternValsSolnVector(anaManagerRCPtr_->getTIADataStore()->nextSolutionPtr);
+      lasSystemRCPtr_->updateExternValsSolnVector(anaManagerRCPtr_->getTIADataStore()->currSolutionPtr);
+      lasSystemRCPtr_->updateExternValsStateVector(anaManagerRCPtr_->getTIADataStore()->nextStatePtr);
+      lasSystemRCPtr_->updateExternValsStateVector(anaManagerRCPtr_->getTIADataStore()->currStatePtr);
+      lasSystemRCPtr_->updateExternValsStoreVector(anaManagerRCPtr_->getTIADataStore()->nextStorePtr);
+      lasSystemRCPtr_->updateExternValsStoreVector(anaManagerRCPtr_->getTIADataStore()->currStorePtr);
 #endif
 
       // Set the nonlinear solver parameters to those appropriate for the
@@ -360,8 +344,8 @@ bool N_ANP_Transient::init()
       // This setInitialGuess call is to up an initial guess in the
       // devices that have them (usually PDE devices).  This is DIFFERENT
       // than an initial condition.
-      loaderRCPtr_->setInitialGuess (dsRCPtr_->nextSolutionPtr);
-     
+      loaderRCPtr_->setInitialGuess (anaManagerRCPtr_->getTIADataStore()->nextSolutionPtr);
+
       if (anaManagerRCPtr_->getBlockAnalysisFlag())
       {
         beginningIntegration = true;
@@ -375,7 +359,7 @@ bool N_ANP_Transient::init()
         // a .IC, or a .NODESET line.  These can be used in both the UIC/NOOP
         // case, as well as the DCOP case, so they need to be outside the if-statement.
         inputOPFlag_ = outputMgrAdapterRCPtr_->setupInitialConditions
-          ( *(dsRCPtr_->nextSolutionPtr),*(dsRCPtr_->flagSolutionPtr));
+          ( *(anaManagerRCPtr_->getTIADataStore()->nextSolutionPtr),*(anaManagerRCPtr_->getTIADataStore()->flagSolutionPtr));
       }
 
       if (!dcopFlag_ && !anaManagerRCPtr_->getMPDEFlag())
@@ -383,20 +367,20 @@ bool N_ANP_Transient::init()
         // this "initializeProblem" call is to set the IC's in devices that
         // have them.  This is done IN PLACE of the operating point.
         loaderRCPtr_->initializeProblem
-              ((dsRCPtr_->nextSolutionPtr),
-               (dsRCPtr_->currSolutionPtr),
-               (dsRCPtr_->lastSolutionPtr),
-               (dsRCPtr_->nextStatePtr),
-               (dsRCPtr_->currStatePtr),
-               (dsRCPtr_->lastStatePtr),
-               (dsRCPtr_->nextStateDerivPtr),
-               (dsRCPtr_->nextStorePtr),
-               (dsRCPtr_->currStorePtr),
-               (dsRCPtr_->lastStorePtr),
-               (dsRCPtr_->daeQVectorPtr),
-               (dsRCPtr_->daeFVectorPtr),
-               (dsRCPtr_->dFdxdVpVectorPtr),
-               (dsRCPtr_->dQdxdVpVectorPtr) );
+              ((anaManagerRCPtr_->getTIADataStore()->nextSolutionPtr),
+               (anaManagerRCPtr_->getTIADataStore()->currSolutionPtr),
+               (anaManagerRCPtr_->getTIADataStore()->lastSolutionPtr),
+               (anaManagerRCPtr_->getTIADataStore()->nextStatePtr),
+               (anaManagerRCPtr_->getTIADataStore()->currStatePtr),
+               (anaManagerRCPtr_->getTIADataStore()->lastStatePtr),
+               (anaManagerRCPtr_->getTIADataStore()->nextStateDerivPtr),
+               (anaManagerRCPtr_->getTIADataStore()->nextStorePtr),
+               (anaManagerRCPtr_->getTIADataStore()->currStorePtr),
+               (anaManagerRCPtr_->getTIADataStore()->lastStorePtr),
+               (anaManagerRCPtr_->getTIADataStore()->daeQVectorPtr),
+               (anaManagerRCPtr_->getTIADataStore()->daeFVectorPtr),
+               (anaManagerRCPtr_->getTIADataStore()->dFdxdVpVectorPtr),
+               (anaManagerRCPtr_->getTIADataStore()->dQdxdVpVectorPtr) );
 
         // Do this to populate the q-vector:
         // since we're also skipping the DC OP, this call will
@@ -406,18 +390,18 @@ bool N_ANP_Transient::init()
       }
 
       // Set a constant history.
-      dsRCPtr_->setConstantHistory();
-      dsRCPtr_->computeDividedDifferences();
+      anaManagerRCPtr_->getTIADataStore()->setConstantHistory();
+      anaManagerRCPtr_->getTIADataStore()->computeDividedDifferences();
       wimRCPtr_->obtainCorrectorDeriv();
 
 #ifdef Xyce_PARALLEL_MPI
       // Update vectors with off proc values.
-      lasSystemRCPtr_->updateExternValsSolnVector(dsRCPtr_->nextSolutionPtr);
-      lasSystemRCPtr_->updateExternValsSolnVector(dsRCPtr_->currSolutionPtr);
-      lasSystemRCPtr_->updateExternValsStateVector(dsRCPtr_->nextStatePtr);
-      lasSystemRCPtr_->updateExternValsStateVector(dsRCPtr_->currStatePtr);
-      lasSystemRCPtr_->updateExternValsStoreVector(dsRCPtr_->nextStorePtr);
-      lasSystemRCPtr_->updateExternValsStoreVector(dsRCPtr_->currStorePtr);
+      lasSystemRCPtr_->updateExternValsSolnVector(anaManagerRCPtr_->getTIADataStore()->nextSolutionPtr);
+      lasSystemRCPtr_->updateExternValsSolnVector(anaManagerRCPtr_->getTIADataStore()->currSolutionPtr);
+      lasSystemRCPtr_->updateExternValsStateVector(anaManagerRCPtr_->getTIADataStore()->nextStatePtr);
+      lasSystemRCPtr_->updateExternValsStateVector(anaManagerRCPtr_->getTIADataStore()->currStatePtr);
+      lasSystemRCPtr_->updateExternValsStoreVector(anaManagerRCPtr_->getTIADataStore()->nextStorePtr);
+      lasSystemRCPtr_->updateExternValsStoreVector(anaManagerRCPtr_->getTIADataStore()->currStorePtr);
 #endif
 
       if (!dcopFlag_ && !tiaParams.resume)
@@ -445,7 +429,7 @@ bool N_ANP_Transient::init()
 
       // we default firstTranOutput_ to true to force the first time point to be output
       // however, if we're resuming, then we need this to be false
-      // this is really a defect of a paused simulation's N_ANP_Transient object
+      // this is really a defect of a paused simulation's Transient object
       // being deleted by the AnalysisManager and then a new one being created
       // when the simulation is resumed.  Need to fully fix this.  RLS 12/22/2009
       firstTranOutput_ = false;
@@ -462,7 +446,7 @@ bool N_ANP_Transient::init()
 
 #ifdef Xyce_DEBUG_ANALYSIS
     if (tiaParams.debugLevel > 0)
-      std::cout << "  transient loop called with resume true " << std::endl;
+      dout() << "  transient loop called with resume true " << std::endl;
 #endif
   }
 
@@ -476,7 +460,7 @@ bool N_ANP_Transient::init()
     if( maxTimeStepExpressionGiven_ )
     {
       suggestedMaxTime = maxTimeStepExpressionRCPtr_->evaluate(
-        dsRCPtr_->currSolutionPtr, dsRCPtr_->currStatePtr, dsRCPtr_->currStorePtr);
+        anaManagerRCPtr_->getTIADataStore()->currSolutionPtr, anaManagerRCPtr_->getTIADataStore()->currStatePtr, anaManagerRCPtr_->getTIADataStore()->currStorePtr);
     }
     secRCPtr_->updateMaxTimeStep( suggestedMaxTime );
     secRCPtr_->updateMinTimeStep();
@@ -495,14 +479,14 @@ bool N_ANP_Transient::init()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::loopProcess()
+// Function      : Transient::loopProcess()
 // Purpose       : Conduct the time stepping loop.
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_Transient::loopProcess()
+bool Transient::loopProcess()
 {
   bool bsuccess = true;
 
@@ -510,9 +494,9 @@ bool N_ANP_Transient::loopProcess()
   while (!(secRCPtr_->finished()))
   {
 #ifdef Xyce_VERBOSE_TIME
-    this->printStepHeader();
+    printStepHeader(Xyce::lout());
 #endif
-    this->printProgress();
+    printProgress(Xyce::lout());
 
     // ------------------------------------------------------------------------
     // If the flag is set to switch integration methods, do that here.
@@ -531,10 +515,10 @@ bool N_ANP_Transient::loopProcess()
 #ifdef Xyce_DEBUG_ANALYSIS
     if (tiaParams.debugLevel > 0)
     {
-      std::cout << std::endl;
-      std::cout << "N_ANP_Transient::loopProcess()" << std::endl;
-      std::cout << "beginningIntegration = " << beginningIntegration << std::endl;
-      std::cout << "secRCPtr_->stepAttemptStatus = " << secRCPtr_->stepAttemptStatus << std::endl;
+      dout() << std::endl;
+      dout() << "Transient::loopProcess()" << std::endl;
+      dout() << "beginningIntegration = " << beginningIntegration << std::endl;
+      dout() << "secRCPtr_->stepAttemptStatus = " << secRCPtr_->stepAttemptStatus << std::endl;
     }
 #endif
 
@@ -546,12 +530,12 @@ bool N_ANP_Transient::loopProcess()
       // integration method initialize call under the DAE formulation.  This
       // segregates codes changes better and makes sense to do as an
       // initialization step even if its changed later.
-      loaderRCPtr_->getInitialQnorm(dsRCPtr_->innerErrorInfoVec);
+      loaderRCPtr_->getInitialQnorm(anaManagerRCPtr_->getTIADataStore()->innerErrorInfoVec);
       double suggestedMaxTime=0.0;
       if( maxTimeStepExpressionGiven_ )
       {
         suggestedMaxTime = maxTimeStepExpressionRCPtr_->evaluate(
-          dsRCPtr_->currSolutionPtr, dsRCPtr_->currStatePtr, dsRCPtr_->currStorePtr);
+          anaManagerRCPtr_->getTIADataStore()->currSolutionPtr, anaManagerRCPtr_->getTIADataStore()->currStatePtr, anaManagerRCPtr_->getTIADataStore()->currStorePtr);
       }
       secRCPtr_->updateMaxTimeStep( suggestedMaxTime );
       wimRCPtr_->initialize();
@@ -568,7 +552,7 @@ bool N_ANP_Transient::loopProcess()
 
 #ifdef Xyce_VERBOSE_TIME
     if (!dcopFlag_)
-      secRCPtr_->outputTimeInfo();
+      secRCPtr_->outputTimeInfo(lout());
 #endif
 
     // ------------------------------------------------------------------------
@@ -615,7 +599,7 @@ bool N_ANP_Transient::loopProcess()
         // time step, then calls this failure a pass
         if( secRCPtr_->newtonConvergenceStatus == -3)
         {
-          string msg = "N_ANP_Transient::loopProcess() Nonlinear solver stalled. Calling this a pass";
+          std::string msg = "Transient::loopProcess() Nonlinear solver stalled. Calling this a pass";
           N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg);
           processSuccessfulStep();
         }
@@ -624,21 +608,20 @@ bool N_ANP_Transient::loopProcess()
         // time step, then calls this failure a pass
         if( secRCPtr_->newtonConvergenceStatus == -2)
         {
-          string msg = "N_ANP_Transient::loopProcess() Update too big. Calling this a pass";
+          std::string msg = "Transient::loopProcess() Update too big. Calling this a pass";
           N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg);
           processSuccessfulStep();
         }
         // another VERY dangerous options.
         // if the non-linear solver is not converging in the max number of steps,
         // and we're very close to a min time step, then calls this failure a pass
-        /*
-        if( secRCPtr_->newtonConvergenceStatus == -1)
-        {
-          string msg = "N_ANP_Transient::loopProcess() Too many steps. Calling this a pass";
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg);
-          processSuccessfulStep();
-        }
-        */
+        //
+        // if( secRCPtr_->newtonConvergenceStatus == -1)
+        // {
+        //   std::string msg = "Transient::loopProcess() Too many steps. Calling this a pass";
+        //   N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg);
+        //   processSuccessfulStep();
+        // }
         else
         {
           // process this failed step as we would have by default.
@@ -665,25 +648,25 @@ bool N_ANP_Transient::loopProcess()
 #ifdef Xyce_DEBUG_ANALYSIS
     if (tiaParams.debugLevel > 0)
     {
-      std::cout << std::endl;
-      std::cout << "   Here we are, just before checking whether to pause. " << std::endl;
-      std::cout << "   minTimeStep = " << secRCPtr_->minTimeStep << std::endl;
-      std::cout << "   final time = " << tiaParams.finalTime << std::endl;
-      std::cout << "   pause time = " << anaManagerRCPtr_->getPauseTime() << std::endl;
-      std::cout << "   initial time = " << secRCPtr_->initialTime << std::endl;
-      std::cout << "   current time = " << secRCPtr_->currentTime << std::endl;
+      dout() << std::endl;
+      dout() << "   Here we are, just before checking whether to pause. " << std::endl;
+      dout() << "   minTimeStep = " << secRCPtr_->minTimeStep << std::endl;
+      dout() << "   final time = " << tiaParams.finalTime << std::endl;
+      dout() << "   pause time = " << anaManagerRCPtr_->getPauseTime() << std::endl;
+      dout() << "   initial time = " << secRCPtr_->initialTime << std::endl;
+      dout() << "   current time = " << secRCPtr_->currentTime << std::endl;
       if (anaManagerRCPtr_->getPauseTime() == secRCPtr_->currentTime)
       {
-        std::cout << "    Pause time and current time equal " << std::endl;
+        dout() << "    Pause time and current time equal " << std::endl;
       }
       else
       {
-        std::cout << "     difference between current and pause times is " 
+        dout() << "     difference between current and pause times is "
           << anaManagerRCPtr_->getPauseTime() - secRCPtr_->currentTime << std::endl;
       }
       if (anaManagerRCPtr_->getPauseTime() == secRCPtr_->initialTime)
       {
-        std::cout << "    Pause time and initial time equal " << std::endl;
+        dout() << "    Pause time and initial time equal " << std::endl;
       }
     }
 #endif
@@ -695,7 +678,7 @@ bool N_ANP_Transient::loopProcess()
 #ifdef Xyce_DEBUG_ANALYSIS
       if (tiaParams.debugLevel > 0)
       {
-        std::cout << "N_ANP_Transient::loopProcess():   pausing simulation " << std::endl;
+        dout() << "Transient::loopProcess():   pausing simulation " << std::endl;
       }
 #endif
       secRCPtr_->simulationPaused();
@@ -708,20 +691,16 @@ bool N_ANP_Transient::loopProcess()
     if (tiaParams.exitTime != 0.0 &&
         secRCPtr_->currentTime > tiaParams.exitTime)
     {
-        string msg = "N_ANP_Transient::loopProcess(): "
-          "  Exit Time exceeded.  Exiting transient loop\n";
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg);
-        bsuccess = true;
+      lout() << "Exit time exceeded.  Exiting transient loop\n" << std::endl;
+      bsuccess = true;
       break;
     }
 
     if (tiaParams.exitStep != -1 &&
           static_cast<int>(stepNumber) == tiaParams.exitStep)
     {
-        string msg = "N_ANP_Transient::loopProcess(): "
-          "  Exit Step.  Exiting transient loop\n";
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg);
-        bsuccess = true;
+      lout() << "Exit step.  Exiting transient loop\n" << std::endl;
+      bsuccess = true;
       break;
     }
 
@@ -734,33 +713,33 @@ bool N_ANP_Transient::loopProcess()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::mixedSignalStep
+// Function      : Transient::mixedSignalStep
 // Purpose       :
 // Special Notes : Habanero API function
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 3/04/09
 //-----------------------------------------------------------------------------
-bool N_ANP_Transient::mixedSignalStep()
+bool Transient::mixedSignalStep()
 {
   takeAnIntegrationStep_();
   return true;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::preStepDetails
+// Function      : Transient::preStepDetails
 // Purpose       :
 // Special Notes : Habanero API function
 // Scope         : private_
 // Creator       : Eric Keiter, SNL
 // Creation Date : 3/04/09
 //-----------------------------------------------------------------------------
-void N_ANP_Transient::preStepDetails (double maxTimeStepFromHabanero)
+void Transient::preStepDetails (double maxTimeStepFromHabanero)
 {
 #ifdef Xyce_VERBOSE_TIME
-  this->printStepHeader();
+  printStepHeader(Xyce::lout());
 #endif
-  this->printProgress();
+  printProgress(Xyce::lout());
 
   // ------------------------------------------------------------------------
   // If the flag is set to switch integration methods, do that here.
@@ -786,10 +765,10 @@ void N_ANP_Transient::preStepDetails (double maxTimeStepFromHabanero)
 #ifdef Xyce_DEBUG_ANALYSIS
   if (tiaParams.debugLevel > 0)
   {
-    std::cout << std::endl;
-    std::cout << "N_ANP_Transient::loopProcess()" << std::endl;
-    std::cout << "beginningIntegration = " << beginningIntegration << std::endl;
-    std::cout << "secRCPtr_->stepAttemptStatus = " << secRCPtr_->stepAttemptStatus << std::endl;
+    dout() << std::endl;
+    dout() << "Transient::loopProcess()" << std::endl;
+    dout() << "beginningIntegration = " << beginningIntegration << std::endl;
+    dout() << "secRCPtr_->stepAttemptStatus = " << secRCPtr_->stepAttemptStatus << std::endl;
   }
 #endif
 
@@ -802,12 +781,12 @@ void N_ANP_Transient::preStepDetails (double maxTimeStepFromHabanero)
     // integration method initialize call under the DAE formulation.  This
     // segregates codes changes better and makes sense to do as an
     // initialization step even if its changed later.
-    loaderRCPtr_->getInitialQnorm(dsRCPtr_->innerErrorInfoVec);
+    loaderRCPtr_->getInitialQnorm(anaManagerRCPtr_->getTIADataStore()->innerErrorInfoVec);
     double suggestedMaxTime=0.0;
     if( maxTimeStepExpressionGiven_ )
     {
       suggestedMaxTime = maxTimeStepExpressionRCPtr_->evaluate(
-        dsRCPtr_->currSolutionPtr, dsRCPtr_->currStatePtr, dsRCPtr_->currStorePtr);
+        anaManagerRCPtr_->getTIADataStore()->currSolutionPtr, anaManagerRCPtr_->getTIADataStore()->currStatePtr, anaManagerRCPtr_->getTIADataStore()->currStorePtr);
     }
     secRCPtr_->updateMaxTimeStep( suggestedMaxTime );
     wimRCPtr_->initialize();
@@ -825,7 +804,7 @@ void N_ANP_Transient::preStepDetails (double maxTimeStepFromHabanero)
 #ifdef Xyce_VERBOSE_TIME
   if (!dcopFlag_)
   {
-    secRCPtr_->outputTimeInfo();
+    secRCPtr_->outputTimeInfo(lout());
   }
 #endif
 
@@ -842,14 +821,14 @@ void N_ANP_Transient::preStepDetails (double maxTimeStepFromHabanero)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::finalizeStep
+// Function      : Transient::finalizeStep
 // Purpose       :
 // Special Notes : Habanero API function
 // Scope         : public
 // Creator       : Eric Keiter, SNL
 // Creation Date : 3/04/09
 //-----------------------------------------------------------------------------
-bool N_ANP_Transient::finalizeStep ()
+bool Transient::finalizeStep ()
 {
   bool recoverableFailureFlag = true;
 
@@ -879,7 +858,7 @@ bool N_ANP_Transient::finalizeStep ()
 
       if( secRCPtr_->newtonConvergenceStatus == -3)
       {
-        string msg = "N_ANP_Transient::loopProcess() Nonlinear solver stalled. Calling this a pass";
+        std::string msg = "Transient::loopProcess() Nonlinear solver stalled. Calling this a pass";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg);
         processSuccessfulStep();
       }
@@ -888,21 +867,20 @@ bool N_ANP_Transient::finalizeStep ()
       // time step, then calls this failure a pass
       if( secRCPtr_->newtonConvergenceStatus == -2)
       {
-        string msg = "N_ANP_Transient::loopProcess() Update too big. Calling this a pass";
+        std::string msg = "Transient::loopProcess() Update too big. Calling this a pass";
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg);
         processSuccessfulStep();
       }
       // another VERY dangerous options.
       // if the non-linear solver is not converging in the max number of steps,
       // and we're very close to a min time step, then calls this failure a pass
-      /*
-      if( secRCPtr_->newtonConvergenceStatus == -1)
-      {
-        string msg = "N_ANP_Transient::loopProcess() Too many steps. Calling this a pass";
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg);
-        processSuccessfulStep();
-      }
-      */
+      // 
+      // if( secRCPtr_->newtonConvergenceStatus == -1)
+      // {
+      //   std::string msg = "Transient::loopProcess() Too many steps. Calling this a pass";
+      //   N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg);
+      //   processSuccessfulStep();
+      // }
       else
       {
         // process this failed step as we would have by default.
@@ -918,24 +896,24 @@ bool N_ANP_Transient::finalizeStep ()
 #ifdef Xyce_DEBUG_ANALYSIS
   if (tiaParams.debugLevel > 0)
   {
-    std::cout << std::endl;
-    std::cout << "   Here we are, just before checking whether to pause. " << std::endl;
-    std::cout << "   minTimeStep = " << secRCPtr_->minTimeStep << std::endl;
-    std::cout << "   final time = " << tiaParams.finalTime << std::endl;
-    std::cout << "   pause time = " << anaManagerRCPtr_->getPauseTime() << std::endl;
-    std::cout << "   initial time = " << secRCPtr_->initialTime << std::endl;
-    std::cout << "   current time = " << secRCPtr_->currentTime << std::endl;
+    dout() << std::endl;
+    dout() << "   Here we are, just before checking whether to pause. " << std::endl;
+    dout() << "   minTimeStep = " << secRCPtr_->minTimeStep << std::endl;
+    dout() << "   final time = " << tiaParams.finalTime << std::endl;
+    dout() << "   pause time = " << anaManagerRCPtr_->getPauseTime() << std::endl;
+    dout() << "   initial time = " << secRCPtr_->initialTime << std::endl;
+    dout() << "   current time = " << secRCPtr_->currentTime << std::endl;
     if (anaManagerRCPtr_->getPauseTime() == secRCPtr_->currentTime)
     {
-      std::cout << "    Pause time and current time equal " << std::endl;
+      dout() << "    Pause time and current time equal " << std::endl;
     }
     else
     {
-      std::cout << "     difference between current and pause times is " << anaManagerRCPtr_->getPauseTime() - secRCPtr_->currentTime << std::endl;
+      dout() << "     difference between current and pause times is " << anaManagerRCPtr_->getPauseTime() - secRCPtr_->currentTime << std::endl;
     }
     if (anaManagerRCPtr_->getPauseTime() == secRCPtr_->initialTime)
     {
-      std::cout << "    Pause time and initial time equal " << std::endl;
+      dout() << "    Pause time and initial time equal " << std::endl;
     }
   }
 #endif
@@ -947,7 +925,7 @@ bool N_ANP_Transient::finalizeStep ()
 #ifdef Xyce_DEBUG_ANALYSIS
     if (tiaParams.debugLevel > 0)
     {
-      std::cout << "N_ANP_Transient::loopProcess():   pausing simulation " << std::endl;
+      dout() << "Transient::loopProcess():   pausing simulation " << std::endl;
     }
 #endif
     secRCPtr_->simulationPaused();
@@ -959,18 +937,15 @@ bool N_ANP_Transient::finalizeStep ()
   if (tiaParams.exitTime != 0.0 &&
       secRCPtr_->currentTime > tiaParams.exitTime)
   {
-    string msg = "N_ANP_Transient::loopProcess(): "
-      "  Exit Time exceeded.  Exiting transient loop\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg);
+    
+    lout() << "Exit time exceeded.  Exiting transient loop\n" << std::endl;
     recoverableFailureFlag = false;
   }
 
   if (tiaParams.exitStep != -1 &&
         static_cast<int>(stepNumber) == tiaParams.exitStep)
   {
-    string msg = "N_ANP_Transient::loopProcess(): "
-      "  Exit Step.  Exiting transient loop\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg);
+    lout() <<"Exit step.  Exiting transient loop\n" << std::endl;
     recoverableFailureFlag = false;
   }
 
@@ -978,14 +953,14 @@ bool N_ANP_Transient::finalizeStep ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::processSuccessfulDCOP()
+// Function      : Transient::processSuccessfulDCOP()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_Transient::processSuccessfulDCOP()
+bool Transient::processSuccessfulDCOP()
 {
   bool bsuccess = true;
 
@@ -1018,11 +993,11 @@ bool N_ANP_Transient::processSuccessfulDCOP()
     beginningIntegration = true;
   }
 
-  dsRCPtr_->setConstantHistory();
-  dsRCPtr_->computeDividedDifferences();
+  anaManagerRCPtr_->getTIADataStore()->setConstantHistory();
+  anaManagerRCPtr_->getTIADataStore()->computeDividedDifferences();
   wimRCPtr_->obtainCorrectorDeriv();
 
-  dsRCPtr_->updateSolDataArrays ();
+  anaManagerRCPtr_->getTIADataStore()->updateSolDataArrays ();
 
   tranopOutputs ();
 
@@ -1033,19 +1008,18 @@ bool N_ANP_Transient::processSuccessfulDCOP()
   //Test and save restart if necessary
   if( anaManagerRCPtr_->testRestartSaveTime_() )
   {
-#ifdef Xyce_DEBUG_RESTART
-    string netListFile = commandLine_.getArgumentValue("netlist");
-    std::cout << "\n " << netListFile;
-    std::cout << "  Calling dumpRestartData" << std::endl;
-#endif
+    if (DEBUG_RESTART)
+      dout() << "\n " << commandLine_.getArgumentValue("netlist")
+                   << "  Calling dumpRestartData" << std::endl;
+
     restartMgrRCPtr_->dumpRestartData( secRCPtr_->currentTime );
-#ifdef Xyce_DEBUG_RESTART
-    std::cout << "  Done Calling dumpRestartData" << std::endl;
-#endif
+
+    if (DEBUG_RESTART)
+      dout() << "  Done Calling dumpRestartData" << std::endl;
   }
 
   // This output call is for device-specific output, such as .OP,
-  // or internal plot output from PDE(TCAD) devices.  
+  // or internal plot output from PDE(TCAD) devices.
   loaderRCPtr_->output();
 
   nlsMgrRCPtr_->allocateTranSolver();
@@ -1055,14 +1029,14 @@ bool N_ANP_Transient::processSuccessfulDCOP()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::processSuccessfulStep()
+// Function      : Transient::processSuccessfulStep()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_Transient::processSuccessfulStep()
+bool Transient::processSuccessfulStep()
 {
   bool bsuccess = true;
   loaderRCPtr_->stepSuccess (anaManagerRCPtr_->currentMode_);
@@ -1083,12 +1057,12 @@ bool N_ANP_Transient::processSuccessfulStep()
 #ifdef Xyce_DEBUG_ANALYSIS
   if (tiaParams.debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                          "  N_ANP_Transient::processSuccessfulStep()");
-    std::cout << "Newton step succeeded:" << std::endl;
-    std::cout << "nextSolutionPtr: " << std::endl;
-    dsRCPtr_->nextSolutionPtr->printPetraObject();
-    std::cout << std::endl;
+    dout() << "  Transient::processSuccessfulStep()" << std::endl
+           << "Newton step succeeded:" << std::endl
+           << "nextSolutionPtr: " << std::endl;
+    
+    anaManagerRCPtr_->getTIADataStore()->nextSolutionPtr->printPetraObject(dout());
+    dout() << std::endl;
   }
 #endif
   // Set things up for the next time step, based on if this one was
@@ -1117,7 +1091,7 @@ bool N_ANP_Transient::processSuccessfulStep()
   if( maxTimeStepExpressionGiven_ )
   {
     suggestedMaxTime = maxTimeStepExpressionRCPtr_->evaluate(
-      dsRCPtr_->currSolutionPtr, dsRCPtr_->currStatePtr, dsRCPtr_->currStorePtr);
+      anaManagerRCPtr_->getTIADataStore()->currSolutionPtr, anaManagerRCPtr_->getTIADataStore()->currStatePtr, anaManagerRCPtr_->getTIADataStore()->currStorePtr);
   }
   secRCPtr_->updateMaxTimeStep( suggestedMaxTime );
   secRCPtr_->updateMinTimeStep();
@@ -1126,7 +1100,7 @@ bool N_ANP_Transient::processSuccessfulStep()
 #ifdef Xyce_VERBOSE_TIME
   if (tiaParams.debugLevel > 0)
   {
-    std::cout << "Transient Analysis:  accepting time step" << std::endl;
+    dout() << "Transient Analysis:  accepting time step" << std::endl;
   }
 #endif // Xyce_VERBOSE_TIME
 
@@ -1135,10 +1109,10 @@ bool N_ANP_Transient::processSuccessfulStep()
 #ifdef Xyce_VERBOSE_TIME
   if (tiaParams.errorAnalysisOption == 1)
   {
-    std::cout.precision(15);
-    std::cout << "ERROROPTION=1: TimeStepLimitedbyBP = " << tiaParams.TimeStepLimitedbyBP << "\n" << std::endl;
-    std::cout << "ERROROPTION=1: NL Its =  " << secRCPtr_->nIterations << "\n" << std::endl;
-    std::cout << "ERROROPTION=1: New DeltaT = " << secRCPtr_->currentTimeStep << "\n" << std::endl;
+    dout().precision(15);
+    dout() << "ERROROPTION=1: TimeStepLimitedbyBP = " << tiaParams.TimeStepLimitedbyBP << "\n" << std::endl;
+    dout() << "ERROROPTION=1: NL Its =  " << secRCPtr_->nIterations << "\n" << std::endl;
+    dout() << "ERROROPTION=1: New DeltaT = " << secRCPtr_->currentTimeStep << "\n" << std::endl;
   }
 #endif // Xyce_VERBOSE_TIME
 
@@ -1170,12 +1144,12 @@ bool N_ANP_Transient::processSuccessfulStep()
 #ifdef Xyce_DEBUG_ANALYSIS
     if (tiaParams.debugLevel > 0)
     {
-      std::cout << " Checking whether to set breakpointrestartstep" << std::endl;
-      std::cout << "   current - stop  = " << timeDiff1 << std::endl;
-      std::cout << "   current - final = " << timeDiff2 << std::endl;
-      std::cout << "   bpTol           = " << bpTol << std::endl;
+      dout() << " Checking whether to set breakpointrestartstep" << std::endl;
+      dout() << "   current - stop  = " << timeDiff1 << std::endl;
+      dout() << "   current - final = " << timeDiff2 << std::endl;
+      dout() << "   bpTol           = " << bpTol << std::endl;
       if (timeDiff1 <= bpTol && timeDiff2 > bpTol)
-        std::cout << "    setting breakPointRestartStep to " << tranStepNumber;
+        dout() << "    setting breakPointRestartStep to " << tranStepNumber;
     }
 #endif
     if (timeDiff1 <= bpTol && timeDiff2 > bpTol)
@@ -1205,25 +1179,25 @@ bool N_ANP_Transient::processSuccessfulStep()
 
   if (tiaParams.saveTimeStepsFlag)
   {
-    dsRCPtr_->timeSteps.push_back(currentTime);
-    dsRCPtr_->timeStepsBreakpointFlag.push_back(beginningIntegration);
-    N_LAS_Vector * aVecPtr = new N_LAS_Vector( *(dsRCPtr_->currSolutionPtr) );
-    dsRCPtr_->fastTimeSolutionVec.push_back( aVecPtr );
-    aVecPtr = new N_LAS_Vector( *(dsRCPtr_->currStatePtr) );
-    dsRCPtr_->fastTimeStateVec.push_back( aVecPtr );
-    aVecPtr = new N_LAS_Vector( *(dsRCPtr_->daeQVectorPtr) );
-    dsRCPtr_->fastTimeQVec.push_back( aVecPtr );
-    aVecPtr = new N_LAS_Vector( *(dsRCPtr_->currStorePtr) );
-    dsRCPtr_->fastTimeStoreVec.push_back( aVecPtr );
+    anaManagerRCPtr_->getTIADataStore()->timeSteps.push_back(currentTime);
+    anaManagerRCPtr_->getTIADataStore()->timeStepsBreakpointFlag.push_back(beginningIntegration);
+    N_LAS_Vector * aVecPtr = new N_LAS_Vector( *(anaManagerRCPtr_->getTIADataStore()->currSolutionPtr) );
+    anaManagerRCPtr_->getTIADataStore()->fastTimeSolutionVec.push_back( aVecPtr );
+    aVecPtr = new N_LAS_Vector( *(anaManagerRCPtr_->getTIADataStore()->currStatePtr) );
+    anaManagerRCPtr_->getTIADataStore()->fastTimeStateVec.push_back( aVecPtr );
+    aVecPtr = new N_LAS_Vector( *(anaManagerRCPtr_->getTIADataStore()->daeQVectorPtr) );
+    anaManagerRCPtr_->getTIADataStore()->fastTimeQVec.push_back( aVecPtr );
+    aVecPtr = new N_LAS_Vector( *(anaManagerRCPtr_->getTIADataStore()->currStorePtr) );
+    anaManagerRCPtr_->getTIADataStore()->fastTimeStoreVec.push_back( aVecPtr );
   }
 
   // 03/16/04 tscoffe:  This is where the solution pointers are rotated.
-  dsRCPtr_->updateSolDataArrays();
+  anaManagerRCPtr_->getTIADataStore()->updateSolDataArrays();
 
 #ifdef Xyce_DEBUG_ANALYSIS
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams.debugLevel > 1)
-    dsRCPtr_->outputSolDataArrays();
+    anaManagerRCPtr_->getTIADataStore()->outputSolDataArrays(Xyce::dout());
 #endif
 #endif
 
@@ -1246,14 +1220,14 @@ bool N_ANP_Transient::processSuccessfulStep()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::processFailedStep
+// Function      : Transient::processFailedStep
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_Transient::processFailedStep()
+bool Transient::processFailedStep()
 {
   bool bsuccess = true;
 
@@ -1282,33 +1256,32 @@ bool N_ANP_Transient::processFailedStep()
 
   loaderRCPtr_->stepFailure (anaManagerRCPtr_->currentMode_);
 
-#ifdef Xyce_VERBOSE_TIME 
+#ifdef Xyce_VERBOSE_TIME
   // DO NOT REMOVE THIS OUTPUT LINE.  It is depended upon by the TIA/ERROROPTION
   // test case, which will fail if this output doesn't happen.
-  std::cout << "Transient Analysis:  rejecting time step" << std::endl;
-#endif // Xyce_VERBOSE_TIME 
+  dout() << "Transient Analysis:  rejecting time step" << std::endl;
+#endif // Xyce_VERBOSE_TIME
 
   wimRCPtr_->rejectStep();
 
 #ifdef Xyce_VERBOSE_TIME
   if (tiaParams.errorAnalysisOption == 1)
   {
-    std::cout.precision(15);
-    std::cout << "ERROROPTION=1: TimeStepLimitedbyBP = " << tiaParams.TimeStepLimitedbyBP << "\n" << std::endl;
-    std::cout << "ERROROPTION=1: NL Its =  " << secRCPtr_->nIterations << "\n" << std::endl;
-    std::cout << "ERROROPTION=1: New DeltaT = " << secRCPtr_->currentTimeStep << "\n" << std::endl;
+    dout().precision(15);
+    dout() << "ERROROPTION=1: TimeStepLimitedbyBP = " << tiaParams.TimeStepLimitedbyBP << "\n" << std::endl;
+    dout() << "ERROROPTION=1: NL Its =  " << secRCPtr_->nIterations << "\n" << std::endl;
+    dout() << "ERROROPTION=1: New DeltaT = " << secRCPtr_->currentTimeStep << "\n" << std::endl;
   }
 #endif // Xyce_VERBOSE_TIME
 
 #ifdef Xyce_DEBUG_ANALYSIS
   if (tiaParams.debugLevel > 0)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                          "  N_ANP_Transient::processFailedStep");
-    std::cout << "Newton step failed:" << std::endl;
-    std::cout << "nextSolutionPtr: " << std::endl;
-    dsRCPtr_->nextSolutionPtr->printPetraObject();
-    std::cout << std::endl;
+    dout() << "  Transient::processFailedStep" << std::endl
+           << "Newton step failed:" << std::endl
+           << "nextSolutionPtr: " << std::endl;
+    anaManagerRCPtr_->getTIADataStore()->nextSolutionPtr->printPetraObject(dout());
+    dout() << std::endl;
   }
 #endif
   totalNumberFailedStepsAttempted_  += 1;
@@ -1319,8 +1292,8 @@ bool N_ANP_Transient::processFailedStep()
 #ifdef Xyce_DEBUG_ANALYSIS
     if (tiaParams.debugLevel > 0)
     {
-      std::cout << "currTimeStep: " << secRCPtr_->currentTimeStep << std::endl;
-      std::cout << "minTimeStep:  " << secRCPtr_->minTimeStep << std::endl;
+      dout() << "currTimeStep: " << secRCPtr_->currentTimeStep << std::endl;
+      dout() << "minTimeStep:  " << secRCPtr_->minTimeStep << std::endl;
     }
 #endif
 
@@ -1329,25 +1302,16 @@ bool N_ANP_Transient::processFailedStep()
     // estimated error over tol.
     if( tiaParams.minTimeStepRecoveryCounter > 0 )
     {
-      ostringstream msgStream;
-      msgStream
-        << "N_ANP_Transient::processFailedStep:  Attempting to retake and accept step where estimated error over tolerance was: "
-        << minEstErrorOverTol
-        << " and time step was: "
-        << timeStepAtMinEstErrorOverTol << std::endl;
+      lout() << "Attempting to retake and accept step where estimated error over tolerance was: " << minEstErrorOverTol
+             << " and time step was: " << timeStepAtMinEstErrorOverTol << std::endl;
 
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msgStream.str() );
       tiaParams.minTimeStepRecoveryCounter--;
       bsuccess = retakeAndAcceptTimeStep( timeStepAtMinEstErrorOverTol );
     }
     else
     {
       outputQueuedData();
-      string msg, msg2;
-      msg = "\nN_ANP_Transient::processFailedStep:"
-        " Time step too small near step number: ";
-      msg2  = "  Exiting transient loop.\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg, stepNumber, msg2);
+      lout() << "Time step too small near step number: " <<  stepNumber << "  Exiting transient loop.\n" << std::endl;
 
       bsuccess = false;
     }
@@ -1356,10 +1320,7 @@ bool N_ANP_Transient::processFailedStep()
   if (tiaParams.constantStepSize)
   {
     outputQueuedData();
-    string msg = "N_ANP_Transient::processFailedStep: ";
-    msg += "  Newton solver failed in constant time step mode.  "
-      "Exiting transient loop.\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg);
+    lout() << "Newton solver failed in constant time step mode.  Exiting transient loop.\n" << std::endl;
 
     bsuccess = false;
   }
@@ -1368,9 +1329,7 @@ bool N_ANP_Transient::processFailedStep()
           static_cast<int>(totalNumberSuccessStepsThisParameter_) == (tiaParams.exitStep-1))
   {
     outputQueuedData();
-    string msg = "N_ANP_Transient::processFailedStep: ";
-    msg += "  Exit Step.  Exiting transient loop\n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg);
+    lout() << "Exit Step.  Exiting transient loop\n" << std::endl;
     bsuccess = false;
   }
 #ifdef Xyce_VERBOSE_TIME
@@ -1386,14 +1345,14 @@ bool N_ANP_Transient::processFailedStep()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::processFailedDCOP
+// Function      : Transient::processFailedDCOP
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_Transient::processFailedDCOP()
+bool Transient::processFailedDCOP()
 {
   bool bsuccess = true;
 
@@ -1403,28 +1362,26 @@ bool N_ANP_Transient::processFailedDCOP()
   (totalNumberFailedStepsAttempted_)++;
   (secRCPtr_->numberSuccessiveFailures)++;
 
-  string msg = "N_ANP_Transient::processFailedDCOP - ";
-  msg += "DC Operating Point Failed.  Exiting transient loop.\n";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg);
+  lout() << "DC Operating Point Failed.  Exiting transient loop" << std::endl;
 
   return bsuccess;
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::finish
+// Function      : Transient::finish
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_Transient::finish()
+bool Transient::finish()
 {
   bool bsuccess = true;
 
   if (tiaParams.saveTimeStepsFlag && anaManagerRCPtr_->getHBFlag())
   {
-    N_TIA_DataStore * dsPtr_ = dsRCPtr_.get();
+    RefCountPtr<N_TIA_DataStore> dsPtr_ = anaManagerRCPtr_->getTIADataStore();
     dsPtr_->timeSteps.push_back(secRCPtr_->currentTime);
     dsPtr_->timeStepsBreakpointFlag.push_back(beginningIntegration);
     N_LAS_Vector * aVecPtr = new N_LAS_Vector( *(dsPtr_->currSolutionPtr) );
@@ -1440,7 +1397,7 @@ bool N_ANP_Transient::finish()
   if (!isPaused)
   {
 #ifdef Xyce_DEBUG_ANALYSIS
-    std::cout << "Calling finishOutput" << std::endl;
+    dout() << "Calling finishOutput" << std::endl;
 #endif
     outputMgrAdapterRCPtr_->finishOutput();
 
@@ -1457,16 +1414,16 @@ bool N_ANP_Transient::finish()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::handlePredictor
+// Function      : Transient::handlePredictor
 // Purpose       :
 // Special Notes :
 // Scope         : private
 // Creator       : Eric Keiter, SNL
 // Creation Date : 06/24/2013
 //-----------------------------------------------------------------------------
-bool N_ANP_Transient::handlePredictor()
+bool Transient::handlePredictor()
 {
-  dsRCPtr_->setErrorWtVector();
+  anaManagerRCPtr_->getTIADataStore()->setErrorWtVector();
   wimRCPtr_->obtainPredictor();
   wimRCPtr_->obtainPredictorDeriv();
 
@@ -1474,10 +1431,9 @@ bool N_ANP_Transient::handlePredictor()
 #ifdef Xyce_DEBUG_TIME
   if (tiaParams.debugLevel > 1)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-           "  N_ANP_Transient::handlePredictor");
-    dsRCPtr_->outputPredictedSolution();
-    dsRCPtr_->outputPredictedDerivative();
+    dout() << "  Transient::handlePredictor" << std::endl;
+    anaManagerRCPtr_->getTIADataStore()->outputPredictedSolution(Xyce::dout());
+    anaManagerRCPtr_->getTIADataStore()->outputPredictedDerivative(Xyce::dout());
   }
 #endif
 #endif
@@ -1490,7 +1446,7 @@ bool N_ANP_Transient::handlePredictor()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::resetForStepAnalysis()
+// Function      : Transient::resetForStepAnalysis()
 // Purpose       : When doing a .STEP sweep, some data must be reset to its
 //                 initial state.
 // Special Notes :
@@ -1498,7 +1454,7 @@ bool N_ANP_Transient::handlePredictor()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 8/26/04
 //-----------------------------------------------------------------------------
-bool N_ANP_Transient::resetForStepAnalysis()
+bool Transient::resetForStepAnalysis()
 {
   totalNumberSuccessStepsThisParameter_ = 0;
   stepNumber = 0;
@@ -1526,7 +1482,7 @@ bool N_ANP_Transient::resetForStepAnalysis()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::resetForHB()
+// Function      : Transient::resetForHB()
 // Purpose       : When doing initial transient run, some analyses require
 //                 a reset function
 //                 they can fill this in if needed.
@@ -1535,11 +1491,11 @@ bool N_ANP_Transient::resetForStepAnalysis()
 // Creator       : T. Mei, SNL, Parallel Computational Sciences
 // Creation Date : 2/26/09
 //-----------------------------------------------------------------------------
-bool N_ANP_Transient::resetForHB()
+bool Transient::resetForHB()
 {
   nlsMgrRCPtr_->resetAll(DC_OP);
   secRCPtr_->resetAll();
-  dsRCPtr_->resetAll();
+  anaManagerRCPtr_->getTIADataStore()->resetAll();
   dcopFlag_ = false;
   anaManagerRCPtr_->nextOutputTime_ = 0.0;
 
@@ -1561,20 +1517,18 @@ bool N_ANP_Transient::resetForHB()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::finalVerboseOutput
+// Function      : Transient::finalVerboseOutput
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_Transient::finalVerboseOutput()
+bool Transient::finalVerboseOutput()
 {
   bool bsuccess = true;
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-      string(" ***** Problem read in and set up time: "),
-               anaManagerRCPtr_->solverStartTime_, string(" seconds"));
+  lout() << "***** Problem read in and set up time: " << anaManagerRCPtr_->solverStartTime_ << " seconds" << std::endl;
 
   if (anaManagerRCPtr_->analysis == ANP_MODE_TRANSIENT)
   {
@@ -1587,9 +1541,7 @@ bool N_ANP_Transient::finalVerboseOutput()
     {
       time = endTRANtime - startDCOPtime;
     }
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-        string(" ***** DCOP time: "),
-           time, string(" seconds.  Breakdown follows:"));
+    lout() << " ***** DCOP time: " << time << " seconds.  Breakdown follows:" << std::endl;
 
     printLoopInfo(0, dcStats);
   }
@@ -1597,10 +1549,7 @@ bool N_ANP_Transient::finalVerboseOutput()
   if (anaManagerRCPtr_->analysis == ANP_MODE_TRANSIENT &&
       endTRANtime >= anaManagerRCPtr_->startTRANtime)
   {
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-        string(" ***** Transient Stepping time: "),
-           endTRANtime-anaManagerRCPtr_->startTRANtime,
-           string(" seconds.  Breakdown follows:"));
+    lout() << " ***** Transient Stepping time: " << endTRANtime-anaManagerRCPtr_->startTRANtime << " seconds.  Breakdown follows:" << std::endl;
 
     printLoopInfo(dcStats, tranStats);
   }
@@ -1609,14 +1558,14 @@ bool N_ANP_Transient::finalVerboseOutput()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::outputQueuedData
+// Function      : Transient::outputQueuedData
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, SNL
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-void N_ANP_Transient::outputQueuedData()
+void Transient::outputQueuedData()
 {
   if( historyTrackingOn_ )
   {
@@ -1637,103 +1586,98 @@ void N_ANP_Transient::outputQueuedData()
     // get the current non-linear solver return codes
     N_NLS_ReturnCodes nlReturnCodes = nlsMgrRCPtr_->getReturnCodes();
 
-    ostringstream outStringStream;
-    outStringStream << " *** Transient failure history: " << std::endl;
-    //                  123456789-123456789-123456789-123456789-123456789-123456789-123456789-123456789-
+    lout() << " *** Transient failure history: " << std::endl;
     if (tiaParams.errorAnalysisOption == 1)
     {
       // truncation error is not used here so est err over tol is not useful in the output
-      //                  123456789-123456789-123456789-123456789-123456789-123456789-123456789-123456789-
-      outStringStream << "Time        Time      Step      Non-Linear Solver      node    node" << std::endl;
-      outStringStream << "(sec)       Step     Status   Status   Iters   ||F||   index   name" << std::endl;
+      lout() << "Time        Time      Step      Non-Linear Solver      node    node" << std::endl;
+      lout() << "(sec)       Step     Status   Status   Iters   ||F||   index   name" << std::endl;
     }
     else
     {
-      //                  123456789-123456789-123456789-123456789-123456789-123456789-123456789-123456789-
-      outStringStream << "Time        Time      Step   EstErr      Non-Linear Solver      node     node" << std::endl;
-      outStringStream << "(sec)       Step     Status  OverTol   Status  Iters   ||F||    index    name"
-        << std::endl;
+      lout() << "Time        Time      Step   EstErr      Non-Linear Solver      node     node" << std::endl;
+      lout() << "(sec)       Step     Status  OverTol   Status  Iters   ||F||    index    name" << std::endl;
     }
 
     for( int i=0; i<queueSize_; i++ )
     {
       int fieldWidth=10;
-      outStringStream << scientific << setprecision(fieldWidth-7) << setfill(' ') << right << setw( fieldWidth )
+      lout() << std::scientific << std::setprecision(fieldWidth-7) << std::setfill(' ') << std::right << std::setw( fieldWidth )
         << timeQueue_.at_from_tail(i) << "  "
         << timeStepQueue_.at_from_tail(i) << "  ";
       if( stepStatusQueue_.at_from_tail(i) == 1 )
       {
-        outStringStream << "pass  ";
+        lout() << "pass  ";
       }
       else
       {
-        outStringStream << "fail  ";
+        lout() << "fail  ";
       }
       if (tiaParams.errorAnalysisOption == 1)
       {
       }
       else
       {
-        outStringStream << estErrorOverTolQueue_.at_from_tail(i) << "  ";
+        lout() << estErrorOverTolQueue_.at_from_tail(i) << "  ";
       }
       int nlStatus = nonlinearSolverStatusQueue_.at_from_tail(i);
-      outStringStream << setw(7) << right;
+      lout() << std::setw(7) << std::right;
       if( nlStatus == nlReturnCodes.normTooSmall )
       {
-        outStringStream << "P:s nrm";
+        lout() << "P:s nrm";
       }
       else if( nlStatus == nlReturnCodes.normalConvergence)
       {
-        outStringStream << "pass   ";
+        lout() << "pass   ";
       }
       else if( nlStatus == nlReturnCodes.nearConvergence )
       {
-        outStringStream << "P:near ";
+        lout() << "P:near ";
       }
       else if( nlStatus == nlReturnCodes.smallUpdate )
       {
-        outStringStream << "P:s up ";
+        lout() << "P:s up ";
       }
       else if( nlStatus == nlReturnCodes.nanFail )
       {
-        outStringStream << "F:NaN  ";
+        lout() << "F:NaN  ";
       }
       else if( nlStatus == nlReturnCodes.tooManySteps )
       {
-        outStringStream << "F:max s";
+        lout() << "F:max s";
       }
       else if( nlStatus == nlReturnCodes.tooManyTranSteps )
       {
-        outStringStream << "F:max s";
+        lout() << "F:max s";
       }
       else if( nlStatus == nlReturnCodes.updateTooBig )
       {
-        outStringStream << "F:big u";
+        lout() << "F:big u";
       }
       else if( nlStatus == nlReturnCodes.stalled )
       {
-        outStringStream << "F:stall";
+        lout() << "F:stall";
       }
       else if( nlStatus == nlReturnCodes.wrmsExactZero )
       {
-        outStringStream << "F:n zro";
+        lout() << "F:n zro";
       }
       else if( nlStatus == nlReturnCodes.innerSolveFailed )
       {
-        outStringStream << "F:in Fl";
+        lout() << "F:in Fl";
       }
       else
       {
-        outStringStream << "code=" <<
+        lout() << "code=" <<
             nonlinearSolverStatusQueue_.at_from_tail(i) << "  ";
       }
 
-      outStringStream << right << setw( 4 )
+      lout() << std::right << std::setw( 4 )
         << nonlinearSolverNumIterationsQueue_.at_from_tail(i) << "  "
         << nonlinearSolverMaxNormQueue_.at_from_tail(i) ;
 
       int outIndex = nonlinearSolverMaxNormIndexQueue_.at_from_tail(i) ;
-      outStringStream << right << fixed << setw( 7 ) << outIndex;
+      lout() << std::right << std::fixed << std::setw( 7 ) << outIndex;
 
       std::string outIndexName("");
       if (!(nameVec_.empty()))
@@ -1748,36 +1692,31 @@ void N_ANP_Transient::outputQueuedData()
       {
         outIndexName = "N/A";
       }
-      outStringStream << left << "    " << outIndexName;
-      outStringStream << std::endl;
+      lout() << std::left << "    " << outIndexName;
+      lout() << std::endl;
     }
-
-    string message(outStringStream.str());
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, message );
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::takeAnIntegrationStep_
+// Function      : Transient::takeAnIntegrationStep_
 // Purpose       : Take a transient integration step.
 // Special Notes :
 // Scope         : private
 // Creator       : Richard Schiek, SNL, Electrical and Microsystem Modeling
 // Creation Date : 01/24/08
 //-----------------------------------------------------------------------------
-void N_ANP_Transient::takeAnIntegrationStep_()
+void Transient::takeAnIntegrationStep_()
 {
   handlePredictor();
   loaderRCPtr_->updateSources();
   secRCPtr_->newtonConvergenceStatus = nlsMgrRCPtr_->solve();
 
 #ifdef Xyce_DEBUG_ANALYSIS
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-        "N_ANP_Transient::takeAnIntegrationStep_:  newtonConvergenceStatus = ", 
-        secRCPtr_->newtonConvergenceStatus);
+  dout() << "Transient::takeAnIntegrationStep_:  newtonConvergenceStatus = " <<  secRCPtr_->newtonConvergenceStatus << std::endl;
 #endif
 
-  dsRCPtr_->stepLinearCombo ();
+  anaManagerRCPtr_->getTIADataStore()->stepLinearCombo ();
   gatherStepStatistics_ ();
   secRCPtr_->nIterations = nlsMgrRCPtr_->getNumIterations();
   secRCPtr_->evaluateStepError ();
@@ -1787,7 +1726,7 @@ void N_ANP_Transient::takeAnIntegrationStep_()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::twoLevelStep
+// Function      : Transient::twoLevelStep
 //
 // Purpose       : Take a transient integration step, for inner 2-level solve.
 //
@@ -1802,11 +1741,11 @@ void N_ANP_Transient::takeAnIntegrationStep_()
 // Creator       :
 // Creation Date : 3/11/06
 //-----------------------------------------------------------------------------
-bool N_ANP_Transient::twoLevelStep ()
+bool Transient::twoLevelStep ()
 {
   loaderRCPtr_->updateSources();
   secRCPtr_->newtonConvergenceStatus = nlsMgrRCPtr_->solve();
-  dsRCPtr_->stepLinearCombo ();
+  anaManagerRCPtr_->getTIADataStore()->stepLinearCombo ();
 
   gatherStepStatistics_ ();
   secRCPtr_->evaluateStepError ();
@@ -1818,14 +1757,14 @@ bool N_ANP_Transient::twoLevelStep ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::retakeAndAcceptTimeStep
+// Function      : Transient::retakeAndAcceptTimeStep
 // Purpose       : Do a requested time step and accept it
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 01/23/09
 //-----------------------------------------------------------------------------
-bool N_ANP_Transient::retakeAndAcceptTimeStep( double aTimeStep )
+bool Transient::retakeAndAcceptTimeStep( double aTimeStep )
 {
   bool bsuccess=true;
   // This function was put in place to handle the following situation.
@@ -1839,7 +1778,7 @@ bool N_ANP_Transient::retakeAndAcceptTimeStep( double aTimeStep )
   // we will try and retake the time step that had the min. est. error over tol.
   // and accept that.
   //
-  // At this point, N_ANP_Transient::processFailedStep() has already determined
+  // At this point, Transient::processFailedStep() has already determined
   // that the preconditions outlined above are in place (i.e. the user requested
   // this and we're about to exit with a time step too small error), so lets
   // try the step that had the min. est error over tol.
@@ -1853,13 +1792,7 @@ bool N_ANP_Transient::retakeAndAcceptTimeStep( double aTimeStep )
   // can't accept step if the non-linear solver failed
   if(secRCPtr_->nIterations==0)
   {
-    string msg, msg2;
-    msg = "\nN_ANP_Transient::retakeAndAcceptTimeStep:"
-        " Time step too small near step number: ";
-    msg2  = "  Exiting transient loop.\n";
-
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg, stepNumber, msg2);
-
+    lout() << "Time step too small near step number: " <<  stepNumber << "  Exiting transient loop.\n" << std::endl;
     bsuccess = false;
   }
   else
@@ -1870,66 +1803,54 @@ bool N_ANP_Transient::retakeAndAcceptTimeStep( double aTimeStep )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::printStepHeader()
+// Function      : Transient::printStepHeader()
 // Purpose       : Prints out time step information.
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/26/00
 //-----------------------------------------------------------------------------
-void N_ANP_Transient::printStepHeader()
+void Transient::printStepHeader(std::ostream &os)
 {
-#ifdef Xyce_VERBOSE_TIME
+  if (VERBOSE_TIME) {
+    os << "***** " << (DEBUG_ANALYSIS ? commandLine_.getArgumentValue("netlist") : "") << "  ";
 
-#ifdef Xyce_DEBUG_ANALYSIS
-  string netListFile = commandLine_.getArgumentValue("netlist");
-  string banner = "***** " + netListFile + "  ";
-#else
-  string banner = "***** ";
-#endif
-  string crStr("\n");
-  string tmpStr;
-
-  //N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, crStr);
-
-  if (dcopFlag_)
-  {
-    tmpStr = banner + "Start of DCOP STEP                        # ";
-  }
-  else
-  {
-    if (beginningIntegration)
+    if (dcopFlag_)
     {
-      if (secRCPtr_->currentTime == tiaParams.initialTime)
-      {
-        tmpStr = banner + "Start of Time Step (INITIAL STEP)         # ";
-      }
-      else
-      {
-        tmpStr = banner + "Start of Time Step (DISCONTINUITY STEP)   # ";
-      }
+      os << "Start of DCOP STEP                        # ";
     }
     else
     {
-      if (!secRCPtr_->stepAttemptStatus)
+      if (beginningIntegration)
       {
-        tmpStr = banner + "Start of Time Step (AFTER FAILED STEP)    # ";
+        if (secRCPtr_->currentTime == tiaParams.initialTime)
+        {
+          os << "Start of Time Step (INITIAL STEP)         # ";
+        }
+        else
+        {
+          os << "Start of Time Step (DISCONTINUITY STEP)   # ";
+        }
       }
       else
       {
-        tmpStr = banner + "Start of Time Step (AFTER SUCCESS STEP)   # ";
+        if (!secRCPtr_->stepAttemptStatus)
+        {
+          os << "Start of Time Step (AFTER FAILED STEP)    # ";
+        }
+        else
+        {
+          os <<  "Start of Time Step (AFTER SUCCESS STEP)   # ";
+        }
       }
     }
+
+    os << totalNumberSuccessStepsThisParameter_ + 1 << std::endl;
   }
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmpStr,
-                          totalNumberSuccessStepsThisParameter_ + 1);
-#endif
-
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::printProgress()
+// Function      : Transient::printProgress()
 // Purpose       : Outputs run completion percentage and estimated
 //                 time-to-completion.
 //
@@ -1939,7 +1860,7 @@ void N_ANP_Transient::printStepHeader()
 // Creator       : Scott A. Hutchinson, SNL, Computational Sciences
 // Creation Date : 06/07/2002
 //-----------------------------------------------------------------------------
-void N_ANP_Transient::printProgress()
+void Transient::printProgress(std::ostream &os)
 {
   if (anaManagerRCPtr_->progressFlag_)
   {
@@ -1952,21 +1873,15 @@ void N_ANP_Transient::printProgress()
     // Estimated CPU time to complete the simulation.
     double estCompletionTime = 0.0;
 
-    string banner(" ***** ");
-    string crStr("\n");
-    string tmpStr;
-
     // Report the beginning of the DC OP calculation.  First call in OP.
     if (dcopFlag_)
     {
       startDCOPtime = anaManagerRCPtr_->xyceTranTimerPtr_->elapsedTime();
       if (gui_)
       {
-        tmpStr = "Xyce in DC Operating Point Calculation";
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::GUI_PROGRESS, tmpStr);
+        Report::signalProgress("Xyce in DC Operating Point Calculation");
       }
-      tmpStr = banner + "Beginning DC Operating Point Calculation...\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmpStr);
+      os << "***** Beginning DC Operating Point Calculation...\n" << std::endl;
     }
     else if (firstTime && totalNumberSuccessStepsThisParameter_ == 1)
     {
@@ -1975,11 +1890,9 @@ void N_ANP_Transient::printProgress()
       firstTime = false;
       if (gui_)
       {
-        tmpStr = "Xyce in Transient Calculation";
-        N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::GUI_PROGRESS, tmpStr);
+        Report::signalProgress("Xyce in Transient Calculation");
       }
-      tmpStr = banner + "Beginning Transient Calculation...\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmpStr);
+      os << "***** Beginning Transient Calculation...\n" << std::endl;
     }
     if (anaManagerRCPtr_->analysis == ANP_MODE_TRANSIENT && totalNumberSuccessStepsThisParameter_  > 0)
     {
@@ -2011,9 +1924,7 @@ void N_ANP_Transient::printProgress()
 
         if (!gui_)
         {
-          tmpStr = banner + "Percent complete: ";
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmpStr,
-                                 percentComplete, " %");
+          os << "***** Percent complete: " <<  percentComplete <<  " %" << std::endl;
         }
 
         if (estCompletionTime > N_UTL_MachineDependentParams::MachineEpsilon())
@@ -2025,9 +1936,10 @@ void N_ANP_Transient::printProgress()
           seconds = static_cast<int> (estCompletionTime - days * 86400 - hours * 3600 - minutes * 60);
 
           char timeStr[256];
+          for (char *c = timeStr; c != timeStr + sizeof(timeStr); ++c)
+            *c = 0;
 
 #ifdef Xyce_PARALLEL_MPI
-
           // get current local system time
           time_t t = time( NULL );
           struct tm * now = localtime( &t );
@@ -2035,24 +1947,19 @@ void N_ANP_Transient::printProgress()
           // format and display output
           if ( ( t != (time_t)-1 ) && ( strftime( timeStr, 255, "%c", now ) != 0 ) )
           {
-            tmpStr = banner + "Current system time: " + timeStr;
+            os << "***** Current system time: " << timeStr << std::endl;
           }
 
           else
           {
-            tmpStr = banner + "Current system time could not be determined.";
+            os << "***** Current system time could not be determined." << std::endl;
           }
-
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmpStr );
-
 #endif
 
           if (days > 0)
-            sprintf(timeStr, "%3d days, %2d hrs., %2d min., %2d sec.", days,
-                    hours, minutes, seconds);
+            sprintf(timeStr, "%3d days, %2d hrs., %2d min., %2d sec.", days, hours, minutes, seconds);
           else if (hours > 0)
-            sprintf(timeStr, "%2d hrs., %2d min., %2d sec.", hours, minutes,
-                    seconds);
+            sprintf(timeStr, "%2d hrs., %2d min., %2d sec.", hours, minutes, seconds);
           else if (minutes > 0)
             sprintf(timeStr, "%2d min., %2d sec.", minutes, seconds);
           else
@@ -2060,24 +1967,20 @@ void N_ANP_Transient::printProgress()
 
           if (gui_)
           {
-            ostringstream ost;
+            std::ostringstream ost;
             ost << "Xyce transient ";
             if (percentComplete < 10)
               ost.precision(2);
             else
               ost.precision(3);
-            ost << percentComplete;
-            ost << "%% complete ... Estimated time to completion: ";
-            ost << timeStr;
-            ost << crStr;
-            tmpStr = ost.str();
-            N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::GUI_PROGRESS, tmpStr);
+            ost << percentComplete
+                << "%% complete ... Estimated time to completion: "
+                << timeStr << std::endl;
+            Report::signalProgress(ost.str());
           }
           else
           {
-            tmpStr = banner + "Estimated time to completion: ";
-            N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, tmpStr + timeStr +
-                                   crStr);
+            os << "***** Estimated time to completion: " << timeStr << std::endl << std::endl;
           }
         }
       }
@@ -2086,29 +1989,29 @@ void N_ANP_Transient::printProgress()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::noopOutputs
+// Function      : Transient::noopOutputs
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/31/2007
 //-----------------------------------------------------------------------------
-void N_ANP_Transient::noopOutputs ()
+void Transient::noopOutputs ()
 {
   if( testOutputTime_() )
   {
     if ( !firstDoubleDCOPStep_ () )
     {
       bool printIC = true;
-//      if ( (!Teuchos::is_null(mpdeMgrPtr_)) && (mpdeMgrPtr_->getMPDEIcFlag()) )
-//      {
-        // don't print the dc-op in the MPDE IC calculation
-//        printIC = false;
-//     }
       if (printIC)
       {
         outputMgrAdapterRCPtr_->tranOutput(
-            secRCPtr_->currentTime, *dsRCPtr_->currSolutionPtr, *dsRCPtr_->currStatePtr, *dsRCPtr_->currStorePtr);
+            secRCPtr_->currentTime, 
+            *(anaManagerRCPtr_->getTIADataStore()->currSolutionPtr), 
+            *(anaManagerRCPtr_->getTIADataStore()->currStatePtr), 
+            *(anaManagerRCPtr_->getTIADataStore()->currStorePtr),
+            objectiveVec_, 
+            dOdpVec_, dOdpAdjVec_, scaled_dOdpVec_, scaled_dOdpAdjVec_);
       }
       if ( ( !Teuchos::is_null(anaManagerRCPtr_->mpdeMgrPtr_)  )  &&
            (  anaManagerRCPtr_->mpdeMgrPtr_->getMPDEFlag()     )  &&
@@ -2116,7 +2019,8 @@ void N_ANP_Transient::noopOutputs ()
          )
       {
         // output the operating point if we can in MPDE mode
-        outputMgrAdapterRCPtr_->outputMPDE(secRCPtr_->currentTime, *dsRCPtr_->nextSolutionPtr);
+        outputMgrAdapterRCPtr_->outputMPDE(secRCPtr_->currentTime, 
+            *(anaManagerRCPtr_->getTIADataStore()->nextSolutionPtr));
       }
     }
     updateOutputTime_(secRCPtr_->currentTime);
@@ -2124,14 +2028,14 @@ void N_ANP_Transient::noopOutputs ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::tranopOutputs
+// Function      : Transient::tranopOutputs
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/31/2007
 //-----------------------------------------------------------------------------
-void N_ANP_Transient::tranopOutputs ()
+void Transient::tranopOutputs ()
 {
   //Test and output if necessary
   if( testOutputTime_() )
@@ -2140,11 +2044,17 @@ void N_ANP_Transient::tranopOutputs ()
     if ( !firstDoubleDCOPStep_ () )
     {
 #ifdef Xyce_DEBUG_ANALYSIS
-      std::cout << "Calling conventional TRANOP outputs!" << std::endl;
+      dout() << "Calling conventional TRANOP outputs!" << std::endl;
 #endif
-      outputMgrAdapterRCPtr_->tranOutput(secRCPtr_->currentTime, *(dsRCPtr_->currSolutionPtr), *dsRCPtr_->currStatePtr, *dsRCPtr_->currStorePtr ) ;
+      outputMgrAdapterRCPtr_->tranOutput(secRCPtr_->currentTime, 
+          *(anaManagerRCPtr_->getTIADataStore()->currSolutionPtr), 
+          *(anaManagerRCPtr_->getTIADataStore()->currStatePtr), 
+          *(anaManagerRCPtr_->getTIADataStore()->currStorePtr),
+          objectiveVec_, 
+            dOdpVec_, dOdpAdjVec_, scaled_dOdpVec_, scaled_dOdpAdjVec_);
 
-      outputMgrAdapterRCPtr_->outputMPDE(secRCPtr_->currentTime, *(dsRCPtr_->nextSolutionPtr));
+      outputMgrAdapterRCPtr_->outputMPDE(secRCPtr_->currentTime, 
+          *(anaManagerRCPtr_->getTIADataStore()->nextSolutionPtr));
       // check this - may be a mistake.
     }
     updateOutputTime_(secRCPtr_->currentTime);
@@ -2153,19 +2063,19 @@ void N_ANP_Transient::tranopOutputs ()
   // SAVE and DCOP restart:
   if ( anaManagerRCPtr_->testDCOPOutputTime_() || anaManagerRCPtr_->testSaveOutputTime_() )
   {
-    outputMgrAdapterRCPtr_->outputDCOP( *(dsRCPtr_->currSolutionPtr) );
+    outputMgrAdapterRCPtr_->outputDCOP( *(anaManagerRCPtr_->getTIADataStore()->currSolutionPtr) );
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::tranStepOutputs
+// Function      : Transient::tranStepOutputs
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/31/2007
 //-----------------------------------------------------------------------------
-void N_ANP_Transient::tranStepOutputs ()
+void Transient::tranStepOutputs ()
 {
   // The printOutputSolution function will sometimes perform
   // interpolations between the current step and the previous step,
@@ -2184,13 +2094,11 @@ void N_ANP_Transient::tranStepOutputs ()
   {
     if (doNotInterpolate)
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-          "doNotInterpolate is TRUE!");
+      dout() << "doNotInterpolate is TRUE!" << std::endl;
     }
     else
     {
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-          "doNotInterpolate is FALSE!");
+      dout() << "doNotInterpolate is FALSE!" << std::endl;
     }
   }
 #endif
@@ -2202,10 +2110,10 @@ void N_ANP_Transient::tranStepOutputs ()
 #ifdef Xyce_DEBUG_ANALYSIS
       if (tiaParams.debugLevel > 0)
       {
-        std::cout << "Calling MPDE outputs!" << std::endl;
+        dout() << "Calling MPDE outputs!" << std::endl;
       }
 #endif
-      outputMgrAdapterRCPtr_->outputMPDE(secRCPtr_->currentTime, *(dsRCPtr_->nextSolutionPtr));
+      outputMgrAdapterRCPtr_->outputMPDE(secRCPtr_->currentTime, *(anaManagerRCPtr_->getTIADataStore()->nextSolutionPtr));
 
       // If we are actually in the MPDE phase, rather than the initial
       // condition, then output here.
@@ -2216,7 +2124,7 @@ void N_ANP_Transient::tranStepOutputs ()
           std::vector<double> fastTimes = anaManagerRCPtr_->mpdeMgrPtr_->getFastTimePoints();
           wimRCPtr_->printMPDEOutputSolution(
                   outputMgrAdapterRCPtr_, secRCPtr_->currentTime,
-                  dsRCPtr_->currSolutionPtr,
+                  anaManagerRCPtr_->getTIADataStore()->currSolutionPtr,
                   fastTimes );
         }
         else
@@ -2225,7 +2133,7 @@ void N_ANP_Transient::tranStepOutputs ()
           int phiGID = anaManagerRCPtr_->mpdeMgrPtr_->getPhiGID();
           wimRCPtr_->printWaMPDEOutputSolution(
                   outputMgrAdapterRCPtr_, secRCPtr_->currentTime,
-                  dsRCPtr_->currSolutionPtr,
+                  anaManagerRCPtr_->getTIADataStore()->currSolutionPtr,
                   fastTimes, phiGID );
         }
       }
@@ -2237,7 +2145,7 @@ void N_ANP_Transient::tranStepOutputs ()
         computeOutputInterpolationTimes_(secRCPtr_->currentTime);
         wimRCPtr_->printOutputSolution(
               outputMgrAdapterRCPtr_, secRCPtr_->currentTime,
-              dsRCPtr_->currSolutionPtr,
+              anaManagerRCPtr_->getTIADataStore()->currSolutionPtr,
               doNotInterpolate,
               outputInterpolationTimes_,
               false) ;
@@ -2248,7 +2156,7 @@ void N_ANP_Transient::tranStepOutputs ()
       computeOutputInterpolationTimes_(secRCPtr_->currentTime);
       wimRCPtr_->printOutputSolution(
               outputMgrAdapterRCPtr_, secRCPtr_->currentTime,
-              dsRCPtr_->currSolutionPtr,
+              anaManagerRCPtr_->getTIADataStore()->currSolutionPtr,
               doNotInterpolate,
               outputInterpolationTimes_,
               false) ;
@@ -2264,7 +2172,7 @@ void N_ANP_Transient::tranStepOutputs ()
     computeOutputInterpolationTimes_(secRCPtr_->currentTime);
     wimRCPtr_->printOutputSolution(
               outputMgrAdapterRCPtr_, secRCPtr_->currentTime,
-              dsRCPtr_->currSolutionPtr,
+              anaManagerRCPtr_->getTIADataStore()->currSolutionPtr,
               doNotInterpolate,
               outputInterpolationTimes_,
               true) ;
@@ -2275,36 +2183,36 @@ void N_ANP_Transient::tranStepOutputs ()
   {
     wimRCPtr_->saveOutputSolution(
                 outputMgrAdapterRCPtr_,
-                dsRCPtr_->currSolutionPtr,
+                anaManagerRCPtr_->getTIADataStore()->currSolutionPtr,
                 anaManagerRCPtr_->saveTime_, doNotInterpolate);
   }
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::testOutputTime_
+// Function      : Transient::testOutputTime_
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel ComputationalSciences.
 // Creation Date : 07/31/01
 //-----------------------------------------------------------------------------
-bool N_ANP_Transient::testOutputTime_()
+bool Transient::testOutputTime_()
 {
   bool flag;
 
 #ifdef Xyce_DEBUG_ANALYSIS
   if (tiaParams.debugLevel > 0)
   {
-    std::cout.width(21); std::cout.precision(13); std::cout.setf(ios::scientific);
-    std::cout << "N_ANP_Transient::testOutputTime.  secPtr_->currentTime = " << secRCPtr_->currentTime << std::endl;
-    std::cout << "N_ANP_Transient::testOutputTime.  tStart      = " << tiaParams.tStart << std::endl;
-    std::cout << "N_ANP_Transient::testOutputTime.  nextOutputTime_ = " << anaManagerRCPtr_->nextOutputTime_ << std::endl;
+    dout().width(21); dout().precision(13); dout().setf(std::ios::scientific);
+    dout() << "Transient::testOutputTime.  secPtr_->currentTime = " << secRCPtr_->currentTime << std::endl;
+    dout() << "Transient::testOutputTime.  tStart      = " << tiaParams.tStart << std::endl;
+    dout() << "Transient::testOutputTime.  nextOutputTime_ = " << anaManagerRCPtr_->nextOutputTime_ << std::endl;
     for (int i=0;i<anaManagerRCPtr_->outputIntervals_.size();++i)
     {
-      std::cout << "outputIntervals_["<<i<<"].first = " << anaManagerRCPtr_->outputIntervals_[i].first;
-      std::cout << std::endl;
+      dout() << "outputIntervals_["<<i<<"].first = " << anaManagerRCPtr_->outputIntervals_[i].first;
+      dout() << std::endl;
     }
-    std::cout << std::endl;
+    dout() << std::endl;
   }
 #endif
 
@@ -2333,14 +2241,14 @@ bool N_ANP_Transient::testOutputTime_()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::updateOutputTime_
+// Function      : Transient::updateOutputTime_
 // Purpose       : Advance output time so it is the next one after currTime
 // Special Notes : formerly part of testOutputTime_
 // Scope         : public
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 02/14/07
 //-----------------------------------------------------------------------------
-void N_ANP_Transient::updateOutputTime_(double currTime)
+void Transient::updateOutputTime_(double currTime)
 {
   // We only need to bother with this if the user has specified output control
   // options
@@ -2363,7 +2271,7 @@ void N_ANP_Transient::updateOutputTime_(double currTime)
     else
     {
       // Multiple intervals specified, we're past the first one
-      pair<double, double> currInterval, nextInterval;
+      std::pair<double, double> currInterval, nextInterval;
       int size = anaManagerRCPtr_->outputIntervals_.size();
       for (int i = 0; i < size; ++i)
         if (anaManagerRCPtr_->outputIntervals_[i].first <= currTime)
@@ -2386,7 +2294,7 @@ void N_ANP_Transient::updateOutputTime_(double currTime)
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_Transient::computeOutputInterpolationTimes_
+// Function      : Transient::computeOutputInterpolationTimes_
 // Purpose       : When we pass "nextOutputTime_", we might have skipped
 //                 over points where output was requested.  Make a list of
 //                 those times so we can interpolate to them.
@@ -2395,7 +2303,7 @@ void N_ANP_Transient::updateOutputTime_(double currTime)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling.
 // Creation Date : 02/14/07
 //-----------------------------------------------------------------------------
-void N_ANP_Transient::computeOutputInterpolationTimes_(double currTime)
+void Transient::computeOutputInterpolationTimes_(double currTime)
 {
   double t;
   outputInterpolationTimes_.clear();
@@ -2416,7 +2324,7 @@ void N_ANP_Transient::computeOutputInterpolationTimes_(double currTime)
       {
         outputInterpolationTimes_.push_back(currTime);
       }
-  
+
       if( (t - tiaParams.finalTime) > 100 * N_UTL_MachineDependentParams::MachinePrecision() )
       {
         // tack on finalTime or we'll miss it
@@ -2428,6 +2336,7 @@ void N_ANP_Transient::computeOutputInterpolationTimes_(double currTime)
       int outInt,lastInt;
 
       lastInt=anaManagerRCPtr_->outputIntervals_.size()-1;
+
       // find which interval nextOutputTime_ is in
       for (outInt=0;
            outInt<lastInt&&anaManagerRCPtr_->outputIntervals_[outInt+1].first<=anaManagerRCPtr_->nextOutputTime_;
@@ -2448,3 +2357,5 @@ void N_ANP_Transient::computeOutputInterpolationTimes_(double currTime)
   }
 }
 
+} // namespace Analysis
+} // namespace Xyce

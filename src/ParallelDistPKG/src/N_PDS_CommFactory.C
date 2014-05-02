@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.8.6.2 $
+// Revision Number: $Revision: 1.13 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -66,13 +66,11 @@
 // Creation Date : 06/26/01
 //-----------------------------------------------------------------------------
 N_PDS_Comm * N_PDS_CommFactory::create( int iargs,
-                                        char * cargs[]
-#ifdef Xyce_PARALLEL_MPI
-                                       , MPI_Comm * comm
-#endif
-                                      )
+                                        char * cargs[], 
+                                        Xyce::Parallel::Machine comm)
 {
   N_PDS_Comm * theComm = NULL;
+  
 #ifdef Xyce_PARALLEL_MPI
   /*
   if( comm )

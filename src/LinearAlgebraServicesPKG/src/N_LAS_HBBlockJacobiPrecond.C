@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.1.2.2 $
+// Revision Number: $Revision: 1.14 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -55,7 +55,7 @@
 #include <N_UTL_Misc.h>
 
 #include <N_LAS_HBBlockJacobiPrecond.h>
-#include <N_LAS_HBBlockJacobiEpetraOperator.h>	
+#include <N_LAS_HBBlockJacobiEpetraOperator.h>
 #include <N_LAS_HBBuilder.h>
 #include <N_LOA_HBLoader.h>
 #include <N_MPDE_State.h>
@@ -72,7 +72,7 @@
 #include <N_UTL_Timer.h>
 
 #include <N_ERH_ErrorMgr.h>
-	
+
 #include <N_PDS_SerialComm.h>
 
 #include <Teuchos_RCP.hpp>
@@ -83,17 +83,6 @@
 
 using Teuchos::RCP;
 using Teuchos::rcp;
-
-// static class member initializations
-// Default preconditioner values
-/*
-const bool   N_LAS_HBBlockJacobiPrecond::useFactory_default_ = false;
-const int    N_LAS_HBBlockJacobiPrecond::overlap_default_    = 0;
-const double N_LAS_HBBlockJacobiPrecond::dropTol_default_    = 1.0e-03;
-const double N_LAS_HBBlockJacobiPrecond::ilutFill_default_   = 2.0;
-const double N_LAS_HBBlockJacobiPrecond::rThresh_default_    = 1.0001;
-const double N_LAS_HBBlockJacobiPrecond::aThresh_default_    = 0.0001;
-*/
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_HBBlockJacobiPrecond::N_LAS_HBBlockJacobiPrecond
@@ -111,7 +100,7 @@ N_LAS_HBBlockJacobiPrecond::N_LAS_HBBlockJacobiPrecond()
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_HBBlockJacobiPrecond::setDefaultOptions
-// Purpose       : resets Ifpack options
+// Purpose       : resets options
 // Special Notes :
 // Scope         : Public
 // Creator       : Heidi Thornquist, SNL, Electrical & Microsystem Modeling
@@ -119,44 +108,25 @@ N_LAS_HBBlockJacobiPrecond::N_LAS_HBBlockJacobiPrecond()
 //-----------------------------------------------------------------------------
 bool N_LAS_HBBlockJacobiPrecond::setDefaultOptions()
 {
-  // Set defaults
-/*
-  useFactory_ = useFactory_default_;
-  dropTol_ = dropTol_default_;
-  ilutFill_ = ilutFill_default_;
-  rThresh_ = rThresh_default_;
-  aThresh_ = aThresh_default_;
-  overlap_ = overlap_default_;
-*/
-
   return true;
 }
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_HBBlockJacobiPrecond::setDefaultOption
-// Purpose       : resets Ifpack option
+// Purpose       : resets option
 // Special Notes :
 // Scope         : Public
 // Creator       : Heidi Thornquist, SNL, Electrical & Microsystem Modeling
 // Creation Date : 11/11/08
 //-----------------------------------------------------------------------------
-bool N_LAS_HBBlockJacobiPrecond::setDefaultOption( const string & option )
+bool N_LAS_HBBlockJacobiPrecond::setDefaultOption( const std::string & option )
 {
-/*
-  if( option == "AZ_athresh" )         aThresh_ = aThresh_default_;
-  if( option == "AZ_rthresh" )         rThresh_ = rThresh_default_;
-  if( option == "AZ_ilut_fill" )       ilutFill_ = ilutFill_default_;
-  if( option == "AZ_drop" )            dropTol_ = dropTol_default_;
-  if( option == "AZ_overlap" )         overlap_ = overlap_default_;
-  if( option == "use_ifpack_factory" ) useFactory_ = useFactory_default_;
-*/
-
   return true;
 }
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_HBBlockJacobiPrecond::setOptions
-// Purpose       : sets Ifpack options and params from modelblock
+// Purpose       : sets options and params from modelblock
 // Special Notes :
 // Scope         : Public
 // Creator       : Heidi Thornquist, SNL, Electrical & Microsystem Modeling
@@ -165,25 +135,25 @@ bool N_LAS_HBBlockJacobiPrecond::setDefaultOption( const string & option )
 bool N_LAS_HBBlockJacobiPrecond::setOptions( const N_UTL_OptionBlock & OB )
 {
   // Set the parameters from the list
-  list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
-  list<N_UTL_Param>::const_iterator end_tpL = OB.getParams().end();
-  for (; it_tpL != end_tpL; ++it_tpL) 
+  std::list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator end_tpL = OB.getParams().end();
+  for (; it_tpL != end_tpL; ++it_tpL)
     {
       this->setParam( *it_tpL );
     }
-  
+
   // store for restart of solver_
   if( &OB != options_.get() )
     {
       options_ = Teuchos::rcp( &OB, false );
     }
-  
-  return STATUS_SUCCESS;
+
+  return true;
 }
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_HBBlockJacobiPrecond::setParam
-// Purpose       : sets Ifpack option
+// Purpose       : sets options
 // Special Notes :
 // Scope         : Public
 // Creator       : Heidi Thornquist, SNL, Electrical & Microsystem Modeling
@@ -191,27 +161,8 @@ bool N_LAS_HBBlockJacobiPrecond::setOptions( const N_UTL_OptionBlock & OB )
 //-----------------------------------------------------------------------------
 bool N_LAS_HBBlockJacobiPrecond::setParam( const N_UTL_Param & param )
 {
-  string tag = param.tag();
-  string uTag = param.uTag();
-
-  // Set our copies of these parameters that get passed to the solver in the
-  // "iterate" command
-/*
-  if( tag == "AZ_overlap" )
-    overlap_ = param.iVal();
-  else if( tag == "AZ_athresh")
-    aThresh_ = param.dVal();
-  else if( tag == "AZ_rthresh")
-    rThresh_ = param.dVal();
-  else if( tag == "AZ_drop")
-    dropTol_ = param.dVal();
-  else if( tag == "AZ_ilut_fill")
-    ilutFill_ = param.dVal();
-  else if( tag == "use_ifpack_factory")
-    useFactory_ = param.iVal();
-  else
-    return false;
-*/
+  std::string tag = param.tag();
+  std::string uTag = param.uTag();
 
   return true;
 }
@@ -226,7 +177,7 @@ bool N_LAS_HBBlockJacobiPrecond::setParam( const N_UTL_Param & param )
 //-----------------------------------------------------------------------------
 bool N_LAS_HBBlockJacobiPrecond::initGraph( const Teuchos::RCP<N_LAS_Problem> & problem )
 {
-  // Generate the graph of each real equivalent form and then generate 
+  // Generate the graph of each real equivalent form and then generate
   // empty linear systems for each frequency.
   RCP<N_LAS_Matrix> appdQdx = rcp( appBuilderPtr_->createMatrix() );
   RCP<N_LAS_Matrix> appdFdx = rcp( appBuilderPtr_->createMatrix() );
@@ -236,19 +187,27 @@ bool N_LAS_HBBlockJacobiPrecond::initGraph( const Teuchos::RCP<N_LAS_Problem> & 
   // C(t) = dq/dx(x(t))
   // Compute:  (omega*i*j*C_bar + G_bar)^{-1} for i=0,1,...,M,-M,...,-1
   //           using real equivalent form K_1 = [G_bar -i*omega*C_bar; i*omega*C_bar G_bar]
-  
+
   // Generate the new real equivalent graph
-  RCP<N_PDS_Comm> pdsCommRCPtr = rcp(new N_PDS_SerialComm);
-  int origRows = appdQdx->getLocalNumRows();
-  int refRows = 2*origRows;
-  epetraMap_ = rcp(new Epetra_Map( refRows, refRows, 0, *(pdsCommRCPtr->petraComm())) );
+  RCP<const Epetra_Map> origMap = appBuilderPtr_->getSolutionMap(); 
+  int origLocalRows = origMap->NumMyElements();
+  int origGlobalRows = origMap->NumGlobalElements();
+  int refRows = 2*origLocalRows;
+  std::vector<int> rowIdxs( refRows );
+  int * origIdxs = origMap->MyGlobalElements();
+  for (int i=0; i<origLocalRows; ++i)
+  {
+    rowIdxs[i] = origIdxs[i];
+    rowIdxs[origLocalRows+i] = origIdxs[i] + origGlobalRows;
+  }
+  epetraMap_ = rcp(new Epetra_Map( -1, refRows, &rowIdxs[0], 0, (appdQdx->epetraObj()).Comm() ) );
 
   // Count up the number of nonzero entries for the 2x2 block matrix.
   std::vector<int> refNNZs(refRows);
   maxRefNNZs_ = 0;
-  for ( int i=0; i<origRows; ++i ) {
+  for ( int i=0; i<origLocalRows; ++i ) {
     refNNZs[i] = appdQdx->getLocalRowLength(i) + appdFdx->getLocalRowLength(i);
-    refNNZs[origRows+i] = refNNZs[i];
+    refNNZs[origLocalRows+i] = refNNZs[i];
     if (refNNZs[i] > maxRefNNZs_) maxRefNNZs_ = refNNZs[i];
   }
   epetraGraph_ = rcp(new Epetra_CrsGraph( Copy, *epetraMap_, &refNNZs[0], true ));
@@ -258,49 +217,55 @@ bool N_LAS_HBBlockJacobiPrecond::initGraph( const Teuchos::RCP<N_LAS_Problem> & 
   std::vector<double> tmpCoeffs(maxRefNNZs_);
   std::vector<int> refIdxs(maxRefNNZs_), refIdxs2(maxRefNNZs_);
 
-  for ( int i=0; i<origRows; ++i ) {
+  for ( int i=0; i<origLocalRows; ++i ) {
 
     // Get the indices for the first block of the matrix (G_bar)
-    appdFdx->getRowCopy( i, maxRefNNZs_, tmpNNZs, &tmpCoeffs[0], &refIdxs[0] );
+    appdFdx->getRowCopy( rowIdxs[i], maxRefNNZs_, tmpNNZs, &tmpCoeffs[0], &refIdxs[0] );
 
     // Get the indices for the third block of the matrix (C_bar)
-    appdQdx->getRowCopy( i, maxRefNNZs_, tmpNNZs2, &tmpCoeffs[0], &refIdxs2[0] );
-    
+    appdQdx->getRowCopy( rowIdxs[i], maxRefNNZs_, tmpNNZs2, &tmpCoeffs[0], &refIdxs2[0] );
+
     // Insert the indices for the third block into refIdxs, as they are the indices of the second block
     for (int j=0; j<tmpNNZs2; ++j) {
-      refIdxs[tmpNNZs+j] = refIdxs2[j]+origRows;
+      refIdxs[tmpNNZs+j] = refIdxs2[j]+origGlobalRows;
     }
-    epetraGraph_->InsertGlobalIndices( i, refNNZs[i], &refIdxs[0] );
-  
+    epetraGraph_->InsertGlobalIndices( rowIdxs[i], refNNZs[i], &refIdxs[0] );
+
     // Insert the indices for the first block into refIdxs2, as they are the indices of the fourth block
     for (int j=0; j<tmpNNZs; ++j) {
-      refIdxs2[tmpNNZs2+j] = refIdxs[j]+origRows;
+      refIdxs2[tmpNNZs2+j] = refIdxs[j]+origGlobalRows;
     }
-    epetraGraph_->InsertGlobalIndices( origRows+i, refNNZs[origRows+i], &refIdxs2[0] );
-  }  
+    epetraGraph_->InsertGlobalIndices( rowIdxs[origLocalRows+i], refNNZs[origLocalRows+i], &refIdxs2[0] );
+  }
   epetraGraph_->FillComplete();
 
   // Get the Fourier series information and generate the Epetra_LinearSystems.
   RCP<N_LAS_BlockVector> bXt = hbBuilderPtr_->createTimeDomainBlockVector();
   N_ = bXt->blockCount();
   M_ = (int)((N_-1)/2);
- 
-  // Generate the vectors for the N_ linear problems to be solved on the diagonal.
-  epetraMatrix_.resize(N_);
-  epetraRHS_.resize(N_);
-  epetraSoln_.resize(N_);
-  epetraProblem_.resize(N_);
-  amesosPtr_.resize(N_); 
 
-  Amesos amesosFactory;  
+  // Generate the vectors for the N_ linear problems to be solved on the diagonal.
+  epetraRHS_ = rcp( new Epetra_MultiVector( *epetraMap_, 1 ) );
+  epetraSoln_ = rcp( new Epetra_MultiVector( *epetraMap_, 1 ) );
+  epetraMatrix_.resize(N_);
+  epetraProblem_.resize(N_);
+  amesosPtr_.resize(N_);
+
+  Amesos amesosFactory;
+  Teuchos::ParameterList params;
+  
+#ifndef Xyce_PARALLEL_MPI 
+  // Inform solver not to check inputs to reduce overhead.
+  params.set( "TrustMe", true );
+#endif
 
   for (int i=0; i<N_; ++i) {
     epetraMatrix_[i] = rcp( new Epetra_CrsMatrix( Copy, *epetraGraph_ ) );
     epetraMatrix_[i]->FillComplete();
-    epetraRHS_[i] = rcp( new Epetra_MultiVector( *epetraMap_, 1 ) );
-    epetraSoln_[i] = rcp( new Epetra_MultiVector( *epetraMap_, 1 ) );
-    epetraProblem_[i] = rcp( new Epetra_LinearProblem( &*epetraMatrix_[i], &*epetraRHS_[i], &*epetraSoln_[i] ) ); 
+    epetraMatrix_[i]->OptimizeStorage();
+    epetraProblem_[i] = rcp( new Epetra_LinearProblem( &*epetraMatrix_[i], &*epetraRHS_, &*epetraSoln_ ) );
     amesosPtr_[i] = rcp( amesosFactory.Create( "Klu", *epetraProblem_[i] ) );
+    amesosPtr_[i]->SetParameters( params );
     amesosPtr_[i]->SymbolicFactorization();
   }
 
@@ -308,7 +273,7 @@ bool N_LAS_HBBlockJacobiPrecond::initGraph( const Teuchos::RCP<N_LAS_Problem> & 
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_LAS_HBBlockJacobiPrecond::compute
+// Function      : N_LAS_HBBlockJacobiPrecond::initValues
 // Purpose       : Initialize the values of the Epetra_LinearSystem's
 // Special Notes :
 // Scope         : Public
@@ -317,48 +282,25 @@ bool N_LAS_HBBlockJacobiPrecond::initGraph( const Teuchos::RCP<N_LAS_Problem> & 
 //-----------------------------------------------------------------------------
 bool N_LAS_HBBlockJacobiPrecond::initValues( const Teuchos::RCP<N_LAS_Problem> & problem )
 {
-  // Get the next solution vector in frequency domain and state vector
-  N_LAS_BlockVector & bXf = *dynamic_cast<N_LAS_BlockVector*>(lasSysPtr_->getNextSolVector());
-  N_LAS_BlockVector & bS = *dynamic_cast<N_LAS_BlockVector*>(lasSysPtr_->getNextStaVector());  
-  N_LAS_BlockVector & bdSdt = *dynamic_cast<N_LAS_BlockVector*>(lasSysPtr_->getNextStaDerivVector());  
-
-  // Permute the solution vector into the time domain
-  RCP<N_LAS_BlockVector> bXt = hbBuilderPtr_->createTimeDomainBlockVector();
-  hbLoaderPtr_->permutedIFT(bXf, &*bXt);
-
-  // Get vectors and matrices for each block 
-  RCP<N_LAS_Vector> appVec = rcp( appBuilderPtr_->createVector() );
-  RCP<N_LAS_Vector> appStateVec = rcp( appBuilderPtr_->createStateVector() );
-  RCP<N_LAS_Vector> appdSdt = rcp( appBuilderPtr_->createStateVector() );
-
-  RCP<N_LAS_Matrix> appdQdx = rcp( appBuilderPtr_->createMatrix() );
-  RCP<N_LAS_Matrix> appdFdx = rcp( appBuilderPtr_->createMatrix() );
-
-  // Get matrix to contain sum for dQdx and dFdx
+  // Get matrix to contain each matrix and sum of all dQdx and dFdx
+  RCP<N_LAS_Matrix> appdQdx, appdFdx;
   RCP<N_LAS_Matrix> appdQdxSum = rcp( appBuilderPtr_->createMatrix() );
   RCP<N_LAS_Matrix> appdFdxSum = rcp( appBuilderPtr_->createMatrix() );
 
+  // Initialize the sum matrix.
   appdQdxSum->put(0.0);
   appdFdxSum->put(0.0);
 
+  // Get the stored Jacobian matrices from the HB loader.
+  std::vector<Teuchos::RCP<N_LAS_Matrix> > vecAppdQdx = hbLoaderPtr_->getStoredQdx();
+  std::vector<Teuchos::RCP<N_LAS_Matrix> > vecAppdFdx = hbLoaderPtr_->getStoredFdx();
+ 
   // Sum up dQdx and dFdx
   for( int i = 0; i < N_; ++i )
   {
-    // Set the fast time.
-    state_->fastTime = times_[i];
-    devInterfacePtr_->setFastTime( times_[i] );
-    appLoaderPtr_->updateSources();
-
-    *appVec = bXt->block(i);
-    *appStateVec = bS.block(i);
-    *appdSdt = bdSdt.block(i);
-
-    appdQdx->put(0.0);
-    appdFdx->put(0.0);
-
-    // Compute dQdx and dFdx for this time point.
-    appLoaderPtr_->loadDAEMatrices( &*appVec, &*appStateVec, &*appdSdt, &*appStateVec, &*appdQdx,  &*appdFdx);
-
+    appdQdx = vecAppdQdx[i];
+    appdFdx = vecAppdFdx[i];
+ 
     // Add into dQdxSum and dFdxSum
     appdQdxSum->add(*appdQdx);
     appdFdxSum->add(*appdFdx);
@@ -366,7 +308,7 @@ bool N_LAS_HBBlockJacobiPrecond::initValues( const Teuchos::RCP<N_LAS_Problem> &
 
   // Average the matrix sum
   appdQdxSum->scale( 1.0/N_ );
-  appdFdxSum->scale( 1.0/N_ );  
+  appdFdxSum->scale( 1.0/N_ );
 
   // Compute omega
   int timesSize = times_.size();
@@ -374,8 +316,10 @@ bool N_LAS_HBBlockJacobiPrecond::initValues( const Teuchos::RCP<N_LAS_Problem> &
   double omega = 2.0 * M_PI/ period;
 
   // Get the values for each row of appdFdxSum/appdQdxSum and insert them into the matrix.
-  int origRows = appdQdx->getLocalNumRows();
-  int tmpNNZs=0, tmpNNZs2=0;
+  RCP<const Epetra_Map> origMap = appBuilderPtr_->getSolutionMap(); 
+  int origLocalRows = origMap->NumMyElements();
+  int origGlobalRows = origMap->NumGlobalElements();
+  int tmpNNZs=0;
   double cplxCoeff = 0.0;
   std::vector<double> tmpCoeffs(maxRefNNZs_);
   std::vector<int> refIdxs(maxRefNNZs_), refIdxs2(maxRefNNZs_);
@@ -385,44 +329,50 @@ bool N_LAS_HBBlockJacobiPrecond::initValues( const Teuchos::RCP<N_LAS_Problem> &
     // Compute the coefficient on the complex matrix [0,1,...,M,-M,...,-1]
     if (nB <= M_)
       cplxCoeff = nB*omega;
-    else 
+    else
       cplxCoeff = (-M_+(nB-M_-1))*omega;
 
     // Insert the entries for all four blocks of the real-equivalent form
-    for ( int i=0; i<origRows; ++i ) {
-      
+    for ( int i=0; i<origLocalRows; ++i ) {
+
+      // Get the global ID for this row.
+      int gid = epetraMap_->GID( i );
+
       // Load [G_bar -i*omega*C_bar; i*omega*C_bar G_bar]
 
       // Get the indices for the first block of the matrix (G_bar)
-      appdFdxSum->getRowCopy( i, maxRefNNZs_, tmpNNZs, &tmpCoeffs[0], &refIdxs[0] );
-      
-      epetraMatrix_[nB]->ReplaceMyValues( i, tmpNNZs, &tmpCoeffs[0], &refIdxs[0] );
-      
+      appdFdxSum->getRowCopy( gid, maxRefNNZs_, tmpNNZs, &tmpCoeffs[0], &refIdxs[0] );
+
+      epetraMatrix_[nB]->ReplaceGlobalValues( gid, tmpNNZs, &tmpCoeffs[0], &refIdxs[0] );
+
       // Modify the indices for the fourth block
       for ( int j=0; j<tmpNNZs; ++j ) {
-        refIdxs[j] += origRows;
+        refIdxs[j] += origGlobalRows;
       }
-      epetraMatrix_[nB]->ReplaceMyValues( origRows+i, tmpNNZs, &tmpCoeffs[0], &refIdxs[0] );
+      epetraMatrix_[nB]->ReplaceGlobalValues( gid+origGlobalRows, tmpNNZs, &tmpCoeffs[0], &refIdxs[0] );
 
       // Add in complex part of REF matrix if non-zero.
       if (cplxCoeff != 0.0) {
 
         // Get the indices for the first block of the matrix (G_bar)
-        appdQdxSum->getRowCopy( i, maxRefNNZs_, tmpNNZs, &tmpCoeffs[0], &refIdxs[0] );
-        
+        appdQdxSum->getRowCopy( gid, maxRefNNZs_, tmpNNZs, &tmpCoeffs[0], &refIdxs[0] );
+
         // Insert the second block
         for (int ii=0; ii<tmpNNZs; ++ii) { tmpCoeffs[ii] *= cplxCoeff; }
-        epetraMatrix_[nB]->ReplaceMyValues( origRows+i, tmpNNZs, &tmpCoeffs[0], &refIdxs[0] );
+        epetraMatrix_[nB]->ReplaceGlobalValues( gid+origGlobalRows, tmpNNZs, &tmpCoeffs[0], &refIdxs[0] );
 
         // Insert the third block
-        for (int ii=0; ii<tmpNNZs; ++ii) { 
-          tmpCoeffs[ii] *= -1.0; 
-          refIdxs[ii] += origRows;
+        for (int ii=0; ii<tmpNNZs; ++ii) {
+          tmpCoeffs[ii] *= -1.0;
+          refIdxs[ii] += origGlobalRows;
         }
-        epetraMatrix_[nB]->ReplaceMyValues( i, tmpNNZs, &tmpCoeffs[0], &refIdxs[0] );
+        epetraMatrix_[nB]->ReplaceGlobalValues( gid, tmpNNZs, &tmpCoeffs[0], &refIdxs[0] );
       }
     }
-  }    
+
+    //std::cout << "N_LAS_HBBlockJacobiPrecond::initValues: epetraMatrix_[ " << nB << " ] : " << std::endl;
+    //epetraMatrix_[nB]->Print(std::cout);
+  }
 
   return true;
 }
@@ -446,46 +396,9 @@ bool N_LAS_HBBlockJacobiPrecond::compute()
 
   if ( Teuchos::is_null( epetraPrec_ ) )
     epetraPrec_ = blockJacobiOperator( epetraProblem_, amesosPtr_, hbBuilderPtr_ );
-  
+
   if ( Teuchos::is_null( epetraPrec_ ) )
     return false;
-
-/*
-  if (useFactory_) 
-  {
-    // Build the preconditioner using the values in problem_; numeric factorization.
-    IFPACK_CHK_ERR(ifpackPrecond_->Compute());
-  }
-  else 
-  {
-    Epetra_CrsMatrix * epetraA = dynamic_cast<Epetra_CrsMatrix*>(problem_->epetraObj().GetMatrix());
-    bool transpose = epetraA->UseTranspose();
-    
-    int factErr = rILUK_->Factor();
-    if (factErr < 0) 
-      return false;
-    
-#ifdef Xyce_VERBOSE_LINEAR
-    double condest;
-    rILUK_->Condest( transpose, condest );
-#endif
-    
-    // Define label for printing out during the solve phase
-    ostringstream ost;
-    ost << "Ifpack_CrsRiluk Preconditioner: LevelFill = " << ilutFill_ << endl << 
-           "                                Overlap = " << overlap_ << endl << 
-           "                                Athresh = " << aThresh_ << endl <<
-           "                                Rthresh = " << rThresh_ << endl <<
-#ifdef Xyce_VERBOSE_LINEAR
-           "                                CondEst = " << condest  << endl << 
-#endif
-           "                                ErrCode = " << factErr  << endl;
-    string label = ost.str();
-    rILUK_->SetLabel(label.c_str());
-    
-    rILUK_->SetUseTranspose( transpose );
-  }
-*/
 
   return precStatus;
 }
@@ -501,7 +414,6 @@ bool N_LAS_HBBlockJacobiPrecond::compute()
 int N_LAS_HBBlockJacobiPrecond::apply( N_LAS_MultiVector & x, N_LAS_MultiVector & y )
 {
   int precStatus = 0;
-  std::cout << " I'm applying the block Jacobi preconditioner!" << std::endl;
   // If there is no preconditioner to apply return a nonzero code
   if( Teuchos::is_null(epetraPrec_) )
     precStatus = -1;

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.13.2.2 $
+// Revision Number: $Revision: 1.31.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -47,18 +47,34 @@
 #define Xyce_N_DEV_ThermalResistor_h
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_DeviceTemplate.h>
+#include <N_DEV_Configuration.h>
+#include <N_DEV_DeviceMaster.h>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceInstance.h>
-#include <N_DEV_DeviceModel.h>
+#include <N_DEV_DeviceInstance.h>
+
+#include <N_DEV_Resistor.h>
 
 namespace Xyce {
 namespace Device {
 namespace ThermalResistor {
 
-
-// ---------- Forward Declarations -------
 class Model;
+class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance, Resistor::Traits>
+{
+  static const char *name() {return "Resistor";}
+  static const char *deviceTypeName() {return "R level 2";}
+  static const int numNodes() {return 2;}
+  static const char *primaryParameter() {return "R";}
+  static const char *instanceDefaultParameter() {return "R";}
+  static const bool isLinearDevice() {return true;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : Instance
@@ -87,111 +103,106 @@ class Instance : public DeviceInstance
 {
   friend class ParametricData<Instance>;
   friend class Model;
-  friend class Master;
+  friend class Traits;friend class Master;
 
-  public:
-  static ParametricData<Instance> &getParametricData();
+public:
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
+  Instance(
+     const Configuration &       configuration,
+     const InstanceBlock &     IB,
+     Model &                   Riter,
+     const FactoryBlock &      factory_block);
 
-    Instance(InstanceBlock & IB,
-			   Model & Riter,
-                           MatrixLoadData & mlData1,
-                           SolverState &ss1,
-                           ExternData  &ed1,
-                           DeviceOptions & do1);
-
-    ~Instance();
+  ~Instance();
 
 private:
   Instance(const Instance &);
   Instance &operator=(const Instance &);
 
 public:
-    void registerLIDs( const vector<int> & intLIDVecRef,
-                       const vector<int> & extLIDVecRef );
-    void registerStateLIDs( const vector<int> & staLIDVecRef );
-    void registerStoreLIDs( const vector<int> & stoLIDVecRef );
-    std::map<int, std::string> &getStoreNameMap();
-    
-    bool processParams (string param = "");
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
+  void registerStateLIDs( const std::vector<int> & staLIDVecRef );
+  void registerStoreLIDs( const std::vector<int> & stoLIDVecRef );
+  std::map<int, std::string> &getStoreNameMap();
 
-    bool updateTemperature(const double & temp_tmp);
+  bool processParams ();
 
-    bool updateIntermediateVars ();
-    bool updatePrimaryState ();
+  bool updateTemperature(const double & temp_tmp);
 
-    const vector< vector<int> > & jacobianStamp() const;
-    void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  bool updateIntermediateVars ();
+  bool updatePrimaryState ();
 
-    bool plotfileFlag () {return true;}
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-    // load functions, residual:
-    bool loadDAEQVector () {return true;}
-    bool loadDAEFVector ();
+  bool plotfileFlag () {return true;}
 
-    // load functions, Jacobian:
-    bool loadDAEdQdx () {return true;}
-    bool loadDAEdFdx ();
+  // load functions, residual:
+  bool loadDAEQVector () {return true;}
+  bool loadDAEFVector ();
 
-    void setupPointers();
+  // load functions, Jacobian:
+  bool loadDAEdQdx () {return true;}
+  bool loadDAEdFdx ();
+
+  void setupPointers();
 
   bool outputPlotFiles ();
 
-  Model &getModel() {
+  Model &getModel() 
+  {
     return model_;
   }
 
-  private:
-  static vector< vector<int> > jacStamp;
+private:
+  static std::vector< std::vector<int> > jacStamp;
 
   Model &       model_;         //< Owning model
 
-    // user-specified paramters:
-    double R;  // resistance  (ohms)
-    // these are for the semiconductor resistor
-    double length;      // resistor length.
-    double width;      // resistor width.
+  // user-specified paramters:
+  double R;  // resistance  (ohms)
+  // these are for the semiconductor resistor
+  double length;      // resistor length.
+  double width;      // resistor width.
 
-    double area;        // resistor width.
-    double thermalLength; // Length of material thermally coupled to resistor.
-    double thermalArea;   // Width of material thermally coupled to resistor.
+  double area;        // resistor width.
+  double thermalLength; // Length of material thermally coupled to resistor.
+  double thermalArea;   // Width of material thermally coupled to resistor.
 
-    // these four params are copied from the model:
-    double resistivity;    // material resistivity
-    double density;        // material density
-    double heatCapacity;   // conductor volumetric heat capacity
-    double thermalHeatCapacity;   // volumetric heat capacity of material thermally coupled to resistor
+  // these four params are copied from the model:
+  double resistivity;    // material resistivity
+  double density;        // material density
+  double heatCapacity;   // conductor volumetric heat capacity
+  double thermalHeatCapacity;   // volumetric heat capacity of material thermally coupled to resistor
 
-    double temp;   // temperature of this instance
+  double temp;   // temperature of this instance
 
-    // derived parameters:
-    double G;  // conductance (1.0/ohms)
-    double i0; // current (ohms)
+  // derived parameters:
+  double G;  // conductance (1.0/ohms)
+  double i0; // current (ohms)
 
-    //Vector local index for Positive Node
-    int li_Pos;
-    //Vector local index for Negative Node
-    int li_Neg;
+  //Vector local index for Positive Node
+  int li_Pos;
+  //Vector local index for Negative Node
+  int li_Neg;
 
-    bool tempModelEnabled;
-    bool outputInternalVarsFlag;
-    int li_TempState;
-    int li_store_dev_i;   
+  bool tempModelEnabled;
+  bool outputInternalVarsFlag;
+  int li_TempState;
+  int li_store_dev_i;
 
-    // Offset variables corresponding to the above declared indices.
-    int APosEquPosNodeOffset;
-    int APosEquNegNodeOffset;
-    int ANegEquPosNodeOffset;
-    int ANegEquNegNodeOffset;
+  // Offset variables corresponding to the above declared indices.
+  int APosEquPosNodeOffset;
+  int APosEquNegNodeOffset;
+  int ANegEquPosNodeOffset;
+  int ANegEquNegNodeOffset;
 
-    // Pointers for Jacobian
-    double *f_PosEquPosNodePtr;
-    double *f_PosEquNegNodePtr;
-    double *f_NegEquPosNodePtr;
-    double *f_NegEquNegNodePtr;
+  // Pointers for Jacobian
+  double *f_PosEquPosNodePtr;
+  double *f_PosEquNegNodePtr;
+  double *f_NegEquPosNodePtr;
+  double *f_NegEquNegNodePtr;
 };
 
 
@@ -210,19 +221,14 @@ class Model : public DeviceModel
 
   friend class ParametricData<Model>;
   friend class Instance;
-  friend class Master;
+  friend class Traits;friend class Master;
 
-  public:
-  static ParametricData<Model> &getParametricData();
-
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
-    Model(const ModelBlock & MB,
-                              SolverState & ss1,
-                        DeviceOptions & do1);
-    ~Model();
+public:
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &        MB,
+     const FactoryBlock &      factory_block);
+  ~Model();
 
 private:
   Model();
@@ -230,41 +236,50 @@ private:
   Model &operator=(const Model &);
 
 public:
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
+
   virtual std::ostream &printOutInstances(std::ostream &os) const;
 
-    bool processParams (string param = "");
-    bool processInstanceParams (string param = "");
+  bool processParams ();
+  bool processInstanceParams ();
 
 
 public:
-  InstanceVector &getInstanceVector() {
+  void addInstance(Instance *instance) 
+  {
+    instanceContainer.push_back(instance);
+  }
+
+  InstanceVector &getInstanceVector() 
+  {
     return instanceContainer;
   }
 
-  const InstanceVector &getInstanceVector() const {
+  const InstanceVector &getInstanceVector() const 
+  {
     return instanceContainer;
   }
 
-  private:
-    vector<Instance*> instanceContainer;
+private:
+  std::vector<Instance*> instanceContainer;
 
-  private:
+private:
 
-    // Semiconductor resistor parameters
-    double tempCoeff1;   // first order temperature coeff.
-    double tempCoeff2;   // second order temperature coeff.
-    double sheetRes;   // sheet resistance
+  // Semiconductor resistor parameters
+  double tempCoeff1;   // first order temperature coeff.
+  double tempCoeff2;   // second order temperature coeff.
+  double sheetRes;   // sheet resistance
 
-    double resistivity;    // material resistivity
-    double density;        // material density
-    double heatCapacity;   // conductor volumetric heat capacity
-    double thermalHeatCapacity;   // volumetric heat capacity of material thermally coupled to resistor
-    double defArea;        // default area
-    double defLength;      // default length
+  double resistivity;    // material resistivity
+  double density;        // material density
+  double heatCapacity;   // conductor volumetric heat capacity
+  double thermalHeatCapacity;   // volumetric heat capacity of material thermally coupled to resistor
+  double defArea;        // default area
+  double defLength;      // default length
 
-    double defWidth;   // default width
-    double narrow;     // narrowing due to side etching
-    double tnom;       // parameter measurement temperature
+  double defWidth;   // default width
+  double narrow;     // narrowing due to side etching
+  double tnom;       // parameter measurement temperature
 };
 
 //-----------------------------------------------------------------------------
@@ -274,31 +289,25 @@ public:
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 11/26/08
 //-----------------------------------------------------------------------------
-class Master : public Xyce::Device::DeviceTemplate<Model, Instance>
+class Master : public DeviceMaster<Traits>
 {
-  public:
-    Master (
-      const std::string &dn,
-      const std::string &cn,
-      const std::string &dmName,
-           LinearDevice linearDev,
-           SolverState & ss1,
-           DeviceOptions & do1)
-      : Xyce::Device::DeviceTemplate<Model, Instance>(
-           dn, cn, dmName, linearDev, ss1, do1)
-    {
+public:
+  Master(
+     const Configuration &       configuration,
+     const FactoryBlock &      factory_block,
+     const SolverState & ss1,
+     const DeviceOptions & do1)
+    : DeviceMaster<Traits>(configuration, factory_block, ss1, do1)
+  {}
 
-    }
+  virtual bool updateState (double * solVec, double * staVec, double * stoVec);
 
-    virtual bool updateState (double * solVec, double * staVec, double * stoVec);
-
-    // load functions:
-    virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
-    virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
-
-    friend class Instance;
-    friend class Model;
+  // load functions:
+  virtual bool loadDAEVectors (double * solVec, double * fVec, double * qVec, double * storeLeadF, double * storeLeadQ);
+  virtual bool loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx);
 };
+
+void registerDevice();
 
 } // namespace ThermalResistor
 } // namespace Device

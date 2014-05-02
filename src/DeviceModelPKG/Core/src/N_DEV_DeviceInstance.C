@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,30 +36,34 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.169.2.4 $
+// Revision Number: $Revision: 1.185 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/02/24 23:49:15 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
+
 #include <Xyce_config.h>
 
-// ----------   Xyce Includes   ----------
-#include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceInstance.h>
-#include <N_DEV_SolverState.h>
+
+#include <N_DEV_Const.h>
+#include <N_DEV_DeviceBlock.h>
+#include <N_DEV_DeviceMgr.h>
 #include <N_DEV_ExternData.h>
+#include <N_DEV_ExternDevice.h>
+#include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_Message.h>
+#include <N_DEV_NumericalJacobian.h>
+#include <N_DEV_SolverState.h>
 #include <N_ERH_ErrorMgr.h>
 #include <N_LAS_Matrix.h>
 #include <N_LAS_Vector.h>
-#include <N_DEV_Const.h>
-#include <N_DEV_DeviceMgr.h>
-#include <N_DEV_ExternDevice.h>
-#include <N_DEV_MatrixLoadData.h>
-#include <N_DEV_NumericalJacobian.h>
 
 namespace Xyce {
 namespace Device {
+
+const char *instanceEntityType = "instance";
 
 //-----------------------------------------------------------------------------
 // Function      : DeviceInstance::DeviceInstance
@@ -70,21 +74,17 @@ namespace Device {
 // Creation Date : 3/30/00
 //-----------------------------------------------------------------------------
 DeviceInstance::DeviceInstance(
-  InstanceBlock &       instance_block,
-  MatrixLoadData &      matrix_load_data,
-  SolverState &         solver_state,
-  ExternData &          extern_data,
-  DeviceOptions &       device_options)
-  : DeviceEntity(solver_state, device_options, instance_block.getName(), instance_block.netlistFileName_, instance_block.lineNumber_),
-    modelName_(instance_block.getModelName()),
+  const InstanceBlock &         instance_block,
+  ParametricData<void> &        parametric_data,
+  const FactoryBlock &          factory_block)
+  : DeviceEntity(instanceEntityType, instance_block.getName(), parametric_data, factory_block.solverState_, factory_block.deviceOptions_, instance_block.netlistFileName_, instance_block.lineNumber_),
     psLoaded(false),
     ssLoaded(false),
     rhsLoaded(false),
     origFlag(true),
-    PDEDeviceFlag(false),
-    mlData(matrix_load_data),
-    cols(matrix_load_data.cols),
-    vals(matrix_load_data.vals),
+    mlData(factory_block.matrixLoadData_),
+    cols(factory_block.matrixLoadData_.cols),
+    vals(factory_block.matrixLoadData_.vals),
     numIntVars(0),
     numExtVars(2),
     numStateVars(0),
@@ -93,13 +93,13 @@ DeviceInstance::DeviceInstance(
     configuredForLeadCurrent(false),
     loadLeadCurrent(false),
     mergeRowColChecked(false),
-    extData(extern_data),
+    extData(factory_block.externData_),
     numJacPtr(NULL)
 {
   devConMap.resize(2);
   devConMap[0] = 1;
   devConMap[1] = 1;
-  numJacPtr = new NumericalJacobian (matrix_load_data, solver_state, extern_data, device_options);
+  numJacPtr = new NumericalJacobian(factory_block.matrixLoadData_, factory_block.solverState_, factory_block.externData_, factory_block.deviceOptions_);
 }
 
 //-----------------------------------------------------------------------------
@@ -160,7 +160,7 @@ void DeviceInstance::enableLeadCurrentCalc()
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/05/01
 //-----------------------------------------------------------------------------
-const vector<string> & DeviceInstance::getDepSolnVars()
+const std::vector<std::string> & DeviceInstance::getDepSolnVars()
 {
   return expVarNames;
 }
@@ -175,25 +175,20 @@ const vector<string> & DeviceInstance::getDepSolnVars()
 // Creation Date : 03/15/05
 //-----------------------------------------------------------------------------
 void DeviceInstance::registerDepSolnLIDs
-(const vector< vector<int> > & depSolnLIDVecRef)
+(const std::vector< std::vector<int> > & depSolnLIDVecRef)
 {
   int size = expVarLIDs.size();
   if (size != depSolnLIDVecRef.size())
   {
-    string msg = "DeviceInstance::registerDepSolnLIDs: Inconsistent ";
-    msg += "number of LIDs returned from topology";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL, msg);
+    DevelFatal0(*this).in("DeviceInstance::registerDepSolnLIDs")
+      << "Inconsistent number of LIDs returned from topology";
   }
   for (int i = 0; i < size; ++i)
   {
     if (depSolnLIDVecRef[i].size() != 1)
     {
-      string msg = "Problem with value for: " + expVarNames[i];
-      msg += ".  This may be an incorrect usage of a lead current in place of a current ";
-      msg += "through a voltage source.";
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+      UserError0(*this) << "Problem with value for " << expVarNames[i]
+                        << ".  This may be an incorrect usage of a lead current in place of a current through a voltage source.";
     }
     expVarLIDs[i] = depSolnLIDVecRef[i][0];
   }
@@ -219,7 +214,7 @@ void DeviceInstance::registerDepSolnLIDs
 // Creation Date : 05/05/01
 //-----------------------------------------------------------------------------
 void DeviceInstance::registerDepSolnGIDs(
-  const vector< vector<int> > & varList )
+  const std::vector< std::vector<int> > & varList )
 {
   int size = expVarGIDs.size();
   for (int i = 0; i < size; ++i)
@@ -237,7 +232,7 @@ void DeviceInstance::registerDepSolnGIDs(
 // Creator       : Eric R. Keiter, SNL
 // Creation Date :
 //-----------------------------------------------------------------------------
-void DeviceInstance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void DeviceInstance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   if (getDeviceOptions().numericalJacobianFlag || getDeviceOptions().testJacobianFlag)
   {
@@ -253,7 +248,7 @@ void DeviceInstance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 03/17/05
 //-----------------------------------------------------------------------------
-void DeviceInstance::getDepSolnGIDVec( vector<int> & depGIDVec )
+void DeviceInstance::getDepSolnGIDVec( std::vector<int> & depGIDVec )
 {
   depGIDVec = expVarGIDs;
   return;
@@ -271,9 +266,9 @@ void DeviceInstance::getDepSolnGIDVec( vector<int> & depGIDVec )
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 05/05/01
 //-----------------------------------------------------------------------------
-const vector<string> & DeviceInstance::getDepStateVars()
+const std::vector<std::string> & DeviceInstance::getDepStateVars()
 {
-  static vector<string> emptyList;
+  static std::vector<std::string> emptyList;
   emptyList.clear();
   return emptyList;
 }
@@ -296,11 +291,11 @@ const vector<string> & DeviceInstance::getDepStateVars()
 // Creation Date : 05/05/01
 //-----------------------------------------------------------------------------
 void DeviceInstance::registerDepStateGIDs(
-  const vector< vector<int> > & varList )
+  const std::vector< std::vector<int> > & varList )
 {
   if( varList.size() != 0 )
   {
-    string msg;
+    std::string msg;
     msg = "DeviceInstance::registerDepStateGIDs\n";
     msg += "\tCall to registerDepStateGIDs for a device which doesn't use it.";
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
@@ -319,9 +314,9 @@ void DeviceInstance::registerDepStateGIDs(
 // Creator       : Eric Keiter
 // Creation Date :
 //-----------------------------------------------------------------------------
-const vector<string> & DeviceInstance::getDepStoreVars()
+const std::vector<std::string> & DeviceInstance::getDepStoreVars()
 {
-  static vector<string> emptyList;
+  static std::vector<std::string> emptyList;
   emptyList.clear();
   return emptyList;
 }
@@ -344,11 +339,11 @@ const vector<string> & DeviceInstance::getDepStoreVars()
 // Creation Date :
 //-----------------------------------------------------------------------------
 void DeviceInstance::registerDepStoreGIDs(
-  const vector< vector<int> > & varList )
+  const std::vector< std::vector<int> > & varList )
 {
   if( varList.size() != 0 )
   {
-    string msg;
+    std::string msg;
     msg = "DeviceInstance::registerDepStoreGIDs\n";
     msg += "\tCall to registerDepStoreGIDs for a device which doesn't use it.";
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
@@ -366,7 +361,7 @@ void DeviceInstance::registerDepStoreGIDs(
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 05/26/00
 //-----------------------------------------------------------------------------
-bool DeviceInstance::getIndexPairList(list<index_pair> & iplRef)
+bool DeviceInstance::getIndexPairList(std::list<index_pair> & iplRef)
 {
   iplRef = indexPairList;
 
@@ -381,7 +376,7 @@ bool DeviceInstance::getIndexPairList(list<index_pair> & iplRef)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 12/15/06
 //-----------------------------------------------------------------------------
-bool DeviceInstance::testDAEMatrices (vector<string> & nameVec)
+bool DeviceInstance::testDAEMatrices (std::vector<std::string> & nameVec)
 {
   bool bsuccess = true;
 
@@ -413,18 +408,16 @@ bool DeviceInstance::trivialStampLoader (N_LAS_Matrix * matPtr)
   int i;
   int row;
 
-  vector<int>::const_iterator firstVar;
-  vector<int>::const_iterator lastVar;
-  vector<int>::const_iterator iterVar;
+  std::vector<int>::const_iterator firstVar;
+  std::vector<int>::const_iterator lastVar;
+  std::vector<int>::const_iterator iterVar;
   int localRows = matPtr->getLocalNumRows();
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0)
   {
-    cout << endl;
-    cout << "Loading trivial stamp for " << getName() << endl;
+    Xyce::dout() << std::endl
+                 << "Loading trivial stamp for " << getName() << std::endl;
   }
-#endif
 
   if (cols.size() < 1) cols.resize(1);
   if (vals.size() < 1) vals.resize(1);
@@ -448,30 +441,18 @@ bool DeviceInstance::trivialStampLoader (N_LAS_Matrix * matPtr)
     {
       row = *iterVar;
 
-#ifdef Xyce_DEBUG_DEVICE
-      if (getDeviceOptions().debugLevel > 0)
-        cout << "matrix row = " << row << endl;
-#endif
+      if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0)
+        Xyce::dout() << "matrix row = " << row << std::endl;
       if (row < 0)
       {
-#ifdef Xyce_DEBUG_DEVICE
-        if (getDeviceOptions().debugLevel > 0) cout << "\tNOT loading this one - too small" << endl;
-#endif
+        if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0)
+          Xyce::dout() << "\tNOT loading this one - too small" << std::endl;
         continue;
       }
-#if 0
-      if (row >= localRows)
-      {
-#ifdef Xyce_DEBUG_DEVICE
-        if (getDeviceOptions().debugLevel > 0) cout << "\tNOT loading this one - too big" << endl;
-#endif
-        continue;
-      }
-#endif
 
-#ifdef Xyce_DEBUG_DEVICE
-      if (getDeviceOptions().debugLevel > 0) cout << "\tloading this one" << endl;
-#endif
+      if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0)
+        Xyce::dout() << "\tloading this one" << std::endl;
+
       count = 1;
       vals[0] = 1.0;
       cols[0] = row;
@@ -513,18 +494,16 @@ bool DeviceInstance::zeroMatrixDiagonal (N_LAS_Matrix * matPtr)
   int i;
   int row;
 
-  vector<int>::const_iterator firstVar;
-  vector<int>::const_iterator lastVar;
-  vector<int>::const_iterator iterVar;
+  std::vector<int>::const_iterator firstVar;
+  std::vector<int>::const_iterator lastVar;
+  std::vector<int>::const_iterator iterVar;
   int localRows = matPtr->getLocalNumRows();
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0)
   {
-    cout << endl;
-    cout << "Zeroing the matrix diagonal for " << getName() << endl;
+    Xyce::dout() << std::endl
+                 << "Zeroing the matrix diagonal for " << getName() << std::endl;
   }
-#endif
 
   if (cols.size() < 1) cols.resize(1);
   if (vals.size() < 1) vals.resize(1);
@@ -548,17 +527,15 @@ bool DeviceInstance::zeroMatrixDiagonal (N_LAS_Matrix * matPtr)
     {
       row = *iterVar;
 
-#ifdef Xyce_DEBUG_DEVICE
-      if (getDeviceOptions().debugLevel > 0)
-        cout << "matrix row = " << row << endl;
-#endif
+      if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0)
+        Xyce::dout() << "matrix row = " << row << std::endl;
+
       if (row < 0) continue;
       if (row >= localRows) continue;
 
-#ifdef Xyce_DEBUG_DEVICE
-      if (getDeviceOptions().debugLevel > 0)
-        cout << "\tloading this one" << endl;
-#endif
+      if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0)
+        Xyce::dout() << "\tloading this one" << std::endl;
+
       count = 1;
       vals[0] = 0.0;
       cols[0] = row;
@@ -581,16 +558,16 @@ bool DeviceInstance::zeroMatrixDiagonal (N_LAS_Matrix * matPtr)
 //
 //                 This function will not remove subcircuit "x" characters,
 //                 but does move the first character of the local name
-//                 to the beginning of the full string.
+//                 to the beginning of the full std::string.
 //
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 09/12/01
 //-----------------------------------------------------------------------------
-void DeviceInstance::spiceInternalName (string & tmpname)
+void DeviceInstance::spiceInternalName (std::string & tmpname)
 {
   size_t pos=tmpname.find_last_of(":");
-  if (pos != string::npos)
+  if (pos != std::string::npos)
   {
     tmpname=tmpname.substr(pos+1,1)+":"+tmpname.substr(0,pos+1)+tmpname.substr(pos+2);
   }
@@ -684,24 +661,24 @@ double DeviceInstance::getMaxTimeStepSize  ()
 // Creation Date : 2/13/04
 //-----------------------------------------------------------------------------
 void DeviceInstance::jacStampMap
-(vector< vector<int> > & stamp_parent,
- vector<int> & map_parent,
- vector< vector<int> > & map2_parent,
- vector< vector<int> > & stamp,
- vector<int> & map,
- vector< vector<int> > & map2,
+(std::vector< std::vector<int> > & stamp_parent,
+ std::vector<int> & map_parent,
+ std::vector< std::vector<int> > & map2_parent,
+ std::vector< std::vector<int> > & stamp,
+ std::vector<int> & map,
+ std::vector< std::vector<int> > & map2,
  int from, int to, int original_size)
 {
   int i, j, t_index, f_index, t_index2, f_index2, p_size, p_row, f_mod;
   int map_2_from;
   bool new_col;
-  vector< vector<int> > fill;
-  vector<int> dup;
-  vector< vector<int> > map2_tmp;
+  std::vector< std::vector<int> > fill;
+  std::vector<int> dup;
+  std::vector< std::vector<int> > map2_tmp;
 
   if (from <= to)
   {
-    string msg = "Internal Error 1 in DeviceInstance::jacStampMap. from <= to.";
+    std::string msg = "Internal Error 1 in DeviceInstance::jacStampMap. from <= to.";
     //msg += " from index = " << from;
     //msg += " to index = " << to;
     N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
@@ -858,7 +835,7 @@ void DeviceInstance::jacStampMap
       }
     }
     if (map_2_from == from) {
-      string msg = "Internal Error 2 in DeviceInstance::jacStampMap";
+      std::string msg = "Internal Error 2 in DeviceInstance::jacStampMap";
       N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
     }
   }
@@ -951,22 +928,20 @@ void DeviceInstance::jacStampMap
 // Creation Date : 2/01/08
 //-----------------------------------------------------------------------------
 void DeviceInstance::jacStampMap_fixOrder
-(vector< vector<int> > & stamp_parent,
- vector< vector<int> > & map2_parent,
- vector< vector<int> > & stamp,
- vector< vector<int> > & map2)
+(std::vector< std::vector<int> > & stamp_parent,
+ std::vector< std::vector<int> > & map2_parent,
+ std::vector< std::vector<int> > & stamp,
+ std::vector< std::vector<int> > & map2)
 {
   int i, j;
   int current_size = stamp_parent.size();
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << "------------------------------------------------------" << endl;
-    cout << "Begin DeviceInstance::jacStampMap_fixOrder."<<endl;
-    cout << "------------------------------------------------------" << endl;
+    Xyce::dout() << Xyce::section_divider << std::endl
+                 << "Begin DeviceInstance::jacStampMap_fixOrder." << std::endl
+                 << Xyce::section_divider << std::endl;
   }
-#endif
 
   // if this is the first time this function is called (for a particular device), then
   // allocate the map and set up their trivial contents.
@@ -987,7 +962,7 @@ void DeviceInstance::jacStampMap_fixOrder
   map2.clear();
 
   // To make this simple, start out with a full, dense stamp.
-  vector < vector <int> > denseStamp(current_size);
+  std::vector< std::vector<int> > denseStamp(current_size);
   for (i=0;i<current_size;++i)
   {
     denseStamp[i].resize(current_size,-1);
@@ -1032,25 +1007,23 @@ void DeviceInstance::jacStampMap_fixOrder
     }
   }
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 1 && getSolverState().debugTimeFlag)
   {
-    cout << "From inside of DeviceInstance::jacStampMap_fixOrder:"<<endl;
-    cout << "The original parent stamp is:" << endl;
+    Xyce::dout() << "From inside of DeviceInstance::jacStampMap_fixOrder:" << std::endl
+                 << "The original parent stamp is:" << std::endl;
     outputJacStamp(stamp_parent);
-    cout << "The new reduced stamp is:" << endl;
+    Xyce::dout() << "The new reduced stamp is:" << std::endl;
     outputJacStamp(stamp);
-    cout << "The dense stamp is:" << endl;
+    Xyce::dout() << "The dense stamp is:" << std::endl;
     outputJacStamp(denseStamp);
 
-    cout << "The new map is:" << endl;
+    Xyce::dout() << "The new map is:" << std::endl;
     outputJacStamp(map2);
 
-    cout << "------------------------------------------------------" << endl;
-    cout << "End DeviceInstance::jacStampMap_fixOrder."<<endl;
-    cout << "------------------------------------------------------" << endl;
+    Xyce::dout() << Xyce::section_divider << std::endl
+                 << "End DeviceInstance::jacStampMap_fixOrder."<<std::endl
+                 << Xyce::section_divider << std::endl;
   }
-#endif
 
   return;
 }
@@ -1062,17 +1035,17 @@ void DeviceInstance::jacStampMap_fixOrder
 // Creator       : Dave Shirley, PSSI
 // Creation Date : 01/19/06
 //-----------------------------------------------------------------------------
-void DeviceInstance::outputJacStamp(const vector<vector<int> > & jac)
+void DeviceInstance::outputJacStamp(const std::vector<std::vector<int> > & jac)
 {
   int i,j;
   for (i=0 ; i<jac.size() ; ++i)
   {
-    cout << "Row: " << i << " ::";
+    Xyce::dout() << "Row: " << i << " ::";
     for (j=0 ; j<jac[i].size() ; ++j)
-      cout << "  " << jac[i][j];
-    cout << endl;
+      Xyce::dout() << "  " << jac[i][j];
+    Xyce::dout() << std::endl;
   }
-  cout << endl;
+  Xyce::dout() << std::endl;
 }
 
 //-----------------------------------------------------------------------------
@@ -1083,22 +1056,22 @@ void DeviceInstance::outputJacStamp(const vector<vector<int> > & jac)
 // Creator       : Keith Santarelli, Electrical & Microsystems Modeling
 // Creation Date : 02/20/08
 //-----------------------------------------------------------------------------
-void DeviceInstance::outputJacMaps(const vector<int>  & jacMap,
-					 const vector<vector<int> > & jacMap2)
+void DeviceInstance::outputJacMaps(const std::vector<int>  & jacMap,
+					 const std::vector<std::vector<int> > & jacMap2)
 {
   int i,j;
 
   for (i=0 ; i<jacMap.size() ; ++i)
   {
-    cout << "Row " << i << ": ";
+    Xyce::dout() << "Row " << i << ": ";
     for (j=0; j < jacMap2[i].size(); j++)
     {
-      cout << jacMap[i]<< "," << jacMap2[i][j] << " ";
+      Xyce::dout() << jacMap[i]<< "," << jacMap2[i][j] << " ";
     }
-    cout << endl;
+    Xyce::dout() << std::endl;
   }
 
-  cout << endl;
+  Xyce::dout() << std::endl;
 }
 
 //-----------------------------------------------------------------------------
@@ -1117,9 +1090,9 @@ void DeviceInstance::outputJacMaps(const vector<int>  & jacMap,
 // Creation Date : 12/13/04
 //-----------------------------------------------------------------------------
 void DeviceInstance::registerGIDData(
-  const vector<int> & counts,
-  const vector<int> & GIDs,
-  const vector< vector<int> > & jacGIDs )
+  const std::vector<int> & counts,
+  const std::vector<int> & GIDs,
+  const std::vector< std::vector<int> > & jacGIDs )
 {
 
   // the test for the PDE system flag only needs to be here until the
@@ -1135,20 +1108,18 @@ void DeviceInstance::registerGIDData(
     int size = GIDs.size();
     int i;
 
-    map<int,int> testIndexMap;
+    std::map<int,int> testIndexMap;
 
-#ifdef Xyce_DEBUG_DEVICE
-    if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+    if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "DeviceInstance::registerGIDData for " << getName() << endl;
-      cout << "  extSize      = " << extSize  << endl;
-      cout << "  intSize      = " << intSize  << endl;
-      cout << "  expSize      = " << expSize  << endl;
-      cout << "  GIDs.size    = " << size << endl;
-      cout << "  jacGIDs.size = " << jacGIDs.size () << endl;
-      cout << endl;
+      Xyce::dout() << "DeviceInstance::registerGIDData for " << getName() << std::endl
+                   << "  extSize      = " << extSize  << std::endl
+                   << "  intSize      = " << intSize  << std::endl
+                   << "  expSize      = " << expSize  << std::endl
+                   << "  GIDs.size    = " << size << std::endl
+                   << "  jacGIDs.size = " << jacGIDs.size () << std::endl
+                   << std::endl;
     }
-#endif
 
     // Copy out external gids:
     extGIDList.clear ();
@@ -1209,7 +1180,7 @@ void DeviceInstance::registerGIDData(
       {
         testIndexMap[GIDs[i]] = 1;
 
-        map<int,int> testJMap;
+        std::map<int,int> testJMap;
         testJMap.clear ();
         int length = jacGIDs[i].size();
         for( int j = 0; j < length; ++j )
@@ -1223,135 +1194,52 @@ void DeviceInstance::registerGIDData(
       }
     }
 
-#ifdef Xyce_DEBUG_DEVICE
-    if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+    if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      vector<int>::const_iterator begin = GIDs.begin ();
-      vector<int>::const_iterator end   = GIDs.end   ();
-      vector<int>::const_iterator iterGID;
+      std::vector<int>::const_iterator begin = GIDs.begin ();
+      std::vector<int>::const_iterator end   = GIDs.end   ();
+      std::vector<int>::const_iterator iterGID;
 
-      cout << " Complete GIDs :" << endl;
+      Xyce::dout() << " Complete GIDs :" << std::endl;
       for (iterGID=begin;iterGID!=end ;++iterGID)
       {
-        cout << "\tgid=" << *iterGID;
-        cout << endl;
+        Xyce::dout() << "\tgid=" << *iterGID << std::endl;
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
 
-      list<index_pair>::iterator first;
-      list<index_pair>::iterator last;
-      list<index_pair>::iterator iter;
+      std::list<index_pair>::iterator first;
+      std::list<index_pair>::iterator last;
+      std::list<index_pair>::iterator iter;
 
-      cout << " intGIDList :" << endl;
+      Xyce::dout() << " intGIDList :" << std::endl;
       first = intGIDList.begin ();
       last  = intGIDList.end   ();
       for (iter=first;iter!=last;++iter)
       {
-        cout << "\tgid=" <<iter->row;
-        cout << endl;
+        Xyce::dout() << "\tgid=" << iter->row << std::endl;
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
 
-      cout << " extGIDList :" << endl;
+      Xyce::dout() << " extGIDList :" << std::endl;
       first = extGIDList.begin ();
       last  = extGIDList.end   ();
       for (iter=first;iter!=last;++iter)
       {
-        cout << "\tgid=" <<iter->row;
-        cout << endl;
+        Xyce::dout() << "\tgid=" << iter->row << std::endl;
       }
-      cout << endl;
+      Xyce::dout() << std::endl;
 
 
-      cout << " indexPairList :" << endl;
+      Xyce::dout() << " indexPairList :" << std::endl;
       first = indexPairList.begin();
       last  = indexPairList.end  ();
       for (iter=first;iter!=last;++iter)
       {
-        cout << "  row=" <<iter->row;
-        cout << "  col=" <<iter->col;
-        cout << endl;
+        Xyce::dout() << "  row=" << iter->row << "  col=" << iter->col << std::endl;
       }
-      cout << endl << endl;
+      Xyce::dout() << std::endl << std::endl;
     }
-#endif
-
   }
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceInstance::getNumNodes
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 9/16/05
-//-----------------------------------------------------------------------------
-int DeviceInstance::getNumNodes() const
-{
-  const Configuration &cTab = getMyParametricData().getConfigTable();
-
-  return cTab.numNodes;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceInstance::getNumOptionalNodes
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 9/16/05
-//-----------------------------------------------------------------------------
-int DeviceInstance::getNumOptionalNodes() const
-{
-  const Configuration &cTab = getMyParametricData().getConfigTable();
-
-  return cTab.numOptionalNodes;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceInstance::getNumFillNodes
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 9/16/05
-//-----------------------------------------------------------------------------
-int DeviceInstance::getNumFillNodes() const
-{
-  const Configuration &cTab = getMyParametricData().getConfigTable();
-
-  return cTab.numFillNodes;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceInstance::getPrimaryParameter
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 9/16/05
-//-----------------------------------------------------------------------------
-void DeviceInstance::getPrimaryParameter(string & primaryParameter) const
-{
-  const Configuration &cTab = getMyParametricData().getConfigTable();
-
-  primaryParameter = cTab.primaryParameter;
-}
-
-//-----------------------------------------------------------------------------
-// Function      : DeviceInstance::getModelTypes
-// Purpose       :
-// Special Notes :
-// Scope         :
-// Creator       : Dave Shirley, PSSI
-// Creation Date : 9/16/05
-//-----------------------------------------------------------------------------
-void DeviceInstance::getModelTypes(vector<string> & modTypesVector) const
-{
-  const Configuration &cTab = getMyParametricData().getConfigTable();
-
-  modTypesVector = cTab.modelTypes;
 }
 
 //-----------------------------------------------------------------------------
@@ -1375,14 +1263,67 @@ bool DeviceInstance::updateTemperature(const double & temp_tmp)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 06/03/02
 //-----------------------------------------------------------------------------
-bool DeviceInstance::processParams (string param)
+bool DeviceInstance::processParams ()
 {
-  string msg;
-  msg = "DeviceInstance::processParams does not exist";
+  Report::DevelFatal0().in("DeviceInstance::processParams")
+    << "DeviceInstance::processParams() must be implemented for device " << getName();
+
+  return true;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : DeviceInstance::updateIntermediateVars
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
+// Creation Date : 11/30/00
+//-----------------------------------------------------------------------------
+bool DeviceInstance::updateIntermediateVars ()
+{
+  std::string msg;
+  msg = "DeviceInstance::updateIntermediateVars does not exist";
   msg += "  for this device: " + getName() + "\n";
   N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
 
   return true;
+}
+
+
+//-----------------------------------------------------------------------------
+// Function      : DeviceInstance::updatePrimaryState
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Eric Keiter, SNL, Parallel Computational Sciences
+// Creation Date : 11/30/00
+//-----------------------------------------------------------------------------
+bool DeviceInstance::updatePrimaryState ()
+{
+  std::string msg;
+  msg = "DeviceInstance::updatePrimaryState does not exist";
+  msg += "  for this device: " + getName() + "\n";
+  N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
+
+  return true;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : DeviceInstance::setInternalState
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Robert J Hoekstra, SNL, Parallel Computational Sciences
+// Creation Date : 09/02/01
+//-----------------------------------------------------------------------------
+bool DeviceInstance::setInternalState(
+  const DeviceState & state )
+{
+  N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL,
+                          "DeviceInstance::setInternalState does not exist for this device: "
+                          + getName() + "\n" );
+
+  return false;
 }
 
 } // namespace Device

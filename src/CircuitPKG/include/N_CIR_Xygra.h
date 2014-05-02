@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.3.6.2 $
+// Revision Number: $Revision: 1.9 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:31 $
+// Revision Date  : $Date: 2014/02/24 23:49:13 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -46,45 +46,46 @@
 #ifndef Xyce_N_CIR_XYGRA_H
 #define Xyce_N_CIR_XYGRA_H
 
-// ---------- Standard Includes ----------
-// ----------   Xyce Includes   ----------
 #include <N_CIR_Xyce.h>
 
 //-----------------------------------------------------------------------------
 // Class         : N_CIR_Xygra
 // Purpose       :
-// Special Notes :  
-//                 
+// Special Notes :
+//
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/21/08
 //-----------------------------------------------------------------------------
-class N_CIR_Xygra : public N_CIR_Xyce
+class N_CIR_Xygra : public Xyce::Circuit::Simulator
 {
+  public:
+    N_CIR_Xygra()
+    {}
+    
+    virtual ~N_CIR_Xygra()
+    {}
+    
+    // and of course all of N_CIR_Xyce's base class public and protected
+    // methods...
 
- public:
-  N_CIR_Xygra();
-  virtual ~N_CIR_Xygra();
-  // and of course all of N_CIR_Xyce's base class public and protected 
-  // methods...
-
-  bool getDeviceNames(const string & deviceType, 
-                      vector<string> & deviceNames);
-  int xygraGetNumNodes(const string & deviceName);
-  int xygraGetNumWindings(const string & deviceName);
-  void xygraGetCoilWindings(const string & deviceName,
-                            vector<int> & cW);
-  void xygraGetCoilNames(const string & deviceName,
-                            vector<string> & cN);
-  bool xygraSetConductances(const string & deviceName, 
-                            const vector< vector<double> > & cM);
-  bool xygraSetK(const string & deviceName, 
-                 const vector< vector<double> > & kM,
-                 const double t=0);
-  bool xygraSetSources(const string & deviceName, 
-                       const vector< double > & sV,
-                       const double t=0);
-  bool xygraGetVoltages(const string & deviceName, 
-                        vector< double > & vN);
-} ;
+    bool getDeviceNames(const std::string & deviceType,
+                        std::vector<std::string> & deviceNames);
+    int xygraGetNumNodes(const std::string & deviceName);
+    int xygraGetNumWindings(const std::string & deviceName);
+    void xygraGetCoilWindings(const std::string & deviceName,
+                              std::vector<int> & cW);
+    void xygraGetCoilNames(const std::string & deviceName,
+                           std::vector<std::string> & cN);
+    bool xygraSetConductances(const std::string & deviceName,
+                              const std::vector< std::vector<double> > & cM);
+    bool xygraSetK(const std::string & deviceName,
+                   const std::vector< std::vector<double> > & kM,
+                   const double t=0);
+    bool xygraSetSources(const std::string & deviceName,
+                         const std::vector< double > & sV,
+                         const double t=0);
+    bool xygraGetVoltages(const std::string & deviceName,
+                          std::vector< double > & vN);
+};
 
 #endif

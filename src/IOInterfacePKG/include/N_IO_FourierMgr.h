@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.1.2.6 $
+// Revision Number: $Revision: 1.10.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Date  : $Date: 2014/02/26 20:42:38 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -52,50 +52,42 @@
 #include <string>
 #include <iostream>
 
-#include <Teuchos_RCP.hpp>
-using Teuchos::RCP;
-using Teuchos::rcp;
-
-// ----------   Xyce Includes   ----------
-
 #include <N_UTL_Misc.h>
 #include <N_UTL_Xyce.h>
 #include <N_IO_fwd.h>
 #include <N_UTL_OptionBlock.h>
-#include <N_IO_PkgOptionsMgr.h>
 #include <N_LAS_Vector.h>
 #include <N_ANP_SweepParam.h>
 
-
-// ---------- Forward Declarations ----------
+namespace Xyce {
+namespace IO {
 
 //-----------------------------------------------------------------------------
-// Class         : N_IO_FourierMgr
+// Class         : FourierMgr
 // Purpose       : This is a manager class for handling .four and .fft statements
 //                 in a simulation
 // Special Notes :
 // Creator       : Heidi Thornquist, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-class N_IO_FourierMgr
+class FourierMgr
 {
-
 public:
-
-  // Default constructor.
-  N_IO_FourierMgr( N_IO_OutputMgr & outputMgr );
+  FourierMgr( OutputMgr & outputMgr );
 
   // Destructor
-  ~N_IO_FourierMgr();
+  ~FourierMgr();
 
   // Return true if Fourier analysis is being performed on any variables.
   bool isFourierActive() { return (!freqVector_.empty() && !time_.empty()); }
 
   // add .four or .fft line from netlist to list of things to perform analysis on.
-  bool addFourierAnalysis( const N_UTL_OptionBlock & fourierLine );
+  bool addFourierAnalysis( const Util::OptionBlock & fourierLine );
+
+  void fixupFourierParameters();
 
   // Called during the simulation to update the fourier objects held by this class
-  void updateFourierData( const double circuitTime, RCP< N_LAS_Vector > solnVecRCP );
+  void updateFourierData( const double circuitTime, const N_LAS_Vector *solnVec );
 
   void outputResults( std::ostream& outputStream );
 
@@ -109,10 +101,7 @@ private:
 
   std::ostream& printResult_( std::ostream& os );
 
-  N_IO_OutputMgr &     outputManager_;
-
-  // package options manager
-  RCP<N_IO_PkgOptionsMgr> pkgOptMgrPtr_;
+  OutputMgr &     outputManager_;
 
   // Store frequencies and solution variables
   int numFreq_, gridSize_;
@@ -122,12 +111,16 @@ private:
   std::vector<double> freqVector_;
   std::vector<double> outputVarsValues_;
   std::vector<std::string> names_;
-  list<N_UTL_Param> outputVars_;
-  vector< list<N_UTL_Param>::iterator > depSolVarIterVector_;
-  vector<int> prdStart_; 
-  vector<double> lastPrdStart_;
-  vector<double> newTime_, newValues_, mag_, phase_, nmag_, nphase_, freq_, thd_;
-
+  std::list<N_UTL_Param> depSolVarIterVector_;
+  Util::OpList outputVars_;
+  std::vector<int> prdStart_; 
+  std::vector<double> lastPrdStart_;
+  std::vector<double> newTime_, newValues_, mag_, phase_, nmag_, nphase_, freq_, thd_;
 };
+
+} // namespace IO
+} // namespace Xyce
+
+typedef Xyce::IO::FourierMgr N_IO_FourierMgr;
 
 #endif  // Xyce_N_IO_FourierMgr_H

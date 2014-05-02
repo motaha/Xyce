@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.3.6.2 $
+// Revision Number: $Revision: 1.7 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:32 $
+// Revision Date  : $Date: 2014/02/24 23:49:13 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -77,14 +77,14 @@ int main( int iargs, char *cargs[] )
   // Set out of memory detection on all systems
   set_new_handler (&_new_handler);
  
-  N_CIR_Xygra * XycePtr = new N_CIR_Xygra();
+  N_CIR_Xygra xygra;
 
-  bool bsuccess = XycePtr->initialize(iargs, cargs);
+  bool bsuccess = xygra.initialize(iargs, cargs);
   vector <string> deviceNames;
   vector <double> vN;
 
   if (bsuccess) 
-    bsuccess = XycePtr->getDeviceNames("Y%XYGRA%DUMMY",deviceNames);
+    bsuccess = xygra.getDeviceNames("Y%XYGRA%DUMMY",deviceNames);
 
   if (bsuccess)
   {
@@ -94,8 +94,8 @@ int main( int iargs, char *cargs[] )
     coilNames.resize(deviceNames.size());
     for (int i=0; i < deviceNames.size(); ++i)
     {
-      XycePtr->xygraGetCoilWindings(deviceNames[i],coilWindings[i]);
-      XycePtr->xygraGetCoilNames(deviceNames[i],coilNames[i]);
+      xygra.xygraGetCoilWindings(deviceNames[i],coilWindings[i]);
+      xygra.xygraGetCoilNames(deviceNames[i],coilNames[i]);
       cout << " Xygra device " << deviceNames[i] << " has " 
            << coilWindings[i].size() << " coils " << endl;
       for (int j=0; j<coilWindings[i].size(); j++)
@@ -105,13 +105,13 @@ int main( int iargs, char *cargs[] )
       }
     }
     
-//        bsuccess = XycePtr->runSimulation();
+//        bsuccess = xygra.runSimulation();
     double completedTime, timeStep;
     completedTime = 0.0;
     timeStep = 1e-2;
     bool opComplete = false;
 
-    while (!(XycePtr->simulationComplete()) && bsuccess)
+    while (!(xygra.simulationComplete()) && bsuccess)
     {
           cout << "Simulation incomplete, completedTime is " << completedTime 
                <<"." << endl;
@@ -127,19 +127,19 @@ int main( int iargs, char *cargs[] )
               if (completedTime == 0)
               {
                 vector<double> sV(1,0.0);
-                XycePtr->xygraSetSources(deviceNames[i],sV,completedTime);
+                xygra.xygraSetSources(deviceNames[i],sV,completedTime);
               }
               // sign of current negative so that voltage at the positive 
               // node winds up positive.
               double currentValue = 
                 -.001*sin(2*3.14159265358979*10.0*(completedTime+timeStep));
               vector<double> sV(1,currentValue);
-              XycePtr->xygraSetSources(deviceNames[i],sV,completedTime+timeStep);
+              xygra.xygraSetSources(deviceNames[i],sV,completedTime+timeStep);
             }
             else
             {
-              int numNodes = XycePtr->xygraGetNumNodes(deviceNames[i]);
-              int numWindings = XycePtr->xygraGetNumWindings(deviceNames[i]);
+              int numNodes = xygra.xygraGetNumNodes(deviceNames[i]);
+              int numWindings = xygra.xygraGetNumWindings(deviceNames[i]);
               cout << " " << i << " " << deviceNames[i] << " has " << numNodes << " nodes and " << numWindings << "windings."<< endl;
               
               // We're now going to kludge this by faking every winding out as a 1K 
@@ -156,7 +156,7 @@ int main( int iargs, char *cargs[] )
                   kM[winding].resize(numWindings,0.0);
                   kM[winding][winding] = G;  // only set diagonal
                 }
-                XycePtr->xygraSetK(deviceNames[i],kM,completedTime);
+                xygra.xygraSetK(deviceNames[i],kM,completedTime);
               }
               G = 1/(1000.0+completedTime+timeStep);
               for (int winding=0; winding<numWindings; ++winding)
@@ -164,7 +164,7 @@ int main( int iargs, char *cargs[] )
                 kM[winding].resize(numWindings,0.0);
                 kM[winding][winding] = G;  // only set diagonal
               }
-              XycePtr->xygraSetK(deviceNames[i],kM,completedTime+timeStep);
+              xygra.xygraSetK(deviceNames[i],kM,completedTime+timeStep);
               
             }
           }
@@ -173,8 +173,8 @@ int main( int iargs, char *cargs[] )
 #ifdef ResistiveCoil
       for (int i = 0; i<deviceNames.size(); ++i)
       {
-        int numNodes = XycePtr->xygraGetNumNodes(deviceNames[i]);
-        int numWindings = XycePtr->xygraGetNumWindings(deviceNames[i]);
+        int numNodes = xygra.xygraGetNumNodes(deviceNames[i]);
+        int numWindings = xygra.xygraGetNumWindings(deviceNames[i]);
         cout << " " << i << " " << deviceNames[i] << " has " << numNodes << " nodes and " << numWindings << "windings."<< endl;
         
         // We're now going to kludge this by faking every winding out as a 1K 
@@ -189,7 +189,7 @@ int main( int iargs, char *cargs[] )
           kM[winding].resize(numWindings,0.0);
           kM[winding][winding] = G;  // only set diagonal
         }
-        XycePtr->xygraSetK(deviceNames[i],kM);
+        xygra.xygraSetK(deviceNames[i],kM);
       }
 #endif
 
@@ -199,20 +199,20 @@ int main( int iargs, char *cargs[] )
       for (int i = 0; i<deviceNames.size(); ++i)
       {
         cout << " setting sources for device " << deviceNames[i] << endl;
-        int numWindings = XycePtr->xygraGetNumWindings(deviceNames[i]);
+        int numWindings = xygra.xygraGetNumWindings(deviceNames[i]);
 
         if (completedTime == 0)
         {
           // set the t=0 version first
           vector<double> sV(numWindings,0.0);
           cout << " setting sources for t=0 " << endl;
-          XycePtr->xygraSetSources(deviceNames[i],sV,completedTime);
+          xygra.xygraSetSources(deviceNames[i],sV,completedTime);
         }
 
         double currentValue =  .001*sin(2*3.14159265358979*10.0*(completedTime+timeStep));
         vector<double> sV(numWindings,currentValue);
         cout << " setting sources for t= "<< completedTime+timeStep << endl;
-        XycePtr->xygraSetSources(deviceNames[i],sV,completedTime+timeStep);
+        xygra.xygraSetSources(deviceNames[i],sV,completedTime+timeStep);
       }
 #endif
 
@@ -222,12 +222,12 @@ int main( int iargs, char *cargs[] )
       {
         cout << "Calling simulateUntil with requested time " << completedTime+timeStep << endl;
 
-        bsuccess = XycePtr->simulateUntil(completedTime+timeStep,completedTime);
+        bsuccess = xygra.simulateUntil(completedTime+timeStep,completedTime);
         cout << "Simulated to " << completedTime << endl;
         for (int i=0; i<deviceNames.size(); i++)
         {
           int offset=0;
-          XycePtr->xygraGetVoltages(deviceNames[i], vN);
+          xygra.xygraGetVoltages(deviceNames[i], vN);
           cout << " Nodal voltages for device " << deviceNames[i] << endl;
           for (int coil=0; coil<coilWindings[i].size(); coil++)
           {
@@ -244,7 +244,7 @@ int main( int iargs, char *cargs[] )
       else
       {
         cout << "Calling simulateUntil with requested time " << completedTime << endl;
-        bsuccess = XycePtr->simulateUntil(completedTime,completedTime);
+        bsuccess = xygra.simulateUntil(completedTime,completedTime);
 
           
         opComplete = true;
@@ -252,8 +252,6 @@ int main( int iargs, char *cargs[] )
 #endif
     }
   }
-
-  delete XycePtr;
 
   (bsuccess) ? exit(0) : exit(-1);
 }

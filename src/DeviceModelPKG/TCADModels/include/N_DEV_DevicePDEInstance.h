@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.49.2.2 $
+// Revision Number: $Revision: 1.56.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:35 $
+// Revision Date  : $Date: 2014/02/26 20:16:31 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -71,7 +71,7 @@
 
 // ---------- Forward Declarations ----------
 
-typedef Sacado::Fad::SFad<double,6> pdeFadType;
+typedef Sacado::Fad::SFad<double,10> pdeFadType;
 
 namespace Xyce {
 namespace Device {
@@ -161,11 +161,9 @@ class DevicePDEInstance : public DeviceInstance
 {
 public:
   DevicePDEInstance(
-    InstanceBlock &  IB,
-    MatrixLoadData & mlData1,
-    SolverState &    ss1,
-    ExternData &     ed1,
-    DeviceOptions &  do1);
+     const InstanceBlock &       IB,
+     ParametricData<void> &      parametric_data,
+     const FactoryBlock &        factory_block);
 
   virtual ~DevicePDEInstance  () {};
 
@@ -180,7 +178,7 @@ public:
     double pi = 4.0*atan(1.0);
 
     double nu_eta = pow(arg, 4.0) + 50.0 +
-                    33.6*arg*(1.0 - 0.68*exp(-0.17*pow(arg+1.0,2)));
+      33.6*arg*(1.0 - 0.68*exp(-0.17*pow(arg+1.0,2)));
 
     double xi = 3.0*sqrt(pi)/(4.0*pow(nu_eta,0.375));
 
@@ -263,6 +261,10 @@ public:
   double dJdn2_qdep (double n1, double n2, double E, const pdeFadType & u, double h, int z);
   double dJdp1_qdep (double n1, double n2, double E, const pdeFadType & u, double h, int z);
   double dJdp2_qdep (double n1, double n2, double E, const pdeFadType & u, double h, int z);
+  double dJdbm1_qdep (double n1, double n2, double E, const pdeFadType & u, double h, int z);
+  double dJdbm2_qdep (double n1, double n2, double E, const pdeFadType & u, double h, int z);
+  double dJdpp1_qdep (double n1, double n2, double E, const pdeFadType & u, double h, int z);
+  double dJdpp2_qdep (double n1, double n2, double E, const pdeFadType & u, double h, int z);
   //
 
 #if 0
@@ -277,8 +279,8 @@ public:
 
   void setupOutputName ();
 
-  const string timeDateStamp();
-  const string tecplotTimeDateStamp();
+  const std::string timeDateStamp();
+  const std::string tecplotTimeDateStamp();
 
 public:
   // physical constants:
@@ -302,7 +304,7 @@ public:
 
   ScalingVars scalingVars;
 
-  map <string, DopeInfo *> dopeInfoMap;
+  std::map<std::string, DopeInfo *> dopeInfoMap;
 
   // photogen, seu variables:
   bool photogenOnFlag;
@@ -319,7 +321,7 @@ public:
   double photoPer;
   int lastPeriodIndex;
   int photoType;
-  string photoString;
+  std::string photoString;
   SourceData * Data_ptr;
   SourceData * DataSaved_ptr;
 
@@ -333,9 +335,6 @@ public:
   double maxPhotoDelta;    // maximum photogen delta.
   bool photoContinuationFinished;
 
-  map <string, CompositeParam *> regionMap;
-  map <string, CompositeParam *> nodeMap;
-
   // continuation parameters:
   double maxVoltDelta;
   bool enableContinuationCalled;
@@ -347,16 +346,16 @@ public:
   bool dopingSensMod;
   bool photogenSensMod;
 
-  string mobModelName;
+  std::string mobModelName;
   bool fieldDependentMobility;
   bool fieldDependentMobilityGiven;
-  string bulkMaterial;
+  std::string bulkMaterial;
   bool variablesScaled;
 
   MaterialSupport matSupport;
   BernouliSupport bernSupport;
 
-  string outputName;  // added to remove the Y%PDE% prefix.
+  std::string outputName;  // added to remove the Y%PDE% prefix.
 
   // inverse fermi integral function functor.
   inverse_fermi_one_half_N fdinvObj;
@@ -380,7 +379,7 @@ private:
 // Creator       :
 // Creation Date :
 //-----------------------------------------------------------------------------
-inline const string DevicePDEInstance::timeDateStamp()
+inline const std::string DevicePDEInstance::timeDateStamp()
 {
   const time_t now = time( NULL );
   char timeDate[ 80 ];
@@ -389,7 +388,7 @@ inline const string DevicePDEInstance::timeDateStamp()
   strftime( timeDate, 80, "TIME='%I:%M:%S %p' DATE='%b %d, %Y' ",
             localtime( &now ) );
 
-  return string( timeDate );
+  return std::string( timeDate );
 }
 
 //-----------------------------------------------------------------------------
@@ -400,7 +399,7 @@ inline const string DevicePDEInstance::timeDateStamp()
 // Creator       : Eric Keiter, SNL
 // Creation Date : 9/6/04
 //-----------------------------------------------------------------------------
-inline const string DevicePDEInstance::tecplotTimeDateStamp()
+inline const std::string DevicePDEInstance::tecplotTimeDateStamp()
 {
   const time_t now = time( NULL );
   char timeDate[ 80 ];
@@ -409,7 +408,7 @@ inline const string DevicePDEInstance::tecplotTimeDateStamp()
   strftime( timeDate, 80, "TIME= \" %I:%M:%S %p %b %d, %Y \" ",
             localtime( &now ) );
 
-  return string( timeDate );
+  return std::string( timeDate );
 }
 
 } // namespace Device

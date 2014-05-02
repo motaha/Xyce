@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.10.2.2 $
+// Revision Number: $Revision: 1.18 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:32 $
+// Revision Date  : $Date: 2014/02/24 23:49:13 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -58,10 +58,6 @@
 #ifdef Xyce_Dakota
 #include <N_DAK_DakotaController.h>
 #endif
-
-#include <Teuchos_RefCountPtr.hpp>
-using Teuchos::RefCountPtr;
-using Teuchos::rcp;
 
 // Function to be called if memory runs out:
 void _new_handler (void)
@@ -86,7 +82,7 @@ bool checkForDakotaFlag( const int iargs, const char * const cargs[])
 
   for( int i=0; i<iargs; i++ )
   {
-    string currentArg(cargs[i]);
+    std::string currentArg(cargs[i]);
     if( currentArg == "-dakota" )
     {
       result = true;
@@ -113,7 +109,7 @@ int main( int iargs, char *cargs[] )
   feenableexcept(FE_DIVBYZERO | FE_INVALID);
 #endif
   // Set out of memory detection on all systems
-  set_new_handler (&_new_handler);
+  std::set_new_handler (&_new_handler);
 
   bool bsuccess = false;
 #ifdef Xyce_Dakota
@@ -121,14 +117,15 @@ int main( int iargs, char *cargs[] )
   {
     // this will be a Xyce simulation where Dakota creates and
     // then runs N_CIR_Xyce(). So pass control to it
-    RCP<N_DAK_DakotaController> dakotaController = rcp(new N_DAK_DakotaController( iargs, cargs ) );
-    bsuccess = dakotaController->run();
+
+    N_DAK_DakotaController dakotaController( iargs, cargs );
+    bsuccess = dakotaController.run();
   }
   else
 #endif
   {
-    RCP<N_CIR_Xyce> XycePtr = rcp(new N_CIR_Xyce());
-    bsuccess = XycePtr->run( iargs, cargs );
+    N_CIR_Xyce xyce;
+    bsuccess = xyce.run( iargs, cargs );
   }
   (bsuccess) ? exit(0) : exit(-1);
 }

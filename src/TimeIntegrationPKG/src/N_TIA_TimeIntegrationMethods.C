@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.47.2.2 $
+// Revision Number: $Revision: 1.60 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:50 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -155,8 +155,7 @@ void N_TIA_WorkingIntegrationMethod::createTimeIntegMethod(
   const unsigned int integration_method)
 {
 #ifdef Xyce_DEBUG_TIME
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-            "\n  ********** createTimeIntegMethod Function Called");
+  Xyce::dout() << "\n  ********** createTimeIntegMethod Function Called" << std::endl;
 #endif
 
   N_TIA_TimeIntegrationMethod* pTIM;
@@ -183,17 +182,10 @@ void N_TIA_WorkingIntegrationMethod::createTimeIntegMethod(
     case TIAMethod_BACKWARD_EULER:
     case TIAMethod_BACKWARD_DIFFERENTIATION_2:
     case TIAMethod_TRAPEZOIDAL:
-      sprintf(ch_msg,
-        "N_TIA_WorkingIntegrationMethod::createTimeIntegMethod.  Non-valid method specified.  integration_method = %d",
-        integration_method);
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, string(ch_msg));
-      break;
-
     default:
-      sprintf(ch_msg,
-        "N_TIA_WorkingIntegrationMethod::createTimeIntegMethod.  Non-valid method specified.  integration_method = %d",
-        integration_method);
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, string(ch_msg));
+      Xyce::Report::DevelFatal0() << "N_TIA_WorkingIntegrationMethod::createTimeIntegMethod.  Invalid integration method "
+                                  << integration_method
+                                  << " specified";
       break;
   }
 
@@ -202,13 +194,12 @@ void N_TIA_WorkingIntegrationMethod::createTimeIntegMethod(
   integMethodPtr = pTIM;
 
 #ifdef Xyce_VERBOSE_TIME
-  printWorkingIntegMethod();
+  printWorkingIntegMethod(Xyce::lout());
 #endif
 
   return;
 }
 
-#ifdef Xyce_VERBOSE_TIME
 //-----------------------------------------------------------------------------
 // Function      : N_TIA_WorkingIntegrationMethod::printWorkingIntegMethod
 // Purpose       : This function is a debug output function.  It prints
@@ -218,35 +209,31 @@ void N_TIA_WorkingIntegrationMethod::createTimeIntegMethod(
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/26/00
 //-----------------------------------------------------------------------------
-void N_TIA_WorkingIntegrationMethod::printWorkingIntegMethod()
+void N_TIA_WorkingIntegrationMethod::printWorkingIntegMethod(std::ostream &os)
 {
-
-  string msg = "  Integration method = ";
+  os << "  Integration method = ";
   
   switch (workingIntegMethod)
   {
     case TIAMethod_NONE:
-      msg = "  Integration method = None\n";
+      os << "None\n";
       break;
     case TIAMethod_BACKWARD_DIFFERENTIATION_15:
-      msg = "  Integration method = Backward Differentiation 15\n";
+      os << "Backward Differentiation 15\n";
       break;
     case TIAMethod_ONESTEP:
-      msg = "Onestep: Trapezoidal\n";
+      os << "Onestep: Trapezoidal\n";
       break;
     case TIAMethod_GEAR_12:
-      msg = "  Integration method = Gear 12\n";
+      os << "Gear 12\n";
       break;
     default:
-      msg = "N_TIA_WorkingIntegrationMethod::printWorkingIntegMethod  ";
-      msg += "Time Integration method not specified correctly.\n";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
+      Xyce::Report::DevelFatal() << "N_TIA_WorkingIntegrationMethod::printWorkingIntegMethod():  Time Integration method not specified correctly.\n";
       break;
   }
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg);
+  os << std::endl;
 }
-#endif
 
 //*****************************************************************************
 //************* Functions for Time Integration Method Base class  *************
@@ -296,10 +283,8 @@ double N_TIA_TimeIntegrationMethod::partialTimeDeriv()
 {
   if (sec.currentTimeStep < 1e-30) 
   {
-    string msg = 
-      "Excessively small current time step in N_TIA_TimeIntegrationMethods.h, incorrectly returning with large value";
+    Xyce::Report::UserWarning() << "Excessively small current time step, incorrectly returning with large value";
 
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING, msg);
     return (leadingCoeff * 1.e+30);
   }
   return (leadingCoeff / sec.currentTimeStep);
@@ -315,7 +300,7 @@ double N_TIA_TimeIntegrationMethod::partialTimeDeriv()
 //-----------------------------------------------------------------------------
 void N_TIA_TimeIntegrationMethod::obtainResidual()
 {
-  string msg = "N_TIA_ControlMethod::obtainResidual";
+  std::string msg = "N_TIA_ControlMethod::obtainResidual";
   msg += " The current algorithm does not have an implemented";
   msg += " obtainResidual function.\n";
   N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
@@ -371,14 +356,19 @@ bool N_TIA_TimeIntegrationMethod::printOutputSolution(
                   const double time,
                   N_LAS_Vector * solnVecPtr,
                   const bool doNotInterpolate,
-                  const vector <double> & outputInterpolationTimes,
+                  const std::vector<double> & outputInterpolationTimes,
                   bool skipPrintLineOutput )
 {
 #ifdef Xyce_DEBUG_TIME
-  cout << "Calling conventional outputs!" << endl;
+  Xyce::dout() << "Calling conventional outputs!" << std::endl;
 #endif
 
-  outputMgrAdapterRCPtr->tranOutput( time, *solnVecPtr, *ds.currStatePtr, *ds.currStorePtr, skipPrintLineOutput  );
+  outputMgrAdapterRCPtr->tranOutput( time, *solnVecPtr, 
+      *ds.currStatePtr, *ds.currStorePtr, 
+        ds.objectiveVec_, 
+        ds.dOdpVec_, ds.dOdpAdjVec_, 
+        ds.scaled_dOdpVec_, ds.scaled_dOdpAdjVec_, 
+        skipPrintLineOutput);
 
   return true;
 }

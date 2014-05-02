@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -38,9 +38,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.36.2.2 $
+// Revision Number: $Revision: 1.43 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/02/24 23:49:15 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -55,10 +55,14 @@
 #else
 #include <math.h>
 #endif
+
 #if( defined HAVE_FLOAT_H && defined HAVE__ISNAN_AND__FINITE_SUPPORT )
 #include <float.h>
 #define isnan(x) _isnan(x)
 #define isinf(x) (!_finite(x))
+#else
+using std::isnan;
+using std::isinf;
 #endif
 
 
@@ -1127,9 +1131,9 @@ int DeviceSupport::finiteNumberTest(const double x)
 // Creation Date : 4/12/06
 //-----------------------------------------------------------------------------
 void DeviceSupport::spline(
-      vector<double> & x,
-      vector<double> & y,
-      vector<double> & y2)
+      std::vector<double> & x,
+      std::vector<double> & y,
+      std::vector<double> & y2)
 {
   double p=0;
   double qn=0;
@@ -1137,7 +1141,7 @@ void DeviceSupport::spline(
   double un=0;
 
   int n = y2.size();
-  vector <double> u(n-1,0.0);
+  std::vector<double> u(n-1,0.0);
 
   // Setting the upper and lower boundary conditions to a
   // "natural boundary condition".
@@ -1172,9 +1176,9 @@ void DeviceSupport::spline(
 // Creation Date : 4/12/06
 //-----------------------------------------------------------------------------
 void DeviceSupport::splint(
-    vector<double> & xa,
-    vector<double> & ya,
-    vector<double> & y2a,
+    std::vector<double> & xa,
+    std::vector<double> & ya,
+    std::vector<double> & y2a,
     double x_position,
     double & y_spline)
 {

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -64,9 +64,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.80.2.3 $
+// Revision Number: $Revision: 1.86 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:46 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -79,12 +79,12 @@
 
 // ----------   Xyce Includes   ----------
 #include <N_UTL_Misc.h>
+#include <N_UTL_fwd.h>
 #include <N_DEV_fwd.h>
 
 // ----------   Forward Declarations  ----------
 class N_LAS_Vector;
 class N_LAS_Matrix;
-class N_UTL_BreakPoint;
 class N_TIA_TwoLevelError;
 
 //-----------------------------------------------------------------------------
@@ -190,29 +190,24 @@ public:
 //  { return false; }
 
   // Virtual function for setting the initial guess.
-  virtual bool setInitialGuess
-      (N_LAS_Vector * solVectorPtr)
+  virtual bool setInitialGuess(N_LAS_Vector * solVectorPtr)
   { return false; }
 
   // Virtual function for setting a single parameter value.
-  virtual bool setParam (string & name, double val)
-  { return false; }
+    virtual bool setParam (std::string & name, double val) = 0; //  { return false; }
 
   // Virtual function for getting a single parameter value.
-  virtual double getParam (const string & name)
-  { return 0.0; }
+    virtual double getParamAndReduce (const std::string & name) = 0; //  { return 0.0; }
+    virtual bool getParamAndReduce (const std::string & name, double & val) = 0; // { return false; }
 
-  virtual bool getParam (const string & name, double & val)
-  { return false; }
-
-  virtual bool getVsrcLIDs (string & srcName, int & li_Pos, int & li_Neg, int & li_Bra)
+  virtual bool getVsrcLIDs (std::string & srcName, int & li_Pos, int & li_Neg, int & li_Bra)
   {
     li_Pos=-1; li_Neg=-1; li_Bra=-1;
     return false;
   }
 
-  int getVoltageDropRow (string & srcName) { return -1; }
-  virtual int getVposRow (string & srcName) { return -1; }
+  int getVoltageDropRow (std::string & srcName) { return -1; }
+  virtual int getVposRow (std::string & srcName) { return -1; }
 
   // Virtual method which is called to update the sources.
   virtual bool updateSources() { return false; }
@@ -247,7 +242,7 @@ public:
   virtual bool disablePDEContinuation () {return false;}
 
   // functions related to the two-level newton:
-  virtual void getNumInterfaceNodes (vector<int> & numINodes) { return; }
+  virtual void getNumInterfaceNodes (std::vector<int> & numINodes) { return; }
   virtual bool loadCouplingRHS (int iSubProblem, int iCouple, N_LAS_Vector * dfdvPtr) { return false; }
   virtual bool calcCouplingTerms (int iSubProblem, int iCouple, const N_LAS_Vector * dxdvPtr) { return false; }
   virtual bool raiseDebugLevel (int increment){return false;}
@@ -265,7 +260,7 @@ public:
 
   // Virtual method which gets the time integration required breakpoint times
   // (in a vector).
-  virtual bool getBreakPoints(vector < N_UTL_BreakPoint > & breakPointTimes)
+  virtual bool getBreakPoints(std::vector< N_UTL_BreakPoint > & breakPointTimes)
   { return false; }
 
   // Virtual accessor which returns the maximum time step size (in seconds).
@@ -282,8 +277,8 @@ public:
 
   // Functions needed by the NEW (power node) 2-level algorithm:
   virtual void homotopyStepSuccess
-    (const vector<string> & paramNames,
-     const vector<double> & paramVals) {};
+    (const std::vector<std::string> & paramNames,
+     const std::vector<double> & paramVals) {};
 
   virtual void homotopyStepFailure () {};
 
@@ -295,9 +290,9 @@ public:
   // tinkering with times or vectors
   virtual void acceptStep() {};
 
-  virtual bool getInitialQnorm (vector<N_TIA_TwoLevelError> & tleVec )
+  virtual bool getInitialQnorm (std::vector<N_TIA_TwoLevelError> & tleVec )
   {return false;}
-  virtual bool getInnerLoopErrorSums (vector<N_TIA_TwoLevelError> & tleVec )
+  virtual bool getInnerLoopErrorSums (std::vector<N_TIA_TwoLevelError> & tleVec )
   {return false;};
 
   virtual bool updateStateArrays () {return true;}

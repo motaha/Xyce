@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -42,9 +42,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.3.2.3 $
+// Revision Number: $Revision: 1.10 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/02/24 23:49:15 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -55,6 +55,7 @@
 
 // Standard includes
 #include <N_UTL_Misc.h>
+#include <N_UTL_fwd.h>
 
 #include <vector>
 #include <cmath>
@@ -63,8 +64,6 @@
 #include <iostream>
 
 #endif
-
-using namespace std;
 
 // Xyce includes
 #include <N_DEV_Reaction.h>
@@ -102,8 +101,8 @@ Reaction::Reaction()
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 3/20/06
 //-----------------------------------------------------------------------------
-Reaction::Reaction(vector< pair<int,double> > & reactants,
-                   vector< pair<int,double> > & products,
+Reaction::Reaction(std::vector< std::pair<int,double> > & reactants,
+                   std::vector< std::pair<int,double> > & products,
                    double rateConstant)
   :
   theReactants(reactants),
@@ -167,7 +166,7 @@ Reaction::operator=(Reaction const & right)
   if (this == &right) return *this;    // assignment to self
 
 #ifdef Xyce_DEBUG_DEVICE
-  cout << "We're doing an assignment of reaction! " << endl;
+  Xyce::dout() << "We're doing an assignment of reaction! " << std::endl;
 #endif
 
   // otherwise:
@@ -221,7 +220,7 @@ Reaction::~Reaction()
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 3/20/06
 //-----------------------------------------------------------------------------
-void Reaction::setReactants(vector< pair<int,double> > & reactants)
+void Reaction::setReactants(std::vector< std::pair<int,double> > & reactants)
 {
   theReactants=reactants;
 }
@@ -236,8 +235,8 @@ void Reaction::setReactants(vector< pair<int,double> > & reactants)
 //-----------------------------------------------------------------------------
 void Reaction::addReactant(int species,double stoich)
 {
-  vector<pair<int,double> >::iterator iter;
-  vector<pair<int,double> >::iterator iter_end=theReactants.end();
+  std::vector<std::pair<int,double> >::iterator iter;
+  std::vector<std::pair<int,double> >::iterator iter_end=theReactants.end();
   bool foundSpecies=false;
 
   // Make sure we only have each that appears on the LHS of a reaction
@@ -255,7 +254,7 @@ void Reaction::addReactant(int species,double stoich)
   // Only if we didn't find the species in our existing list should we
   // add a new entry to the vector.
   if (!foundSpecies)
-    theReactants.push_back(pair<int,double>(species,stoich));
+    theReactants.push_back(std::pair<int,double>(species,stoich));
 }
 
 
@@ -269,8 +268,8 @@ void Reaction::addReactant(int species,double stoich)
 //-----------------------------------------------------------------------------
 void Reaction::addProduct(int species,double stoich)
 {
-  vector<pair<int,double> >::iterator iter;
-  vector<pair<int,double> >::iterator iter_end=theProducts.end();
+  std::vector<std::pair<int,double> >::iterator iter;
+  std::vector<std::pair<int,double> >::iterator iter_end=theProducts.end();
   bool foundSpecies=false;
 
   // Make sure we only have each that appears on the RHS of a reaction
@@ -288,7 +287,7 @@ void Reaction::addProduct(int species,double stoich)
   // Only if we didn't find the species in our existing list should we
   // add a new entry to the vector.
   if (!foundSpecies)
-    theProducts.push_back(pair<int,double>(species,stoich));
+    theProducts.push_back(std::pair<int,double>(species,stoich));
 }
 
 //-----------------------------------------------------------------------------
@@ -299,7 +298,7 @@ void Reaction::addProduct(int species,double stoich)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 3/20/06
 //-----------------------------------------------------------------------------
-void Reaction::setProducts(vector< pair<int,double> > & products)
+void Reaction::setProducts(std::vector< std::pair<int,double> > & products)
 {
   theProducts=products;
 }
@@ -322,8 +321,8 @@ void Reaction::setProducts(vector< pair<int,double> > & products)
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 3/20/06
 //-----------------------------------------------------------------------------
-double Reaction::getRate(vector<double> &concentrations,
-                                    vector<double> &constants)
+double Reaction::getRate(std::vector<double> &concentrations,
+                                    std::vector<double> &constants)
 {
   int rSize=theReactants.size();
   int pSize=theProducts.size();
@@ -372,9 +371,9 @@ double Reaction::getRate(vector<double> &concentrations,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 9/13/06
 //-----------------------------------------------------------------------------
-void Reaction::getDRateDC(vector<double> &concentrations,
-                                     vector<double> &constants,
-                                     vector<double> &dratedc)
+void Reaction::getDRateDC(std::vector<double> &concentrations,
+                                     std::vector<double> &constants,
+                                     std::vector<double> &dratedc)
 {
   int cSize=concentrations.size();
   int rSize=theReactants.size();
@@ -469,8 +468,8 @@ void Reaction::getDRateDC(vector<double> &concentrations,
 // Creation Date : 10/17/06
 //-----------------------------------------------------------------------------
 void Reaction::getDRateDConst(int constNum,
-                                         vector<double> &concentrations,
-                                         vector<double> &constants,
+                                         std::vector<double> &concentrations,
+                                         std::vector<double> &constants,
                                          double &dratedc)
 {
   int cSize=constants.size();
@@ -549,9 +548,9 @@ void Reaction::getDRateDConst(int constNum,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 3/20/06
 //-----------------------------------------------------------------------------
-void Reaction::getDdt(vector<double> &concentrations,
-                      vector<double> &constants,
-                      vector<double> &ddt)
+void Reaction::getDdt(std::vector<double> &concentrations,
+                      std::vector<double> &constants,
+                      std::vector<double> &ddt)
 {
   int rSize=theReactants.size();
   int pSize=theProducts.size();
@@ -611,16 +610,16 @@ void Reaction::getDdt(vector<double> &concentrations,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 3/20/06
 //-----------------------------------------------------------------------------
-void Reaction::getJac(vector<double> &concentrations,
-                      vector<double> &constants,
-                      vector<vector<double> > &jac)
+void Reaction::getJac(std::vector<double> &concentrations,
+                      std::vector<double> &constants,
+                      std::vector<std::vector<double> > &jac)
 {
   int cSize=concentrations.size();
   int rSize=theReactants.size();
   int pSize=theProducts.size();
   int species;
   double stoich,c;
-  vector<double> dratedc(cSize,0.0);
+  std::vector<double> dratedc(cSize,0.0);
   int i,j;
 
   // here is where the assumption of static species numbering is coded.
@@ -696,9 +695,9 @@ void Reaction::getJac(vector<double> &concentrations,
 // Creation Date : 3/20/06
 //-----------------------------------------------------------------------------
 void Reaction::getDFdConst(int constantNumber,
-                                      vector<double> &concentrations,
-                                      vector<double> &constants,
-                                      vector<double> &dFdConst)
+                                      std::vector<double> &concentrations,
+                                      std::vector<double> &constants,
+                                      std::vector<double> &dFdConst)
 {
   int constSize=constants.size();
   int rSize=theReactants.size();
@@ -818,8 +817,8 @@ void Reaction::setEmissionRateCalculator(double sigma, double v,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/01/06
 //-----------------------------------------------------------------------------
-void Reaction::setComplexRateCalculator(vector<N_DEV::Specie> &V,
-                                              vector<N_DEV::Specie> &C,
+void Reaction::setComplexRateCalculator(std::vector<Specie> &V,
+                                              std::vector<Specie> &C,
                                               double C0, double t0, double x0)
 {
   if (myRateCalc) // we already have a calculator set
@@ -841,8 +840,8 @@ void Reaction::setComplexRateCalculator(vector<N_DEV::Specie> &V,
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 8/01/06
 //-----------------------------------------------------------------------------
-void Reaction::setDecomplexRateCalculator(vector<N_DEV::Specie> &V,
-                                              vector<N_DEV::Specie> &C,
+void Reaction::setDecomplexRateCalculator(std::vector<Specie> &V,
+                                              std::vector<Specie> &C,
                                               double bindingEnergy,
                                               double gammaAB, double gammaA,
                                               double gammaB, double concSi,
@@ -980,7 +979,7 @@ void Reaction::setConstDependency(int cSize)
 // Creation Date : 5/27/06
 //-----------------------------------------------------------------------------
 void Reaction::output
-  ( const vector<N_DEV::Specie> & species, ostream & os ) const
+  ( const std::vector<Specie> & species, std::ostream & os ) const
 {
   int i=0;
   int isize = theReactants.size();
@@ -995,7 +994,7 @@ void Reaction::output
       double tmp = theReactants[i].second;
       if (tmp > 1.0)
         os << " "<<tmp<< " * ";
-      os.setf(ios::right); os.width(3);
+      os.setf(std::ios::right); os.width(3);
       os << species[speciesIndex].getName();
 
       firstPrintDone = true;
@@ -1014,7 +1013,7 @@ void Reaction::output
       double tmp = theProducts[i].second;
       if (tmp > 1.0)
         os << " " << tmp << " * ";
-      os.setf(ios::right); os.width(3);
+      os.setf(std::ios::right); os.width(3);
 
       os << species[speciesIndex].getName();
       firstPrintDone = true;
@@ -1022,17 +1021,17 @@ void Reaction::output
   }
 
   os << "    Rate Constant: ";
-  os.precision(8); os.setf(ios::scientific);
+  os.precision(8); os.setf(std::ios::scientific);
   os << theRateConstant;
 
 #if 0
   os << "\n       Dependencies:\n";
   for (int j=0;j<concDependency.size();++j)
   {
-    os << " " << species[j].getName() << " = " << concDependency[j] << endl;
+    os << " " << species[j].getName() << " = " << concDependency[j] << std::endl;
   }
 #endif
-  os << endl;
+  os << std::endl;
 
 }
 

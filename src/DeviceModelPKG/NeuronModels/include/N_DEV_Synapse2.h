@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.10.2.1 $
+// Revision Number: $Revision: 1.25.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:33 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -47,10 +47,13 @@
 #define Xyce_N_DEV_Synapse2_h
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_DeviceTemplate.h>
+#include <N_DEV_Configuration.h>
+#include <N_DEV_DeviceMaster.h>
 #include <N_DEV_DeviceBlock.h>
 #include <N_DEV_DeviceInstance.h>
 #include <N_DEV_DeviceModel.h>
+
+#include <N_DEV_Synapse.h>
 
 #include <Sacado.hpp>
 
@@ -58,9 +61,20 @@ namespace Xyce {
 namespace Device {
 namespace Synapse2 {
 
-// ---------- Forward Declarations -------
 class Model;
 class Instance;
+
+struct Traits : public DeviceTraits<Model, Instance, Synapse::Traits>
+{
+  static const char *name() {return "Synapse";}
+  static const char *deviceTypeName() {return "YSYNAPSE level 2";}
+  static const int numNodes() {return 2;}
+  static const bool isLinearDevice() {return true;}
+
+  static Device *factory(const Configuration &configuration, const FactoryBlock &factory_block);
+  static void loadModelParameters(ParametricData<Model> &model_parameters);
+  static void loadInstanceParameters(ParametricData<Instance> &instance_parameters);
+};
 
 //-----------------------------------------------------------------------------
 // Class         : Instance
@@ -87,94 +101,89 @@ class Instance;
 //-----------------------------------------------------------------------------
 class Instance : public DeviceInstance
 {
-    friend class ParametricData<Instance>;
-    friend class Model;
-    friend class Master;
+  friend class ParametricData<Instance>;
+  friend class Model;
+  friend class Traits;friend class Master;
 
-  public:
-    static vector< vector<int> > jacStamp;
-    static ParametricData<Instance> &getParametricData();
+public:
+  static std::vector< std::vector<int> > jacStamp;
 
-    virtual const ParametricData<void> &getMyParametricData() const {
-      return getParametricData();
-    }
+  Instance(
+     const Configuration &       configuration,
+     const InstanceBlock &     IB,
+     Model &                   Riter,
+     const FactoryBlock &      factory_block);
 
-    Instance(InstanceBlock & IB,
-             Model & Riter,
-             MatrixLoadData & mlData1,
-             SolverState &ss1,
-             ExternData  &ed1,
-             DeviceOptions & do1);
+  ~Instance();
 
-    ~Instance();
+private:
+  Instance(const Instance &);
+  Instance &operator=(const Instance &);
 
-  private:
-    Instance(const Instance &);
-    Instance &operator=(const Instance &);
+public:
+  void registerLIDs( const std::vector<int> & intLIDVecRef,
+                     const std::vector<int> & extLIDVecRef );
+  void registerStateLIDs( const std::vector<int> & staLIDVecRef );
+  std::map<int,std::string> & getIntNameMap ();
 
-  public:
-    void registerLIDs( const vector<int> & intLIDVecRef,
-                       const vector<int> & extLIDVecRef );
-    void registerStateLIDs( const vector<int> & staLIDVecRef );
-    map<int,string> & getIntNameMap ();
+  bool processParams ();
 
-    bool processParams (string param = "");
+  bool updateTemperature(const double & temp_tmp);
 
-    bool updateTemperature(const double & temp_tmp);
+  bool updateIntermediateVars ();
+  bool updatePrimaryState ();
+  bool updateSecondaryState ();
 
-    bool updateIntermediateVars ();
-    bool updatePrimaryState ();
-    bool updateSecondaryState ();
+  const std::vector< std::vector<int> > & jacobianStamp() const;
+  void registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec );
 
-    const vector< vector<int> > & jacobianStamp() const;
-    void registerJacLIDs( const vector< vector<int> > & jacLIDVec );
+  // load functions, residual:
+  bool loadDAEQVector ();
+  bool loadDAEFVector ();
 
-    // load functions, residual:
-    bool loadDAEQVector ();
-    bool loadDAEFVector ();
+  // load functions, Jacobian:
+  bool loadDAEdQdx ();
+  bool loadDAEdFdx ();
 
-    // load functions, Jacobian:
-    bool loadDAEdQdx ();
-    bool loadDAEdFdx ();
+  void setupPointers();
 
-    void setupPointers();
+  Model &getModel() 
+  {
+    return model_;
+  }
 
-    Model &getModel() {
-      return model_;
-    }
+private:
 
-  private:
+  Model &       model_;         //< Owning model
 
-    Model &       model_;         //< Owning model
-
-    // user-specified paramters:
+  // user-specified paramters:
 
 
-    //Vector local index for Positive Node
-    int li_Prev;
-    //Vector local index for Negative Node
-    int li_Post;
-    int li_rVar;
+  //Vector local index for Positive Node
+  int li_Prev;
+  //Vector local index for Negative Node
+  int li_Post;
+  int li_rVar;
 
-    // Offset variables corresponding to the above declared indices.
-    int APostEquPostNodeOffset;
-    int APostEquRNodeOffset;
-    int AREquPostNodeOffset;
-    int AREquRNodeOffset;
+  // Offset variables corresponding to the above declared indices.
+  int APostEquPostNodeOffset;
+  int APostEquRNodeOffset;
+  int AREquPostNodeOffset;
+  int AREquRNodeOffset;
 
-    // Pointers for Jacobian
-    double *f_PostEquPostNodePtr;
-    double *f_PostEquRNodePtr;
-    double *f_REquPostNodePtr;
-    double *f_REquRNodePtr;
+  // Pointers for Jacobian
+  double *f_PostEquPostNodePtr;
+  double *f_PostEquRNodePtr;
+  double *f_REquPostNodePtr;
+  double *f_REquRNodePtr;
 
-    // vars used for load calculations
-    double ipost;  // post Synapse2 current
-    double didVpost;
-    double didr;
-    double rFval;
-    double drFdVpre;
-    double drFdr;
+  // vars used for load calculations
+  double ipost;  // post Synapse2 current
+  double didVpost;
+  double didr;
+  double rFval;
+  double drFdVpre;
+  double drFdr;
 };
 
 //-----------------------------------------------------------------------------
@@ -188,58 +197,62 @@ class Instance : public DeviceInstance
 //-----------------------------------------------------------------------------
 class Model : public DeviceModel
 {
-    typedef std::vector<Instance *> InstanceVector;
+  typedef std::vector<Instance *> InstanceVector;
 
-    friend class ParametricData<Model>;
-    friend class Instance;
-    friend class Master;
+  friend class ParametricData<Model>;
+  friend class Instance;
+  friend class Traits;friend class Master;
 
-  public:
-    static ParametricData<Model> &getParametricData();
+public:
+  Model(
+     const Configuration &       configuration,
+     const ModelBlock &        MB,
+     const FactoryBlock &      factory_block);
+  ~Model();
 
-    virtual const ParametricData<void> &getMyParametricData() const {
-      return getParametricData();
-    }
+private:
+  Model();
+  Model(const Model &);
+  Model &operator=(const Model &);
 
-    Model(const ModelBlock & MB,
-          SolverState & ss1,
-          DeviceOptions & do1);
-    ~Model();
+public:
+  virtual void forEachInstance(DeviceInstanceOp &op) const /* override */;
 
-  private:
-    Model();
-    Model(const Model &);
-    Model &operator=(const Model &);
+  virtual std::ostream &printOutInstances(std::ostream &os) const;
 
-  public:
-    virtual std::ostream &printOutInstances(std::ostream &os) const;
-
-    bool processParams (string param = "");
-    bool processInstanceParams (string param = "");
+  bool processParams ();
+  bool processInstanceParams ();
 
 
-  public:
-    InstanceVector &getInstanceVector() {
-      return instanceContainer;
-    }
+public:
+  void addInstance(Instance *instance) 
+  {
+    instanceContainer.push_back(instance);
+  }
 
-    const InstanceVector &getInstanceVector() const {
-      return instanceContainer;
-    }
+  InstanceVector &getInstanceVector() 
+  {
+    return instanceContainer;
+  }
 
-  private:
-    vector<Instance*> instanceContainer;
+  const InstanceVector &getInstanceVector() const 
+  {
+    return instanceContainer;
+  }
 
-  private:
+private:
+  std::vector<Instance*> instanceContainer;
 
-    // Synapse2 parameters
-    double gMax;
-    double eRev;
-    double alpha;
-    double beta;
-    double vP;
-    double kP;
-    double tMax;
+private:
+
+  // Synapse2 parameters
+  double gMax;
+  double eRev;
+  double alpha;
+  double beta;
+  double vP;
+  double kP;
+  double tMax;
 };
 
 //-----------------------------------------------------------------------------
@@ -249,25 +262,22 @@ class Model : public DeviceModel
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 11/26/08
 //-----------------------------------------------------------------------------
-class Master : public Xyce::Device::DeviceTemplate<Model, Instance>
+class Master : public DeviceMaster<Traits>
 {
-  public:
-    Master (
-      const string dn,
-      const string cn,
-      const string dmName,
-      LinearDevice        linearDev,
-      SolverState & ss1,
-      DeviceOptions & do1)
-      : Xyce::Device::DeviceTemplate<Model, Instance>(
-        dn, cn, dmName, linearDev, ss1, do1)
-    {}
+  friend class Instance;
+  friend class Model;
 
-    virtual bool updateState (double * solVec, double * staVec, double * stoVec);
-    virtual bool updateSecondaryState (double * staDeriv, double * stoVec);
+public:
+  Master(
+     const Configuration &       configuration,
+     const FactoryBlock &      factory_block,
+     const SolverState & ss1,
+     const DeviceOptions & do1)
+    : DeviceMaster<Traits>(configuration, factory_block, ss1, do1)
+  {}
 
-    friend class Instance;
-    friend class Model;
+  virtual bool updateState (double * solVec, double * staVec, double * stoVec);
+  virtual bool updateSecondaryState (double * staDeriv, double * stoVec);
 };
 
 
@@ -298,6 +308,8 @@ static ScalarT rEquF( const ScalarT V, const ScalarT r, const ScalarT alpha, con
   }
   return result;
 }
+
+void registerDevice();
 
 } // namespace Synapse2
 } // namespace Device

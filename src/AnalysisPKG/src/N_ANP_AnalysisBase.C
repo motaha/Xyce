@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,56 +31,55 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.19.2.3 $
-// Revision Date  : $Date: 2013/10/03 17:23:31 $
+// Revision Number: $Revision: 1.35 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 #include <Xyce_config.h>
 
-// ---------- Standard Includes ----------
+#include <N_ANP_AnalysisBase.h>
 
-// ----------   Xyce Includes   ----------
-#include<N_ANP_AnalysisManager.h>
-#include<N_ANP_AnalysisBase.h>
-#include<N_ERH_ErrorMgr.h>
+#include <N_ANP_AnalysisManager.h>
+#include <N_ERH_Message.h>
 
-#include <N_TIA_MachDepParams.h>
+namespace Xyce {
+namespace Analysis {
+
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::N_ANP_AnalysisBase
+// Function      : AnalysisBase::AnalysisBase
 // Purpose       : Constructor
 // Special Notes : 
 // Scope         : public
 // Creator       : Todd S. Coffey, SNL.
 // Creation Date : 01/29/08
 //-----------------------------------------------------------------------------
-N_ANP_AnalysisBase::N_ANP_AnalysisBase( N_ANP_AnalysisManager * anaManagerPtr )
+AnalysisBase::AnalysisBase( AnalysisManager * anaManagerPtr )
   : tiaParams(anaManagerPtr->tiaParams),
-  commandLine_(anaManagerPtr->commandLine_),
-  beginningIntegration(true),
-  integrationMethod_(TIAMethod_NONE),
-  stepNumber(0),
-  tranStepNumber(0),
-  totalNumberSuccessfulStepsTaken_(0),
-  totalNumberSuccessStepsThisParameter_(0),
-  totalNumberFailedStepsAttempted_(0),
-  totalNumberJacobiansEvaluated_(0),
-  totalNumberIterationMatrixFactorizations_(0),
-  totalNumberLinearSolves_(0),
-  totalNumberFailedLinearSolves_(0),
-  totalNumberLinearIters_(0),
-  totalNumberResidualEvaluations_(0),
-  totalNonlinearConvergenceFailures_(0),
-  totalLinearSolutionTime_(0.0),
-  totalResidualLoadTime_(0.0),
-  totalJacobianLoadTime_(0.0),
-  doubleDCOPFlag_(false),
-  doubleDCOPStep_(0),
-  sensFlag_(false),
-  inputOPFlag_(false)
+    beginningIntegration(true),
+    integrationMethod_(TIAMethod_NONE),
+    stepNumber(0),
+    tranStepNumber(0),
+    totalNumberSuccessfulStepsTaken_(0),
+    totalNumberSuccessStepsThisParameter_(0),
+    totalNumberFailedStepsAttempted_(0),
+    totalNumberJacobiansEvaluated_(0),
+    totalNumberIterationMatrixFactorizations_(0),
+    totalNumberLinearSolves_(0),
+    totalNumberFailedLinearSolves_(0),
+    totalNumberLinearIters_(0),
+    totalNumberResidualEvaluations_(0),
+    totalNonlinearConvergenceFailures_(0),
+    totalLinearSolutionTime_(0.0),
+    totalResidualLoadTime_(0.0),
+    totalJacobianLoadTime_(0.0),
+    doubleDCOPFlag_(false),
+    doubleDCOPStep_(0),
+    sensFlag_(false),
+    inputOPFlag_(false),
+    commandLine_(anaManagerPtr->getCommandLine())
 {
   anaManagerRCPtr_ = rcp(anaManagerPtr, false );
   assemblerRCPtr_ = anaManagerPtr->assemblerPtr;
-  dsRCPtr_ = anaManagerPtr->dsPtr_;
   lasSystemRCPtr_ = anaManagerPtr->lasSysPtr;
   loaderRCPtr_ = anaManagerPtr->loaderPtr;
   nlsMgrRCPtr_ = anaManagerPtr->nlsMgrPtr;
@@ -90,214 +89,31 @@ N_ANP_AnalysisBase::N_ANP_AnalysisBase( N_ANP_AnalysisManager * anaManagerPtr )
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::~N_ANP_AnalysisBase()
+// Function      : AnalysisBase::~AnalysisBase()
 // Purpose       : destructor
 // Special Notes : 
 // Scope         : 
 // Creator       : Todd S. Coffey, SNL.
 // Creation Date : 01/29/08
 //-----------------------------------------------------------------------------
-N_ANP_AnalysisBase::~N_ANP_AnalysisBase()
+AnalysisBase::~AnalysisBase()
 {
 }
 
-//-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::run
-// Purpose       : Run an analysis
-// Special Notes : 
-// Scope         : public
-// Creator       : Todd S. Coffey, SNL.
-// Creation Date : 01/29/08
-//-----------------------------------------------------------------------------
-bool N_ANP_AnalysisBase::run() 
-{ 
-  string msg = "N_ANP_AnalaysisBase::run:  ";
-  msg += "This virtual fuction must be redefined by the derived class!";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-  return false; 
-}
-
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::init
-// Purpose       : Initialize an analysis
-// Special Notes : 
-// Scope         : public
-// Creator       : Todd S. Coffey, SNL.
-// Creation Date : 01/29/08
-//-----------------------------------------------------------------------------
-bool N_ANP_AnalysisBase::init() 
-{ 
-  string msg = "N_ANP_AnalaysisBase::init:  ";
-  msg += "This virtual fuction must be redefined by the derived class!";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-  return false; 
-}
-
-
-//-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::loopProcess()
-// Purpose       : loop in an analysis
-// Special Notes : 
-// Scope         : public
-// Creator       : Todd S. Coffey, SNL.
-// Creation Date : 01/29/08
-//-----------------------------------------------------------------------------
-bool N_ANP_AnalysisBase::loopProcess() 
-{ 
-  string msg = "N_ANP_AnalaysisBase::loopProcess:  ";
-  msg += "This virtual fuction must be redefined by the derived class!";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-  return false; 
-}
-
-
-//-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::processSuccessfulStep()
-// Purpose       : Processes a good step
-// Special Notes : 
-// Scope         : public
-// Creator       : Todd S. Coffey, SNL.
-// Creation Date : 01/29/08
-//-----------------------------------------------------------------------------
-bool N_ANP_AnalysisBase::processSuccessfulStep() 
-{ 
-  string msg = "N_ANP_AnalaysisBase::processSuccessfulStep:  ";
-  msg += "This virtual fuction must be redefined by the derived class!";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-  return false; 
-}
-
-
-//-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::processFailedStep()
-// Purpose       : Processes a failed step
-// Special Notes : 
-// Scope         : public
-// Creator       : Todd S. Coffey, SNL.
-// Creation Date : 01/29/08
-//-----------------------------------------------------------------------------
-bool N_ANP_AnalysisBase::processFailedStep() 
-{ 
-  string msg = "N_ANP_AnalaysisBase::processFailedStep:  ";
-  msg += "This virtual fuction must be redefined by the derived class!";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-  return false; 
-}
-
-
-//-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::finish()
-// Purpose       : finish an analysis
-// Special Notes : 
-// Scope         : public
-// Creator       : Todd S. Coffey, SNL.
-// Creation Date : 01/29/08
-//-----------------------------------------------------------------------------
-bool N_ANP_AnalysisBase::finish() 
-{ 
-  string msg = "N_ANP_AnalaysisBase::finish:  ";
-  msg += "This virtual fuction must be redefined by the derived class!";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-  return false; 
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::handlePredictor ()
-// Purpose       : 
-// Special Notes : 
-// Scope         : public
-// Creator       : Eric R. Keiter, SNL.
-// Creation Date : 06/24/2013
-//-----------------------------------------------------------------------------
-bool N_ANP_AnalysisBase::handlePredictor () 
-{ 
-  string msg = "N_ANP_AnalaysisBase::handlePredictor :  ";
-  msg += "This virtual fuction must be redefined by the derived class!";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-  return false; 
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::preStepDetails
-// Purpose       : 
-// Special Notes : 
-// Scope         : public
-// Creator       : Eric Keiter, SNL
-// Creation Date : 03/04/09
-//-----------------------------------------------------------------------------
-void N_ANP_AnalysisBase::preStepDetails (double maxTimeStepFromHabanero) 
-{ 
-  string msg = "N_ANP_AnalaysisBase::preStepDetails:  ";
-  msg += "This virtual fuction must be redefined by the derived class!";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::mixedSignalStep
-// Purpose       : 
-// Special Notes : 
-// Scope         : public
-// Creator       : Eric Keiter, SNL
-// Creation Date : 03/04/09
-//-----------------------------------------------------------------------------
-bool N_ANP_AnalysisBase::mixedSignalStep() 
-{ 
-  string msg = "N_ANP_AnalaysisBase::mixedSignalStep:  ";
-  msg += "This virtual fuction must be redefined by the derived class!";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-  return false; 
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::finalizeStep
-// Purpose       : 
-// Special Notes : 
-// Scope         : public
-// Creator       : Eric Keiter, SNL
-// Creation Date : 03/04/09
-//-----------------------------------------------------------------------------
-bool N_ANP_AnalysisBase::finalizeStep ()
-{ 
-  string msg = "N_ANP_AnalaysisBase::finalizeStep:  ";
-  msg += "This virtual fuction must be redefined by the derived class!";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-  return false; 
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::twoLevelStep
-// Purpose       : 
-// Special Notes : 
-// Scope         : public
-// Creator       : Eric Keiter, SNL
-// Creation Date : 
-//-----------------------------------------------------------------------------
-bool N_ANP_AnalysisBase::twoLevelStep() 
-{ 
-  string msg = "N_ANP_AnalaysisBase::twoLevelStep:  ";
-  msg += "This virtual fuction must be redefined by the derived class!";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-  return false; 
-}
-
-//-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::printStepHeader()
+// Function      : AnalysisBase::printStepHeader()
 // Purpose       : Prints out step information.
 // Special Notes : 
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/26/00
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisBase::printStepHeader() 
-{ 
-  string msg = "N_ANP_AnalaysisBase::printStepHeader:  ";
-  msg += "This virtual fuction must be redefined by the derived class!";
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-}
+void AnalysisBase::printStepHeader(std::ostream &os) 
+{}
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::printProgress()
+// Function      : AnalysisBase::printProgress()
 // Purpose       : Outputs run completion percentage and estimated
 //                 time-to-completion.
 // Special Notes : 
@@ -305,12 +121,11 @@ void N_ANP_AnalysisBase::printStepHeader()
 // Creator       : Scott A. Hutchinson, SNL, Computational Sciences
 // Creation Date : 06/07/2002
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisBase::printProgress() 
-{ 
-}
+void AnalysisBase::printProgress(std::ostream &os) 
+{}
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::resetForStepAnalysis() 
+// Function      : AnalysisBase::resetForStepAnalysis() 
 // Purpose       : When doing a .STEP sweep, some data must be reset to its 
 //                 initial state.
 // Special Notes :
@@ -318,7 +133,7 @@ void N_ANP_AnalysisBase::printProgress()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 8/26/04
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisBase::resetForStepAnalysis()
+bool AnalysisBase::resetForStepAnalysis()
 {
   totalNumberSuccessStepsThisParameter_ = 0;
   stepNumber = 0;
@@ -329,14 +144,14 @@ bool N_ANP_AnalysisBase::resetForStepAnalysis()
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::setupSweepLoop
+// Function      : AnalysisBase::setupSweepLoop
 // Purpose       : Processes sweep parameters.
 // Special Notes : Used for DC and STEP analysis classes.
 // Scope         : public
 // Creator       : Eric R. Keiter, SNL.
 // Creation Date : 08/21/04
 //-----------------------------------------------------------------------------
-int N_ANP_AnalysisBase::setupSweepLoop_( vector <N_ANP_SweepParam> & sweepParamVec )
+int AnalysisBase::setupSweepLoop_( std::vector<SweepParam> & sweepParamVec )
 {
   double pinterval = 1.0;
   double pcount = 0.0, pstart, pstop, pstep;
@@ -346,16 +161,16 @@ int N_ANP_AnalysisBase::setupSweepLoop_( vector <N_ANP_SweepParam> & sweepParamV
   double tmp = 0.0;
   for (int iparam=0;iparam<(int)sweepParamVec.size();++iparam)
   {
-    tmp = loaderRCPtr_->getParam (sweepParamVec[iparam].name);
+    tmp = loaderRCPtr_->getParamAndReduce(sweepParamVec[iparam].name);
   }
 
 
 #ifdef Xyce_DEBUG_ANALYSIS
   if (anaManagerRCPtr_->tiaParams.debugLevel > 0)
   {
-    cout << endl << endl;
-    cout << "-----------------" << endl;
-    cout << "N_ANP_AnalysisManager::setupSweepLoop" << endl;
+    Xyce::dout() << std::endl << std::endl
+                 << Xyce::subsection_divider << std::endl
+                 << "AnalysisManager::setupSweepLoop" << std::endl;
   }
 #endif
 
@@ -365,13 +180,13 @@ int N_ANP_AnalysisBase::setupSweepLoop_( vector <N_ANP_SweepParam> & sweepParamV
 #ifdef Xyce_DEBUG_ANALYSIS
     if (anaManagerRCPtr_->tiaParams.debugLevel > 0)
     {
-      cout << "name = " << sweepParamVec[iparam].name << endl;
+      Xyce::dout() << "name = " << sweepParamVec[iparam].name << std::endl;
     }
 #endif
     // set interval:
     sweepParamVec[iparam].interval = static_cast<int> (pinterval);
 
-    // This stuff should probably be moved up into the N_ANP_SweepParam class.
+    // This stuff should probably be moved up into the SweepParam class.
 
     // obtain next pinterval:
     if (sweepParamVec[iparam].type=="LIN")
@@ -419,13 +234,13 @@ int N_ANP_AnalysisBase::setupSweepLoop_( vector <N_ANP_SweepParam> & sweepParamV
 #ifdef Xyce_DEBUG_ANALYSIS
       if (anaManagerRCPtr_->tiaParams.debugLevel > 0)
       {
-        cout << "pstart  = " << pstart << endl;
-        cout << "pstop   = " << pstop  << endl;
-        cout << "pstep   = " << pstep  << endl;
-        cout << "pstop-pstart/pstep = " << ((pstop - pstart)/pstep) << endl;
-        cout << "floor ()= " << floor(((pstop - pstart)/pstep)+1.0) << endl;
-        cout << "pcount  = " << pcount << endl;
-        cout << "maxStep = " << sweepParamVec[iparam].maxStep << endl;
+        Xyce::dout() << "pstart  = " << pstart << std::endl;
+        Xyce::dout() << "pstop   = " << pstop  << std::endl;
+        Xyce::dout() << "pstep   = " << pstep  << std::endl;
+        Xyce::dout() << "pstop-pstart/pstep = " << ((pstop - pstart)/pstep) << std::endl;
+        Xyce::dout() << "floor ()= " << floor(((pstop - pstart)/pstep)+1.0) << std::endl;
+        Xyce::dout() << "pcount  = " << pcount << std::endl;
+        Xyce::dout() << "maxStep = " << sweepParamVec[iparam].maxStep << std::endl;
       }
 #endif
     }
@@ -465,19 +280,16 @@ int N_ANP_AnalysisBase::setupSweepLoop_( vector <N_ANP_SweepParam> & sweepParamV
     }
     else
     {
-      string msg=
-        "N_ANP_AnalysisManager::setupSweepLoop: unsupported STEP type";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL_0, msg);
-
+      Report::UserError0() << " Unsupported STEP type";
     }
     pinterval *= pcount;
 
 #ifdef Xyce_DEBUG_ANALYSIS
     if (anaManagerRCPtr_->tiaParams.debugLevel > 0)
     {
-      cout << "parameter = " << sweepParamVec[iparam].name << endl;
-      cout << "pcount    = " << pcount << endl;
-      cout << "pinterval = " << pinterval << endl;
+      Xyce::dout() << "parameter = " << sweepParamVec[iparam].name << std::endl;
+      Xyce::dout() << "pcount    = " << pcount << std::endl;
+      Xyce::dout() << "pinterval = " << pinterval << std::endl;
     }
 #endif
   }
@@ -488,19 +300,19 @@ int N_ANP_AnalysisBase::setupSweepLoop_( vector <N_ANP_SweepParam> & sweepParamV
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::updateSweepParams_ 
+// Function      : AnalysisBase::updateSweepParams_ 
 // Purpose       : Update parameters either for DC or STEP sweeps
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 8/26/04
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisBase::updateSweepParams_ 
-  (int loopIter, vector <N_ANP_SweepParam> & sweepParamVec)
+bool AnalysisBase::updateSweepParams_ 
+  (int loopIter, std::vector<SweepParam> & sweepParamVec)
 {
-  vector <N_ANP_SweepParam>::iterator iterParam;
-  vector <N_ANP_SweepParam>::iterator firstParam = sweepParamVec.begin();
-  vector <N_ANP_SweepParam>::iterator lastParam = sweepParamVec.end ();
+  std::vector<SweepParam>::iterator iterParam;
+  std::vector<SweepParam>::iterator firstParam = sweepParamVec.begin();
+  std::vector<SweepParam>::iterator lastParam = sweepParamVec.end ();
   bool resetFlag=false;
 
   // set parameter(s)
@@ -519,14 +331,14 @@ bool N_ANP_AnalysisBase::updateSweepParams_
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::resetAll
+// Function      : AnalysisBase::resetAll
 // Purpose       : 
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter
 // Creation Date : 12/16/10
 //-----------------------------------------------------------------------------
-void N_ANP_AnalysisBase::resetAll()
+void AnalysisBase::resetAll()
 {
   stepNumber = 0;
   tranStepNumber = 0;
@@ -547,14 +359,14 @@ void N_ANP_AnalysisBase::resetAll()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::saveLoopInfo
+// Function      : AnalysisBase::saveLoopInfo
 // Purpose       : 
 // Special Notes :
 // Scope         : public
 // Creator       : Eric R. Keiter
 // Creation Date : 12/16/10
 //-----------------------------------------------------------------------------
-int N_ANP_AnalysisBase::saveLoopInfo ()
+int AnalysisBase::saveLoopInfo ()
 {
   int pos = saveTimeI.size();
   saveTimeI.resize(pos+1);
@@ -601,7 +413,7 @@ int N_ANP_AnalysisBase::saveLoopInfo ()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_ANP_AnalysisBase::printLoopInfo
+// Function      : AnalysisBase::printLoopInfo
 // Purpose       : Prints out time loop information.
 // Special Notes : Prints stats from save point start to save point finish.
 //                 Special case 0,0 is entire run to this point
@@ -609,7 +421,7 @@ int N_ANP_AnalysisBase::saveLoopInfo ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/26/00
 //-----------------------------------------------------------------------------
-bool N_ANP_AnalysisBase::printLoopInfo(int start, int finish)
+bool AnalysisBase::printLoopInfo(int start, int finish)
 {
   bool bsuccess = true;
   int t1, t2, indI = 0, indD = 0;
@@ -624,78 +436,51 @@ bool N_ANP_AnalysisBase::printLoopInfo(int start, int finish)
     t2 = finish;
   }
 
-  string crMsg = ("");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, crMsg);
-
-  string msg = ("\tNumber Successful Steps Taken:\t\t");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg,
-                saveTimeI[t2][indI]-saveTimeI[t1][indI]);
+  lout() << "\tNumber Successful Steps Taken:\t\t" << saveTimeI[t2][indI]-saveTimeI[t1][indI] << std::endl;
   indI++;
 
-  msg = ("\tNumber Failed Steps Attempted:\t\t");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg,
-                saveTimeI[t2][indI]-saveTimeI[t1][indI]);
+  lout() << "\tNumber Failed Steps Attempted:\t\t" << saveTimeI[t2][indI]-saveTimeI[t1][indI] << std::endl;
   indI++;
 
-  msg = ("\tNumber Jacobians Evaluated:\t\t");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg,
-                saveTimeI[t2][indI]-saveTimeI[t1][indI]);
+  lout() << "\tNumber Jacobians Evaluated:\t\t" << saveTimeI[t2][indI]-saveTimeI[t1][indI] << std::endl;
   indI++;
 
-  msg = ("\tNumber Iteration Matrix Factorizations:\t");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg,
-                saveTimeI[t2][indI]-saveTimeI[t1][indI]);
+  lout() << "\tNumber Iteration Matrix Factorizations:\t" << saveTimeI[t2][indI]-saveTimeI[t1][indI] << std::endl;
   indI++;
 
-  msg = ("\tNumber Linear Solves:\t\t\t");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg,
-                saveTimeI[t2][indI]-saveTimeI[t1][indI]);
+  lout() << "\tNumber Linear Solves:\t\t\t" << saveTimeI[t2][indI]-saveTimeI[t1][indI] << std::endl;
   indI++;
 
-  msg = ("\tNumber Failed Linear Solves:\t\t");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg,
-                saveTimeI[t2][indI]-saveTimeI[t1][indI]);
+  lout() << "\tNumber Failed Linear Solves:\t\t" << saveTimeI[t2][indI]-saveTimeI[t1][indI] << std::endl;
   indI++;
 
   if (saveTimeI[t2][indI] > saveTimeI[t1][indI])
   {
-    msg = ("\tNumber Linear Solver Iterations:\t");
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg,
-                saveTimeI[t2][indI]-saveTimeI[t1][indI]);
+    lout() << "\tNumber Linear Solver Iterations:\t" << saveTimeI[t2][indI]-saveTimeI[t1][indI] << std::endl;
   }
   indI++;  // still needs to be incremented, even if info is not printed 
 
-  msg = ("\tNumber Residual Evaluations:\t\t");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg,
-                saveTimeI[t2][indI]-saveTimeI[t1][indI]);
+  lout() << "\tNumber Residual Evaluations:\t\t" << saveTimeI[t2][indI]-saveTimeI[t1][indI] << std::endl;
   indI++;
 
-  msg = ("\tNumber Nonlinear Convergence Failures:\t");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg,
-                saveTimeI[t2][indI]-saveTimeI[t1][indI]);
+  lout() << "\tNumber Nonlinear Convergence Failures:\t" << saveTimeI[t2][indI]-saveTimeI[t1][indI] << std::endl;
   indI++;
 
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, crMsg);
+  lout() << std::endl;
 
-  msg = ("\tTotal Residual Load Time:\t\t");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg,
-                saveTimeD[t2][indD]-saveTimeD[t1][indD], " seconds");
+  lout() << "\tTotal Residual Load Time:\t\t" << saveTimeD[t2][indD]-saveTimeD[t1][indD] << " seconds" << std::endl;
   indD++;
 
-  msg = ("\tTotal Jacobian Load Time:\t\t");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg,
-                saveTimeD[t2][indD]-saveTimeD[t1][indD], " seconds");
+  lout() << "\tTotal Jacobian Load Time:\t\t" << saveTimeD[t2][indD]-saveTimeD[t1][indD] << " seconds" << std::endl;
   indD++;
 
-  msg = ("\tTotal Linear Solution Time:\t\t");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_OUT_0, msg,
-                saveTimeD[t2][indD]-saveTimeD[t1][indD], " seconds");
+  lout() << "\tTotal Linear Solution Time:\t\t" << saveTimeD[t2][indD]-saveTimeD[t1][indD] << " seconds" << std::endl;
   indD++;
 
   return bsuccess;
 }
 
-void N_ANP_AnalysisBase::gatherStepStatistics_ ()
+void AnalysisBase::gatherStepStatistics_ ()
 {
   if (secRCPtr_->newtonConvergenceStatus <= 0)
   {
@@ -712,4 +497,7 @@ void N_ANP_AnalysisBase::gatherStepStatistics_ ()
   totalResidualLoadTime_              += nlsMgrRCPtr_->getTotalResidualLoadTime();
   totalJacobianLoadTime_              += nlsMgrRCPtr_->getTotalJacobianLoadTime();
 }
+
+} // namespace Analysis
+} // namespace Xyce
 

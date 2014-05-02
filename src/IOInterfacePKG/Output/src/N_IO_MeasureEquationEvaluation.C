@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,61 +31,135 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.4.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Number: $Revision: 1.13 $
+// Revision Date  : $Date: 2014/02/24 23:49:20 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
-
-// ----------   Xyce Includes   ----------
 #include <N_IO_MeasureEquationEvaluation.h>
 #include <N_ERH_ErrorMgr.h>
 
+namespace Xyce {
+namespace IO {
+namespace Measure {
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureEquationEvaluation::N_IO_MeasureEquationEvaluation()
+// Function      : EquationEvaluation::EquationEvaluation()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-N_IO_MeasureEquationEvaluation::N_IO_MeasureEquationEvaluation( const N_UTL_OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr ):
-  N_IO_MeasureBase( measureBlock, outputMgr)
+EquationEvaluation::EquationEvaluation( const Util::OptionBlock & measureBlock, N_IO_OutputMgr &outputMgr ):
+  Base( measureBlock, outputMgr)
 {
-  string msg = "MEASURE equation evaluation is not supported.  The measure item " + name_ +
-    " will be ignored.";
-  N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_WARNING, msg);
+  // indicate that this measure type is supported and should be processed in simulation
+  typeSupported_ = true;
+}
+
+void EquationEvaluation::prepareOutputVariables() 
+{
+  // this measurement should have only one dependent variable.
+  // Error for now if it doesn't
+  numOutVars_ = outputVars_.size();
+  
+  if ( numOutVars_ > 1 )
+  {
+    std::string msg = "Too many dependent variables for relative error measure, \"" + name_ + "\" Exiting.";
+    N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL, msg);
+  }
+
+  outVarValues_.resize( numOutVars_, 0.0 );
+ 
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureEquationEvaluation::updateTran()
+// Function      : EquationEvaluation::updateTran()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-void N_IO_MeasureEquationEvaluation::updateTran( const double circuitTime, RCP< N_LAS_Vector > solnVecRCP)
+void EquationEvaluation:: updateTran( const double circuitTime, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec)
 {
+  if( !calculationDone_ && withinFromToWindow( circuitTime ) )
+  {
+    // we're in the transient window, now we need to calculate the value of this
+    // measure and see if it triggers any specified rise, fall, cross windowing.
+
+    // update our outVarValues_ vector
+    for( int i=0; i< numOutVars_; i++ )
+    {
+      outVarValues_[i] = getOutputValue(outputVars_[i], solnVec, stateVec, storeVec, 0);
+    }
+
+    // not intuitive, but the output of this measure is just the outputVars_ operator evaluated 
+    // within the FromToWindow.  At this time there shouldn't be more than one outVarValues_ so just
+    // take the first element.
+    calculationResult_=outVarValues_[0];
+  }
 
 }
 
+
 //-----------------------------------------------------------------------------
-// Function      : N_IO_MeasureEquationEvaluation::updateDC()
+// Function      : EquationEvaluation::updateDC()
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rich Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-void N_IO_MeasureEquationEvaluation::updateDC( const vector<N_ANP_SweepParam> & dcParamsVec, RCP< N_LAS_Vector > solnVecRCP)
+void EquationEvaluation::updateDC( const std::vector<N_ANP_SweepParam> & dcParamsVec, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec)
 {
+  // update our outVarValues_ vector
+  for( int i=0; i< numOutVars_; i++ )
+  {
+    outVarValues_[i] = getOutputValue(outputVars_[i], solnVec, stateVec, storeVec, 0);
+  }
+  // not intuitive, but the output of this measure is just the outputVars_ operator evaluated 
+  // within the FromToWindow.  At this time there shouldn't be more than one outVarValues_ so just
+  // take the first element.
+  calculationResult_=outVarValues_[0];
 
 }
+
+
+//-----------------------------------------------------------------------------
+// Function      : EquationEvaluation::updateAC()
+// Purpose       :
+// Special Notes :
+// Scope         : public
+// Creator       : Rich Schiek, Electrical and Microsystems Modeling
+// Creation Date : 3/10/2014
+//-----------------------------------------------------------------------------
+void EquationEvaluation::updateAC( const double frequency, const N_LAS_Vector * solnVec, const N_LAS_Vector *imaginaryVec)
+{
+  if( !calculationDone_ && withinFromToWindow( frequency ) )
+  {
+    // we're in the frequency window, now we need to calculate the value of this
+    // measure and see if it triggers any specified rise, fall, cross windowing.
+
+    // update our outVarValues_ vector
+    for( int i=0; i< numOutVars_; i++ )
+    {
+      outVarValues_[i] = getOutputValue(outputVars_[i], solnVec, 0, 0, imaginaryVec);
+    }
+    // not intuitive, but the output of this measure is just the outputVars_ operator evaluated 
+    // within the FromToWindow.  At this time there shouldn't be more than one outVarValues_ so just
+    // take the first element.
+    calculationResult_=outVarValues_[0];
+ 
+  }
+
+
+}
+
+} // namespace Measure
+} // namespace IO
+} // namespace Xyce

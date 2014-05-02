@@ -38,9 +38,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.8.2.1 $
+// Revision Number: $Revision: 1.9.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:33 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -96,7 +96,7 @@ static ScalarT alphaN( const ScalarT & Vn1)
   else
   {
     r = (10.0 - vDiff) /
-        (100.0 * ( std::exp( (10.0 - vDiff)/10.0 ) - 1.0 ));
+      (100.0 * ( std::exp( (10.0 - vDiff)/10.0 ) - 1.0 ));
   }
   r *= 1000.0; // change from 1/ms to 1/s
   return r;
@@ -120,12 +120,12 @@ static ScalarT alphaM( const ScalarT & Vn1)
   if ((vDiff > 24.99) && (vDiff < 25.01) )
   {
     r = (1.0) /
-        (( std::exp( (25.0 - vDiff)/10.0 )));
+      (( std::exp( (25.0 - vDiff)/10.0 )));
   }
   else
   {
     r = (25.0 - vDiff) /
-        (10.0 * ( std::exp( (25.0 - vDiff)/10.0 ) - 1.0 ));
+      (10.0 * ( std::exp( (25.0 - vDiff)/10.0 ) - 1.0 ));
   }
   r *= 1000.0; // change from 1/ms to 1/s
   return r;
@@ -325,7 +325,7 @@ static ScalarT kcl1EquF( const ScalarT& Vn1, const ScalarT& Vn2, const ScalarT& 
   ScalarT powMC = MC * MC;
   ScalarT powCC = CC * CC * CC * CC;
   ScalarT r = memG * (Vn1 - Vn2 - restV) + Kg * powN * (Vn1 - Vn2 - Ke ) + NaG * powM * h * (Vn1 - Vn2 - NaE )
-              + Ag * powA * b * (Vn1 - Vn2 - Ae) + CaTg * powMC * HC * (Vn1 - Vn2 - CaE) + KCaG * powCC * (Vn1 - Vn2 - Ke);
+    + Ag * powA * b * (Vn1 - Vn2 - Ae) + CaTg * powMC * HC * (Vn1 - Vn2 - CaE) + KCaG * powCC * (Vn1 - Vn2 - Ke);
   return r;
 }
 

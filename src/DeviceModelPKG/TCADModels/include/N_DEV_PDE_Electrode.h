@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.8.2.2 $
+// Revision Number: $Revision: 1.13.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:36 $
+// Revision Date  : $Date: 2014/02/26 20:16:31 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -75,8 +75,8 @@ namespace Device {
 class PDE_Electrode : public CompositeParam
 {
 public:
-  PDE_Electrode ()
-    : CompositeParam (),
+  PDE_Electrode (ParametricData<void> &parametric_data)
+    : CompositeParam(parametric_data),
       name   ("ANODE"),// got to call it something...
       nodeName("node1"),
       bcName("bc1"),
@@ -87,20 +87,6 @@ public:
       oxcharge(0.0)
   {};
 
-
-  // PDE_Electrode (const PDE_Electrode & right)
-  //   : CompositeParam (right),
-
-  //     name(right.name),
-  //     nodeName(right.nodeName),
-  //     bcName(right.bcName),
-  //     material(right.material),
-  //     materialGiven(right.materialGiven),
-  //     oxideBndryFlag(right.oxideBndryFlag),
-  //     oxthick(right.oxthick),
-  //     oxcharge(right.oxcharge)
-
-  // {};
   virtual ~PDE_Electrode () {}
 
 private:
@@ -110,10 +96,10 @@ public:
   virtual void processParams () {}
 
 public:
-  string name;     // name of the electrode.
-  string nodeName; // name of the ckt node.
-  string bcName;   // name of the bc.
-  string material;
+  std::string name;     // name of the electrode.
+  std::string nodeName; // name of the ckt node.
+  std::string bcName;   // name of the bc.
+  std::string material;
   bool   materialGiven;
   bool   oxideBndryFlag;
   double oxthick;
@@ -137,19 +123,7 @@ class PDE_1DElectrode : public PDE_Electrode
 public:
   static ParametricData<PDE_1DElectrode> &getParametricData();
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
   PDE_1DElectrode ();
-
-  // PDE_1DElectrode (const PDE_1DElectrode & right)
-  //   : PDE_Electrode (right),
-  //     area(right.area),
-  //     location(right.location),
-  //     sideGiven(right.sideGiven),
-  //     side(right.side)
-  // {}
 
   virtual ~PDE_1DElectrode () {}
   virtual void processParams ();
@@ -162,7 +136,7 @@ public:
   bool areaGiven;
   double location;
   bool sideGiven;
-  string side;    // this class implicitly assumes that the device is
+  std::string side;    // this class implicitly assumes that the device is
   // one dimensional.  The options for side in this
   // class are: left (x=0), middle (0<x<xmax), right (x=xmax)
 
@@ -181,28 +155,10 @@ class PDE_2DElectrode : public PDE_Electrode
 {
   friend class ParametricData<PDE_2DElectrode>;
 
-  virtual const ParametricData<void> &getMyParametricData() const {
-    return getParametricData();
-  }
-
 public:
   static ParametricData<PDE_2DElectrode> &getParametricData();
 
   PDE_2DElectrode ();
-  // PDE_2DElectrode (const PDE_2DElectrode & right)
-  //   : PDE_Electrode (right),
-
-  //     start(right.start),
-  //     end(right.end),
-  //     startGiven(right.startGiven),
-  //     endGiven(right.endGiven),
-  //     sideGiven(right.sideGiven),
-  //     side(right.side),
-  //     iA (right.iA),
-  //     iB(right.iB),
-  //     uLabel(right.uLabel)
-
-  // {}
 
   virtual ~PDE_2DElectrode () {}
   virtual void processParams ();
@@ -218,7 +174,7 @@ public:
   bool endGiven;    // ending location.
 
   bool sideGiven;
-  string side;    // this class implicitly assumes that
+  std::string side;    // this class implicitly assumes that
   // the device is a 4-sided parallelogram.  Any
   // electrode, therefore, is on the top, bottom, left,
   // or right side.

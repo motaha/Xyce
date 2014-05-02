@@ -12,6 +12,7 @@ set ( IOInterface_SOURCES
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_IO_DistributionTool.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_IO_FunctionBlock.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_IO_mmio.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_IO_Op.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_IO_Objective.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_IO_OptionBlock.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_IO_OutputMgr.C

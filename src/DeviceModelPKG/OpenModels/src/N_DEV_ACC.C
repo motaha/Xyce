@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -38,9 +38,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.21.2.2 $
+// Revision Number: $Revision: 1.50.2.2 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //----------------------------------------------------------------------------
@@ -51,61 +51,44 @@
 // ---------- Standard Includes ----------
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_Const.h>
 #include <N_DEV_ACC.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
+#include <N_DEV_Const.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_DeviceMaster.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_Message.h>
+#include <N_DEV_SolverState.h>
 
 #include <N_LAS_Matrix.h>
 #include <N_LAS_Vector.h>
 
+#include <N_UTL_IndentStreamBuf.h>
+
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<ACC::Instance>::ParametricData()
-{
-  // Set up configuration constants:
-  setNumNodes(3);
-  setNumOptionalNodes(0);
-  setNumFillNodes(0);
-  setModelRequired(0);
-  // no primary parameter, no setPrimaryParameter call
-
-
-  // Set up double precision variables:
-  addPar ("V0", 0.0, false, ParameterType::NO_DEP,
-          &ACC::Instance::v0,
-          NULL, U_MSM1, CAT_NONE, "Initial Velocity");
-
-  addPar ("X0", 0.0, false, ParameterType::NO_DEP,
-          &ACC::Instance::x0,
-          NULL, U_METER, CAT_NONE, "Initial Position");
-}
-
-template<>
-ParametricData<ACC::Model>::ParametricData()
-{}
 
 namespace ACC {
 
-vector< vector<int> > Instance::jacStamp;
 
+void Traits::loadInstanceParameters(ParametricData<ACC::Instance> &p)
+{
+  p.addPar("V0", 0.0, &ACC::Instance::v0)
+    .setUnit(U_MSM1)
+    .setDescription("Initial Velocity");
 
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
+  p.addPar("X0", 0.0, &ACC::Instance::x0)
+    .setUnit(U_METER)
+    .setDescription("Initial Position");
 }
 
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
+void Traits::loadModelParameters(ParametricData<ACC::Model> &p)
+{}
 
-  return parMap;
-}
+
+
+std::vector< std::vector<int> > Instance::jacStamp;
 
 // Class Instance
 //-----------------------------------------------------------------------------
@@ -117,13 +100,11 @@ ParametricData<Model> &Model::getParametricData() {
 // Creation Date : 10/25/07
 //-----------------------------------------------------------------------------
 Instance::Instance(
-  InstanceBlock &               IB,
+  const Configuration & configuration,
+  const InstanceBlock &               IB,
   Model & Miter,
-  MatrixLoadData &              mlData1,
-  SolverState &                 ss1,
-  ExternData  &                 ed1,
-  DeviceOptions &               do1)
-  : DeviceInstance(IB, mlData1, ss1, ed1, do1),
+  const FactoryBlock &  factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(Miter),
     v0(0.0),
     x0(0.0),
@@ -192,41 +173,11 @@ Instance::~Instance ()
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 10/25/07
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                             const vector<int> & extLIDVecRef )
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                             const std::vector<int> & extLIDVecRef )
 {
-  string msg;
-
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "-------------------------------------------------------------------------"
-    "----";
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << endl << dashedline << endl;
-    cout << "  ACCInstance::registerLIDs" << endl;
-    cout << "  name = " << getName() << endl;
-  }
-#endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -236,21 +187,15 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
   li_Velocity = extLIDVec[1];
   li_Position = extLIDVec[2];
 
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0 )
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0)
   {
-    cout << "  li_Acc = " << li_Acc << endl;
-    cout << "  li_Velocity = " << li_Velocity << endl;
-    cout << "  li_Position = " << li_Position << endl;
+    dout() << getName() << " LIDs"
+      << Util::push << std::endl
+           << "li_Acc = " << li_Acc << std::endl
+           << "li_Velocity = " << li_Velocity << std::endl
+           << "li_Position = " << li_Position << std::endl
+           << Util::pop << std::endl;
   }
-#endif
-
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0 )
-  {
-    cout << dashedline << endl;
-  }
-#endif
 }
 
 //-----------------------------------------------------------------------------
@@ -261,7 +206,7 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 05/13/05
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   return intNameMap;
 }
@@ -275,20 +220,10 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 10/25/07
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs(const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs(const std::vector<int> & staLIDVecRef )
 {
-  string msg;
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
   // Copy over the global ID lists:
   staLIDVec = staLIDVecRef;
 
@@ -305,7 +240,7 @@ void Instance::registerStateLIDs(const vector<int> & staLIDVecRef )
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 08/20/01
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   return jacStamp;
 }
@@ -318,7 +253,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 08/27/01
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
 
@@ -359,12 +294,11 @@ bool Instance::updateIntermediateVars ()
 //-----------------------------------------------------------------------------
 bool Instance::updatePrimaryState ()
 {
-#ifdef Xyce_DEBUG_DEVICE
-  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Instance::updatePrimaryState" <<endl;
+    Xyce::dout() << "Instance::updatePrimaryState" <<std::endl;
   }
-#endif
+
   bool bsuccess = updateIntermediateVars ();
   double * staVec = extData.nextStaVectorRawPtr;
 
@@ -424,18 +358,14 @@ bool Instance::loadDAEFVector ()
   double * fVec = extData.daeFVectorRawPtr;
 
   // Load DAE F-vector
-
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
-  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
+  if (DEBUG_DEVICE && getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "  Instance::loadDAEFVector" << endl;
-    cout << "  name = " << getName() <<endl;
-    cout << "  velocity = " << velocity << endl;
-    cout << "  position = " << position << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "  Instance::loadDAEFVector" << std::endl;
+    Xyce::dout() << "  name = " << getName() <<std::endl;
+    Xyce::dout() << "  velocity = " << velocity << std::endl;
+    Xyce::dout() << "  position = " << position << std::endl;
   }
-#endif
 
   if (getSolverState().dcopFlag)
   {
@@ -553,10 +483,11 @@ bool Instance::loadDAEdQdx ()
 // Creator       : Tom Russo, SNL, Electrical and Microsystems Modeling
 // Creation Date : 10/25/07
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-              SolverState & ss1,
-              DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1)
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block)
 {
 }
 
@@ -570,9 +501,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -590,23 +521,56 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i;
-  os << endl;
-  os << "    name     getModelName()  Parameters" << endl;
+  os << std::endl;
+  os << "    name     model name  Parameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "      ";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
+}
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new DeviceMaster<Traits>(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("acc", 1);
 }
 
 } // namespace ACC

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -38,9 +38,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.72.4.2 $
+// Revision Number: $Revision: 1.80 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -48,16 +48,13 @@
 #ifndef Xyce_N_TIA_PARAMS_H
 #define Xyce_N_TIA_PARAMS_H
 
-// ----------   Standard Includes   ----------
 #include <vector>
 
-// ----------   Xyce Includes   ----------
 #include <N_UTL_Misc.h>
-
-// ---------- Forward Declarations ----------
+#include <N_UTL_fwd.h>
+#include <N_IO_fwd.h>
 
 class N_TIA_DataStore;
-class N_IO_CmdParse;
 
 //-----------------------------------------------------------------------------
 // Class         : N_TIA_TIAParams::N_TIA_TIAParams
@@ -206,11 +203,15 @@ class N_TIA_TIAParams
     bool outputInterpMPDE;
 
     // Period of oscillation used by HB
-    double freq;
-    bool freqGiven; 
+//    double freq;
+    std::vector<double> freqs;
+    bool freqGiven;
+
+//    double freq2;
+//    bool freq2Given; 
      
     // AC  
-    string type; 
+    std::string type; 
     double np;  
     double fStart; 
     double fStop; 
@@ -266,7 +267,7 @@ class N_TIA_TIAParams
     std::list< std::string > condTestDeviceNames;
 
     // commandline parser object
-    N_IO_CmdParse & commandLine;
+    N_IO_CmdParse * commandLine;
 
   protected:
   private :
@@ -280,11 +281,8 @@ class N_TIA_TIAParams
 
     N_TIA_TIAParams & operator=(const N_TIA_TIAParams & right);
 
-#ifdef Xyce_VERBOSE_TIME
     // Print out time-integration parameters.
-    void printParams(int analysis);
-#endif
-
+    void printParams(std::ostream &os, int analysis);
 };
 
 #endif // Xyce_N_TIA_TIAParams_H

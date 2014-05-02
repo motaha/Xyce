@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -37,8 +37,8 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.8.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:30 $
+// Revision Number: $Revision: 1.15 $
+// Revision Date  : $Date: 2014/02/24 23:49:12 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
@@ -52,12 +52,13 @@ using Teuchos::rcp;
 
 
 // ----------   Xyce Includes   ----------
+#include <N_ANP_fwd.h>
+#include <N_UTL_fwd.h>
+
 #include <N_ANP_AnalysisBase.h>
 #include <N_UTL_FixedQueue.h>
 
 // ---------- Forward Declarations ----------
-class N_ANP_AnalysisManager;
-class N_UTL_ExpressionData;
 class N_LAS_Matrix;
 class N_LAS_Vector;
 class N_LAS_BlockMatrix;
@@ -65,19 +66,22 @@ class N_LAS_BlockVector;
 class Amesos_BaseSolver;
 class Epetra_LinearProblem;
 
+namespace Xyce {
+namespace Analysis {
+
 //-------------------------------------------------------------------------
-// Class         : N_ANP_MOR 
+// Class         : MOR 
 // Purpose       : MOR analysis class
 // Special Notes : 
 // Creator       : Ting Mei
 // Creation Date : 05/24/11
 //-------------------------------------------------------------------------
-class N_ANP_MOR: public N_ANP_AnalysisBase 
+class MOR: public AnalysisBase 
 {
   public:
-    N_ANP_MOR( N_ANP_AnalysisManager * anaManagerPtr );
+    MOR( AnalysisManager * anaManagerPtr );
 
-    ~N_ANP_MOR();
+    ~MOR();
     
     bool setAnalysisParams(const N_UTL_OptionBlock & paramsBlock);
 
@@ -88,9 +92,18 @@ class N_ANP_MOR: public N_ANP_AnalysisBase
     bool evalRedTransferFunction();
 
     bool processSuccessfulStep(bool origSys);
-    bool processFailedStep();
-    bool finish();
-    bool handlePredictor();
+
+    virtual bool processSuccessfulStep() /* override */ {
+      return true;
+    }
+    
+    virtual bool loopProcess() /* override */ {
+      return true;
+    }
+    
+    virtual bool processFailedStep(); /* override */
+    virtual bool finish(); /* override */
+    virtual bool handlePredictor(); /* override */
 
     void setDCOPFlag(bool flag) { dcopFlag_ = flag; }
     bool getDCOPFlag() { return dcopFlag_; }
@@ -102,7 +115,7 @@ class N_ANP_MOR: public N_ANP_AnalysisBase
     int morEvalSize_;
     int numPorts_;
  
-    list < int > morEvalFailures_; 
+    std::list < int > morEvalFailures_; 
     std::vector<std::string> portList_;
  
     double stepMult_;
@@ -158,4 +171,9 @@ class N_ANP_MOR: public N_ANP_AnalysisBase
     RCP<Epetra_LinearProblem> blockProblem_, origProblem_;
 };
 
-#endif
+} // namespace Analysis
+} // namespace Xyce
+
+typedef Xyce::Analysis::MOR N_ANP_MOR;
+
+#endif // Xyce_N_ANP_MOR_h

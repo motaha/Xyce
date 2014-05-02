@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,46 +36,48 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.5.2.2 $
+// Revision Number: $Revision: 1.10 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ----------   Xyce Includes   ----------
 #include <N_TOP_CktGraphCreatorBasic.h>
 #include <N_TOP_CktGraphBasic.h>
 
+namespace Xyce {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktGraphCreatorBasic::create
+// Function      : CktGraphCreatorBasic::create
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 8/10/06
 //-----------------------------------------------------------------------------
-N_TOP_CktGraph* N_TOP_CktGraphCreatorBasic::create( const string &cgID )
+CktGraph* CktGraphCreatorBasic::create( const std::string &cgID )
 {
-  return new N_TOP_CktGraphBasic( cgID, maxTries_ );
+  return new CktGraphBasic( cgID, maxTries_ );
 }
 
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktGraphCreatorBasic::create
+// Function      : CktGraphCreatorBasic::create
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 8/10/06
 //-----------------------------------------------------------------------------
-N_TOP_CktGraph* N_TOP_CktGraphCreatorBasic::create( const string &cgID,
-                                                    const list<NodeID> & nodeList )
+CktGraph* CktGraphCreatorBasic::create( const std::string &cgID,
+                                                    const std::list<NodeID> & nodeList )
 {
-  return new N_TOP_CktGraphBasic( cgID, nodeList, maxTries_ );
+  return new CktGraphBasic( cgID, nodeList, maxTries_ );
 }
 
+} // namespace Topo
+} // namespace Xyce

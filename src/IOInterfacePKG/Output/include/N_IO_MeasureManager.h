@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,17 +36,15 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.10.2.3 $
+// Revision Number: $Revision: 1.22 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Date  : $Date: 2014/02/24 23:49:20 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #ifndef  Xyce_N_IO_MeasureManager_H
 #define Xyce_N_IO_MeasureManager_H
-
-// ---------- Standard Includes ----------
 
 #include <list>
 #include <string>
@@ -56,63 +54,69 @@
 using Teuchos::RefCountPtr;
 using Teuchos::rcp;
 
-// ----------   Xyce Includes   ----------
-
-#include <N_UTL_Misc.h>
-#include <N_UTL_Xyce.h>
-#include <N_IO_fwd.h>
-#include <N_UTL_OptionBlock.h>
+#include <N_ANP_SweepParam.h>
 #include <N_IO_PkgOptionsMgr.h>
 #include <N_LAS_Vector.h>
-#include <N_ANP_SweepParam.h>
+#include <N_IO_Measure_fwd.h>
+#include <N_UTL_Misc.h>
+#include <N_UTL_OptionBlock.h>
+#include <N_UTL_Xyce.h>
 
-
-// ---------- Forward Declarations ----------
-class N_IO_MeasureBase;
+namespace Xyce {
+namespace IO {
+namespace Measure {
 
 //-----------------------------------------------------------------------------
-// Class         : N_IO_MeasureManager
+// Class         : MeasureManager
 // Purpose       : This is a manager class for handling measure statements
 //                 in a simulation
 // Special Notes :
 // Creator       : Richard Schiek, Electrical and Microsystems Modeling
 // Creation Date : 3/10/2009
 //-----------------------------------------------------------------------------
-class N_IO_MeasureManager
+class Manager
 {
-
+    typedef std::vector<Base *> MeasurementVector;
+    
 public:
-
+    
   // Default constructor.
-  N_IO_MeasureManager( N_IO_OutputMgr & outputMgr );
+    Manager( IO::OutputMgr & outputMgr );
 
   // Destructor
-  ~N_IO_MeasureManager();
+  ~Manager();
 
   // Return true if .measure analysis is being performed on any variables.
   bool isMeasureActive() { return (!allMeasuresList_.empty()); }
 
   // add .measure line from netlist to list of things to measure
-  bool addMeasure(const N_UTL_OptionBlock & measureLine);
+  bool addMeasure(const Util::OptionBlock & measureLine);
 
+    void fixupMeasureParameters();
+    
   // Called during the simulation to update the measure objects held by this class
   // To keep things obvious, use one call for tran and another for DC
-  void updateTranMeasures( const double circuitTime, RCP< N_LAS_Vector > solnVecRCP);
-  void updateDcMeasures( const vector<N_ANP_SweepParam> & dcParamsVec, RCP< N_LAS_Vector > solnVecRCP);
+  void updateTranMeasures( const double circuitTime, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec);
+  void updateDcMeasures( const std::vector<N_ANP_SweepParam> & dcParamsVec, const N_LAS_Vector *solnVec, const N_LAS_Vector *stateVec, const N_LAS_Vector *storeVec);
+  void updateAcMeasures( const double frequency, const N_LAS_Vector *solnVec, const N_LAS_Vector *imaginaryVec);
+   
+  std::ostream & outputResults(std::ostream& outputStream, bool printHeader=true );
+    
+    const Base *find(const std::string &name) const;
 
-  void outputResults(std::ostream& outputStream, bool printHeader=true );
-
-  void getMeasureValue (const string &name, double &value, bool &found);
+    void getMeasureValue (const std::string &name, double &value, bool &found) const;
 
 private:
-  N_IO_OutputMgr &     outputManager_;
+    IO::OutputMgr &     outputManager_;
 
-  // package options manager
-  RCP<N_IO_PkgOptionsMgr> pkgOptMgrPtr_;
-
-  list<RCP<N_IO_MeasureBase> > allMeasuresList_;
-  list<RCP<N_IO_MeasureBase> > activeMeasuresList_;
-
+    MeasurementVector allMeasuresList_;
+    MeasurementVector activeMeasuresList_;
 };
+
+} // namespace Measure
+} // namespace IO
+} // namespace Xyce
+
+typedef Xyce::IO::Measure::Manager N_IO_MeasureManager;
 
 #endif  // Xyce_N_IO_MeasureManager_H

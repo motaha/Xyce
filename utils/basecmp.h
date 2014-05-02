@@ -1,7 +1,7 @@
 //-------------------------------------------------------------------------
 // Copyright Notice
 //
-// Copyright (c) 2000, Sandia Corporation, Albuquerque, NM.
+// Copyright (c) 2000, 2013, Sandia Corporation, Albuquerque, NM.
 //-------------------------------------------------------------------------
 
 //-------------------------------------------------------------------------
@@ -19,22 +19,18 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.8 $
+// Revision Number: $Revision: 1.9 $
 //
-// Revision Date  : $Date: 2008/02/21 05:19:06 $
+// Revision Date  : $Date: 2013/09/18 20:27:38 $
 //
-// Current Owner  : $Author: erkeite $
+// Current Owner  : $Author: dgbaur $
 //-------------------------------------------------------------------------
 
 #ifndef Xyce_BaseCompare_h
 #define Xyce_BaseCompare_h
 
-#include <iostream>
-#include <fstream>
+#include <string>
 #include <map>
-#include <vector>
-
-using namespace std;
 
 // uncomment this to have the utilities  read two Xyce files, rather than
 // a chilespice file and a Xyce file.
@@ -70,9 +66,9 @@ class baseCompare
 
     char txt[128];
 
-    map<int,int> CtoX;
-    map<int,int> XtoC;
-    map<int,string> xyceNameMap;
+    std::map<int,int> CtoX;
+    std::map<int,int> XtoC;
+    std::map<int,std::string> xyceNameMap;
 
     int isize;
   protected:

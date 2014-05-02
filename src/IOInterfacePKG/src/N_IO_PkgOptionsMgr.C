@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,43 +36,41 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.13.2.2 $
+// Revision Number: $Revision: 1.21 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:43 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
-
-// ----------   Xyce Includes   ----------
-
 #include <N_IO_PkgOptionsMgr.h>
 
+namespace Xyce {
+namespace IO {
+
 //-----------------------------------------------------------------------------
-// Function      : N_IO_PkgOptionsMgr::N_IO_PkgOptionsMgr
+// Function      : PkgOptionsMgr::PkgOptionsMgr
 // Purpose       : destructor
 // Special Notes :
 // Scope         : public
 // Creator       : Richard Schiek, SNL
 // Creation Date : 10/21/2008
 //-----------------------------------------------------------------------------
-N_IO_PkgOptionsMgr::N_IO_PkgOptionsMgr()
+PkgOptionsMgr::PkgOptionsMgr()
 {
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_PkgOptionsMgr::~N_IO_PkgOptionsMgr
+// Function      : PkgOptionsMgr::~PkgOptionsMgr
 // Purpose       : destructor
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL
 // Creation Date : 1/28/2003
 //-----------------------------------------------------------------------------
-N_IO_PkgOptionsMgr::~N_IO_PkgOptionsMgr()
+PkgOptionsMgr::~PkgOptionsMgr()
 {
   circRegsIterator iterCR = circSpecificRegs_.begin();
   circRegsIterator  endCR = circSpecificRegs_.end  ();
@@ -89,7 +87,7 @@ N_IO_PkgOptionsMgr::~N_IO_PkgOptionsMgr()
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_PkgOptionsMgr::submitRegistration
+// Function      : PkgOptionsMgr::submitRegistration
 // Purpose       : Register an object for recieving options
 //
 // Special Notes : The design of this function and the other 'submit' function
@@ -104,8 +102,8 @@ N_IO_PkgOptionsMgr::~N_IO_PkgOptionsMgr()
 // Creator       : Robert Hoekstra, SNL
 // Creation Date : 1/28/2003
 //-----------------------------------------------------------------------------
-bool N_IO_PkgOptionsMgr::submitRegistration( const string & regName,
-                                             const string & circName,
+bool PkgOptionsMgr::submitRegistration( const std::string & regName,
+                                             const std::string & circName,
                                              N_IO_PkgOptionsReg * reg )
 {
 
@@ -136,14 +134,14 @@ bool N_IO_PkgOptionsMgr::submitRegistration( const string & regName,
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_IO_PkgOptionsMgr::submitOptions
+// Function      : PkgOptionsMgr::submitOptions
 // Purpose       : Register an option block to be given to pkg's
 // Special Notes :
 // Scope         : public
 // Creator       : Robert Hoekstra, SNL
 // Creation Date : 1/28/2003
 //-----------------------------------------------------------------------------
-bool N_IO_PkgOptionsMgr::submitOptions( const N_UTL_OptionBlock & options, const string & circName )
+bool PkgOptionsMgr::submitOptions( const Util::OptionBlock & options, const std::string & circName )
 {
 
   // if a registration for this particular circuit hasn't happened yet, then
@@ -154,18 +152,18 @@ bool N_IO_PkgOptionsMgr::submitOptions( const N_UTL_OptionBlock & options, const
     circSpecificOpts_[circName] = tmpOpt;
   }
 
-  N_UTL_OptionBlock newOptions( options );
-  string oname(newOptions.getName());
+  Util::OptionBlock newOptions( options );
+  std::string oname(newOptions.getName());
 
-  N_UTL_OptionBlock::ParameterList::iterator iterO = newOptions.begin();
-  N_UTL_OptionBlock::ParameterList::iterator  endO = newOptions.end();
+  Util::OptionBlock::ParameterList::iterator iterO = newOptions.begin();
+  Util::OptionBlock::ParameterList::iterator  endO = newOptions.end();
   for( ; iterO != endO; ++iterO )
   {
-    if( iterO->tag() == "SINGLETON" && iterO->iVal() )
+    if( iterO->tag() == "SINGLETON" && iterO->getImmutableValue<int>() )
     {
       if( circSpecificOpts_[circName].count( oname ) )
       {
-        string msg("Only 1 option line of type: " + oname + " allowed!\n");
+        std::string msg("Only 1 option line of type: " + oname + " allowed!\n");
         N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::DEV_FATAL_0, msg );
       }
       else
@@ -194,3 +192,5 @@ bool N_IO_PkgOptionsMgr::submitOptions( const N_UTL_OptionBlock & options, const
   return true;
 }
 
+} // namespace IO
+} // namespace Xyce

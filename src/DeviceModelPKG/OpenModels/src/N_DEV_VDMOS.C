@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.131.2.4 $
+// Revision Number: $Revision: 1.156.2.3 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:39 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -62,11 +62,15 @@
 
 // ---------- Xyce Includes ----------
 #include <N_DEV_Const.h>
-#include <N_DEV_VDMOS.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_VDMOS.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
+
+#include <N_DEV_MOSFET1.h>
 
 #include <N_LAS_Matrix.h>
 #include <N_LAS_Vector.h>
@@ -74,518 +78,499 @@
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<VDMOS::Instance>::ParametricData()
+
+namespace VDMOS {
+
+
+void Traits::loadInstanceParameters(ParametricData<VDMOS::Instance> &p)
 {
-    setNumNodes(4);
-    setNumOptionalNodes(0);
-    setNumFillNodes(0);
-    setModelRequired(1);
-    addModelType("NMOS");
-    addModelType("PMOS");
-
-    // Set up map for normal (double) param variables:
-    addPar ("L", 0.0, false,   ParameterType::NO_DEP,
+// Set up map for normal (double) param variables:
+    p.addPar ("L", 0.0, false,   ParameterType::NO_DEP,
       &VDMOS::Instance::l,
-      NULL, U_METER, CAT_GEOMETRY, "Channel length"); 
+      NULL, U_METER, CAT_GEOMETRY, "Channel length");
 
-    addPar ("W", 0.0, false,   ParameterType::NO_DEP,
+    p.addPar ("W", 0.0, false,   ParameterType::NO_DEP,
       &VDMOS::Instance::w,
       NULL, U_METER,  CAT_GEOMETRY, "Channel width");
 
-    addPar ("AD", 0.0, false,   ParameterType::NO_DEP,
+    p.addPar ("AD", 0.0, false,   ParameterType::NO_DEP,
       &VDMOS::Instance::drainArea,
       NULL, U_METER2,  CAT_GEOMETRY, "Drain diffusion area");
 
-    addPar ("AS", 0.0, false,   ParameterType::NO_DEP,
+    p.addPar ("AS", 0.0, false,   ParameterType::NO_DEP,
       &VDMOS::Instance::sourceArea,
-      NULL, U_METER2,  CAT_GEOMETRY, "Source diffusion area"); 
+      NULL, U_METER2,  CAT_GEOMETRY, "Source diffusion area");
 
-    addPar ("NRD", 1.0, false,   ParameterType::NO_DEP,
+    p.addPar ("NRD", 1.0, false,   ParameterType::NO_DEP,
       &VDMOS::Instance::drainSquares,
-      NULL, U_SQUARES, CAT_GEOMETRY, "Multiplier for RSH to yield parasitic resistance of drain"); 
+      NULL, U_SQUARES, CAT_GEOMETRY, "Multiplier for RSH to yield parasitic resistance of drain");
 
-    addPar ("NRS", 1.0, false,   ParameterType::NO_DEP,
+    p.addPar ("NRS", 1.0, false,   ParameterType::NO_DEP,
       &VDMOS::Instance::sourceSquares,
-      NULL, U_SQUARES, CAT_GEOMETRY, "Multiplier for RSH to yield parasitic resistance of source"); 
+      NULL, U_SQUARES, CAT_GEOMETRY, "Multiplier for RSH to yield parasitic resistance of source");
 
-    addPar ("PD", 0.0, false,   ParameterType::NO_DEP,
+    p.addPar ("PD", 0.0, false,   ParameterType::NO_DEP,
       &VDMOS::Instance::drainPerimeter,
       NULL, U_METER, CAT_GEOMETRY, "Drain diffusion perimeter");
 
-    addPar ("PS", 0.0, false,   ParameterType::NO_DEP,
+    p.addPar ("PS", 0.0, false,   ParameterType::NO_DEP,
       &VDMOS::Instance::sourcePerimeter,
       NULL, U_METER, CAT_GEOMETRY, "Source diffusion perimeter");
 
-    addPar ("M", 1.0, false,   ParameterType::NO_DEP,
+    p.addPar ("M", 1.0, false,   ParameterType::NO_DEP,
       &VDMOS::Instance::numberParallel,
       NULL, U_NONE, CAT_CONTROL,  "Multiplier for M devices connected in parallel");
 
-    addPar ("TEMP", 0.0, false,   ParameterType::TIME_DEP,
+    p.addPar ("TEMP", 0.0, false,   ParameterType::TIME_DEP,
       &VDMOS::Instance::temp,
-      NULL, STANDARD, CAT_NONE, "");
+      NULL, STANDARD, CAT_NONE, "Device temperature");
 }
 
-template<>
-ParametricData<VDMOS::Model>::ParametricData()
+void Traits::loadModelParameters(ParametricData<VDMOS::Model> &p)
 {
-    addPar ("L0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("L0", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::l0, NULL,
        U_METER, CAT_GEOMETRY, "Gate length of nominal device");
 
-    addPar ("W0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("W0", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::w0, NULL,
        U_METER, CAT_GEOMETRY, "Gate width of nominal device");
 
-    addPar ("VTO", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("VTO", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::vt0, NULL,
-      U_VOLT, CAT_VOLT, "Zero-bias threshold voltage"); 
+      U_VOLT, CAT_VOLT, "Zero-bias threshold voltage");
 
-    addPar ("PHI", 0.6, false, ParameterType::NO_DEP,
+    p.addPar ("PHI", 0.6, false, ParameterType::NO_DEP,
       &VDMOS::Model::phi, NULL,
       U_VOLT, CAT_PROCESS, "Surface potential");
 
-    addPar ("RD", 0.0, false, ParameterType::MIN_RES,
+    p.addPar ("RD", 0.0, false, ParameterType::MIN_RES,
       &VDMOS::Model::drainResistance, NULL,
       U_OHM, CAT_RES, "Drain ohmic resistance");
 
-    addPar ("RG", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RG", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::gateResistance, NULL,
        U_OHM, CAT_RES, "Gate ohmic resistance");
 
-    addPar ("RS", 0.0, false, ParameterType::MIN_RES,
+    p.addPar ("RS", 0.0, false, ParameterType::MIN_RES,
       &VDMOS::Model::sourceResistance, NULL,
       U_OHM, CAT_RES, "Source ohmic resistance");
 
-    addPar ("CBD", 0.0, false, ParameterType::MIN_CAP,
+    p.addPar ("CBD", 0.0, false, ParameterType::MIN_CAP,
       &VDMOS::Model::capBD,
       &VDMOS::Model::capBDGiven,
       U_FARAD, CAT_CAP, "Zero-bias bulk-drain p-n capacitance");
- 
-    addPar ("CBS", 0.0, false, ParameterType::MIN_CAP,
+
+    p.addPar ("CBS", 0.0, false, ParameterType::MIN_CAP,
       &VDMOS::Model::capBS,
       &VDMOS::Model::capBSGiven,
       U_FARAD, CAT_CAP, "Zero-bias bulk-source p-n capacitance");
 
-    addPar ("TS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TS", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::timeScale, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("IS", 1e-14, false, ParameterType::NO_DEP,
+    p.addPar ("IS", 1e-14, false, ParameterType::NO_DEP,
       &VDMOS::Model::jctSatCur, NULL,
       U_AMP, CAT_CURRENT, "Bulk p-n saturation current");
 
-    addPar ("PB", 0.8, false, ParameterType::NO_DEP,
+    p.addPar ("PB", 0.8, false, ParameterType::NO_DEP,
       &VDMOS::Model::bulkJctPotential, NULL,
       U_VOLT, CAT_VOLT, "Bulk p-n bottom potential");
 
-    addPar ("CGSO", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CGSO", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::gateSourceOverlapCapFactor, NULL,
       U_FARADMM1, CAT_CAP, "Gate-source overlap capacitance/channel width");
 
-    addPar ("CGDO", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CGDO", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::gateDrainOverlapCapFactor, NULL,
       U_FARADMM1, CAT_CAP, "Gate-drain overlap capacitance/channel width");
 
-    addPar ("CGBO", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CGBO", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::gateBulkOverlapCapFactor, NULL,
       U_FARADMM1, CAT_CAP, "Gate-bulk overlap capacitance/channel length");
 
-    addPar ("RSH", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RSH", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::sheetResistance, NULL,
       U_OHM, CAT_RES, "Drain, source diffusion sheet resistance");
 
-    addPar ("CJ", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CJ", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::bulkCapFactor,
       &VDMOS::Model::bulkCapFactorGiven,
       U_FARADMM2, CAT_CAP, "Bulk p-n zero-bias bottom capacitance/area");
 
-    addPar ("MJ", 0.5, false, ParameterType::NO_DEP,
+    p.addPar ("MJ", 0.5, false, ParameterType::NO_DEP,
       &VDMOS::Model::bulkJctBotGradingCoeff, NULL,
       U_NONE, CAT_DOPING, "Bulk p-n bottom grading coefficient");
 
-    addPar ("CJSW", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("CJSW", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::sideWallCapFactor,
       &VDMOS::Model::sideWallCapFactorGiven,
       U_FARADMM2, CAT_CAP, "Bulk p-n zero-bias sidewall capacitance/area");
 
-    addPar ("MJSW", 0.5, false, ParameterType::NO_DEP,
+    p.addPar ("MJSW", 0.5, false, ParameterType::NO_DEP,
       &VDMOS::Model::bulkJctSideGradingCoeff, NULL,
       U_NONE, CAT_DOPING, "Bulk p-n sidewall grading coefficient");
 
-    addPar ("JS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("JS", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::jctSatCurDensity, NULL,
       U_AMPMM2, CAT_PROCESS, "Bulk p-n saturation current density");
- 
-    addPar ("TOX", 1e-7, false, ParameterType::NO_DEP,
+
+    p.addPar ("TOX", 1e-7, false, ParameterType::NO_DEP,
       &VDMOS::Model::oxideThickness, NULL,
       U_METER, CAT_GEOMETRY, "Gate oxide thickness");
 
-    addPar ("LD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LD", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::latDiff, NULL,
       U_METER, CAT_DOPING, "Lateral diffusion length");
 
-    addPar ("UO", 280., false, ParameterType::NO_DEP,
+    p.addPar ("UO", 280., false, ParameterType::NO_DEP,
       &VDMOS::Model::surfaceMobility, NULL,
       U_CMM2VM1SM1, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "Surface mobility");
 
-    addPar ("U0", 280., false, ParameterType::NO_DEP,
+    p.addPar ("U0", 280., false, ParameterType::NO_DEP,
       &VDMOS::Model::surfaceMobility0, NULL,
       U_CMM2VM1SM1, CAT_PROCESS, "Surface mobility");
 
-    addPar ("FC", 0.5, false, ParameterType::NO_DEP,
+    p.addPar ("FC", 0.5, false, ParameterType::NO_DEP,
       &VDMOS::Model::fwdCapDepCoeff, NULL,
        U_NONE, CAT_CAP, "Coefficient for forward-bias depletion capacitance formula");
 
-    addPar ("NSUB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("NSUB", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::substrateDoping, NULL,
       U_CMM3, CAT_DOPING, "Substrate doping density");
 
-    addPar ("NSS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("NSS", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::surfaceStateDensity, NULL,
       U_CMM2, CAT_PROCESS, "Surface state density");
 
-    addPar ("TNOM", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TNOM", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::tnom, NULL,
        STANDARD, CAT_NONE, "");
 
-    addPar ("VMAX", 4e+4, false, ParameterType::NO_DEP,
+    p.addPar ("VMAX", 4e+4, false, ParameterType::NO_DEP,
       &VDMOS::Model::maxDriftVel, NULL,
        U_MSM1, CAT_PROCESS, "Maximum drift velocity for carriers");
 
-    addPar ("XJ", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("XJ", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::junctionDepth, NULL,
        U_METER, CAT_GEOMETRY, "Metallurgical junction depth");
 
-    addPar ("LAMBDA", 0.048, false, ParameterType::NO_DEP,
+    p.addPar ("LAMBDA", 0.048, false, ParameterType::NO_DEP,
       &VDMOS::Model::lambda, NULL,
        U_VOLTM1, CAT_PROCESS, "Output conductance parameter");
 
-    addPar ("DELTA", 5.0, false, ParameterType::NO_DEP,
+    p.addPar ("DELTA", 5.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::delta, NULL,
        U_NONE, CAT_NONE, "Transition width parameter");
 
-    addPar ("ETA", 1.32, false, ParameterType::NO_DEP,
+    p.addPar ("ETA", 1.32, false, ParameterType::NO_DEP,
       &VDMOS::Model::eta, NULL,
        U_NONE, CAT_NONE, "Subthreshold ideality factor");
 
-    addPar ("M", 4.0, false, ParameterType::NO_DEP,
+    p.addPar ("M", 4.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::m, NULL,
        U_NONE, CAT_CONTROL, "Knee shape parameter");
 
-    addPar ("MC", 3.0, false, ParameterType::NO_DEP,
+    p.addPar ("MC", 3.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::mc, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("SIGMA0", 0.048, false, ParameterType::NO_DEP,
+    p.addPar ("SIGMA0", 0.048, false, ParameterType::NO_DEP,
       &VDMOS::Model::sigma0, NULL,
        U_NONE, CAT_NONE, "DIBL parameter");
 
-    addPar ("VSIGMAT", 1.7, false, ParameterType::NO_DEP,
+    p.addPar ("VSIGMAT", 1.7, false, ParameterType::NO_DEP,
       &VDMOS::Model::vsigmat, NULL,
        U_VOLT, CAT_VOLT, "DIBL parameter");
 
-    addPar ("VSIGMA", 0.2, false, ParameterType::NO_DEP,
+    p.addPar ("VSIGMA", 0.2, false, ParameterType::NO_DEP,
       &VDMOS::Model::vsigma, NULL,
        U_VOLT, CAT_VOLT, "DIBL parameter");
 
-    addPar ("THETA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("THETA", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::theta, NULL,
        U_MVM1, CAT_PROCESS, "Mobility degradation parameter");
 
-    addPar ("GAMMAS0", 0.5, false, ParameterType::NO_DEP,
+    p.addPar ("GAMMAS0", 0.5, false, ParameterType::NO_DEP,
       &VDMOS::Model::gammas0, NULL,
        U_VOLTMH, CAT_NONE, "Body effect constant in front of square root term");
 
-    addPar ("GAMMAL0", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("GAMMAL0", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::gammal0, NULL,
        U_NONE, CAT_NONE, "Body effect constant in front of linear term");
 
-    addPar ("LGAMMAS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LGAMMAS", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::lgammas, NULL,
        U_VOLTMH, CAT_NONE, "Sensitivity of gS on device length");
 
-    addPar ("WGAMMAS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WGAMMAS", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::wgammas, NULL,
        U_VOLTMH, CAT_NONE, "Sensitivity of gS on device width");
 
-    addPar ("LGAMMAL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("LGAMMAL", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::lgammal_, NULL,
        U_NONE, CAT_NONE, "Sensitivity of gL on device length");
 
-    addPar ("WGAMMAL", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("WGAMMAL", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::wgammal, NULL,
        U_NONE, CAT_NONE, "Sensitivity of gL on device width");
 
-    addPar ("K", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("K", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::k, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("KVT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("KVT", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::kvt, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("MDTEMP", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("MDTEMP", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::mdtemp, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("KVS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("KVS", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::kvs, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("TVS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("TVS", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::tvs, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("MTH", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("MTH", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::mth, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("ARTD", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("ARTD", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::artd, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("BRTD", 0.035, false, ParameterType::NO_DEP,
+    p.addPar ("BRTD", 0.035, false, ParameterType::NO_DEP,
       &VDMOS::Model::brtd, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("CRTD", 0.1472, false, ParameterType::NO_DEP,
+    p.addPar ("CRTD", 0.1472, false, ParameterType::NO_DEP,
       &VDMOS::Model::crtd, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("DRTD", 0.0052, false, ParameterType::NO_DEP,
+    p.addPar ("DRTD", 0.0052, false, ParameterType::NO_DEP,
       &VDMOS::Model::drtd, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("NRTD", 0.115, false, ParameterType::NO_DEP,
+    p.addPar ("NRTD", 0.115, false, ParameterType::NO_DEP,
       &VDMOS::Model::nrtd, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("N2", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("N2", 1.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::n2, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("XQC", 0.6, false, ParameterType::NO_DEP,
+    p.addPar ("XQC", 0.6, false, ParameterType::NO_DEP,
       &VDMOS::Model::xqc, NULL,
        U_NONE, CAT_PROCESS, "Charge partitioning factor");
 
-    addPar ("MCV", 10.0, false, ParameterType::NO_DEP,
+    p.addPar ("MCV", 10.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::mcv, NULL,
        U_NONE, CAT_GEOMETRY, "Transition width parameter used by the charge partitioning scheme");
 
-    addPar ("VFB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("VFB", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::vfb, NULL,
        U_VOLT, CAT_VOLT, "Flat band voltage");
 
-    addPar ("ALPHA", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("ALPHA", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::alpha, NULL,
        U_NONE, CAT_NONE, "Parameter accounting for the threshold dependence on the channel potential");
 
-    addPar ("LS", 35e-9, false, ParameterType::NO_DEP,
+    p.addPar ("LS", 35e-9, false, ParameterType::NO_DEP,
       &VDMOS::Model::ls, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("RSUB", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RSUB", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::rsub, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("VP", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("VP", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::vp,
       &VDMOS::Model::vpGiven,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("AI", 2e+9, false, ParameterType::NO_DEP,
+    p.addPar ("AI", 2e+9, false, ParameterType::NO_DEP,
       &VDMOS::Model::ai, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("BI", 8e+8, false, ParameterType::NO_DEP,
+    p.addPar ("BI", 8e+8, false, ParameterType::NO_DEP,
       &VDMOS::Model::bi, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("DELMAX", 0.9, false, ParameterType::NO_DEP,
+    p.addPar ("DELMAX", 0.9, false, ParameterType::NO_DEP,
       &VDMOS::Model::delmax, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("MD", 2.0, false, ParameterType::NO_DEP,
+    p.addPar ("MD", 2.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::md, NULL,
        U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    addPar ("DRIFTPARAMA", 0.08, false, ParameterType::NO_DEP,
+    p.addPar ("DRIFTPARAMA", 0.08, false, ParameterType::NO_DEP,
       &VDMOS::Model::driftParamA, NULL,
        U_OHM, CAT_RES, "Drift region resistance intercept parameter");
 
-    addPar ("DRIFTPARAMB", 0.013, false, ParameterType::NO_DEP,
+    p.addPar ("DRIFTPARAMB", 0.013, false, ParameterType::NO_DEP,
       &VDMOS::Model::driftParamB, NULL,
        U_OHMPV, CAT_RES, "Drift region resistance slope parameter");
 
-    addPar ("RDSSHUNT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("RDSSHUNT", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::rdsshunt, NULL,
        U_OHM, CAT_RES, "Drain-source shunt resistance");
 
-    addPar ("D1IS", 1e-14, false, ParameterType::NO_DEP,
+    p.addPar ("D1IS", 1e-14, false, ParameterType::NO_DEP,
       &VDMOS::Model::D1DIOsatCur, NULL,
        U_AMP, CAT_CURRENT, "Drain-Source diode saturation current");
 
-    addPar ("D1RS", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("D1RS", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::D1DIOresist, NULL,
        U_OHM, CAT_RES, "Drain-source diode ohmic resistance");
 
-    addPar ("D1N", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("D1N", 1.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::D1DIOemissionCoeff, NULL,
        U_NONE, CAT_PROCESS, "Drain-source diode emission coefficient");
 
-    addPar ("D1TT", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("D1TT", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::D1DIOtransitTime, NULL,
        U_SECOND, CAT_PROCESS, "Drain-source diode transit time");
 
-    addPar ("D1CJO", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("D1CJO", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::D1DIOjunctionCap, NULL,
        U_FARAD, CAT_CAP, "Drain-source diode junction capacitance");
 
-    addPar ("D1VJ", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("D1VJ", 1.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::D1DIOjunctionPot, NULL,
        U_VOLT, CAT_VOLT, "Drain-source diode junction potential");
 
-    addPar ("D1M", 0.5, false, ParameterType::NO_DEP,
+    p.addPar ("D1M", 0.5, false, ParameterType::NO_DEP,
       &VDMOS::Model::D1DIOgradingCoeff, NULL,
        U_NONE, CAT_PROCESS, "Drain-source diode grading coefficient");
 
-    addPar ("D1EG", 1.11, false, ParameterType::NO_DEP,
+    p.addPar ("D1EG", 1.11, false, ParameterType::NO_DEP,
       &VDMOS::Model::D1DIOactivationEnergy, NULL,
        U_EV, CAT_PROCESS, "Drain-source diode activation energy");
 
-    addPar ("D1XTI", 3.0, false, ParameterType::NO_DEP,
+    p.addPar ("D1XTI", 3.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::D1DIOsaturationCurrentExp, NULL,
        U_NONE, CAT_PROCESS, "Drain-source diode sat. current temperature exponent");
 
-    addPar ("D1FC", 0.5, false, ParameterType::NO_DEP,
+    p.addPar ("D1FC", 0.5, false, ParameterType::NO_DEP,
       &VDMOS::Model::D1DIOdepletionCapCoeff, NULL,
        U_NONE, CAT_CAP, "Drain-source diode forward bias depletion capacitance");
 
-    addPar ("D1BV", 1E99, false, ParameterType::NO_DEP,
+    p.addPar ("D1BV", 1E99, false, ParameterType::NO_DEP,
       &VDMOS::Model::D1DIObreakdownVoltage,
       &VDMOS::Model::D1DIObreakdownVoltageGiven,
        U_VOLT, CAT_VOLT, "Drain-source diode reverse breakdown voltage");
 
-    addPar ("D1IBV", 1e-3, false, ParameterType::NO_DEP,
+    p.addPar ("D1IBV", 1e-3, false, ParameterType::NO_DEP,
       &VDMOS::Model::D1DIObreakdownCurrent, NULL,
        U_AMP, CAT_CURRENT, "Drain-source diode current at breakdown voltage");
 
-    addPar ("D1IKF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("D1IKF", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::D1DIOikf, NULL,
        U_AMP, CAT_CURRENT, "Drain-source diode high injection knee currrent");
 
-    addPar ("D1ISR", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("D1ISR", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::D1DIOisr, NULL,
        U_AMP, CAT_CURRENT, "Drain-source diode recombination saturation current");
 
-    addPar ("D1NR", 2.0, false, ParameterType::NO_DEP,
+    p.addPar ("D1NR", 2.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::D1DIOnr, NULL,
        U_NONE, CAT_PROCESS, "Drain-source diode recombination emission coefficient");
 
-    addPar ("D1KF", 0.0, false, ParameterType::NO_DEP,
+    p.addPar ("D1KF", 0.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::D1DIOfNcoef, NULL,
        U_NONE, CAT_FLICKER, "Drain-source diode flicker noise coefficient");
 
-    addPar ("D1AF", 1.0, false, ParameterType::NO_DEP,
+    p.addPar ("D1AF", 1.0, false, ParameterType::NO_DEP,
       &VDMOS::Model::D1DIOfNexp, NULL,
        U_NONE, CAT_FLICKER, "Drain-source diode flicker noise exponent");
 
-    addPar ("D1TNOM", 300.15, false, ParameterType::NO_DEP,
+    p.addPar ("D1TNOM", 300.15, false, ParameterType::NO_DEP,
       &VDMOS::Model::D1DIOnomTemp, NULL,
        U_DEGC, CAT_TEMP, "Drain-source diode nominal temperature");
 
     // Set up non-double precision variables:
-    addPar ("TPG", 1, false, ParameterType::NO_DEP,
+    p.addPar ("TPG", 1, false, ParameterType::NO_DEP,
             &VDMOS::Model::gateType, NULL,
             U_NONE, CAT_MATERIAL, "Gate material type (-1 = same as substrate,"
                             " 0 = aluminum, 1 = opposite of substrate)");
-    addPar ("CV", 1, false, ParameterType::NO_DEP,
+    p.addPar ("CV", 1, false, ParameterType::NO_DEP,
             &VDMOS::Model::cv, NULL,
             U_NONE, CAT_CONTROL, "Charge model storage selector");
-    addPar ("CVE", 1, false, ParameterType::NO_DEP,
+    p.addPar ("CVE", 1, false, ParameterType::NO_DEP,
             &VDMOS::Model::cve, NULL,
             U_NONE, CAT_CONTROL, "Meyer-like capacitor model selector");
-    addPar ("FPE", 1, false, ParameterType::NO_DEP,
+    p.addPar ("FPE", 1, false, ParameterType::NO_DEP,
             &VDMOS::Model::fpe, NULL,
             U_NONE, CAT_CONTROL, "Charge partitioning scheme selector");
-    addPar ("ISUBMOD", 0, false, ParameterType::NO_DEP,
+    p.addPar ("ISUBMOD", 0, false, ParameterType::NO_DEP,
             &VDMOS::Model::isubmod, NULL,
             U_NONE, ParameterCategory(CAT_PROCESS | UNDOCUMENTED), "");
 
-    DeviceModel::initThermalModel(*this);
+    DeviceModel::initThermalModel(p);
 }
 
-namespace VDMOS {
 
-vector< vector<int> > Instance::jacStamp_DC_SC_GC;
-vector< vector<int> > Instance::jacStamp_DC_GC;
-vector< vector<int> > Instance::jacStamp_SC_GC;
-vector< vector<int> > Instance::jacStamp_DC_SC;
-vector< vector<int> > Instance::jacStamp_GC;
-vector< vector<int> > Instance::jacStamp_SC;
-vector< vector<int> > Instance::jacStamp_DC;
-vector< vector<int> > Instance::jacStamp;
 
-vector<int> Instance::jacMap_DC_SC_GC;
-vector<int> Instance::jacMap_DC_GC;
-vector<int> Instance::jacMap_SC_GC;
-vector<int> Instance::jacMap_DC_SC;
-vector<int> Instance::jacMap_GC;
-vector<int> Instance::jacMap_SC;
-vector<int> Instance::jacMap_DC;
-vector<int> Instance::jacMap;
+std::vector< std::vector<int> > Instance::jacStamp_DC_SC_GC;
+std::vector< std::vector<int> > Instance::jacStamp_DC_GC;
+std::vector< std::vector<int> > Instance::jacStamp_SC_GC;
+std::vector< std::vector<int> > Instance::jacStamp_DC_SC;
+std::vector< std::vector<int> > Instance::jacStamp_GC;
+std::vector< std::vector<int> > Instance::jacStamp_SC;
+std::vector< std::vector<int> > Instance::jacStamp_DC;
+std::vector< std::vector<int> > Instance::jacStamp;
 
-vector< vector<int> > Instance::jacMap2_DC_SC_GC;
-vector< vector<int> > Instance::jacMap2_DC_GC;
-vector< vector<int> > Instance::jacMap2_SC_GC;
-vector< vector<int> > Instance::jacMap2_DC_SC;
-vector< vector<int> > Instance::jacMap2_GC;
-vector< vector<int> > Instance::jacMap2_SC;
-vector< vector<int> > Instance::jacMap2_DC;
-vector< vector<int> > Instance::jacMap2;
+std::vector<int> Instance::jacMap_DC_SC_GC;
+std::vector<int> Instance::jacMap_DC_GC;
+std::vector<int> Instance::jacMap_SC_GC;
+std::vector<int> Instance::jacMap_DC_SC;
+std::vector<int> Instance::jacMap_GC;
+std::vector<int> Instance::jacMap_SC;
+std::vector<int> Instance::jacMap_DC;
+std::vector<int> Instance::jacMap;
+
+std::vector< std::vector<int> > Instance::jacMap2_DC_SC_GC;
+std::vector< std::vector<int> > Instance::jacMap2_DC_GC;
+std::vector< std::vector<int> > Instance::jacMap2_SC_GC;
+std::vector< std::vector<int> > Instance::jacMap2_DC_SC;
+std::vector< std::vector<int> > Instance::jacMap2_GC;
+std::vector< std::vector<int> > Instance::jacMap2_SC;
+std::vector< std::vector<int> > Instance::jacMap2_DC;
+std::vector< std::vector<int> > Instance::jacMap2;
 
 // duplicating, but with RD1RS nonzero
-vector< vector<int> > Instance::jacStamp_D1C_DC_SC_GC;
-vector< vector<int> > Instance::jacStamp_D1C_DC_GC;
-vector< vector<int> > Instance::jacStamp_D1C_SC_GC;
-vector< vector<int> > Instance::jacStamp_D1C_DC_SC;
-vector< vector<int> > Instance::jacStamp_D1C_GC;
-vector< vector<int> > Instance::jacStamp_D1C_SC;
-vector< vector<int> > Instance::jacStamp_D1C_DC;
-vector< vector<int> > Instance::jacStamp_D1C;
+std::vector< std::vector<int> > Instance::jacStamp_D1C_DC_SC_GC;
+std::vector< std::vector<int> > Instance::jacStamp_D1C_DC_GC;
+std::vector< std::vector<int> > Instance::jacStamp_D1C_SC_GC;
+std::vector< std::vector<int> > Instance::jacStamp_D1C_DC_SC;
+std::vector< std::vector<int> > Instance::jacStamp_D1C_GC;
+std::vector< std::vector<int> > Instance::jacStamp_D1C_SC;
+std::vector< std::vector<int> > Instance::jacStamp_D1C_DC;
+std::vector< std::vector<int> > Instance::jacStamp_D1C;
 
-vector<int> Instance::jacMap_D1C_DC_SC_GC;
-vector<int> Instance::jacMap_D1C_DC_GC;
-vector<int> Instance::jacMap_D1C_SC_GC;
-vector<int> Instance::jacMap_D1C_DC_SC;
-vector<int> Instance::jacMap_D1C_GC;
-vector<int> Instance::jacMap_D1C_SC;
-vector<int> Instance::jacMap_D1C_DC;
-vector<int> Instance::jacMap_D1C;
+std::vector<int> Instance::jacMap_D1C_DC_SC_GC;
+std::vector<int> Instance::jacMap_D1C_DC_GC;
+std::vector<int> Instance::jacMap_D1C_SC_GC;
+std::vector<int> Instance::jacMap_D1C_DC_SC;
+std::vector<int> Instance::jacMap_D1C_GC;
+std::vector<int> Instance::jacMap_D1C_SC;
+std::vector<int> Instance::jacMap_D1C_DC;
+std::vector<int> Instance::jacMap_D1C;
 
-vector< vector<int> > Instance::jacMap2_D1C_DC_SC_GC;
-vector< vector<int> > Instance::jacMap2_D1C_DC_GC;
-vector< vector<int> > Instance::jacMap2_D1C_SC_GC;
-vector< vector<int> > Instance::jacMap2_D1C_DC_SC;
-vector< vector<int> > Instance::jacMap2_D1C_GC;
-vector< vector<int> > Instance::jacMap2_D1C_SC;
-vector< vector<int> > Instance::jacMap2_D1C_DC;
-vector< vector<int> > Instance::jacMap2_D1C;
-
-
-
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
-}
-
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
+std::vector< std::vector<int> > Instance::jacMap2_D1C_DC_SC_GC;
+std::vector< std::vector<int> > Instance::jacMap2_D1C_DC_GC;
+std::vector< std::vector<int> > Instance::jacMap2_D1C_SC_GC;
+std::vector< std::vector<int> > Instance::jacMap2_D1C_DC_SC;
+std::vector< std::vector<int> > Instance::jacMap2_D1C_GC;
+std::vector< std::vector<int> > Instance::jacMap2_D1C_SC;
+std::vector< std::vector<int> > Instance::jacMap2_D1C_DC;
+std::vector< std::vector<int> > Instance::jacMap2_D1C;
 
 //--------------------- Class Model ----------------------------
 
@@ -597,10 +582,11 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Tom Russo, Component Information and Models
 // Creation Date : 2/26/01
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-                                        SolverState & ss1,
-                                        DeviceOptions & do1)
-  : DeviceModel(MB, ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
     dtype(CONSTNMOS),
     gateType(0),
 
@@ -749,11 +735,7 @@ Model::Model (const ModelBlock & MB,
     }
     else
     {
-      string msg = "Could not recognize the type for model ";
-      msg += getName();
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+      UserError0(*this) << "Could not recognize the type for model " << getName();
     }
   }
 
@@ -783,70 +765,44 @@ Model::Model (const ModelBlock & MB,
   updateDependentParameters();
 
   // calculate dependent (ie computed) params and check for errors:
-
   if (given("U0"))
   {
-    string msg1 =  " ******************* \n";
-    msg1 += ": WARNING: You have specified the surface mobility as u0 instead ";
-    msg1 += "of uo.  This is supported, but ill-advised.\n";
-    msg1 += " ***************** \n";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING, msg1);
     if (given("UO"))
-    {
-      string msg2 = "Not only that, you specified both uo and u0, which is not allowed.";
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg2;
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
-    }
+      UserError0(*this) << "You have specified both uo and u0, which is not allowed.";
+
+    UserWarning0(*this) << "You have specified the surface mobility as u0 instead of uo.  This is supported, but ill-advised.";
+
     surfaceMobility = surfaceMobility0;
   }
 
   if(eta == 0)
   {
-    string msg = "ETA cannot be zero for level 18";
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "ETA cannot be zero for level 18";
   }
 
   if(driftParamA == 0 && driftParamB == 0)
   {
-    string msg = "Both driftParamA and driftParamB cannot be zero";
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Both driftParamA and driftParamB cannot be zero";
   }
 
   if(cv != 1 && cv != 2)
   {
-    string msg = "Model error: use cv=1 (Meyer's model) or cv=2 (Meyer-like Model)";
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Model error: use cv=1 (Meyer's model) or cv=2 (Meyer-like Model)";
   }
 
   if(fpe != 1 && fpe != 2 && fpe != 3)
   {
-    string msg = "Model error: use fpe=1 (and xqc), fpe=2 (and xqc,mcv) or fpe=3";
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Model error: use fpe=1 (and xqc), fpe=2 (and xqc,mcv) or fpe=3";
   }
 
   if(mcv <= 1)
   {
-    string msg = "Model error: charge conservation requires mcv > 1";
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Model error: charge conservation requires mcv > 1";
   }
 
   if(xqc > 1 || xqc < 0.5)
   {
-    string msg = "Model error: charge conservation requires 0.5 <= xqc <= 1.0";
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Model error: charge conservation requires 0.5 <= xqc <= 1.0";
   }
 
   // New version of VDMOSModel. We have to set lambda to zero
@@ -856,25 +812,22 @@ Model::Model (const ModelBlock & MB,
   // limit grading coeff to max of 0.9
   if(D1DIOgradingCoeff > 0.9)
   {
-      string msg1 = "grading coefficient too large, limited to 0.9";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg1);
-      D1DIOgradingCoeff = 0.9;
+    UserWarning0(*this) << "grading coefficient too large, limited to 0.9";
+    D1DIOgradingCoeff = 0.9;
   }
 
   // limit activation energy to min of 0.1
   if(D1DIOactivationEnergy < 0.1)
   {
-      string msg2 = "activation energy too small, limited to 0.1";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg2);
-      D1DIOactivationEnergy = 0.1;
+    UserWarning0(*this) << "activation energy too small, limited to 0.1";
+    D1DIOactivationEnergy = 0.1;
   }
 
   // limit depletion cap coeff to max of 0.95
   if(D1DIOdepletionCapCoeff > 0.95)
   {
-      string msg3 = "coefficient Fc too large, limited to 0.95";
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_WARNING_0, msg3);
-      D1DIOdepletionCapCoeff = 0.95;
+    UserWarning0(*this) << "coefficient Fc too large, limited to 0.95";
+    D1DIOdepletionCapCoeff = 0.95;
   }
 
   processParams ();
@@ -882,42 +835,42 @@ Model::Model (const ModelBlock & MB,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "   " << endl;
-    cout << "l0 " << l0 << endl;
-    cout << "w0 " << w0 << endl;
-    cout << "vt0 = " << vt0 << endl;
-    cout << "gamma = " << gamma << endl;
-    cout << "lambda = " << lambda << endl;
-    cout << "phi = " << phi << endl;
-    cout << "drainResistance = " << drainResistance << endl;
-    cout << "gateResistance  = " << gateResistance << endl;
-    cout << "sourceResistance = " << sourceResistance << endl;
-    cout << "capBD = " << capBD << endl;
-    cout << "capBS = " << capBS << endl;
-    cout << "timeScale = " << timeScale << endl;
-    cout << "jctSatCur = " << jctSatCur << endl;
-    cout << "bulkJctPotential = " << bulkJctPotential << endl;
-    cout << "gateSourceOverlapCapFactor = " << gateSourceOverlapCapFactor << endl;
-    cout << "gateDrainOverlapCapFactor = " << gateDrainOverlapCapFactor << endl;
-    cout << "gateBulkOverlapCapFactor = " << gateBulkOverlapCapFactor << endl;
-    cout << "sheetResistance = " << sheetResistance << endl;
-    cout << "bulkCapFactor   = " << bulkCapFactor   << endl;
-    cout << "bulkJctBotGradingCoeff   = " << bulkJctBotGradingCoeff   << endl;
-    cout << "sideWallCapFactor   = " << sideWallCapFactor   << endl;
-    cout << "bulkJctSideGradingCoeff   = " << bulkJctSideGradingCoeff   << endl;
-    cout << "jctSatCurDensity   = " << jctSatCurDensity   << endl;
-    cout << "oxideThickness   = " << oxideThickness   << endl;
-    cout << "oxideCapFactor = " << oxideCapFactor << endl;
-    cout << "latDiff   = " << latDiff   << endl;
-    cout << "surfaceMobility   = " << surfaceMobility   << endl;
-    cout << "fwdCapDepCoeff   = " << fwdCapDepCoeff   << endl;
-    cout << "substrateDoping   = " << substrateDoping   << endl;
-    cout << "gateType   = " << gateType   << endl;
-    cout << "surfaceStateDensity   = " << surfaceStateDensity   << endl;
-    cout << "tnom   = " << tnom   << endl;
-    cout << "driftParamA = " << driftParamA << endl;
-    cout << "driftParamB = " << driftParamB << endl;
-    cout << "rdsshunt = " << rdsshunt << endl;
+    Xyce::dout() << "   " << std::endl;
+    Xyce::dout() << "l0 " << l0 << std::endl;
+    Xyce::dout() << "w0 " << w0 << std::endl;
+    Xyce::dout() << "vt0 = " << vt0 << std::endl;
+    Xyce::dout() << "gamma = " << gamma << std::endl;
+    Xyce::dout() << "lambda = " << lambda << std::endl;
+    Xyce::dout() << "phi = " << phi << std::endl;
+    Xyce::dout() << "drainResistance = " << drainResistance << std::endl;
+    Xyce::dout() << "gateResistance  = " << gateResistance << std::endl;
+    Xyce::dout() << "sourceResistance = " << sourceResistance << std::endl;
+    Xyce::dout() << "capBD = " << capBD << std::endl;
+    Xyce::dout() << "capBS = " << capBS << std::endl;
+    Xyce::dout() << "timeScale = " << timeScale << std::endl;
+    Xyce::dout() << "jctSatCur = " << jctSatCur << std::endl;
+    Xyce::dout() << "bulkJctPotential = " << bulkJctPotential << std::endl;
+    Xyce::dout() << "gateSourceOverlapCapFactor = " << gateSourceOverlapCapFactor << std::endl;
+    Xyce::dout() << "gateDrainOverlapCapFactor = " << gateDrainOverlapCapFactor << std::endl;
+    Xyce::dout() << "gateBulkOverlapCapFactor = " << gateBulkOverlapCapFactor << std::endl;
+    Xyce::dout() << "sheetResistance = " << sheetResistance << std::endl;
+    Xyce::dout() << "bulkCapFactor   = " << bulkCapFactor   << std::endl;
+    Xyce::dout() << "bulkJctBotGradingCoeff   = " << bulkJctBotGradingCoeff   << std::endl;
+    Xyce::dout() << "sideWallCapFactor   = " << sideWallCapFactor   << std::endl;
+    Xyce::dout() << "bulkJctSideGradingCoeff   = " << bulkJctSideGradingCoeff   << std::endl;
+    Xyce::dout() << "jctSatCurDensity   = " << jctSatCurDensity   << std::endl;
+    Xyce::dout() << "oxideThickness   = " << oxideThickness   << std::endl;
+    Xyce::dout() << "oxideCapFactor = " << oxideCapFactor << std::endl;
+    Xyce::dout() << "latDiff   = " << latDiff   << std::endl;
+    Xyce::dout() << "surfaceMobility   = " << surfaceMobility   << std::endl;
+    Xyce::dout() << "fwdCapDepCoeff   = " << fwdCapDepCoeff   << std::endl;
+    Xyce::dout() << "substrateDoping   = " << substrateDoping   << std::endl;
+    Xyce::dout() << "gateType   = " << gateType   << std::endl;
+    Xyce::dout() << "surfaceStateDensity   = " << surfaceStateDensity   << std::endl;
+    Xyce::dout() << "tnom   = " << tnom   << std::endl;
+    Xyce::dout() << "driftParamA = " << driftParamA << std::endl;
+    Xyce::dout() << "driftParamB = " << driftParamB << std::endl;
+    Xyce::dout() << "rdsshunt = " << rdsshunt << std::endl;
   }
 #endif
 
@@ -933,9 +886,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -955,24 +908,45 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i;
-  os << endl;
-  os << "    name     getModelName()  Parameters" << endl;
+  os << std::endl;
+  os << "    name     model name  Parameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "\t";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 //-----------------------------------------------------------------------------
 // Function      : Model::processParams
@@ -982,7 +956,7 @@ std::ostream &Model::printOutInstances(std::ostream &os) const
 // Creator       : pmc
 // Creation Date : 2/17/2004
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
   double wkfngs(0.0);
   double wkfng(0.0);
@@ -1039,11 +1013,9 @@ bool Model::processParams (string param)
     }
     else
     {
+      UserError0(*this) << "SubstrateDoping is 0";
+
       substrateDoping = 0;
-      string msg = "SubstrateDoping=0";
-      std::ostringstream oss;
-      oss << "Error in " << netlistLocation() << "\n" << msg;
-      N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, oss.str());
     }
   }
 
@@ -1082,12 +1054,12 @@ bool Model::processParams (string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 03/23/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -1108,14 +1080,12 @@ bool Model::processInstanceParams(string param)
 // Creator       : Tom Russo, Component Information and Models
 // Creation Date : 3/21/01
 //-----------------------------------------------------------------------------
-Instance::Instance(InstanceBlock & IB,
-    Model & Miter,
-    MatrixLoadData & mlData1,
-    SolverState &ss1,
-    ExternData  &ed1,
-    DeviceOptions & do1)
-  : DeviceInstance(IB,mlData1,ss1, ed1, do1),
-
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock &         IB,
+  Model &                       Miter,
+  const FactoryBlock &          factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(Miter),
     dNode(0),
     gNode(0),
@@ -1144,7 +1114,7 @@ Instance::Instance(InstanceBlock & IB,
     vthLimit(0.0),
     numberParallel(1),
 
-            temp(getDeviceOptions().temp.dVal()),
+            temp(getDeviceOptions().temp.getImmutableValue<double>()),
     tSurfMob(0.0),
     tPhi(0.0),
     tVto(0.0),
@@ -1481,9 +1451,6 @@ Instance::Instance(InstanceBlock & IB,
     li_store_dev_is(-1),
     li_store_dev_ib(-1)
 {
-  setName(IB.getName());
-  setModelName(model_.getName());
-
   //numStateVars = 21;
   numStateVars = 15;
   numExtVars   = 4;
@@ -1621,7 +1588,7 @@ Instance::Instance(InstanceBlock & IB,
 
   // Set any non-constant parameter defaults:
   if (!given("TEMP"))
-    temp = getDeviceOptions().temp.dVal();
+    temp = getDeviceOptions().temp.getImmutableValue<double>();
   if (!given("L"))
     l = model_.l0;
   if (!given("W"))
@@ -1701,10 +1668,7 @@ Instance::Instance(InstanceBlock & IB,
 
   if(l - 2 * model_.latDiff <=0)
   {
-    string msg = "effective channel length less than zero.";
-    std::ostringstream oss;
-    oss << "Error in " << netlistLocation() << "\n" << msg;
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_FATAL, oss.str());
+    UserError0(*this) << "Effective channel length less than zero.";
   }
 
   // values for diode #1
@@ -1741,49 +1705,22 @@ Instance::~Instance ()
 // Creator       : Robert Hoekstra, Computational Sciences
 // Creation Date : 6/21/02
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                                          const vector<int> & extLIDVecRef )
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                                          const std::vector<int> & extLIDVecRef )
 {
-  string msg;
-
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << dashedline << endl;
-    cout << "  In Instance::register LIDs\n\n";
-    cout << "  name             = " << getName() << endl;
-  }
-#endif
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "  number of internal variables: " << numInt << endl;
-    cout << "  number of external variables: " << numExt << endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "  In Instance::register LIDs\n\n";
+    Xyce::dout() << "  name             = " << getName() << std::endl;
+    Xyce::dout() << "  number of internal variables: " << numIntVars << std::endl;
+    Xyce::dout() << "  number of external variables: " << numExtVars << std::endl;
   }
 #endif
-
-  if ( numIntVars != numInt)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
-  }
 
   // copy over the global ID lists.
   intLIDVec = intLIDVecRef;
@@ -1824,18 +1761,18 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "\n variable local indices:\n";
-    cout << "  li_Drain       = " << li_Drain << endl;
-    cout << "  li_Source      = " << li_Source << endl;
-    cout << "  li_Gate        = " << li_Gate << endl;
-    cout << "  li_Bulk        = " << li_Bulk << endl;
-    cout << "  li_DrainPrime  = " << li_DrainPrime << endl;
-    cout << "  li_GatePrime   = " << li_GatePrime << endl;
-    cout << "  li_SourcePrime = " << li_SourcePrime << endl;
-    cout << "  li_DrainDrift  = " << li_DrainDrift << endl;
-    cout << "  li_D1Prime       = " << li_D1Prime << endl;
+    Xyce::dout() << "\n variable local indices:\n";
+    Xyce::dout() << "  li_Drain       = " << li_Drain << std::endl;
+    Xyce::dout() << "  li_Source      = " << li_Source << std::endl;
+    Xyce::dout() << "  li_Gate        = " << li_Gate << std::endl;
+    Xyce::dout() << "  li_Bulk        = " << li_Bulk << std::endl;
+    Xyce::dout() << "  li_DrainPrime  = " << li_DrainPrime << std::endl;
+    Xyce::dout() << "  li_GatePrime   = " << li_GatePrime << std::endl;
+    Xyce::dout() << "  li_SourcePrime = " << li_SourcePrime << std::endl;
+    Xyce::dout() << "  li_DrainDrift  = " << li_DrainDrift << std::endl;
+    Xyce::dout() << "  li_D1Prime       = " << li_D1Prime << std::endl;
 
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -1849,13 +1786,13 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 05/13/05
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
     // set up the internal name map:
-    string tmpstr;
+    std::string tmpstr;
     tmpstr = getName()+"_drainprime";
     spiceInternalName (tmpstr);
     intNameMap[ li_DrainPrime ] = tmpstr;
@@ -1900,38 +1837,19 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Robert Hoekstra, Computational Sciences
 // Creation Date : 6/21/02
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-  string msg;
-
-#ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-    "------------------------------------------------------------------------"
-    "-----";
-
-  if (getDeviceOptions().debugLevel > 0)
-  {
-    cout << endl;
-    cout << dashedline << endl;
-    cout << "  In Instance::registerStateLIDs\n\n";
-    cout << "  name             = " << getName() << endl;
-  }
-#endif
-
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
-    cout << "  Number of State LIDs: " << numSta << endl;
+  {
+    Xyce::dout() << std::endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "  In Instance::registerStateLIDs\n\n";
+    Xyce::dout() << "  name             = " << getName() << std::endl;
+    Xyce::dout() << "  Number of State LIDs: " << numStateVars << std::endl;
+  }
 #endif
 
   // Copy over the global ID lists:
@@ -1968,32 +1886,32 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "  State local indices:" << endl;
-    cout << endl;
+    Xyce::dout() << "  State local indices:" << std::endl;
+    Xyce::dout() << std::endl;
 
-    cout << "  li_state_vbdd          = " << li_state_vbdd << "\n";
-    cout << "  li_state_vbs           = " << li_state_vbs << "\n";
-    cout << "  li_state_vgps          = " << li_state_vgps << "\n";
-    cout << "  li_state_vdds          = " << li_state_vdds << "\n";
-    cout << "  li_state_qgs           = " << li_state_qgs  << "\n";
-    //cout << "  li_state_cqgs          = " << li_state_cqgs << "\n";
-    cout << "  li_state_capgs         = " << li_state_capgs << "\n";
-    cout << "  li_state_capgdd        = " << li_state_capgdd << "\n";
-    cout << "  li_state_capgb         = " << li_state_capgb << "\n";
-    cout << "  li_state_qgdd          = " << li_state_qgdd << "\n";
-    //cout << "  li_state_cqgdd         = " << li_state_cqgdd << "\n";
-    cout << "  li_state_qgb           = " << li_state_qgb << "\n";
-    //cout << "  li_state_cqgb          = " << li_state_cqgb << "\n";
-    cout << "  li_state_qbs           = " << li_state_qbs << "\n";
-    //cout << "  li_state_cqbs          = " << li_state_cqbs << "\n";
-    cout << "  li_state_qbd           = " << li_state_qbd << "\n";
-    //cout << "  li_state_cqbd          = " << li_state_cqbd << "\n";
-    cout << "  li_state_D1DIOcapCharge  = " << li_state_D1DIOcapCharge << "\n";
-    //cout << "  li_state_D1DIOcapCurrent = " << li_state_D1DIOcapCurrent << "\n";
-    cout << "  li_state_von           = " << li_state_von << "\n";
+    Xyce::dout() << "  li_state_vbdd          = " << li_state_vbdd << "\n";
+    Xyce::dout() << "  li_state_vbs           = " << li_state_vbs << "\n";
+    Xyce::dout() << "  li_state_vgps          = " << li_state_vgps << "\n";
+    Xyce::dout() << "  li_state_vdds          = " << li_state_vdds << "\n";
+    Xyce::dout() << "  li_state_qgs           = " << li_state_qgs  << "\n";
+    //Xyce::dout() << "  li_state_cqgs          = " << li_state_cqgs << "\n";
+    Xyce::dout() << "  li_state_capgs         = " << li_state_capgs << "\n";
+    Xyce::dout() << "  li_state_capgdd        = " << li_state_capgdd << "\n";
+    Xyce::dout() << "  li_state_capgb         = " << li_state_capgb << "\n";
+    Xyce::dout() << "  li_state_qgdd          = " << li_state_qgdd << "\n";
+    //Xyce::dout() << "  li_state_cqgdd         = " << li_state_cqgdd << "\n";
+    Xyce::dout() << "  li_state_qgb           = " << li_state_qgb << "\n";
+    //Xyce::dout() << "  li_state_cqgb          = " << li_state_cqgb << "\n";
+    Xyce::dout() << "  li_state_qbs           = " << li_state_qbs << "\n";
+    //Xyce::dout() << "  li_state_cqbs          = " << li_state_cqbs << "\n";
+    Xyce::dout() << "  li_state_qbd           = " << li_state_qbd << "\n";
+    //Xyce::dout() << "  li_state_cqbd          = " << li_state_cqbd << "\n";
+    Xyce::dout() << "  li_state_D1DIOcapCharge  = " << li_state_D1DIOcapCharge << "\n";
+    //Xyce::dout() << "  li_state_D1DIOcapCurrent = " << li_state_D1DIOcapCurrent << "\n";
+    Xyce::dout() << "  li_state_von           = " << li_state_von << "\n";
 
-    cout << endl;
-    cout << dashedline << endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -2008,15 +1926,9 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 4/23/2013
 //-----------------------------------------------------------------------------
-void Instance::registerStoreLIDs( const vector<int> & stoLIDVecRef )
+void Instance::registerStoreLIDs( const std::vector<int> & stoLIDVecRef )
 {
-  int numSto = stoLIDVecRef.size();
-  if (numSto != getNumStoreVars())
-  {
-    string msg = "Instance::registerStoreLIDs:";
-    msg += "numSto != numStoreVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
+  AssertLIDs(stoLIDVecRef.size() == getNumStoreVars());
 
   // Copy over the global ID lists:
   stoLIDVec = stoLIDVecRef;
@@ -2037,16 +1949,16 @@ void Instance::registerStoreLIDs( const vector<int> & stoLIDVecRef )
 // Creator       : Richard Schiek, Electrical Systems Modeling
 // Creation Date : 4/23/2013
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getStoreNameMap ()
+std::map<int,std::string> & Instance::getStoreNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if( loadLeadCurrent && storeNameMap.empty ())
   {
     // change subcircuitname:devicetype_deviceName to
     // devicetype:subcircuitName:deviceName
-    string modName(getName());
+    std::string modName(getName());
     spiceInternalName(modName);
-    string tmpstr;
+    std::string tmpstr;
     tmpstr = modName+":DEV_ID";
     storeNameMap[ li_store_dev_id ] = tmpstr;
     tmpstr = modName+":DEV_IG";
@@ -2068,7 +1980,7 @@ map<int,string> & Instance::getStoreNameMap ()
 // Creator       : Robert Hoekstra, Computational Sciences
 // Creation Date : 9/3/02
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   if( drainCond != 0.0 && gateCond != 0.0 && sourceCond != 0.0)
     return (model_.D1DIOconductance != 0)?jacStamp_D1C_DC_SC_GC:jacStamp_DC_SC_GC;
@@ -2098,11 +2010,11 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Robert Hoekstra, Computational Sciences
 // Creation Date : 9/3/02
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
-  vector<int> map;
-  vector< vector<int> > map2;
+  std::vector<int> map;
+  std::vector< std::vector<int> > map2;
   double d1dcond=(model_.D1DIOconductance);
   if (gateCond != 0.0)
   {
@@ -2449,33 +2361,33 @@ bool Instance::loadDAEQVector ()
     dQdxdVp[li_D1Prime] -= coef_Jdxp;
     dQdxdVp[li_Drain]   += coef_Jdxp;
   }
-  
+
   if( loadLeadCurrent )
   {
     double * storeLeadQ = extData.storeLeadCurrQCompRawPtr;
-    
+
     storeLeadQ[li_store_dev_id] = -D1DIOcapCharge;
     storeLeadQ[li_store_dev_is] = 0;
     storeLeadQ[li_store_dev_ig] = 0;
     storeLeadQ[li_store_dev_ib] = (ceqbs + ceqbd - ceqgb);
-    // case where optional nodes become external nodes:    
+    // case where optional nodes become external nodes:
     if( !gateCond )
     {
       // G' is G
       storeLeadQ[li_store_dev_ig] += (ceqgs+ceqgdd+ceqgb);
     }
-  
+
     if( !sourceCond )
     {
       // S' is S
       storeLeadQ[li_store_dev_is] += (-(ceqbs + ceqgs));
     }
-  
+
     if( !drainCond )
     {
       // Ddrift is D'
     }
-  
+
     if( !model_.D1DIOconductance )
     {
       // D1' is S
@@ -2551,16 +2463,16 @@ bool Instance::loadDAEFVector ()
     dFdxdVp[li_Drain] += gd_Jdxp;
     dFdxdVp[li_D1Prime] -= gd_Jdxp;
   }
-  
+
   if( loadLeadCurrent )
   {
     double * storeLeadF = extData.nextStoVectorRawPtr;
-    
+
     storeLeadF[li_store_dev_id] = (Idraindrift + Irdsshunt - D1current);
     storeLeadF[li_store_dev_is] = (Isource - Irdsshunt + Ird1rs);
     storeLeadF[li_store_dev_ig] = 0;
     storeLeadF[li_store_dev_ib] = (ceqbs + ceqbd);
-    // case where optional nodes become external nodes: 
+    // case where optional nodes become external nodes:
     if (Igate != 0.0)
     {
       storeLeadF[li_store_dev_ig]  += Igate;
@@ -2570,18 +2482,18 @@ bool Instance::loadDAEFVector ()
       // G' is G
       storeLeadF[li_store_dev_ig] += -Igate;
     }
-  
+
     if( !sourceCond )
     {
       // S' is S
       storeLeadF[li_store_dev_is] += (-Isource-(ceqbs + cdreq));
     }
-  
+
     if( !drainCond )
     {
       // Ddrift is D'
     }
-  
+
     if( !model_.D1DIOconductance )
     {
       // D1' is S
@@ -2774,17 +2686,16 @@ bool Instance::updateIntermediateVars ()
   int    D1Check(0);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
 
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout <<"  Instance::updateIntermediateVars.\n"<<endl;
-    cout <<"  name = " << getName() << endl;
-    cout <<"  Model name = " << model_.getName() << endl;
-    cout <<"  dtype is " << model_.dtype << endl;
-    cout << endl;
-    cout.width(25); cout.precision(17); cout.setf(ios::scientific);
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() <<"  Instance::updateIntermediateVars.\n"<<std::endl;
+    Xyce::dout() <<"  name = " << getName() << std::endl;
+    Xyce::dout() <<"  Model name = " << model_.getName() << std::endl;
+    Xyce::dout() <<"  dtype is " << model_.dtype << std::endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout().width(25); Xyce::dout().precision(17); Xyce::dout().setf(std::ios::scientific);
   }
 #endif
 
@@ -2829,17 +2740,17 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "   "  << endl;
-    cout << " Solution vector: " << endl;
-    cout << " Vg  = " << Vg << endl;
-    cout << " Vd  = " << Vd << endl;
-    cout << " Vs  = " << Vs << endl;
-    cout << " Vb  = " << Vb << endl;
-    cout << " Vdp = " << Vdp << endl;
-    cout << " Vgp = " << Vgp << endl;
-    cout << " Vsp = " << Vsp << endl;
-    cout << " Vdd = " << Vdd << endl;
-    cout << " Vd1p= " << Vd1p << endl;
+    Xyce::dout() << "   "  << std::endl;
+    Xyce::dout() << " Solution vector: " << std::endl;
+    Xyce::dout() << " Vg  = " << Vg << std::endl;
+    Xyce::dout() << " Vd  = " << Vd << std::endl;
+    Xyce::dout() << " Vs  = " << Vs << std::endl;
+    Xyce::dout() << " Vb  = " << Vb << std::endl;
+    Xyce::dout() << " Vdp = " << Vdp << std::endl;
+    Xyce::dout() << " Vgp = " << Vgp << std::endl;
+    Xyce::dout() << " Vsp = " << Vsp << std::endl;
+    Xyce::dout() << " Vdd = " << Vdd << std::endl;
+    Xyce::dout() << " Vd1p= " << Vd1p << std::endl;
   }
 #endif
 
@@ -2945,8 +2856,8 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "After Von first set, ";
-    cout << " von = " << von << " Von = " << Von << endl;
+    Xyce::dout() << "After Von first set, ";
+    Xyce::dout() << " von = " << von << " Von = " << Von << std::endl;
   }
 #endif
 
@@ -2958,14 +2869,14 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << " checking whether to limit voltages  "<< endl;
-      cout << "  Von = " << Von << endl;
-      cout << " before limiting: " << endl;
-      cout << " vgpdd = " << vgpdd <<  " vgpdd_old = " << vgpdd_old << endl;
-      cout << " vgps  = " << vgps <<  " vgps_old = " << vgps_old << endl;
-      cout << " vdds = " << vdds <<  " vdds_old = " << vdds_old << endl;
-      cout << " vbs  = " << vbs <<  " vbs_old = " << vbs_old << endl;
-      cout << " vbdd = " << vbdd <<  " vbdd_old = " << vbdd_old << endl;
+      Xyce::dout() << " checking whether to limit voltages  "<< std::endl;
+      Xyce::dout() << "  Von = " << Von << std::endl;
+      Xyce::dout() << " before limiting: " << std::endl;
+      Xyce::dout() << " vgpdd = " << vgpdd <<  " vgpdd_old = " << vgpdd_old << std::endl;
+      Xyce::dout() << " vgps  = " << vgps <<  " vgps_old = " << vgps_old << std::endl;
+      Xyce::dout() << " vdds = " << vdds <<  " vdds_old = " << vdds_old << std::endl;
+      Xyce::dout() << " vbs  = " << vbs <<  " vbs_old = " << vbs_old << std::endl;
+      Xyce::dout() << " vbdd = " << vbdd <<  " vbdd_old = " << vbdd_old << std::endl;
     }
 #endif
 
@@ -2999,12 +2910,12 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << " After limiting: " << endl;
-      cout << " vgpdd = " << vgpdd << endl;
-      cout << " vgps  = " << vgps << endl;
-      cout << " vdds = " << vdds << endl;
-      cout << " vbs  = " << vbs << endl;
-      cout << " vbdd = " << vbdd << endl;
+      Xyce::dout() << " After limiting: " << std::endl;
+      Xyce::dout() << " vgpdd = " << vgpdd << std::endl;
+      Xyce::dout() << " vgps  = " << vgps << std::endl;
+      Xyce::dout() << " vdds = " << vdds << std::endl;
+      Xyce::dout() << " vbs  = " << vbs << std::endl;
+      Xyce::dout() << " vbdd = " << vbdd << std::endl;
     }
 #endif
 
@@ -3039,23 +2950,23 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << " vbs  = " << vbs << endl;
-    cout << " vgps = " << vgps << endl;
-    cout << " vdds = " << vdds << endl;
-    cout << " vbdd = " << vbdd << endl;
-    cout << " vgpdd= " << vgpdd << endl;
+    Xyce::dout() << " vbs  = " << vbs << std::endl;
+    Xyce::dout() << " vgps = " << vgps << std::endl;
+    Xyce::dout() << " vdds = " << vdds << std::endl;
+    Xyce::dout() << " vbdd = " << vbdd << std::endl;
+    Xyce::dout() << " vgpdd= " << vgpdd << std::endl;
 
-    cout << " Vddp = " << Vddp << endl;
-    cout << " Vddd = " << Vddd << endl;
-    cout << " Vdddp= " << Vdddp << endl;
-    cout << " Vssp = " << Vssp << endl;
-    cout << " Vbsp = " << Vbsp << endl;
-    cout << " Vbdp = " << Vbdp << endl;
-    cout << " Vggp = " << Vggp << endl;
-    cout << " Vgpsp = " << Vgpsp << endl;
-    cout << " Vgpdp = " << Vgpdp << endl;
-    cout << " Vgpb  = " << Vgpb  << endl;
-    cout << " Vdpsp= " << Vdpsp << endl;
+    Xyce::dout() << " Vddp = " << Vddp << std::endl;
+    Xyce::dout() << " Vddd = " << Vddd << std::endl;
+    Xyce::dout() << " Vdddp= " << Vdddp << std::endl;
+    Xyce::dout() << " Vssp = " << Vssp << std::endl;
+    Xyce::dout() << " Vbsp = " << Vbsp << std::endl;
+    Xyce::dout() << " Vbdp = " << Vbdp << std::endl;
+    Xyce::dout() << " Vggp = " << Vggp << std::endl;
+    Xyce::dout() << " Vgpsp = " << Vgpsp << std::endl;
+    Xyce::dout() << " Vgpdp = " << Vgpdp << std::endl;
+    Xyce::dout() << " Vgpb  = " << Vgpb  << std::endl;
+    Xyce::dout() << " Vdpsp= " << Vdpsp << std::endl;
 
   }
 #endif
@@ -3069,13 +2980,13 @@ bool Instance::updateIntermediateVars ()
   {
     if (origFlag == 0)
     {
-      cout << " Something modified the voltages. " << endl;
-      cout << " Voltage       before      after        diff " << endl;
-      cout << " vgps       " << vgps_orig << "  " << vgps << " " << vgps-vgps_orig << endl;
-      cout << " vdds       " << vdds_orig << "  " << vdds << " " << vdds-vdds_orig << endl;
-      cout << " vbs       " << vbs_orig << "  " << vbs << " " << vbs-vbs_orig << endl;
-      cout << " vbdd       " << vbdd_orig << "  " << vbdd << " " << vbdd-vbdd_orig << endl;
-      cout << " vgpdd       " << vgpdd_orig << "  " << vgpdd << " " << vgpdd-vgpdd_orig << endl;
+      Xyce::dout() << " Something modified the voltages. " << std::endl;
+      Xyce::dout() << " Voltage       before      after        diff " << std::endl;
+      Xyce::dout() << " vgps       " << vgps_orig << "  " << vgps << " " << vgps-vgps_orig << std::endl;
+      Xyce::dout() << " vdds       " << vdds_orig << "  " << vdds << " " << vdds-vdds_orig << std::endl;
+      Xyce::dout() << " vbs       " << vbs_orig << "  " << vbs << " " << vbs-vbs_orig << std::endl;
+      Xyce::dout() << " vbdd       " << vbdd_orig << "  " << vbdd << " " << vbdd-vbdd_orig << std::endl;
+      Xyce::dout() << " vgpdd       " << vgpdd_orig << "  " << vgpdd << " " << vgpdd-vgpdd_orig << std::endl;
     }
   }
 #endif
@@ -3139,14 +3050,14 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "*******Setting cbs for vbs<=0 ******" << endl;
-      cout << "         vbs  = " << vbs << endl;
-      cout << "          vt  = " << vt  << endl;
-      cout << "          n2  = " << model_.n2  << endl;
-      cout << "         SSC  = " << SourceSatCur << endl;
-      cout << "         gbs  = " << gbs  << endl;
-      cout << "         cbs  = " << cbs << endl;
-      cout << "         j1   = " << j1 << endl;
+      Xyce::dout() << "*******Setting cbs for vbs<=0 ******" << std::endl;
+      Xyce::dout() << "         vbs  = " << vbs << std::endl;
+      Xyce::dout() << "          vt  = " << vt  << std::endl;
+      Xyce::dout() << "          n2  = " << model_.n2  << std::endl;
+      Xyce::dout() << "         SSC  = " << SourceSatCur << std::endl;
+      Xyce::dout() << "         gbs  = " << gbs  << std::endl;
+      Xyce::dout() << "         cbs  = " << cbs << std::endl;
+      Xyce::dout() << "         j1   = " << j1 << std::endl;
     }
 #endif
   }
@@ -3163,17 +3074,17 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "*******Setting cbs for vbs>0 ******" << endl;
-      cout << "     vbs  = " << vbs << endl;
-      cout << "      vt  = " << vt  << endl;
-      cout << "      n2  = " << model_.n2 << endl;
-      cout << "  vbs/vt  = " << vbs/vt  << endl;
-      cout << "  Maxarg  = " << CONSTMAX_EXP_ARG << endl;
-      cout << "     arg  = " << Xycemin(CONSTMAX_EXP_ARG,
-                                         model_.n2*vbs/vt) << endl;
-      cout << "    evbs  = " << evbs << endl;
-      cout << "     gbs  = " << gbs << endl;
-      cout << "     cbs  = " << cbs << endl;
+      Xyce::dout() << "*******Setting cbs for vbs>0 ******" << std::endl;
+      Xyce::dout() << "     vbs  = " << vbs << std::endl;
+      Xyce::dout() << "      vt  = " << vt  << std::endl;
+      Xyce::dout() << "      n2  = " << model_.n2 << std::endl;
+      Xyce::dout() << "  vbs/vt  = " << vbs/vt  << std::endl;
+      Xyce::dout() << "  Maxarg  = " << CONSTMAX_EXP_ARG << std::endl;
+      Xyce::dout() << "     arg  = " << Xycemin(CONSTMAX_EXP_ARG,
+                                         model_.n2*vbs/vt) << std::endl;
+      Xyce::dout() << "    evbs  = " << evbs << std::endl;
+      Xyce::dout() << "     gbs  = " << gbs << std::endl;
+      Xyce::dout() << "     cbs  = " << cbs << std::endl;
     }
 #endif
   }
@@ -3189,13 +3100,13 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "*******Setting cbd for vbdd<=0 ******" << endl;
-      cout << "         vbdd = " << vbdd << endl;
-      cout << "         SSC  = " << SourceSatCur << endl;
-      cout << "          vt  = " << vt  << endl;
-      cout << "          n2  = " << model_.n2 << endl;
-      cout << "         gbd  = " << gbd << endl;
-      cout << "         cbd  = " << cbd << endl;
+      Xyce::dout() << "*******Setting cbd for vbdd<=0 ******" << std::endl;
+      Xyce::dout() << "         vbdd = " << vbdd << std::endl;
+      Xyce::dout() << "         SSC  = " << SourceSatCur << std::endl;
+      Xyce::dout() << "          vt  = " << vt  << std::endl;
+      Xyce::dout() << "          n2  = " << model_.n2 << std::endl;
+      Xyce::dout() << "         gbd  = " << gbd << std::endl;
+      Xyce::dout() << "         cbd  = " << cbd << std::endl;
     }
 #endif
 
@@ -3213,16 +3124,16 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "*******Setting cbd for vbdd>0 ******" << endl;
-      cout << "     vbdd  = " << vbdd << endl;
-      cout << "      vt   = " << vt  << endl;
-      cout << "  vbdd/vt  = " << vbdd/vt  << endl;
-      cout << "  Maxarg   = " << CONSTMAX_EXP_ARG << endl;
-      cout << "     arg   = " << Xycemin(CONSTMAX_EXP_ARG,
-                                        model_.n2*vbdd/vt) << endl;
-      cout << "    evbdd  = " << evbdd << endl;
-      cout << "     gbd   = " << gbd << endl;
-      cout << "     cbd   = " << cbd << endl;
+      Xyce::dout() << "*******Setting cbd for vbdd>0 ******" << std::endl;
+      Xyce::dout() << "     vbdd  = " << vbdd << std::endl;
+      Xyce::dout() << "      vt   = " << vt  << std::endl;
+      Xyce::dout() << "  vbdd/vt  = " << vbdd/vt  << std::endl;
+      Xyce::dout() << "  Maxarg   = " << CONSTMAX_EXP_ARG << std::endl;
+      Xyce::dout() << "     arg   = " << Xycemin(CONSTMAX_EXP_ARG,
+                                        model_.n2*vbdd/vt) << std::endl;
+      Xyce::dout() << "    evbdd  = " << evbdd << std::endl;
+      Xyce::dout() << "     gbd   = " << gbd << std::endl;
+      Xyce::dout() << "     cbd   = " << cbd << std::endl;
     }
 #endif
   }
@@ -3320,23 +3231,23 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "  "  << endl;
-    cout << " dtype   = " << model_.dtype << endl;
-    cout << " D1vd    = " << D1vd << endl;
-    cout << " D1vtr   = " << D1vtr << endl;
-    cout << " D1csat  = " << D1csat << endl;
-    cout << " D1csatr = " << D1csatr << endl;
-    cout << " D1gspr  = " << D1gspr << endl;
-    cout << " D1cdr   = " << D1cdr << endl;
-    cout << " D1gdr   = " << D1gdr << endl;
-    cout << " D1vte   = " << D1vte << endl;
-    cout << " D1evd   = " << D1evd << endl;
-    cout << " D1arg   = " << D1arg << endl;
-    cout << " D1evrev = " << D1evrev << endl;
-    cout << " D1DIOtBrkdwnV = " << D1DIOtBrkdwnV << endl << endl;
-    cout << " D1cd    = " << D1cd << endl;
-    cout << " D1gd    = " << D1gd << endl;
-    cout << " D1cdeq  = " << D1cdeq << endl;
+    Xyce::dout() << "  "  << std::endl;
+    Xyce::dout() << " dtype   = " << model_.dtype << std::endl;
+    Xyce::dout() << " D1vd    = " << D1vd << std::endl;
+    Xyce::dout() << " D1vtr   = " << D1vtr << std::endl;
+    Xyce::dout() << " D1csat  = " << D1csat << std::endl;
+    Xyce::dout() << " D1csatr = " << D1csatr << std::endl;
+    Xyce::dout() << " D1gspr  = " << D1gspr << std::endl;
+    Xyce::dout() << " D1cdr   = " << D1cdr << std::endl;
+    Xyce::dout() << " D1gdr   = " << D1gdr << std::endl;
+    Xyce::dout() << " D1vte   = " << D1vte << std::endl;
+    Xyce::dout() << " D1evd   = " << D1evd << std::endl;
+    Xyce::dout() << " D1arg   = " << D1arg << std::endl;
+    Xyce::dout() << " D1evrev = " << D1evrev << std::endl;
+    Xyce::dout() << " D1DIOtBrkdwnV = " << D1DIOtBrkdwnV << std::endl << std::endl;
+    Xyce::dout() << " D1cd    = " << D1cd << std::endl;
+    Xyce::dout() << " D1gd    = " << D1gd << std::endl;
+    Xyce::dout() << " D1cdeq  = " << D1cdeq << std::endl;
   }
 #endif
 
@@ -3504,12 +3415,12 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "  "  << endl;
-    cout << " Going into qmeyer..." << endl;
-    cout << " Mode is " << mode << endl;
-    cout << " Args are vgps = " << vgps << " vgpdd = " << vgpdd << endl;
-    cout << " Vgpb = " << Vgpb << " Von = " << Von << " Vddsat = " << Vddsat << endl;
-    cout << " tPhi = " << tPhi << " OxideCap = " << OxideCap << endl;
+    Xyce::dout() << "  "  << std::endl;
+    Xyce::dout() << " Going into qmeyer..." << std::endl;
+    Xyce::dout() << " Mode is " << mode << std::endl;
+    Xyce::dout() << " Args are vgps = " << vgps << " vgpdd = " << vgpdd << std::endl;
+    Xyce::dout() << " Vgpb = " << Vgpb << " Von = " << Von << " Vddsat = " << Vddsat << std::endl;
+    Xyce::dout() << " tPhi = " << tPhi << " OxideCap = " << OxideCap << std::endl;
   }
 #endif
   if (mode > 0)
@@ -3554,10 +3465,10 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
     if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout << "Doing meyer back averaging..."<< endl;
-      cout << " capgs  = " << capgs  << " capgs_old  = " << capgs_old << endl;
-      cout << " capgdd = " << capgdd << " capgdd_old = " << capgdd_old << endl;
-      cout << " capgb  = " << capgb  << " capgb_old  = " << capgb_old << endl;
+      Xyce::dout() << "Doing meyer back averaging..."<< std::endl;
+      Xyce::dout() << " capgs  = " << capgs  << " capgs_old  = " << capgs_old << std::endl;
+      Xyce::dout() << " capgdd = " << capgdd << " capgdd_old = " << capgdd_old << std::endl;
+      Xyce::dout() << " capgb  = " << capgb  << " capgb_old  = " << capgb_old << std::endl;
     }
 #endif
     Capgs  = ( capgs+capgs_old   + GateSourceOverlapCap );
@@ -3567,12 +3478,12 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Capgs  = " << Capgs << endl;
-    cout << "Capgdd = " << Capgdd << endl;
-    cout << "Capgb  = " << Capgb << endl;
-    cout << "capgs  = " << capgs << endl;
-    cout << "capgdd = " << capgdd << endl;
-    cout << "capgb  = " << capgb << endl;
+    Xyce::dout() << "Capgs  = " << Capgs << std::endl;
+    Xyce::dout() << "Capgdd = " << Capgdd << std::endl;
+    Xyce::dout() << "Capgb  = " << Capgb << std::endl;
+    Xyce::dout() << "capgs  = " << capgs << std::endl;
+    Xyce::dout() << "capgdd = " << capgdd << std::endl;
+    Xyce::dout() << "capgb  = " << capgb << std::endl;
   }
 #endif
   Capgs  *= (Capgs  < 0.0)?-1.0:1.0;
@@ -3639,30 +3550,30 @@ bool Instance::updateIntermediateVars ()
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << " Done with Instance::updateIntermediateVars " << endl;
-    cout << "  mode         = " << mode << endl;
-    cout << "  Idrain       = " << Idrain << endl;
-    cout << "  Igate        = " << Igate << endl;
-    cout << "  Isource      = " << Isource << endl;
-    cout << "  Idraindrift  = " << Idraindrift << endl;
-    cout << "  Ird1rs  = " << Ird1rs << endl;
-    cout << "  dIdd_dVd     = " << dIdd_dVd << endl;
-    cout << "  gddd         = " << gddd << endl;
-    cout << "  Irdsshunt    = " << Irdsshunt << endl;
-    cout << "  D1DIOcapCurrent = " << D1DIOcapCurrent << endl;
-    cout << "  cbd          = " << cbd << endl;
-    cout << "  cbs          = " << cbs  << endl;
-    cout << "  qbd          = " << qbd  << endl;
-    cout << "  qbs          = " << qbs << endl;
-    cout << "  cdrain       = " << cdrain  << endl;
-    cout << "  cdraindrift  = " << cdraindrift  << endl;
-    cout << "  cdreq        = " << cdreq  << endl;
-    cout << "  gdds         = " << gdds << endl;
-    cout << "  gdsshunt     = " << gdsshunt << endl;
-    cout << "  gm           = " << gm << endl;
-    cout << "  gmbs         = " << gmbs << endl;
-    cout << "  Gm           = " << Gm << endl;
-    cout << "  Gmbs         = " << Gmbs << endl;
+    Xyce::dout() << " Done with Instance::updateIntermediateVars " << std::endl;
+    Xyce::dout() << "  mode         = " << mode << std::endl;
+    Xyce::dout() << "  Idrain       = " << Idrain << std::endl;
+    Xyce::dout() << "  Igate        = " << Igate << std::endl;
+    Xyce::dout() << "  Isource      = " << Isource << std::endl;
+    Xyce::dout() << "  Idraindrift  = " << Idraindrift << std::endl;
+    Xyce::dout() << "  Ird1rs  = " << Ird1rs << std::endl;
+    Xyce::dout() << "  dIdd_dVd     = " << dIdd_dVd << std::endl;
+    Xyce::dout() << "  gddd         = " << gddd << std::endl;
+    Xyce::dout() << "  Irdsshunt    = " << Irdsshunt << std::endl;
+    Xyce::dout() << "  D1DIOcapCurrent = " << D1DIOcapCurrent << std::endl;
+    Xyce::dout() << "  cbd          = " << cbd << std::endl;
+    Xyce::dout() << "  cbs          = " << cbs  << std::endl;
+    Xyce::dout() << "  qbd          = " << qbd  << std::endl;
+    Xyce::dout() << "  qbs          = " << qbs << std::endl;
+    Xyce::dout() << "  cdrain       = " << cdrain  << std::endl;
+    Xyce::dout() << "  cdraindrift  = " << cdraindrift  << std::endl;
+    Xyce::dout() << "  cdreq        = " << cdreq  << std::endl;
+    Xyce::dout() << "  gdds         = " << gdds << std::endl;
+    Xyce::dout() << "  gdsshunt     = " << gdsshunt << std::endl;
+    Xyce::dout() << "  gm           = " << gm << std::endl;
+    Xyce::dout() << "  gmbs         = " << gmbs << std::endl;
+    Xyce::dout() << "  Gm           = " << Gm << std::endl;
+    Xyce::dout() << "  Gmbs         = " << Gmbs << std::endl;
   }
 #endif
 
@@ -3748,14 +3659,13 @@ bool Instance::updateTemperature ( const double & temp_tmp)
 //#define EPSSIO2    3.453130e-11 == CONSTEPSOX (Xyce value)
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline2 = "---------------------";
 
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << dashedline2 << endl;
-    cout << "  Instance::Begin of updateTemperature. \n";
-    cout <<" name = " << getName() << endl;
-    cout << endl;
+    Xyce::dout() << subsection_divider << std::endl;
+    Xyce::dout() << "  Instance::Begin of updateTemperature. \n";
+    Xyce::dout() <<" name = " << getName() << std::endl;
+    Xyce::dout() << std::endl;
   }
 #endif
 
@@ -3780,9 +3690,9 @@ bool Instance::updateTemperature ( const double & temp_tmp)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << " Temperature = "<< temp << endl;
-    cout << " tnom = " << tnom << endl;
-    cout << " ratio = " << ratio << endl;
+    Xyce::dout() << " Temperature = "<< temp << std::endl;
+    Xyce::dout() << " tnom = " << tnom << std::endl;
+    Xyce::dout() << " ratio = " << ratio << std::endl;
   }
 #endif
 
@@ -3797,17 +3707,17 @@ bool Instance::updateTemperature ( const double & temp_tmp)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << " fact1  = " << model_.fact1 << endl;
-    cout << " vtnom  = " << model_.vtnom << endl;
-    cout << " egfet1 = " << model_.egfet1 << endl;
-    cout << " pbfact1= " << model_.pbfact1 << endl;
-    cout << " vt     = " << vt << endl;
-    cout << " ratio  = " << ratio << endl;
-    cout << " fact2  = " << fact2 << endl;
-    cout << " kt     = " << kt << endl;
-    cout << " egfet  = " << egfet << endl;
-    cout << " arg    = " << arg << endl;
-    cout << " pbfact = " << pbfact << endl;
+    Xyce::dout() << " fact1  = " << model_.fact1 << std::endl;
+    Xyce::dout() << " vtnom  = " << model_.vtnom << std::endl;
+    Xyce::dout() << " egfet1 = " << model_.egfet1 << std::endl;
+    Xyce::dout() << " pbfact1= " << model_.pbfact1 << std::endl;
+    Xyce::dout() << " vt     = " << vt << std::endl;
+    Xyce::dout() << " ratio  = " << ratio << std::endl;
+    Xyce::dout() << " fact2  = " << fact2 << std::endl;
+    Xyce::dout() << " kt     = " << kt << std::endl;
+    Xyce::dout() << " egfet  = " << egfet << std::endl;
+    Xyce::dout() << " arg    = " << arg << std::endl;
+    Xyce::dout() << " pbfact = " << pbfact << std::endl;
   }
 #endif
 
@@ -3850,25 +3760,25 @@ bool Instance::updateTemperature ( const double & temp_tmp)
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << " ratio4 = " << ratio4 << endl;
-    cout << " tSurfMob = " << tSurfMob << endl;
-    cout << " phio = " << phio << endl;
-    cout << " tPhi = " << tPhi << endl;
-    cout << " tVbi = " << tVbi << endl;
-    cout << " tVto = " << tVto << endl;
-    cout << " tSatCur = " << tSatCur << endl;
-    cout << " tSatCurDens = " << tSatCurDens << endl;
-    cout << " pbo = " << pbo << endl;
-    cout << " gmaold = " << gmaold << endl;
-    cout << " tBulkPot = " << tBulkPot << endl;
-    cout << " gmanew = " << gmanew << endl;
-    cout << " capfact = " << capfact << endl;
-    cout << " tCbd = " << tCbd << endl;
-    cout << " tCbs = " << tCbs << endl;
-    cout << " tCj = " << tCj << endl;
-    cout << " capfact = " << capfact << endl;
-    cout << " tCjsw = " << tCjsw << endl;
-    cout << " tDepCap = " << tDepCap << endl;
+    Xyce::dout() << " ratio4 = " << ratio4 << std::endl;
+    Xyce::dout() << " tSurfMob = " << tSurfMob << std::endl;
+    Xyce::dout() << " phio = " << phio << std::endl;
+    Xyce::dout() << " tPhi = " << tPhi << std::endl;
+    Xyce::dout() << " tVbi = " << tVbi << std::endl;
+    Xyce::dout() << " tVto = " << tVto << std::endl;
+    Xyce::dout() << " tSatCur = " << tSatCur << std::endl;
+    Xyce::dout() << " tSatCurDens = " << tSatCurDens << std::endl;
+    Xyce::dout() << " pbo = " << pbo << std::endl;
+    Xyce::dout() << " gmaold = " << gmaold << std::endl;
+    Xyce::dout() << " tBulkPot = " << tBulkPot << std::endl;
+    Xyce::dout() << " gmanew = " << gmanew << std::endl;
+    Xyce::dout() << " capfact = " << capfact << std::endl;
+    Xyce::dout() << " tCbd = " << tCbd << std::endl;
+    Xyce::dout() << " tCbs = " << tCbs << std::endl;
+    Xyce::dout() << " tCj = " << tCj << std::endl;
+    Xyce::dout() << " capfact = " << capfact << std::endl;
+    Xyce::dout() << " tCjsw = " << tCjsw << std::endl;
+    Xyce::dout() << " tDepCap = " << tDepCap << std::endl;
   }
 #endif
 
@@ -4046,9 +3956,9 @@ bool Instance::updateTemperature ( const double & temp_tmp)
         if (D1cbv < D1DIOtSatCur*model_.D1DIObreakdownVoltage/D1vt_loc)
         {
           D1cbv=D1DIOtSatCur*model_.D1DIObreakdownVoltage/D1vt_loc;
-          cout << " breakdown current increased to " << D1cbv <<
+          Xyce::dout() << " breakdown current increased to " << D1cbv <<
                     "to resolve incompatability " <<
-                    "with specified saturation current" << endl;
+                    "with specified saturation current" << std::endl;
           D1xbv=model_.D1DIObreakdownVoltage;
         } else
         {
@@ -4064,14 +3974,12 @@ bool Instance::updateTemperature ( const double & temp_tmp)
                               -D1xbv)/D1vt_loc)-1+D1xbv/D1vt_loc);
               if (fabs(D1xcbv-D1cbv) <= D1tol) goto matched;
           }
-          cout << " unable to match forward and reverse diode regions: D1bv = "
-              << D1xbv << " D1ibv = " << D1xcbv << endl;
+          Xyce::dout() << " unable to match forward and reverse diode regions: D1bv = "
+              << D1xbv << " D1ibv = " << D1xcbv << std::endl;
         }
         matched:
         D1DIOtBrkdwnV = D1xbv;
     }
-// PMC
-//  model_.outputParams(0);
 
   return bsuccess;
 }
@@ -4198,8 +4106,8 @@ bool Instance::updateSecondaryState ()
   // --- since the lead resistances are the only thing between the primed node
   // and the lead, the currents are still correct AT CONVERGED SOLUTIONS
 
-  /* 
-  lead current load has been moved to F & Q loads 
+  /*
+  lead current load has been moved to F & Q loads
   LeadCurrentD = -model_.dtype*(-mode*cdrain+cbd+cqgdd+cqbd) - D1current-Irdsshunt;
   LeadCurrentG = model_.dtype*(cqgs+cqgb+cqgdd);
   LeadCurrentS = model_.dtype*(-mode*cdrain+cbs-cqgs-cqbs) + D1current+Irdsshunt;
@@ -4218,24 +4126,24 @@ bool Instance::updateSecondaryState ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
 
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << " L = " << l << endl;
-    cout << " W = " << w<< endl;
-    cout << " drainArea = " << drainArea<< endl;
-    cout << " sourceArea = " << sourceArea<< endl;
-    cout << " drainSquares = " << drainSquares<< endl;
-    cout << " sourceSquares = " << sourceSquares<< endl;
-    cout << " drainPerimeter = " << drainPerimeter<< endl;
-    cout << " sourcePerimeter = " << sourcePerimeter<< endl;
-    cout << " drainCond = " << drainCond<< endl;
-    cout << " sourceCond = " << sourceCond << endl;
-    cout << " draindriftCond = " << draindriftCond<< endl;
-    cout << " temp = " << temp<< endl;
+    Xyce::dout() << " L = " << l << std::endl;
+    Xyce::dout() << " W = " << w<< std::endl;
+    Xyce::dout() << " drainArea = " << drainArea<< std::endl;
+    Xyce::dout() << " sourceArea = " << sourceArea<< std::endl;
+    Xyce::dout() << " drainSquares = " << drainSquares<< std::endl;
+    Xyce::dout() << " sourceSquares = " << sourceSquares<< std::endl;
+    Xyce::dout() << " drainPerimeter = " << drainPerimeter<< std::endl;
+    Xyce::dout() << " sourcePerimeter = " << sourcePerimeter<< std::endl;
+    Xyce::dout() << " drainCond = " << drainCond<< std::endl;
+    Xyce::dout() << " sourceCond = " << sourceCond << std::endl;
+    Xyce::dout() << " draindriftCond = " << draindriftCond<< std::endl;
+    Xyce::dout() << " temp = " << temp<< std::endl;
   }
 #endif
 
@@ -4633,9 +4541,8 @@ bool Instance::UCCMCharges( double vgs, double vgdd,
           break;
       default:
         {
-          string msg = "\n Partitioning model does not exist" ;
-          N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_WARNING,msg);
-          return 1;
+          UserWarning(*this) << "Partitioning model does not exist";
+          return true;
         }
      }
   }
@@ -4778,18 +4685,18 @@ bool Instance::UCCMmosa1(double xvgs, double xvdds,
 #define EXP_MAX     150.0
 
   if(output == 1) {
-    cout << "                 " << endl;
-    cout << "ETA     = " << ETA << endl;
-    cout << "RS      = " << RS << endl;
-    cout << "RD      = " << RD << endl;
-    cout << "VSIGMAT = " << VSIGMAT << endl;
-    cout << "VSIGMA  = " << VSIGMA << endl;
-    cout << "SIGMA0  = " << SIGMA0 << endl;
-    cout << "THETA   = " << THETA << endl;
-    cout << "LAMBDA  = " << LAMBDA << endl;
-    cout << "DELTA   = " << DELTA << endl;
-    cout << "VMAX    = " << VMAX << endl;
-    cout << "TOX     = " << TOX << endl;
+    Xyce::dout() << "                 " << std::endl;
+    Xyce::dout() << "ETA     = " << ETA << std::endl;
+    Xyce::dout() << "RS      = " << RS << std::endl;
+    Xyce::dout() << "RD      = " << RD << std::endl;
+    Xyce::dout() << "VSIGMAT = " << VSIGMAT << std::endl;
+    Xyce::dout() << "VSIGMA  = " << VSIGMA << std::endl;
+    Xyce::dout() << "SIGMA0  = " << SIGMA0 << std::endl;
+    Xyce::dout() << "THETA   = " << THETA << std::endl;
+    Xyce::dout() << "LAMBDA  = " << LAMBDA << std::endl;
+    Xyce::dout() << "DELTA   = " << DELTA << std::endl;
+    Xyce::dout() << "VMAX    = " << VMAX << std::endl;
+    Xyce::dout() << "TOX     = " << TOX << std::endl;
     output=0;
   }
 
@@ -5034,33 +4941,33 @@ bool Instance::UCCMmosa2(double xvgs, double xvdds,
 #define DELMAX   model_.delmax
 
    if(output == 1) {
-     cout << "                 " << endl;
-     cout << "ETA     = " << ETA << endl;
-     cout << "RS      = " << RS << endl;
-     cout << "RD      = " << RD << endl;
-     cout << "VSIGMAT = " << VSIGMAT << endl;
-     cout << "VSIGMA  = " << VSIGMA << endl;
-     cout << "SIGMA0  = " << SIGMA0 << endl;
-     cout << "THETA   = " << THETA << endl;
-     cout << "LAMBDA  = " << LAMBDA << endl;
-     cout << "DELTA   = " << DELTA << endl;
-     cout << "ALPHA   = " << ALPHA << endl;
-     cout << "VMAX    = " << VMAX << endl;
-     cout << "TOX     = " << TOX << endl;
-     cout << "W       = " << W << endl;
-     cout << "L       = " << L << endl;
-     cout << "LS      = " << LS << endl;
-     cout << "M       = " << M << endl;
-     cout << "INVM    = " << INVM << endl;
-     cout << "MC      = " << MC << endl;
-     cout << "INVMC   = " << INVMC << endl;
-     cout << "RSUB    = " << RSUB << endl;
-     cout << "AI      = " << AI << endl;
-     cout << "BI      = " << BI << endl;
-     cout << "MD      = " << MD << endl;
-     cout << "INVMD   = " << INVMD << endl;
-     cout << "DELMAX  = " << DELMAX << endl;
-     cout << "VP      = " << vp << endl;
+     Xyce::dout() << "                 " << std::endl;
+     Xyce::dout() << "ETA     = " << ETA << std::endl;
+     Xyce::dout() << "RS      = " << RS << std::endl;
+     Xyce::dout() << "RD      = " << RD << std::endl;
+     Xyce::dout() << "VSIGMAT = " << VSIGMAT << std::endl;
+     Xyce::dout() << "VSIGMA  = " << VSIGMA << std::endl;
+     Xyce::dout() << "SIGMA0  = " << SIGMA0 << std::endl;
+     Xyce::dout() << "THETA   = " << THETA << std::endl;
+     Xyce::dout() << "LAMBDA  = " << LAMBDA << std::endl;
+     Xyce::dout() << "DELTA   = " << DELTA << std::endl;
+     Xyce::dout() << "ALPHA   = " << ALPHA << std::endl;
+     Xyce::dout() << "VMAX    = " << VMAX << std::endl;
+     Xyce::dout() << "TOX     = " << TOX << std::endl;
+     Xyce::dout() << "W       = " << W << std::endl;
+     Xyce::dout() << "L       = " << L << std::endl;
+     Xyce::dout() << "LS      = " << LS << std::endl;
+     Xyce::dout() << "M       = " << M << std::endl;
+     Xyce::dout() << "INVM    = " << INVM << std::endl;
+     Xyce::dout() << "MC      = " << MC << std::endl;
+     Xyce::dout() << "INVMC   = " << INVMC << std::endl;
+     Xyce::dout() << "RSUB    = " << RSUB << std::endl;
+     Xyce::dout() << "AI      = " << AI << std::endl;
+     Xyce::dout() << "BI      = " << BI << std::endl;
+     Xyce::dout() << "MD      = " << MD << std::endl;
+     Xyce::dout() << "INVMD   = " << INVMD << std::endl;
+     Xyce::dout() << "DELMAX  = " << DELMAX << std::endl;
+     Xyce::dout() << "VP      = " << vp << std::endl;
      output=0;
    }
 
@@ -5313,13 +5220,14 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
   bool bsuccess = true;
 
   // first loop over the models:
-  for (ModelMap::const_iterator model_it = getModelMap().begin(); model_it != getModelMap().end(); ++model_it)
-  {
-    // loop over the instances for this model.
-    InstanceVector::const_iterator first = (*model_it).second->instanceContainer.begin();
-    InstanceVector::const_iterator last = (*model_it).second->instanceContainer.end();
+  // for (ModelMap::const_iterator model_it = getModelMap().begin(); model_it != getModelMap().end(); ++model_it)
+  // {
+  //   // loop over the instances for this model.
+  //   InstanceVector::const_iterator first = (*model_it).second->instanceContainer.begin();
+  //   InstanceVector::const_iterator last = (*model_it).second->instanceContainer.end();
 
-    for (InstanceVector::const_iterator it = first; it != last; ++it)
+  //   for (InstanceVector::const_iterator it = first; it != last; ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
     {
       Instance & mi = *(*it);
 
@@ -5404,7 +5312,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
       staVec[ mi.li_state_von ] = mi.von;
 
     }
-  }
+//  }
 
   return bsuccess;
 }
@@ -5420,13 +5328,14 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 bool Master::updateSecondaryState ( double * staDerivVec, double * stoVec )
 {
   // first loop over the models:
-  for (ModelMap::const_iterator model_it = getModelMap().begin(); model_it != getModelMap().end(); ++model_it)
-  {
-    // loop over the instances for this model.
-    InstanceVector::const_iterator first = (*model_it).second->instanceContainer.begin();
-    InstanceVector::const_iterator last = (*model_it).second->instanceContainer.end();
+  // for (ModelMap::const_iterator model_it = getModelMap().begin(); model_it != getModelMap().end(); ++model_it)
+  // {
+  //   // loop over the instances for this model.
+  //   InstanceVector::const_iterator first = (*model_it).second->instanceContainer.begin();
+  //   InstanceVector::const_iterator last = (*model_it).second->instanceContainer.end();
 
-    for (InstanceVector::const_iterator it = first; it != last; ++it)
+  //   for (InstanceVector::const_iterator it = first; it != last; ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
     {
       Instance & mi = *(*it);
 
@@ -5453,7 +5362,7 @@ bool Master::updateSecondaryState ( double * staDerivVec, double * stoVec )
       mi.LeadCurrentB = mi.getModel().dtype*(mi.cbd-mi.cbs-mi.cqgb+mi.cqbd+mi.cqbs);
       */
     }
-  }
+//  }
 
   return true;
 }
@@ -5468,7 +5377,7 @@ bool Master::updateSecondaryState ( double * staDerivVec, double * stoVec )
 //-----------------------------------------------------------------------------
 bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  double * storeLeadF, double * storeLeadQ)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & mi = *(*it);
 
@@ -5547,7 +5456,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
     qVec[mi.li_SourcePrime] += (-(Qeqbs + Qeqgs));
     qVec[mi.li_D1Prime] +=  mi.D1DIOcapCharge;
     qVec[mi.li_Drain]   += -mi.D1DIOcapCharge;
-    
+
     // voltlim section:
     if (!mi.origFlag)
     {
@@ -5573,14 +5482,14 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
       dQdxdVp[mi.li_D1Prime] -= qcoef_Jdxp;
       dQdxdVp[mi.li_Drain]   += qcoef_Jdxp;
     }
-    
+
     if( mi.loadLeadCurrent )
-    {    
+    {
       storeLeadF[mi.li_store_dev_id] = (mi.Idraindrift + mi.Irdsshunt - D1current);
       storeLeadF[mi.li_store_dev_is] = (mi.Isource - mi.Irdsshunt + mi.Ird1rs);
       storeLeadF[mi.li_store_dev_ig] = 0;
       storeLeadF[mi.li_store_dev_ib] = (ceqbs + ceqbd);
-      // case where optional nodes become external nodes: 
+      // case where optional nodes become external nodes:
       if (mi.Igate != 0.0)
       {
         storeLeadF[mi.li_store_dev_ig]  += mi.Igate;
@@ -5590,46 +5499,46 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
         // G' is G
         storeLeadF[mi.li_store_dev_ig] += -mi.Igate;
       }
-  
+
       if( !mi.sourceCond )
       {
         // S' is S
         storeLeadF[mi.li_store_dev_is] += (-mi.Isource-(ceqbs + mi.cdreq));
       }
-  
+
       if( !mi.drainCond )
       {
         // Ddrift is D'
       }
-  
+
       if( !mi.model_.D1DIOconductance )
       {
         // D1' is S
         storeLeadF[mi.li_store_dev_is] += (D1current - mi.Ird1rs);
       }
-    
+
       storeLeadQ[mi.li_store_dev_id] = -mi.D1DIOcapCharge;
       storeLeadQ[mi.li_store_dev_is] = 0;
       storeLeadQ[mi.li_store_dev_ig] = 0;
       storeLeadQ[mi.li_store_dev_ib] = (Qeqbs + Qeqbd - Qeqgb);
-      // case where optional nodes become external nodes:    
+      // case where optional nodes become external nodes:
       if( !mi.gateCond )
       {
         // G' is G
         storeLeadQ[mi.li_store_dev_ig] += (Qeqgs+Qeqgdd+Qeqgb);
       }
-  
+
       if( !mi.sourceCond )
       {
         // S' is S
         storeLeadQ[mi.li_store_dev_is] += (-(Qeqbs + Qeqgs));
       }
-  
+
       if( !mi.drainCond )
       {
         // Ddrift is D'
       }
-  
+
       if( !mi.model_.D1DIOconductance )
       {
         // D1' is S
@@ -5657,7 +5566,7 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 #ifdef _OMP
 #pragma omp parallel for
 #endif
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & mi = *(*it);
 
@@ -5964,6 +5873,20 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
   return true;
 }
 #endif
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("m", 18)
+    .registerModelType("pmos", 18)
+    .registerModelType("nmos", 18);
+}
 
 } // namespace VDMOS
 } // namespace Device

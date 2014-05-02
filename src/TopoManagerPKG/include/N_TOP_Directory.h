@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.10.2.2 $
+// Revision Number: $Revision: 1.15 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,46 +46,41 @@
 #ifndef N_TOP_Directory_h
 #define N_TOP_Directory_h 1
 
-// ---------- Standard Includes ----------
 #include <string>
 #include <vector>
 #include <iosfwd>
 
-// ----------   Xyce Includes   ----------
 #include <N_UTL_Xyce.h>
+#include <N_TOP_fwd.h>
+#include <N_PDS_fwd.h>
 #include <N_TOP_Misc.h>
 
-// ---------- Forward Declarations ----------
+namespace Xyce {
+namespace Topo {
 
-class N_TOP_Node;
-class N_TOP_Topology;
-
-class N_PDS_Manager;
-
-class N_TOP_DirectoryData;
+class DirectoryData;
 
 //-----------------------------------------------------------------------------
-// Class         : N_TOP_Directory
+// Class         : Directory
 // Purpose       :
 // Special Notes :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 7/05/01
 //-----------------------------------------------------------------------------
-class N_TOP_Directory
+class Directory
 {
 
 public:
 
   // Constructor
-  N_TOP_Directory( N_TOP_Topology * topo,
-                   N_PDS_Manager * pds = 0 )
+  Directory( Topology * topo, N_PDS_Manager * pds = 0 )
   : topMgr_(topo),
     pdsMgr_(pds),
     data_(0)
   { }
 
   // Destructor
-  ~N_TOP_Directory();
+  ~Directory();
 
   // Registers the PDS manager.
   bool registerParallelServices(N_PDS_Manager * pds)
@@ -93,46 +88,50 @@ public:
 
   bool generateDirectory();
 
-  bool getGIDs( const vector<NodeID> & idVec,
-                vector<int> & gidVec );
-  bool getProcs( const vector<NodeID> & idVec,
-                 vector<int> & procVec );
+  bool getGIDs( const std::vector<NodeID> & idVec,
+                std::vector<int> & gidVec );
+  bool getProcs( const std::vector<NodeID> & idVec,
+                 std::vector<int> & procVec );
 
-  bool getSolnGIDs( const vector<NodeID> & idVec,
-                    vector< vector<int> > & gidVec,
-                    vector<int> & procVec );
-  bool getStateGIDs( const vector<NodeID> & idVec,
-                     vector< vector<int> > & gidVec,
-                     vector<int> & procVec );
-  bool getStoreGIDs( const vector<NodeID> & idVec,
-                     vector< vector<int> > & gidVec,
-                     vector<int> & procVec );
+  bool getSolnGIDs( const std::vector<NodeID> & idVec,
+                    std::vector< std::vector<int> > & gidVec,
+                    std::vector<int> & procVec );
+  bool getStateGIDs( const std::vector<NodeID> & idVec,
+                     std::vector< std::vector<int> > & gidVec,
+                     std::vector<int> & procVec );
+  bool getStoreGIDs( const std::vector<NodeID> & idVec,
+                     std::vector< std::vector<int> > & gidVec,
+                     std::vector<int> & procVec );
 
 private:
 
   // Copy constructor (private).
-  N_TOP_Directory(const N_TOP_Directory & right);
+  Directory(const Directory & right);
 
   // Assignment operator (private).
-  N_TOP_Directory & operator=(const N_TOP_Directory & right);
+  Directory & operator=(const Directory & right);
 
   // Equality operator.
-  bool operator==(const N_TOP_Directory & right) const;
+  bool operator==(const Directory & right) const;
 
   // Non-equality operator.
-  bool operator!=(const N_TOP_Directory & right) const;
+  bool operator!=(const Directory & right) const;
 
 private:
 
   // Pointer to the topology manager.
-  N_TOP_Topology * topMgr_;
+  Topology * topMgr_;
 
   // Pointer to the PDS manager.
   N_PDS_Manager * pdsMgr_;
 
   // Pimpl
-  N_TOP_DirectoryData * data_;
-
+  DirectoryData * data_;
 };
+
+} // namespace Topo
+} // namespace Xyce
+
+typedef Xyce::Topo::Directory N_TOP_Directory;
 
 #endif

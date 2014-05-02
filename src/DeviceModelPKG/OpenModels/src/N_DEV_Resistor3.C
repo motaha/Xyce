@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,22 +36,28 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.22.2.2 $
+// Revision Number: $Revision: 1.40.2.3 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 #include <Xyce_config.h>
 
+#include <memory>
+
 // ---------- Standard Includes ----------
 
 // ----------   Xyce Includes   ----------
-#include <N_DEV_Resistor3.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_Resistor3.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
+
+#include <N_DEV_Resistor.h>
 
 #include <N_LAS_Vector.h>
 #include <N_LAS_Matrix.h>
@@ -59,78 +65,52 @@
 
 namespace Xyce {
 namespace Device {
-
-template<>
-ParametricData<Resistor3::Instance>::ParametricData()
-{
-    setNumNodes(2);
-    setNumOptionalNodes(0);
-    setNumFillNodes(0);
-    setModelRequired(0);
-    setPrimaryParameter("R");
-    addModelType("R");
-
-    // Set up double precision variables:
-    addPar ("R", 1000.0, false,  ParameterType::TIME_DEP,
-        &Resistor3::Instance::R,    NULL,
-        U_OHM, CAT_NONE, "Resistance");
-
-    addPar ("L", 0.0, false,     ParameterType::NO_DEP,
-        &Resistor3::Instance::length, NULL,
-        U_METER, CAT_NONE, "Length");
-
-    addPar ("W", 0.0, false,     ParameterType::NO_DEP,
-        &Resistor3::Instance::width,  NULL,
-        U_METER, CAT_NONE, "Width");
-
-    addPar ("TEMP", 0.0, false,  ParameterType::TIME_DEP,
-        &Resistor3::Instance::temp, NULL,
-        U_DEGC, CAT_NONE, "Temperature");
-
-    addPar ("TC1",   0.0, false,   ParameterType::NO_DEP,
-      &Resistor3::Instance::tempCoeff1,
-      &Resistor3::Instance::tempCoeff1Given,
-      U_DEGCM1, CAT_NONE, "Linear Temperature Coefficient");
-
-    addPar ("TC2",   0.0, false,   ParameterType::NO_DEP,
-      &Resistor3::Instance::tempCoeff2,
-      &Resistor3::Instance::tempCoeff2Given,
-      U_DEGCM2, CAT_NONE, "Quadratic Temperature Coefficient");
-
-    // This call tells the parameter handling code that TC can be specified
-    // as a vector with up to two elements as in TC=a,b.  It then translates
-    // TC=a,b into TC1=a TC2=b.  Likewise, TC=a will translate into TC1=a
-    makeVector ("TC", 2);
-
-    addPar ("DTEMP",   0.0, false,   ParameterType::NO_DEP,
-      &Resistor3::Instance::dtemp,
-      &Resistor3::Instance::dtempGiven,
-      U_DEGC, CAT_NONE, "Device Temperature -- For compatibility only. Parameter is NOT used");
-}
-
-template<>
-ParametricData<Resistor3::Model>::ParametricData()
-{
-}
-
 namespace Resistor3 {
 
-vector< vector<int> > Instance::jacStamp;
-vector< vector<int> > Instance::jacStampPDE;
+void Traits::loadInstanceParameters(ParametricData<Resistor3::Instance> &p)
+{
+  p.addPar ("R", 1000.0, false,  ParameterType::TIME_DEP,
+            &Resistor3::Instance::R,    NULL,
+            U_OHM, CAT_NONE, "Resistance");
 
+  p.addPar ("L", 0.0, false,     ParameterType::NO_DEP,
+            &Resistor3::Instance::length, NULL,
+            U_METER, CAT_NONE, "Length");
 
+  p.addPar ("W", 0.0, false,     ParameterType::NO_DEP,
+            &Resistor3::Instance::width,  NULL,
+            U_METER, CAT_NONE, "Width");
 
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
+  p.addPar ("TEMP", 0.0, false,  ParameterType::TIME_DEP,
+            &Resistor3::Instance::temp, NULL,
+            U_DEGC, CAT_NONE, "Device temperature");
 
-  return parMap;
+  p.addPar ("TC1",   0.0, false,   ParameterType::NO_DEP,
+            &Resistor3::Instance::tempCoeff1,
+            &Resistor3::Instance::tempCoeff1Given,
+            U_DEGCM1, CAT_NONE, "Linear Temperature Coefficient");
+
+  p.addPar ("TC2",   0.0, false,   ParameterType::NO_DEP,
+            &Resistor3::Instance::tempCoeff2,
+            &Resistor3::Instance::tempCoeff2Given,
+            U_DEGCM2, CAT_NONE, "Quadratic Temperature Coefficient");
+
+  // This call tells the parameter handling code that TC can be specified
+  // as a vector with up to two elements as in TC=a,b.  It then translates
+  // TC=a,b into TC1=a TC2=b.  Likewise, TC=a will translate into TC1=a
+  p.makeVector ("TC", 2);
+
+  p.addPar ("DTEMP",   0.0, false,   ParameterType::NO_DEP,
+            &Resistor3::Instance::dtemp,
+            &Resistor3::Instance::dtempGiven,
+            U_DEGC, CAT_NONE, "Device Temperature -- For compatibility only. Parameter is NOT used");
 }
 
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
+void Traits::loadModelParameters(ParametricData<Resistor3::Model> &p)
+{}
 
-  return parMap;
-}
+std::vector< std::vector<int> > Instance::jacStamp;
+std::vector< std::vector<int> > Instance::jacStampPDE;
 
 
 // Class Instance
@@ -142,24 +122,22 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Richard Schiek, Electrical and Microsystems Modeling
 // Creation Date : 2/1/10
 //-----------------------------------------------------------------------------
-Instance::Instance(InstanceBlock & IB,
-			                     Model & Viter,
-                                       MatrixLoadData & mlData1,
-                                       SolverState &ss1,
-                                       ExternData  &ed1,
-                                       DeviceOptions & do1)
-
-  : DeviceInstance(IB,mlData1,ss1,ed1,do1),
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock &         IB,
+  Model &                       Viter,
+  const FactoryBlock &          factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(Viter),
-  srcCurrent(0.0),
-  srcVoltage(0.0),
-  srcDrop(0.0),
-  srcBC(0.0),
-
-  li_Pos(-1),
-  li_Neg(-1),
-  li_Bra(-1),
-  tempCoeff1(0.0),
+    srcCurrent(0.0),
+    srcVoltage(0.0),
+    srcDrop(0.0),
+    srcBC(0.0),
+    
+    li_Pos(-1),
+    li_Neg(-1),
+    li_Bra(-1),
+    tempCoeff1(0.0),
   tempCoeff2(0.0),
   dtemp(0.0),
   tempCoeff1Given(false),
@@ -232,9 +210,6 @@ Instance::Instance(InstanceBlock & IB,
   // Calculate any parameters specified as expressions:
   updateDependentParameters();
   processParams();
-
-  // calculate dependent (ie computed) params and check for errors:
-
 }
 
 //-----------------------------------------------------------------------------
@@ -257,7 +232,7 @@ Instance::~Instance ()
 // Creator       : Richard Schiek, Electrical and Microsystems Modeling
 // Creation Date : 2/1/10
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
   return true;
 }
@@ -270,19 +245,17 @@ bool Instance::processParams (string param)
 // Creator       : Richard Schiek, Electrical and Microsystems Modeling
 // Creation Date : 2/1/10
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs ( const vector<int> & intLIDVecRef,
-	                                const vector<int> & extLIDVecRef)
+void Instance::registerLIDs ( const std::vector<int> & intLIDVecRef,
+	                                const std::vector<int> & extLIDVecRef)
 {
-  string msg;
+  std::string msg;
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline(
-      "-----------------------------------------------------------------------------");
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << endl << dashedline << endl;
-    cout << "  Instance::registerLIDs" << endl;
-    cout << "  name = " << getName() << endl;
+    Xyce::dout() << std::endl << section_divider << std::endl;
+    Xyce::dout() << "  Instance::registerLIDs" << std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
   }
 #endif
 
@@ -320,10 +293,10 @@ void Instance::registerLIDs ( const vector<int> & intLIDVecRef,
 #ifdef Xyce_DEBUG_DEVICE
   if (getDeviceOptions().debugLevel > 0 )
   {
-    cout << "  li_Pos = " << li_Pos << endl;
-    cout << "  li_Neg = " << li_Neg << endl;
-    cout << "  li_Bra = " << li_Bra << endl;
-    cout << dashedline << endl;
+    Xyce::dout() << "  li_Pos = " << li_Pos << std::endl;
+    Xyce::dout() << "  li_Neg = " << li_Neg << std::endl;
+    Xyce::dout() << "  li_Bra = " << li_Bra << std::endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 }
@@ -336,13 +309,13 @@ void Instance::registerLIDs ( const vector<int> & intLIDVecRef,
 // Creator       : Richard Schiek, Electrical and Microsystems Modeling
 // Creation Date : 2/1/10
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (intNameMap.empty ())
   {
     // set up the internal name map
-    string tmpstr(getName()+"_branch");
+    std::string tmpstr(getName()+"_branch");
     spiceInternalName (tmpstr);
     intNameMap[ li_Bra ] = tmpstr;
   }
@@ -360,21 +333,9 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Richard Schiek, Electrical and Microsystems Modeling
 // Creation Date : 2/1/10
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the
-  // proper number of internal and external variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSTa != numStateVars";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL_0,msg);
-  }
-
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 }
 
 //-----------------------------------------------------------------------------
@@ -385,7 +346,7 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 // Creator       : Richard Schiek, Electrical and Microsystems Modeling
 // Creation Date : 2/1/10
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   if (getSolverState().PDESystemFlag)
     return jacStampPDE;
@@ -401,7 +362,7 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Richard Schiek, Electrical and Microsystems Modeling
 // Creation Date : 2/1/10
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
   if (getSolverState().PDESystemFlag)
@@ -578,7 +539,7 @@ double Instance::getMaxTimeStepSize  ()
 // Creator       : Richard Schiek, Electrical and Microsystems Modeling
 // Creation Date : 2/1/10
 //-----------------------------------------------------------------------------
-void Instance::varTypes( vector<char> & varTypeVec )
+void Instance::varTypes( std::vector<char> & varTypeVec )
 {
   varTypeVec.resize(1);
   varTypeVec[0] = 'I';
@@ -594,10 +555,11 @@ void Instance::varTypes( vector<char> & varTypeVec )
 // Creator       : Richard Schiek, Electrical and Microsystems Modeling
 // Creation Date : 2/1/10
 //-----------------------------------------------------------------------------
-Model::Model (const ModelBlock & MB,
-                                        SolverState & ss1,
-                                        DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
     DC_TRAN (0)
 {
 }
@@ -612,9 +574,9 @@ Model::Model (const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model ()
 {
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -634,24 +596,45 @@ Model::~Model ()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i;
-  os << endl;
-  os << "    name     getModelName()  Parameters" << endl;
+  os << std::endl;
+  os << "    name     model name  Parameters" << std::endl;
   for (i=0, iter=first; iter!=last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "      ";
-    os << (*iter)->getModelName();
-    os << endl;
+    os << getName();
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 
 //-----------------------------------------------------------------------------
@@ -670,14 +653,15 @@ std::ostream &Model::printOutInstances(std::ostream &os) const
 bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 {
 
-  // first loop over the models:
-  for (ModelMap::const_iterator model_it = getModelMap().begin(); model_it != getModelMap().end(); ++model_it)
-  {
-    // loop over the instances for this model.
-    InstanceVector::const_iterator first = (*model_it).second->instanceContainer.begin();
-    InstanceVector::const_iterator last = (*model_it).second->instanceContainer.end();
+  // // first loop over the models:
+  // for (ModelMap::const_iterator model_it = getModelMap().begin(); model_it != getModelMap().end(); ++model_it)
+  // {
+  //   // loop over the instances for this model.
+  //   InstanceVector::const_iterator first = (*model_it).second->instanceContainer.begin();
+  //   InstanceVector::const_iterator last = (*model_it).second->instanceContainer.end();
 
-    for (InstanceVector::const_iterator it = first; it != last; ++it)
+  //   for (InstanceVector::const_iterator it = first; it != last; ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
     {
       Instance & vi = *(*it);
 
@@ -712,7 +696,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
         vi.srcBC      *= vi.scale;
       }
     }
-  }
+//  }
 
   return true;
 }
@@ -727,7 +711,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 //-----------------------------------------------------------------------------
 bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  double * storeLeadF, double * storeLeadQ)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & vi = *(*it);
 
@@ -754,7 +738,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
 //-----------------------------------------------------------------------------
 bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & vi = *(*it);
 
@@ -781,6 +765,19 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
   }
 
   return true;
+}
+
+Device *
+Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice() 
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("r", 3)
+    .registerModelType("r", 3);
 }
 
 } // namespace Resistor3

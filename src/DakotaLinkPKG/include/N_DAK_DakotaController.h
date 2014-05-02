@@ -7,7 +7,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -41,9 +41,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.21.4.2 $
+// Revision Number: $Revision: 1.27 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:32 $
+// Revision Date  : $Date: 2014/02/24 23:49:13 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -63,9 +63,9 @@ using Teuchos::rcp;
 
 // Dakota headers
 #define DISABLE_DAKOTA_CONFIG_H   1 // Don't need dakota's dakota_config.h 
-#include <ParallelLibrary.H>
-#include <ProblemDescDB.H>
-#include <DakotaStrategy.H>
+#include <ParallelLibrary.hpp>
+#include <ProblemDescDB.hpp>
+#include <DakotaStrategy.hpp>
 #undef  DISABLE_DAKOTA_CONFIG_H  
 
 // ----------   Xyce Includes   ----------
@@ -73,12 +73,9 @@ using Teuchos::rcp;
 #include <N_UTL_Xyce.h>
 
 // foward declarations
-class N_CIR_Xyce;
-class N_DAK_DakotaInterface;
+#include <N_CIR_fwd.h>
 
-#ifdef Xyce_PARALLEL_MPI
-#include <mpi.h>
-#endif
+class N_DAK_DakotaInterface;
 
 class N_DAK_DakotaController
 {
@@ -109,20 +106,15 @@ private:
     int iargsReduced;             // argumet line without -dakota <filename>
     char ** cargsReduced;         //
     
-    string dakotaInputFileName;   // dakota input file 
-    string outputFileName;
-    string stdOutputFilename;
-    string stdErrorFilename;
-    string readRestartFilename;
-    string writeRestartFilename;
+    std::string dakotaInputFileName;   // dakota input file 
+    std::string outputFileName;
+    std::string stdOutputFilename;
+    std::string stdErrorFilename;
+    std::string readRestartFilename;
+    std::string writeRestartFilename;
     int restartEvals;
     int numFunctions;
     
-#ifdef Xyce_PARALLEL_MPI     
-    // MPI Comm we'll need for parallel communication
-    MPI_Comm MPICommObject_;
-#endif
-
     // dakota objects we'll need
     RCP< Dakota::ParallelLibrary > parallelLib;
     RCP< Dakota::ProblemDescDB > problemDatabase;

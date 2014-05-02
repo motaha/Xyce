@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.19.2.2 $
+// Revision Number: $Revision: 1.26 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:35 $
+// Revision Date  : $Date: 2014/02/24 23:49:16 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -50,13 +50,11 @@
 #include <string>
 #include <map>
 
-// ----------   Xyce Includes   ----------
-#include <N_DEV_fwd.h>
 #include <N_UTL_Xyce.h>
+#include <N_DEV_fwd.h>
+#include <N_PDS_fwd.h>
+#include <N_UTL_fwd.h>
 
-// ---------- Forward Declarations ----------
-class N_UTL_BreakPoint;
-class N_PDS_Comm;
 class N_TIA_TimeIntInfo;
 class N_TIA_TwoLevelError;
 
@@ -78,17 +76,13 @@ class ExternCodeInterface
     ExternCodeInterface (const ExternCodeInterface &right);
     virtual ~ExternCodeInterface();
 
-    virtual bool initialize(
-#ifdef Xyce_PARALLEL_MPI
-                             N_PDS_Comm * comm = 0
-#endif
-                           ) = 0;
+    virtual bool initialize(N_PDS_Comm * comm = 0) = 0;
 
     virtual bool simulateStep
       ( const SolverState & solState,
-        const map< string, double > & inputMap,
-        vector<double> & outputVector,
-        vector< vector<double> > & jacobian,
+        const std::map< std::string, double > & inputMap,
+        std::vector<double> & outputVector,
+        std::vector< std::vector<double> > & jacobian,
         N_TIA_TwoLevelError & tlError
         ) = 0;
 
@@ -96,27 +90,19 @@ class ExternCodeInterface
     virtual bool run () = 0;
 
     virtual void homotopyStepSuccess
-      (const vector<string> & paramNames,
-       const vector<double> & paramVals) = 0;
+      (const std::vector<std::string> & paramNames,
+       const std::vector<double> & paramVals) = 0;
 
     virtual void homotopyStepFailure () = 0;
 
     virtual void stepSuccess (int analysis) = 0;
     virtual void stepFailure (int analysis) = 0;
-    virtual bool getBreakPoints (vector<N_UTL_BreakPoint> &breakPointTimes) = 0;
+    virtual bool getBreakPoints (std::vector<N_UTL_BreakPoint> &breakPointTimes) = 0;
     virtual bool updateStateArrays () = 0;
     virtual bool startTimeStep ( const N_TIA_TimeIntInfo & tiInfo ) = 0;
-    virtual bool setInternalParam (string & name, double val) = 0;
+    virtual bool setInternalParam (std::string & name, double val) = 0;
 
     virtual bool getInitialQnorm (N_TIA_TwoLevelError & tle) = 0;
-
-  protected:
-  private:
-
-  public:
-  protected:
-  private:
-
 };
 
 } // namespace Device

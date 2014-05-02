@@ -3,7 +3,7 @@
 
 `define attr(txt) (*txt*)
 
-module resistor (p,n);
+module resistor (p,n) `attr(xyceModelGroup="Resistor" xyceSpiceDeviceName="R" xyceLevelNumber="6") ;
   electrical p,n;
   inout p,n;
 

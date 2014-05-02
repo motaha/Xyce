@@ -29,16 +29,16 @@
 //
 // Special Notes  : 
 //
-// Creator        : David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+// Creator        : David G. Baur  Raytheon  Sandia National Laboratories 1355 
 //
 // Creation Date  : 2013/04/18 18:01:27
 //
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.2.2.2 $
+// Revision Number: $Revision: 1.4.2.5 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/03/03 18:29:29 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -49,7 +49,7 @@
 #include <string>
 
 #if __GNUC__ == 3 || __GNUC__ == 4 || defined __xlC__
-#define STK_USE_PLATFORM_DEMANGLER
+#define Xyce__USE_PLATFORM_DEMANGLER
 #endif
 
 namespace Xyce {
@@ -63,11 +63,7 @@ namespace Xyce {
  *
  * @return		a <b>std::string</b> value of the demangled name.
  */
-#ifdef STK_USE_PLATFORM_DEMANGLER
 std::string demangle(const char *symbol);
-#else
-const char *demangle(const char *symbol);
-#endif
 
 } // namespace Xyce
 

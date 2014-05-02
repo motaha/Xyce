@@ -36,11 +36,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.8.2.3 $
+// Revision Number: $Revision: 1.21.2.4 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/03/10 16:15:20 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: dgbaur $
 //-------------------------------------------------------------------------
 
 #ifndef Xyce_N_DEV_Pars_h
@@ -48,31 +48,27 @@
 
 #include <algorithm>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
 
-#include <N_DEV_Configuration.h>
-#include <N_DEV_Const.h>
-#include <N_DEV_Param.h>
-#include <N_DEV_Units.h>
 #include <N_DEV_fwd.h>
-#include <N_ERH_ErrorMgr.h>
-#include <N_UTL_NoCase.h>
+#include <N_DEV_Units.h>
 
 /**
  * ParameterType::ExprAccess is enumeration of parameter usage types and masks
  */
 namespace ParameterType {
-  enum ExprAccess
+enum ExprAccess
   {
     NO_DEP    = 0x0,              ///< Parameter can only be set to a constant from netlist
     TIME_DEP  = 0x1,              ///< Parameter may be specified as time dependent expression from netlist
     SOLN_DEP  = 0x2,              ///< Parameter may be specified as a solution dependent expression from netlist
-    NO_INPUT  = 0x4,              ///< Parameter cannot be initialized from netlist // THIS IS SCHEDULED FOR TERMINATION
     LOG_T_DEP = 0x8,              ///< Parameter uses temperature interpolation based on log of value
     MIN_RES   = 0x10,             ///< Parameter is subject to being set to minimum lead resistance
-    MIN_CAP   = 0x20              ///< Parameter is subject to being set to minimum junction capacitance
+    MIN_CAP   = 0x20,             ///< Parameter is subject to being set to minimum junction capacitance
+    NO_DOC    = 0x40              ///< Parameter is not to be documented
   };
 };
 
@@ -134,12 +130,56 @@ namespace Device {
  */
 
 typedef std::map<std::string, CompositeParam *> CompositeMap;
+typedef std::map<int, double>  OriginalValueMap;
+typedef std::set<int> GivenValueSet;
+
+class Descriptor;
+
+typedef std::map<std::string, Descriptor *, LessNoCase> ParameterMap;
 
 /**
- * Tag for all classes that manage parameters AKA entities
+ * Base class for all parameters
  */
-struct ParameterBase
-{};
+class ParameterBase
+{
+public:
+  ParameterBase()
+    : originalValueMap_(),
+      givenValueSet_()
+  {}
+
+private:
+  ParameterBase(const ParameterBase &);
+  ParameterBase &operator=(const ParameterBase &);
+
+public:
+  double getOriginalValue(int serial_number) 
+  {
+    return originalValueMap_[serial_number];
+  }
+
+  void setOriginalValue(int serial_number, double value) 
+  {
+    originalValueMap_[serial_number] = value;
+  }
+
+  bool wasValueGiven(int serial_number) const 
+  {
+    return givenValueSet_.find(serial_number) != givenValueSet_.end();
+  }
+
+  void setValueGiven(int serial_number, bool value) 
+  {
+    if (value)
+      givenValueSet_.insert(serial_number);
+    else
+      givenValueSet_.erase(serial_number);
+  }
+
+private:
+  OriginalValueMap            originalValueMap_;      ///< Map from device entity and original value index to original value
+  GivenValueSet               givenValueSet_;         ///< Map from device entity and serial number to value given flag
+};
 
 template<class C>
 class ParametricData;
@@ -163,6 +203,7 @@ template <>
 inline std::ostream &printEntry(std::ostream &os, const Entry<CompositeMap> &entry);
 
 void typeMismatch(const std::type_info &from_type, const std::type_info &to_type);
+void nonexistentParameter(const std::string &name, const std::type_info &entity_type);
 
 /**
  * Class Entry<void> defines the parameter binding value entry interface.
@@ -175,68 +216,69 @@ void typeMismatch(const std::type_info &from_type, const std::type_info &to_type
 template<>
 class Entry<void>
 {
-  protected:
-    /**
-     * Constructs the Entry base class
-     *
-     * @note The construct is protected so it may only be constructed by Entry<T> classes.
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 08:32:36 2013
-     */
-    Entry()
-    {}
+protected:
+  /**
+   * Constructs the Entry base class
+   *
+   * @note The construct is protected so it may only be constructed by Entry<T> classes.
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 08:32:36 2013
+   */
+  Entry()
+  {}
 
-  public:
-    /**
-     * Destroys Entry
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 08:34:16 2013
-     */
-    virtual ~Entry()
-    {}
+public:
+  /**
+   * Destroys Entry
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 08:34:16 2013
+   */
+  virtual ~Entry()
+  {}
 
-  private:
-    Entry(const Entry &);
-    Entry &operator=(const Entry &);
+private:
+  Entry(const Entry &);
+  Entry &operator=(const Entry &);
 
-  public:
-    /**
-     * Returns the type_info of the data type being stored in the entry.
-     *
-     * @return const reference to the type_info of the data type being stored in the entry.
-     */
-    virtual const std::type_info &type() const = 0;
+public:
+  /**
+   * Returns the type_info of the data type being stored in the entry.
+   *
+   * @return const reference to the type_info of the data type being stored in the entry.
+   */
+  virtual const std::type_info &type() const = 0;
 
-    /**
-     * Prints the value of the entry to the output stream
-     *
-     * @param os output stream to write to
-     *
-     * @return reference to the output stream
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Wed Aug  7 11:28:02 2013
-     */
-    std::ostream &print(std::ostream &os) const {
-      doPrint(os);
+  /**
+   * Prints the value of the entry to the output stream
+   *
+   * @param os output stream to write to
+   *
+   * @return reference to the output stream
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Wed Aug  7 11:28:02 2013
+   */
+  std::ostream &print(std::ostream &os) const 
+  {
+    doPrint(os);
 
-      return os;
-    }
+    return os;
+  }
 
-  private:
-    /**
-     * Prints the value of the entry to the output stream
-     *
-     * @param os output stream to write to
-     *
-     * @return reference to the output stream
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Wed Aug  7 11:29:29 2013
-     */
-    virtual std::ostream &doPrint(std::ostream &os) const = 0;
+private:
+  /**
+   * Prints the value of the entry to the output stream
+   *
+   * @param os output stream to write to
+   *
+   * @return reference to the output stream
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Wed Aug  7 11:29:29 2013
+   */
+  virtual std::ostream &doPrint(std::ostream &os) const = 0;
 };
 
 /**
@@ -248,169 +290,178 @@ class Entry<void>
 template<class T>
 class Entry : public Entry<void>
 {
-  public:
-    /**
-     * Constructs an Entry.
-     *
-     * Initializes the parameter member variable pointer of type T.  Note the member variable
-     * pointer are actually offsets into an object where the data for the member exists.  So, by
-     * storing this pointer the value of any object of type can be retrieved.
-     *
-     * The default value ot type T is also contained here.
-     *
-     * @param member_value_ptr parameter member variable pointer
-     * @param default_value Default value of parameter
-     */
-    Entry(T ParameterBase::*member_value_ptr, const T &default_value = T())
-      : memberValuePtr_(member_value_ptr),
-        defaultValue_(default_value)
-    {}
+public:
+  /**
+   * Constructs an Entry.
+   *
+   * Initializes the parameter member variable pointer of type T.  Note the member variable
+   * pointer are actually offsets into an object where the data for the member exists.  So, by
+   * storing this pointer the value of any object of type can be retrieved.
+   *
+   * The default value ot type T is also contained here.
+   *
+   * @param member_value_ptr parameter member variable pointer
+   * @param default_value Default value of parameter
+   */
+  Entry(T ParameterBase::*member_value_ptr, const T &default_value = T())
+    : memberValuePtr_(member_value_ptr),
+      defaultValue_(default_value)
+  {}
 
-    /**
-     * Destroys the entry
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Wed Aug  7 11:30:29 2013
-     */
-    virtual ~Entry()
-    {}
+  /**
+   * Destroys the entry
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Wed Aug  7 11:30:29 2013
+   */
+  virtual ~Entry()
+  {}
 
-  private:
-    Entry(const Entry &);
-    Entry &operator=(const Entry &);
+private:
+  Entry(const Entry &);               ///< No copying
+  Entry &operator=(const Entry &);    ///< No assignment
 
-  public:
-    /**
-     * Returns type_info of this entry.
-     *
-     * @return const reference to type_info of this entry
-     */
-    virtual const std::type_info &type() const {
-      return typeid(T);
-    }
+public:
+  /**
+   * Returns type_info of this entry.
+   *
+   * @return const reference to type_info of this entry
+   */
+  virtual const std::type_info &type() const 
+  {
+    return typeid(T);
+  }
 
-  private:
-    /**
-     * Prints the value of the entry to the output stream
-     *
-     * @param os output stream to write to
-     *
-     * @return reference to the output stream
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Wed Aug  7 11:29:29 2013
-     */
-    virtual std::ostream &doPrint(std::ostream &os) const {
-      return printEntry(os, *this);
-    }
+private:
+  /**
+   * Prints the value of the entry to the output stream
+   *
+   * @param os output stream to write to
+   *
+   * @return reference to the output stream
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Wed Aug  7 11:29:29 2013
+   */
+  virtual std::ostream &doPrint(std::ostream &os) const 
+  {
+    return printEntry(os, *this);
+  }
 
-  public:
-    /**
-     * Return the member pointer to the data member variable that holds the value associated with
-     * this parameter
-     *
-     * @return member pointer to the data member variable
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Wed Aug  7 11:31:21 2013
-     */
-    T ParameterBase::*getMemberPtr() const {
-      return memberValuePtr_;
-    }
+public:
+  /**
+   * Return the member pointer to the data member variable that holds the value associated with
+   * this parameter
+   *
+   * @return member pointer to the data member variable
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Wed Aug  7 11:31:21 2013
+   */
+  T ParameterBase::*getMemberPtr() const 
+  {
+    return memberValuePtr_;
+  }
 
-    /**
-     * Return the value of the entity's parameter
-     *
-     * @param entity device class or device instance
-     *
-     * @return const reference to the value of the entity's parameter
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Wed Aug  7 11:32:58 2013
-     */
-    const T &getValue(const ParameterBase &entity) const {
-      return entity.*memberValuePtr_;
-    }
+  /**
+   * Return the value of the entity's parameter
+   *
+   * @param entity device class or device instance
+   *
+   * @return const reference to the value of the entity's parameter
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Wed Aug  7 11:32:58 2013
+   */
+  const T &getValue(const ParameterBase &entity) const 
+  {
+    return entity.*memberValuePtr_;
+  }
 
-    /**
-     * Return the value of the entity's parameter
-     *
-     * @param entity device class or device instance
-     *
-     * @return reference to the value of the entity's parameter
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Wed Aug  7 11:32:58 2013
-     */
-    T &getValue(ParameterBase &entity) const {
-      return entity.*memberValuePtr_;
-    }
+  /**
+   * Return the value of the entity's parameter
+   *
+   * @param entity device class or device instance
+   *
+   * @return reference to the value of the entity's parameter
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Wed Aug  7 11:32:58 2013
+   */
+  T &getValue(ParameterBase &entity) const 
+  {
+    return entity.*memberValuePtr_;
+  }
 
-    /**
-     * Sets the value of the entity's parameter
-     *
-     * @param entity device class or device instance
-     * @param value value to set the entity's parameter to
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Wed Aug  7 11:32:58 2013
-     */
-    void setValue(ParameterBase &entity, const T &value) const {
-      entity.*memberValuePtr_ = value;
-    }
+  /**
+   * Sets the value of the entity's parameter
+   *
+   * @param entity device class or device instance
+   * @param value value to set the entity's parameter to
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Wed Aug  7 11:32:58 2013
+   */
+  void setValue(ParameterBase &entity, const T &value) const 
+  {
+    entity.*memberValuePtr_ = value;
+  }
 
-    /**
-     * Return the default value of the parameter
-     *
-     * All parameters provide a default value when created.  The parameter is set to this value and
-     * the given flag is cleared on construction.  If the value is provided by the net list, the
-     * parameter's value is set accordingly and given flag is set to true.
-     *
-     * @return const reference to the parameter's default value
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Wed Aug  7 11:35:18 2013
-     */
-    const T &getDefaultValue() const {
-      return defaultValue_;
-    }
+  /**
+   * Return the default value of the parameter
+   *
+   * All parameters provide a default value when created.  The parameter is set to this value and
+   * the given flag is cleared on construction.  If the value is provided by the net list, the
+   * parameter's value is set accordingly and given flag is set to true.
+   *
+   * @return const reference to the parameter's default value
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Wed Aug  7 11:35:18 2013
+   */
+  const T &getDefaultValue() const 
+  {
+    return defaultValue_;
+  }
 
-    /**
-     * Sets the parameter's default value
-     *
-     * All parameters provide a default value when created.  The parameter is set to this value and
-     * the given flag is cleared on construction.  If the value is provided by the net list, the
-     * parameter's value is set accordingly and given flag is set to true.
-     *
-     * @param value default value of the parameter
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Wed Aug  7 11:37:50 2013
-     */
-    void setDefaultValue(const T &value) {
-      defaultValue_ = value;
-    }
+  /**
+   * Sets the parameter's default value
+   *
+   * All parameters provide a default value when created.  The parameter is set to this value and
+   * the given flag is cleared on construction.  If the value is provided by the net list, the
+   * parameter's value is set accordingly and given flag is set to true.
+   *
+   * @param value default value of the parameter
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Wed Aug  7 11:37:50 2013
+   */
+  void setDefaultValue(const T &value) 
+  {
+    defaultValue_ = value;
+  }
 
-  private:
-    T                           defaultValue_;        ///< Default value of parameter
-    T ParameterBase::*          memberValuePtr_;      ///< Member pointer containing value
+private:
+  T                           defaultValue_;        ///< Default value of parameter
+  T ParameterBase::*          memberValuePtr_;      ///< Member pointer containing value
 };
 
 /**
  * Casts the entry to type T
  *
- * If the entry if not of the specified type, typeMismatch() is calls to emit a fatal error.
+ * If the entry if not of the specified type, typeMismatch() is called to emit a fatal error.
  *
- * @param T type to cast to
+ * @tparam T type to cast to
  * @param entry entry to cast
  *
  * @return const reference to Entry<T>
  *
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
  * @date   Thu Jul 25 13:21:09 2013
  */
 template<class T>
-const Entry<T> &entry_cast(const Entry<void> &entry) {
+const Entry<T> &entry_cast(const Entry<void> &entry) 
+{
   if (entry.type() != typeid(T))
     typeMismatch(entry.type(), typeid(T));
 
@@ -420,18 +471,19 @@ const Entry<T> &entry_cast(const Entry<void> &entry) {
 /**
  * Casts the entry to type T
  *
- * If the entry if not of the specified type, typeMismatch() is calls to emit a fatal error.
+ * If the entry if not of the specified type, typeMismatch() is called to emit a fatal error.
  *
- * @param T type to cast to
+ * @tparam T type to cast to
  * @param entry entry to cast
  *
  * @return reference to Entry<T>
  *
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
  * @date   Thu Jul 25 13:21:09 2013
  */
 template<class T>
-Entry<T> &entry_cast(Entry<void> &entry) {
+Entry<T> &entry_cast(Entry<void> &entry) 
+{
   if (entry.type() != typeid(T))
     typeMismatch(entry.type(), typeid(T));
 
@@ -444,7 +496,7 @@ Entry<T> &entry_cast(Entry<void> &entry) {
  * The descriptor contains the Entry for the parameter member variable.  Each parameter is assigned
  * a serialNumber_ when it is created and is used by manage the given value map.  The parameter may
  * have a given member variable as well.  The parameter can be marked to store its original
- * initialized value and the originalValueIndex_ is used to store this value in the s_originalValueMap.
+ * initialized value and the serialNumber_ is used to store this value in the s_originalValueMap.
  *
  * If the parameter is vectorized, the index to this parameter is in vec_.
  *
@@ -456,408 +508,455 @@ Entry<T> &entry_cast(Entry<void> &entry) {
  */
 class Descriptor
 {
-  public:
-    /**
-     * Constructs Descriptor
-     *
-     * @param entry the parameter member variable pointer, type and default value
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Wed Aug  7 11:38:43 2013
-     */
-    Descriptor(Entry<void> *const entry)
-      : serialNumber_(0),
-        originalValueIndex_(-1),
-        vec_(0),
-        expressionAccess_(ParameterType::NO_DEP),
-        entry_(entry),
-        unit_(U_NONE),
-        category_(CAT_NONE),
-        description_(""),
-        compositeParametricData_(0),
-        given_(static_cast<bool ParameterBase::*>(0))
-    {}
+public:
+  /**
+   * Constructs Descriptor
+   *
+   * @param entry the parameter member variable pointer, type and default value
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Wed Aug  7 11:38:43 2013
+   */
+  Descriptor(Entry<void> *const entry)
+    : serialNumber_(0),
+      originalValueFlag_(false),
+      vec_(0),
+      expressionAccess_(ParameterType::NO_DEP),
+      entry_(entry),
+      unit_(U_NONE),
+      category_(CAT_NONE),
+      description_(""),
+      compositeParametricData_(0),
+      given_(static_cast<bool ParameterBase::*>(0))
+  {}
 
-    /**
-     * Destroy Descriptor
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Wed Aug  7 15:42:55 2013
-     */
-    virtual ~Descriptor() {
-      delete entry_;
-    }
+  /**
+   * Destroy Descriptor
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Wed Aug  7 15:42:55 2013
+   */
+  virtual ~Descriptor() 
+  {
+    delete entry_;
+  }
 
-  private:
-    Descriptor(const Descriptor &descriptor);
-    Descriptor &operator=(const Descriptor &descriptor);
-
-  public:
-    /**
-     * Tests entry data type
-     *
-     * @return true if entry is of type T
-     *
-     * @date   Wed Aug  7 10:31:04 2013
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     */
-    template <class T>
-    bool isType() const {
-      if (entry_)
-        return entry_->type() == typeid(T);
-
-      return typeid(T) == typeid(int);
-    }
-
-    /**
-     * Sets the original value index used to store and retrieve values from the OriginalValueMap
-     *
-     * @param index index of the original value in the OriginalValueMap
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 14:37:03 2013
-     */
-    void setOriginalValueIndex(int index) {
-      originalValueIndex_ = index;
-    }
-
-    /**
-     * Returns the index of the origina value in the OriginalValueMap
-     *
-     * @return original value index
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 14:19:59 2013
-     */
-    int getOriginalValueIndex() const {
-      return originalValueIndex_;
-    }
-
-    /**
-     * Sets the serial number used to store and retrieve given boolean from the GivenValueMap
-     *
-     * @param serial_number serial number of the parameter in the GivenValueMap
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 14:38:18 2013
-     */
-    void setSerialNumber(int serial_number) {
-      serialNumber_ = serial_number;
-    }
-
-    /**
-     * Gets the serial number used to store and retireve given boolean fromt he GivenValueMap
-     *
-     * @return parameter serial number
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 14:40:30 2013
-     */
-    int getSerialNumber() const {
-      return serialNumber_;
-    }
-
-    /**
-     * Sets the expression access which describe the usage of the parameter
-     *
-     * @param expression_access usage of the paraemeter
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 14:41:56 2013
-     */
-    void setExpressionAccess(ExprAccess expression_access) {
-      expressionAccess_ = expression_access;
-    }
-
-    /**
-     * Gets the expression access which describes the usage of the paramter
-     *
-     * @return usage of the parameter
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 14:41:26 2013
-     */
-    ExprAccess getExpressionAccess() const {
-      return expressionAccess_;
-    }
-
-    /**
-     * Sets the units of the parameter, only used to document the parameter
-     *
-     * @param unit units of the parameter
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 14:43:32 2013
-     */
-    void setUnit(ParameterUnit unit) {
-      unit_ = unit;
-    }
-
-    /**
-     * Gets the units of the parameter, only used to document the parameter
-     *
-     * @return units of the parameter
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 14:44:16 2013
-     */
-    ParameterUnit getUnit() const {
-      return unit_;
-    }
-
-    /**
-     * Sets the category of the parameter, only used to document the parameter
-     *
-     * @param category category of the parameter
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 14:45:09 2013
-     */
-    void setCategory(ParameterCategory category) {
-      category_ = category;
-    }
-
-    /**
-     * Gets the category of the parameter, only used to document the parameter
-     *
-     * @return categort of the parameter
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 14:45:40 2013
-     */
-    ParameterCategory getCategory() const {
-      return category_;
-    }
-
-    /**
-     * Sets the description of the parameter, only used to document the parameter
-     *
-     * @param description description of the parameter
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 14:46:21 2013
-     */
-    void setDescription(const std::string &description) {
-      description_ = description;
-    }
-
-    /**
-     * Gets the description of the parameter, only used to document the parameter
-     *
-     * @return description of the parameter
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 14:46:46 2013
-     */
-    const std::string &getDescription() const {
-      return description_;
-    }
-
-    /**
-     * Sets the composite parametric
-     *
-     * A composite parameter is a named aggregation of parameters
-     *
-     * @param composite_parametric_data composite parameter
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 14:47:19 2013
-     */
-    void setCompositeParametricData(const ParametricData<void> *composite_parametric_data) {
-      compositeParametricData_ = composite_parametric_data;
-    }
-
-    /**
-     * Return the composite parameter
-     *
-     * A composite parameter is a named aggregation of parameters
-     *
-     * @return const pointer to the composite parameter
-     *
-     * @note I think the template parameter is really only ever CompositeParam, though sometimes its
-     * currently void.
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 14:09:01 2013
-     */
-    template <class U>
-    const ParametricData<U> *getCompositeParametricData() const {
-      return static_cast<const ParametricData<U> *>(compositeParametricData_);
-    }
-
-    /**
-     * sets the vector length of an vectorized parameter
-     *
-     * @param index
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 14:50:05 2013
-     */
-    void setVec(int index) {
-      vec_ = index;
-    }
-
-    /**
-     * Gets the vector length of a vectorized parameter
-     *
-     * @return length of the vectorized parameter
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 14:51:10 2013
-     */
-    int getVec() const {
-      return vec_;
-    }
-
-    /**
-     * Gets the entry object of the parameter
-     *
-     * @return const reference to the Entry<void>
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 15:29:16 2013
-     */
-    const Entry<void> &getEntry() const {
-      return *entry_;
-    }
-
-    /**
-     * Gets the entry object of the parameter
-     *
-     * @return reference to the Entry<void>
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 15:29:16 2013
-     */
-    Entry<void> &getEntry() {
-      return *entry_;
-    }
+private:
+  Descriptor(const Descriptor &descriptor);
+  Descriptor &operator=(const Descriptor &descriptor);
 
 public:
-    /**
-     * Returns the value of the parameter for the entity
-     *
-     * @param entity device class or device instance
-     *
-     * @return reference to the value of the parameter for the entity
-     *
-     * @date   Wed Aug  7 10:36:10 2013
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     */
-    template <class T>
-    const T &value(const ParameterBase &entity) const {
-      const Entry<T> &entry = entry_cast<T>(*entry_);
+  /**
+   * Tests entry data type
+   *
+   * @return true if entry is of type T
+   *
+   * @date   Wed Aug  7 10:31:04 2013
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   */
+  template <class T>
+  bool isType() const 
+  {
+    if (entry_)
+      return entry_->type() == typeid(T);
 
-      return entry.getValue(entity);
-    }
+    return typeid(T) == typeid(int);
+  }
 
-    /**
-     * Returns the value of the parameter for the entity
-     *
-     * @param entity device class or device instance
-     *
-     * @return reference to the value of the parameter for the entity
-     *
-     * @date   Wed Aug  7 10:36:10 2013
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     */
-    template <class T>
-    T &value(ParameterBase &entity) const {
-      const Entry<T> &entry = entry_cast<T>(*entry_);
+  bool isComposite() const 
+  {
+    return compositeParametricData_ != 0;
+  }
 
-      return entry.getValue(entity);
-    }
+  /**
+   * Sets a boolean marking an original value having been stored.
+   *
+   * @param original_value_flag
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 14:37:03 2013
+   */
+  Descriptor &setOriginalValueStored(bool original_value_flag) 
+  {
+    originalValueFlag_ = original_value_flag;
+    return *this;
+  }
 
-    /**
-     * Returns the parameter member variable pointer of the enrtry
-     *
-     * @return parameter member pointer of type T
-     *
-     * @date   Wed Aug  7 10:54:58 2013
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     */
-    template <class T>
-    T ParameterBase::*getMemberPtr() const {
-      const Entry<T> &entry = entry_cast<T>(*entry_);
+  /**
+   * Returns whether an original value has been stored
+   *
+   * @return True if original value has been stored.  False otherwise.
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 14:19:59 2013
+   */
+  bool hasOriginalValueStored() const 
+  {
+    return originalValueFlag_;
+  }
 
-      return entry.getMemberPtr();
-    }
+  /**
+   * Sets the expression access which describe the usage of the parameter
+   *
+   * @param expression_access usage of the paraemeter
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 14:41:56 2013
+   */
+  Descriptor &setExpressionAccess(ExprAccess expression_access) 
+  {
+    expressionAccess_ = expression_access;
+    return *this;
+  }
 
-    /**
-     * Tests if parameter has a given data member
-     *
-     * Parameters may provide a boolean member variable that is set true if the netlist provides
-     * the value.
-     *
-     * @return true if the parameter has a boolean member variable to set if it is provided by the netlist
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Wed Aug  7 11:03:55 2013
-     */
-    bool hasGivenMember() const {
-      return given_ != static_cast<bool ParameterBase::*>(0);
-    }
+  /**
+   * Gets the expression access which describes the usage of the paramter
+   *
+   * @return usage of the parameter
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 14:41:26 2013
+   */
+  ExprAccess getExpressionAccess() const 
+  {
+    return expressionAccess_;
+  }
 
-    /**
-     * Sets the boolean member variable to set if the netlist provides the value.
-     *
-     * Parameters may provide a boolean member variable that is set true if the netlist provides
-     * the value.
-     *
-     * @param given boolean member variable to be set
-     *
-     * @date   Wed Aug  7 11:02:38 2013
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     */
-    template<class U>
-    void setGivenMember(bool U::*given) {
-      given_ = static_cast<bool ParameterBase::*>(given);
-    }
+  /**
+   * Sets the units of the parameter, only used to document the parameter
+   *
+   * @param unit units of the parameter
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 14:43:32 2013
+   */
+  Descriptor &setUnit(ParameterUnit unit) 
+  {
+    unit_ = unit;
+    return *this;
+  }
 
-    /**
-     * Tests if the parameter has been given by the netlist.
-     *
-     * @return true if the parameter was given by the netline
-     *
-     * @date   Wed Aug  7 11:01:42 2013
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     */
-    bool getGiven(ParameterBase &entity) const {
+  /**
+   * Gets the units of the parameter, only used to document the parameter
+   *
+   * @return units of the parameter
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 14:44:16 2013
+   */
+  ParameterUnit getUnit() const 
+  {
+    return unit_;
+  }
+
+  /**
+   * Sets the category of the parameter, only used to document the parameter
+   *
+   * @param category category of the parameter
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 14:45:09 2013
+   */
+  Descriptor &setCategory(ParameterCategory category) 
+  {
+    category_ = category;
+    return *this;
+  }
+
+  /**
+   * Gets the category of the parameter, only used to document the parameter
+   *
+   * @return categort of the parameter
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 14:45:40 2013
+   */
+  ParameterCategory getCategory() const 
+  {
+    return category_;
+  }
+
+  /**
+   * Sets the description of the parameter, only used to document the parameter
+   *
+   * @param description description of the parameter
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 14:46:21 2013
+   */
+  Descriptor &setDescription(const std::string &description) 
+  {
+    description_ = description;
+    return *this;
+  }
+
+  /**
+   * Gets the description of the parameter, only used to document the parameter
+   *
+   * @return description of the parameter
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 14:46:46 2013
+   */
+  const std::string &getDescription() const 
+  {
+    return description_;
+  }
+
+  /**
+   * Sets the composite parametric
+   *
+   * A composite parameter is a named aggregation of parameters
+   *
+   * @param composite_parametric_data composite parameter
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 14:47:19 2013
+   */
+  Descriptor &setCompositeParametricData(const ParametricData<void> *composite_parametric_data) 
+  {
+    compositeParametricData_ = composite_parametric_data;
+    return *this;
+  }
+
+  /**
+   * Return the composite parameter
+   *
+   * A composite parameter is a named aggregation of parameters
+   *
+   * @return const pointer to the composite parameter
+   *
+   * @note I think the template parameter is really only ever CompositeParam, though sometimes its
+   * currently void.
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 14:09:01 2013
+   */
+  template <class U>
+  const ParametricData<U> *getCompositeParametricData() const 
+  {
+    return static_cast<const ParametricData<U> *>(compositeParametricData_);
+  }
+
+  /**
+   * sets the vector length of an vectorized parameter
+   *
+   * @param index
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 14:50:05 2013
+   */
+  Descriptor &setVec(int index) 
+  {
+    vec_ = index;
+    return *this;
+  }
+
+  /**
+   * Gets the vector length of a vectorized parameter
+   *
+   * @return length of the vectorized parameter
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 14:51:10 2013
+   */
+  int getVec() const 
+  {
+    return vec_;
+  }
+
+  /**
+   * Gets the entry object of the parameter
+   *
+   * @return const reference to the Entry<void>
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 15:29:16 2013
+   */
+  const Entry<void> &getEntry() const 
+  {
+    return *entry_;
+  }
+
+  /**
+   * Gets the entry object of the parameter
+   *
+   * @return reference to the Entry<void>
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 15:29:16 2013
+   */
+  Entry<void> &getEntry() 
+  {
+    return *entry_;
+  }
+
+  /**
+   * Sets the serial number used to store and retrieve given boolean from the GivenValueMap
+   *
+   * @param serial_number serial number of the parameter in the GivenValueMap
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 14:38:18 2013
+   */
+  Descriptor &setSerialNumber(int serial_number) 
+  {
+    serialNumber_ = serial_number;
+    return *this;
+  }
+
+  /**
+   * Gets the serial number used to store and retireve given boolean fromt he GivenValueMap
+   *
+   * @return parameter serial number
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 14:40:30 2013
+   */
+  int getSerialNumber() const 
+  {
+    return serialNumber_;
+  }
+
+public:
+  /**
+   * Returns the value of the parameter for the entity
+   *
+   * @param entity device class or device instance
+   *
+   * @return reference to the value of the parameter for the entity
+   *
+   * @date   Wed Aug  7 10:36:10 2013
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   */
+  template <class T>
+  const T &value(const ParameterBase &entity) const 
+  {
+    const Entry<T> &entry = entry_cast<T>(*entry_);
+
+    return entry.getValue(entity);
+  }
+
+  /**
+   * Returns the value of the parameter for the entity
+   *
+   * @param entity device class or device instance
+   *
+   * @return reference to the value of the parameter for the entity
+   *
+   * @date   Wed Aug  7 10:36:10 2013
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   */
+  template <class T>
+  T &value(ParameterBase &entity) const 
+  {
+    const Entry<T> &entry = entry_cast<T>(*entry_);
+
+    return entry.getValue(entity);
+  }
+
+  /**
+   * Returns the parameter member variable pointer of the enrtry
+   *
+   * @return parameter member pointer of type T
+   *
+   * @date   Wed Aug  7 10:54:58 2013
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   */
+  template <class T>
+  T ParameterBase::*getMemberPtr() const 
+  {
+    const Entry<T> &entry = entry_cast<T>(*entry_);
+
+    return entry.getMemberPtr();
+  }
+
+  /**
+   * Tests if parameter has a given data member
+   *
+   * Parameters may provide a boolean member variable that is set true if the netlist provides
+   * the value.
+   *
+   * @return true if the parameter has a boolean member variable to set if it is provided by the netlist
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Wed Aug  7 11:03:55 2013
+   */
+  bool hasGivenMember() const 
+  {
+    return given_ != static_cast<bool ParameterBase::*>(0);
+  }
+
+  /**
+   * Sets the boolean member variable to set if the netlist provides the value.
+   *
+   * Parameters may provide a boolean member variable that is set true if the netlist provides
+   * the value.
+   *
+   * @param given boolean member variable to be set
+   *
+   * @date   Wed Aug  7 11:02:38 2013
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   */
+  template<class U>
+  Descriptor &setGivenMember(bool U::*given) 
+  {
+    given_ = static_cast<bool ParameterBase::*>(given);
+    return *this;
+  }
+
+  /**
+   * Tests if the parameter has been given by the netlist.
+   *
+   * @return true if the parameter was given by the netline
+   *
+   * @date   Wed Aug  7 11:01:42 2013
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   */
+  bool getGiven(ParameterBase &entity) const 
+  {
+    if (hasGivenMember()) 
+    {
       return entity.*given_;
     }
 
-    /**
-     * Sets the given state of the parameter to value
-     *
-     * The parameter's boolean member variable that is set true if exists and the netlist provides
-     * the value.
-     *
-     * @param entity device class or device instance
-     * @param value true if provided by netlist
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Wed Aug  7 11:09:00 2013
-     */
-    void setGiven(ParameterBase &entity, bool value) const {
-      if (hasGivenMember()) {
-        entity.*given_ = value;
-      }
+    return false;
+  }
+
+  /**
+   * Sets the given state of the parameter to value
+   *
+   * The parameter's boolean member variable that is set true if exists and the netlist provides
+   * the value.
+   *
+   * @param entity device class or device instance
+   * @param value true if provided by netlist
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Wed Aug  7 11:09:00 2013
+   */
+  void setGiven(ParameterBase &entity, bool value) const 
+  {
+    if (hasGivenMember()) 
+    {
+      entity.*given_ = value;
     }
+  }
 
-  private:
-    int                                 serialNumber_;          ///< Unique identifier of descriptor
-    int                                 originalValueIndex_;    ///< Index where original value is store usually -1, meaning none saved.
-    int                                 vec_;                   ///< If > 0 specifies a vector of params.(eg: if = 3 then IC becomes IC1, IC2, IC3)
-    ExprAccess                          expressionAccess_;      ///< Flags for parameter attributes, such as whether can be input by user, may depend on time, etc.
+private:
+  int                                 serialNumber_;          ///< Unique identifier of descriptor
+  bool                                originalValueFlag_;     ///< Flag indicating original value was stored
+  int                                 vec_;                   ///< If > 0 specifies a vector of params.(eg: if = 3 then IC becomes IC1, IC2, IC3)
+  ExprAccess                          expressionAccess_;      ///< Flags for parameter attributes, such as whether can be input by user, may depend on time, etc.
 
-    Entry<void> * const                 entry_;                 ///< Pointer to entry which contains the value
+  Entry<void> * const                 entry_;                 ///< Pointer to entry which contains the value
+  bool                                isComposite_;
+  ParameterUnit                       unit_;                  ///< Unit designator for documentation
+  ParameterCategory                   category_;              ///< Category designator for documentation
+  std::string                         description_;           ///< Description of parameter for documentation
+  const ParametricData<void> *        compositeParametricData_;
 
-    ParameterUnit                       unit_;                  ///< Unit designator for documentation
-    ParameterCategory                   category_;              ///< Category designator for documentation
-    std::string                         description_;           ///< Description of parameter for documentation
-    const ParametricData<void> *        compositeParametricData_;
-
-    bool ParameterBase::*               given_;                 ///< Pointer to given bool, usually NULL.
+  bool ParameterBase::*               given_;                 ///< Pointer to given bool, usually 0
 };
 
 
@@ -869,11 +968,12 @@ public:
  *
  * @return reference to the output stream
  *
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
  * @date   Fri Aug  9 15:32:26 2013
  */
 template <class T>
-inline std::ostream &printEntry(std::ostream &os, const Entry<T> &entry) {
+inline std::ostream &printEntry(std::ostream &os, const Entry<T> &entry) 
+{
   os << entry.getDefaultValue();
 
   return os;
@@ -887,13 +987,34 @@ inline std::ostream &printEntry(std::ostream &os, const Entry<T> &entry) {
  *
  * @return reference to the output stream
  *
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
  * @date   Fri Aug  9 15:33:24 2013
  */
 template <class T>
-inline std::ostream &printEntry(std::ostream &os, const Entry<std::vector<T> > &entry) {
+inline std::ostream &printEntry(std::ostream &os, const Entry<std::vector<T> > &entry) 
+{
   for (typename std::vector<T>::const_iterator it = entry.getDefaultValue().begin(); it != entry.getDefaultValue().end(); ++it)
     os << (*it) << std::endl;
+
+  return os;
+}
+
+/**
+ * Prints the entry default values of a map parameter
+ *
+ * @param os output stream
+ * @param entry entry to print
+ *
+ * @return reference to the output stream
+ *
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+ * @date   Thu Feb  6 16:37:16 2014
+ */
+template <class T>
+inline std::ostream &printEntry(std::ostream &os, const Entry<std::map<std::string, T> > &entry) 
+{
+  for (typename std::map<std::string, T>::const_iterator it = entry.getDefaultValue().begin(); it != entry.getDefaultValue().end(); ++it)
+    os << (*it).first << std::endl;
 
   return os;
 }
@@ -906,11 +1027,12 @@ inline std::ostream &printEntry(std::ostream &os, const Entry<std::vector<T> > &
  *
  * @return reference to the output stream
  *
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
  * @date   Fri Aug  9 15:34:18 2013
  */
 template <>
-inline std::ostream &printEntry(std::ostream &os, const Entry<std::string> &entry) {
+inline std::ostream &printEntry(std::ostream &os, const Entry<std::string> &entry) 
+{
   os << "'" << entry.getDefaultValue() << "'";
 
   return os;
@@ -924,11 +1046,12 @@ inline std::ostream &printEntry(std::ostream &os, const Entry<std::string> &entr
  *
  * @return reference to the output stream
  *
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
  * @date   Fri Aug  9 15:34:18 2013
  */
 template <>
-inline std::ostream &printEntry(std::ostream &os, const Entry<bool> &entry) {
+inline std::ostream &printEntry(std::ostream &os, const Entry<bool> &entry) 
+{
   os << (entry.getDefaultValue() ? "true" : "false");
 
   return os;
@@ -942,11 +1065,12 @@ inline std::ostream &printEntry(std::ostream &os, const Entry<bool> &entry) {
  *
  * @return reference to the output stream
  *
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
  * @date   Fri Aug  9 15:34:18 2013
  */
 template <>
-inline std::ostream &printEntry(std::ostream &os, const Entry<CompositeMap> &entry) {
+inline std::ostream &printEntry(std::ostream &os, const Entry<CompositeMap> &entry) 
+{
   for (CompositeMap::const_iterator it = entry.getDefaultValue().begin(); it != entry.getDefaultValue().end(); ++it)
     os << (*it).first << ": " << (*it).second << std::endl;
 
@@ -960,11 +1084,12 @@ inline std::ostream &printEntry(std::ostream &os, const Entry<CompositeMap> &ent
  *
  * @return const reference to the default value of the entry of the descriptor
  *
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
  * @date   Fri Aug  9 15:37:33 2013
  */
 template <class T>
-inline const T &getDefaultValue(const Descriptor &descriptor) {
+inline const T &getDefaultValue(const Descriptor &descriptor) 
+{
   const Entry<T> &entry = entry_cast<T>(descriptor.getEntry());
 
   return entry.getDefaultValue();
@@ -976,11 +1101,12 @@ inline const T &getDefaultValue(const Descriptor &descriptor) {
  * @param descriptor descriptor of the parameter
  * @param t default value
  *
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
  * @date   Fri Aug  9 15:38:49 2013
  */
 template <class T>
-inline void setDefaultValue(Descriptor &descriptor, const T &t) {
+inline void setDefaultValue(Descriptor &descriptor, const T &t) 
+{
   Entry<T> &entry = entry_cast<T>(descriptor.getEntry());
 
   entry.setDefaultValue(t);
@@ -994,11 +1120,12 @@ inline void setDefaultValue(Descriptor &descriptor, const T &t) {
  *
  * @return const reference to the value of the entry of the descriptor
  *
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
  * @date   Fri Aug  9 15:39:40 2013
  */
 template <class T>
-inline const T &value(const ParameterBase &entity, const Descriptor &descriptor) {
+inline const T &value(const ParameterBase &entity, const Descriptor &descriptor)
+{
   const Entry<T> &entry = entry_cast<T>(descriptor.getEntry());
 
   return entry.getValue(entity);
@@ -1012,11 +1139,12 @@ inline const T &value(const ParameterBase &entity, const Descriptor &descriptor)
  *
  * @return reference to the value of the entry of the descriptor
  *
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
  * @date   Fri Aug  9 15:39:40 2013
  */
 template <class T>
-inline T &value(ParameterBase &entity, const Descriptor &descriptor) {
+inline T &value(ParameterBase &entity, const Descriptor &descriptor) 
+{
   const Entry<T> &entry = entry_cast<T>(descriptor.getEntry());
 
   return entry.getValue(entity);
@@ -1031,11 +1159,12 @@ inline T &value(ParameterBase &entity, const Descriptor &descriptor) {
  *
  * @return const reference to the value of the entry of the descriptor
  *
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
  * @date   Fri Aug  9 15:39:40 2013
  */
 template <class T, class U>
-inline const T &getValue(const ParameterBase &entity, const Descriptor &descriptor) {
+inline const T &getValue(const ParameterBase &entity, const Descriptor &descriptor) 
+{
   const Entry<T> &entry = entry_cast<T>(descriptor.getEntry());
 
   return entry.getValue(entity);
@@ -1048,11 +1177,12 @@ inline const T &getValue(const ParameterBase &entity, const Descriptor &descript
  * @param descriptor descriptor of the parameter
  * @param value value
  *
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
  * @date   Fri Aug  9 15:42:13 2013
  */
 template <class T, class U>
-inline void setValue(ParameterBase &entity, const Descriptor &descriptor, const T &value) {
+inline void setValue(ParameterBase &entity, const Descriptor &descriptor, const T &value) 
+{
   const Entry<T> &entry = entry_cast<T>(descriptor.getEntry());
 
   entry.setValue(entity, value);
@@ -1069,270 +1199,81 @@ inline void setValue(ParameterBase &entity, const Descriptor &descriptor, const 
  * To restore original values during perturbation, the originalValueCount_ and serialNumber_ members
  * maintain counts of original values to be stored and of parameters declared.
  *
- * @todo configTable_ needs to be moved elsewhere someday as it is only used for device instance
- * entities  It was added here temporarily to make it available without having to construct one ala
- * the parameter binding map.
- *
  * @date   Tue Aug  6 13:10:21 2013
- * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
  */
 template<>
 class ParametricData<void>
 {
-  public:
-    typedef std::map<std::string, Descriptor *, LessNoCase> ParameterMap;
+public:
+  /**
+   * Constructs a ParametricData object
+   *
+   * @date   Tue Aug  6 13:10:21 2013
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   */
+  ParametricData()
+    : map_()
+  {}
 
-    /**
-     * Constructs a ParametricData object
-     *
-     * @date   Tue Aug  6 13:10:21 2013
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     */
-    ParametricData()
-      : map_(),
-        serialNumberCount_(0),
-        originalValueCount_(0),
-        configTable_()
-    {}
+  /**
+   * Destroys a ParametricData object
+   *
+   * @date   Tue Aug  6 13:13:47 2013
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   */
+  virtual ~ParametricData() 
+  {
+    for (ParameterMap::iterator it = map_.begin(); it != map_.end(); ++it)
+      delete (*it).second;
+  }
 
-    /**
-     * Destroys a ParametricData object
-     *
-     * @date   Tue Aug  6 13:13:47 2013
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     */
-    virtual ~ParametricData() {
-      for (ParameterMap::iterator it = map_.begin(); it != map_.end(); ++it)
-        delete (*it).second;
-    }
+private:
+  ParametricData(const ParametricData &parametric_data);              ///< No copying
+  ParametricData &operator=(const ParametricData &parametric_data);   ///< No assignment
 
-  private:
-    ParametricData(const ParametricData &parametric_data);
-    ParametricData &operator=(const ParametricData &parametric_data);
+public:
+  /**
+   * Gets the parameter binding map map
+   *
+   * @return reference to the parameter binding map
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 15:50:06 2013
+   */
+  ParameterMap &getMap() 
+  {
+    return map_;
+  }
 
-  public:
-    /** 
-     * Gets the parameter binding map map
-     *
-     * @return reference to the parameter binding map
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 15:50:06 2013
-     */
-    ParameterMap &getMap() {
-      return map_;
-    }
+  /**
+   * Returns the parameter binding map
+   *
+   * @return const reference to the parameter binding map
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 15:50:06 2013
+   */
+  const ParameterMap &getMap() const 
+  {
+    return map_;
+  }
 
-    /** 
-     * Gets the parameter binding map map
-     *
-     * @return const reference to the parameter binding map
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 15:50:06 2013
-     */
-    const ParameterMap &getMap() const {
-      return map_;
-    }
+protected:
+  /**
+   * Adds the parameter to the parameter binding map
+   *
+   * @param name parameter name
+   * @param descriptor descriptor created for the parameter
+   * @param parameter_data_class typeinfo to get the class name for diagnostics
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Fri Aug  9 16:23:45 2013
+   */
+  void addDescriptor(const std::string &name, Descriptor *descriptor, const std::type_info &parameter_data_class);
 
-    /** 
-     * Gets the configuation table.
-     *
-     * @return reference to the configuation table
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 16:11:37 2013
-     */
-    Configuration &getConfigTable() {
-      return configTable_;
-    }
-
-    /** 
-     * Gets the configuation table.
-     *
-     * @return const reference to the configuation table
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 16:11:37 2013
-     */
-    const Configuration &getConfigTable() const {
-      return configTable_;
-    }
-
-    /** 
-     * Sets the number of nodes in the configuation table 
-     *
-     * @param node_count number of nodes
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 16:13:14 2013
-     */
-    void setNumNodes(int node_count) {
-      configTable_.numNodes = node_count;
-    }
-
-    /** 
-     * Gets the number of nodes in the configuation table 
-     *
-     * @return number of nodes
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 16:13:14 2013
-     */
-    int getNumNodes() const {
-      return configTable_.numNodes;
-    }
-
-    /** 
-     * Sets the number of optional nodes in the configuation table 
-     *
-     * @param node_count number of optional nodes
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 16:13:14 2013
-     */
-    void setNumOptionalNodes(int node_count) {
-      configTable_.numOptionalNodes = node_count;
-    }
-
-    /** 
-     * Gets the number of optional nodes in the configuation table 
-     *
-     * @return number of optional nodes
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 16:13:14 2013
-     */
-    int getNumOptionalNodes() const {
-      return configTable_.numOptionalNodes;
-    }
-
-    /** 
-     * Sets the number of fill nodes in the configuation table 
-     *
-     * @param node_count number of fill nodes
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 16:13:14 2013
-     */
-    void setNumFillNodes(int node_count) {
-      configTable_.numFillNodes = node_count;
-    }
-
-    /** 
-     * Gets the number of fill nodes in the configuation table 
-     *
-     * @return number of fill nodes
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 16:13:14 2013
-     */
-    int getNumFillNodes() const {
-      return configTable_.numFillNodes;
-    }
-
-    /** 
-     * Sets the model required flag 
-     *
-     * @param model_required 1 if the model is required
-     *
-     * @todo This otta be a boolean
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 16:17:23 2013
-     */
-    void setModelRequired(int model_required) {
-      configTable_.modelRequired = model_required;
-    }
-
-    /** 
-     * Gets the model required falg 
-     *
-     * @return 1 if the model is required
-     *
-     * @todo This otta be a boolean
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 16:19:42 2013
-     */
-    int getModelRequired() const {
-      return configTable_.modelRequired;
-    }
-
-    /** 
-     * Sets the primary parameter
-     *
-     * This name is applied to the netlist as is specified is the first primary name is missing.
-     *
-     * @param parameter_name name of the primary parameter
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 16:20:18 2013
-     */
-    void setPrimaryParameter(const std::string &parameter_name) {
-      configTable_.primaryParameter = parameter_name;
-    }
-
-    /** 
-     * Gets the primary parameter
-     *
-     * This name is applied to the netlist as is specified is the first primary name is missing.
-     *
-     * @return name of the primary parameter
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 16:20:18 2013
-     */
-    const std::string &getPrimaryParameter() const {
-      return configTable_.primaryParameter;
-    }
-
-    /** 
-     * Adds the model type to the list of model types of this device instance 
-     *
-     * @param model_type_name name of the model type
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 16:22:13 2013
-     */
-    void addModelType(const std::string &model_type_name) {
-      std::vector<std::string>::iterator it = std::find_if(configTable_.modelTypes.begin(), configTable_.modelTypes.end(), EqualNoCaseOp(model_type_name));
-
-      // Add if not found
-      if (it == configTable_.modelTypes.end())
-        configTable_.modelTypes.push_back(model_type_name);
-    }
-
-    /** 
-     * Returns the list of model types
-     *
-     * @return const reference to the list of model type
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 16:23:04 2013
-     */
-    const std::vector<std::string> &getModelTypes() const {
-      return configTable_.modelTypes;
-    }
-
-  protected:
-    /** 
-     * Adds the parameter to the parameter binding map 
-     *
-     * @param name parameter name
-     * @param descriptor descriptor created for the parameter
-     * @param parameter_data_class typeinfo to get the class name for diagnostics
-     *
-     * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
-     * @date   Fri Aug  9 16:23:45 2013
-     */
-    void addDescriptor(const std::string &name, Descriptor *descriptor, const std::type_info &parameter_data_class);
-
-  protected:
-    ParameterMap  map_;                 ///< Mapping from parameter name to descriptor
-    int           serialNumberCount_;   ///< Count of parameters
-    int           originalValueCount_;  ///< Count of original values
-    Configuration configTable_;         ///< Device configuration information
+protected:
+  ParameterMap  map_;                 ///< Mapping from parameter name to descriptor
 };
 
 void checkExprAccess(const std::string &name, ParameterType::ExprAccess &expr_access, const std::type_info &parameter_data_class);
@@ -1340,271 +1281,370 @@ void checkExprAccess(const std::string &name, ParameterType::ExprAccess &expr_ac
 /**
  * Manages parameter binding for class C.
  *
- * @note There is a bewildering set of addPar() functions to take in to account nearly any
- * conceivable combination of parameter.  This should either be refactored to allow a cascade of
- * setters or the parameter management change entirely.
  */
 template<class C>
 class ParametricData : public ParametricData<void>
 {
-  public:
-    ParametricData()
-      : ParametricData<void>()
-    {}
+public:
+  /**
+   * Constructs the parameter data map
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Thu Feb  6 16:39:06 2014
+   */
+  ParametricData()
+    : ParametricData<void>()
+  {}
 
-    virtual ~ParametricData()
-    {}
+  /**
+   * Destroys the parameter data map
+   *
+   *
+   *
+   * @return
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Thu Feb  6 16:39:34 2014
+   */
+  virtual ~ParametricData()
+  {}
 
-  private:
-    ParametricData(const ParametricData &parametric_data);
-    ParametricData &operator=(const ParametricData &parametric_data);
+private:
+  ParametricData(const ParametricData &parametric_data);              ///< No copying
+  ParametricData &operator=(const ParametricData &parametric_data);   ///< No assignment
 
-  public:
-    template<class T, class U>
-    void addPar(const char *parName, T def, bool orig, ParameterType::ExprAccess depend, T U::*varPtr, bool U::*givenPtr, ParameterUnit unit, ParameterCategory category, const char *description)
+public:
+  /**
+   * Adds the parameter description to the parameter map
+   *
+   * @tparam T                data type of the parameter
+   * @tparam U                class containing the member data storing the parameter's value
+   * @param parName           const pointer to the parameter name
+   * @param default_value     default value
+   * @param varPtr            member pointer to the parameter's value
+   *
+   * @return
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Thu Feb  6 16:33:48 2014
+   */
+  template<class T, class U>
+  Descriptor &addPar(const char *parName, T default_value, T U::*varPtr)
+  {
+    Descriptor *descriptor = new Descriptor(new Entry<T>(static_cast<T ParameterBase::*>(varPtr), default_value));
+
+    addDescriptor(parName, descriptor, typeid(C));
+
+    return *descriptor;
+  }
+
+  /**
+   * Adds the parameter description to the parameter map
+   *
+   * This is specialization to allow const char * (quoted strings) to create a std::string type parameter.
+   *
+   * @tparam U                class containing the member data storing the parameter's value
+   * @param parName           const pointer to the parameter name
+   * @param default_value     default value
+   * @param varPtr            member pointer to the parameter's value
+   *
+   * @return
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Thu Feb  6 16:33:48 2014
+   */
+  template<class U>
+  Descriptor &addPar(const char *parName, const char *default_value, std::string U::*varPtr)
+  {
+    Descriptor *descriptor = new Descriptor(new Entry<std::string>(static_cast<std::string ParameterBase::*>(varPtr), default_value));
+
+    addDescriptor(parName, descriptor, typeid(C));
+
+    return *descriptor;
+  }
+
+
+  /**
+   * Adds the parameter description to the parameter map
+   *
+   * TODO: [DGB] This function should be eliminated and the addPar(const char *parName, T default_value, T U::*varPtr) used exclusively
+   *
+   * @tparam T                data type of the parameter
+   * @tparam U                class containing the member data storing the parameter's value
+   * @param parName           const pointer to the parameter name
+   * @param def               default value
+   * @param orig              true if the original value is no be stored
+   * @param depend            the dependency type of this parameter
+   * @param varPtr            member pointer to the parameter's value
+   * @param givenPtr          member pointer to the parameter's given boolean
+   * @param unit              parameter's measurement units
+   * @param category          parameter documentation category
+   * @param description       documentation description
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Thu Feb  6 16:43:30 2014
+   */
+  template<class T, class U>
+  void addPar(const char *parName, T def, bool orig, ParameterType::ExprAccess depend, T U::*varPtr, bool U::*givenPtr, ParameterUnit unit, ParameterCategory category, const char *description)
+  {
+    Descriptor *descriptor = new Descriptor(new Entry<T>(static_cast<T ParameterBase::*>(varPtr), def));
+
+    checkExprAccess(parName, depend, typeid(C));
+
+    descriptor->setExpressionAccess(depend);
+    descriptor->setOriginalValueStored(orig);
+    descriptor->setGivenMember(givenPtr);
+    descriptor->setUnit(unit);
+    descriptor->setCategory(category);
+    descriptor->setDescription(description);
+
+    addDescriptor(parName, descriptor, typeid(C));
+  }
+
+  /**
+   * Adds the parameter description to the parameter map
+   *
+   * This is specialization to allow const char * (quoted strings) to create a std::string type parameter.
+   *
+   * TODO: [DGB] This function should be eliminated and the addPar(const char *parName, T default_value, T U::*varPtr) used exclusively
+   *
+   * @tparam T                data type of the parameter
+   * @tparam U                class containing the member data storing the parameter's value
+   * @param parName           const pointer to the parameter name
+   * @param def               default value
+   * @param orig              true if the original value is no be stored
+   * @param depend            the dependency type of this parameter
+   * @param varPtr            member pointer to the parameter's value
+   * @param givenPtr          member pointer to the parameter's given boolean
+   * @param unit              parameter's measurement units
+   * @param category          parameter documentation category
+   * @param description       documentation description
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Thu Feb  6 16:43:30 2014
+   */
+  template<class U>
+  void addPar(const char *parName, const char *def, bool orig, ParameterType::ExprAccess depend, std::string U::*varPtr, bool U::*givenPtr, ParameterUnit unit, ParameterCategory category, const char *description)
+  {
+    Descriptor *descriptor = new Descriptor(new Entry<std::string>(static_cast<std::string ParameterBase::*>(varPtr), def));
+
+    checkExprAccess(parName, depend, typeid(C));
+
+    descriptor->setExpressionAccess(depend);
+    descriptor->setOriginalValueStored(orig);
+    descriptor->setGivenMember(givenPtr);
+    descriptor->setUnit(unit);
+    descriptor->setCategory(category);
+    descriptor->setDescription(description);
+
+    addDescriptor(parName, descriptor, typeid(C));
+  }
+
+  /**
+   * Adds the parameter description to the parameter map
+   *
+   * This is specialization to allow 0 to be passed as given member pointer
+   *
+   * TODO: [DGB] This function should be eliminated and the addPar(const char *parName, T default_value, T U::*varPtr) used exclusively
+   *
+   * @tparam T                data type of the parameter
+   * @tparam U                class containing the member data storing the parameter's value
+   * @param parName           const pointer to the parameter name
+   * @param def               default value
+   * @param orig              true if the original value is no be stored
+   * @param depend            the dependency type of this parameter
+   * @param varPtr            member pointer to the parameter's value
+   * @param noGivenPtr        always 0
+   * @param unit              parameter's measurement units
+   * @param category          parameter documentation category
+   * @param description       documentation description
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Thu Feb  6 16:43:30 2014
+   */
+  template<class T, class U>
+  void addPar(const char *parName, T def, bool orig, ParameterType::ExprAccess depend, T U::*varPtr, void *noGivenPtr, ParameterUnit unit, ParameterCategory category, const char *description)
+  {
+    Descriptor *descriptor = new Descriptor(new Entry<T>(static_cast<T ParameterBase::*>(varPtr), def));
+
+    checkExprAccess(parName, depend, typeid(C));
+
+    descriptor->setExpressionAccess(depend);
+    descriptor->setOriginalValueStored(orig);
+    descriptor->setUnit(unit);
+    descriptor->setCategory(category);
+    descriptor->setDescription(description);
+
+    addDescriptor(parName, descriptor, typeid(C));
+  }
+
+  /**
+   * Adds a composite parameter to the parameter map
+   *
+   *
+   * @param comp_name
+   * @param composite_pars
+   * @param composite_map
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Thu Feb  6 16:47:59 2014
+   */
+  template<class U, class V>
+  void addComposite(const char *comp_name, const ParametricData<U> &composite_pars, std::map<std::string, U *> V::*composite_map)
+  {
+    Descriptor *descriptor = new Descriptor(new Entry<std::map<std::string, U *> >(static_cast<std::map<std::string, U *> ParameterBase::*>(composite_map)));
+
+    descriptor->setUnit(U_INVALID);
+    descriptor->setCategory(CAT_INVALID);
+    descriptor->setCompositeParametricData(&composite_pars);
+
+    addDescriptor(comp_name, descriptor, typeid(C));
+  }
+
+  /**
+   * Adds a composite vector parameter to the parameter map
+   *
+   *
+   * @param comp_name
+   * @param composite_pars
+   * @param composite_vector
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Thu Feb  6 16:47:59 2014
+   */
+  template<class U, class V>
+  void addComposite(const char *comp_name, const ParametricData<U> &composite_pars, std::vector<U *> V::*composite_vector)
+  {
+    Descriptor *descriptor = new Descriptor(new Entry<std::vector<U *> >(static_cast<std::vector<U *> ParameterBase::*>(composite_vector)));
+
+    descriptor->setUnit(U_INVALID);
+    descriptor->setCategory(CAT_INVALID);
+    descriptor->setCompositeParametricData(&composite_pars);
+    addDescriptor(comp_name, descriptor, typeid(C));
+  }
+
+  /**
+   * Allows the parameter to be specified as a vector
+   *
+   *
+   * @param cname
+   * @param len
+   *
+   * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+   * @date   Thu Feb  6 16:50:29 2014
+   */
+  void makeVector(const std::string &cname, int len) 
+  {
+    for (int i = 1; i <= len; ++i) 
     {
-      Descriptor *descriptor = new Descriptor(new Entry<T>(static_cast<T ParameterBase::*>(varPtr), def));
+      std::ostringstream oss;
+      oss << cname << i;
+      std::string param = oss.str();
 
-      checkExprAccess(parName, depend, typeid(C));
+      ParameterMap::iterator it = map_.find(param);
+      if (it == map_.end())
+        nonexistentParameter(param, typeid(C));
 
-      descriptor->setExpressionAccess(depend);
-      if (orig)
-        descriptor->setOriginalValueIndex(originalValueCount_++);
-      descriptor->setSerialNumber(serialNumberCount_++);
-      descriptor->setGivenMember(givenPtr);
-      descriptor->setUnit(unit);
-      descriptor->setCategory(category);
-      descriptor->setDescription(description);
-
-      addDescriptor(parName, descriptor, typeid(C));
+      Descriptor &descriptor = *(*it).second;
+      descriptor.setVec(i);
     }
-
-    template<class T, class U>
-    void addPar(const char *parName, T def, bool orig, ParameterType::ExprAccess depend, T U::*varPtr, void *noGivenPtr, ParameterUnit unit, ParameterCategory category, const char *description)
-    {
-      Descriptor *descriptor = new Descriptor(new Entry<T>(static_cast<T ParameterBase::*>(varPtr), def));
-
-      checkExprAccess(parName, depend, typeid(C));
-
-      descriptor->setExpressionAccess(depend);
-      if (orig)
-        descriptor->setOriginalValueIndex(originalValueCount_++);
-      descriptor->setSerialNumber(serialNumberCount_++);
-      descriptor->setUnit(unit);
-      descriptor->setCategory(category);
-      descriptor->setDescription(description);
-
-      addDescriptor(parName, descriptor, typeid(C));
-    }
-
-    template<class T, class U>
-    void addPar(const char *parName, T def, bool orig, ParameterType::ExprAccess depend, T U::*varPtr, ParameterUnit unit, ParameterCategory category, const char *description)
-    {
-      Descriptor *descriptor = new Descriptor(new Entry<T>(static_cast<T ParameterBase::*>(varPtr), def));
-
-      checkExprAccess(parName, depend, typeid(C));
-
-      descriptor->setExpressionAccess(depend);
-      if (orig)
-        descriptor->setOriginalValueIndex(originalValueCount_++);
-      descriptor->setSerialNumber(serialNumberCount_++);
-      descriptor->setUnit(unit);
-      descriptor->setCategory(category);
-      descriptor->setDescription(description);
-
-      addDescriptor(parName, descriptor, typeid(C));
-    }
-
-    template<class U>
-    void addPar(const char *parName, const char *def, bool orig, ParameterType::ExprAccess depend, std::string U::*varPtr, bool U::*givenPtr, ParameterUnit unit, ParameterCategory category, const char *description)
-    {
-      Descriptor *descriptor = new Descriptor(new Entry<std::string>(static_cast<std::string ParameterBase::*>(varPtr), def));
-
-      checkExprAccess(parName, depend, typeid(C));
-
-      descriptor->setExpressionAccess(depend);
-      if (orig)
-        descriptor->setOriginalValueIndex(originalValueCount_++);
-      descriptor->setSerialNumber(serialNumberCount_++);
-      descriptor->setGivenMember(givenPtr);
-      descriptor->setUnit(unit);
-      descriptor->setCategory(category);
-      descriptor->setDescription(description);
-
-      addDescriptor(parName, descriptor, typeid(C));
-    }
-
-    template<class U>
-    void addPar(const char *parName, const char *def, bool orig, ParameterType::ExprAccess depend, std::string U::*varPtr, void *noGivenPtr, ParameterUnit unit, ParameterCategory category, const char *description)
-    {
-      Descriptor *descriptor = new Descriptor(new Entry<std::string>(static_cast<std::string ParameterBase::*>(varPtr), def));
-
-      checkExprAccess(parName, depend, typeid(C));
-
-      descriptor->setExpressionAccess(depend);
-      if (orig)
-        descriptor->setOriginalValueIndex(originalValueCount_++);
-      descriptor->setSerialNumber(serialNumberCount_++);
-      descriptor->setUnit(unit);
-      descriptor->setCategory(category);
-      descriptor->setDescription(description);
-
-      addDescriptor(parName, descriptor, typeid(C));
-    }
-
-    template<class U>
-    void addPar(const char *parName, const char *def, bool orig, ParameterType::ExprAccess depend, std::string U::*varPtr, ParameterUnit unit, ParameterCategory category, const char *description)
-    {
-      Descriptor *descriptor = new Descriptor(new Entry<std::string>(static_cast<std::string ParameterBase::*>(varPtr), def));
-
-      checkExprAccess(parName, depend, typeid(C));
-
-      descriptor->setExpressionAccess(depend);
-      if (orig)
-        descriptor->setOriginalValueIndex(originalValueCount_++);
-      descriptor->setSerialNumber(serialNumberCount_++);
-      descriptor->setUnit(unit);
-      descriptor->setCategory(category);
-      descriptor->setDescription(description);
-
-      addDescriptor(parName, descriptor, typeid(C));
-    }
-
-    template<class T, class U>
-    void addPar(const char *parName, const T &def, bool orig, ParameterType::ExprAccess depend, T U::*varPtr, bool U::*givenPtr)
-    {
-      Descriptor *descriptor = new Descriptor(new Entry<T>(static_cast<T ParameterBase::*>(varPtr), def));
-
-      checkExprAccess(parName, depend, typeid(C));
-
-      descriptor->setExpressionAccess(depend);
-      if (orig)
-        descriptor->setOriginalValueIndex(originalValueCount_++);
-      descriptor->setSerialNumber(serialNumberCount_++);
-      descriptor->setGivenMember(givenPtr);
-
-      addDescriptor(parName, descriptor, typeid(C));
-    }
-
-    template<class T, class U>
-    void addPar(const char *parName, const T &def, bool orig, ParameterType::ExprAccess depend, T U::*varPtr, void *noGivenPtr)
-    {
-      Descriptor *descriptor = new Descriptor(new Entry<T>(static_cast<T ParameterBase::*>(varPtr), def));
-
-      checkExprAccess(parName, depend, typeid(C));
-
-      descriptor->setExpressionAccess(depend);
-      if (orig)
-        descriptor->setOriginalValueIndex(originalValueCount_++);
-      descriptor->setSerialNumber(serialNumberCount_++);
-
-      addDescriptor(parName, descriptor, typeid(C));
-    }
-
-    template<class T, class U>
-    void addPar(const char *parName, const T &def, bool orig, ParameterType::ExprAccess depend, T U::*varPtr)
-    {
-      Descriptor *descriptor = new Descriptor(new Entry<T>(static_cast<T ParameterBase::*>(varPtr), def));
-
-      checkExprAccess(parName, depend, typeid(C));
-
-      descriptor->setExpressionAccess(depend);
-      if (orig)
-        descriptor->setOriginalValueIndex(originalValueCount_++);
-      descriptor->setSerialNumber(serialNumberCount_++);
-
-      addDescriptor(parName, descriptor, typeid(C));
-    }
-
-    template<class T, class U>
-    void addPar(const char *parName, T def, bool orig, T U::*varPtr, bool U::*givenPtr)
-    {
-      Descriptor *descriptor = new Descriptor(new Entry<T>(static_cast<T ParameterBase::*>(varPtr), def));
-
-      if (orig)
-        descriptor->setOriginalValueIndex(originalValueCount_++);
-      descriptor->setSerialNumber(serialNumberCount_++);
-      descriptor->setGivenMember(givenPtr);
-
-      addDescriptor(parName, descriptor, typeid(C));
-    }
-
-    template<class T, class U>
-    void addPar(const char *parName, T def, bool orig, T U::*varPtr)
-    {
-      Descriptor *descriptor = new Descriptor(new Entry<T>(static_cast<T ParameterBase::*>(varPtr), def));
-
-      if (orig)
-        descriptor->setOriginalValueIndex(originalValueCount_++);
-      descriptor->setSerialNumber(serialNumberCount_++);
-
-      addDescriptor(parName, descriptor, typeid(C));
-    }
-
-    template<class U>
-    void addPar(const char *parName, const char *def, bool orig, std::string U::*varPtr, bool U::*givenPtr)
-    {
-      Descriptor *descriptor = new Descriptor(new Entry<std::string>(static_cast<std::string ParameterBase::*>(varPtr), def));
-
-      if (orig)
-        descriptor->setOriginalValueIndex(originalValueCount_++);
-      descriptor->setSerialNumber(serialNumberCount_++);
-      descriptor->setGivenMember(givenPtr);
-
-      addDescriptor(parName, descriptor, typeid(C));
-    }
-
-    template<class U>
-    void addPar(const char *parName, const char *def, bool orig, std::string U::*varPtr)
-    {
-      Descriptor *descriptor = new Descriptor(new Entry<std::string>(static_cast<std::string ParameterBase::*>(varPtr), def));
-
-      if (orig)
-        descriptor->setOriginalValueIndex(originalValueCount_++);
-      descriptor->setSerialNumber(serialNumberCount_++);
-
-      addDescriptor(parName, descriptor, typeid(C));
-    }
-
-    template<class U, class V>
-    void addComposite(const char *comp_name, const ParametricData<U> &composite_pars, CompositeMap V::*composite_map)
-    {
-      Descriptor *descriptor = new Descriptor(new Entry<CompositeMap>(static_cast<CompositeMap ParameterBase::*>(composite_map)));
-
-      descriptor->setSerialNumber(serialNumberCount_++);
-      descriptor->setExpressionAccess(ParameterType::NO_DEP);
-      descriptor->setUnit(U_INVALID);
-      descriptor->setCategory(CAT_INVALID);
-      descriptor->setCompositeParametricData(&composite_pars);
-
-      addDescriptor(comp_name, descriptor, typeid(C));
-    }
-
-    void makeVector (const std::string &cname, int len) {
-      for (int i = 1; i <= len; ++i) {
-        std::ostringstream oss;
-        oss << cname << i;
-        std::string param = oss.str();
-
-        ParameterMap::iterator it = map_.find(param);
-        if (it == map_.end()) {
-          std::string msg(" C::makeVector: parameter: ");
-          msg += param;
-          msg += " does not exist";
-          N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-        }
-
-        Descriptor &descriptor = *(*it).second;
-        descriptor.setVec(i);
-      }
-    }
+  }
 };
 
-double getOriginalValue(ParameterBase *entity, int original_value_index);
-void setOriginalValue(ParameterBase *entity, int original_value_index, double value);
+/**
+ * Set the default values for the parameter.
+ *
+ * Note that any values provided in the objects constructor that are defined as parameters have their initialized value
+ * replaced with the default value given in the addPar() call
+ *
+ * @param parameter_base
+ * @param begin
+ * @param end
+ * @param device_options
+ *
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+ * @date   Thu Feb  6 16:51:00 2014
+ */
+void setDefaultParameters(ParameterBase &parameter_base, ParameterMap::const_iterator begin, ParameterMap::const_iterator end, const DeviceOptions &device_options);
 
-bool wasValueGiven(ParameterBase *entity, int serial_number);
-void setValueGiven(ParameterBase *entity, int serial_number, bool value);
+/**
+ * Retrieve a parameter's original value
+ *
+ * @param parameter_base        device entity holding parameter
+ * @param serial_number         entity's serial number
+ *
+ * @return original value of the parameter
+ *
+ * @date   Tue Aug  6 13:51:16 2013
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+ */
+inline double getOriginalValue(ParameterBase &parameter_base, int serial_number)
+{
+  return parameter_base.getOriginalValue(serial_number);
+}
+
+/**
+ * Set a parameter's original value
+ *
+ * @param parameter_base        device entity or composite holding parameter
+ * @param serial_number         entity's serial number
+ * @param value                 value to be stored
+ *
+ * @date   Tue Aug  6 13:53:29 2013
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+ */
+inline void setOriginalValue(ParameterBase &parameter_base, int serial_number, double value)
+{
+  parameter_base.setOriginalValue(serial_number, value);
+}
+
+
+/**
+ * Return true if a value was provided for the device
+ *
+ * @param parameter_base        device entity or composite holding parameter
+ * @param serial_number         serial number of parameter
+ *
+ * @return true if a value was provided for the device
+ *
+ * @date   Tue Aug  6 13:54:25 2013
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+ */
+inline bool wasValueGiven(const ParameterBase &parameter_base, int serial_number)
+{
+  return parameter_base.wasValueGiven(serial_number);
+}
+
+
+/**
+ * Set the given value state of a parameter
+ *
+ * @param parameter_base        device entity or composite holding parameter
+ * @param serial_number         serial number of parameter
+ * @param value                 true if the value was given
+ *
+ * @date   Tue Aug  6 13:55:34 2013
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+ */
+inline void setValueGiven(ParameterBase &parameter_base, int serial_number, bool value)
+{
+  parameter_base.setValueGiven(serial_number, value);
+}
+
+/**
+ * Returns true if the name is TNOM or TEMP
+ *
+ * @param name  parameter name
+ *
+ * @return true if the name is TNOM or TEMP
+ *
+ * @author David G. Baur  Raytheon  Sandia National Laboratories 1355 
+ * @date   Thu Feb  6 16:52:26 2014
+ */
+inline bool isTempParam(const std::string &name) 
+{
+  return equal_nocase(name, "TNOM") || equal_nocase(name, "TEMP");
+}
 
 } // namespace Device
 } // namespace Xyce

@@ -30,16 +30,16 @@
 // Special Notes  : Forward declaring everything as a class breaks if the implementation of the type changes (like during
 //                  templatization)
 //
-// Creator        : David G. Baur  Raytheon  Sandia National Laboratories 1355 <dgbaur@sandia.gov>
+// Creator        : David G. Baur  Raytheon  Sandia National Laboratories 1355 
 //
 // Creation Date  : 2013/04/18 18:01:27
 //
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.8.2.2 $
+// Revision Number: $Revision: 1.23.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/03/03 18:29:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -47,16 +47,21 @@
 #ifndef Xyce_N_DEV_fwd_h
 #define Xyce_N_DEV_fwd_h
 
-#include <Xyce_config.h>
 #include <map>
 #include <string>
 #include <utility>
+
+#include <N_UTL_NameLevelKey.h>
+#include <N_UTL_NoCase.h>
+#include <N_UTL_TypeIndex.h>
 
 namespace Xyce {
 namespace Device {
 
 class CompositeParam;
+class Configuration;
 class Depend;
+class Descriptor;
 class Device;
 class DeviceBuilder;
 class DeviceEntity;
@@ -65,12 +70,13 @@ class DeviceInterface;
 class DeviceMgr;
 class DeviceModel;
 class DeviceOptions;
+class DeviceSensitivities;
 class DeviceState;
 class DeviceSupport;
 class ExternalSimulationData;
-class ExtendedDeviceBuilder;
 class ExternCodeInterface;
 class ExternData;
+class FactoryBlock;
 class InstanceBlock;
 class MatrixLoadData;
 class ModelBlock;
@@ -125,26 +131,30 @@ class Instance;
 class Model;
 }
 
+typedef type_index EntityTypeId;
+typedef type_index ModelTypeId;
+typedef type_index InstanceTypeId;
+
+typedef std::map<std::string, Descriptor *, LessNoCase> ParameterMap;
 typedef std::map<std::string, CompositeParam *> CompositeMap;
 
-struct DeviceLevelKey;
+typedef std::map<EntityTypeId, Device *> EntityTypeIdDeviceMap;
 
-void registerDevices();
+struct ModelGroupLeadTraits;
 
-#ifdef Xyce_RAD_MODELS
-void registerSandiaDevices();
-#endif
+template <class M, class I, class G = ModelGroupLeadTraits>
+class DeviceTraits;
 
-#ifdef Xyce_NONFREE_MODELS
-void registerNonFreeDevices();
-#endif
+template <class T>
+class DeviceMaster;
+
+template <class T>
+class Config;
 
 } // namespace Device
 } // namespace Xyce
 
-typedef Xyce::Device::CompositeParam N_DEV_CompositeParam;
 typedef Xyce::Device::Depend sDepend;
-typedef Xyce::Device::Device N_DEV_Device;
 typedef Xyce::Device::DeviceBuilder N_DEV_DeviceBuilder;
 typedef Xyce::Device::DeviceEntity N_DEV_DeviceEntity;
 typedef Xyce::Device::DeviceInstance N_DEV_DeviceInstance;
@@ -152,10 +162,10 @@ typedef Xyce::Device::DeviceInterface N_DEV_DeviceInterface;
 typedef Xyce::Device::DeviceMgr N_DEV_DeviceMgr;
 typedef Xyce::Device::DeviceModel N_DEV_DeviceModel;
 typedef Xyce::Device::DeviceOptions N_DEV_DeviceOptions;
+typedef Xyce::Device::DeviceSensitivities N_DEV_DeviceSensitivities;
 typedef Xyce::Device::DeviceState N_DEV_DeviceState;
 typedef Xyce::Device::DeviceSupport N_DEV_DeviceSupport;
 typedef Xyce::Device::ExternalSimulationData N_DEV_ExternalSimulationData;
-typedef Xyce::Device::ExtendedDeviceBuilder N_DEV_ExtendedDeviceBuilder;
 typedef Xyce::Device::ExternCodeInterface N_DEV_ExternCodeInterface;
 typedef Xyce::Device::ExternData N_DEV_ExternData;
 typedef Xyce::Device::InstanceBlock N_DEV_InstanceBlock;
@@ -201,7 +211,6 @@ typedef Xyce::Device::SpecieSource N_DEV_SpecieSource;
 
 typedef Xyce::Device::ExternDevice::Instance N_DEV_ExternDeviceInstance;
 typedef Xyce::Device::ExternDevice::Model N_DEV_ExternDeviceModel;
-
 
 #endif // Xyce_N_DEV_fwd_h
 

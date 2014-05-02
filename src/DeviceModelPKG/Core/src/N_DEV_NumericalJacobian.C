@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.56.2.2 $
+// Revision Number: $Revision: 1.67 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/02/24 23:49:15 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -89,10 +89,9 @@ namespace Device {
 //-----------------------------------------------------------------------------
 NumericalJacobian::NumericalJacobian(
   MatrixLoadData & mlData1,
-  SolverState &ss1,
-  ExternData  &ed1,
-  DeviceOptions & do1)
-
+  const SolverState &ss1,
+  const ExternData  &ed1,
+  const DeviceOptions & do1)
   : mlData(mlData1),
     cols(mlData1.cols),
     vals(mlData1.vals),
@@ -173,48 +172,48 @@ NumericalJacobian::~NumericalJacobian()
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 12/15/06
 //-----------------------------------------------------------------------------
-bool NumericalJacobian::testDAEMatrices( DeviceInstance & instance, const vector<string> & nameVec)
+bool NumericalJacobian::testDAEMatrices( DeviceInstance & instance, const std::vector<std::string> & nameVec)
 {
 
   // Set up various references to indexing arrays
-  const vector<int> & devLIDs               = instance.getDevLIDs();
-  const vector<int> & devStateLIDs          = instance.getStaLIDVec();
-  const vector < vector<int> > & devJacLIDs = instance.getDevJacLIDs();
-  const vector < vector<int> > & jacStamp   = instance.jacobianStamp();
+  const std::vector<int> & devLIDs               = instance.getDevLIDs();
+  const std::vector<int> & devStateLIDs          = instance.getStaLIDVec();
+  const std::vector< std::vector<int> > & devJacLIDs = instance.getDevJacLIDs();
+  const std::vector< std::vector<int> > & jacStamp   = instance.jacobianStamp();
 
 
   // Set up references to temporary data structures.
-  vector < vector <double> > & numJacF = mlData.numJac;
-  vector < vector <double> > & saveJacF = mlData.saveJac;
-  vector < vector <double> > & devJacF = mlData.devJac;
-  vector < vector <double> > & diffJacF = mlData.diffJac;
-  vector < vector <double> > & relJacF = mlData.relJac;
+  std::vector< std::vector<double> > & numJacF = mlData.numJac;
+  std::vector< std::vector<double> > & saveJacF = mlData.saveJac;
+  std::vector< std::vector<double> > & devJacF = mlData.devJac;
+  std::vector< std::vector<double> > & diffJacF = mlData.diffJac;
+  std::vector< std::vector<double> > & relJacF = mlData.relJac;
 
-  vector < vector <double> > & numJacQ = mlData.numJacQ;
-  vector < vector <double> > & saveJacQ = mlData.saveJacQ;
-  vector < vector <double> > & devJacQ = mlData.devJacQ;
-  vector < vector <double> > & diffJacQ = mlData.diffJacQ;
-  vector < vector <double> > & relJacQ = mlData.relJacQ;
+  std::vector< std::vector<double> > & numJacQ = mlData.numJacQ;
+  std::vector< std::vector<double> > & saveJacQ = mlData.saveJacQ;
+  std::vector< std::vector<double> > & devJacQ = mlData.devJacQ;
+  std::vector< std::vector<double> > & diffJacQ = mlData.diffJacQ;
+  std::vector< std::vector<double> > & relJacQ = mlData.relJacQ;
 
-  vector < vector <int> > & statusF  = mlData.status;
-  vector < vector <int> > & statusQ  = mlData.statusQ;
-  vector < vector <int> > & stencil = mlData.stencil;
+  std::vector< std::vector<int> > & statusF  = mlData.status;
+  std::vector< std::vector<int> > & statusQ  = mlData.statusQ;
+  std::vector< std::vector<int> > & stencil = mlData.stencil;
 
-  vector <double> & saveF = mlData.saveRHS;
-  vector <double> & pertF = mlData.pertRHS;
-  vector <double> & origF = mlData.origRHS;
-  vector <double> & saveQ = mlData.saveQ;
-  vector <double> & pertQ = mlData.pertQ;
-  vector <double> & origQ = mlData.origQ;
+  std::vector<double> & saveF = mlData.saveRHS;
+  std::vector<double> & pertF = mlData.pertRHS;
+  std::vector<double> & origF = mlData.origRHS;
+  std::vector<double> & saveQ = mlData.saveQ;
+  std::vector<double> & pertQ = mlData.pertQ;
+  std::vector<double> & origQ = mlData.origQ;
 
-  vector <double> & saveSoln = mlData.saveSoln;
-  vector <double> & pertSoln = mlData.pertSoln;
-  vector <double> & saveCurrSoln = mlData.saveCurrSoln;
+  std::vector<double> & saveSoln = mlData.saveSoln;
+  std::vector<double> & pertSoln = mlData.pertSoln;
+  std::vector<double> & saveCurrSoln = mlData.saveCurrSoln;
 
-  vector <double> & saveLastState = mlData.saveLastState;
-  vector <double> & saveCurrState = mlData.saveCurrState;
-  vector <double> & saveNextState = mlData.saveNextState;
-  vector <double> & saveStateDerivs = mlData.saveStateDerivs;
+  std::vector<double> & saveLastState = mlData.saveLastState;
+  std::vector<double> & saveCurrState = mlData.saveCurrState;
+  std::vector<double> & saveNextState = mlData.saveNextState;
+  std::vector<double> & saveStateDerivs = mlData.saveStateDerivs;
 
   // set up references to epetra objects.
   N_LAS_Vector & Fvec          = (*extData.daeFVectorPtr);
@@ -253,9 +252,7 @@ bool NumericalJacobian::testDAEMatrices( DeviceInstance & instance, const vector
   if(devJacLIDs.empty())
   {
 #ifdef Xyce_DEBUG_DEVICE
-    string msg("NumericalJacobian::testDAEMatrices: " + instance.getName());
-    msg += " does not have jacLIDs available\n";
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_WARNING, msg);
+    Report::UserWarning() << instance.getName() << " does not have jacLIDs available";
 #endif
 
     return true;
@@ -545,10 +542,10 @@ bool NumericalJacobian::testDAEMatrices( DeviceInstance & instance, const vector
     // Output Jacobians Differences.
     // If debug enabled, always output.
     // If not, only output for failures.
-    printJacobian_ (instance, nameVec, failedTest);
+    printJacobian_ (dout(), instance, nameVec, failedTest);
 #else
     if (failedTest)
-      printJacobian_ (instance, nameVec, failedTest);
+      printJacobian_ (lout(), instance, nameVec, failedTest);
 #endif
 
     // Restore jacobian, RHS for this device
@@ -599,7 +596,7 @@ void NumericalJacobian::loadLocalDAEVectors (DeviceInstance & instance)
   N_LAS_Vector & nextStaDeriv = (*extData.nextStaDerivVectorPtr);
   N_LAS_Vector & nextSol      = (*extData.nextSolVectorPtr);
 
-  const vector<int> & devStateLIDs = instance.getStaLIDVec();
+  const std::vector<int> & devStateLIDs = instance.getStaLIDVec();
   int numState = devStateLIDs.size();
 
   instance.updateDependentParameters(nextSol); // this line necessary for expressions
@@ -631,40 +628,39 @@ void NumericalJacobian::loadLocalDAEVectors (DeviceInstance & instance)
 // Creation Date : 12/12/06
 //-----------------------------------------------------------------------------
 void NumericalJacobian::printJacobian_(
-  DeviceInstance & instance,
-  const vector<string> & nameVec,
-  bool failed)
+  std::ostream &                        os,
+  DeviceInstance &                      instance,
+  const std::vector<std::string> &      nameVec,
+  bool                                  failed)
 {
-  ostringstream ost;
-
   bool NAflag = false;
-  const vector<int> & devLIDs               = instance.getDevLIDs();
+  const std::vector<int> & devLIDs               = instance.getDevLIDs();
 
   // These curly brackets are for scoping only.
   {
-    const vector < vector <double> > & numJac = mlData.numJac;
-    const vector < vector <double> > & anaJac = mlData.devJac;
-    const vector < vector <double> > & diffJac = mlData.diffJac;
-    const vector < vector <double> > & relJac = mlData.relJac;
-    const vector < vector <int> > & stencil = mlData.stencil;
-    const vector < vector <int> > & status = mlData.status;
+    const std::vector< std::vector<double> > & numJac = mlData.numJac;
+    const std::vector< std::vector<double> > & anaJac = mlData.devJac;
+    const std::vector< std::vector<double> > & diffJac = mlData.diffJac;
+    const std::vector< std::vector<double> > & relJac = mlData.relJac;
+    const std::vector< std::vector<int> > & stencil = mlData.stencil;
+    const std::vector< std::vector<int> > & status = mlData.status;
 
 
-    ost << "-------------------------------------" << endl;
-    ost << "dFdx matrix for " << instance.getName();
+    os << Xyce::section_divider << std::endl;
+    os << "dFdx matrix for " << instance.getName();
 
     if (failed)
     {
-      ost << ":  JACOBIAN TEST FAILURE";
+      os << ":  JACOBIAN TEST FAILURE";
     }
     else
     {
-      ost << ":  JACOBIAN TEST SUCCESS";
+      os << ":  JACOBIAN TEST SUCCESS";
     }
-    ost << " at time = " << solState.currTime;
-    ost << " at Niter = " << solState.newtonIter;
-    ost << endl;
-    ost << "       Numerical     Analytic      absDiff       relative Error  Status   Names  (row, col)"<<endl;
+    os << " at time = " << solState.currTime;
+    os << " at Niter = " << solState.newtonIter;
+    os << std::endl;
+    os << "       Numerical     Analytic      absDiff       relative Error  Status   Names  (row, col)"<<std::endl;
 
     int i,j;
     int numCols = devLIDs.size();
@@ -707,38 +703,38 @@ void NumericalJacobian::printJacobian_(
                   numJac[i][j], anaJac[i][j], diffJac[i][j], relJac[i][j]);
         }
 
-        ost << string(tmpChar);
+        os << std::string(tmpChar);
 
-        ost << "     ("<< nameVec[devLIDs[i]]
+        os << "     ("<< nameVec[devLIDs[i]]
             << ", " << nameVec[devLIDs[j]]
             << ") "
-            << " row,col=[ " << i << ", " << j << "]" << endl;
+            << " row,col=[ " << i << ", " << j << "]" << std::endl;
 
 
       }
     }
   }
 
-  const vector < vector <double> > & numJac = mlData.numJacQ;
-  const vector < vector <double> > & anaJac = mlData.devJacQ;
-  const vector < vector <double> > & diffJac = mlData.diffJacQ;
-  const vector < vector <double> > & relJac = mlData.relJacQ;
-  const vector < vector <int> > & stencil = mlData.stencil;
-  const vector < vector <int> > & status = mlData.statusQ;
+  const std::vector< std::vector<double> > & numJac = mlData.numJacQ;
+  const std::vector< std::vector<double> > & anaJac = mlData.devJacQ;
+  const std::vector< std::vector<double> > & diffJac = mlData.diffJacQ;
+  const std::vector< std::vector<double> > & relJac = mlData.relJacQ;
+  const std::vector< std::vector<int> > & stencil = mlData.stencil;
+  const std::vector< std::vector<int> > & status = mlData.statusQ;
 
-  ost << "dQdx matrix for " << instance.getName();
+  os << "dQdx matrix for " << instance.getName();
 
   if (failed)
   {
-    ost << ":  JACOBIAN TEST FAILURE";
+    os << ":  JACOBIAN TEST FAILURE";
   }
   else
   {
-    ost << ":  JACOBIAN TEST SUCCESS";
+    os << ":  JACOBIAN TEST SUCCESS";
   }
-  ost << " at time = " << solState.currTime;
-  ost << endl;
-  ost << "       Numerical     Analytic      absDiff       relative Error  Status   Names  (row, col)"<<endl;
+  os << " at time = " << solState.currTime;
+  os << std::endl;
+  os << "       Numerical     Analytic      absDiff       relative Error  Status   Names  (row, col)"<<std::endl;
 
   int i,j;
   int numCols = devLIDs.size();
@@ -777,41 +773,33 @@ void NumericalJacobian::printJacobian_(
                 numJac[i][j], anaJac[i][j], diffJac[i][j], relJac[i][j]);
       }
 
-      ost << string(tmpChar);
+      os << std::string(tmpChar);
 
-      ost << "     ("<< nameVec[devLIDs[i]]
+      os << "     ("<< nameVec[devLIDs[i]]
           << ", " << nameVec[devLIDs[j]]
           << ") "
-          << " row,col=[ " << i << ", " << j << "]" << endl;
+          << " row,col=[ " << i << ", " << j << "]" << std::endl;
 
     }
   }
 
   if(NAflag)
-    ost << " Note:  NA = untestable special case, such as IC=, etc." << endl;
-  ost << "-------------------------------------" << endl;
-
-  string message(ost.str());
-  //N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO, message);
-  cout << message;
+    os << " Note:  NA = untestable special case, such as IC=, etc." << std::endl;
+  os << Xyce::section_divider << std::endl;
 
   if (failed)
   {
     if (!(devOptions.testJacWarn))
     {
-      string msg("Fatal Numerical Jacobian test failure.  Exiting.\n"
-                 "If you want this failure to be a warning, rather than fatal,\n"
-                 "run with .options device testjacwarn=1 in the netlist.\n");
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_FATAL,msg);
+      Report::UserError() << "Numerical Jacobian test failure" << std::endl
+                          << "If you want this failure to be a warning, rather than an error, "
+                          << "run with .options device testjacwarn=1 in the netlist.";
     }
     else
     {
-      string msg("Warning Numerical Jacobian test failure. \n");
-      N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_WARNING,msg);
+      Report::UserWarning() << "Numerical Jacobian test failure";
     }
   }
-
-  return;
 }
 
 //-----------------------------------------------------------------------------
@@ -844,12 +832,12 @@ void NumericalJacobian::printJacobian_(
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 12/14/06
 //-----------------------------------------------------------------------------
-void NumericalJacobian::mergeTest( DeviceInstance & instance, const vector<string> & nameVec)
+void NumericalJacobian::mergeTest( DeviceInstance & instance, const std::vector<std::string> & nameVec)
 {
   int i,j,k;
-  const vector<int> & devLIDs               = instance.getDevLIDs();
-  const vector < vector <double> > & devJac = mlData.devJac;
-  vector < vector <int> > & status = mlData.status;
+  const std::vector<int> & devLIDs               = instance.getDevLIDs();
+  const std::vector< std::vector<double> > & devJac = mlData.devJac;
+  std::vector< std::vector<int> > & status = mlData.status;
   int numRows, numCols;
   numRows = devLIDs.size();
   numCols = numRows;
@@ -867,9 +855,7 @@ void NumericalJacobian::mergeTest( DeviceInstance & instance, const vector<strin
           {
             if (devJac[i][k] != devJac[j][k])
             {
-              string msg("NumericalJacobian::testDAEMatrices: " + instance.getName());
-              msg += " different non-zero values in row merge";
-              N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_WARNING, msg);
+              Report::UserWarning() << "In device " + instance.getName() << " different non-zero values in row merge";
             }
             status[i][k] = 2;
           }
@@ -877,9 +863,7 @@ void NumericalJacobian::mergeTest( DeviceInstance & instance, const vector<strin
           {
             if (devJac[k][i] != devJac[k][j])
             {
-              string msg("NumericalJacobian::testDAEMatrices: " + instance.getName());
-              msg += "different non-zero values in column merge";
-              N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::DEV_WARNING, msg);
+              Report::UserWarning() << "In device " + instance.getName() << " different non-zero values in column merge";
             }
             status[k][i] = 2;
           }
@@ -899,12 +883,12 @@ void NumericalJacobian::mergeTest( DeviceInstance & instance, const vector<strin
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 12/14/06
 //-----------------------------------------------------------------------------
-void NumericalJacobian::testDebugHead( DeviceInstance & instance, const vector<string> & nameVec, int i, double dX)
+void NumericalJacobian::testDebugHead( DeviceInstance & instance, const std::vector<std::string> & nameVec, int i, double dX)
 {
-  const vector<int> & devLIDs = instance.getDevLIDs();
+  const std::vector<int> & devLIDs = instance.getDevLIDs();
 
-  cout << "------------------------------------------------------------"<<endl;
-  cout << "Perturbing (LID="<<devLIDs[i]<<") " << nameVec[devLIDs[i]] << " by " << dX << endl;
+  Xyce::dout() << Xyce::section_divider<<std::endl;
+  Xyce::dout() << "Perturbing (LID="<<devLIDs[i]<<") " << nameVec[devLIDs[i]] << " by " << dX << std::endl;
 }
 
 //-----------------------------------------------------------------------------
@@ -915,26 +899,26 @@ void NumericalJacobian::testDebugHead( DeviceInstance & instance, const vector<s
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 12/14/06
 //-----------------------------------------------------------------------------
-void NumericalJacobian::testDebugOut( DeviceInstance & instance, const vector<string> & nameVec, int i, int j)
+void NumericalJacobian::testDebugOut( DeviceInstance & instance, const std::vector<std::string> & nameVec, int i, int j)
 {
-  const vector<int> & devLIDs = instance.getDevLIDs();
-  const vector <double> & pertRHS = mlData.pertRHS;
-  const vector <double> & origRHS = mlData.origRHS;
+  const std::vector<int> & devLIDs = instance.getDevLIDs();
+  const std::vector<double> & pertRHS = mlData.pertRHS;
+  const std::vector<double> & origRHS = mlData.origRHS;
 
-  const vector < vector <double> > & numJac = mlData.numJac;
-  const vector < vector <double> > & relJac = mlData.relJac;
+  const std::vector< std::vector<double> > & numJac = mlData.numJac;
+  const std::vector< std::vector<double> > & relJac = mlData.relJac;
 
-  cout.width(15); cout.precision(7); cout.setf(ios::scientific);
-  cout << "dFdX: ";
-  cout << " (" << devLIDs[j] << ", " << devLIDs[i] << ") ";
-  cout << numJac[j][i];
-  cout << " Forig = " << origRHS[j];
-  cout << " Fperturb = " << pertRHS[j];
+  Xyce::dout().width(15); Xyce::dout().precision(7); Xyce::dout().setf(std::ios::scientific);
+  Xyce::dout() << "dFdX: ";
+  Xyce::dout() << " (" << devLIDs[j] << ", " << devLIDs[i] << ") ";
+  Xyce::dout() << numJac[j][i];
+  Xyce::dout() << " Forig = " << origRHS[j];
+  Xyce::dout() << " Fperturb = " << pertRHS[j];
   double dF = -(pertRHS[j]-origRHS[j]);
-  cout << " dF = " << dF;
-  cout << " (" << nameVec[devLIDs[j]] << ", " << nameVec[devLIDs[i]] << ") ";
-  cout << endl;
-  cout << "  relative error = " << relJac[j][i] << endl;
+  Xyce::dout() << " dF = " << dF;
+  Xyce::dout() << " (" << nameVec[devLIDs[j]] << ", " << nameVec[devLIDs[i]] << ") ";
+  Xyce::dout() << std::endl;
+  Xyce::dout() << "  relative error = " << relJac[j][i] << std::endl;
 }
 
 //-----------------------------------------------------------------------------
@@ -945,9 +929,9 @@ void NumericalJacobian::testDebugOut( DeviceInstance & instance, const vector<st
 // Creator       : Eric Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 12/14/06
 //-----------------------------------------------------------------------------
-void NumericalJacobian::testDebugTail( DeviceInstance & instance, const vector<string> & nameVec)
+void NumericalJacobian::testDebugTail( DeviceInstance & instance, const std::vector<std::string> & nameVec)
 {
-  cout << "------------------------------------------------------------"<<endl;
+  Xyce::dout() << Xyce::section_divider<<std::endl;
 }
 
 } // namespace Device

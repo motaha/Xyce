@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.1.2.2 $
+// Revision Number: $Revision: 1.6 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:44 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -54,15 +54,12 @@
 
 #include <N_LAS_PrecondFactory.h>
 #include <N_ERH_ErrorMgr.h>
-#include <N_DEV_DeviceInterface.h>
 #include <N_UTL_OptionBlock.h>
 
 // ----------  Fwd Declares  -------------
 
 class N_LAS_Preconditioner;
 class N_LAS_Problem;
-class N_LOA_Loader;
-class N_MPDE_State;
 class N_LAS_HBBuilder;
 class N_LOA_HBLoader;
 class N_LAS_Builder;
@@ -92,25 +89,21 @@ public:
   // NOTE:  This type of creation is not supported by this preconditioner factory.
   Teuchos::RCP<N_LAS_Preconditioner> create( const Teuchos::RCP<N_LAS_Problem> & problem )
   {
-    std::string msg = "N_LAS_HBPrecondFactory::create() using N_LAS_Problem is not supported!";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_ERROR_0, msg);
+    Xyce::Report::DevelFatal0().in("N_LAS_HBPrecondFactory::create()") << " using N_LAS_Problem is not supported!";
     return Teuchos::null;
   }
 
   // Creates a new preconditioner (matrix free).
   Teuchos::RCP<N_LAS_Preconditioner> create( const Teuchos::RCP<N_LAS_System> & lasSystem );
 
+  // Set the time step(s) being used in the HB analysis.
+  // NOTE:  This is only useful for FD preconditioning techniques.
+  void setTimeSteps( const std::vector<double> & timeSteps )
+    { timeSteps_ = timeSteps; }
+
   // Set the fast times being used in the HB analysis.
   void setFastTimes( const std::vector<double> & times )
     { times_ = times; }
-
-  // Register MPDE state
-  void registerMPDEState( const Teuchos::RCP<N_MPDE_State>& mpdeState )
-    { statePtr_ = mpdeState; }
-
-  // Register the application system loader
-  void registerAppLoader( const Teuchos::RCP<N_LOA_Loader>& appLoaderPtr ) 
-    { appLoaderPtr_ = appLoaderPtr; }
 
   // Register the application system builder
   void registerAppBuilder( const Teuchos::RCP<N_LAS_Builder>& appBuilderPtr ) 
@@ -124,21 +117,14 @@ public:
   void registerHBBuilder( const Teuchos::RCP<N_LAS_HBBuilder>& hbBuilder ) 
     { hbBuilderPtr_ = hbBuilder; }
 
-  // Register the interface to the devices
-  void registerDeviceInterface( const Teuchos::RCP< N_DEV_DeviceInterface >& devInterfacePtr )
-    { devInterfacePtr_ = devInterfacePtr; }
-
 private:
 
-  std::vector<double> times_;
+  std::vector<double> times_, timeSteps_;
   std::string precType_;
-  Teuchos::RCP<N_MPDE_State> statePtr_;
-  Teuchos::RCP<N_LOA_Loader> appLoaderPtr_;
   Teuchos::RCP<N_LAS_Builder> appBuilderPtr_;
   Teuchos::RCP<N_LAS_System> lasSysPtr_;
   Teuchos::RCP<N_LOA_HBLoader> hbLoaderPtr_;
   Teuchos::RCP<N_LAS_HBBuilder> hbBuilderPtr_;
-  Teuchos::RCP<N_DEV_DeviceInterface> devInterfacePtr_;
   Teuchos::RCP<const N_UTL_OptionBlock> OB_;
 
   // Copy constructor.

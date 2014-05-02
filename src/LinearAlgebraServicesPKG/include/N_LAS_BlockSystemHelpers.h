@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -38,9 +38,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.8.6.2 $
+// Revision Number: $Revision: 1.14 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:44 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -69,6 +69,19 @@ class N_PDS_ParMap;
 class Epetra_CrsGraph;
 
 //-----------------------------------------------------------------------------
+// Function      : generateOffset 
+// Purpose       : A helper function that standardizes how offsets are computed
+// Special Notes : Block maps, graphs, vectors, and matrices require a global
+//               : numbering scheme.  Xyce uses an offset index to space the 
+//               : global ids apart so that they are unique.  The computation
+//               : of this offset is performed by this function using the
+//               : N_PDS_ParMap from the base block object.
+// Creator       : Heidi Thornquist, SNL, Electrical Systems Modeling
+// Creation Date : 10/8/13
+//-----------------------------------------------------------------------------
+int generateOffset( const N_PDS_ParMap& baseMap );
+
+//-----------------------------------------------------------------------------
 // Function      : createBlockVector
 // Purpose       : A helper function for creating a block vector.
 // Special Notes : This block vector construction is a numBlock replicate of the parallel
@@ -76,7 +89,7 @@ class Epetra_CrsGraph;
 // Creator       : Heidi Thornquist, SNL, Electrical Systems Modeling
 // Creation Date : 6/22/11
 //-----------------------------------------------------------------------------
-Teuchos::RCP<N_LAS_BlockVector> createBlockVector( int numBlocks, N_LAS_Vector& subBlockVector );
+Teuchos::RCP<N_LAS_BlockVector> createBlockVector( int numBlocks, N_LAS_Vector& subBlockVector, int augmentRows=0 );
 
 //-----------------------------------------------------------------------------
 // Function      : createBlockParMaps
@@ -97,7 +110,8 @@ std::vector<Teuchos::RCP<N_PDS_ParMap> > createBlockParMaps2( int numBlocks, N_P
 // Creator       : Heidi Thornquist, SNL, Electrical Systems Modeling
 // Creation Date : 6/22/11
 //-----------------------------------------------------------------------------
-Teuchos::RCP<N_PDS_ParMap> createBlockParMap( int numBlocks, N_PDS_ParMap& pmap );
+Teuchos::RCP<N_PDS_ParMap> createBlockParMap( int numBlocks, N_PDS_ParMap& pmap,
+                                              int augmentRows=0, std::vector<int>* augmentedGIDs = 0 );
 
 //-----------------------------------------------------------------------------
 // Function      : createBlockGraph
@@ -108,6 +122,19 @@ Teuchos::RCP<N_PDS_ParMap> createBlockParMap( int numBlocks, N_PDS_ParMap& pmap 
 //-----------------------------------------------------------------------------
 Teuchos::RCP<Epetra_CrsGraph> createBlockGraph( int offset, std::vector<std::vector<int> >& blockPattern,
                                                 N_PDS_ParMap& blockMap, const Epetra_CrsGraph& baseGraph );
+
+//-----------------------------------------------------------------------------
+// Function      : createBlockFreqERFParMap
+// Purpose       : A helper function for creating block parallel maps for 
+//               : the frequency domain.  The map generated here has all the
+//               : harmonics for one time point grouped together in expanded
+//               : real form.
+//               : This function returns only the map, not the overlap map.
+// Special Notes :
+// Creator       : Heidi Thornquist, SNL, Electrical Systems Modeling
+// Creation Date : 6/22/11
+//-----------------------------------------------------------------------------
+Teuchos::RCP<N_PDS_ParMap> createBlockFreqERFParMap( int numHarmonics, N_PDS_ParMap& pmap );
 
 //-----------------------------------------------------------------------------
 // Function      : copyToBlockVector

@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -31,8 +31,8 @@
 //
 // Revision Information:
 // ---------------------
-// Revision Number: $Revision: 1.2.2.2 $
-// Revision Date  : $Date: 2013/10/03 17:23:42 $
+// Revision Number: $Revision: 1.6 $
+// Revision Date  : $Date: 2014/02/24 23:49:20 $
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
 
@@ -80,10 +80,10 @@ N_IO_OutputPrn::~N_IO_OutputPrn()
 // Creator       : Rich Schiek
 // Creation Date : 4/16/13
 //-----------------------------------------------------------------------------
-bool N_IO_OutputPrn::getOutputVarNames( vector< string > & varNames )
+bool N_IO_OutputPrn::getOutputVarNames( std::vector< std::string > & varNames )
 {
   bool retVal = true;
-  stringstream extractedVarName;
+  std::stringstream extractedVarName;
   bool doneWithReadLine = false;
   bool withinWord=false;
   while( !doneWithReadLine )
@@ -106,7 +106,7 @@ bool N_IO_OutputPrn::getOutputVarNames( vector< string > & varNames )
       {
         // just found first white space after word so 
         // transfer extractedVarName to varNames array 
-        string name;
+        std::string name;
         extractedVarName >> name;
         varNames.push_back( name );
         extractedVarName.clear();
@@ -134,10 +134,10 @@ bool N_IO_OutputPrn::getOutputVarNames( vector< string > & varNames )
 bool N_IO_OutputPrn::getOutputNextVarValues( N_LAS_Vector * varValues )
 {
   bool retVal = true;
-  stringstream extractedVarValue;
+  std::stringstream extractedVarValue;
   bool doneWithReadLine = false;
   bool withinWord=false;
-  const string validNumberChars="0123456789";
+  const std::string validNumberChars="0123456789";
   // assume we start filling the array at index 0.
   int varIndex = 0;
   while( !doneWithReadLine )
@@ -159,7 +159,7 @@ bool N_IO_OutputPrn::getOutputNextVarValues( N_LAS_Vector * varValues )
     {
       // need to ensure that characters read are valid numbers 
       // 0123456789
-      if( withinWord || (validNumberChars.find( characterRead ) != string::npos ) )
+      if( withinWord || (validNumberChars.find( characterRead ) != std::string::npos ) )
       {
         withinWord = true;
         extractedVarValue.put(characterRead);

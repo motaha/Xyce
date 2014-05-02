@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.4.2.2 $
+// Revision Number: $Revision: 1.9 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -77,8 +77,8 @@ N_LAS_TrilinosPrecondFactory::N_LAS_TrilinosPrecondFactory( const N_UTL_OptionBl
   OB_ = Teuchos::rcp( &OB, false );
   precType_ = "IFPACK";
 
-  list<N_UTL_Param>::const_iterator itPI = OB.getParams().begin();
-  list<N_UTL_Param>::const_iterator endPI = OB.getParams().end();
+  std::list<N_UTL_Param>::const_iterator itPI = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator endPI = OB.getParams().end();
 
   for( ; itPI != endPI; ++itPI )
   {
@@ -134,8 +134,7 @@ N_LAS_TrilinosPrecondFactory::create( const Teuchos::RCP<N_LAS_Problem> & proble
   }
   else
   {
-    std::string msg = "N_LAS_TrilinosPrecondFactory::create()";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_ERROR_0, msg + ", preconditioning type " + precType_ + " unrecognized!\n");
+    Xyce::Report::DevelFatal0().in("N_LAS_TrilinosPrecondFactory::create()") << "preconditioning type " << precType_ << " unrecognized!";
   }
   return precond;
 }

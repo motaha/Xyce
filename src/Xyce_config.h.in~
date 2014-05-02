@@ -3,9 +3,6 @@
 /* Define to 1 if you have the <algorithm> header file. */
 #undef HAVE_ALGORITHM
 
-/* Define to 1 if you have the <algo.h> header file. */
-#undef HAVE_ALGO_H
-
 /* define if you have the bison parser generator */
 #undef HAVE_BISON
 
@@ -29,6 +26,9 @@
 
 /* Define to 1 if you have the `DftiCreateDescriptor' function. */
 #undef HAVE_DFTICREATEDESCRIPTOR
+
+/* Define to 1 if you have the <dlfcn.h> header file. */
+#undef HAVE_DLFCN_H
 
 /* define if you have the flex lexical scanner generator */
 #undef HAVE_FLEX
@@ -150,6 +150,9 @@
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
+
+/* use threads */
+#undef USE_THREADS
 
 /* Build the ATHENA device. */
 #undef Xyce_ATHENA

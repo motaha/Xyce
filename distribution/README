@@ -1,35 +1,4 @@
-Xyce Parallel Electronic Simulator 5.3 
+Xyce Parallel Electronic Simulator 
 
-
-
-Copyright Notice
-
-Copyright (c) 2002-2013, Sandia Corporation, Albuquerque, NM, USA.  Under the
-terms of Contract DE-AC04-94AL85000, there is a non-exclusive license for
-use of this work by or on behalf of the U.S. Government.  Export of this
-program may require a license from the United States Government.
-
-
-
-The installer package for this PLATFORM is organized as follows:
-
-    Install_Xyce_PLATFORM
-    |
-    |___ README
-    |
-    |___ install_PLATFORM.sh
-    |
-    |___ xtl.tar.gz
-
-
-
-To install Xyce, from the setup directory type:
-
-    sh install_PLATFORM.sh
-
-and follow the instructions.
-
-
-
-You must have standard Unix utilities (tar, gzip, sh, etc.) prior to 
-installation.  Superuser privileges are not required.
+This file serves no useful purpose except that some installer types
+demand its existence.

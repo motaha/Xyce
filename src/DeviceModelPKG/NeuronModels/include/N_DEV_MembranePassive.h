@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.7.2.1 $
+// Revision Number: $Revision: 1.10.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:33 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -66,20 +66,20 @@ namespace Device {
 //-----------------------------------------------------------------------------
 class MembranePassive : public MembraneModel
 {
-  public:
-    MembranePassive(SolverState & ss1, double cMem, double gMem, double vRest);
-    ~MembranePassive() {}
+public:
+  MembranePassive(const SolverState & ss1, double cMem, double gMem, double vRest);
+  ~MembranePassive() {}
 
-    void setJacStamp( int numExtVars, int segmentNumber, int vOffset, vector< vector< int > > & segmentJacStamp );
-    void loadDAEQVector( int segmentNumber, vector< int > & lidIndexVector, N_LAS_Vector * solnVecPtr, N_LAS_Vector * daeQVecPtr, double segArea);
-    void loadDAEFVector( int segmentNumber, vector< int > & lidIndexVector, N_LAS_Vector * solnVecPtr, N_LAS_Vector * daeFVecPtr, double segArea);
-    void loadDAEdQdx( int segmentNumber, int vOffset, vector< int > & lidIndexVector, vector< vector< int > > & jacobianOffsets, N_LAS_Vector * solnVecPtr, N_LAS_Matrix * dQdxMatPtr, double segArea);
-    void loadDAEdFdx( int segmentNumber, int vOffset, vector< int > & lidIndexVector, vector< vector< int > > & jacobianOffsets, N_LAS_Vector * solnVecPtr, N_LAS_Matrix * dFdxMatPtr, double segArea);
+  void setJacStamp( int numExtVars, int segmentNumber, int vOffset, std::vector< std::vector< int > > & segmentJacStamp );
+  void loadDAEQVector( int segmentNumber, std::vector< int > & lidIndexVector, N_LAS_Vector * solnVecPtr, N_LAS_Vector * daeQVecPtr, double segArea);
+  void loadDAEFVector( int segmentNumber, std::vector< int > & lidIndexVector, N_LAS_Vector * solnVecPtr, N_LAS_Vector * daeFVecPtr, double segArea);
+  void loadDAEdQdx( int segmentNumber, int vOffset, std::vector< int > & lidIndexVector, std::vector< std::vector< int > > & jacobianOffsets, N_LAS_Vector * solnVecPtr, N_LAS_Matrix * dQdxMatPtr, double segArea);
+  void loadDAEdFdx( int segmentNumber, int vOffset, std::vector< int > & lidIndexVector, std::vector< std::vector< int > > & jacobianOffsets, N_LAS_Vector * solnVecPtr, N_LAS_Matrix * dFdxMatPtr, double segArea);
 
-    // constitutive parameters
-    double cMem_;     // membrane capacitance
-    double gMem_;     // membrane conductance
-    double vRest_;    // membrane rest voltage
+  // constitutive parameters
+  double cMem_;     // membrane capacitance
+  double gMem_;     // membrane conductance
+  double vRest_;    // membrane rest voltage
 };
 
 } // namespace Device

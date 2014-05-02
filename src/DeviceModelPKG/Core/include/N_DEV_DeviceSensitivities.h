@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.16.2.2 $
+// Revision Number: $Revision: 1.25.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:37 $
+// Revision Date  : $Date: 2014/02/26 20:16:30 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,29 +46,8 @@
 #ifndef Xyce_N_DEV_DeviceSensitivities_h
 #define Xyce_N_DEV_DeviceSensitivities_h
 
-// ---------- Standard Includes ----------
-
-#include <vector>
-#include <string>
-#include <map>
-
-// ----------   Xyce Includes   ----------
-#include <N_UTL_Misc.h>
 #include <N_DEV_fwd.h>
-#include <N_IO_fwd.h>
-#include <N_DEV_Device.h>
-#include <N_DEV_DeviceOptions.h>
-#include <N_DEV_DeviceEntity.h>
-
-// ---------- Forward Declarations ----------
-class N_NLS_Manager;
-
-class N_LAS_System;
-class N_LAS_Matrix;
-class N_LAS_MultiVector;
-class N_LAS_Vector;
-
-class N_ERH_ErrorMgr;
+#include <N_UTL_fwd.h>
 
 namespace Xyce {
 namespace Device {
@@ -83,51 +62,22 @@ namespace Device {
 
 class DeviceSensitivities
 {
-  // functions:
 public:
-  DeviceSensitivities ( DeviceOptions & do1,
-                              ExternData & extData1,
-                              SolverState & solState1,
-                              N_LAS_System & lasSys1);
-
+  DeviceSensitivities(
+     DeviceMgr &               device_manager,
+     const DeviceOptions &     device_options);
   ~DeviceSensitivities();
 
-  bool registerSensParams (const N_UTL_OptionBlock & OB);
-
-  DeviceEntity* getDeviceEntity(const string & param);
-
-  bool stripParamName
-  (const std::string & fullName,
-   string & strippedName,
-   string & entityName) const;
-
-
 private:
-  DeviceSensitivities (const DeviceSensitivities & right);
-
-  void setUpDeviceEntityMap_ ();
-
-  const DeviceEntity * findDeviceEntity_ (const std::string & param) const;
-  DeviceEntity * findDeviceEntity_ (const std::string & param);
+  DeviceSensitivities(const DeviceSensitivities &);
+  DeviceSensitivities &operator=(const DeviceSensitivities &);
 
 public:
+  bool registerSensParams(const Util::OptionBlock &option_block);
 
 private:
-  map <string, DeviceEntity*> nameDevEntityMap_;
-  std::vector<std::string> sensParamArray_;
-
-  bool entityMapDone_;
-  int numSensParams_;
-
-  DeviceMgr     & devMgr_;
-  DeviceOptions & devOptions_;
-  ExternData    & extData_;
-  SolverState   & solState_;
-  N_LAS_System        & lasSys_;
-  const N_NLS_Manager & nlsMgr_;
-
-  // Petra options block (passed to iterative solver)
-  N_UTL_OptionBlock* petraOptionBlockPtr_;
+  DeviceMgr &                 deviceManager_;
+  const DeviceOptions &       deviceOptions_;
 };
 
 } // namespace Device

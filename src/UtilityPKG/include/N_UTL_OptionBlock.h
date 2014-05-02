@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.11.2.2 $
+// Revision Number: $Revision: 1.20.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/02/26 19:14:55 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,16 +46,13 @@
 #ifndef Xyce_N_UTL_OptionBlock_h
 #define Xyce_N_UTL_OptionBlock_h
 
-// ---------- Standard Includes ----------
 #include <string>
 #include <list>
 #include <iosfwd>
 
-// ----------   Xyce Includes   ----------
 #include <N_UTL_fwd.h>
 #include <N_UTL_Param.h>
-#include <N_UTL_Misc.h>
-#include <N_UTL_Xyce.h>
+#include <N_UTL_NetlistLocation.h>
 #include <N_UTL_Packable.h>
 
 namespace Xyce {
@@ -80,7 +77,7 @@ enum { NEW_STATE, MODIFIED_STATE, PROCESSED_STATE };
 class OptionBlock : public Packable
 {
   public:
-    typedef std::list<N_UTL_Param> ParameterList;
+    typedef std::list<Param> ParameterList;
 
     // Constructor
     OptionBlock(const std::string & n_str = std::string());
@@ -89,11 +86,11 @@ class OptionBlock : public Packable
     OptionBlock(const OptionBlock & right);
 
     // Destructor
-    ~OptionBlock();
+    virtual ~OptionBlock();
 
     // compare contained lists
     // the equity operator just compares the "name" field.  This
-    // will compare the N_UTL_Param lists as well.
+    // will compare the Param lists as well.
     bool compareParamLists( const OptionBlock & right ) const;
 
     // Assignment operator.
@@ -109,12 +106,25 @@ class OptionBlock : public Packable
     void clear();
 
     //beginning of params
-    ParameterList::iterator begin() {
+    ParameterList::iterator begin() 
+    {
       return params_.begin();
     }
 
     //end of params
-    ParameterList::iterator end() {
+    ParameterList::iterator end() 
+    {
+      return params_.end();
+    }
+
+    ParameterList::const_iterator begin() const 
+    {
+      return params_.begin();
+    }
+
+    //end of params
+    ParameterList::const_iterator end() const 
+    {
       return params_.end();
     }
 
@@ -136,41 +146,56 @@ class OptionBlock : public Packable
     double getTagValueAsDouble( std::string iTag ) const;
     int getTagValueAsInt( std::string iTag ) const;
 
-    const std::list<N_UTL_Param> &getParams() const {
+    const std::list<Param> &getParams() const 
+    {
       return params_;
     }
 
-    std::list<N_UTL_Param> &getParams() {
+    std::list<Param> &getParams() 
+    {
       return params_;
     }
 
-    const std::string &getName() const {
+    const std::string &getName() const 
+    {
       return name_;
     }
 
-    void setName(const std::string &name) {
+    void setName(const std::string &name) 
+    {
       name_ = name;
     }
 
-    int getStatus() const {
+    const NetlistLocation &getNetlistLocation() const 
+    {
+      return netlistLocation_;
+    }
+
+    void setNetlistLocation(const NetlistLocation &netlist_location) 
+    {
+      netlistLocation_ = netlist_location;
+    }
+
+    int getStatus() const 
+    {
       return status_;
     }
 
-    void setStatus(int status) {
+    void setStatus(int status) 
+    {
       status_ = status;
     }
 
   private:
-
-    // Not encapsulated, probably should be.
-    std::string name_;
-    int status_;  // state of block: NEW_STATE, MODIFIED_STATE, PROCESSED_STATE
-    list < N_UTL_Param > params_;
+    std::string         name_;
+    NetlistLocation     netlistLocation_;
+    int                 status_;  // state of block: NEW_STATE, MODIFIED_STATE, PROCESSED_STATE
+    std::list<Param>    params_;
 };
 
 std::ostream &operator<<(std::ostream &os, const OptionBlock &options);
 
-} // namespace Device
+} // namespace Util
 } // namespace Xyce
 
 

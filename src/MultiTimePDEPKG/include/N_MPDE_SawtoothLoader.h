@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.18.2.2 $
+// Revision Number: $Revision: 1.23 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:46 $
+// Revision Date  : $Date: 2014/02/24 23:49:24 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -56,6 +56,8 @@ using Teuchos::rcp;
 // ----------   Xyce Includes   ----------
 
 #include <N_UTL_Misc.h>
+#include <N_ANP_fwd.h>
+
 #include <N_LOA_Loader.h>
 
 #include <N_MPDE_State.h>
@@ -64,8 +66,6 @@ using Teuchos::rcp;
 
 class N_LAS_Vector;
 class N_LAS_Matrix;
-
-class N_ANP_AnalysisInterface;
 
 //-----------------------------------------------------------------------------
 // Class         : N_MPDE_SawtoothLoader
@@ -140,6 +140,10 @@ public:
                           N_LAS_Vector * FVectorPtr,
                           N_LAS_Vector * dFdxdVpVectorPtr,
                           N_LAS_Vector * dQdxdVpVectorPtr)  { return false; }
+
+    virtual bool setParam (std::string & name, double val) { return false; }
+    virtual double getParamAndReduce (const std::string & name) { return 0.0; }
+    virtual bool getParamAndReduce (const std::string & name, double & val) { return false; }
 
   // Assign times for fast time scale
   void setTimeShift( double timeShift )

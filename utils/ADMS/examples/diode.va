@@ -6,7 +6,7 @@
 
 `define CONSTroot2 1.41421356237309504880
 
-module diode(a,c);
+module diode(a,c) `attr(xyceModelGroup="Diode" xyceSpiceDeviceName="D" xyceLevelNumber="2001") ;;
   //device terminals
   inout a,c;
   electrical a,c;

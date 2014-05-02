@@ -4,6 +4,8 @@
 # class source list
 set ( ParallelDist_SOURCES
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_PDS_CommFactory.C 
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_PDS_ParallelMachine.C 
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_PDS_MPI.C 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_PDS_GlobalAccessor.C 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_PDS_Manager.C 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_PDS_Migrator.C 

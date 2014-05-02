@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -38,9 +38,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.56.2.3 $
+// Revision Number: $Revision: 1.71 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:43 $
+// Revision Date  : $Date: 2014/02/24 23:49:22 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -58,24 +58,28 @@
 #include <N_IO_SpiceSeparatedFieldTool.h>
 #include <N_PDS_Comm.h>
 #include <N_UTL_Xyce.h>
+#include <N_UTL_fwd.h>
 #include <N_ERH_ErrorMgr.h>
 #include <N_UTL_Misc.h>
 
+namespace Xyce {
+namespace IO {
+
 //-------------------------------------------------------------------------
-// Function      : N_IO_SpiceSeparatedFieldTool::N_IO_SpiceSeparatedFieldTool
+// Function      : SpiceSeparatedFieldTool::SpiceSeparatedFieldTool
 // Purpose       : constructor
 // Special Notes :
 // Creator       : Jian Li
 // Creation Date : 07/12/2002
 //-------------------------------------------------------------------------
-N_IO_SpiceSeparatedFieldTool::N_IO_SpiceSeparatedFieldTool(ifstream & input,
-  string const & fileStr, const vector< pair< string, string > > & externalParams)
+SpiceSeparatedFieldTool::SpiceSeparatedFieldTool(std::ifstream & input,
+  std::string const & fileStr, const std::vector< std::pair< std::string, std::string > > & externalParams)
 : in_(input), cursorLineNum_(1), fileName_(fileStr), externalParams_(externalParams)
 {
 }
 
 //-------------------------------------------------------------------------
-// Function      : N_IO_SpiceSeparatedFieldTool::getLine
+// Function      : SpiceSeparatedFieldTool::getLine
 // Purpose       : Read the line (one character at a time via calling
 //                 NextChar_),  and split the line into fields (via calling
 //                 SplitLine).  KRS 10/11/07:  I have overloaded getLine to
@@ -87,10 +91,10 @@ N_IO_SpiceSeparatedFieldTool::N_IO_SpiceSeparatedFieldTool(ifstream & input,
 // Creator       : Alan Lundin
 // Creation Date :
 //-------------------------------------------------------------------------
-int N_IO_SpiceSeparatedFieldTool::getLine(vector<StringToken>& line)
+int SpiceSeparatedFieldTool::getLine(std::vector<StringToken>& line)
 {
   char c=0;
-  const string nonid(" \t\n\r(){},='");
+  const std::string nonid(" \t\n\r(){},='");
   line.clear();
   
   skipCommentsAndBlankLines_();
@@ -183,10 +187,10 @@ int N_IO_SpiceSeparatedFieldTool::getLine(vector<StringToken>& line)
       {
         // test {block} for expected VECTOR* contents 
         int lineSize = line.size();
-        // avoid reading past beginning of line vector<> 
+        // avoid reading past beginning of line std::vector<> 
         if( lineSize > 2)
         {
-          string earlierField ( ExtendedString( 
+          std::string earlierField ( ExtendedString( 
           line[ lineSize - 2 ].string_ ).toUpper() );
           // compare the prior field to VECTOR* tags
           if( earlierField == "DOPINGPROFILES" || earlierField == "SOURCELIST" ||
@@ -212,13 +216,11 @@ int N_IO_SpiceSeparatedFieldTool::getLine(vector<StringToken>& line)
           int lastLength = ( line[lineSize - 1].string_ ).size();
           if( lastLength > 2 )
           {
-            string last2 ( line[lineSize - 1].string_, lastLength - 2, 2 );
+            std::string last2 ( line[lineSize - 1].string_, lastLength - 2, 2 );
 
             if( last2 == "e+" || last2 == "e-" || last2 == "E+" || last2 == "E-" )
             {
-              string msg ("Invalid notation encountered.");
-              N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-                fileName_, line[lineSize - 1].lineNumber_);
+              Report::UserError0().at(fileName_, line[lineSize - 1].lineNumber_) << "Invalid notation encountered.";
             }
           } 
         }
@@ -301,7 +303,7 @@ int N_IO_SpiceSeparatedFieldTool::getLine(vector<StringToken>& line)
 
 
 //-------------------------------------------------------------------------
-// Function      : N_IO_SpiceSeparatedFieldTool::getLine
+// Function      : SpiceSeparatedFieldTool::getLine
 // Purpose       : Read the line (one character at a time via calling
 //                 NextChar_),  and split the line into fields (via calling
 //                 SplitLine).  
@@ -330,11 +332,11 @@ int N_IO_SpiceSeparatedFieldTool::getLine(vector<StringToken>& line)
 // Creator       : Alan Lundin
 // Creation Date :
 //-------------------------------------------------------------------------
-int N_IO_SpiceSeparatedFieldTool::getLine(vector<StringToken>& line, bool 
+int SpiceSeparatedFieldTool::getLine(std::vector<StringToken>& line, bool 
 replgndvar)
 {
   char c(0);
-  const string nonid(" \t\n\r(){},='");
+  const std::string nonid(" \t\n\r(){},='");
   line.clear();
 
   skipCommentsAndBlankLines_();
@@ -348,7 +350,7 @@ replgndvar)
 
   char lastNonWhite(0);
   char saveC;
-  string lastTok("");
+  std::string lastTok("");
   while ( endOfLine == false && NextChar_(c)  )
   {
     saveC = c;
@@ -365,7 +367,7 @@ replgndvar)
       }
     }
     StringToken field;
-    string isGndSynonym(""); //used to check for "GND", "GND!", "GROUND"
+    std::string isGndSynonym(""); //used to check for "GND", "GND!", "GROUND"
                              //or stuff like "GrOUnD" and replace them with "0"
     field.lineNumber_ = cursorLineNum_;
     field.string_.reserve(16);
@@ -373,14 +375,14 @@ replgndvar)
     {
       if (!noImplicitExpression && lastNonWhite == '=' &&
          ((!isModel && ((lastTok != "IC")&&(lastTok != "TC")) ) || (isModel && lastTok != "VERSION")) &&
-          N_UTL::possibleParam(lastTok) && c != '{' && c != '\'' && c != '\"') 
+          Util::possibleParam(lastTok) && c != '{' && c != '\'' && c != '\"') 
       {
         int numParen (0);
         if (c == '(')
         {
           numParen++;
         }
-        string extraString(1,c);
+        std::string extraString(1,c);
         while (!endOfLine) 
         {
           endOfLine = !NextChar_(c);
@@ -402,10 +404,10 @@ replgndvar)
         {
           in_.putback(c);
         }
-        bool simple = N_UTL::isInt(extraString) 
-                   || N_UTL::isValue(extraString) 
-                   || N_UTL::possibleParam(extraString) 
-                   || N_UTL::isBool(extraString) ;
+        bool simple = Util::isInt(extraString) 
+                   || Util::isValue(extraString) 
+                   || Util::possibleParam(extraString) 
+                   || Util::isBool(extraString) ;
         if (!simple)
         {
           field.string_ = "{";
@@ -487,11 +489,11 @@ replgndvar)
           {
             // test {block} for expected VECTOR* contents 
             int lineSize = line.size();
-            // avoid reading past beginning of line vector<> 
+            // avoid reading past beginning of line std::vector<> 
             if( lineSize > 2)
             {
-              string earlierField ( line[ lineSize - 2 ].string_ ) ;
-              N_UTL::toUpper(earlierField) ;
+              std::string earlierField ( line[ lineSize - 2 ].string_ ) ;
+              Util::toUpper(earlierField) ;
               // compare the prior field to VECTOR* tags
               if( earlierField == "DOPINGPROFILES" || earlierField == "SOURCELIST" ||
                   earlierField == "LAYER" ||
@@ -509,13 +511,11 @@ replgndvar)
               int lastLength = ( line[lineSize - 1].string_ ).size();
               if( lastLength > 2 )
               {
-                string last2 ( line[lineSize - 1].string_, lastLength - 2, 2 );
+                std::string last2 ( line[lineSize - 1].string_, lastLength - 2, 2 );
 
                 if( last2 == "e+" || last2 == "e-" || last2 == "E+" || last2 == "E-" )
                 {
-                  string msg ("Invalid notation encountered.");
-                  N_ERH_ErrorMgr::report( N_ERH_ErrorMgr::USR_FATAL_0, msg,
-                  fileName_, line[lineSize - 1].lineNumber_);
+                  Report::UserError0().at(fileName_, line[lineSize - 1].lineNumber_) << "Invalid notation encountered.";
                 }
               } 
             }
@@ -600,8 +600,8 @@ replgndvar)
       if (isGndSynonym=="GND" || isGndSynonym=="GND!" || isGndSynonym=="GROUND") 
       {
 #ifdef Xyce_DEBUG_IO
-        cout << "Node " <<field.string_ << " is a synonym for ground.  " <<  
-        "Replacing node name with 0" << endl;
+        Xyce::dout() << "Node " <<field.string_ << " is a synonym for ground.  " <<  
+        "Replacing node name with 0" << std::endl;
 #endif
 
         field.string_ = "0";
@@ -610,8 +610,8 @@ replgndvar)
 
     if ( !(field.string_.empty()) )
     {
-      string ucFieldString(field.string_);
-      N_UTL::toUpper(ucFieldString);
+      std::string ucFieldString(field.string_);
+      Util::toUpper(ucFieldString);
 
       if (line.empty()) 
       {
@@ -646,7 +646,7 @@ replgndvar)
 }
 
 //-------------------------------------------------------------------------
-// Function      : N_IO_SpiceSeparatedFieldTool::getLineWithComments
+// Function      : SpiceSeparatedFieldTool::getLineWithComments
 // Purpose       : Read the line (one character at a time via calling
 //                 NextChar_),  and split the line into fields (via calling
 //                 SplitLine).  This function is the same as getLine, except
@@ -656,11 +656,11 @@ replgndvar)
 // Creator       : Keith Santarelli
 // Creation Date : 12/05/2007
 //-------------------------------------------------------------------------
-int N_IO_SpiceSeparatedFieldTool::getLineWithComments(vector<StringToken>& line)
+int SpiceSeparatedFieldTool::getLineWithComments(std::vector<StringToken>& line)
 {
   char c=0;
   bool NextCharFlag;
-  const string nonid(" \t\n\r");
+  const std::string nonid(" \t\n\r");
   line.clear();
 
   bool endOfLine = false; //is the line end?
@@ -675,7 +675,7 @@ int N_IO_SpiceSeparatedFieldTool::getLineWithComments(vector<StringToken>& line)
     if (nonid.find(c) == nonid.npos) //not a whitespace character
     {
       field.string_ += c;
-      while (NextCharFlag = in_.get(c)) 
+      while ( (NextCharFlag = in_.get(c)) ) 
         { 
         if (nonid.find(c) == nonid.npos)
           field.string_ += c;
@@ -708,7 +708,7 @@ int N_IO_SpiceSeparatedFieldTool::getLineWithComments(vector<StringToken>& line)
 }
 
 //-------------------------------------------------------------------------
-// Function      : N_IO_SpiceSeparatedFieldTool::getLine2
+// Function      : SpiceSeparatedFieldTool::getLine2
 // Purpose       : Read the line (one character at a time via calling
 //                 NextChar_), and split the line into fields (via calling
 //                 SplitLine).  This function differs from getLine in that
@@ -719,10 +719,10 @@ int N_IO_SpiceSeparatedFieldTool::getLineWithComments(vector<StringToken>& line)
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date :
 //-------------------------------------------------------------------------
-int N_IO_SpiceSeparatedFieldTool::getLine2(vector<StringToken>& line)
+int SpiceSeparatedFieldTool::getLine2(std::vector<StringToken>& line)
 {
   char c=0;
-  const string nonid(" \t\n\r(),");
+  const std::string nonid(" \t\n\r(),");
   line.clear();
 
   skipCommentsAndBlankLines_();
@@ -811,7 +811,7 @@ int N_IO_SpiceSeparatedFieldTool::getLine2(vector<StringToken>& line)
 }
 
 //-------------------------------------------------------------------------
-// Function      : N_IO_SpiceSeparatedFieldTool::changeCursorLineNumber
+// Function      : SpiceSeparatedFieldTool::changeCursorLineNumber
 // Purpose       :
 //
 // Increase or decrease the line number of cursor by the given amount.
@@ -823,39 +823,27 @@ int N_IO_SpiceSeparatedFieldTool::getLine2(vector<StringToken>& line)
 // Creator       : Jian Li
 // Creation Date : 07/12/2002
 //-------------------------------------------------------------------------
-void N_IO_SpiceSeparatedFieldTool::changeCursorLineNumber(int token)
+void SpiceSeparatedFieldTool::changeCursorLineNumber(int token)
 {
   cursorLineNum_ += token;
   if (cursorLineNum_ < 1) cursorLineNum_ = 1;
 }
 
 //-------------------------------------------------------------------------
-// Function      : N_IO_SpiceSeparatedFieldTool::getFilePosition
+// Function      : SpiceSeparatedFieldTool::getFilePosition
 // Purpose       : Return the current character position in file.
 // Scope         : public
 // Special Notes :
 // Creator       : ??
 // Creation Date : ??
 //-------------------------------------------------------------------------
-streampos N_IO_SpiceSeparatedFieldTool::getFilePosition() const 
+std::streampos SpiceSeparatedFieldTool::getFilePosition() const 
 { 
-  // This clear() hack was necessary back in the ALPHA and SGI days, but
-  // is not only not necessary anymore, it's stupid.
-  // Make sure iostate flages are cleared before attempting tellg.
-  //  in_.clear(); 
-#ifdef Xyce_BROKEN_TELLG_EOF
-  // This lossage is needed on SGIs, where tellg returns -1 if a read is
-  // done to EOF, but not if a seek is done.  Sigh.
-  if ( in_.tellg() == streampos(-1))
-  {
-    in_.seekg(0,ios::end);
-  }
-#endif
   return in_.tellg(); 
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_SpiceSeparatedFieldTool::setLocation
+// Function       : SpiceSeparatedFieldTool::setLocation
 // Purpose        : Set the location in the ifstream at which the next
 //                  input operation will begin.
 // Special Notes  : 
@@ -863,13 +851,13 @@ streampos N_IO_SpiceSeparatedFieldTool::getFilePosition() const
 // Creator        : Lon Waters
 // Creation Date  : 02/21/2003
 //----------------------------------------------------------------------------
-bool N_IO_SpiceSeparatedFieldTool::setLocation(streampos const& startPosition)
+bool SpiceSeparatedFieldTool::setLocation(std::streampos const& startPosition)
 {
   in_.clear();
 
-  if (startPosition == streampos(-1))
+  if (startPosition == std::streampos(-1))
   {
-    in_.seekg(0,ios::end);
+    in_.seekg(0,std::ios::end);
   }
   else
   {
@@ -879,14 +867,14 @@ bool N_IO_SpiceSeparatedFieldTool::setLocation(streampos const& startPosition)
 }
 
 //-------------------------------------------------------------------------
-// Function      : N_IO_SpiceSeparatedFieldTool::NextChar_
+// Function      : SpiceSeparatedFieldTool::NextChar_
 // Purpose       : Read in a character & check for special characters.
 // Special Notes :
 // Scope         : private
 // Creator       : Alan Lundin
 // Creation Date :
 //-------------------------------------------------------------------------
-bool N_IO_SpiceSeparatedFieldTool::NextChar_(char& c)
+bool SpiceSeparatedFieldTool::NextChar_(char& c)
 {
   // check common case (i.e., not EOL)
   if (in_.eof()) return false;
@@ -965,14 +953,14 @@ bool N_IO_SpiceSeparatedFieldTool::NextChar_(char& c)
 }
 
 //-------------------------------------------------------------------------
-// Function      : N_IO_SpiceSeparatedFieldTool::skipToEndOfLine_
+// Function      : SpiceSeparatedFieldTool::skipToEndOfLine_
 // Purpose       : Helper function to skip to the end of a physical line.
 // Special Notes :
 // Scope         : private
 // Creator       : Raikanta Sahu
 // Creation Date : 07/11/2002
 //-------------------------------------------------------------------------
-void N_IO_SpiceSeparatedFieldTool::skipToEndOfLine_()
+void SpiceSeparatedFieldTool::skipToEndOfLine_()
 {
   char c(0);
   while ( ! in_.eof() )
@@ -1007,7 +995,7 @@ void N_IO_SpiceSeparatedFieldTool::skipToEndOfLine_()
 }
 
 //-------------------------------------------------------------------------
-// Function      : N_IO_SpiceSeparatedFieldTool::skipCommentsAndBlankLines_
+// Function      : SpiceSeparatedFieldTool::skipCommentsAndBlankLines_
 // Purpose       : Helper function to skip the comments and white
 //                 spaces before reading a logical Line.
 // Special Notes :
@@ -1015,7 +1003,7 @@ void N_IO_SpiceSeparatedFieldTool::skipToEndOfLine_()
 // Creator       : Raikanta Sahu
 // Creation Date : 07/11/2002
 //-------------------------------------------------------------------------
-void N_IO_SpiceSeparatedFieldTool::skipCommentsAndBlankLines_()
+void SpiceSeparatedFieldTool::skipCommentsAndBlankLines_()
 {
   char c(0);
   while ( ! in_.eof() )
@@ -1044,7 +1032,7 @@ void N_IO_SpiceSeparatedFieldTool::skipCommentsAndBlankLines_()
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_SpiceSeparatedFieldTool::substituteExternalParams
+// Function       : SpiceSeparatedFieldTool::substituteExternalParams
 // Purpose        : During the parsing of a line to tokens, replace any 
 //                  supplied external parameters with the new values 
 // Special Notes  : 
@@ -1052,15 +1040,15 @@ void N_IO_SpiceSeparatedFieldTool::skipCommentsAndBlankLines_()
 // Creator        : Richard Schiek, Electrical and MEMS modeling
 // Creation Date  : 10/09/2008
 //----------------------------------------------------------------------------
-void N_IO_SpiceSeparatedFieldTool::substituteExternalParams(vector<StringToken>& line)
+void SpiceSeparatedFieldTool::substituteExternalParams(std::vector<StringToken>& line)
 {
   bool foundMacroStatement = false;
-  vector<N_IO_SpiceSeparatedFieldTool::StringToken>::iterator currField = line.begin();
-  vector<N_IO_SpiceSeparatedFieldTool::StringToken>::iterator endField = line.end();
+  std::vector<SpiceSeparatedFieldTool::StringToken>::iterator currField = line.begin();
+  std::vector<SpiceSeparatedFieldTool::StringToken>::iterator endField = line.end();
   while( currField != endField )
   {
-    vector< pair< string, string > >::iterator currentSub = externalParams_.begin();
-    vector< pair< string, string > >::iterator endSub = externalParams_.end();
+    std::vector< std::pair< std::string, std::string > >::iterator currentSub = externalParams_.begin();
+    std::vector< std::pair< std::string, std::string > >::iterator endSub = externalParams_.end();
     if( currField->string_ == "@selecttext" )
       foundMacroStatement=true;
     while( currentSub != endSub )
@@ -1100,7 +1088,7 @@ void N_IO_SpiceSeparatedFieldTool::substituteExternalParams(vector<StringToken>&
       if( currField->string_ == "@selecttext" )
       {
         // from her on will need to be replaced so save this location 
-        vector<N_IO_SpiceSeparatedFieldTool::StringToken>::iterator resultLoc = currField;
+        std::vector<SpiceSeparatedFieldTool::StringToken>::iterator resultLoc = currField;
         // look ahead to the selection field
         currField++;
         if( currField != endField )
@@ -1109,7 +1097,7 @@ void N_IO_SpiceSeparatedFieldTool::substituteExternalParams(vector<StringToken>&
           if( currField != endField )
           {
             // should be at selection key 
-            string selectionKey = currField->string_;
+            std::string selectionKey = currField->string_;
             int selectionKeyValue = ExtendedString( currField->string_ ).Value();
             currField++;
             while( currField != endField )
@@ -1162,27 +1150,27 @@ void N_IO_SpiceSeparatedFieldTool::substituteExternalParams(vector<StringToken>&
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_SpiceSeparatedFieldTool::StringToken::instance()
+// Function       : SpiceSeparatedFieldTool::StringToken::instance()
 // Purpose        : 
 // Special Notes  : 
 // Scope          : 
 // Creator        : Lon Waters
 // Creation Date  : 07/11/2003
 //----------------------------------------------------------------------------
-Packable* N_IO_SpiceSeparatedFieldTool::StringToken::instance() const
+Packable* SpiceSeparatedFieldTool::StringToken::instance() const
 {
-  return new N_IO_SpiceSeparatedFieldTool::StringToken();
+  return new SpiceSeparatedFieldTool::StringToken();
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_SpiceSeparatedFieldTool::StringToken::packedByteCount
+// Function       : SpiceSeparatedFieldTool::StringToken::packedByteCount
 // Purpose        : 
 // Special Notes  : 
 // Scope          : 
 // Creator        : Lon Waters
 // Creation Date  : 07/11/2003
 //----------------------------------------------------------------------------
-int N_IO_SpiceSeparatedFieldTool::StringToken::packedByteCount() const
+int SpiceSeparatedFieldTool::StringToken::packedByteCount() const
 {
   int byteCount(0);
   int length;
@@ -1198,14 +1186,14 @@ int N_IO_SpiceSeparatedFieldTool::StringToken::packedByteCount() const
 }
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_SpiceSeparatedFieldTool::StringToken::pack
+// Function       : SpiceSeparatedFieldTool::StringToken::pack
 // Purpose        : 
 // Special Notes  : 
 // Scope          : 
 // Creator        : Lon Waters
 // Creation Date  : 07/11/2003
 //----------------------------------------------------------------------------
-void N_IO_SpiceSeparatedFieldTool::StringToken::pack(
+void SpiceSeparatedFieldTool::StringToken::pack(
     char* buf, int bsize, int& pos, N_PDS_Comm* comm) const
 {
   int length;
@@ -1224,8 +1212,7 @@ void N_IO_SpiceSeparatedFieldTool::StringToken::pack(
 #ifdef Xyce_COUNT_PACKED_BYTES
   if (pos != predictedPos)
   {
-    string msg ("Predicted pos does not match actual pos in N_IO_SpiceSeparatedFieldTool::pack");
-    N_ERH_ErrorMgr::report ( N_ERH_ErrorMgr::USR_WARNING, msg );
+    DevelFatal(*this, "SpiceSeparatedFieldTool::StringToken::pack") << "Predicted pos does not match actual pos";
   }
 #endif
 }
@@ -1233,21 +1220,21 @@ void N_IO_SpiceSeparatedFieldTool::StringToken::pack(
 
 
 //----------------------------------------------------------------------------
-// Function       : N_IO_SpiceSeparatedFieldTool::StringToken::unpack
+// Function       : SpiceSeparatedFieldTool::StringToken::unpack
 // Purpose        : 
 // Special Notes  : 
 // Scope          : 
 // Creator        : Lon Waters
 // Creation Date  : 07/11/2003
 //----------------------------------------------------------------------------
-void N_IO_SpiceSeparatedFieldTool::StringToken::unpack(
+void SpiceSeparatedFieldTool::StringToken::unpack(
     char* pB, int bsize, int& pos, N_PDS_Comm* comm)
 {
   int length;
 
   // unpack string_
   comm->unpack( pB, bsize, pos, &length, 1 );
-  string_ = string( (pB+pos), length);
+  string_ = std::string( (pB+pos), length);
   pos += length;
 
   // unpack lineNumber_
@@ -1256,3 +1243,5 @@ void N_IO_SpiceSeparatedFieldTool::StringToken::unpack(
   lineNumber_ = lineNum;
 }
 
+} // namespace IO
+} // namespace Xyce

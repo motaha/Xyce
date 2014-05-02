@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,34 +36,25 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.36.2.3 $
+// Revision Number: $Revision: 1.45 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:35 $
+// Revision Date  : $Date: 2014/02/24 23:49:16 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
-
-// ---------- Standard Includes ----------
 #include <iostream>
 
-#ifdef Xyce_PARALLEL_MPI
-#include <mpi.h>
-#endif
-
-// ----------   Xyce Includes   ----------
 #include <N_DEV_XyceInterface.h>
 #include <N_CIR_Xyce.h>
 #include <N_DEV_DeviceOptions.h>
 #include <N_UTL_BreakPoint.h>
 
-#ifdef Xyce_PARALLEL_MPI
 #include <N_PDS_SerialParComm.h>
 #include <N_PDS_ParComm.h>
 #include <N_PDS_MPIComm.h>
-#endif
 
 #include <N_IO_CmdParse.h>
 
@@ -82,11 +73,10 @@ namespace Device {
 // Creation Date : 04/15/05
 //-----------------------------------------------------------------------------
 XyceInterface::XyceInterface(
-      DeviceOptions & do1,
-      N_IO_CmdParse & cp,
-      string & netlist)
+  const DeviceOptions & do1,
+  const IO::CmdParse &  cp,
+  const std::string &   netlist)
   : devOptions_(do1),
-    commandLine_(cp),
     tmpCmdLine_(cp),
     netlistFileName_(netlist),
     XycePtr_(NULL)
@@ -123,20 +113,14 @@ XyceInterface::~XyceInterface()
 // Creation Date : 03/01/2006
 //-----------------------------------------------------------------------------
 bool XyceInterface::initialize(
-#ifdef Xyce_PARALLEL_MPI
-                                     N_PDS_Comm * comm
-#endif
-                                    )
+  N_PDS_Comm *          comm)
 {
-
-#ifdef Xyce_PARALLEL_MPI
   int procID = comm->procID();
-#endif
 
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0)
   {
-    cout << "In XyceInterface::initialize" << endl;
+    Xyce::dout() << "In XyceInterface::initialize" << std::endl;
   }
 #endif
 
@@ -144,46 +128,39 @@ bool XyceInterface::initialize(
 #ifdef Xyce_PARALLEL_MPI
   if( comm->isSerial() )
   {
-    XycePtr_ = new N_CIR_Xyce( &((dynamic_cast<N_PDS_SerialParComm*>(comm))->parComm()->mpiComm()->comm()) );
+    XycePtr_ = new N_CIR_Xyce( ((dynamic_cast<N_PDS_SerialParComm*>(comm))->parComm()->mpiComm()->comm()) );
   }
   else
   {
-    XycePtr_ = new N_CIR_Xyce( &((dynamic_cast<N_PDS_ParComm*>(comm))->mpiComm()->comm()) );
+    XycePtr_ = new N_CIR_Xyce( ((dynamic_cast<N_PDS_ParComm*>(comm))->mpiComm()->comm()) );
   }
 #else
   XycePtr_ = new N_CIR_Xyce();
 #endif
 
-#ifdef Xyce_PARALLEL_MPI
-  if (!procID)
+  if (procID == 0)
   {
-#endif
     // Reset the netlist name in the local copy of the command line arguments:
-    tmpCmdLine_.setNetlist (netlistFileName_);
-#ifdef Xyce_PARALLEL_MPI
+    tmpCmdLine_.setNetlist(netlistFileName_);
   }
-  else
-  {
-  }
-#endif
 
 #ifdef Xyce_DEBUG__TWOLEVEL
 #ifdef Xyce_PARALLEL_MPI
-  cout << "\nproc: " << procID;
+  Xyce::dout() << "\nproc: " << procID;
 #endif
-  cout << "Command Line Arguments passed to the inner solve:\n";
+  Xyce::dout() << "Command Line Arguments passed to the inner solve:\n";
   for (int i=0;i<tmpCmdLine_.iargs;++i)
   {
 #ifdef Xyce_PARALLEL_MPI
-    cout << " proc: " << procID;
+    Xyce::dout() << " proc: " << procID;
 #endif
-    cout << " cargs["<<i<<"] = " << string(tmpCmdLine_.cargs[i]) << endl;
+    Xyce::dout() << " cargs["<<i<<"] = " << std::string(tmpCmdLine_.cargs[i]) << std::endl;
   }
 #endif
 
-  XycePtr_->initialize (tmpCmdLine_.iargs, tmpCmdLine_.cargs);
+  XycePtr_->initialize(tmpCmdLine_.argc(), tmpCmdLine_.argv());
 
-  XycePtr_->startupSolvers ();
+  XycePtr_->startupSolvers();
 
   return true;
 }
@@ -205,9 +182,9 @@ bool XyceInterface::initialize(
 //-----------------------------------------------------------------------------
 bool XyceInterface::simulateStep
       ( const SolverState & solState,
-        const map<string,double> & inputMap,
-        vector<double> & outputVector,
-        vector< vector<double> > & jacobian,
+        const std::map<std::string,double> & inputMap,
+        std::vector<double> & outputVector,
+        std::vector< std::vector<double> > & jacobian,
         N_TIA_TwoLevelError & tlError
       )
 {
@@ -215,7 +192,7 @@ bool XyceInterface::simulateStep
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0)
   {
-    cout << "In XyceInterface::simulateStep" << endl;
+    Xyce::dout() << "In XyceInterface::simulateStep" << std::endl;
   }
 #endif
 
@@ -241,7 +218,7 @@ bool XyceInterface::finalize ()
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0)
   {
-    cout << "In XyceInterface::finalize" << endl;
+    Xyce::dout() << "In XyceInterface::finalize" << std::endl;
   }
 #endif
 
@@ -262,7 +239,7 @@ bool XyceInterface::run ()
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0)
   {
-    cout << "In XyceInterface::run" << endl;
+    Xyce::dout() << "In XyceInterface::run" << std::endl;
   }
 #endif
 
@@ -282,7 +259,7 @@ bool XyceInterface::run ()
 #ifdef Xyce_DEBUG_DEVICE
   if (devOptions_.debugLevel > 0)
   {
-    cout << "cargs_loc[0] = " << string(cargs_loc[0]) << endl;
+    Xyce::dout() << "cargs_loc[0] = " << std::string(cargs_loc[0]) << std::endl;
   }
 #endif
 
@@ -307,8 +284,8 @@ bool XyceInterface::run ()
 // Creation Date : 03/20/06
 //-----------------------------------------------------------------------------
 void XyceInterface::homotopyStepSuccess
-      (const vector<string> & paramNames,
-       const vector<double> & paramVals)
+      (const std::vector<std::string> & paramNames,
+       const std::vector<double> & paramVals)
 {
   XycePtr_->homotopyStepSuccess (paramNames, paramVals);
   return;
@@ -384,7 +361,7 @@ bool XyceInterface::getInitialQnorm (N_TIA_TwoLevelError & tle)
 // Creation Date : 03/14/06
 //-----------------------------------------------------------------------------
 bool XyceInterface::getBreakPoints
-    (vector<N_UTL_BreakPoint> &breakPointTimes)
+    (std::vector<N_UTL_BreakPoint> &breakPointTimes)
 {
   bool bsuccess = true;
   if (XycePtr_)
@@ -438,7 +415,7 @@ bool XyceInterface::startTimeStep ( const N_TIA_TimeIntInfo & tiInfo )
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 03/18/06
 //-----------------------------------------------------------------------------
-bool XyceInterface::setInternalParam (string & name, double val)
+bool XyceInterface::setInternalParam (std::string & name, double val)
 {
   bool bsuccess = true;
   if (XycePtr_)

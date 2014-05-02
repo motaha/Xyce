@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.354.2.3 $
+// Revision Number: $Revision: 1.381.2.4 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/03/06 23:33:43 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -62,439 +62,434 @@
 #endif
 
 // ----------    Xyce Includes  ----------
+#include <N_DEV_BJT.h>
 #include <N_DEV_Const.h>
-#include <N_DEV_ExternData.h>
-#include <N_DEV_SolverState.h>
 #include <N_DEV_DeviceOptions.h>
+#include <N_DEV_ExternData.h>
 #include <N_DEV_MatrixLoadData.h>
+#include <N_DEV_SolverState.h>
+#include <N_DEV_Message.h>
+#include <N_ERH_ErrorMgr.h>
 
 #include <N_LAS_Matrix.h>
 #include <N_LAS_MultiVector.h>
 #include <N_LAS_Vector.h>
 
-#include <N_DEV_BJT.h>
-
 namespace Xyce {
 namespace Device {
 
-template<>
-ParametricData<BJT::Instance>::ParametricData()
+
+namespace BJT {
+
+
+void Traits::loadInstanceParameters(ParametricData<BJT::Instance> &p)
 {
     // Set up configuration constants:
-    setNumNodes(3);
-    setNumOptionalNodes(4);
-    setNumFillNodes(1);
-
-    setModelRequired(1);
-    addModelType("NPN");
-    addModelType("PNP");
-
-    // Set up double precision variables:
-    addPar ("AREA", 1.0, false, NO_DEP,
+// Set up double precision variables:
+    p.addPar ("AREA", 1.0, false, NO_DEP,
       &BJT::Instance::AREA, NULL,
       U_NONE, CAT_GEOMETRY, "Relative device area");
 
-    addPar ("IC1",  0.0, false, NO_DEP,
+    p.addPar ("IC1",  0.0, false, NO_DEP,
       &BJT::Instance::icVBE,
       &BJT::Instance::IC_GIVEN,
       U_VOLT, CAT_VOLT, "Vector of initial values: Vbe, Vce. Vbe=IC1");
 
-    addPar ("IC2",  0.0, false, NO_DEP,
+    p.addPar ("IC2",  0.0, false, NO_DEP,
       &BJT::Instance::icVCE,
       &BJT::Instance::IC_GIVEN,
       U_VOLT, CAT_VOLT, "Vector of initial values: Vbe, Vce. Vce=IC2");
 
-    addPar ("TEMP", 0.0, false, TIME_DEP,
+    p.addPar ("TEMP", 0.0, false, TIME_DEP,
       &BJT::Instance::TEMP, NULL,
-      STANDARD, CAT_UNKNOWN, "");
+      STANDARD, CAT_UNKNOWN, "Device temperature");
 
     // Set up non-double precision variables:
-    addPar ("OFF", false, false, NO_DEP,
+    p.addPar ("OFF", false, false, NO_DEP,
             &BJT::Instance::OFF, NULL,
             U_LOGIC, CAT_VOLT, "Initial condition of no voltage drops accross device");
 
-    addPar ("LAMBERTW", false, false, NO_DEP,
+    p.addPar ("LAMBERTW", false, false, NO_DEP,
             &BJT::Instance::lambertWFlag, NULL,
             U_LOGIC, CAT_NONE, "Flag for toggling the use of the lambert-W function instead of exponentials.");
 
-    makeVector ("IC", 2);
+    p.makeVector ("IC", 2);
 }
 
-template<>
-ParametricData<BJT::Model>::ParametricData()
+void Traits::loadModelParameters(ParametricData<BJT::Model> &p)
 {
     // Set up double precision variables:
-    addPar ("TNOM", 0.0, false, NO_DEP,
+    p.addPar ("TNOM", 0.0, false, NO_DEP,
 	      &BJT::Model::TNOM, NULL,
        U_DEGC, CAT_UNKNOWN, "Parameter measurement temperature");
 
-    addPar ("IS", 1.e-16, false, LOG_T_DEP,
+    p.addPar ("IS", 1.e-16, false, LOG_T_DEP,
 	      &BJT::Model::satCur, NULL,
        U_AMP, CAT_UNKNOWN, "Transport saturation current");
 
-    addPar ("BF", 100.0, true, NO_DEP,
+    p.addPar ("BF", 100.0, true, NO_DEP,
 	      &BJT::Model::betaF,
 	      &BJT::Model::BFgiven,
        U_NONE, CAT_UNKNOWN, "Ideal maximum foward beta");
 
-    addPar ("BFM", 100.0, true, NO_DEP,  // hspice
+    p.addPar ("BFM", 100.0, true, NO_DEP,  // hspice
 	      &BJT::Model::betaF,
 	      &BJT::Model::BFMgiven,
        U_NONE, CAT_UNKNOWN, "Ideal maximum foward beta");
 
-    addPar ("NF", 1.0, true, NO_DEP,
+    p.addPar ("NF", 1.0, true, NO_DEP,
 	      &BJT::Model::emissionCoeffF, NULL,
        U_NONE, CAT_UNKNOWN, "Foward current emission coefficient");
 
     // forward early voltage has aliases for different spice flavors.
-    addPar ("VA", 0.0, false, NO_DEP,  // Hspice/Pspice
+    p.addPar ("VA", 0.0, false, NO_DEP,  // Hspice/Pspice
 	      &BJT::Model::earlyVoltF,
 	      &BJT::Model::VAgiven,
        U_VOLT, CAT_UNKNOWN, "Foward early voltage");
 
-    addPar ("VBF", 0.0, false, NO_DEP,  // Hspice
+    p.addPar ("VBF", 0.0, false, NO_DEP,  // Hspice
 	      &BJT::Model::earlyVoltF,
 	      &BJT::Model::VBFgiven,
        U_VOLT, CAT_UNKNOWN, "Foward early voltage");
 
-    addPar ("VAF", 0.0, false, NO_DEP,  // spice3
+    p.addPar ("VAF", 0.0, false, NO_DEP,  // spice3
 	      &BJT::Model::earlyVoltF,
 	      &BJT::Model::VAFgiven,
        U_VOLT, CAT_UNKNOWN, "Foward early voltage");
 
-    addPar ("IKF", 0.0, false, NO_DEP,
+    p.addPar ("IKF", 0.0, false, NO_DEP,
 	      &BJT::Model::rollOffF,
 	      &BJT::Model::IKFgiven,
        U_AMP, CAT_UNKNOWN, "Corner for foward-beta high-current roll-off");
 
-    addPar ("IK", 0.0, false, NO_DEP,
+    p.addPar ("IK", 0.0, false, NO_DEP,
 	      &BJT::Model::rollOffF,
 	      &BJT::Model::IKgiven,
        U_AMP, CAT_UNKNOWN, "Corner for foward-beta high-current roll-off");
 
-    addPar ("JBF", 0.0, false, NO_DEP,
+    p.addPar ("JBF", 0.0, false, NO_DEP,
 	      &BJT::Model::rollOffF,
 	      &BJT::Model::JBFgiven,
        U_AMP, CAT_UNKNOWN, "Corner for foward-beta high-current roll-off");
 
     // base-emitter leakage sat current has aliases for different spice flavors.
-    addPar ("ISE", 0.0, false, LOG_T_DEP,
+    p.addPar ("ISE", 0.0, false, LOG_T_DEP,
 	      &BJT::Model::leakBECurrent,
 	      &BJT::Model::leakBECurrentGiven,
        U_AMP, CAT_UNKNOWN, "Base-emitter leakage saturation current");
 
-    addPar ("JLE", 0.0, false, LOG_T_DEP,  // Hspice
+    p.addPar ("JLE", 0.0, false, LOG_T_DEP,  // Hspice
 	      &BJT::Model::leakBECurrent,
 	      &BJT::Model::JLEgiven,
        U_AMP, CAT_UNKNOWN, "Base-emitter leakage saturation current");
 
-    addPar ("NE", 1.5, false, NO_DEP,
+    p.addPar ("NE", 1.5, false, NO_DEP,
 	      &BJT::Model::leakBEEmissionCoeff,
 	      &BJT::Model::NEgiven,
        U_NONE, CAT_UNKNOWN, "Base-emitter leakage emission coefficient");
 
-    addPar ("NLE", 1.5, false, NO_DEP,
+    p.addPar ("NLE", 1.5, false, NO_DEP,
 	      &BJT::Model::leakBEEmissionCoeff,
 	      &BJT::Model::NLEgiven,
        U_NONE, CAT_UNKNOWN, "Base-emitter leakage emission coefficient");
 
     // BR/BRM alias:
-    addPar ("BR", 1.0, false, NO_DEP,
+    p.addPar ("BR", 1.0, false, NO_DEP,
 	      &BJT::Model::betaR,
 	      &BJT::Model::BRgiven,
        U_NONE, CAT_UNKNOWN, "Ideal maximum reverse beta");
 
-    addPar ("BRM", 1.0, false, NO_DEP,
+    p.addPar ("BRM", 1.0, false, NO_DEP,
 	      &BJT::Model::betaR,
 	      &BJT::Model::BRMgiven,
        U_NONE, CAT_UNKNOWN, "Ideal maximum reverse beta");
 
-    addPar ("NR", 1.0, true, NO_DEP,
+    p.addPar ("NR", 1.0, true, NO_DEP,
 	      &BJT::Model::emissionCoeffR, NULL,
        U_NONE, CAT_UNKNOWN, "Reverse current emission coefficient");
 
     // reverse early voltage has several aliases:
     // Interestingly, more aliases than for the forward early voltage.
-    addPar ("VAR", 0.0, false, NO_DEP,  // spice
+    p.addPar ("VAR", 0.0, false, NO_DEP,  // spice
 	      &BJT::Model::earlyVoltR,
 	      &BJT::Model::VARgiven,
        U_VOLT, CAT_UNKNOWN, "Reverse early voltage");
 
-    addPar ("VB", 0.0, false, NO_DEP,  // pspice, hspice
+    p.addPar ("VB", 0.0, false, NO_DEP,  // pspice, hspice
 	      &BJT::Model::earlyVoltR,
 	      &BJT::Model::VBgiven,
        U_VOLT, CAT_UNKNOWN, "Reverse early voltage");
 
-    addPar ("VRB", 0.0, false, NO_DEP,  // hspice
+    p.addPar ("VRB", 0.0, false, NO_DEP,  // hspice
 	      &BJT::Model::earlyVoltR,
 	      &BJT::Model::VRBgiven,
        U_VOLT, CAT_UNKNOWN, "Reverse early voltage");
 
-    addPar ("BV", 0.0, false, NO_DEP,  // hspice
+    p.addPar ("BV", 0.0, false, NO_DEP,  // hspice
 	      &BJT::Model::earlyVoltR,
 	      &BJT::Model::BVgiven,
        U_VOLT, CAT_UNKNOWN, "Reverse early voltage");
 
     // Corner for reverse-beta high-current roll-off has an alias:
-    addPar ("IKR", 0.0, false, NO_DEP,
+    p.addPar ("IKR", 0.0, false, NO_DEP,
 	      &BJT::Model::rollOffR,
 	      &BJT::Model::IKRgiven,
        U_AMP, CAT_UNKNOWN, "Corner for reverse-beta high-current roll-off");
 
-    addPar ("JBR", 0.0, false, NO_DEP,  // hspice
+    p.addPar ("JBR", 0.0, false, NO_DEP,  // hspice
 	      &BJT::Model::rollOffR,
 	      &BJT::Model::JBRgiven,
        U_AMP, CAT_UNKNOWN, "Corner for reverse-beta high-current roll-off");
 
     // Base-collector leakage saturation current has an alias:
-    addPar ("ISC", 0.0, false, NO_DEP,  //spice/pspice
+    p.addPar ("ISC", 0.0, false, NO_DEP,  //spice/pspice
 	      &BJT::Model::leakBCCurrent,
 	      &BJT::Model::leakBCCurrentGiven,
        U_AMP, CAT_UNKNOWN, "Base-collector leakage saturation current");
 
-    addPar ("JLC", 0.0, false, NO_DEP,  // hspice
+    p.addPar ("JLC", 0.0, false, NO_DEP,  // hspice
 	      &BJT::Model::leakBCCurrent,
 	      &BJT::Model::JLCgiven,
        U_AMP, CAT_UNKNOWN, "Base-collector leakage saturation current");
 
-    addPar ("NC", 2.0, false, NO_DEP,
+    p.addPar ("NC", 2.0, false, NO_DEP,
 	      &BJT::Model::leakBCEmissionCoeff, NULL,
        U_NONE, CAT_UNKNOWN, "Base-collector leakage emission coefficient");
 
-    addPar ("RB", 0.0, false, NO_DEP,
+    p.addPar ("RB", 0.0, false, NO_DEP,
 	      &BJT::Model::baseResist, NULL,
        U_OHM, CAT_UNKNOWN, "Zero-bias (maximum) base resistance");
 
     // IRB (Current at which RB falls off by half)") has an alias:
-    addPar ("IRB", 0.0, false, NO_DEP,  //spice/pspice
+    p.addPar ("IRB", 0.0, false, NO_DEP,  //spice/pspice
 	      &BJT::Model::baseCurrHalfResist,
 	      &BJT::Model::IRBgiven,
        U_AMP, CAT_UNKNOWN, "Current at which RB falls off by half");
 
-    addPar ("JRB", 0.0, false, NO_DEP,  // hspice
+    p.addPar ("JRB", 0.0, false, NO_DEP,  // hspice
 	      &BJT::Model::baseCurrHalfResist,
 	      &BJT::Model::JRBgiven,
        U_AMP, CAT_UNKNOWN, "Current at which RB falls off by half");
 
-    addPar ("IOB", 0.0, false, NO_DEP,  // hspice
+    p.addPar ("IOB", 0.0, false, NO_DEP,  // hspice
 	      &BJT::Model::baseCurrHalfResist,
 	      &BJT::Model::IOBgiven,
        U_AMP, CAT_UNKNOWN, "Current at which RB falls off by half");
 
-    addPar ("RBM", 0.0, false, NO_DEP,
+    p.addPar ("RBM", 0.0, false, NO_DEP,
 	      &BJT::Model::minBaseResist,
 	      &BJT::Model::minBaseResistGiven,
        U_OHM, CAT_UNKNOWN, "Maximum base resistance");
 
-    addPar ("RE", 0.0, false, MIN_RES,
+    p.addPar ("RE", 0.0, false, MIN_RES,
 	      &BJT::Model::emitterResist, NULL,
        U_OHM, CAT_UNKNOWN, "Emitter ohmic resistance");
 
-    addPar ("RC", 0.0, false, MIN_RES,
+    p.addPar ("RC", 0.0, false, MIN_RES,
 	      &BJT::Model::collectorResist, NULL,
        U_OHM, CAT_UNKNOWN, "Collector ohmic resistance");
 
-    addPar ("CJE", 0.0, false, MIN_CAP,
+    p.addPar ("CJE", 0.0, false, MIN_CAP,
 	      &BJT::Model::depCapBE, NULL,
        U_FARAD, CAT_UNKNOWN, "Base-emitter zero-bias p-n capacitance");
 
     // alias for VJE:
-    addPar ("VJE", 0.75, false, NO_DEP,  //spice
+    p.addPar ("VJE", 0.75, false, NO_DEP,  //spice
 	      &BJT::Model::potBE,
 	      &BJT::Model::VJEgiven,
        U_VOLT, CAT_UNKNOWN, "Base-emitter built-in potential");
 
-    addPar ("PE", 0.75, false, NO_DEP,  //pspice/hspice
+    p.addPar ("PE", 0.75, false, NO_DEP,  //pspice/hspice
 	      &BJT::Model::potBE,
 	      &BJT::Model::PEgiven,
        U_VOLT, CAT_UNKNOWN, "Base-emitter built-in potential");
 
     // alias for MJE:
-    addPar ("MJE", 0.33, false, NO_DEP,  //spice
+    p.addPar ("MJE", 0.33, false, NO_DEP,  //spice
 	      &BJT::Model::juncExpBE,
 	      &BJT::Model::MJEgiven,
        U_NONE, CAT_UNKNOWN, "Base-emitter p-n grading factor");
 
-    addPar ("ME", 0.33, false, NO_DEP,  //pspice/hspice
+    p.addPar ("ME", 0.33, false, NO_DEP,  //pspice/hspice
 	      &BJT::Model::juncExpBE,
 	      &BJT::Model::MEgiven,
        U_NONE, CAT_UNKNOWN, "Base-emitter p-n grading factor");
 
-    addPar ("TF", 0.0, false, NO_DEP,
+    p.addPar ("TF", 0.0, false, NO_DEP,
 	      &BJT::Model::transTimeF, NULL,
        U_SECOND, CAT_UNKNOWN, "Ideal foward transit time");
 
-    addPar ("XTF", 0.0, false, NO_DEP,
+    p.addPar ("XTF", 0.0, false, NO_DEP,
 	      &BJT::Model::transTimeBiasCoeffF, NULL,
        U_NONE, CAT_UNKNOWN, "Transit time bias dependence coefficient");
 
-    addPar ("VTF", 0.0, false, NO_DEP,
+    p.addPar ("VTF", 0.0, false, NO_DEP,
 	      &BJT::Model::transTimeFVBC, NULL,
        U_VOLT, CAT_UNKNOWN, "Transit time dependancy on Vbc");
 
     // alias for ITF:
-    addPar ("ITF", 0.0, false, NO_DEP,  // spice
+    p.addPar ("ITF", 0.0, false, NO_DEP,  // spice
 	      &BJT::Model::transTimeHighCurrF,
 	      &BJT::Model::ITFgiven,
        U_UNKNOWN, CAT_UNKNOWN, "Transit time dependancy on IC");
 
-    addPar ("JTF", 0.0, false, NO_DEP,  // hspice
+    p.addPar ("JTF", 0.0, false, NO_DEP,  // hspice
 	      &BJT::Model::transTimeHighCurrF,
 	      &BJT::Model::JTFgiven,
        U_UNKNOWN, CAT_UNKNOWN, "Transit time dependancy on IC");
 
-    addPar ("PTF", 0.0, false, NO_DEP,
+    p.addPar ("PTF", 0.0, false, NO_DEP,
 	      &BJT::Model::excessPhase, NULL,
        U_DEGREE, CAT_UNKNOWN, "Excess Phase at 1/(2pi*TF) Hz");
 
-    addPar ("CJC", 0.0, false, MIN_CAP,
+    p.addPar ("CJC", 0.0, false, MIN_CAP,
 	      &BJT::Model::depCapBC, NULL,
        U_FARAD, CAT_UNKNOWN, "Base-collector zero-bias p-n capacitance");
 
     // alias for VJC:
-    addPar ("VJC", 0.75, false, NO_DEP,  // spice
+    p.addPar ("VJC", 0.75, false, NO_DEP,  // spice
 	      &BJT::Model::potBC,
 	      &BJT::Model::VJCgiven,
        U_VOLT, CAT_UNKNOWN, "Base-collector built-in potential");
 
-    addPar ("PC", 0.75, false, NO_DEP,  // pspice, hspice
+    p.addPar ("PC", 0.75, false, NO_DEP,  // pspice, hspice
 	      &BJT::Model::potBC,
 	      &BJT::Model::PCgiven,
        U_VOLT, CAT_UNKNOWN, "Base-collector built-in potential");
 
     // alias for MJC:
-    addPar ("MJC", 0.33, false, NO_DEP, // spice
+    p.addPar ("MJC", 0.33, false, NO_DEP, // spice
 	      &BJT::Model::juncExpBC,
 	      &BJT::Model::MJCgiven,
        U_NONE, CAT_UNKNOWN, "Base-collector p-n grading factor");
 
-    addPar ("MC", 0.33, false, NO_DEP, //pspice/hspice
+    p.addPar ("MC", 0.33, false, NO_DEP, //pspice/hspice
 	      &BJT::Model::juncExpBC,
 	      &BJT::Model::MCgiven,
        U_NONE, CAT_UNKNOWN, "Base-collector p-n grading factor");
 
     // alias for XCJC:
-    addPar ("XCJC", 1.0, false, NO_DEP,
+    p.addPar ("XCJC", 1.0, false, NO_DEP,
 	      &BJT::Model::baseFracBCCap,
 	      &BJT::Model::XCJCgiven,
        U_NONE, CAT_UNKNOWN, "Fraction of CJC connected internally to RB");
-    addPar ("CDIS", 1.0, false, NO_DEP,
+    p.addPar ("CDIS", 1.0, false, NO_DEP,
 	      &BJT::Model::baseFracBCCap,
 	      &BJT::Model::CDISgiven,
        U_NONE, CAT_UNKNOWN, "Fraction of CJC connected internally to RB");
 
-    addPar ("TR", 0.0, false, NO_DEP,
+    p.addPar ("TR", 0.0, false, NO_DEP,
 	      &BJT::Model::transTimeR, NULL,
        U_SECOND, CAT_UNKNOWN, "Ideal reverse transit time");
 
     // substrate zero bias capacitance has several aliases for different spice flavors.
-    addPar ("CJS", 0.0, false, NO_DEP,  // spice
+    p.addPar ("CJS", 0.0, false, NO_DEP,  // spice
 	      &BJT::Model::CJS,
 	      &BJT::Model::CJSgiven,
        U_FARAD, CAT_UNKNOWN, "Substrate zero-bias p-n capacitance");
 
-    addPar ("CCS", 0.0, false, NO_DEP,  // Pspice/Hspice
+    p.addPar ("CCS", 0.0, false, NO_DEP,  // Pspice/Hspice
 	      &BJT::Model::CJS,
 	      &BJT::Model::CCSgiven,
        U_FARAD, CAT_UNKNOWN, "Substrate zero-bias p-n capacitance");
 
-    addPar ("CSUB", 0.0, false, NO_DEP,  // Hspice
+    p.addPar ("CSUB", 0.0, false, NO_DEP,  // Hspice
 	      &BJT::Model::CJS,
 	      &BJT::Model::CSUBgiven,
        U_FARAD, CAT_UNKNOWN, "Substrate zero-bias p-n capacitance");
 
     // aliases for VJS:
-    addPar ("VJS", 0.75, false, NO_DEP,  // spice
+    p.addPar ("VJS", 0.75, false, NO_DEP,  // spice
 	      &BJT::Model::potSubst,
 	      &BJT::Model::VJSgiven,
        U_VOLT, CAT_UNKNOWN, "Substrate built-in potential");
 
-    addPar ("PS", 0.75, false, NO_DEP,  // pspice
+    p.addPar ("PS", 0.75, false, NO_DEP,  // pspice
 	      &BJT::Model::potSubst,
 	      &BJT::Model::PSgiven,
        U_VOLT, CAT_UNKNOWN, "Substrate built-in potential");
 
-    addPar ("PSUB", 0.75, false, NO_DEP,  // hspice
+    p.addPar ("PSUB", 0.75, false, NO_DEP,  // hspice
 	      &BJT::Model::potSubst,
 	      &BJT::Model::PSUBgiven,
        U_VOLT, CAT_UNKNOWN, "Substrate built-in potential");
 
     // aliases for MJS:
-    addPar ("MJS", 0.0, false, NO_DEP,
+    p.addPar ("MJS", 0.0, false, NO_DEP,
 	      &BJT::Model::expSubst,
 	      &BJT::Model::MJSgiven,
        U_NONE, CAT_UNKNOWN, "Substrate p-n grading factor");
 
-    addPar ("MS", 0.0, false, NO_DEP,
+    p.addPar ("MS", 0.0, false, NO_DEP,
 	      &BJT::Model::expSubst,
 	      &BJT::Model::MSgiven,
        U_NONE, CAT_UNKNOWN, "Substrate p-n grading factor");
 
-    addPar ("ESUB", 0.0, false, NO_DEP,
+    p.addPar ("ESUB", 0.0, false, NO_DEP,
 	      &BJT::Model::expSubst,
 	      &BJT::Model::ESUBgiven,
        U_NONE, CAT_UNKNOWN, "Substrate p-n grading factor");
 
     // alias for XTB:
-    addPar ("XTB", 0.0, false, NO_DEP,  //spice/pspice
+    p.addPar ("XTB", 0.0, false, NO_DEP,  //spice/pspice
 	      &BJT::Model::betaExp,
 	      &BJT::Model::XTBgiven,
        U_NONE, CAT_UNKNOWN, "Foward and reverse beta temperature coefficient");
 
-    addPar ("TB", 0.0, false, NO_DEP,  // hspice
+    p.addPar ("TB", 0.0, false, NO_DEP,  // hspice
 	      &BJT::Model::betaExp,
 	      &BJT::Model::TBgiven,
        U_NONE, CAT_UNKNOWN, "Foward and reverse beta temperature coefficient");
 
-    addPar ("TCB", 0.0, false, NO_DEP,  // hspice
+    p.addPar ("TCB", 0.0, false, NO_DEP,  // hspice
 	      &BJT::Model::betaExp,
 	      &BJT::Model::TCBgiven,
        U_NONE, CAT_UNKNOWN, "Foward and reverse beta temperature coefficient");
 
-    addPar ("EG", 1.11, false, NO_DEP,
+    p.addPar ("EG", 1.11, false, NO_DEP,
 	      &BJT::Model::energyGap, NULL,
        U_EV, CAT_UNKNOWN, "Bandgap voltage (barrier highth)");
 
     // alias for XTI:
-    addPar ("XTI", 3.0, false, NO_DEP,  // spice/hspice
+    p.addPar ("XTI", 3.0, false, NO_DEP,  // spice/hspice
 	      &BJT::Model::tempExpIS,
 	      &BJT::Model::XTIgiven,
        U_UNKNOWN, CAT_UNKNOWN, "Temperature exponent for IS. (synonymous with PT)");
 
-    addPar ("PT", 3.0, false, NO_DEP,  // pspice
+    p.addPar ("PT", 3.0, false, NO_DEP,  // pspice
 	      &BJT::Model::tempExpIS,
 	      &BJT::Model::PTgiven,
        U_UNKNOWN, CAT_UNKNOWN, "Temperature exponent for IS. (synonymous with XTI)");
 
-    addPar ("KF", 0.0, false, NO_DEP,
+    p.addPar ("KF", 0.0, false, NO_DEP,
 	      &BJT::Model::fNCoeff, NULL,
        U_NONE, CAT_UNKNOWN, "Flicker noise coefficient");
 
-    addPar ("AF", 1.0, false, NO_DEP,
+    p.addPar ("AF", 1.0, false, NO_DEP,
 	      &BJT::Model::fNExp, NULL,
        U_UNKNOWN, CAT_UNKNOWN, "Flicker noise exponent");
 
-    addPar ("FC", 0.5, false, NO_DEP,
+    p.addPar ("FC", 0.5, false, NO_DEP,
 	      &BJT::Model::depCapCoeff, NULL,
        U_NONE, CAT_UNKNOWN, "Foward-bias depletion capacitor coefficient");
 
-    addPar ("C2", 0.0, false, NO_DEP,
+    p.addPar ("C2", 0.0, false, NO_DEP,
 	      &BJT::Model::c2,
 	      &BJT::Model::c2Given,
        U_UNKNOWN, CAT_UNKNOWN, "Coefficient for base-emitter leak current.");
 
-    addPar ("C4", 0.0, false, NO_DEP,
+    p.addPar ("C4", 0.0, false, NO_DEP,
 	      &BJT::Model::c4,
 	      &BJT::Model::c4Given,
        U_UNKNOWN, CAT_UNKNOWN, "Coefficient for base-collector leak current.");
 
     // alias for NK/NKF:
-    addPar ("NK", 0.5, false, NO_DEP,
+    p.addPar ("NK", 0.5, false, NO_DEP,
 	      &BJT::Model::rollOffExp,
 	      &BJT::Model::NKgiven,
        U_NONE, CAT_UNKNOWN, "High current rolloff coefficient");
 
-    addPar ("NKF", 0.5, false, NO_DEP,
+    p.addPar ("NKF", 0.5, false, NO_DEP,
 	      &BJT::Model::rollOffExp,
 	      &BJT::Model::NKFgiven,
        U_NONE, CAT_UNKNOWN, "High current rolloff coefficient");
@@ -502,49 +497,37 @@ ParametricData<BJT::Model>::ParametricData()
     // Set up non-double precision variables:
 
     // Thermal model setup:
-    DeviceModel::initThermalModel(*this);
+    DeviceModel::initThermalModel(p);
 }
 
-namespace BJT {
 
-vector< vector<int> > Instance::jacStamp_RB_RC_RE_;
-vector< vector<int> > Instance::jacStamp_RB_RC_;
-vector< vector<int> > Instance::jacStamp_RB_RE_;
-vector< vector<int> > Instance::jacStamp_RC_RE_;
-vector< vector<int> > Instance::jacStamp_RB_;
-vector< vector<int> > Instance::jacStamp_RC_;
-vector< vector<int> > Instance::jacStamp_RE_;
-vector< vector<int> > Instance::jacStamp_;
 
-vector<int> Instance::jacMap_RB_RC_RE_;
-vector<int> Instance::jacMap_RB_RC_;
-vector<int> Instance::jacMap_RB_RE_;
-vector<int> Instance::jacMap_RC_RE_;
-vector<int> Instance::jacMap_RB_;
-vector<int> Instance::jacMap_RC_;
-vector<int> Instance::jacMap_RE_;
-vector<int> Instance::jacMap_;
+std::vector< std::vector<int> > Instance::jacStamp_RB_RC_RE_;
+std::vector< std::vector<int> > Instance::jacStamp_RB_RC_;
+std::vector< std::vector<int> > Instance::jacStamp_RB_RE_;
+std::vector< std::vector<int> > Instance::jacStamp_RC_RE_;
+std::vector< std::vector<int> > Instance::jacStamp_RB_;
+std::vector< std::vector<int> > Instance::jacStamp_RC_;
+std::vector< std::vector<int> > Instance::jacStamp_RE_;
+std::vector< std::vector<int> > Instance::jacStamp_;
 
-vector< vector<int> > Instance::jacMap2_RB_RC_RE_;
-vector< vector<int> > Instance::jacMap2_RB_RC_;
-vector< vector<int> > Instance::jacMap2_RB_RE_;
-vector< vector<int> > Instance::jacMap2_RC_RE_;
-vector< vector<int> > Instance::jacMap2_RB_;
-vector< vector<int> > Instance::jacMap2_RC_;
-vector< vector<int> > Instance::jacMap2_RE_;
-vector< vector<int> > Instance::jacMap2_;
+std::vector<int> Instance::jacMap_RB_RC_RE_;
+std::vector<int> Instance::jacMap_RB_RC_;
+std::vector<int> Instance::jacMap_RB_RE_;
+std::vector<int> Instance::jacMap_RC_RE_;
+std::vector<int> Instance::jacMap_RB_;
+std::vector<int> Instance::jacMap_RC_;
+std::vector<int> Instance::jacMap_RE_;
+std::vector<int> Instance::jacMap_;
 
-ParametricData<Instance> &Instance::getParametricData() {
-  static ParametricData<Instance> parMap;
-
-  return parMap;
-}
-
-ParametricData<Model> &Model::getParametricData() {
-  static ParametricData<Model> parMap;
-
-  return parMap;
-}
+std::vector< std::vector<int> > Instance::jacMap2_RB_RC_RE_;
+std::vector< std::vector<int> > Instance::jacMap2_RB_RC_;
+std::vector< std::vector<int> > Instance::jacMap2_RB_RE_;
+std::vector< std::vector<int> > Instance::jacMap2_RC_RE_;
+std::vector< std::vector<int> > Instance::jacMap2_RB_;
+std::vector< std::vector<int> > Instance::jacMap2_RC_;
+std::vector< std::vector<int> > Instance::jacMap2_RE_;
+std::vector< std::vector<int> > Instance::jacMap2_;
 
 //-----------------------------------------------------------------------------
 // Function      : Instance::processParams
@@ -554,7 +537,7 @@ ParametricData<Model> &Model::getParametricData() {
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Instance::processParams (string param)
+bool Instance::processParams ()
 {
   updateTemperature(TEMP);
   return true;
@@ -569,14 +552,12 @@ bool Instance::processParams (string param)
 // Creation Date : 11/30/00
 //----------------------------------------------------------------------------
 
-Instance::Instance(InstanceBlock & IB,
-                   Model &model,
-                   MatrixLoadData & mlData1,
-                   SolverState &ss1,
-                   ExternData  &ed1,
-                   DeviceOptions & do1)
-
-  : DeviceInstance(IB,mlData1, ss1, ed1, do1),
+Instance::Instance(
+  const Configuration & configuration,
+  const InstanceBlock &         IB,
+  Model &                       model,
+  const FactoryBlock &          factory_block)
+  : DeviceInstance(IB, configuration.getInstanceParameters(), factory_block),
     model_(model),
     AREA(1.0),
     icVBE(0.0),
@@ -863,7 +844,7 @@ Instance::Instance(InstanceBlock & IB,
   numStateVars = 7;
   setNumStoreVars(3);
   numLeadCurrentStoreVars = 4; // lead current dev_ib, dev_ie, dev_ic and dev_is
-  
+
   devConMap.resize(4);
   devConMap[0] = 1;
   devConMap[1] = 1;
@@ -924,7 +905,7 @@ Instance::Instance(InstanceBlock & IB,
     jacStamp_RB_RC_RE_[6][2] = 5;     // E'-B'
     jacStamp_RB_RC_RE_[6][3] = 6;     // E'-E'
 
-    if (devOptions.newExcessPhase)
+    if (getDeviceOptions().newExcessPhase)
     {
       //Excess Phase Terms
       jacStamp_RB_RC_RE_.resize(9);
@@ -953,7 +934,7 @@ Instance::Instance(InstanceBlock & IB,
     jacMap_RB_RC_RE_.clear();
 
     int StampSize = 0;
-    if (devOptions.newExcessPhase)
+    if (getDeviceOptions().newExcessPhase)
     {
       StampSize = 9;
     }
@@ -992,7 +973,7 @@ Instance::Instance(InstanceBlock & IB,
 
   // Set any non-constant parameter defaults:
   if (!given("TEMP"))
-    TEMP = devOptions.temp.dVal();
+    TEMP = getDeviceOptions().temp.getImmutableValue<double>();
 
   // Calculate any parameters specified as expressions:
   updateDependentParameters();
@@ -1039,7 +1020,7 @@ Instance::Instance(InstanceBlock & IB,
   {
     if (numExtVars != 4 + numExist)
     {
-      string msg = ":";
+      std::string msg = ":";
       msg += "  name = " + getName();
       msg += " wrong number of external nodes are set!";
       msg += "  Either set none of them, or set them all.";
@@ -1051,7 +1032,7 @@ Instance::Instance(InstanceBlock & IB,
   }
 
 
-  if (devOptions.newExcessPhase)
+  if (getDeviceOptions().newExcessPhase)
   {
     //add in 2 variables for excess phase calc.
     numIntVars += 2;
@@ -1080,59 +1061,38 @@ Instance::~Instance()
 // Creator       : Robert Hoekstra
 // Creation Date : 6/13/02
 //-----------------------------------------------------------------------------
-void Instance::registerLIDs( const vector<int> & intLIDVecRef,
-                                      const vector<int> & extLIDVecRef )
+void Instance::registerLIDs( const std::vector<int> & intLIDVecRef,
+                                      const std::vector<int> & extLIDVecRef )
 {
-  string msg;
-
-  // Check if the size of the ID lists corresponds to the proper number of
-  // internal and external variables
-  int numInt = intLIDVecRef.size();
-  int numExt = extLIDVecRef.size();
+  AssertLIDs(intLIDVecRef.size() == numIntVars);
+  AssertLIDs(extLIDVecRef.size() == numExtVars);
 
 #ifdef Xyce_DEBUG_DEVICE
-  const string dashedline =
-  "----------------------------------------------------------------------------";
-
-  if (devOptions.debugLevel > 0)
+  if (getDeviceOptions().debugLevel > 0)
   {
-    cout << dashedline << endl;
-    cout << "  BJTInstance::registerLIDs" <<endl;
-    cout << "  name = " << getName() << endl;
-    cout << "  number of internal variables: " << numInt << endl;
-    cout << "  number of external variables: " << numExt << endl;
-    cout << "  numIntVars = " << numIntVars << endl;
-    cout << "  numExtVars = " << numExtVars << endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "  BJTInstance::registerLIDs" <<std::endl;
+    Xyce::dout() << "  name = " << getName() << std::endl;
+    Xyce::dout() << "  number of internal variables: " << numIntVars << std::endl;
+    Xyce::dout() << "  number of external variables: " << numExtVars << std::endl;
+    Xyce::dout() << "  numIntVars = " << numIntVars << std::endl;
+    Xyce::dout() << "  numExtVars = " << numExtVars << std::endl;
   }
 #endif
-
-  if (numInt != numIntVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numInt != numIntVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
-
-  if (numExt != numExtVars)
-  {
-    msg = "Instance::registerLIDs:";
-    msg += "numExt != numExtVars";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
 
   // Copy over the global ID lists.
   intLIDVec = intLIDVecRef;
   extLIDVec = extLIDVecRef;
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel > 0)
+  if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "  Internal LID List" << endl;
+    Xyce::dout() << "  Internal LID List" << std::endl;
     for( int i = 0; i < intLIDVec.size(); ++i )
-      cout << "  " << intLIDVec[i] << endl;
-    cout << "  External LID List" << endl;
+      Xyce::dout() << "  " << intLIDVec[i] << std::endl;
+    Xyce::dout() << "  External LID List" << std::endl;
     for( int i = 0; i < extLIDVec.size(); ++i )
-      cout << "  " << extLIDVec[i] << endl;
+      Xyce::dout() << "  " << extLIDVec[i] << std::endl;
   }
 #endif
 
@@ -1189,30 +1149,30 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
   }
 
 
-  if (devOptions.newExcessPhase)
+  if (getDeviceOptions().newExcessPhase)
   {
     li_Ifx = intLIDVec[intIndex++];
     li_dIfx = intLIDVec[intIndex++];
   }
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel > 0)
+  if (getDeviceOptions().debugLevel > 0)
   {
-    cout << "  li_Coll  = " << li_Coll << endl;
-    cout << "  li_CollP = " << li_CollP << endl;
-    cout << "  li_Base  = " << li_Base << endl;
-    cout << "  li_BaseP = " << li_BaseP << endl;
-    cout << "  li_Emit  = " << li_Emit << endl;
-    cout << "  li_EmitP = " << li_EmitP << endl;
-    cout << "  li_Subst = " << li_Subst << endl;
+    Xyce::dout() << "  li_Coll  = " << li_Coll << std::endl;
+    Xyce::dout() << "  li_CollP = " << li_CollP << std::endl;
+    Xyce::dout() << "  li_Base  = " << li_Base << std::endl;
+    Xyce::dout() << "  li_BaseP = " << li_BaseP << std::endl;
+    Xyce::dout() << "  li_Emit  = " << li_Emit << std::endl;
+    Xyce::dout() << "  li_EmitP = " << li_EmitP << std::endl;
+    Xyce::dout() << "  li_Subst = " << li_Subst << std::endl;
 
-    if (devOptions.newExcessPhase)
+    if (getDeviceOptions().newExcessPhase)
     {
-      cout << "  li_Ifx   = " << li_Ifx   << endl;
-      cout << "  li_dIfx  = " << li_dIfx  << endl;
+      Xyce::dout() << "  li_Ifx   = " << li_Ifx   << std::endl;
+      Xyce::dout() << "  li_dIfx  = " << li_dIfx  << std::endl;
     }
 
-    cout << dashedline << endl;
+    Xyce::dout() << section_divider << std::endl;
   }
 #endif
 
@@ -1226,10 +1186,10 @@ void Instance::registerLIDs( const vector<int> & intLIDVecRef,
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 05/13/05
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getIntNameMap ()
+std::map<int,std::string> & Instance::getIntNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
-  string tmpstr;
+  std::string tmpstr;
   if (intNameMap.empty () && !externalNodeMode)
   {
     // Setup the internal node name map:
@@ -1255,7 +1215,7 @@ map<int,string> & Instance::getIntNameMap ()
     }
   }
 
-  if (devOptions.newExcessPhase)
+  if (getDeviceOptions().newExcessPhase)
   {
     tmpstr = getName()+"_ExcessPhase_Ifx";
     spiceInternalName (tmpstr);
@@ -1278,16 +1238,16 @@ map<int,string> & Instance::getIntNameMap ()
 // Creator       : Richard Schiek, SNL, Electrical Systems Modeling
 // Creation Date : 01/23/13
 //-----------------------------------------------------------------------------
-map<int,string> & Instance::getStoreNameMap ()
+std::map<int,std::string> & Instance::getStoreNameMap ()
 {
   // set up the internal name map, if it hasn't been already.
   if (storeNameMap.empty ())
   {
     // change subcircuitname:devicetype_deviceName to
     // devicetype:subcircuitName:deviceName
-    string modName(getName());
+    std::string modName(getName());
     spiceInternalName(modName);
-    string tmpstr;
+    std::string tmpstr;
 
     tmpstr = modName+":VBE";
     storeNameMap[ li_storevBE ] = tmpstr;
@@ -1319,20 +1279,9 @@ map<int,string> & Instance::getStoreNameMap ()
 // Creator       : Robert Hoekstra
 // Creation Date : 6/13/02
 //-----------------------------------------------------------------------------
-void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
+void Instance::registerStateLIDs( const std::vector<int> & staLIDVecRef )
 {
-  string msg;
-
-  // Check if the size of the ID list corresponds to the proper number of state
-  // variables.
-  int numSta = staLIDVecRef.size();
-
-  if (numSta != numStateVars)
-  {
-    msg = "Instance::registerStateLIDs:";
-    msg += "numSta != numStateVars";
-    N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
+  AssertLIDs(staLIDVecRef.size() == numStateVars);
 
   // Copy over the global ID lists:
   staLIDVec = staLIDVecRef;
@@ -1356,18 +1305,9 @@ void Instance::registerStateLIDs( const vector<int> & staLIDVecRef )
 // Creator       : Eric Keiter, SNL
 // Creation Date : 12/09/11
 //-----------------------------------------------------------------------------
-void Instance::registerStoreLIDs( const vector<int> & stoLIDVecRef )
+void Instance::registerStoreLIDs( const std::vector<int> & stoLIDVecRef )
 {
-  // Check if the size of the ID list corresponds to the proper number
-  // of state variables.
-  int numSto = stoLIDVecRef.size();
-
-  if (numSto != getNumStoreVars())
-  {
-    string msg = "Instance::registerStoreLIDs:";
-    msg += "numSto != numStoreVars";
-    N_ERH_ErrorMgr::report (N_ERH_ErrorMgr::DEV_FATAL, msg);
-  }
+  AssertLIDs(stoLIDVecRef.size() == getNumStoreVars());
 
   // Copy over the global ID lists:
   stoLIDVec = stoLIDVecRef;
@@ -1394,7 +1334,7 @@ void Instance::registerStoreLIDs( const vector<int> & stoLIDVecRef )
 // Creator       : Robert Hoekstra
 // Creation Date : 8/21/02
 //-----------------------------------------------------------------------------
-const vector< vector<int> > & Instance::jacobianStamp() const
+const std::vector< std::vector<int> > & Instance::jacobianStamp() const
 {
   if (model_.baseResist)
   {
@@ -1440,12 +1380,12 @@ const vector< vector<int> > & Instance::jacobianStamp() const
 // Creator       : Robert Hoekstra
 // Creation Date : 8/27/02
 //-----------------------------------------------------------------------------
-void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
+void Instance::registerJacLIDs( const std::vector< std::vector<int> > & jacLIDVec )
 {
   DeviceInstance::registerJacLIDs( jacLIDVec );
 
-  vector<int> map;
-  vector< vector<int> > map2;
+  std::vector<int> map;
+  std::vector< std::vector<int> > map2;
 
   if (model_.baseResist)
   {
@@ -1537,7 +1477,7 @@ void Instance::registerJacLIDs( const vector< vector<int> > & jacLIDVec )
   AEmitPEquBasePNodeOffset  = jacLIDVec[map[6]][map2[6][2]];
   AEmitPEquEmitPNodeOffset  = jacLIDVec[map[6]][map2[6][3]];
 
-  if (devOptions.newExcessPhase)
+  if (getDeviceOptions().newExcessPhase)
   {
     //Excess Phase Terms
     ACollPEquIfxNodeOffset    = jacLIDVec[map[4]][map2[4][6]];
@@ -1638,7 +1578,7 @@ void Instance::setupPointers()
   q_EmitPEquBasePNodePtr =   &(dQdx[li_EmitP][AEmitPEquBasePNodeOffset  ]);
   q_EmitPEquEmitPNodePtr =   &(dQdx[li_EmitP][AEmitPEquEmitPNodeOffset  ]);
 
-  if (devOptions.newExcessPhase)
+  if (getDeviceOptions().newExcessPhase)
   {
     //F-matrix excess phase Terms
     f_CollPEquIfxNodePtr =       &(dFdx[li_CollP][ACollPEquIfxNodeOffset    ]);
@@ -1691,10 +1631,10 @@ bool Instance::updateTemperature( const double & temp )
 {
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel > 0 && solState.debugTimeFlag)
+  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << "Start BJTInst::updateTemperature" << endl;
-    cout << "temp = "<<temp << endl;
+    Xyce::dout() << "Start BJTInst::updateTemperature" << std::endl;
+    Xyce::dout() << "temp = "<<temp << std::endl;
   }
 #endif
   if( temp != -999.0 ) TEMP = temp;
@@ -1727,16 +1667,16 @@ bool Instance::updateTemperature( const double & temp )
 
   // Temp. adj. saturation current
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel > 0 && solState.debugTimeFlag)
+  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << " Factor is " << factor << endl;
-    cout << " Bfactor is " << bfactor << endl;
-    cout << " factlog is " << factlog << endl;
-    cout << " ratio1 is " << ratio1 << endl;
-    cout << "  TEMP is " << TEMP << endl;
-    cout << "  TNOM is " << model_.TNOM << endl;
-    cout << "   Energy gap is " << model_.energyGap << endl;
-    cout << "   tempExpIS is " << model_.tempExpIS << endl;
+    Xyce::dout() << " Factor is " << factor << std::endl;
+    Xyce::dout() << " Bfactor is " << bfactor << std::endl;
+    Xyce::dout() << " factlog is " << factlog << std::endl;
+    Xyce::dout() << " ratio1 is " << ratio1 << std::endl;
+    Xyce::dout() << "  TEMP is " << TEMP << std::endl;
+    Xyce::dout() << "  TNOM is " << model_.TNOM << std::endl;
+    Xyce::dout() << "   Energy gap is " << model_.energyGap << std::endl;
+    Xyce::dout() << "   tempExpIS is " << model_.tempExpIS << std::endl;
   }
 #endif
 
@@ -1819,46 +1759,42 @@ bool Instance::updateTemperature( const double & temp )
     tInvEarlyVoltR = 0;
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel > 0 && solState.debugTimeFlag)
+  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    const string dashedline =
-    "----------------------------------------------------------------------------";
 
-    cout << dashedline << endl;
-    cout << "In BJTInst::updateTemperature" << endl;
-    cout << dashedline << endl;
-    cout << "TEMP       = " << TEMP << endl;
-    cout << "TNOM       = " << TNOM << endl;
-    cout << "vt         = " << vt << endl;
-    cout << "tSatCur    = " << tSatCur << endl;
-    cout << "tBetaF     = " << tBetaF << endl;
-    cout << "tBetaR     = " << tBetaR << endl;
-    cout << "tBELeakCur = " << tBELeakCur << endl;
-    cout << "tBCLeakCur = " << tBELeakCur << endl;
-    cout << "tBEPot     = " << tBEPot << endl;
-    cout << "tBECap     = " << tBECap << endl;
-    cout << "tBCPot     = " << tBCPot << endl;
-    cout << "tBCCap     = " << tBCCap << endl;
-    cout << "tDepCap    = " << tDepCap << endl;
-    cout << "tF1        = " << tF1 << endl;
-    cout << "tF4        = " << tF4 << endl;
-    cout << "tF5        = " << tF5 << endl;
-    cout << "tleakBEEmissionCoeff = " << tleakBEEmissionCoeff << endl;
-    cout << "tleakBCEmissionCoeff = " << tleakBCEmissionCoeff << endl;
-    cout << "tRollOffExp      = " << tRollOffExp << endl;
-    cout << "tInvRollOffF     = " << tInvRollOffF << endl;
-    cout << "tInvRollOffR     = " << tInvRollOffR << endl;
-    cout << "tInvEarlyVoltF   = " << tInvEarlyVoltF << endl;
-    cout << "tInvEarlyVoltR   = " << tInvEarlyVoltR << endl;
-    cout << "tBaseResist      = " << tBaseResist << endl;
-    cout << "tCollectorResist = " << tCollectorResist << endl;
-    cout << "tEmitterResist   = " << tEmitterResist << endl;
-    cout << dashedline << endl;
-    cout << endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "In BJTInst::updateTemperature" << std::endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << "TEMP       = " << TEMP << std::endl;
+    Xyce::dout() << "TNOM       = " << TNOM << std::endl;
+    Xyce::dout() << "vt         = " << vt << std::endl;
+    Xyce::dout() << "tSatCur    = " << tSatCur << std::endl;
+    Xyce::dout() << "tBetaF     = " << tBetaF << std::endl;
+    Xyce::dout() << "tBetaR     = " << tBetaR << std::endl;
+    Xyce::dout() << "tBELeakCur = " << tBELeakCur << std::endl;
+    Xyce::dout() << "tBCLeakCur = " << tBELeakCur << std::endl;
+    Xyce::dout() << "tBEPot     = " << tBEPot << std::endl;
+    Xyce::dout() << "tBECap     = " << tBECap << std::endl;
+    Xyce::dout() << "tBCPot     = " << tBCPot << std::endl;
+    Xyce::dout() << "tBCCap     = " << tBCCap << std::endl;
+    Xyce::dout() << "tDepCap    = " << tDepCap << std::endl;
+    Xyce::dout() << "tF1        = " << tF1 << std::endl;
+    Xyce::dout() << "tF4        = " << tF4 << std::endl;
+    Xyce::dout() << "tF5        = " << tF5 << std::endl;
+    Xyce::dout() << "tleakBEEmissionCoeff = " << tleakBEEmissionCoeff << std::endl;
+    Xyce::dout() << "tleakBCEmissionCoeff = " << tleakBCEmissionCoeff << std::endl;
+    Xyce::dout() << "tRollOffExp      = " << tRollOffExp << std::endl;
+    Xyce::dout() << "tInvRollOffF     = " << tInvRollOffF << std::endl;
+    Xyce::dout() << "tInvRollOffR     = " << tInvRollOffR << std::endl;
+    Xyce::dout() << "tInvEarlyVoltF   = " << tInvEarlyVoltF << std::endl;
+    Xyce::dout() << "tInvEarlyVoltR   = " << tInvEarlyVoltR << std::endl;
+    Xyce::dout() << "tBaseResist      = " << tBaseResist << std::endl;
+    Xyce::dout() << "tCollectorResist = " << tCollectorResist << std::endl;
+    Xyce::dout() << "tEmitterResist   = " << tEmitterResist << std::endl;
+    Xyce::dout() << section_divider << std::endl;
+    Xyce::dout() << std::endl;
   }
 #endif
-// PMC
-//  model_.outputParams(0);
 
   return true;
 }
@@ -1906,7 +1842,7 @@ bool Instance::lambertWCurrent(double &Id, double &Gd, double Vd, double Vte, do
 bool Instance::loadDeviceMask ()
 {
   bool returnVal=false;
-  if (devOptions.newExcessPhase)
+  if (getDeviceOptions().newExcessPhase)
   {
     N_LAS_Vector * maskVectorPtr = extData.deviceMaskVectorPtr;
 
@@ -1948,11 +1884,11 @@ bool Instance::loadDAEQVector ()
   qVec[li_EmitP] -= model_.TYPE*( qBEdep + qBEdiff );
 
   // excess phase ERK-dcop
-  if (td != 0 && devOptions.newExcessPhase)
+  if (td != 0 && getDeviceOptions().newExcessPhase)
   {
     qVec[li_Ifx] += solVec[li_Ifx];
 
-    if (!(solState.dcopFlag) )
+    if (!(getSolverState().dcopFlag) )
     {
       qVec[li_dIfx] += solVec[li_dIfx]*td*td;
     }
@@ -1963,7 +1899,7 @@ bool Instance::loadDAEQVector ()
   }
 
   // load up the jdxp terms
-  if (devOptions.voltageLimiterFlag)
+  if (getDeviceOptions().voltageLimiterFlag)
   {
     double Cp_Jdxp_q = 0.0;
     double Ep_Jdxp_q = 0.0;
@@ -1991,13 +1927,13 @@ bool Instance::loadDAEQVector ()
   if( loadLeadCurrent )
   {
     double * storeLeadQ = extData.storeLeadCurrQCompRawPtr;
-    
+
     storeLeadQ[li_store_dev_ic] = -model_.TYPE * ( qCS + qBX + qBCdep + qBCdiff );
     storeLeadQ[li_store_dev_ib] = model_.TYPE * ( qBX + qBEdep + qBEdiff + qBCdep + qBCdiff );
     storeLeadQ[li_store_dev_ie] = -model_.TYPE*( qBEdep + qBEdiff );
     storeLeadQ[li_store_dev_is] = model_.TYPE * qCS;
   }
-  
+
   return true;
 }
 
@@ -2022,7 +1958,7 @@ void Instance::auxDAECalculations ()
   double td = model_.excessPhaseFac;
   double * solVec = extData.nextSolVectorRawPtr;
 
-  if ( td != 0 && !(solState.dcopFlag) )
+  if ( td != 0 && !(getSolverState().dcopFlag) )
   {
     i_fx = solVec[li_Ifx];
     iCE = i_fx - iBC / qB;
@@ -2038,7 +1974,7 @@ void Instance::auxDAECalculations ()
 
   if (td != 0)
   {
-    if (!(solState.dcopFlag) )
+    if (!(getSolverState().dcopFlag) )
     {
       diCEdvBp = invqB * (-invqB * iBC  * dqBdvBp - gBC);
       diCEdvCp = invqB * (-invqB * iBC * dqBdvCp + gBC);
@@ -2100,14 +2036,14 @@ bool Instance::loadDAEFVector ()
   double i_fx = 0.0;
   double di_fx = 0.0;
 
-  if (devOptions.newExcessPhase)
+  if (getDeviceOptions().newExcessPhase)
   {
     i_fx = solVec[li_Ifx];
     di_fx = solVec[li_dIfx];
 
     if (td != 0)
     {
-      if (!(solState.dcopFlag) )
+      if (!(getSolverState().dcopFlag) )
       {
         // omega0 = 1/td;
         fVec[li_Ifx] += - di_fx;
@@ -2133,7 +2069,7 @@ bool Instance::loadDAEFVector ()
   double Ifx_Jdxp_f=0.0 ;
 
   // Now for the jdxp terms
-  if (devOptions.voltageLimiterFlag)
+  if (getDeviceOptions().voltageLimiterFlag)
   {
     if (!origFlag)
     {
@@ -2150,9 +2086,9 @@ bool Instance::loadDAEFVector ()
       Ep_Jdxp_f *= model_.TYPE;
 
       // ERK-dcop.
-      if ( td != 0 && devOptions.newExcessPhase )
+      if ( td != 0 && getDeviceOptions().newExcessPhase )
       {
-        if ( !(solState.dcopFlag) )
+        if ( !(getSolverState().dcopFlag) )
         {
           dIfx_Jdxp_f =  -3 *( diBEdvBp*vbe_diff + diBEdvCp * vce_diff);
           dIfx_Jdxp_f *= model_.TYPE;
@@ -2171,9 +2107,9 @@ bool Instance::loadDAEFVector ()
     dFdxdVp[li_EmitP] += Ep_Jdxp_f;
 
     // ERK-dcop.
-    if ( td != 0 && devOptions.newExcessPhase )
+    if ( td != 0 && getDeviceOptions().newExcessPhase )
     {
-      if ( !(solState.dcopFlag) )
+      if ( !(getSolverState().dcopFlag) )
       {
         dFdxdVp[li_dIfx] += dIfx_Jdxp_f;
       }
@@ -2187,7 +2123,7 @@ bool Instance::loadDAEFVector ()
   if( loadLeadCurrent )
   {
     double * storeLeadF = extData.nextStoVectorRawPtr;
-    
+
     storeLeadF[li_store_dev_ic] = model_.TYPE * ( iC );
     storeLeadF[li_store_dev_is] = 0;
     storeLeadF[li_store_dev_ie] = model_.TYPE * ( iE );
@@ -2249,9 +2185,9 @@ bool Instance::loadDAEdQdx ()
       += capBEdiff + capBEdep;
 
   // excess phase terms.  ERK-dcop
-  if ( td != 0 && devOptions.newExcessPhase )
+  if ( td != 0 && getDeviceOptions().newExcessPhase )
   {
-    if (!(solState.dcopFlag) )
+    if (!(getSolverState().dcopFlag) )
     {
       dQdx[li_Ifx][AIfxEquIfxNodeOffset] += 1;
       dQdx[li_dIfx][AdIfxEqudIfxNodeOffset] += 1*td*td;
@@ -2300,7 +2236,7 @@ bool Instance::loadDAEdFdx ()
   dFdx[li_CollP][ACollPEquEmitPNodeOffset] += diCEdvEp;
 
   // excess phase terms.  ERK-dcop
-  if ( td != 0 && devOptions.newExcessPhase && !(solState.dcopFlag) )
+  if ( td != 0 && getDeviceOptions().newExcessPhase && !(getSolverState().dcopFlag) )
     dFdx[li_CollP][ACollPEquIfxNodeOffset] += 1.0 * model_.TYPE;
 
   dFdx[li_BaseP][ABasePEquBaseNodeOffset] -= diBrdvB;
@@ -2328,15 +2264,15 @@ bool Instance::loadDAEdFdx ()
       += gBEtot + gEpr + diCEdvBp + diCEdvCp; // this is a test.
 
   // excess phase terms.  ERK-dcop
-  if ( td != 0 && devOptions.newExcessPhase && !(solState.dcopFlag) )
+  if ( td != 0 && getDeviceOptions().newExcessPhase && !(getSolverState().dcopFlag) )
     dFdx[li_EmitP][AEmitPEquIfxNodeOffset] += -1.0 * model_.TYPE;
 
   // excess phase terms.  ERK-dcop
-  if (devOptions.newExcessPhase)
+  if (getDeviceOptions().newExcessPhase)
   {
     if ( td != 0 )
     {
-      if ( !(solState.dcopFlag) )
+      if ( !(getSolverState().dcopFlag) )
       {
         dFdx[li_Ifx][AIfxEqudIfxNodeOffset]+= -1;
         dFdx[li_dIfx][AdIfxEquCollPNodeOffset] += -3*diBEdvCp * model_.TYPE;
@@ -2400,7 +2336,7 @@ bool Instance::updatePrimaryState()
   // time derivatives w.r.t. charge are zero.  This is to maintain 3f5
   // compatibility.  ERK.
 
-  if (!(solState.dcopFlag) && (solState.initTranFlag) && solState.newtonIter==0)
+  if (!(getSolverState().dcopFlag) && (getSolverState().initTranFlag) && getSolverState().newtonIter==0)
   {
     currStaVec[li_qstateBEdiff] = qBEdiff;
     currStaVec[li_qstateBEdep] = qBEdep;
@@ -2465,10 +2401,10 @@ void Instance::oldDAEExcessPhaseCalculation1 ()
 
   currCexbc = lastCexbc = 0.0;
 
-  if (!(solState.dcopFlag) && td != 0)
+  if (!(getSolverState().dcopFlag) && td != 0)
   {
     // If there is no cexbc history, create one and use it.
-    if (solState.beginIntegrationFlag)
+    if (getSolverState().beginIntegrationFlag)
     {
       currCexbc = lastCexbc = iBE/qB;
       (*extData.currStaVectorPtr)[li_istateCEXBC] = currCexbc;
@@ -2501,12 +2437,12 @@ void Instance::oldDAEExcessPhaseCalculation2
   double td = model_.excessPhaseFac;
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel > 0 && solState.debugTimeFlag)
+  if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
   {
-    cout << endl;
-    cout << "  Excess Phase stuff:" <<endl;
-    cout << "  name = " << getName() <<endl;
-    cout << "  td   = " << td <<endl;
+    Xyce::dout() << std::endl;
+    Xyce::dout() << "  Excess Phase stuff:" <<std::endl;
+    Xyce::dout() << "  name = " << getName() <<std::endl;
+    Xyce::dout() << "  td   = " << td <<std::endl;
   }
 #endif
 
@@ -2522,13 +2458,13 @@ void Instance::oldDAEExcessPhaseCalculation2
   iEX=iBE;
   gEX=gBE;
 
-  dt0 = solState.currTimeStep;
-  dt1 = solState.lastTimeStep;
+  dt0 = getSolverState().currTimeStep;
+  dt1 = getSolverState().lastTimeStep;
 
   iC_local = 0.0;
 
   // do excess phase stuff if we are in transient mode and td is nonzero.
-  if (!(solState.dcopFlag) && td != 0)
+  if (!(getSolverState().dcopFlag) && td != 0)
   {
     double arg1, arg2, denom;
 
@@ -2539,7 +2475,7 @@ void Instance::oldDAEExcessPhaseCalculation2
     phaseScalar  = arg1 / denom;
 
     // Secondary state stuff:
-    if (!solState.beginIntegrationFlag)
+    if (!getSolverState().beginIntegrationFlag)
     {
       currCexbc = (*extData.currStaVectorPtr)[li_istateCEXBC];
       lastCexbc = (*extData.lastStaVectorPtr)[li_istateCEXBC];
@@ -2578,10 +2514,10 @@ bool Instance::updateIntermediateVars ()
   double * solVec = extData.nextSolVectorRawPtr;
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel>0 && solState.debugTimeFlag)
+  if (getDeviceOptions().debugLevel>0 && getSolverState().debugTimeFlag)
   {
-    cout << "----------------------------------------------" << endl;
-    cout << "Instance::updateIntermediateVars " << getName() <<endl;
+    Xyce::dout() << Xyce::section_divider << std::endl;
+    Xyce::dout() << "Instance::updateIntermediateVars " << getName() <<std::endl;
   }
 #endif
 
@@ -2611,7 +2547,7 @@ bool Instance::updateIntermediateVars ()
   origFlag = true;
   offFlag = false;
 
-  if (solState.initJctFlag && !OFF && devOptions.voltageLimiterFlag)
+  if (getSolverState().initJctFlag && !OFF && getDeviceOptions().voltageLimiterFlag)
   {
     if( IC_GIVEN )
     {
@@ -2623,7 +2559,7 @@ bool Instance::updateIntermediateVars ()
     }
     else
     {
-      if (solState.inputOPFlag)
+      if (getSolverState().inputOPFlag)
       {
         N_LAS_Vector * flagSolVectorPtr = extData.flagSolVectorPtr;
         if ((*flagSolVectorPtr)[li_Emit] == 0 || (*flagSolVectorPtr)[li_EmitP] == 0 ||
@@ -2643,9 +2579,9 @@ bool Instance::updateIntermediateVars ()
         vBX = vBC;
         origFlag = false;
 #ifdef Xyce_DEBUG_DEVICE
-        if (devOptions.debugLevel > 0 && solState.debugTimeFlag)
+        if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
         {
-          cout << " Setting device initial condition to Base-Emitter drop=tVCrit (" << tVCrit << ")"<<endl;
+          Xyce::dout() << " Setting device initial condition to Base-Emitter drop=tVCrit (" << tVCrit << ")"<<std::endl;
         }
 #endif
       }
@@ -2653,19 +2589,19 @@ bool Instance::updateIntermediateVars ()
 
 
 #ifdef Xyce_DEBUG_DEVICE
-    if (devOptions.debugLevel > 0 && solState.debugTimeFlag)
+    if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout.width(21); cout.precision(13); cout.setf(ios::scientific);
-      cout << "  " <<endl;
-      cout << "  using UIC.\n";
-      cout << "  vBE = " << vBE << endl;
-      cout << "  vBC = " << vBC << endl;
-      cout << "  vBX = " << vBX << endl;
-      cout << "  vCS = " << vCS << endl;
+      Xyce::dout().width(21); Xyce::dout().precision(13); Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << "  " <<std::endl;
+      Xyce::dout() << "  using UIC.\n";
+      Xyce::dout() << "  vBE = " << vBE << std::endl;
+      Xyce::dout() << "  vBC = " << vBC << std::endl;
+      Xyce::dout() << "  vBX = " << vBX << std::endl;
+      Xyce::dout() << "  vCS = " << vCS << std::endl;
     }
 #endif
   }
-  else if ((solState.initFixFlag || solState.initJctFlag) && OFF)
+  else if ((getSolverState().initFixFlag || getSolverState().initJctFlag) && OFF)
   {
     vBX = vBC = vBE = 0.0 ;
     // NOTE:  Must not set "origFlag" here, because that flags "non-converged"
@@ -2677,19 +2613,19 @@ bool Instance::updateIntermediateVars ()
     offFlag = true;
 
 #ifdef Xyce_DEBUG_DEVICE
-    if (devOptions.debugLevel > 0 && solState.debugTimeFlag)
+    if (getDeviceOptions().debugLevel > 0 && getSolverState().debugTimeFlag)
     {
-      cout.width(21); cout.precision(13); cout.setf(ios::scientific);
-      cout << "  " <<endl;
-      cout << "  BJT explicitly set OFF, zeroing all junction drops.\n";
+      Xyce::dout().width(21); Xyce::dout().precision(13); Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << "  " <<std::endl;
+      Xyce::dout() << "  BJT explicitly set OFF, zeroing all junction drops.\n";
     }
 #endif
   }
 
 
-  if (solState.newtonIter == 0)
+  if (getSolverState().newtonIter == 0)
   {
-    if (!(solState.dcopFlag)||(solState.locaEnabledFlag && solState.dcopFlag))
+    if (!(getSolverState().dcopFlag)||(getSolverState().locaEnabledFlag && getSolverState().dcopFlag))
     {
       vBE_old = (*extData.currStoVectorPtr)[li_storevBE];
       vBC_old = (*extData.currStoVectorPtr)[li_storevBC];
@@ -2710,33 +2646,33 @@ bool Instance::updateIntermediateVars ()
   }
 
 #ifdef Xyce_DEBUG_DEVICE
-  if (devOptions.debugLevel > -2 && solState.debugTimeFlag)
+  if (getDeviceOptions().debugLevel > -2 && getSolverState().debugTimeFlag)
   {
-    cout << "  tVCrit = " << tVCrit << endl;
-    cout.width(3);
-    cout << solState.newtonIter;
-    cout.width(5); cout << getName();
-    cout << "  Blim: ";
-    cout << "  vBE=";
-    cout.width(21); cout.precision(13); cout.setf(ios::scientific);
-    cout << vBE;
-    cout << "  vBC=";
-    cout.width(21); cout.precision(13); cout.setf(ios::scientific);
-    cout << vBC << endl;
+    Xyce::dout() << "  tVCrit = " << tVCrit << std::endl;
+    Xyce::dout().width(3);
+    Xyce::dout() << getSolverState().newtonIter;
+    Xyce::dout().width(5); Xyce::dout() << getName();
+    Xyce::dout() << "  Blim: ";
+    Xyce::dout() << "  vBE=";
+    Xyce::dout().width(21); Xyce::dout().precision(13); Xyce::dout().setf(std::ios::scientific);
+    Xyce::dout() << vBE;
+    Xyce::dout() << "  vBC=";
+    Xyce::dout().width(21); Xyce::dout().precision(13); Xyce::dout().setf(std::ios::scientific);
+    Xyce::dout() << vBC << std::endl;
   }
 #endif
 
   // if we had bypass implemented, most of it would be here.
   // don't bother limiting voltages if we've already forced OFF.
 
-  if (devOptions.voltageLimiterFlag && !(solState.initFixFlag&&OFF))
+  if (getDeviceOptions().voltageLimiterFlag && !(getSolverState().initFixFlag&&OFF))
   {
     // "reset" the junction voltages to keep them from changing too much.
     // only do this if this is not the first  newton iteration, and not
     // a by pass step.
     int ichk1, icheck;
 
-    if (solState.newtonIter >= 0)
+    if (getSolverState().newtonIter >= 0)
     {
       ichk1=1;  // don't know what this is for...
 
@@ -2750,26 +2686,26 @@ bool Instance::updateIntermediateVars ()
     }
 
 #ifdef Xyce_DEBUG_DEVICE
-    if (devOptions.debugLevel > -2 && solState.debugTimeFlag)
+    if (getDeviceOptions().debugLevel > -2 && getSolverState().debugTimeFlag)
     {
-      cout.width(3);
-      cout << solState.newtonIter;
-      cout.width(5); cout << getName() ;
-      cout << "  Alim: ";
-      cout << "  vBE=";
-      cout.width(21); cout.precision(13); cout.setf(ios::scientific);
-      cout << vBE;
-      cout << "  vBC=";
-      cout.width(21); cout.precision(13); cout.setf(ios::scientific);
-      cout << vBC;
+      Xyce::dout().width(3);
+      Xyce::dout() << getSolverState().newtonIter;
+      Xyce::dout().width(5); Xyce::dout() << getName() ;
+      Xyce::dout() << "  Alim: ";
+      Xyce::dout() << "  vBE=";
+      Xyce::dout().width(21); Xyce::dout().precision(13); Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vBE;
+      Xyce::dout() << "  vBC=";
+      Xyce::dout().width(21); Xyce::dout().precision(13); Xyce::dout().setf(std::ios::scientific);
+      Xyce::dout() << vBC;
 
-      //cout << "  vBE_orig = " << vBE_orig << endl;
-      //cout << "  vBC_orig = " << vBC_orig << endl <<endl;
-      //cout << "  origFlag = " << origFlag << endl;
+      //cout << "  vBE_orig = " << vBE_orig << std::endl;
+      //cout << "  vBC_orig = " << vBC_orig << std::endl <<std::endl;
+      //cout << "  origFlag = " << origFlag << std::endl;
 
-      if (origFlag) cout << " SAME";
-      else          cout << " DIFF";
-      cout << endl;
+      if (origFlag) Xyce::dout() << " SAME";
+      else          Xyce::dout() << " DIFF";
+      Xyce::dout() << std::endl;
     }
 #endif
   }
@@ -2800,7 +2736,7 @@ bool Instance::updateIntermediateVars ()
     }
     else
     {
-      gBE = -csat / vBE + devOptions.gmin;
+      gBE = -csat / vBE + getDeviceOptions().gmin;
       iBE = gBE * vBE;
       gBEleak = -iLeakBE / vBE;
       iBEleak = gBEleak * vBE;
@@ -2819,7 +2755,7 @@ bool Instance::updateIntermediateVars ()
     }
     else
     {
-      gBC = -csat / vBC + devOptions.gmin;
+      gBC = -csat / vBC + getDeviceOptions().gmin;
       iBC = gBC * vBC;
       gBCleak = -iLeakBC / vBC;
       iBCleak = gBCleak * vBC;
@@ -2835,17 +2771,17 @@ bool Instance::updateIntermediateVars ()
       arg1 = Xycemin(CONSTMAX_EXP_ARG, arg1);
       double devBE;
       double evBE;
-      if (solState.bjtArtParameterFlag)
+      if (getSolverState().bjtArtParameterFlag)
       {
-        evBE = devSupport.Xexp( arg1 , devBE, devOptions.exp_order );
+        evBE = devSupport.Xexp( arg1 , devBE, getDeviceOptions().exp_order );
       }
       else
       {
          evBE = exp( arg1 );
          devBE=evBE;
       }
-      iBE = csat * ( evBE - 1.0 ) + devOptions.gmin * vBE;
-      gBE = csat * devBE / vtF + devOptions.gmin;
+      iBE = csat * ( evBE - 1.0 ) + getDeviceOptions().gmin * vBE;
+      gBE = csat * devBE / vtF + getDeviceOptions().gmin;
 
       if (iLeakBE == 0.0)
         iBEleak = gBEleak = 0.0;
@@ -2855,9 +2791,9 @@ bool Instance::updateIntermediateVars ()
         arg1 = Xycemin(CONSTMAX_EXP_ARG, arg1);
         double devBEleak;
         double evBEleak;
-        if (solState.bjtArtParameterFlag)
+        if (getSolverState().bjtArtParameterFlag)
         {
-          evBEleak =devSupport.Xexp(arg1,devBEleak,devOptions.exp_order );
+          evBEleak =devSupport.Xexp(arg1,devBEleak,getDeviceOptions().exp_order );
         }
         else
         {
@@ -2870,7 +2806,7 @@ bool Instance::updateIntermediateVars ()
     }
     else
     {
-      gBE = -csat / vBE + devOptions.gmin;
+      gBE = -csat / vBE + getDeviceOptions().gmin;
       iBE = gBE * vBE;
       gBEleak = -iLeakBE / vBE;
       iBEleak = gBEleak * vBE;
@@ -2882,17 +2818,17 @@ bool Instance::updateIntermediateVars ()
       arg1 = Xycemin(CONSTMAX_EXP_ARG, arg1);
       double devBC;
       double evBC;
-      if (solState.bjtArtParameterFlag)
+      if (getSolverState().bjtArtParameterFlag)
       {
-        evBC = devSupport.Xexp( arg1 , devBC, devOptions.exp_order );
+        evBC = devSupport.Xexp( arg1 , devBC, getDeviceOptions().exp_order );
       }
       else
       {
         evBC = exp( arg1 );
         devBC=evBC;
       }
-      iBC = csat * ( evBC - 1.0 ) + devOptions.gmin * vBC;
-      gBC = csat * devBC / vtR + devOptions.gmin;
+      iBC = csat * ( evBC - 1.0 ) + getDeviceOptions().gmin * vBC;
+      gBC = csat * devBC / vtR + getDeviceOptions().gmin;
 
       if (iLeakBC == 0.0)
         iBCleak = gBCleak = 0.0;
@@ -2902,9 +2838,9 @@ bool Instance::updateIntermediateVars ()
         arg1 = Xycemin(CONSTMAX_EXP_ARG, arg1);
         double devBCleak;
         double evBCleak;
-        if (solState.bjtArtParameterFlag)
+        if (getSolverState().bjtArtParameterFlag)
         {
-          evBCleak= devSupport.Xexp(arg1,devBCleak,devOptions.exp_order);
+          evBCleak= devSupport.Xexp(arg1,devBCleak,getDeviceOptions().exp_order);
         }
         else
         {
@@ -2917,7 +2853,7 @@ bool Instance::updateIntermediateVars ()
     }
     else
     {
-      gBC = -csat / vBC + devOptions.gmin;
+      gBC = -csat / vBC + getDeviceOptions().gmin;
       iBC = gBC * vBC;
       gBCleak = -iLeakBC / vBC;
       iBCleak = gBCleak * vBC;
@@ -3027,7 +2963,7 @@ bool Instance::updateIntermediateVars ()
   // the state vector, that was pulled out already.
   bool geqCB_recalc(false);
   if (model_.transTimeF != 0.0 && vBE > 0.0 &&
-      ((!solState.dcopFlag)||solState.tranopFlag||solState.acopFlag))
+      ((!getSolverState().dcopFlag)||getSolverState().tranopFlag||getSolverState().acopFlag))
   {
     double argtf = 0.0;
     double arg2 = 0.0;
@@ -3057,7 +2993,7 @@ bool Instance::updateIntermediateVars ()
     gBEhighCurr  = (gBEhighCurr * (1.0 + arg2) - iBEhighCurr * dqBdvEp) / qB;
 
     capeqCB = model_.transTimeF * (arg3 - iBEhighCurr * dqBdvCp) / qB;
-    geqCB = capeqCB*solState.pdt;
+    geqCB = capeqCB*getSolverState().pdt;
     geqCB_recalc = true;
   }
 
@@ -3204,23 +3140,23 @@ bool Instance::updateIntermediateVars ()
   oldDAEExcessPhaseCalculation1 ();
   oldDAEExcessPhaseCalculation2 (iEX_tmp,gEX_tmp,iC_tmp);
 
-  if (devOptions.newExcessPhase)
+  if (getDeviceOptions().newExcessPhase)
   {
     auxDAECalculations ();  // iB, iC and iE calculated here.
 
   }
   else
   {
-    if (!(solState.dcopFlag))
+    if (!(getSolverState().dcopFlag))
     {
-      double pdt = solState.pdt;
+      double pdt = getSolverState().pdt;
 
       // ERK. 12/17/2006.
       // It is necessary to set pdt=0.0, because for the first time step out of
       // the DCOP, all the time derivatives are forced to be zero.  Thus, all
       // their derivatives should also be zero.  If it wasn't for that, then pdt
       // could always be pdt.  (it used to be, before the -jacobian_test capability).
-      if (solState.initTranFlag && solState.newtonIter==0)
+      if (getSolverState().initTranFlag && getSolverState().newtonIter==0)
       {
         pdt = 0.0;
       }
@@ -3314,7 +3250,7 @@ bool Instance::outputPlotFiles ()
 
   sprintf(filename,"Q_%s.dat",getName().c_str());
 
-  double time = solState.currTime;
+  double time = getSolverState().currTime;
   FILE *fp1;
 
   if (callsOutputPlot <= 0)
@@ -3339,7 +3275,7 @@ bool Instance::outputPlotFiles ()
     fprintf(fp1,"%s","\t    \"iBE/qB \",\n");
     fprintf(fp1,"%s","\t    \"currCexbc \",\n");
     fprintf(fp1,"%s","\t    \"lastCexbc \",\n");
-    if (devOptions.newExcessPhase)
+    if (getDeviceOptions().newExcessPhase)
     {
       fprintf(fp1,"%s","\t    \"i_fx \",\n");
       fprintf(fp1,"%s","\t    \"di_fx \",\n");
@@ -3353,7 +3289,7 @@ bool Instance::outputPlotFiles ()
   fprintf(fp1,"  %12.4e",currCexbc);
   fprintf(fp1,"  %12.4e",nextCexbc);
 
-  if (devOptions.newExcessPhase)
+  if (getDeviceOptions().newExcessPhase)
   {
     double * solVec = extData.nextSolVectorRawPtr;
     double i_fx = solVec[li_Ifx];
@@ -3378,7 +3314,7 @@ bool Instance::outputPlotFiles ()
 // Creator       : Eric Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 6/03/02
 //-----------------------------------------------------------------------------
-bool Model::processParams (string param)
+bool Model::processParams ()
 {
 
   if (!leakBECurrentGiven && c2Given)
@@ -3433,7 +3369,7 @@ bool Model::processParams (string param)
     if( depCapCoeff > 0.9999 )
     {
       depCapCoeff = 0.9999;
-      cout << "Bad Depletion Capacitance Coefficient" << endl;
+      Xyce::dout() << "Bad Depletion Capacitance Coefficient" << std::endl;
     }
   }
   else
@@ -3459,12 +3395,12 @@ bool Model::processParams (string param)
 // Creator       : Dave Shirely, PSSI
 // Creation Date : 03/23/06
 //----------------------------------------------------------------------------
-bool Model::processInstanceParams(string param)
+bool Model::processInstanceParams()
 {
 
-  vector<Instance*>::iterator iter;
-  vector<Instance*>::iterator first = instanceContainer.begin();
-  vector<Instance*>::iterator last  = instanceContainer.end();
+  std::vector<Instance*>::iterator iter;
+  std::vector<Instance*>::iterator first = instanceContainer.begin();
+  std::vector<Instance*>::iterator last  = instanceContainer.end();
 
   for (iter=first; iter!=last; ++iter)
   {
@@ -3482,10 +3418,11 @@ bool Model::processInstanceParams(string param)
 // Creator       : Laura Boucheron
 // Creation Date : 7/12/00
 //-----------------------------------------------------------------------------
-Model::Model(const ModelBlock & MB,
-                                     SolverState & ss1,
-                                     DeviceOptions & do1)
-  : DeviceModel(MB,ss1,do1),
+Model::Model(
+  const Configuration & configuration,
+  const ModelBlock &    MB,
+  const FactoryBlock &  factory_block)
+  : DeviceModel(MB, configuration.getModelParameters(), factory_block),
     TYPE(1),
     TNOM(300.0),
     satCur(1.0e-16),
@@ -3610,9 +3547,7 @@ Model::Model(const ModelBlock & MB,
   // forward beta (BF/BFM)
   if (BFgiven && BFMgiven)
   {
-    string msg = "  bjt " + getName();
-    msg += " Both BF and BFM are set, which is redundant.";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "Both BF and BFM are set, which is redundant.";
   }
   if (BFgiven || BFMgiven)
   {
@@ -3622,9 +3557,7 @@ Model::Model(const ModelBlock & MB,
   // reverse beta (Re/BRM)
   if (BRgiven && BRMgiven)
   {
-    string msg = "  bjt " + getName();
-    msg += " Both BR and BRM are set, which is redundant.";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "Both BR and BRM are set, which is redundant.";
   }
   if (BRgiven || BRMgiven)
   {
@@ -3638,9 +3571,7 @@ Model::Model(const ModelBlock & MB,
   VAFgivenCount += VBFgiven?1:0;
   if (VAFgivenCount > 1)
   {
-    string msg = "  bjt " + getName();
-    msg += " The forward early voltage is set more than once.  VA, VAF and VBF are aliases.";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "The forward early voltage is set more than once.  VA, VAF and VBF are aliases.";
   }
   if (VAFgivenCount > 0)
   {
@@ -3655,9 +3586,7 @@ Model::Model(const ModelBlock & MB,
   VARgivenCount += BVgiven?1:0;
   if (VARgivenCount > 1)
   {
-    string msg = "  bjt " + getName();
-    msg += " The reverse early voltage is set more than once.  VAR,VB,VRB and BV are aliases.";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "The reverse early voltage is set more than once.  VAR,VB,VRB and BV are aliases.";
   }
   if (VARgivenCount > 0)
   {
@@ -3671,9 +3600,7 @@ Model::Model(const ModelBlock & MB,
   IKFgivenCount += JBFgiven?1:0;
   if (IKFgivenCount > 1)
   {
-    string msg = "  bjt " + getName();
-    msg += " High current roll-off is set more than once (IKF, JBF or IK).";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "High current roll-off is set more than once (IKF, JBF or IK).";
   }
   if (IKFgivenCount > 0)
   {
@@ -3683,9 +3610,7 @@ Model::Model(const ModelBlock & MB,
   // reverse high current roll-off (IKR/JBR)
   if (IKRgiven && JBRgiven)
   {
-    string msg = "  bjt " + getName();
-    msg += " Both IKR and JBRgiven are set, which is redundant.";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "Both IKR and JBRgiven are set, which is redundant.";
   }
   if (IKRgiven || JBRgiven)
   {
@@ -3696,9 +3621,7 @@ Model::Model(const ModelBlock & MB,
   // but it is not.
   if (JLEgiven && leakBECurrentGiven)
   {
-    string msg = "  bjt " + getName();
-    msg += " Both JLE and ISE are set, which is redundant.";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "Both JLE and ISE are set, which is redundant.";
   }
   if (JLEgiven || leakBECurrentGiven)
   {
@@ -3709,9 +3632,7 @@ Model::Model(const ModelBlock & MB,
   // but it is not.
   if (JLCgiven && leakBCCurrentGiven)
   {
-    string msg = "  bjt " + getName();
-    msg += " Both JLC and ISC are set, which is redundant.";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "Both JLC and ISC are set, which is redundant.";
   }
   if (JLCgiven || leakBCCurrentGiven)
   {
@@ -3721,9 +3642,7 @@ Model::Model(const ModelBlock & MB,
   // leakage emission coefficient (NE/NLE)
   if (NLEgiven && NEgiven)
   {
-    string msg = "  bjt " + getName();
-    msg += " Both NLE and NE are set, which is redundant.";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "Both NLE and NE are set, which is redundant.";
   }
   if (NLEgiven || NEgiven)
   {
@@ -3733,9 +3652,7 @@ Model::Model(const ModelBlock & MB,
   // BE exponential factor (MJE/ME)
   if (MJEgiven && MEgiven)
   {
-    string msg = "  bjt " + getName();
-    msg += " Both MJE and ME are set, which is redundant.";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << " Both MJE and ME are set, which is redundant.";
   }
   if (MJEgiven || MEgiven)
   {
@@ -3745,9 +3662,7 @@ Model::Model(const ModelBlock & MB,
   // BC exponential factor (MJC/MC)
   if (MJCgiven && MCgiven)
   {
-    string msg = "  bjt " + getName();
-    msg += " Both MJC and MC are set, which is redundant.";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "Both MJC and MC are set, which is redundant.";
   }
   if (MJCgiven || MCgiven)
   {
@@ -3761,9 +3676,7 @@ Model::Model(const ModelBlock & MB,
   CJSgivenCount += CSUBgiven?1:0;
   if (CJSgivenCount > 1)
   {
-    string msg = "  bjt " + getName();
-    msg += " The zero-bias collector-substrate capacitance (CJS, CCS or CSUB) is set more than once.";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "The zero-bias collector-substrate capacitance (CJS, CCS or CSUB) is set more than once.";
   }
   if (CJSgivenCount > 0)
   {
@@ -3777,9 +3690,7 @@ Model::Model(const ModelBlock & MB,
   IRBgivenCount += IOBgiven?1:0;
   if (IRBgivenCount > 1)
   {
-    string msg = "  bjt " + getName();
-    msg += " The current for 1/2 base resistance (IRB, JRB or IOB) is set more than once.";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "The current for 1/2 base resistance (IRB, JRB or IOB) is set more than once.";
   }
   if (IRBgivenCount > 0)
   {
@@ -3789,9 +3700,7 @@ Model::Model(const ModelBlock & MB,
   // BE built-in potential (VJE/PE)
   if (VJEgiven && PEgiven)
   {
-    string msg = "  bjt " + getName();
-    msg += " The BE built-in potential (VJE or PE) is set more than once.";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "The BE built-in potential (VJE or PE) is set more than once.";
   }
   if (VJEgiven && PEgiven)
   {
@@ -3801,9 +3710,7 @@ Model::Model(const ModelBlock & MB,
   // BC built-in potential (VJC/PC)
   if (VJCgiven && PCgiven)
   {
-    string msg = "  bjt " + getName();
-    msg += " The BC built-in potential (VJC or PC) is set more than once.";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "The BC built-in potential (VJC or PC) is set more than once.";
   }
   if (VJCgiven && PCgiven)
   {
@@ -3813,9 +3720,7 @@ Model::Model(const ModelBlock & MB,
   // fraction of BC capacitance to int. base node (XCJC/CDIS)
   if (XCJCgiven && CDISgiven)
   {
-    string msg = "  bjt " + getName();
-    msg += " XCJC and CDIS are both set (they are aliases).";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "XCJC and CDIS are both set (they are aliases).";
   }
   if (XCJCgiven && CDISgiven)
   {
@@ -3829,9 +3734,7 @@ Model::Model(const ModelBlock & MB,
   VJSgivenCount += PSUBgiven?1:0;
   if (VJSgivenCount > 1)
   {
-    string msg = "  bjt " + getName();
-    msg += " The forward early voltage is set more than once.  PS, VJS and PSUB are aliases.";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "The forward early voltage is set more than once.  PS, VJS and PSUB are aliases.";
   }
   if (VJSgivenCount > 0)
   {
@@ -3845,9 +3748,7 @@ Model::Model(const ModelBlock & MB,
   MJSgivenCount += ESUBgiven?1:0;
   if (MJSgivenCount > 1)
   {
-    string msg = "  bjt " + getName();
-    msg += " The forward early voltage is set more than once.  MS, MJS and ESUB are aliases.";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "The forward early voltage is set more than once.  MS, MJS and ESUB are aliases.";
   }
   if (MJSgivenCount > 0)
   {
@@ -3857,9 +3758,7 @@ Model::Model(const ModelBlock & MB,
   // (ITF/JTF)
   if (ITFgiven && JTFgiven)
   {
-    string msg = "  bjt " + getName();
-    msg += " ITF and JTF are both set (they are aliases).";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "ITF and JTF are both set (they are aliases).";
   }
   if (ITFgiven && JTFgiven)
   {
@@ -3869,9 +3768,7 @@ Model::Model(const ModelBlock & MB,
   // (NK/NKF)
   if (NKgiven && NKFgiven)
   {
-    string msg = "  bjt " + getName();
-    msg += " NK and NKF are both set (they are aliases).";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "NK and NKF are both set (they are aliases).";
   }
   if (NKgiven && NKFgiven)
   {
@@ -3885,9 +3782,7 @@ Model::Model(const ModelBlock & MB,
   XTBgivenCount += TCBgiven?1:0;
   if (XTBgivenCount > 1)
   {
-    string msg = "  bjt " + getName();
-    msg += " The forward early voltage is set more than once.  TB, XTB and TCB are aliases.";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "The forward early voltage is set more than once.  TB, XTB and TCB are aliases.";
   }
   if (XTBgivenCount > 0)
   {
@@ -3898,9 +3793,7 @@ Model::Model(const ModelBlock & MB,
   // (PT/XTI)
   if (PTgiven && XTIgiven)
   {
-    string msg = "  bjt " + getName();
-    msg += " PT and XTI are both set (they are aliases).";
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_FATAL, msg);
+    UserError0(*this) << "PT and XTI are both set (they are aliases).";
   }
   if (PTgiven && XTIgiven)
   {
@@ -3919,7 +3812,7 @@ Model::Model(const ModelBlock & MB,
 
   // Set any non-constant parameter defaults:
   if (!given("TNOM"))
-    TNOM = devOptions.tnom;
+    TNOM = getDeviceOptions().tnom;
 
   if( !NKgiven)
     rollOffExp = 0.5;
@@ -3941,9 +3834,9 @@ Model::Model(const ModelBlock & MB,
 //-----------------------------------------------------------------------------
 Model::~Model()
 {
-  vector<Instance*>::iterator iterI;
-  vector<Instance*>::iterator firstI = instanceContainer.begin ();
-  vector<Instance*>::iterator lastI  = instanceContainer.end ();
+  std::vector<Instance*>::iterator iterI;
+  std::vector<Instance*>::iterator firstI = instanceContainer.begin ();
+  std::vector<Instance*>::iterator lastI  = instanceContainer.end ();
 
   // loop over instances:
   for (iterI = firstI; iterI != lastI; ++iterI)
@@ -3963,31 +3856,52 @@ Model::~Model()
 //-----------------------------------------------------------------------------
 std::ostream &Model::printOutInstances(std::ostream &os) const
 {
-  vector<Instance*>::const_iterator iter;
-  vector<Instance*>::const_iterator first = instanceContainer.begin();
-  vector<Instance*>::const_iterator last  = instanceContainer.end();
+  std::vector<Instance*>::const_iterator iter;
+  std::vector<Instance*>::const_iterator first = instanceContainer.begin();
+  std::vector<Instance*>::const_iterator last  = instanceContainer.end();
 
   int i;
-  os << "     name     modelName  Parameters" << endl;
+  os << "     name     modelName  Parameters" << std::endl;
   for (i = 0, iter = first; iter != last; ++iter, ++i)
   {
     os << "  " << i << ": " << (*iter)->getName() << "        ";
-    os << (*iter)->getModelName();
+    os << getName();
 
-    os << endl;
-    os << "  AREA  = " << (*iter)->AREA  << endl;
-    os << "  icVBE = " << (*iter)->icVBE << endl;
-    os << "  icVCE = " << (*iter)->icVCE << endl;
-    os << "  TEMP  = " << (*iter)->TEMP  << endl;
-    os << "  OFF   = " << (*iter)->OFF   << endl;
+    os << std::endl;
+    os << "  AREA  = " << (*iter)->AREA  << std::endl;
+    os << "  icVBE = " << (*iter)->icVBE << std::endl;
+    os << "  icVCE = " << (*iter)->icVCE << std::endl;
+    os << "  TEMP  = " << (*iter)->TEMP  << std::endl;
+    os << "  OFF   = " << (*iter)->OFF   << std::endl;
 
-    os << endl;
+    os << std::endl;
   }
 
-  os << endl;
+  os << std::endl;
 
   return os;
 }
+
+//-----------------------------------------------------------------------------
+// Function      : Model::forEachInstance
+// Purpose       : 
+// Special Notes :
+// Scope         : public
+// Creator       : David Baur
+// Creation Date : 2/4/2014
+//-----------------------------------------------------------------------------
+/// Apply a device instance "op" to all instances associated with this
+/// model
+/// 
+/// @param[in] op Operator to apply to all instances.
+/// 
+/// 
+void Model::forEachInstance(DeviceInstanceOp &op) const /* override */ 
+{
+  for (std::vector<Instance *>::const_iterator it = instanceContainer.begin(); it != instanceContainer.end(); ++it)
+    op(*it);
+}
+
 
 //-----------------------------------------------------------------------------
 // BJT Master functions:
@@ -4005,7 +3919,7 @@ bool Master::updateState (double * solVec, double * staVec, double * stoVec)
 {
   bool bsuccess = true;
 
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & bi = *(*it);
 
@@ -4061,7 +3975,7 @@ bool Master::updateSecondaryState ( double * staDerivVec, double * stoVec )
 {
   bool bsuccess = true;
 
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & bi = *(*it);
 
@@ -4090,7 +4004,7 @@ bool Master::updateSecondaryState ( double * staDerivVec, double * stoVec )
 //-----------------------------------------------------------------------------
 bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  double * storeLeadF, double * storeLeadQ)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & bi = *(*it);
 
@@ -4234,21 +4148,21 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
       dQdxdVp[bi.li_BaseP] += Bp_Jdxp_q;
       dQdxdVp[bi.li_EmitP] += Ep_Jdxp_q;
     }
-    
+
     if( bi.loadLeadCurrent )
     {
       storeLeadQ[bi.li_store_dev_ic] = -bi.model_.TYPE * ( bi.qCS + bi.qBX + bi.qBCdep + bi.qBCdiff );
       storeLeadQ[bi.li_store_dev_ib] = bi.model_.TYPE * ( bi.qBX + bi.qBEdep + bi.qBEdiff + bi.qBCdep + bi.qBCdiff );
       storeLeadQ[bi.li_store_dev_ie] = -bi.model_.TYPE*( bi.qBEdep + bi.qBEdiff );
       storeLeadQ[bi.li_store_dev_is] = bi.model_.TYPE * bi.qCS;
-      
+
       storeLeadF[bi.li_store_dev_ic] = bi.model_.TYPE * ( bi.iC );
       storeLeadF[bi.li_store_dev_is] = 0;
       storeLeadF[bi.li_store_dev_ie] = bi.model_.TYPE * ( bi.iE );
       storeLeadF[bi.li_store_dev_ib] = bi.model_.TYPE * ( bi.iB );
-      
+
     }
-  
+
   }
 
   return true;
@@ -4264,7 +4178,7 @@ bool Master::loadDAEVectors (double * solVec, double * fVec, double *qVec,  doub
 //-----------------------------------------------------------------------------
 bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
 {
-  for (InstanceVector::const_iterator it = getInstanceVector().begin(); it != getInstanceVector().end(); ++it)
+  for (InstanceVector::const_iterator it = getInstanceBegin(); it != getInstanceEnd(); ++it)
   {
     Instance & bi = *(*it);
 
@@ -4300,9 +4214,9 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
    *bi.f_EmitPEquBasePNodePtr += - bi.diCEdvBp - bi.gBEtot;
 
    // ERK Note:  -bi.diCEdvEp should equal + bi.diCEdvBp + bi.diCEdvCp.  In the
-   // oribi.ginal old-Dbi.AE form, + bi.diCEdvBp + bi.diCEdvCp is used.  In
-   // the more recent new-Dbi.AE form, we've used bi.diCEdvEp, but it sometimes
-   // results in subtle bi.differences between old- and new-Dbi.AE jacobians.
+   // original old-DAE form, + bi.diCEdvBp + bi.diCEdvCp is used.  In
+   // the more recent new-DAE form, we've used bi.diCEdvEp, but it sometimes
+   // results in subtle differences between old- and new-DAE jacobians.
    // This should matter, but .....
    *bi.f_EmitPEquEmitPNodePtr += bi.gBEtot + bi.gEpr + bi.diCEdvBp + bi.diCEdvCp; // this is a test.
        //+= bi.gBEtot + bi.gEpr - bi.diCEdvEp;
@@ -4403,9 +4317,9 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
    dFdx[bi.li_EmitP][bi.AEmitPEquBasePNodeOffset] += - bi.diCEdvBp - bi.gBEtot;
 
    // ERK Note:  -bi.diCEdvEp should equal + bi.diCEdvBp + bi.diCEdvCp.  In the
-   // oribi.ginal old-Dbi.AE form, + bi.diCEdvBp + bi.diCEdvCp is used.  In
-   // the more recent new-Dbi.AE form, we've used bi.diCEdvEp, but it sometimes
-   // results in subtle bi.differences between old- and new-Dbi.AE jacobians.
+   // original old-DAE form, + bi.diCEdvBp + bi.diCEdvCp is used.  In
+   // the more recent new-DAE form, we've used bi.diCEdvEp, but it sometimes
+   // results in subtle differences between old- and new-DAE jacobians.
    // This should matter, but .....
 
    dFdx[bi.li_EmitP][bi.AEmitPEquEmitPNodeOffset] += bi.gBEtot + bi.gEpr + bi.diCEdvBp + bi.diCEdvCp; // this is a test.
@@ -4476,6 +4390,20 @@ bool Master::loadDAEMatrices (N_LAS_Matrix & dFdx, N_LAS_Matrix & dQdx)
   #endif
   }
   return true;
+}
+
+Device *Traits::factory(const Configuration &configuration, const FactoryBlock &factory_block)
+{
+
+  return new Master(configuration, factory_block, factory_block.solverState_, factory_block.deviceOptions_);
+}
+
+void registerDevice()
+{
+  Config<Traits>::addConfiguration()
+    .registerDevice("q", 1)
+    .registerModelType("pnp", 1)
+    .registerModelType("npn", 1);
 }
 
 } // namespace BJT

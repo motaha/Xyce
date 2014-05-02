@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -39,9 +39,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.24.2.2 $
+// Revision Number: $Revision: 1.30 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:49 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -90,7 +90,7 @@ N_PDS_MPIComm::N_PDS_MPIComm( int iargs, char * cargs[] )
   mpiComm_ = MPI_COMM_WORLD;
 
   // Error string
-  const string errorMsg( "N_PDS_MPIComm::initMPI - MPI_Init failed.");
+  const std::string errorMsg( "N_PDS_MPIComm::initMPI - MPI_Init failed.");
   
 #ifdef HAVE_UNISTD_H
   //
@@ -121,14 +121,14 @@ N_PDS_MPIComm::N_PDS_MPIComm( int iargs, char * cargs[] )
       {
         // changing the directory back may have failed.  Issue a warning
         // and try and continue.
-        const string cdErrorMsg1( "N_PDS_MPIComm::initMPI Resetting working directory failed.  Trying to continue.");
+        const std::string cdErrorMsg1( "N_PDS_MPIComm::initMPI Resetting working directory failed.  Trying to continue.");
         N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING, cdErrorMsg1 );
       }
     }
   }
   else
   {
-    const string cdErrorMsg2( "N_PDS_MPIComm::initMPI Couldn't get working directory.  Trying to continue.");
+    const std::string cdErrorMsg2( "N_PDS_MPIComm::initMPI Couldn't get working directory.  Trying to continue.");
     N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING, cdErrorMsg2 );
   }
 #endif 
@@ -165,8 +165,8 @@ N_PDS_MPIComm::N_PDS_MPIComm( int iargs, char * cargs[] )
     // split mpi communicator
     int processID = procID();
     MPI_Comm myNewMpiComm;
-    std::cout << "N_PDS_MPIComm on procID, " << processID << ", procPerProblem = " << procPerProblem << std::endl;
-    const string errorMsgForSplit( "N_PDS_MPIComm::initMPI - MPI_Comm_split failed.");
+    Xyce::dout() << "N_PDS_MPIComm on procID, " << processID << ", procPerProblem = " << procPerProblem << std::endl;
+    const std::string errorMsgForSplit( "N_PDS_MPIComm::initMPI - MPI_Comm_split failed.");
     if( MPI_SUCCESS != MPI_Comm_split( MPI_COMM_WORLD, processID, procPerProblem, &myNewMpiComm ) )
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, errorMsg);
     mpiComm_ = myNewMpiComm;  
@@ -186,7 +186,7 @@ N_PDS_MPIComm::N_PDS_MPIComm( int iargs, char * cargs[] )
 // Creator       : Robert Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 06/26/01
 //-----------------------------------------------------------------------------
-N_PDS_MPIComm::N_PDS_MPIComm( const MPI_Comm & mComm )
+N_PDS_MPIComm::N_PDS_MPIComm( const MPI_Comm mComm )
  : mpiComm_(mComm),
    mpiCommOwned_(false)
 {
@@ -252,7 +252,7 @@ int N_PDS_MPIComm::numProc() const
   int size = 1;
 
   // Error string
-  const string error_msg(
+  const std::string error_msg(
     "N_PDS_MPIComm::numProc -  MPI_Comm_size failed.");
 
   // Get the machine size.
@@ -276,7 +276,7 @@ int N_PDS_MPIComm::procID() const
   int id = 0;
 
   // Error string
-  const string error_msg(
+  const std::string error_msg(
     "N_PDS_Comm::getProcID -  MPI_Comm_rank failed.");
 
   // Get the machine size.
@@ -615,8 +615,8 @@ bool N_PDS_MPIComm::iRecv( double * val, const int & count, const int & src )
 //-----------------------------------------------------------------------------
 bool N_PDS_MPIComm::waitAll()
 {
-  list<MPI_Request>::iterator r=request_.begin();
-  list<MPI_Request>::iterator r_end = request_.end();
+  std::list<MPI_Request>::iterator r=request_.begin();
+  std::list<MPI_Request>::iterator r_end = request_.end();
 
   for ( ; r!=r_end ; ++r)
   {

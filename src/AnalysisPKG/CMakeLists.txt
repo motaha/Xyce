@@ -18,6 +18,7 @@ set ( Analysis_SOURCES
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_ANP_OutputMgrAdapter.C 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_ANP_Step.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_ANP_SweepParam.C
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/N_ANP_Report.C
       ${CMAKE_CURRENT_SOURCE_DIR}/src/N_ANP_Transient.C 
       CACHE INTERNAL "X_S" )
 

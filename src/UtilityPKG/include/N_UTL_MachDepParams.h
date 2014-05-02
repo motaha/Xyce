@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -50,9 +50,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.1.4.2 $
+// Revision Number: $Revision: 1.6 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:52 $
+// Revision Date  : $Date: 2014/02/24 23:49:28 $
 //
 // Current Owner  : $Author $
 //-----------------------------------------------------------------------------
@@ -68,6 +68,9 @@
 
 #include <limits>
 
+namespace Xyce {
+namespace Util {
+
 //-----------------------------------------------------------------------------
 // Class         : N_UTL_MachineDependentParams
 // Purpose       :
@@ -75,40 +78,45 @@
 // Creator       : Tom Russo
 // Creation Date : 8/01/2012
 //-----------------------------------------------------------------------------
-class N_UTL_MachineDependentParams
+class MachineDependentParams
 {
 public:
 
   // 10 * Minimum Floating Point Value
   inline static double MachineZero()
-  { return 10.0 * numeric_limits<double>::min(); }
+  { return 10.0 * std::numeric_limits<double>::min(); }
 
   // SquareRoot(Maximum Floating Point Value)
   inline static double MachineBig()
-  { return sqrt(numeric_limits<double>::max()); }
+  { return sqrt(std::numeric_limits<double>::max()); }
 
   // Machine precision
   // This is NOT 4*epsilon as N_TIA_MachineDependentParams used to call it,
   // because the N_TIA_NumericalLimits class actually defined epsilon 
-  // differently than the C++ numeric_limits does.  We do here precisely what 
+  // differently than the C++ std::numeric_limits does.  We do here precisely what 
   // the older class used to, because it turns out to matter in a few
   // cases where this MachinePrecision is used.  
-  // 4*numeric_limits<double>::epsilon turns out to be even smaller than this.
+  // 4*std::numeric_limits<double>::epsilon turns out to be even smaller than this.
   inline static double MachinePrecision()
-  { return 2 * pow(10.0, -(numeric_limits<double>::digits10)); }
+  { return 2 * pow(10.0, -(std::numeric_limits<double>::digits10)); }
 
   // Machine Unit Roundoff
   inline static double MachineEpsilon()
-  { return numeric_limits<double>::epsilon(); }
+  { return std::numeric_limits<double>::epsilon(); }
 
   inline static double DoubleMin()
-  { return numeric_limits<double>::min(); }
+  { return std::numeric_limits<double>::min(); }
   inline static double DoubleMax()
-  { return numeric_limits<double>::max(); }
+  { return std::numeric_limits<double>::max(); }
   inline static int IntMin()
-  { return numeric_limits<int>::min(); }
+  { return std::numeric_limits<int>::min(); }
   inline static int IntMax()
-  { return numeric_limits<int>::max(); }
+  { return std::numeric_limits<int>::max(); }
 };
+
+} // namespace Util
+} // namespace Xyce
+
+typedef Xyce::Util::MachineDependentParams N_UTL_MachineDependentParams;
 
 #endif     // Xyce_N_UTL_MACH_DEP_PARAMS_H

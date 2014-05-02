@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,11 +36,11 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.44.2.2 $
+// Revision Number: $Revision: 1.51.2.1 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/03/06 00:41:20 $
 //
-// Current Owner  : $Author: tvrusso $
+// Current Owner  : $Author: erkeite $
 //-----------------------------------------------------------------------------
 
 #ifndef N_TOP_TopoLSUtil_h
@@ -58,50 +58,45 @@
 using Teuchos::RefCountPtr;
 using Teuchos::rcp;
 
-// ----------   Xyce Includes   ----------
+#include <N_IO_fwd.h>
+#include <N_TOP_fwd.h>
+#include <N_PDS_fwd.h>
 
 #include <N_UTL_Xyce.h>
 #include <N_UTL_Misc.h>
-
 #include <N_LAS_QueryUtil.h>
-
 #include <N_IO_PkgOptionsMgr.h>
 
-// ---------- Forward Declarations ----------
 
-class N_PDS_Manager;
-class N_PDS_GlobalAccessor;
-
-class N_TOP_Topology;
-
-class N_IO_CmdParse;
+namespace Xyce {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Class         : N_TOP_TopoLSUtil
+// Class         : TopoLSUtil
 // Purpose       :
 // Special Notes :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/26/00
 //-----------------------------------------------------------------------------
-class N_TOP_TopoLSUtil : public N_LAS_QueryUtil
+class TopoLSUtil : public N_LAS_QueryUtil
 {
 public:
 
   // Constructor
-  //N_TOP_TopoLSUtil(N_TOP_Topology * topo = 0, N_IO_CmdParse & cp);
-  N_TOP_TopoLSUtil(N_TOP_Topology * topo, N_IO_CmdParse & cp);
+  //TopoLSUtil(Topology * topo = 0, IO::CmdParse & cp);
+  TopoLSUtil(Topology * topo, IO::CmdParse & cp);
 
   // Destructor
-  ~N_TOP_TopoLSUtil() {}
+  ~TopoLSUtil() {}
 
   // Register the pointer to the topology object.
-  bool registerTopology(N_TOP_Topology * topo) { return (topoPtr_ = topo); }
+  bool registerTopology(Topology * topo) { return (topoPtr_ = topo); }
 
   // Register the pointer to the parallel services manager object.
   bool registerParallelMgr(N_PDS_Manager * pdsmgr) { return (pdsMgrPtr_ = pdsmgr); }
 
   // Method to register the package options manager
-  bool registerPkgOptionsMgr( RCP<N_IO_PkgOptionsMgr> pkgOptPtr );
+  bool registerPkgOptionsMgr( IO::PkgOptionsMgr *pkgOptPtr );
   bool registerTimeOptions(const N_UTL_OptionBlock & OB);
   bool registerOptions(const N_UTL_OptionBlock & OB);
 
@@ -128,12 +123,15 @@ public:
   // get access to the supernode flag
   bool supernodeFlag() {return supernode_;}
 
+  // get access to the names file flag
+  bool namesFileFlag() {return namesFile_;}
+
   // Accessor methods.
 
-  const vector<int> & vnodeGIDVec() const { return vnodeGIDVector_; }
-  const vector<int> & vsrcGIDVec() const { return vsrcGIDVector_; }
-  //const vector<int> & noDCPathGIDVec() const { return noDCPathGIDVector_; }
-  //const vector<int> & connToOneTermGIDVec() const { return connToOneTermGIDVector_; }
+  const std::vector<int> & vnodeGIDVec() const { return vnodeGIDVector_; }
+  const std::vector<int> & vsrcGIDVec() const { return vsrcGIDVector_; }
+  //const std::vector<int> & noDCPathGIDVec() const { return noDCPathGIDVector_; }
+  //const std::vector<int> & connToOneTermGIDVec() const { return connToOneTermGIDVector_; }
 
   int numGlobalNodes() const { return numGlobalNodes_; }
   int numLocalNodes() const { return numLocalNodes_; }
@@ -143,66 +141,66 @@ public:
   int numExternRows() const { return numExternRows_; }
   int numGlobalExternRows() const { return numGlobalExternRows_; }
   int baseRowGID() const { return baseRowGID_; }
-  const vector<int> & rowList_GID() const { return rowList_GID_; }
-  const vector< pair<int,int> > & rowList_ExternGID() const { return rowList_ExternGID_; }
+  const std::vector<int> & rowList_GID() const { return rowList_GID_; }
+  const std::vector< std::pair<int,int> > & rowList_ExternGID() const { return rowList_ExternGID_; }
 
   int numGlobalStateVars() const { return numGlobalStateVars_; }
   int numLocalStateVars() const { return numLocalStateVars_; }
   int numExternStateVars() const { return numExternStateVars_; }
   int numGlobalExternStateVars() const { return numGlobalExternStateVars_; }
   int baseStateVarGID() const { return baseStateVarGID_; }
-  const vector<int> & rowList_StateGID() const { return rowList_StateGID_; }
-  const vector< pair<int,int> > & rowList_ExternStateGID() const { return rowList_ExternStateGID_; }
+  const std::vector<int> & rowList_StateGID() const { return rowList_StateGID_; }
+  const std::vector< std::pair<int,int> > & rowList_ExternStateGID() const { return rowList_ExternStateGID_; }
 
   int numGlobalStoreVars() const { return numGlobalStoreVars_; }
   int numLocalStoreVars() const { return numLocalStoreVars_; }
   int numExternStoreVars() const { return numExternStoreVars_; }
   int numGlobalExternStoreVars() const { return numGlobalExternStoreVars_; }
   int baseStoreVarGID() const { return baseStoreVarGID_; }
-  const vector<int> & rowList_StoreGID() const { return rowList_StoreGID_; }
-  const vector< pair<int,int> > & rowList_ExternStoreGID() const { return rowList_ExternStoreGID_; }
+  const std::vector<int> & rowList_StoreGID() const { return rowList_StoreGID_; }
+  const std::vector< std::pair<int,int> > & rowList_ExternStoreGID() const { return rowList_ExternStoreGID_; }
 
   int numGlobalNZs() const { return numGlobalNZs_; }
   int numLocalNZs() const { return numLocalNZs_; }
-  const vector<int> & rowList_NumNZs() const { return rowList_NumNZs_; }
-  const vector< list<int> > & rowList_ColList() const { return rowList_ColList_; }
+  const std::vector<int> & rowList_NumNZs() const { return rowList_NumNZs_; }
+  const std::vector< std::list<int> > & rowList_ColList() const { return rowList_ColList_; }
 
-  const vector<char> & rowList_VarType() const { return rowList_VarType_; }
+  const std::vector<char> & rowList_VarType() const { return rowList_VarType_; }
 
-  struct N_TOP_TopoLSUtil_OptionsReg : public N_IO_PkgOptionsReg
+  struct TopoLSUtil_OptionsReg : public IO::PkgOptionsReg
   {
-    N_TOP_TopoLSUtil_OptionsReg( N_TOP_TopoLSUtil & tlsu )
+    TopoLSUtil_OptionsReg( TopoLSUtil & tlsu )
     : topLSutil(tlsu)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return topLSutil.registerOptions( options ); }
 
-    N_TOP_TopoLSUtil & topLSutil;
+    TopoLSUtil & topLSutil;
   };
 
-  struct N_TOP_TopoLSUtil_TimeOptionsReg : public N_IO_PkgOptionsReg
+  struct TopoLSUtil_TimeOptionsReg : public IO::PkgOptionsReg
   {
-    N_TOP_TopoLSUtil_TimeOptionsReg( N_TOP_TopoLSUtil & tlsu )
+    TopoLSUtil_TimeOptionsReg( TopoLSUtil & tlsu )
     : topLSutil(tlsu)
     {}
 
     bool operator()( const N_UTL_OptionBlock & options )
     { return topLSutil.registerTimeOptions( options ); }
 
-    N_TOP_TopoLSUtil & topLSutil;
+    TopoLSUtil & topLSutil;
   };
 
 private:
 
   // Pointer to the topology object.
-  N_TOP_Topology * topoPtr_;
+  Topology * topoPtr_;
 
   // command line object:
-  N_IO_CmdParse & commandLine_;
+  IO::CmdParse & commandLine_;
   
   // package options manager
-  RCP<N_IO_PkgOptionsMgr> pkgOptMgrPtr_;
+  IO::PkgOptionsMgr * pkgOptMgrPtr_;
   
   // Pointer to the parallel services manager object.
   N_PDS_Manager * pdsMgrPtr_;
@@ -217,9 +215,9 @@ private:
   // Number of local (on processor) nodes in the topology.
   int numLocalNodes_;
   int baseNodeGID_;
-  vector<int> nodeList_GID_;
-  vector< pair<int,int> > nodeList_ExternGID_;
-  map<int,int> nodeGtoL_Map_;
+  std::vector<int> nodeList_GID_;
+  std::vector< std::pair<int,int> > nodeList_ExternGID_;
+  std::map<int,int> nodeGtoL_Map_;
 
   // Number of global (across all processors) rows in the linear system.
   int numGlobalRows_;
@@ -228,9 +226,9 @@ private:
   int numExternRows_;
   int numGlobalExternRows_;
   int baseRowGID_;
-  vector<int> rowList_GID_;
-  vector< pair<int,int> > rowList_ExternGID_;
-  map<int,int> GtoL_Map_;
+  std::vector<int> rowList_GID_;
+  std::vector< std::pair<int,int> > rowList_ExternGID_;
+  std::map<int,int> GtoL_Map_;
 
   // Number of global (across all processors) state-variables associated with
   // the linear system.
@@ -241,8 +239,8 @@ private:
   int numExternStateVars_;
   int numGlobalExternStateVars_;
   int baseStateVarGID_;
-  vector<int> rowList_StateGID_;
-  vector< pair<int,int> > rowList_ExternStateGID_;
+  std::vector<int> rowList_StateGID_;
+  std::vector< std::pair<int,int> > rowList_ExternStateGID_;
 
   // Number of global (across all processors) store-variables associated with
   // the linear system.
@@ -253,51 +251,56 @@ private:
   int numExternStoreVars_;
   int numGlobalExternStoreVars_;
   int baseStoreVarGID_;
-  vector<int> rowList_StoreGID_;
-  vector< pair<int,int> > rowList_ExternStoreGID_;
+  std::vector<int> rowList_StoreGID_;
+  std::vector< std::pair<int,int> > rowList_ExternStoreGID_;
 
   // Variable Type info used for scaling
-  vector<char> rowList_VarType_;
+  std::vector<char> rowList_VarType_;
 
   //Graph info for jacobian matrix
   int numGlobalNZs_;
   int numLocalNZs_;
-  vector<int> rowList_NumNZs_;
-  vector< list<int> > rowList_ColList_;
+  std::vector<int> rowList_NumNZs_;
+  std::vector< std::list<int> > rowList_ColList_;
 
-  // new DAE boolean.
   bool checkConnectivity_;
   bool supernode_;
+  bool namesFile_;
 
-  vector<int> vnodeGIDVector_;
-  vector<int> vsrcGIDVector_;
+  std::vector<int> vnodeGIDVector_;
+  std::vector<int> vsrcGIDVector_;
 
   //Adding these lists to detect the IDs of nodes for which there is
   //no DC path to ground or for which the node is only connected to one device
   //terminal.
 
-  vector<string> noDCPathIDVector_;
-  vector<string> connToOneTermIDVector_;
+  std::vector<std::string> noDCPathIDVector_;
+  std::vector<std::string> connToOneTermIDVector_;
 
 private:
 
   //testing routine for problems with voltage node connectivity
   bool testVoltageNodeConnectivity_();
-  void comm_boundaries (map<int, vector<int> > & gid_map,
-                      vector<int> & actual_buf_in, vector<int> & actual_buf_out,
-                      vector<int> & buf_len, vector<int> & buf_dest,
-                      vector<int *> & buf_in, vector<int *> & buf_out, int mode);
+  void comm_boundaries (std::map<int, std::vector<int> > & gid_map,
+                      std::vector<int> & actual_buf_in, std::vector<int> & actual_buf_out,
+                      std::vector<int> & buf_len, std::vector<int> & buf_dest,
+                      std::vector<int *> & buf_in, std::vector<int *> & buf_out, int mode);
 
-  void outputTopoWarnings(vector<int> &, map<int,string> &, string);
+  void outputTopoWarnings(std::vector<int> &, std::map<int,std::string> &, std::string);
 
   // Don't allow copy construction or assignment.
   // Copy constructor (private)
-  N_TOP_TopoLSUtil(const N_TOP_TopoLSUtil & right);
+  TopoLSUtil(const TopoLSUtil & right);
   // Assignment operator (private).
-  N_TOP_TopoLSUtil & operator = (const N_TOP_TopoLSUtil & right);
+  TopoLSUtil & operator = (const TopoLSUtil & right);
 
-  friend ostream & operator << (ostream & os, const N_TOP_TopoLSUtil & tlsu);
+    friend std::ostream & operator << (std::ostream & os, const TopoLSUtil & tlsu);
 
 };
+
+} // namespace Topo
+} // namespace Xyce
+
+typedef Xyce::Topo::TopoLSUtil N_TOP_TopoLSUtil;
 
 #endif

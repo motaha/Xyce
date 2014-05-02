@@ -23,6 +23,7 @@ libTopoManager_la_SOURCES= \
   $(srcdir)/src/N_TOP_Indexor.C \
   $(srcdir)/src/N_TOP_TopologyMgr.C \
   $(srcdir)/src/N_TOP_DevInsertionTool.C \
+  $(srcdir)/include/N_TOP_fwd.h \
   $(srcdir)/include/N_TOP_CktGraph.h \
   $(srcdir)/include/N_TOP_CktGraphCreator.h \
   $(srcdir)/include/N_TOP_CktGraphCreatorBasic.h \

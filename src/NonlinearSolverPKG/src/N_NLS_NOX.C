@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,15 +36,16 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.6.6.2 $
+// Revision Number: $Revision: 1.12 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:48 $
+// Revision Date  : $Date: 2014/02/24 23:49:25 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
 
 #include <Xyce_config.h>
 
+#include <N_UTL_fwd.h>
 
 // ---------- Standard Includes ----------
 
@@ -57,18 +58,18 @@
 
 // ----------   Code   ----------
 
-void N_NLS_NOX::error(const string msg)
+void N_NLS_NOX::error(const std::string &msg)
 {
   N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_FATAL, msg);
 }
 
-void N_NLS_NOX::warning(const string msg)
+void N_NLS_NOX::warning(const std::string &msg)
 {
   N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0, msg);
 }
 
-void N_NLS_NOX::info(const string msg)
+void N_NLS_NOX::info(const std::string &msg)
 {
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, msg);
+  Xyce::lout() << msg << std::endl;
 }
 

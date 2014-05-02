@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.26.2.2 $
+// Revision Number: $Revision: 1.39 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:45 $
+// Revision Date  : $Date: 2014/02/24 23:49:23 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -54,6 +54,7 @@
 
 // ----------   Xyce Includes   ----------
 
+#include <N_UTL_fwd.h>
 #include <N_UTL_Misc.h>
 
 #include <N_LAS_BelosSolver.h>
@@ -166,7 +167,7 @@ bool N_LAS_BelosSolver::setDefaultOptions()
 // Creator       : Heidi Thornquist, SNL, Electrical & Microsystem Modeling
 // Creation Date : 9/25/07
 //-----------------------------------------------------------------------------
-bool N_LAS_BelosSolver::setDefaultOption( const string & option )
+bool N_LAS_BelosSolver::setDefaultOption( const std::string & option )
 {
   return true;
 }
@@ -189,19 +190,19 @@ bool N_LAS_BelosSolver::setOptions(const N_UTL_OptionBlock& OB)
   belosParams_->set("Maximum Iterations",maxIter_);
   belosParams_->set("Num Blocks", KSpace_);
   belosParams_->set("Block Size", 1);
-  belosParams_->set("Convergence Tolerance", tolerance_); 
+  belosParams_->set("Convergence Tolerance", tolerance_);
   belosParams_->set("Orthogonalization", "ICGS");
 
   // Number of vectors in recycle space for GCRODR
-  belosParams_->set("Num Recycled Blocks", recycle_); 
+  belosParams_->set("Num Recycled Blocks", recycle_);
 
-  list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
-  list<N_UTL_Param>::const_iterator end_tpL = OB.getParams().end();
+  std::list<N_UTL_Param>::const_iterator it_tpL = OB.getParams().begin();
+  std::list<N_UTL_Param>::const_iterator end_tpL = OB.getParams().end();
   for (; it_tpL != end_tpL; ++it_tpL)
   {
     setParam( *it_tpL );
   }
-  
+
   // store for restart of solver_
   if( &OB != &*options_ )
   {
@@ -214,13 +215,13 @@ bool N_LAS_BelosSolver::setOptions(const N_UTL_OptionBlock& OB)
     options_->getParams().push_back( N_UTL_Param( "TR_singleton_filter", 1 ) );
   }
 
-  if (!lasProblem_.matrixFree()) 
+  if (!lasProblem_.matrixFree())
   {
     // create the transformation object if needed.
     if( Teuchos::is_null(transform_) ) transform_ = N_LAS_TransformTool()( OB );
   }
 
-  return STATUS_SUCCESS;
+  return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -233,19 +234,21 @@ bool N_LAS_BelosSolver::setOptions(const N_UTL_OptionBlock& OB)
 //-----------------------------------------------------------------------------
 bool N_LAS_BelosSolver::setParam( const N_UTL_Param & param )
 {
-  string tag = param.tag();
-  string uTag = param.uTag();
+  std::string tag = param.tag();
+  std::string uTag = param.uTag();
 
   // Set our copies of these parameters.
   if( tag == "AZ_max_iter" )
-    setMaxIter(param.iVal());
+    setMaxIter(param.getImmutableValue<int>());
+  if( tag == "AZ_kspace" )
+    setKSpace(param.getImmutableValue<int>());
   else if( tag == "AZ_tol" )
-    setTolerance(param.dVal());
+    setTolerance(param.getImmutableValue<double>());
   else if( uTag == "OUTPUT_LS" )
-    outputLS_ = param.iVal();
+    outputLS_ = param.getImmutableValue<int>();
   else if( uTag == "OUTPUT_BASE_LS" )
-    outputBaseLS_ = param.iVal();
-  else if( tag == "BELOS_SOLVER_TYPE" )    
+    outputBaseLS_ = param.getImmutableValue<int>();
+  else if( tag == "BELOS_SOLVER_TYPE" )
    belosSolver_ = param.usVal();
 
   return true;
@@ -267,9 +270,9 @@ bool N_LAS_BelosSolver::getInfo( N_UTL_Param & param )
     param.setVal( (int)numLinearIters_ );
   else if( param.tag() == "AZ_tol" )
     param.setVal( tolerance_ );
-  else 
+  else
     return false;
-  
+
   return true;
 }
 
@@ -310,27 +313,7 @@ bool N_LAS_BelosSolver::setBelosParam_(const char * paramName,
 // Creation Date : 09/25/07
 //-----------------------------------------------------------------------------
 void N_LAS_BelosSolver::printParams_() const
-{
-/*
-  string dashedline =  "------------------------------------------------"
-    "-----------------------------";
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\n");
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0,
-                         "\n***** Linear solver options:\n");
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\tPreconditioner:\t\t",
-                         preCond_);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\tTolerance:\t\t",
-                         tolerance_);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\tMax Iterations:\t\t",
-                         maxIter_);
-
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, dashedline);
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, "\n");
-*/
-}
+{}
 
 //-----------------------------------------------------------------------------
 // Function      : N_LAS_BelosSolver::solve
@@ -360,14 +343,14 @@ int N_LAS_BelosSolver::solve( bool ReuseFactors )
       tProblem_ = &((*transform_)( *problem_ ));
       tProblem_->SetPDL(unsure);
     }
-    swap( tProblem_, problem_ );
+    std::swap( tProblem_, problem_ );
     transform_->fwd();
   }
 
 
 #ifdef Xyce_DETAILED_LINSOLVE_TIMES
   time2 = timer_->wallTime();
-  cout << "Fwd Trans Time: " << time2-time1 << endl;
+  Xyce::dout() << "Fwd Trans Time: " << time2-time1 << std::endl;
 #endif
 
   if( Teuchos::is_null(solver_) ) {
@@ -381,18 +364,18 @@ int N_LAS_BelosSolver::solve( bool ReuseFactors )
     }
     Teuchos::RCP< Epetra_MultiVector> X = Teuchos::rcp( problem_->GetLHS(), false );
     Teuchos::RCP< Epetra_MultiVector> B = Teuchos::rcp( problem_->GetRHS(), false );
-    belosProblem_ = 
+    belosProblem_ =
       Teuchos::rcp( new Belos::LinearProblem<double,Epetra_MultiVector,Epetra_Operator>( A, X, B ) );
 
     // Create Belos solver (Block GMRES is default)
     if (belosSolver_ == "GCRODR") {
-      solver_ = Teuchos::rcp( new Belos::GCRODRSolMgr<double,Epetra_MultiVector,Epetra_Operator>() );  
+      solver_ = Teuchos::rcp( new Belos::GCRODRSolMgr<double,Epetra_MultiVector,Epetra_Operator>() );
     }
     else {
       solver_ = Teuchos::rcp( new Belos::BlockGmresSolMgr<double,Epetra_MultiVector,Epetra_Operator>() );
     }
- 
-    // Reduce the size of the Krylov space if the linear system is smaller than the default size 
+
+    // Reduce the size of the Krylov space if the linear system is smaller than the default size
     // to avoid warning messages.
     int lsDim = X->GlobalLength();
     if (lsDim < KSpace_) {
@@ -400,7 +383,7 @@ int N_LAS_BelosSolver::solve( bool ReuseFactors )
       belosParams_->set("Num Blocks", KSpace_);
     }
   }
-      
+
   // Output the linear system to a Matrix Market file every outputLS_ calls if outputLS_ > 0
   static int file_number = 1, base_file_number = 1;
   if (outputLS_ && !lasProblem_.matrixFree()) {
@@ -445,25 +428,24 @@ int N_LAS_BelosSolver::solve( bool ReuseFactors )
 #endif
 
   Teuchos::RCP<N_LAS_Problem> tmpProblem = Teuchos::rcp( new N_LAS_Problem( Teuchos::rcp(problem_,false) ) );
-  
+
   // Create the preconditioner if we don't have one.
   if ( Teuchos::is_null( precond_ ) ) {
     N_LAS_TrilinosPrecondFactory factory( *options_ );
     precond_ = factory.create( tmpProblem );
     isPrecSet_ = false;
   }
-  
+
   // Initialize the values compute the preconditioner.
   bool initRet = precond_->initValues( tmpProblem );
-  if (!initRet) 
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_ERROR_0,
-			   "N_LAS_Preconditioner::initValues() preconditioner could not be initialized!\n");
-  
+  if (!initRet)
+    Xyce::Report::DevelFatal0().in("N_LAS_Preconditioner::initValues()") << "preconditioner could not be initialized!";
+
   // Compute the preconditioner
   bool compRet = precond_->compute();
   if (!compRet)
-    N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::DEV_ERROR_0,
-			   "N_LAS_Preconditioner::compute() preconditioner could not be computed!\n");
+    Xyce::Report::DevelFatal0().in("N_LAS_Preconditioner::compute()") << "preconditioner could not be computed!";
+
   // Set the preconditioner as an operator if it was just constructed, else inform the Belos
   // solver to use no preconditioning.
   if ( !isPrecSet_ ) {
@@ -479,27 +461,26 @@ int N_LAS_BelosSolver::solve( bool ReuseFactors )
     solver_->setParameters( belosParams_ );
     isPrecSet_ = true;
   }
-  
+
 #ifdef Xyce_DETAILED_LINSOLVE_TIMES
   time2 = timer_->wallTime();
-  cout << "Ifpack Time: " << time2-time1 << endl;
+  Xyce::dout() << "Ifpack Time: " << time2-time1 << std::endl;
 #elif defined(Xyce_VERBOSE_LINEAR)
   time2 = timer_->wallTime();
 #endif
- 
- 
+
+
   // Reset the problem for the next solve.
   belosProblem_->setProblem();
 
   // Solve the problem.
-  Belos::ReturnType linearStatus; 
+  Belos::ReturnType linearStatus;
   linearStatus = solver_->solve();
   numLinearIters_ = solver_->getNumIters();
 
 #if defined(Xyce_DETAILED_LINSOLVE_TIMES) || defined(Xyce_VERBOSE_LINEAR)
   time1 = timer_->wallTime();
-  std::string belos_time = "Belos Solve Time: " + Teuchos::Utils::toString( time1-time2 );
-  N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_INFO_0, belos_time);
+  Xyce::lout() << "Belos Solve Time: " << (time1 - time2) << std::endl;
 #endif
 
 /*
@@ -512,14 +493,14 @@ int N_LAS_BelosSolver::solve( bool ReuseFactors )
   resid.Norm2( &actual_resids[0] );
   b->Norm2( &rhs_norm[0] );
   for (int i=0; i<numrhs; i++ ) {
-    std::cout << "Problem " << i << " : \t" << actual_resids[i]/rhs_norm[i] << std::endl;
+    Xyce::dout() << "Problem " << i << " : \t" << actual_resids[i]/rhs_norm[i] << std::endl;
   }
 */
 
   if( !Teuchos::is_null(transform_) )
   {
     transform_->rvs();
-    swap( tProblem_, problem_ );
+    std::swap( tProblem_, problem_ );
   }
 
 /*
@@ -530,13 +511,13 @@ int N_LAS_BelosSolver::solve( bool ReuseFactors )
   resid2.Norm2( &actual_resids[0] );
   b2->Norm2( &rhs_norm[0] );
   for (int i=0; i<numrhs; i++ ) {
-    std::cout << "Problem " << i << " : \t" << actual_resids[i]/rhs_norm[i] << std::endl;
+    Xyce::dout() << "Problem " << i << " : \t" << actual_resids[i]/rhs_norm[i] << std::endl;
   }
 */
 
 #ifdef Xyce_DETAILED_LINSOLVE_TIMES
   time2 = timer_->wallTime();
-  cout << "Rvs Trans Time: " << time2-time1 << endl;
+  Xyce::dout() << "Rvs Trans Time: " << time2-time1 << std::endl;
 #endif
 
   // Output computed solution vectors, if requested.
@@ -560,7 +541,7 @@ int N_LAS_BelosSolver::solve( bool ReuseFactors )
   // Update the total solution time
   solutionTime_ = timer_->elapsedTime();
 #ifdef Xyce_DETAILED_LINSOLVE_TIMES
-  cout << "Solve Time: " << solutionTime_ << endl;
+  Xyce::dout() << "Solve Time: " << solutionTime_ << std::endl;
 #endif
 
   // Belos does not return the residual, so use a fake residual that indicates convergence
@@ -568,11 +549,11 @@ int N_LAS_BelosSolver::solve( bool ReuseFactors )
   if (linearStatus == Belos::Unconverged)
   {
 #ifdef Xyce_VERBOSE_LINEAR
-    if (solver_->isLOADetected()) 
+    if (solver_->isLOADetected())
     {
       N_ERH_ErrorMgr::report(N_ERH_ErrorMgr::USR_WARNING_0,
 			   "Belos::BlockGmresSolMgr has detected a loss of accuracy!\n");
-    } 
+    }
 #endif
   }
 

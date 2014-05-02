@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.4.2.2 $
+// Revision Number: $Revision: 1.12 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/02/24 23:49:15 $
 //
 // Current Owner  : $Author: tvrusso $
 //-------------------------------------------------------------------------
@@ -82,13 +82,13 @@ template<>
 ParametricData<RegionData>::ParametricData()
 {
   // Set up map for double precision variables:
-  addPar("AREA", 1.0e+15, false, &RegionData::area);
-  addPar("XLOC", 0.0, false, &RegionData::xloc);
+  addPar("AREA", 1.0e+15, &RegionData::area);
+  addPar("XLOC", 0.0, &RegionData::xloc);
 
   // Set up map for non-double precision variables:
-  addPar("NAME", std::string("none"), false, &RegionData::name);
-  addPar("TYPE", std::string("none"), false, &RegionData::type);
-  addPar("FILE", std::string(""), false, &RegionData::reactionFile);
+  addPar("NAME", std::string("none"), &RegionData::name);
+  addPar("TYPE", std::string("none"), &RegionData::type);
+  addPar("FILE", std::string(""), &RegionData::reactionFile);
 }
 
 ParametricData<RegionData> &RegionData::getParametricData() {
@@ -109,7 +109,7 @@ ParametricData<RegionData> &RegionData::getParametricData() {
 // Creation Date : 8/24/06
 //-----------------------------------------------------------------------------
 RegionData::RegionData ():
-  CompositeParam (),
+  CompositeParam (getParametricData()),
   name("RXNREGION"),
   outName("RXNREGION"),
   type("JUNCTION"),
@@ -117,8 +117,7 @@ RegionData::RegionData ():
   area(1.0e-4),
   xloc(1.83e-4),
   doNothing(false)
-{
-}
+{}
 
 //-----------------------------------------------------------------------------
 // Function      : RegionData::processParams
@@ -128,10 +127,10 @@ RegionData::RegionData ():
 // Creator       : Eric Keiter, SNL
 // Creation Date : 8/24/06
 //-----------------------------------------------------------------------------
-void RegionData::processParams ()
+void RegionData::processParams()
 {
-  ParameterMap::const_iterator p_i = (*getPMap()).find(string("TYPE"));
-  const Pars &p = static_cast<const Pars &>(*(*p_i).second);
+  ParameterMap::const_iterator p_i = getParameterMap().find("TYPE");
+  const Descriptor &p = *(*p_i).second;
   ExtendedString tmp = p.value<std::string>(*this);
   p.value<std::string>(*this) = tmp.toLower();
 }
@@ -145,13 +144,13 @@ void RegionData::processParams ()
 // Creator       : Eric R. Keiter, SNL, Parallel Computational Sciences
 // Creation Date : 5/23/05
 //-----------------------------------------------------------------------------
-ostream & operator<<(ostream & os, const RegionData & rd)
+std::ostream & operator<<(std::ostream & os, const RegionData & rd)
 {
   os << " Region Data: name = " << rd.name <<
     " x=" << rd.xloc <<
     " reaction file = " << rd.reactionFile <<
     " type = " << rd.type <<
-    endl;
+    std::endl;
 
   return os;
 }

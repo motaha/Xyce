@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.42.2.3 $
+// Revision Number: $Revision: 1.47 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:38 $
+// Revision Date  : $Date: 2014/02/24 23:49:15 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -48,6 +48,7 @@
 #include <iostream>
 
 #include <N_UTL_Expression.h>
+#include <N_ERH_fwd.h>
 #include <N_DEV_SolverState.h>
 
 namespace Xyce {
@@ -151,110 +152,110 @@ void SolverState::InitializeHomotopyBlockSize(int numBlocks)
 // Creator       : Eric R. Keiter, SNL, Electrical and Microsystems Modeling
 // Creation Date : 10/05/2005
 //-----------------------------------------------------------------------------
-ostream& operator<<(ostream & os, const SolverState & ss)
+std::ostream& operator<<(std::ostream & os, const SolverState & ss)
 {
 
-  os << "-----------------------------------------------------" << endl;
-  os << "  Device Package Solver State:" << endl;
+  os << section_divider << std::endl;
+  os << "  Device Package Solver State:" << std::endl;
 
-  os << "  pdt = " << ss.pdt << endl;
-  os << "  currTimeStep = " << ss.currTimeStep << endl;
-  os << "  lastTimeStep = " << ss.lastTimeStep << endl;
-  os << "  currTime = " << ss.currTime << endl;
-  os << "  finalTime = " << ss.finalTime << endl;
-  os << "  startingTimeStep = " << ss.startingTimeStep << endl;
-  os << "  bpTol = " << ss.bpTol << endl;
+  os << "  pdt = " << ss.pdt << std::endl;
+  os << "  currTimeStep = " << ss.currTimeStep << std::endl;
+  os << "  lastTimeStep = " << ss.lastTimeStep << std::endl;
+  os << "  currTime = " << ss.currTime << std::endl;
+  os << "  finalTime = " << ss.finalTime << std::endl;
+  os << "  startingTimeStep = " << ss.startingTimeStep << std::endl;
+  os << "  bpTol = " << ss.bpTol << std::endl;
 
-  os << "  acceptedTime = " << ss.acceptedTime << endl;
-  os << "  currentOrder = " << ss.currentOrder << endl;
-  os << "  usedOrder =  " << ss.usedOrder << endl;
+  os << "  acceptedTime = " << ss.acceptedTime << std::endl;
+  os << "  currentOrder = " << ss.currentOrder << std::endl;
+  os << "  usedOrder =  " << ss.usedOrder << std::endl;
 
   os << "  mpdeOnFlag = ";
   if (ss.mpdeOnFlag)
   {
-    os << "yes" << endl;
-    os << "  currFastTime = " << ss.currFastTime << endl;
-    os << "  finalFastTime = " << ss.finalFastTime << endl;
-    os << "  blockAnalysisFlag  = " << ss.blockAnalysisFlag << endl;
+    os << "yes" << std::endl;
+    os << "  currFastTime = " << ss.currFastTime << std::endl;
+    os << "  finalFastTime = " << ss.finalFastTime << std::endl;
+    os << "  blockAnalysisFlag  = " << ss.blockAnalysisFlag << std::endl;
   }
   else
   {
-    os << "no" << endl;
+    os << "no" << std::endl;
   }
 
-  os << "  timeStepNumber = " << ss.timeStepNumber << endl;
-  os << "  ltraTimeIndex = " << ss.ltraTimeIndex << endl;
-  os << "  ltraTimeStepHistorySize = " << ss.ltraTimeHistorySize << endl;
-  os << "  ltraDoCompact = " << ss.ltraDoCompact << endl;
-  os << "  newtonIter = " << ss.newtonIter << endl;
-  os << "  stepLoopIter = "  << ss.stepLoopIter << endl;
-  os << "  continuationStepNumber = " << ss.continuationStepNumber << endl;
+  os << "  timeStepNumber = " << ss.timeStepNumber << std::endl;
+  os << "  ltraTimeIndex = " << ss.ltraTimeIndex << std::endl;
+  os << "  ltraTimeStepHistorySize = " << ss.ltraTimeHistorySize << std::endl;
+  os << "  ltraDoCompact = " << ss.ltraDoCompact << std::endl;
+  os << "  newtonIter = " << ss.newtonIter << std::endl;
+  os << "  stepLoopIter = "  << ss.stepLoopIter << std::endl;
+  os << "  continuationStepNumber = " << ss.continuationStepNumber << std::endl;
   os << "  firstContinuationParam = ";
-  if (ss.firstContinuationParam) os << "yes" << endl;
-  else                           os << "no" << endl;
+  if (ss.firstContinuationParam) os << "yes" << std::endl;
+  else                           os << "no" << std::endl;
 
   os << "  firstSolveComplete = ";
-  if (ss.firstSolveComplete) os << "yes" << endl;
-  else                       os << "no" << endl;
+  if (ss.firstSolveComplete) os << "yes" << std::endl;
+  else                       os << "no" << std::endl;
 
   os << "  initTranFlag = ";
-  if (ss.initTranFlag) os << "yes" << endl;
-  else                 os << "no" << endl;
+  if (ss.initTranFlag) os << "yes" << std::endl;
+  else                 os << "no" << std::endl;
 
   os << "  beginIntegrationFlag = ";
-  if (ss.beginIntegrationFlag) os << "yes" << endl;
-  else                         os << "no" << endl;
+  if (ss.beginIntegrationFlag) os << "yes" << std::endl;
+  else                         os << "no" << std::endl;
 
   os << "  dcopFlag = ";
-  if (ss.dcopFlag) os << "yes" << endl;
-  else             os << "no" << endl;
+  if (ss.dcopFlag) os << "yes" << std::endl;
+  else             os << "no" << std::endl;
 
   os << "  inputOPFlag = ";
-  if (ss.inputOPFlag) os << "yes" << endl;
-  else             os << "no" << endl;
+  if (ss.inputOPFlag) os << "yes" << std::endl;
+  else             os << "no" << std::endl;
 
   os << "  transientFlag = ";
-  if (ss.transientFlag) os << "yes" << endl;
-  else                  os << "no" << endl;
+  if (ss.transientFlag) os << "yes" << std::endl;
+  else                  os << "no" << std::endl;
 
   os << "  dcsweepFlag = ";
-  if (ss.dcsweepFlag) os << "yes" << endl;
-  else                os << "no" << endl;
+  if (ss.dcsweepFlag) os << "yes" << std::endl;
+  else                os << "no" << std::endl;
 
   os << "  tranopFlag = ";
-  if (ss.tranopFlag) os << "yes" << endl;
-  else               os << "no" << endl;
+  if (ss.tranopFlag) os << "yes" << std::endl;
+  else               os << "no" << std::endl;
 
   os << "  acopFlag = ";
-  if (ss.acopFlag) os << "yes" << endl;
-  else             os << "no" << endl;
+  if (ss.acopFlag) os << "yes" << std::endl;
+  else             os << "no" << std::endl;
 
   os << "  PDESystemFlag = ";
-  if (ss.PDESystemFlag) os << "yes" << endl;
-  else                  os << "no" << endl;
+  if (ss.PDESystemFlag) os << "yes" << std::endl;
+  else                  os << "no" << std::endl;
 
   os << "  locaEnabledFlag = ";
-  if (ss.locaEnabledFlag) os << "yes" << endl;
-  else                    os << "no" << endl;
+  if (ss.locaEnabledFlag) os << "yes" << std::endl;
+  else                    os << "no" << std::endl;
 
   os << "  initJctFlag = ";
-  if (ss.initJctFlag) os << "yes" << endl;
-  else                os << "no" << endl;
+  if (ss.initJctFlag) os << "yes" << std::endl;
+  else                os << "no" << std::endl;
 
   os << "  initFixFlag = ";
-  if (ss.initFixFlag) os << "yes" << endl;
-  else                os << "no" << endl;
+  if (ss.initFixFlag) os << "yes" << std::endl;
+  else                os << "no" << std::endl;
 
   os << "  sweepSourceResetFlag = ";
-  if (ss.sweepSourceResetFlag) os << "yes" << endl;
-  else                         os << "no" << endl;
+  if (ss.sweepSourceResetFlag) os << "yes" << std::endl;
+  else                         os << "no" << std::endl;
 
   os << "  debugTimeFlag = ";
-  if (ss.debugTimeFlag) os << "yes" << endl;
-  else                  os << "no" << endl;
+  if (ss.debugTimeFlag) os << "yes" << std::endl;
+  else                  os << "no" << std::endl;
 
-  os << "-----------------------------------------------------" << endl;
-  os << endl;
+  os << section_divider << std::endl;
+  os << std::endl;
 
   return os;
 }

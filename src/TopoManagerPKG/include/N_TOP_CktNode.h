@@ -6,7 +6,7 @@
 //   Government retains certain rights in this software.
 //
 //    Xyce(TM) Parallel Electrical Simulator
-//    Copyright (C) 2002-2013  Sandia Corporation
+//    Copyright (C) 2002-2014 Sandia Corporation
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -36,9 +36,9 @@
 // Revision Information:
 // ---------------------
 //
-// Revision Number: $Revision: 1.44.2.2 $
+// Revision Number: $Revision: 1.49 $
 //
-// Revision Date  : $Date: 2013/10/03 17:23:51 $
+// Revision Date  : $Date: 2014/02/24 23:49:27 $
 //
 // Current Owner  : $Author: tvrusso $
 //-----------------------------------------------------------------------------
@@ -46,45 +46,41 @@
 #ifndef N_TOP_CktNode_h
 #define N_TOP_CktNode_h 1
 
-// ---------- Standard Includes ----------
 #include <iosfwd>
 #include <string>
 #include <list>
 #include <vector>
 #include <map>
 
-// ----------   Xyce Includes   ----------
+#include <N_TOP_fwd.h>
+
 #include <N_UTL_Xyce.h>
 #include <N_UTL_Misc.h>
 #include <N_TOP_Misc.h>
 
-// ---------- Forward Declarations ----------
-
-class N_TOP_Topology;
-class N_TOP_NodeBlock;
-
-class N_TOP_GraphNode;
+namespace Xyce {
+namespace Topo {
 
 //-----------------------------------------------------------------------------
-// Class         : N_TOP_CktNode
+// Class         : CktNode
 // Purpose       :
 // Special Notes :
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/16/00
 //-----------------------------------------------------------------------------
-class N_TOP_CktNode
+class CktNode
 {
 
 public:
 
   // Constructor
-  N_TOP_CktNode(const string & nodeID = string(""),
+  CktNode(const std::string & nodeID = std::string(""),
                 const int & globalID = 0,
-                const list < int > & varGIDList = list < int > (),
-                const list < int > & statevarGIDList = list < int > (),
-                const list < int > & storevarGIDList = list < int > (),
+                const std::list< int > & varGIDList = std::list< int > (),
+                const std::list< int > & statevarGIDList = std::list< int > (),
+                const std::list< int > & storevarGIDList = std::list< int > (),
                 const int & pNum = 0, const bool & owned = true,
-                N_TOP_GraphNode * gN = 0 )
+                GraphNode * gN = 0 )
   : id_(nodeID),
     gID_(globalID),
     procNum_(pNum),
@@ -97,23 +93,23 @@ public:
   {}
 
   // Constructor
-  N_TOP_CktNode( const N_TOP_NodeBlock & nb,
-                 N_TOP_GraphNode * gN = 0 );
+  CktNode( const NodeBlock & nb,
+                 GraphNode * gN = 0 );
 
   // Auto generated copy construct.
 
   // Destructor
-  virtual ~N_TOP_CktNode() { }
+  virtual ~CktNode() { }
 
-  bool operator == (const N_TOP_CktNode & right) const { return id_ == right.id_; }
-  bool operator != (const N_TOP_CktNode & right) const { return id_ != right.id_; }
+  bool operator == (const CktNode & right) const { return id_ == right.id_; }
+  bool operator != (const CktNode & right) const { return id_ != right.id_; }
 
   //-------- get and set methods for attributes
 
   // Get circuit node id.
-  const string & get_id() const { return id_; }
+  const std::string & get_id() const { return id_; }
   // Set circuit node id.
-  void set_id(const string & value) { id_ = value; }
+  void set_id(const std::string & value) { id_ = value; }
 
   // Get circuit node global id.
   const int & get_gID() const { return gID_; }
@@ -122,7 +118,7 @@ public:
 
   virtual int type() const = 0;
 
-  //The following get/set functions are only used in N_TOP_CktNode_V class
+  //The following get/set functions are only used in CktNode_V class
   //to access and change the noDCPath_ and connToOneTermVar_ internal variables
   //These boolean variables are not defined in the other derived classes, so
   //we create dummy functions there that do nothing.
@@ -137,45 +133,45 @@ public:
 
 
 
-  const list<int> & get_SolnVarGIDList() const
+  const std::list<int> & get_SolnVarGIDList() const
   { return solnVarGIDList_; }
-  void set_SolnVarGIDList(const list<int> & svGIDList)
+  void set_SolnVarGIDList(const std::list<int> & svGIDList)
   { solnVarGIDList_ = svGIDList; }
-  void set_SolnVarGIDVec(const vector<int> & svGIDVec)
+  void set_SolnVarGIDVec(const std::vector<int> & svGIDVec)
   { solnVarGIDList_.assign( svGIDVec.begin(), svGIDVec.end() ); }
 
-  const list<int> & get_ExtSolnVarGIDList() const
+  const std::list<int> & get_ExtSolnVarGIDList() const
   { return extSolnVarGIDList_; }
-  void set_ExtSolnVarGIDList(const list<int> & svGIDList)
+  void set_ExtSolnVarGIDList(const std::list<int> & svGIDList)
   { extSolnVarGIDList_ = svGIDList; }
-  void set_ExtSolnVarGIDVec(const vector<int> & svGIDVec)
+  void set_ExtSolnVarGIDVec(const std::vector<int> & svGIDVec)
   { extSolnVarGIDList_.assign( svGIDVec.begin(), svGIDVec.end() ); }
 
-  const list < int > & get_StateVarGIDList() const
+  const std::list< int > & get_StateVarGIDList() const
   { return stateVarGIDList_; }
-  void set_StateVarGIDList(const list < int > & svGIDList)
+  void set_StateVarGIDList(const std::list< int > & svGIDList)
   { stateVarGIDList_ = svGIDList; }
-  void set_StateVarGIDVec(const vector < int > & svGIDVec)
+  void set_StateVarGIDVec(const std::vector< int > & svGIDVec)
   { stateVarGIDList_.assign( svGIDVec.begin(), svGIDVec.end() ); }
 
-  const list < int > & get_StoreVarGIDList() const
+  const std::list< int > & get_StoreVarGIDList() const
   { return storeVarGIDList_; }
-  void set_StoreVarGIDList(const list < int > & svGIDList)
+  void set_StoreVarGIDList(const std::list< int > & svGIDList)
   { storeVarGIDList_ = svGIDList; }
-  void set_StoreVarGIDVec(const vector < int > & svGIDVec)
+  void set_StoreVarGIDVec(const std::vector< int > & svGIDVec)
   { storeVarGIDList_.assign( svGIDVec.begin(), svGIDVec.end() ); }
 
-  const vector< vector<int> > & get_DepSolnGIDVec() const
+  const std::vector< std::vector<int> > & get_DepSolnGIDVec() const
   { return depSolnGIDVec_; }
-  void set_DepSolnGIDVec(const vector< vector<int> > & dsGIDs)
+  void set_DepSolnGIDVec(const std::vector< std::vector<int> > & dsGIDs)
   { depSolnGIDVec_ = dsGIDs; }
-  const vector< vector<int> > & get_DepStateGIDVec() const
+  const std::vector< std::vector<int> > & get_DepStateGIDVec() const
   { return depStateGIDVec_; }
-  void set_DepStateGIDVec(const vector< vector<int> > & dsGIDs)
+  void set_DepStateGIDVec(const std::vector< std::vector<int> > & dsGIDs)
   { depStateGIDVec_ = dsGIDs; }
-  const vector< vector<int> > & get_DepStoreGIDVec() const
+  const std::vector< std::vector<int> > & get_DepStoreGIDVec() const
   { return depStoreGIDVec_; }
-  void set_DepStoreGIDVec(const vector< vector<int> > & dsGIDs)
+  void set_DepStoreGIDVec(const std::vector< std::vector<int> > & dsGIDs)
   { depStoreGIDVec_ = dsGIDs; }
 
   // Get the processor number.
@@ -191,31 +187,31 @@ public:
   const int & get_Offset() const { return Offset_; }
   void set_Offset(const int & Offset) { Offset_ = Offset; }
 
-  N_TOP_GraphNode * get_GraphNode() { return graphNodePtr_; }
-  void set_GraphNode(N_TOP_GraphNode * gN) { graphNodePtr_ = gN; }
+  GraphNode * get_GraphNode() { return graphNodePtr_; }
+  void set_GraphNode(GraphNode * gN) { graphNodePtr_ = gN; }
 
-  N_TOP_NodeBlock * extractNodeBlock();
+  NodeBlock * extractNodeBlock();
 
-  virtual const vector< vector<int> > & jacobianStamp() const
-  { static vector< vector<int> > dummy; return dummy; }
-  virtual void registerJacLIDswithDev( const vector< vector<int> > & jacLIDVec ) {}
+  virtual const std::vector< std::vector<int> > & jacobianStamp() const
+  { static std::vector< std::vector<int> > dummy; return dummy; }
+  virtual void registerJacLIDswithDev( const std::vector< std::vector<int> > & jacLIDVec ) {}
 
   virtual void registerGIDDataWithDev(
-               const vector<int> & counts,
-               const vector<int> & GIDs,
-               const vector< vector<int> > & jacGIDs ) {}
+               const std::vector<int> & counts,
+               const std::vector<int> & GIDs,
+               const std::vector< std::vector<int> > & jacGIDs ) {}
 
   //------- Added for use with the outputFileName function
-  virtual map<int,string> & getIntNameMap() { return intNameMap_; }
-  virtual map<int,string> & getStateNameMap() { return stateNameMap_; }
-  virtual map<int,string> & getStoreNameMap() { return storeNameMap_; }
+  virtual std::map<int,std::string> & getIntNameMap() { return intNameMap_; }
+  virtual std::map<int,std::string> & getStateNameMap() { return stateNameMap_; }
+  virtual std::map<int,std::string> & getStoreNameMap() { return storeNameMap_; }
 
-  virtual void varTypeList( vector<char> & varTypeVec ) {}
+  virtual void varTypeList( std::vector<char> & varTypeVec ) {}
 
 protected:
 
   // Node id.
-  string id_;
+  std::string id_;
   // Global node id.
   int gID_;
 
@@ -226,24 +222,24 @@ protected:
 
   int Offset_;
 
-  N_TOP_GraphNode * graphNodePtr_;
+  GraphNode * graphNodePtr_;
 
   // Solution variable global id list.
-  list<int> solnVarGIDList_;
-  list<int> extSolnVarGIDList_;
+  std::list<int> solnVarGIDList_;
+  std::list<int> extSolnVarGIDList_;
   // State variable global id list.
-  list<int> stateVarGIDList_;
-  list<int> storeVarGIDList_;
+  std::list<int> stateVarGIDList_;
+  std::list<int> storeVarGIDList_;
 
-  vector< vector<int> > depSolnGIDVec_;
-  vector< vector<int> > depStateGIDVec_;
-  vector< vector<int> > depStoreGIDVec_;
+  std::vector< std::vector<int> > depSolnGIDVec_;
+  std::vector< std::vector<int> > depStateGIDVec_;
+  std::vector< std::vector<int> > depStoreGIDVec_;
 
-  vector<int> depSolnGIDJacVec_;
+  std::vector<int> depSolnGIDJacVec_;
 
-  map<int,string> intNameMap_;
-  map<int,string> stateNameMap_;
-  map<int,string> storeNameMap_;
+  std::map<int,std::string> intNameMap_;
+  std::map<int,std::string> stateNameMap_;
+  std::map<int,std::string> storeNameMap_;
 
 public:
 
@@ -258,77 +254,82 @@ public:
   virtual int storeVarCount() { return storeVarGIDList_.size(); }
   virtual int depStoreVarCount() { return depStoreGIDVec_.size(); }
 
-  virtual void leadConnect(vector<int> &) {return;}
+  virtual void leadConnect(std::vector<int> &) {return;}
 
-  virtual void registerGIDswithDev( const list<index_pair> & intGIDList,
-  	                            const list<index_pair> & extGIDList) {}
+  virtual void registerGIDswithDev( const std::list<index_pair> & intGIDList,
+  	                            const std::list<index_pair> & extGIDList) {}
 
-  virtual void registerStateGIDswithDev( const list<index_pair> & stateGIDList) {}
-  virtual void registerStoreGIDswithDev( const list<index_pair> & storeGIDList) {}
+  virtual void registerStateGIDswithDev( const std::list<index_pair> & stateGIDList) {}
+  virtual void registerStoreGIDswithDev( const std::list<index_pair> & storeGIDList) {}
 
-  virtual void registerLIDswithDev( const vector<int> & intLIDVec,
-                                    const vector<int> & extLIDVec ) {}
-  virtual void registerStateLIDswithDev( const vector<int> & stateLIDVec ) {}
-  virtual void registerStoreLIDswithDev( const vector<int> & storeLIDVec ) {}
+  virtual void registerLIDswithDev( const std::vector<int> & intLIDVec,
+                                    const std::vector<int> & extLIDVec ) {}
+  virtual void registerStateLIDswithDev( const std::vector<int> & stateLIDVec ) {}
+  virtual void registerStoreLIDswithDev( const std::vector<int> & storeLIDVec ) {}
 
-  virtual void registerDepLIDswithDev( const vector< vector<int> > & depLIDVec ) {}
-  virtual void registerDepStateLIDswithDev( const vector< vector<int> > & depStateLIDVec ) {}
-  virtual void registerDepStoreLIDswithDev( const vector< vector<int> > & depStoreLIDVec ) {}
+  virtual void registerDepLIDswithDev( const std::vector< std::vector<int> > & depLIDVec ) {}
+  virtual void registerDepStateLIDswithDev( const std::vector< std::vector<int> > & depStateLIDVec ) {}
+  virtual void registerDepStoreLIDswithDev( const std::vector< std::vector<int> > & depStoreLIDVec ) {}
 
-  virtual void getDepSolnVars( vector< NodeID >& dsVars );
-  virtual void registerDepSolnGIDs( const vector< vector<int> > & dsGIDs) {}
-  virtual void getDepStateVars( vector< NodeID >& dsVars );
-  virtual void registerDepStateGIDs(const vector < vector < int > > & dsGIDs) {}
-  virtual void getDepStoreVars( vector< NodeID >& dsVars );
-  virtual void registerDepStoreGIDs(const vector < vector < int > > & dsGIDs) {}
+  virtual void getDepSolnVars( std::vector< NodeID >& dsVars );
+  virtual void registerDepSolnGIDs( const std::vector< std::vector<int> > & dsGIDs) {}
+  virtual void getDepStateVars( std::vector< NodeID >& dsVars );
+  virtual void registerDepStateGIDs(const std::vector< std::vector< int > > & dsGIDs) {}
+  virtual void getDepStoreVars( std::vector< NodeID >& dsVars );
+  virtual void registerDepStoreGIDs(const std::vector< std::vector< int > > & dsGIDs) {}
 
-  virtual void getRowColPairs(list<index_pair> & rcList) {}
+  virtual void getRowColPairs(std::list<index_pair> & rcList) {}
 
-  const vector<int> & get_DepSolnGIDJacVec() { return depSolnGIDJacVec_; }
+  const std::vector<int> & get_DepSolnGIDJacVec() { return depSolnGIDJacVec_; }
 
-  virtual ostream & put(ostream & os) const = 0;
+  virtual std::ostream & put(std::ostream & os) const = 0;
 
-  friend ostream & operator << (ostream & os, const N_TOP_CktNode & cn);
+  friend std::ostream & operator << (std::ostream & os, const CktNode & cn);
 
 };
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNode::getDepSolnVars
+// Function      : CktNode::getDepSolnVars
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/01/01
 //-----------------------------------------------------------------------------
-inline void N_TOP_CktNode::getDepSolnVars( vector< NodeID >& dsVars )
+inline void CktNode::getDepSolnVars( std::vector< NodeID >& dsVars )
 {
   dsVars.clear();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNode::getDepStateVars
+// Function      : CktNode::getDepStateVars
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Rob Hoekstra, SNL, Parallel Computational Sciences
 // Creation Date : 5/01/01
 //-----------------------------------------------------------------------------
-inline void N_TOP_CktNode::getDepStateVars( vector< NodeID >& dsVars )
+inline void CktNode::getDepStateVars( std::vector< NodeID >& dsVars )
 {
   dsVars.clear();
 }
 
 //-----------------------------------------------------------------------------
-// Function      : N_TOP_CktNode::getDepStoreVars
+// Function      : CktNode::getDepStoreVars
 // Purpose       :
 // Special Notes :
 // Scope         : public
 // Creator       : Eric Keiter
 // Creation Date :
 //-----------------------------------------------------------------------------
-inline void N_TOP_CktNode::getDepStoreVars( vector< NodeID >& dsVars )
+inline void CktNode::getDepStoreVars( std::vector< NodeID >& dsVars )
 {
   dsVars.clear();
 }
+
+} // namespace Topo
+} // namespace Xyce
+
+typedef Xyce::Topo::CktNode N_TOP_CktNode;
 
 #endif
